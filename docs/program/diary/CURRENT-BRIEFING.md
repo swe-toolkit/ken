@@ -33,7 +33,47 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-08 ~18:4xZ · TWO LANES ACTIVE; PX8 IS RED AND BEING FIXED
+## LIVE — 2026-08-08 ~20:0xZ · THREE LANES OPEN; PX8-ERRID-ALLOC MERGED
+
+> ### STANDING SEQUENCING POLICY — DECIDE IT, DO NOT ASK IT
+>
+> **Operator, 2026-08-08, after a lane question of mine blocked the session for
+> several hours while they were away:** *"Let's make sure sequencing is
+> determined well in advance so you don't have to ask me questions like that."*
+>
+> **Sequencing and lane posture are the Steward's to decide.** A blocking
+> question halts every seat, and the cost is not the question — it is that the
+> whole fleet idles behind it with no way to proceed.
+>
+> 1. **Never block on a sequencing question.** Pick the default, act, and flag
+>    it in the next report as a decision the operator may reverse. Reversal is
+>    cheap; a stalled fleet is not.
+> 2. **Keep every team fed with dependency-clear, genuinely framed work.** A
+>    team idle next to a startable node is a Steward defect.
+> 3. **Concurrency is justified by CRATE DISJOINTNESS, measured — never by a
+>    general allowance and never by a frame's declared paths.** Re-derive it at
+>    every handback; today's claim died on the *other* lane's repair.
+> 4. **Escalate only:** a scope fork the roadmap does not settle, anything that
+>    grows the TCB, or a gate-readiness call. Not lane count, not ordering.
+> 5. **Verify a node's OWNER and its FRAME before kicking.** Both bit today —
+>    `PX8-ERRID-SCOPE` is Verify's, not Foundation's, and several frames sit
+>    under non-id filenames.
+
+### The forward queue, settled in advance
+
+| team | now | next | then |
+|---|---|---|---|
+| **Verify** | `PX8-ERRID-SCOPE` (L, kicked `evt_36a5exak1stgz`) | `CI-IGNORED-SWEEP` (S, dep-free, framed) | — |
+| **Kernel** | `KERNEL-NESTED-IND` (L, kicked `evt_6cm2d60a1140z`) | unblocks Foundation's `DS-9` | — |
+| **Runtime** | between WPs | `RT-CONTINUATION-EDGE-DISPOSITION` (#6i) **once I frame it — STEWARD DEBT** | `RT-MATCH-RECURSOR-CONSUMERS` |
+| **Foundation** | idle, nothing dependency-clear | `DS-9` after `KERNEL-NESTED-IND` | `PX9` after `PX8` |
+
+> **Runtime's `ready` count is NOT startable depth.** Ten runtime nodes read
+> `ready`; at least `RT-FNUNIT-RESULT-TOKEN` has **no frame at all** — only
+> mentions inside other frames. **Audit a `ready` node's frame before treating
+> it as queue depth.**
+
+### Session state
 
 `main` = **`a1b7c068`**. Worktree clean. **Nothing of mine is unpublished.**
 
