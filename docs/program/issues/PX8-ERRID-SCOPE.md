@@ -139,3 +139,57 @@ partial close of a clause whose whole point is universality.
 
 ⚠ **`PX8` does not close until this and [[PX8-WROTE-ABS]] and
 [[PX8-F-CAP-41]] all discharge**, and the closure property is re-verified.
+
+## CLEARED by the Adversary on merged `dea1e064` — with one prose caveat
+
+**No defect.** Triaged and accepted by the Steward; **do not re-file any of the
+below.**
+
+**The reaching claim holds in its strong form**, which was the axis with least
+independent confidence. `abi_v1.rs` drives `ken_host_dispatch_v1` — the real FFI
+entry — and its token is **derived from live inventory**: taken from a genuine
+`BufferAllocate`, wrapped via `ResourceTokenV1::from_erased_identity`, and
+**asserted to resolve in `context.resources`** before a future generation is
+derived from it. It neither forges a checked Ken resource value nor freezes a
+literal slot index, which are the two fakes the frame's own gap paragraph names.
+`eval.rs`'s ordering claim is **asserted**, not merely named
+(`backend.write_calls == 0`), and — the stronger point — the backend is rigged
+to be **loud** if visited, so the zero-visit assertion proves something an inert
+backend could not.
+
+**No row pins an ordinal in either numbering.** `eval.rs` contains **zero**
+numeric-literal assertions; `abi_v1.rs` passes `reply.detail` through the
+production decoder and asserts on the **named variant**, so a moved code moves
+decoder and assertion together.
+
+> ### THE ONE THING THAT CAN GO STALE SILENTLY, AND IT IS PROSE
+>
+> A doc comment states **"writes wire resource-error code 1"** as a fact. It is
+> **prose, not a pin**, and it is safe today only because the wire numbering is
+> **append-only**, so code 1 cannot move. **It is the single place here where a
+> number could rot with no test failing.** If the wire numbering ever stops
+> being append-only, this sentence is wrong and nothing will say so.
+
+**On the QA no-new-run gap: record the STRONGER reason.** The handback closed it
+with *"prose-only, executable bytes unchanged"*, which is only as good as a
+token-level claim nobody re-derived. **The gap is closed because CI ran the
+suite on the exact merged SHA**, so whatever the final child changed, the merged
+bytes were executed. The prose-only premise would become load-bearing only if CI
+had **not** run on that SHA.
+
+**Bounded, and left open on purpose:** duplication was checked **among the three
+added rows only**, not against the pre-existing corpus.
+
+### The predecessor's `effects.rs` loop is closed as a CHARACTERIZATION
+
+`PX8-ERRID-ALLOC`'s `+223/-5` in
+`cranelift_backend/lowering/core/tests/effects.rs` — flagged unaudited twice —
+adds two `#[test]`s plus six per-role projection fixtures, with the nullary
+rejection control kept from being a bare negative by the six positives beside
+it. **The `-5` is the notable part and runs the right way:** it deletes a
+hard-coded `if fixture.call_index == 0 { 11 } else { 22 }` literal pair in favour
+of per-role fixtures — **the same class of frozen magic value as the
+`err.alternative(10)` witness that had to be derived.**
+
+**Still open, and not to be reported as cleared:** whether the six fixtures
+discriminate from one another, and the contention assessment for that tree.

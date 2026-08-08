@@ -216,3 +216,11 @@ of Track T.
   entire reason this file exists.
 - The completion program's coverage record is `10-linux-abi-completion.md` §9.
   Update it when this closes.
+
+> ### ONE INHERITED CAVEAT FROM `PX8-ERRID-SCOPE`, ALREADY TRIAGED
+>
+> A doc comment in that WP's evidence states **"writes wire resource-error code
+> 1"** as a fact. It is **prose, not a pin**, safe only because the wire
+> numbering is **append-only**. **If any PX8 work makes that numbering stop
+> being append-only, that sentence goes wrong silently** — no test covers it.
+> Full triage on [[PX8-ERRID-SCOPE]]; do not re-file.
