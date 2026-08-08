@@ -20443,8 +20443,18 @@ mod tests {
             .expect_err("a dynamic set is not a constructor node");
 
         // UNPLANNED — a position past the end of the alternative list.
-        plan.synthesized_tree_node(seat, &err.alternative(10))
-            .expect_err("the resource surface has ten alternatives, 0 through 9");
+        plan.synthesized_tree_node(
+            seat,
+            &err.alternative(
+                u32::try_from(
+                    plan.synthesized_dynamic_alternatives(seat, &err)
+                        .expect("the error root is the resource surface")
+                        .len(),
+                )
+                .expect("the inventory fits"),
+            ),
+        )
+        .expect_err("a position past the closed resource-error inventory must refuse");
 
         // An `IOError` alternative is terminal: nothing below it is a
         // constructor, so a path continuing past one names no node.
@@ -20757,7 +20767,7 @@ mod tests {
                 .expect("the error root resolves")
                 .expect("the error root is the resource surface")
                 .len(),
-            10
+            11
         );
 
         // ⭐ LAWFULLY non-dynamic: `Wrote` is a constructor, so the answer is a
