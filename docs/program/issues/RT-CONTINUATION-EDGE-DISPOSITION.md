@@ -1,7 +1,7 @@
 ---
 id: RT-CONTINUATION-EDGE-DISPOSITION
 title: "One planner edge carries both binding projection and a causal call obligation — split the representation so a binding candidate can be settled InlineNoCall without ever entering the call-discharge partition"
-status: draft
+status: ready
 owner: runtime
 size: TBD
 gate: none
@@ -129,4 +129,4 @@ representation plus a five-mutation proof obligation, and measurement 3 carries
 a **named hard stop** that would fork it again. **Size it on its frame, after
 the census in measurement 1.**
 
-Frame: to be written by the Steward before release.
+Frame: `docs/program/wp/RT-CONTINUATION-EDGE-DISPOSITION.md`.
