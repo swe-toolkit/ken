@@ -68,8 +68,12 @@
 > WINDS DOWN**, because `PX8-ERRID-SCOPE` was already in CI and finishes on its
 > own — no lane is halted and no work is discarded.
 >
-> ⇒ **When `PX8-ERRID-SCOPE` lands, DO NOT kick `CI-IGNORED-SWEEP`.** It stays
-> `ready` and unstarted. Verify's ring stands down after the merge.
+> ⇒ **DONE 2026-08-08:** `PX8-ERRID-SCOPE` merged at `e0abf72a` and Verify's
+> ring was stood down at `evt_5bfzjp5phktbb`. `CI-IGNORED-SWEEP` stays `ready`
+> and unstarted. **The cap is now SATISFIED at Runtime + Kernel.**
+>
+> **`PX8` is NOT yet unblocked** — it still needs `PX8-F-CAP-41` and
+> `PX8-WROTE-ABS`, both `draft`. Do not read this merge as opening `PX9`.
 >
 > **Steady state is Runtime + Kernel.** Foundation is already idle by plan.
 > **The cap binds the STEWARD, not the teams** — teams never self-start, so the
@@ -83,7 +87,7 @@
 
 | team | now | next | then |
 |---|---|---|---|
-| **Verify** | `PX8-ERRID-SCOPE` (L, in CI at `e0abf72a`) | **STANDS DOWN — lane cap.** Do NOT kick `CI-IGNORED-SWEEP` | — |
+| **Verify** | **MERGED `e0abf72a`, ring STOOD DOWN** (`evt_5bfzjp5phktbb`) | **nothing — lane cap.** `CI-IGNORED-SWEEP` stays `ready`, unstarted | — |
 | **Kernel** | `KERNEL-NESTED-IND` (L, kicked `evt_6cm2d60a1140z`) | unblocks Foundation's `DS-9` | — |
 | **Runtime** | between WPs | `RT-CONTINUATION-EDGE-DISPOSITION` (#6i) **once I frame it — STEWARD DEBT** | `RT-MATCH-RECURSOR-CONSUMERS` |
 | **Foundation** | idle, nothing dependency-clear | `DS-9` after `KERNEL-NESTED-IND` | `PX9` after `PX8` |
