@@ -6176,6 +6176,85 @@ mod px5b_effect_observation_tests {
         }
     }
 
+    trait PositionedFailureIdentity {
+        const ERROR: ken_host::IoErrorIdentityV1;
+    }
+
+    struct UnsupportedPositionedFailure;
+
+    impl PositionedFailureIdentity for UnsupportedPositionedFailure {
+        const ERROR: ken_host::IoErrorIdentityV1 = ken_host::IoErrorIdentityV1::Unsupported;
+    }
+
+    struct BrokenPipePositionedFailure;
+
+    impl PositionedFailureIdentity for BrokenPipePositionedFailure {
+        const ERROR: ken_host::IoErrorIdentityV1 = ken_host::IoErrorIdentityV1::BrokenPipe;
+    }
+
+    struct PositionedFailureBackend<E> {
+        write_calls: usize,
+        _error: std::marker::PhantomData<E>,
+    }
+
+    impl<E> Default for PositionedFailureBackend<E> {
+        fn default() -> Self {
+            Self {
+                write_calls: 0,
+                _error: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl<E: PositionedFailureIdentity> ken_host::HostEffectBackendV1 for PositionedFailureBackend<E> {
+        fn console_write(
+            &mut self,
+            _stream: ken_host::ConsoleStreamV1,
+            _bytes: &[u8],
+        ) -> Result<(), ken_host::IoErrorIdentityV1> {
+            unreachable!("positioned fixture does not call console output")
+        }
+
+        fn console_flush(
+            &mut self,
+            _stream: ken_host::ConsoleStreamV1,
+        ) -> Result<(), ken_host::IoErrorIdentityV1> {
+            unreachable!("positioned fixture does not call console flush")
+        }
+
+        fn console_is_terminal(&mut self, _stream: ken_host::ConsoleStreamV1) -> bool {
+            unreachable!("positioned fixture does not inspect a console")
+        }
+
+        fn fs_read_file(
+            &mut self,
+            _grant: &ken_host::CapabilityGrantV1,
+            _path: &[u8],
+        ) -> Result<Vec<u8>, ken_host::FileErrorCauseV1> {
+            unreachable!("positioned fixture does not call whole-file read")
+        }
+
+        fn fs_write_file(
+            &mut self,
+            _grant: &ken_host::CapabilityGrantV1,
+            _path: &[u8],
+            _create_policy: ken_host::CreatePolicyV1,
+            _bytes: &[u8],
+        ) -> Result<(), ken_host::FileErrorCauseV1> {
+            unreachable!("positioned fixture does not call whole-file write")
+        }
+
+        fn fs_resource_write_at(
+            &mut self,
+            _handle: &ken_host::ResourceHandleV1,
+            _offset: u64,
+            _bytes: &[u8],
+        ) -> Result<usize, ken_host::IoErrorIdentityV1> {
+            self.write_calls += 1;
+            Err(E::ERROR)
+        }
+    }
+
     fn console_ids() -> ConsoleIds {
         let mut next = 100u32;
         let mut id = || {
@@ -6344,6 +6423,44 @@ mod px5b_effect_observation_tests {
         assert_eq!(*id, expected);
     }
 
+    fn expect_resource_host_io(value: &EvalVal, expected: GlobalId, ids: &ConsoleIds, fs: &FSIds) {
+        let payload = result_payload(value, ids.err_id);
+        let EvalVal::Ctor {
+            id: resource_host_io,
+            args,
+            ..
+        } = payload
+        else {
+            panic!("expected ResourceHostIO, got {payload:?}")
+        };
+        assert_eq!(*resource_host_io, fs.resource_host_io_id);
+        let EvalVal::Ctor { id, .. } = args.first().expect("ResourceHostIO identity") else {
+            panic!("expected named IOError constructor")
+        };
+        assert_eq!(*id, expected);
+    }
+
+    /// Structural negative for `PX8-ERRID-SCOPE` D6 / AC-5. The two success
+    /// vocabularies are matched without a wildcard, so a retry/status arm such
+    /// as `WouldBlock` cannot enter PX8 progress without making this function
+    /// non-exhaustive. `WouldBlock` remains PX12 scope; this function does not
+    /// manufacture it or add a nonblocking input.
+    fn assert_px8_progress_vocabulary(outcome: &ken_host::CanonicalOutcomeV1) {
+        match outcome {
+            ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ReadProgress(
+                progress,
+            )) => match progress {
+                ken_host::ReadProgressV1::ReadSome { .. } | ken_host::ReadProgressV1::ReadEof => {}
+            },
+            ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::WriteProgress(
+                progress,
+            )) => match progress {
+                ken_host::WriteProgressV1::Wrote(_) => {}
+            },
+            _ => {}
+        }
+    }
+
     fn expect_resource_token(value: &EvalVal, ids: &ConsoleIds) -> ken_host::ResourceTokenV1 {
         let payload = result_payload(value, ids.ok_id);
         let EvalVal::ResourceToken(token) = payload else {
@@ -6384,6 +6501,11 @@ mod px5b_effect_observation_tests {
     /// Durable invariant (`PX8-ERRID-ALLOC` AC-2): the checked FS driver
     /// reifies a failure from the production host reservation path as the
     /// nullary `ResourceError.AllocationFailed` constructor.
+    ///
+    /// This interpreter row is expressed in the named semantic
+    /// `ResourceError.AllocationFailed` identity. It exercises neither numeric
+    /// mapping and neither proves nor infers emitter/planner alternative 7 or
+    /// ABI code 9.
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn buffer_reservation_failure_reifies_the_checked_allocation_error() {
@@ -6409,6 +6531,237 @@ mod px5b_effect_observation_tests {
         );
 
         expect_resource_error(&result, fs.allocation_failed_id, &ids);
+
+        let mut policy_rejected = ken_host::ResourceTableV1::with_buffer_limits(
+            ken_host::BufferLimitsV1::new(1, 1).unwrap(),
+        );
+        let result = run_fs(
+            fs.private_buffer_allocate_id,
+            &[
+                EvalVal::Unknown,
+                EvalVal::BigInt(BigInt::from(usize::MAX as u64)),
+            ],
+            &mut host,
+            &mut policy_rejected,
+            &fs,
+            &ids,
+            &mut store,
+        );
+        expect_resource_error(&result, fs.buffer_limit_id, &ids);
+        assert_ne!(
+            fs.allocation_failed_id, fs.buffer_limit_id,
+            "the named semantic ResourceError.AllocationFailed identity exercises neither numeric mapping and neither proves nor infers emitter/planner alternative 7 or ABI code 9"
+        );
+    }
+
+    fn with_positioned_write_fixture(
+        label: &str,
+        test: impl FnOnce(
+            &ConsoleIds,
+            &FSIds,
+            &mut EvalStore,
+            &mut ken_host::ResourceTableV1,
+            ken_host::ResourceTokenV1,
+            ken_host::ResourceTokenV1,
+        ),
+    ) {
+        let ids = console_ids();
+        let fs = fs_ids();
+        let mut store = EvalStore::new();
+        let root = rt_parity_root(label);
+        std::fs::write(root.join("source"), b"abcd").unwrap();
+        std::fs::write(root.join("target"), b"unchanged").unwrap();
+        let mut host = PosixHost::new_at(&root);
+        let capability = EvalVal::Cap(host.mint_fs_cap(capabilities::AUTH_FULL));
+        let mut resources = ken_host::ResourceTableV1::default();
+        let read_mode = make_ctor(fs.resource_read_id, vec![], &mut store);
+        let source = open_file(
+            b"source",
+            read_mode,
+            capability.clone(),
+            &mut host,
+            &mut resources,
+            &fs,
+            &ids,
+            &mut store,
+        );
+        let create_keep = make_ctor(fs.create_or_keep_id, vec![], &mut store);
+        let write_mode = make_ctor(fs.resource_write_create_id, vec![create_keep], &mut store);
+        let target = open_file(
+            b"target",
+            write_mode,
+            capability,
+            &mut host,
+            &mut resources,
+            &fs,
+            &ids,
+            &mut store,
+        );
+        let allocated = allocate_buffer(4, &mut host, &mut resources, &fs, &ids, &mut store);
+        let buffer = expect_resource_token(&allocated, &ids);
+        let filled = run_fs(
+            fs.private_fs_read_at_id,
+            &[
+                EvalVal::Unknown,
+                EvalVal::ResourceToken(source),
+                EvalVal::Int(0),
+                EvalVal::ResourceToken(buffer),
+                EvalVal::Int(0),
+                EvalVal::Int(4),
+            ],
+            &mut host,
+            &mut resources,
+            &fs,
+            &ids,
+            &mut store,
+        );
+        let _ = result_payload(&filled, ids.ok_id);
+
+        test(&ids, &fs, &mut store, &mut resources, target, buffer);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn dispatch_positioned_write(
+        backend: &mut impl ken_host::HostEffectBackendV1,
+        resources: &mut ken_host::ResourceTableV1,
+        file: ken_host::ResourceTokenV1,
+        buffer: ken_host::ResourceTokenV1,
+        buffer_start: u64,
+    ) -> (ken_host::CanonicalRequestV1, ken_host::HostDispatchReplyV1) {
+        let request = ken_host::CanonicalRequestV1::FsWriteAt {
+            file_offset: 0,
+            buffer_start,
+            length: 4,
+        };
+        let reply = ken_host::dispatch_host_op_v1(
+            backend,
+            &ken_host::CapabilityTableV1::default(),
+            resources,
+            ken_host::HostOpV1::FsWriteAt,
+            None,
+            ken_host::ResourceInputsV1::FileBufferSpan {
+                file,
+                target_buffer: buffer,
+                span_origin: buffer,
+            },
+            &request,
+        )
+        .expect("well-formed positioned request reaches the real dispatcher");
+        (request, reply)
+    }
+
+    /// Durable invariant (`PX8-ERRID-SCOPE` D2 / AC-1 through AC-4): the
+    /// actual positioned consumer rejects an out-of-range live buffer seat as
+    /// `InvalidBounds` before visiting the synchronous backend and before
+    /// constructing progress.
+    ///
+    /// MEASURED: the production dispatcher and interpreter reifier return the
+    /// named constructor while the backend visit counter stays zero. CLAIMED:
+    /// the positioned InvalidBounds arm reaches independently. THE GAP: the
+    /// witness start is derived from the live buffer inventory, and the
+    /// dispatcher—not the test—must classify it before backend I/O.
+    /// This row uses a named resource-error constructor, not either allocation
+    /// numbering.
+    #[test]
+    fn positioned_invalid_bounds_reifies_before_backend_visit() {
+        with_positioned_write_fixture(
+            "px8-errid-invalid-bounds",
+            |ids, fs, store, resources, file, buffer| {
+                let capacity = resources
+                    .resolve_buffer(buffer)
+                    .expect("fixture buffer remains live")
+                    .0
+                    .capacity() as u64;
+                let out_of_range = capacity
+                    .checked_add(1)
+                    .expect("fixture capacity has a successor");
+                let mut backend =
+                    PositionedFailureBackend::<BrokenPipePositionedFailure>::default();
+                let (request, reply) =
+                    dispatch_positioned_write(&mut backend, resources, file, buffer, out_of_range);
+                assert_eq!(
+                    backend.write_calls, 0,
+                    "pre-I/O rejection must not visit backend"
+                );
+                let result = reify_host_reply_v1(
+                    reply.outcome,
+                    reply.resource_token,
+                    None,
+                    &request,
+                    fs.private_fs_write_at_id,
+                    fs,
+                    ids,
+                    store,
+                )
+                .expect("interpreter reifies positioned InvalidBounds");
+                expect_resource_error(&result, fs.invalid_bounds_id, ids);
+            },
+        );
+    }
+
+    fn assert_positioned_backend_failure<E: PositionedFailureIdentity>(
+        label: &str,
+        expected: impl FnOnce(&ConsoleIds) -> GlobalId,
+    ) {
+        with_positioned_write_fixture(label, |ids, fs, store, resources, file, buffer| {
+            let mut backend = PositionedFailureBackend::<E>::default();
+            let (request, reply) =
+                dispatch_positioned_write(&mut backend, resources, file, buffer, 0);
+            assert_eq!(
+                backend.write_calls, 1,
+                "real synchronous backend is the producer"
+            );
+            let result = reify_host_reply_v1(
+                reply.outcome,
+                reply.resource_token,
+                None,
+                &request,
+                fs.private_fs_write_at_id,
+                fs,
+                ids,
+                store,
+            )
+            .expect("interpreter reifies the backend identity");
+            expect_resource_host_io(&result, expected(ids), ids, fs);
+        });
+    }
+
+    /// Durable invariant (`PX8-ERRID-SCOPE` D4 / AC-1, AC-3, AC-5): the real
+    /// synchronous positioned backend's named `Unsupported` refusal remains an
+    /// error through interpreter reification.
+    ///
+    /// MEASURED: one backend visit returns the backend type's fixed identity
+    /// and the reifier yields `ResourceHostIO Unsupported`. CLAIMED: PX8 reaches
+    /// the synchronous unsupported arm without nonblocking input. THE GAP: the
+    /// error must originate in `fs_resource_write_at`, not in a hand-built
+    /// canonical outcome. This I/O identity uses neither allocation numbering.
+    #[test]
+    fn positioned_backend_unsupported_reifies_as_named_error() {
+        assert_positioned_backend_failure::<UnsupportedPositionedFailure>(
+            "px8-errid-unsupported",
+            |ids| ids.unsupported_id,
+        );
+    }
+
+    /// Durable invariant (`PX8-ERRID-SCOPE` D5 / AC-1, AC-3, AC-6): a stable
+    /// named positioned host-I/O failure distinct from `Interrupted` remains an
+    /// error through interpreter reification.
+    ///
+    /// MEASURED: one backend visit returns the backend type's fixed BrokenPipe
+    /// identity and the reifier yields `ResourceHostIO BrokenPipe`. CLAIMED:
+    /// the non-Interrupted host-I/O arm reaches independently. THE GAP: the
+    /// error must originate in the real positioned backend seam and the locked
+    /// constructor asserted here must differ from `Interrupted`. This I/O
+    /// identity uses neither allocation numbering.
+    #[test]
+    fn positioned_backend_broken_pipe_reifies_distinct_from_interrupted() {
+        assert_positioned_backend_failure::<BrokenPipePositionedFailure>(
+            "px8-errid-broken-pipe",
+            |ids| {
+                assert_ne!(ids.brokenpipe_id, ids.interrupted_id);
+                ids.brokenpipe_id
+            },
+        );
     }
 
     fn open_file<H: HostHandler>(
@@ -6921,6 +7274,7 @@ mod px5b_effect_observation_tests {
         )
         .expect("real dispatcher admits the component short write");
         assert_eq!(backend.write_calls, 1);
+        assert_px8_progress_vocabulary(&reply.outcome);
         let result = reify_host_reply_v1(
             reply.outcome,
             reply.resource_token,

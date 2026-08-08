@@ -2498,6 +2498,103 @@ mod tests {
         let _ = std::fs::remove_dir_all(directory);
     }
 
+    /// Durable invariant (`PX8-ERRID-SCOPE` D1 / AC-1 through AC-3): a
+    /// well-formed native positioned request whose resource token names a
+    /// future generation reaches the production resource resolver and is
+    /// reified as the wire/ABI `MalformedResource` identity, not as a terminal
+    /// ABI-decode failure or a progress reply.
+    ///
+    /// MEASURED: `ken_host_dispatch_v1` accepts the request, records an
+    /// `FsReadAt` event whose outcome is `MalformedResource`, and writes wire
+    /// resource-error code 1. CLAIMED: malformed-resource resolution is a
+    /// production-reaching PX8 error arm. THE GAP: the token must enter through
+    /// the native ABI boundary and be derived from a live inventory token, so
+    /// this does not forge a checked Ken resource value or freeze a literal
+    /// slot index.
+    #[test]
+    fn positioned_future_generation_reifies_malformed_resource() {
+        let directory = std::env::temp_dir().join(format!(
+            "ken-px8-errid-scope-malformed-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let initialized = context(&directory);
+
+        let allocate = BufferAllocateRequestV1 { capacity: 1 };
+        let mut reply = HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: 0,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+        };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context.cast_const(),
+                HostOpV1::BufferAllocate as u64,
+                (&allocate as *const BufferAllocateRequestV1).cast(),
+                std::mem::size_of::<BufferAllocateRequestV1>(),
+                (&mut reply as *mut HostReplyV1).cast(),
+            )
+        };
+        assert_eq!(status, 0);
+        assert_eq!(reply.tag, REPLY_RESOURCE);
+        let live_buffer = crate::ResourceTokenV1::from_erased_identity(reply.detail);
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        context
+            .resources
+            .identity(live_buffer)
+            .expect("the witness starts from the live resource inventory");
+
+        let generation_stride = 1_u64 << u32::BITS;
+        let future_generation = live_buffer
+            .erased_identity()
+            .checked_add(generation_stride)
+            .expect("the live token admits a derived future generation");
+        let request = FsPositionedRequestV1 {
+            file: future_generation,
+            buffer: live_buffer.erased_identity(),
+            file_offset: 0,
+            buffer_start: 0,
+            length: 1,
+        };
+        let status = unsafe {
+            ken_host_dispatch_v1(
+                initialized.context.cast_const(),
+                HostOpV1::FsReadAt as u64,
+                (&request as *const FsPositionedRequestV1).cast(),
+                std::mem::size_of::<FsPositionedRequestV1>(),
+                (&mut reply as *mut HostReplyV1).cast(),
+            )
+        };
+        assert_eq!(status, 0, "the ABI envelope is valid and reaches dispatch");
+        assert_eq!(reply.tag, REPLY_RESOURCE_ERROR, "no progress is reified");
+        assert_eq!(
+            decode_resource_error_reply(reply.detail, reply.resource_error),
+            Some(crate::ResourceErrorV1::MalformedResource)
+        );
+
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        let event = context
+            .effect_trace
+            .last()
+            .expect("positioned event recorded");
+        assert_eq!(event.operation, HostOpV1::FsReadAt);
+        assert!(event.resource_bindings.is_empty());
+        assert_eq!(
+            event.outcome,
+            CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(
+                crate::ResourceErrorV1::MalformedResource
+            ))
+        );
+
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
     #[test]
     fn change_mode_rejects_file_type_bits_before_dispatch() {
         let directory =
