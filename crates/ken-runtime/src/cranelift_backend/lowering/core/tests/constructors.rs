@@ -6285,7 +6285,7 @@ fn first_effect_seat(plan: &StaticTransitionPlan<'_>) -> Option<StaticOriginId> 
 
 /// **`D7` — the dynamic-alternative consumer fails closed on a missing record.**
 ///
-/// MEASURED: at a real `FsWriteAt` seat whose error root is the ten-alternative
+/// MEASURED: at a real `FsWriteAt` seat whose error root is the eleven-alternative
 /// resource surface, `dynamic_alternatives_agree` accepts the alternatives
 /// carrying the occurrences the planner issued **under the seat's own emission
 /// owner**, and refuses under a *different* enumerated unit's owner — at which
@@ -6352,7 +6352,11 @@ fn a_dynamic_alternative_with_no_planned_record_refuses() {
     let population = plan
         .synthesized_dynamic_alternatives(seat, &error_root)
         .expect("the error root is the resource surface");
-    assert_eq!(population.len(), 10, "the resource surface has ten alternatives");
+    assert_eq!(
+        population.len(),
+        11,
+        "the resource surface has eleven alternatives"
+    );
 
     let seed_env = NativeSeedEnvironment::empty();
     let compiler = bare_carrier_test_lowering(&seed_env, plan);
@@ -6431,7 +6435,7 @@ fn a_dynamic_alternative_with_no_planned_record_refuses() {
     // owner — and the cardinality still matches, so nothing but the
     // per-alternative record lookup can catch this. Under the predecessor
     // `.ok()` the expectation became `None`, compared equal to the emitted
-    // `None`, and all ten alternatives agreed.
+    // `None`, and all eleven alternatives agreed.
     let refused = compiler.dynamic_alternatives_agree(
         absent,
         seat,

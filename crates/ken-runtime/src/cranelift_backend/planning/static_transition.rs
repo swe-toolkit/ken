@@ -4145,7 +4145,7 @@ fn host_effect_recipe_tree(operation: ken_host::HostOpV1) -> SynthesizedHostResu
         ]));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 
-    /// The ten-alternative resource surface, in the emitter's own order.
+    /// The eleven-alternative resource surface, in the emitter's own order.
     const RESOURCE_SURFACE: SynthesizedAggregateNode =
         N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
             N::Fixed {
@@ -4167,6 +4167,7 @@ fn host_effect_recipe_tree(operation: ken_host::HostOpV1) -> SynthesizedHostResu
                 children: &[RESOURCE_KIND, RESOURCE_KIND],
             },
             N::nullary(R::ResourceBufferLimit),
+            N::nullary(R::ResourceAllocationFailed),
             N::nullary(R::ResourceInvalidOffset),
             N::nullary(R::ResourceInvalidBounds),
             N::nullary(R::ResourceNoProgress),
@@ -20094,7 +20095,7 @@ mod tests {
         let field = SynthesizedAggregateStep::Field;
         let alt = SynthesizedAggregateStep::Alternative;
 
-        // The ten resource-surface alternatives, in the emitter's order.
+        // The eleven resource-surface alternatives, in the emitter's order.
         let surface: Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)> = [
             R::ResourceHostIo,
             R::ResourceClosed,
@@ -20103,6 +20104,7 @@ mod tests {
             R::ResourceReleaseFailed,
             R::ResourceKindMismatch,
             R::ResourceBufferLimit,
+            R::ResourceAllocationFailed,
             R::ResourceInvalidOffset,
             R::ResourceInvalidBounds,
             R::ResourceNoProgress,
@@ -20441,8 +20443,18 @@ mod tests {
             .expect_err("a dynamic set is not a constructor node");
 
         // UNPLANNED — a position past the end of the alternative list.
-        plan.synthesized_tree_node(seat, &err.alternative(10))
-            .expect_err("the resource surface has ten alternatives, 0 through 9");
+        plan.synthesized_tree_node(
+            seat,
+            &err.alternative(
+                u32::try_from(
+                    plan.synthesized_dynamic_alternatives(seat, &err)
+                        .expect("the error root is the resource surface")
+                        .len(),
+                )
+                .expect("the inventory fits"),
+            ),
+        )
+        .expect_err("a position past the closed resource-error inventory must refuse");
 
         // An `IOError` alternative is terminal: nothing below it is a
         // constructor, so a path continuing past one names no node.
@@ -20628,7 +20640,7 @@ mod tests {
 
     /// **The PLANNER owns the alternative population, count included.**
     ///
-    /// MEASURED: at a real `FsWriteAt` seat the resource surface reports ten
+    /// MEASURED: at a real `FsWriteAt` seat the resource surface reports eleven
     /// ordered roles, `ResourceKind` reports its two, and a reachable `IOError`
     /// set reports the whole closed inventory. A path that names a constructor,
     /// an `IOError` alternative, or nothing at all is refused rather than
@@ -20673,6 +20685,7 @@ mod tests {
                 Fixed(R::ResourceReleaseFailed),
                 Fixed(R::ResourceKindMismatch),
                 Fixed(R::ResourceBufferLimit),
+                Fixed(R::ResourceAllocationFailed),
                 Fixed(R::ResourceInvalidOffset),
                 Fixed(R::ResourceInvalidBounds),
                 Fixed(R::ResourceNoProgress),
@@ -20754,7 +20767,7 @@ mod tests {
                 .expect("the error root resolves")
                 .expect("the error root is the resource surface")
                 .len(),
-            10
+            11
         );
 
         // ⭐ LAWFULLY non-dynamic: `Wrote` is a constructor, so the answer is a
