@@ -28,6 +28,47 @@ has an identity to assert against.
 `verify-qa`), not a Foundation one. Releasing it opens a lane that is not
 currently open.
 
+> ### THE SURFACE HAS TWO INDEPENDENT NUMBERINGS AND NO WRITTEN MAPPING
+>
+> **Adversary triage on merged `22fd1141`, accepted by the Steward as a known
+> limitation — not a defect, and not to be re-filed.** It was checked for a
+> compatibility break specifically, and that hypothesis is **refuted**: the
+> emitter's ordinal is **not persisted on the wire**, so a middle insert
+> renumbers nothing externally.
+>
+> | surface | this role | rule for a new role |
+> |---|---|---|
+> | emitter / planner | **alternative 7** | **insert**, positional and internal |
+> | wire and ABI | **code 9** | **append**, persisted and must not move |
+>
+> **Both are correct in their own domain, and the natural assumption that a new
+> role appends on both sides is true on one and false on the other.** A reader
+> who knows one numbering cannot infer the other. **State which numbering every
+> evidence row you write is expressed in**, and never carry an ordinal across
+> that boundary without converting it.
+>
+> ### THE RISK AXIS IS ORDINAL, NOT CARDINALITY
+>
+> `PX8-ERRID-ALLOC` reddened CI twice. **A count mismatch is loud** — four
+> baseline controls caught it immediately. **An ordinal mismatch is silent:**
+> the sum stays the same size and a consumer simply reads the wrong role, which
+> is exactly what its first red was. A cardinality sweep is **structurally
+> unable** to find that, because both sides can agree on "ten" while disagreeing
+> about *which* seven.
+>
+> ⇒ For any row touching this surface, the question is **"who encodes an
+> ordinal, and in which numbering?"**, not "who encodes the count".
+>
+> ### TWO SCOPING FACTS TO INHERIT RATHER THAN REDISCOVER
+>
+> - The interpreter's end-to-end reachability evidence for the new role
+>   (`buffer_reservation_failure_reifies_the_checked_allocation_error`) is
+>   **`#[cfg(target_pointer_width = "64")]`**. The claim is **64-bit-scoped and
+>   nothing outside the attribute says so.** Fine while CI is x86_64; do not
+>   restate it as unconditional.
+> - `lowering/core/tests/effects.rs` gained **+223/-5** and was **explicitly not
+>   audited**. Treat it as **untouched, not cleared**.
+
 ⭐ **On the Linux ABI I critical path** — one of `PX8`'s three blockers. `PX8`
 gates 15 of that program's 19 nodes.
 
