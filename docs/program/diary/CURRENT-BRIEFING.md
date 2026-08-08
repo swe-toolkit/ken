@@ -59,11 +59,31 @@
 >    `PX8-ERRID-SCOPE` is Verify's, not Foundation's, and several frames sit
 >    under non-id filenames.
 
+> ### LANE CAP IS TWO — OPERATOR, 2026-08-08
+>
+> *"stick to 2 lanes for now. don't halt a lane, but let one of them naturally
+> finish and then don't start another task for it."*
+>
+> **Three build lanes were open when this was issued. VERIFY IS THE ONE THAT
+> WINDS DOWN**, because `PX8-ERRID-SCOPE` was already in CI and finishes on its
+> own — no lane is halted and no work is discarded.
+>
+> ⇒ **When `PX8-ERRID-SCOPE` lands, DO NOT kick `CI-IGNORED-SWEEP`.** It stays
+> `ready` and unstarted. Verify's ring stands down after the merge.
+>
+> **Steady state is Runtime + Kernel.** Foundation is already idle by plan.
+> **The cap binds the STEWARD, not the teams** — teams never self-start, so the
+> only way it gets violated is by me sending a kick. Before any kickoff, count
+> the live lanes first.
+>
+> **This overrides the "keep every team fed" default above.** That default
+> still governs *within* the cap; it does not authorize a third lane.
+
 ### The forward queue, settled in advance
 
 | team | now | next | then |
 |---|---|---|---|
-| **Verify** | `PX8-ERRID-SCOPE` (L, kicked `evt_36a5exak1stgz`) | `CI-IGNORED-SWEEP` (S, dep-free, framed) | — |
+| **Verify** | `PX8-ERRID-SCOPE` (L, in CI at `e0abf72a`) | **STANDS DOWN — lane cap.** Do NOT kick `CI-IGNORED-SWEEP` | — |
 | **Kernel** | `KERNEL-NESTED-IND` (L, kicked `evt_6cm2d60a1140z`) | unblocks Foundation's `DS-9` | — |
 | **Runtime** | between WPs | `RT-CONTINUATION-EDGE-DISPOSITION` (#6i) **once I frame it — STEWARD DEBT** | `RT-MATCH-RECURSOR-CONSUMERS` |
 | **Foundation** | idle, nothing dependency-clear | `DS-9` after `KERNEL-NESTED-IND` | `PX9` after `PX8` |
