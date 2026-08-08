@@ -11,6 +11,31 @@ not assume.**
 **Risk:** medium-high — the classification chooses between a planner-authority
 correction, a producer/call-seat repair, and an evidence-plumbing repair.
 
+> ## `D2` AND `D3` ARE WITHDRAWN FROM THIS FRAME — 2026-08-08
+>
+> **Architect hard-stop ruling `evt_dakdkqk4wbg6`.** Option 3 is **not
+> implementable as planner-side edge exclusion**: one planner edge carries both
+> **binding projection** and a **causal call obligation**, and bridge selection
+> cannot distinguish them. Both available narrowings are real failures — removing
+> the edge before interning loses the binding, and removing only `calls.insert`
+> leaves an interned-unit / caller population contradiction.
+>
+> **`D2` and `D3` below are re-homed to
+> [[RT-CONTINUATION-EDGE-DISPOSITION]]**, the seventh authority. Read them as
+> the record of what this node was asked for, **not as work to start.**
+> `AC-3`, `AC-5`, `AC-6` and `AC-7` cannot be discharged here and move with
+> them.
+>
+> **`D0` and `D1` STAND, and they are this node's delivered scope.** The
+> exact-witness conclusion **"no call occurred" is unchanged**, option 2 stays
+> refuted, and the 213-identity census stands. **This is the §5 outcome the
+> frame anticipated — a distinct authority, not a defect in `D0`/`D1`.**
+>
+> Green partial: `2e267180dcbdb7a59df59edf0dde9924925cb7d5`. Held and **never
+> published**: `a15a3e934766a1d075386ba561a9469e51a448b7` — note the real
+> object, not the `a15a3e93bd76...` string that circulated, which is not an
+> object at all.
+
 **Read `docs/program/16-recursive-descent-retirement.md` first.** This node
 exists because of that campaign's **Trap 2**, and this frame does not repeat the
 traps.
