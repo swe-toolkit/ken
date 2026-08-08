@@ -1,7 +1,7 @@
 ---
 id: RT-CONTINUATION-EDGE-DISPOSITION
 title: "One planner edge carries both binding projection and a causal call obligation — split the representation so a binding candidate can be settled InlineNoCall without ever entering the call-discharge partition"
-status: ready
+status: active
 owner: runtime
 size: TBD
 gate: none
@@ -10,6 +10,47 @@ blocks: [RT-MATCH-RECURSOR-CONSUMERS]
 github: null
 origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted the held red control a15a3e934766a1d075386ba561a9469e51a448b7 as load-bearing and withdrew the planner-side option-3 mechanism it had previously ruled at evt_4ebpfvfrvv8qy. Predecessor RT-CONTINUATION-CALL-DISCHARGE delivered D0/D1 attribution; its D2/D3 are re-homed here. Campaign docs/program/16-recursive-descent-retirement.md node #6i. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> ## `D0` IS MERGED, AND IT MOVED `D2`/`D3` RATHER THAN THE REPRESENTATION
+>
+> **Landed 2026-08-09 at exact `e93afb06783d7d7eff81a137ef6f92f1095411e6`,
+> base `6be73d20`, PR #1659.** Record only — one path, `+207/-0`, `crates/`
+> byte-identical to the base (tree `4c2bc579` both sides). Record:
+> `docs/program/wp/RT-CONTINUATION-EDGE-DISPOSITION-D0.md`.
+>
+> **637 candidates, one disposition each, zero orphans.** `DIRECT` 193,
+> `COMPOSED` 43, `BOTH` **0**, `INLINE_NO_CALL` 21, `BRIDGE_INCOMPLETE` 25,
+> `PLANNED_ONLY` 355. `BRIDGE_INCOMPLETE` is a bridge scope **entered and not
+> completed**, kept separate on purpose — the frame settles `InlineNoCall` only
+> on a scope that **completes**, and folding the two would manufacture members.
+>
+> **The closeout ranges over 210 of the 637.** A ledger only closes over
+> candidates whose owner function reaches closeout, so **427 are never
+> checked** — including **52 `DIRECT` and 11 `COMPOSED`** discharged at seats no
+> closeout sees. ⇒ `D2`'s *"an exact, disjoint disposition for every candidate"*
+> is **not a check added at the existing seat; it changes which population that
+> seat ranges over.** Routed to the Architect (`evt_7hzmgfyedd70v`), not ruled
+> by the ring — the right call, and it is why `D1` is stopped.
+>
+> **`AC-7` is measured OPEN, and the empty cell is the finding.** No
+> `InlineNoCall` member has a binding, a closeout, **and** a successful compile.
+> The three closeout-visible members are this campaign's own controls
+> (`ccr_d3`, `coc_d3`, `sar_d3`), all refusing; the two inside successful
+> compiles carry `CLOSE_CHECKED = false`, so they compile **because nothing
+> looked**, not because anything was discharged. Counting them is exactly
+> **Trap 3**. ⇒ **A `D3` witness must be AUTHORED under `D1`.** That is a
+> measurement, not a shortfall in the search.
+>
+> **The declaration/definition/ABI half of the hard stop is NOT closed.**
+> `b2f_last_unit_emission()` returns `(0, 0)` after a successful compile of the
+> witness, so it is not observing the path the question needs, and the ring
+> stopped rather than substitute a different number. An **interned-but-uncalled
+> specialization already exists inside a successful compile**, which weakens the
+> strong form without settling it. The exact remaining measurement is named in
+> the record.
+>
+> **Sizing stays `TBD`, and no number was proposed.** Two of the three inputs a
+> size rests on are the ones this census moved, and the hard stop is open.
 
 > # THIS IS THE SEVENTH WALL, AND IT IS A REPRESENTATION SPLIT, NOT A REPAIR.
 
