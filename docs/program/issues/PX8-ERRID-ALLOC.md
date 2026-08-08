@@ -1,7 +1,7 @@
 ---
 id: PX8-ERRID-ALLOC
 title: "ResourceErrorV1 has no allocation-failure identity and buffer allocation is infallible, so PX8's allocation-distinct-from-BufferLimit row cannot be produced at all"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none

@@ -10,9 +10,23 @@ work with an unusually exact specification.**
 **Risk:** medium-high — four of the five need a *real* producer, and the
 tempting shortcut is banned by name in `§4`.
 
-**Status:** Steward frame, shovel-ready.
-⛔ **Blocked on [[PX8-ERRID-ALLOC]]** (Foundation, in flight) — row 3 has no
-identity to assert against until it merges.
+**Status:** Steward frame, shovel-ready. **UNBLOCKED 2026-08-08** —
+[[PX8-ERRID-ALLOC]] merged at exact `8f3692bd`, `main` `22fd1141`, so row 3 now
+has an identity to assert against.
+
+> **Two things landed with it that bear on row 3, and neither is in this frame
+> below.** The resource surface is now **eleven** roles, not ten, with nullary
+> `ResourceAllocationFailed` at **alternative 7**. And the sibling past-end
+> negative control in `planning/static_transition.rs` was rewritten to **derive**
+> its out-of-range witness from `synthesized_dynamic_alternatives(...).len()`
+> rather than hardcode an index, because the hardcoded one silently came into
+> range when the surface widened. **Any evidence row you write that pins this
+> surface's cardinality, or picks a witness by index, has the same defect
+> waiting.** Re-derive both facts at your own base; do not carry these numbers.
+
+**This is a Team Verify WP** (`verify-leader` + `verify-implementer` +
+`verify-qa`), not a Foundation one. Releasing it opens a lane that is not
+currently open.
 
 ⭐ **On the Linux ABI I critical path** — one of `PX8`'s three blockers. `PX8`
 gates 15 of that program's 19 nodes.
