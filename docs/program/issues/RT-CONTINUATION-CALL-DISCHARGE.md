@@ -6,7 +6,7 @@ owner: runtime
 size: S
 gate: none
 depends_on: [RT-SPECIALIZED-ACTIVE-RESUME]
-blocks: [RT-MATCH-RECURSOR-CONSUMERS]
+blocks: [RT-CONTINUATION-EDGE-DISPOSITION]
 github: null
 origin: Architect ruling evt_vxqa83y4z3nt (2026-08-08) on the RT-SPECIALIZED-ACTIVE-RESUME D2/D3 sixth wall at exact d9175d05, with the Steward cut and release ruling evt_27jwdbz9h2t4c. Campaign docs/program/16-recursive-descent-retirement.md node #6h. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
@@ -149,61 +149,71 @@ planner-authority correction, option 1 touches a producer/call seat, option 2 is
 an evidence-plumbing repair. **Re-size on the `D0`/`D1` handback**, as #6f and
 #6g both were.
 
-## RULED: OPTION 3 — the planner over-issues. Re-sized `M` to `S`
+## WITHDRAWN: the option-3 ruling. `D2`/`D3` are re-homed, `D0`/`D1` stand
 
-Architect ruling relayed at `evt_4ebpfvfrvv8qy`; Steward re-size
-`evt_e5t1809bn0k4`, 2026-08-08. `D0`/`D1` at exact `9f0a4e41`.
+**Architect hard-stop ruling `evt_dakdkqk4wbg6`, 2026-08-08. This section
+replaces the "RULED: OPTION 3 — the planner over-issues, re-sized `M` to `S`"
+block that stood here.** That block is **false** and was removed rather than
+annotated, because its claim sat in a heading where an appended correction does
+not reach.
 
-**This is a planner-owned source-structural classification** of the exact
-producer / continuation / alternative / recursive-position edge as **direct
-specialization call** versus **deferred-inline case**. The activated witness is
-**deferred-inline** — bridge-selected case work is performed inline — so the
-planner's continuation token is **over-issued**.
+### What survives, and it is the whole point of an attribution node
 
-**Options 1 and 2 are refuted.** Option 2 fell at `D0`: with `emitted=0` and
-`composed=0` there is no call instruction of any kind, so there is no lost
-evidence because nothing happened.
+**The exact-witness conclusion is UNCHANGED: no call occurred.** `D0`'s trace
+and `D1`'s refutation of option 2 stand, and so does the 213-identity census
+(`DIRECT 170`, `COMPOSED 34`, nine committed controls, no independent program
+reaching `close` undischarged). **This node was filed as an ATTRIBUTION node
+that does not begin with a repair, and attribution is exactly what it
+delivered.**
 
-> ### `declared=1` DOES NOT MEAN LOWERING INTENDED TO CALL
+### What is withdrawn, and why it is not a defect in `D0`/`D1`
+
+**Option 3 is not implementable as planner-side edge exclusion.** The ruling it
+rested on conflated **two roles carried by one planner edge**:
+
+| role | who needs it |
+|---|---|
+| **binding projection** | the deferred constructor environment needs worker provenance to install IH / static-worker bindings at recursive positions |
+| **causal call obligation** | only a direct specialization call, or a verified composed raw-worker call, owes a `ContinuationCallIdentity` discharge |
+
+**Bridge selection cannot distinguish them**, and thirty-four bridge-taken edges
+are genuinely compositionally consumed. Restricting to the ordinary arm still
+conflates the ruled witness with `d8e`: **their planner coordinates are
+identical**, and the semantic difference appears only when the arm body resolves
+its de Bruijn callee against the materialized environment.
+
+Both available narrowings are **real failures, not missing predicates**:
+
+- removing the edge **before interning** loses the binding, so `d8e` compiles
+  with a shifted environment;
+- removing only `calls.insert` leaves an **interned-unit / caller population
+  contradiction**.
+
+> ### THE RED CONTROL IS LOAD-BEARING, AND COMMITTING IT RED WAS CORRECT
 >
-> It reads that way, and it is the inference the next reader will reach for.
-> **`close`'s own note says declaration is bulk over the planned set** — *"an
-> unused declaration is a `FuncRef` nobody called."* So `declared=1` merely
-> restates `planned=1` and settles nothing.
+> Held object **`a15a3e934766a1d075386ba561a9469e51a448b7`** — **never
+> published**, with `65639a13` and `aa78c973`. It is what proved the conflation.
+> A control edited until it passes stops being evidence of anything.
 >
-> Recorded because it dissolved on inspection; a fact that dissolves is only
-> harmless when the dissolution is written down next to it.
+> **The string `a15a3e93bd76...` that circulated in the handoff is NOT AN
+> OBJECT.** It shares the first eight characters with the real one. Resolve this
+> SHA with `git cat-file -t` before it enters a Decision; a prefix match is not
+> an existence check.
 
-### What `D2` owes
+### Disposition
 
-The same classification must govern **issuance and bridge choice**; **no token,
-claim slot, or declaration** for deferred-inline; reachability built from the
-remaining eligible graph. **Unchanged:** direct/composed edges, finished-CLIF
-verification, exact set equality, the both-sets refusal.
+`D2` and `D3` are **withdrawn from this node** and re-homed to
+[[RT-CONTINUATION-EDGE-DISPOSITION]], the seventh authority. **This is the
+frame's §5 outcome — a distinct authority, not an enlargement of `D2`** — and
+the campaign's standing record is that treating a new authority as a defect in
+the previous repair is the expensive mistake. **Do not re-open the five landed
+repairs or [[RT-SPECIALIZED-ACTIVE-RESUME]]'s accepted `D2`/`D3` over this.**
 
-Evidence: the deferred-inline classification/bridge/selected path; the identity
-**absent from all five ledger populations**; **token-only reissue reproduces the
-refusal**; one direct and one composed survivor preserved; the census changing
-**only** by ruled-edge removal; and both lanes `Ok` with the retained ledger
-**still unopened**.
+**Sizing is retired rather than corrected.** `S` was granted against an
+edge-exclusion repair that no longer exists; re-sizing this node would size work
+it no longer carries. The successor is sized on its own frame.
 
-> ### THE ONE THING THAT OVERTURNS `S`
->
-> **Excluding an edge is small. Discovering that the planner's traversal
-> assumes the edge exists is not** — that is a traversal-contract change at
-> planner authority and a different node's work.
->
-> **Hard stop and route** if the reachability rebuild requires changing the
-> traversal contract rather than excluding an edge from it. Do not let a
-> growing reachability change quietly convert this to an `M` in flight.
->
-> **Evidence item 5 is the early instrument:** *census changes only by
-> ruled-edge removal* is a differential over the whole 213-identity population,
-> so a traversal-contract problem appears there as a second changed row rather
-> than as a surprise at review.
-
-### Sequencing
-
-`D2` waits for Foundation's `PX8-ERRID-ALLOC` to land, then **rebases onto the
-resulting `main`** — see the contention note above. Re-derive every `core.rs`
-coordinate after the rebase.
+**Green partial:** `2e267180dcbdb7a59df59edf0dde9924925cb7d5`, the `D0`/`D1`
+attribution record, proceeds through fresh exact-SHA QA and a Decision that
+**excludes all `D2`/`D3` mechanism and the held object**. Its own record says
+the classification did not close, and it is `crates/`-identical.
