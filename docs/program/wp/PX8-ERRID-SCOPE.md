@@ -10,9 +10,64 @@ work with an unusually exact specification.**
 **Risk:** medium-high — four of the five need a *real* producer, and the
 tempting shortcut is banned by name in `§4`.
 
-**Status:** Steward frame, shovel-ready.
-⛔ **Blocked on [[PX8-ERRID-ALLOC]]** (Foundation, in flight) — row 3 has no
-identity to assert against until it merges.
+**Status:** Steward frame, shovel-ready. **UNBLOCKED 2026-08-08** —
+[[PX8-ERRID-ALLOC]] merged at exact `8f3692bd`, `main` `22fd1141`, so row 3 now
+has an identity to assert against.
+
+> **Two things landed with it that bear on row 3, and neither is in this frame
+> below.** The resource surface is now **eleven** roles, not ten, with nullary
+> `ResourceAllocationFailed` at **alternative 7**. And the sibling past-end
+> negative control in `planning/static_transition.rs` was rewritten to **derive**
+> its out-of-range witness from `synthesized_dynamic_alternatives(...).len()`
+> rather than hardcode an index, because the hardcoded one silently came into
+> range when the surface widened. **Any evidence row you write that pins this
+> surface's cardinality, or picks a witness by index, has the same defect
+> waiting.** Re-derive both facts at your own base; do not carry these numbers.
+
+**This is a Team Verify WP** (`verify-leader` + `verify-implementer` +
+`verify-qa`), not a Foundation one. Releasing it opens a lane that is not
+currently open.
+
+> ### THE SURFACE HAS TWO INDEPENDENT NUMBERINGS AND NO WRITTEN MAPPING
+>
+> **Adversary triage on merged `22fd1141`, accepted by the Steward as a known
+> limitation — not a defect, and not to be re-filed.** It was checked for a
+> compatibility break specifically, and that hypothesis is **refuted**: the
+> emitter's ordinal is **not persisted on the wire**, so a middle insert
+> renumbers nothing externally.
+>
+> | surface | this role | rule for a new role |
+> |---|---|---|
+> | emitter / planner | **alternative 7** | **insert**, positional and internal |
+> | wire and ABI | **code 9** | **append**, persisted and must not move |
+>
+> **Both are correct in their own domain, and the natural assumption that a new
+> role appends on both sides is true on one and false on the other.** A reader
+> who knows one numbering cannot infer the other. **State which numbering every
+> evidence row you write is expressed in**, and never carry an ordinal across
+> that boundary without converting it.
+>
+> ### THE RISK AXIS IS ORDINAL, NOT CARDINALITY
+>
+> `PX8-ERRID-ALLOC` reddened CI twice. **A count mismatch is loud** — four
+> baseline controls caught it immediately. **An ordinal mismatch is silent:**
+> the sum stays the same size and a consumer simply reads the wrong role, which
+> is exactly what its first red was. A cardinality sweep is **structurally
+> unable** to find that, because both sides can agree on "ten" while disagreeing
+> about *which* seven.
+>
+> ⇒ For any row touching this surface, the question is **"who encodes an
+> ordinal, and in which numbering?"**, not "who encodes the count".
+>
+> ### TWO SCOPING FACTS TO INHERIT RATHER THAN REDISCOVER
+>
+> - The interpreter's end-to-end reachability evidence for the new role
+>   (`buffer_reservation_failure_reifies_the_checked_allocation_error`) is
+>   **`#[cfg(target_pointer_width = "64")]`**. The claim is **64-bit-scoped and
+>   nothing outside the attribute says so.** Fine while CI is x86_64; do not
+>   restate it as unconditional.
+> - `lowering/core/tests/effects.rs` gained **+223/-5** and was **explicitly not
+>   audited**. Treat it as **untouched, not cleared**.
 
 ⭐ **On the Linux ABI I critical path** — one of `PX8`'s three blockers. `PX8`
 gates 15 of that program's 19 nodes.
