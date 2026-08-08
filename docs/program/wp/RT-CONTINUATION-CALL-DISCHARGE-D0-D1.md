@@ -1,5 +1,76 @@
 # RT-CONTINUATION-CALL-DISCHARGE — `D0` trace and `D1` classification
 
+> ## READ THIS FIRST — THIS DOCUMENT IS A DATED RECORD, NOT A CURRENT STATE
+>
+> ### THE CLASSIFICATION DID NOT CLOSE. NONE OF THE THREE OPTIONS IS A RESOLUTION.
+>
+> **Added 2026-08-08 by the Runtime implementer, on the Steward's instruction
+> (`evt_3ktfbtkehh3gk`) and the Architect's hard-stop ruling
+> (`evt_dakdkqk4wbg6`), both relayed by the Runtime leader.**
+>
+> **Everything below this block is the `D0`/`D1` handback exactly as it was
+> returned at exact `9f0a4e41`, before any ruling on it.** It is preserved
+> verbatim because it is the measurement every later ruling was argued from.
+> This block does not correct it. It records what became of its open questions,
+> and the short answer is that they were answered and the answer did not hold.
+>
+> **The chronology, in full, because no single step of it is the current
+> state:**
+>
+> 1. **The Architect ruled option 3** (relayed `evt_4ebpfvfrvv8qy`): the planner
+>    over-issues the causal edge, because the heterogeneous-deforestation bridge
+>    performs the selected case inline and the producer's call seat is never
+>    reached. Option 1 was refuted there; option 2 is refuted below, in section
+>    4, and that refutation still stands.
+> 2. **`D2` built that ruling's mechanism — a planner-side source-structural
+>    classification that excludes the edge — and measured that it does not
+>    hold.** Classifying every bridge-taken edge deferred-inline reds nineteen
+>    committed controls, because thirty-four bridge-taken edges are genuinely
+>    compositionally consumed. Narrowing to the ordinary bridge arm still
+>    conflates the ruled witness with `d8e`'s, whose planner coordinates are
+>    **identical** to it; the two differ only in the de Bruijn callee the arm
+>    body resolves against the materialized environment. Excluding the edge
+>    before interning loses the binding and lets `d8e` compile in a shifted
+>    environment where it previously refused. Excluding only the call leaves an
+>    interned unit with no caller.
+> 3. **The Architect withdrew that mechanism** (`evt_dakdkqk4wbg6`), on the
+>    ground the measurement established: **one planner edge carries two roles** —
+>    binding projection, which the deferred constructor environment needs to
+>    install IH and static-worker bindings at recursive positions, and causal
+>    call obligation, which only a real direct or verified composed call owes.
+>    **Bridge selection cannot distinguish them.** Both failures above are real,
+>    not missing predicates.
+>
+> **Where that leaves this record.** The exact-witness finding is unaffected:
+> for this identity, no call occurred. **But option 3 is NOT implementable as
+> planner-side edge exclusion, and the three-way frame below is incomplete at
+> the component boundary.** Nothing in sections 5 through 8 should be read as
+> naming an implementable resolution or as work to pick up — in particular,
+> section 5's *"options 1 and 3 are both live"* and section 6's separating
+> measurement are both historical.
+>
+> **The successor is a distinct seventh authority, and it is not this node.**
+> Phase-spanning continuation-edge disposition: the planner mints an opaque
+> binding candidate, and lowering settles each candidate exactly once, from
+> events only it can observe. It is **deliberately not a third discharge** —
+> the causal-call partition stays exactly as it is. Do not start it; it is
+> released separately.
+>
+> **This document's own standing is unchanged by all of that.** It is accepted
+> `D0`/`D1` attribution evidence, `crates/`-identical, and it said at the time —
+> correctly — that the classification did not close.
+>
+> **Held and never published:** the `D2` code, its four controls and its
+> committed red control are exact `a15a3e934766a1d075386ba561a9469e51a448b7`.
+> The red is load-bearing: it is what established the two roles, and a control
+> edited until it passes stops being evidence of anything.
+>
+> **Sections 1 through 8 below are unchanged and are not to be rewritten.** One
+> note on their coordinates: the base line immediately below names `cc4621d0`,
+> which was correct when this was written. The commit was later carried
+> unchanged onto `9f4a44d6`; no measurement in the record is affected by that
+> move.
+
 Base: `origin/main` `cc4621d03a13b7a47cadb1b8ecf035b7ae85a378`. Frame blob
 `59fb2325`, node blob `f56b4641`, both read from the worktree at that base.
 Predecessor `2137ee7d` confirmed an ancestor.
