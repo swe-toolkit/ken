@@ -6502,8 +6502,10 @@ mod px5b_effect_observation_tests {
     /// reifies a failure from the production host reservation path as the
     /// nullary `ResourceError.AllocationFailed` constructor.
     ///
-    /// This interpreter row names emitter/planner alternative 7. It does not
-    /// traverse or infer from the separately persisted wire/ABI code 9.
+    /// This interpreter row is expressed in the named semantic
+    /// `ResourceError.AllocationFailed` identity. It exercises neither numeric
+    /// mapping and neither proves nor infers emitter/planner alternative 7 or
+    /// ABI code 9.
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn buffer_reservation_failure_reifies_the_checked_allocation_error() {
@@ -6548,7 +6550,7 @@ mod px5b_effect_observation_tests {
         expect_resource_error(&result, fs.buffer_limit_id, &ids);
         assert_ne!(
             fs.allocation_failed_id, fs.buffer_limit_id,
-            "emitter/planner alternative 7 is a distinct named constructor"
+            "the named semantic ResourceError.AllocationFailed identity exercises neither numeric mapping and neither proves nor infers emitter/planner alternative 7 or ABI code 9"
         );
     }
 
