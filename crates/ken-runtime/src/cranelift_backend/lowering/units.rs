@@ -3161,6 +3161,15 @@ pub(in crate::cranelift_backend) enum D3Event {
     /// A composed claim was RECORDED during lowering, which is strictly before
     /// finished-CLIF verification promotes it.
     ComposedRecorded { identity: ContinuationCallIdentity },
+    /// The shared direct funnel was REACHED and RETURNED an answer.
+    ///
+    /// ⛔ Deliberately a separate event from [`Self::Settle`], and the
+    /// separation was forced by a row that could not be written without it:
+    /// row 4 withholds the settlement while preserving the call, so it must
+    /// assert "the funnel returned AND nothing was settled". One event
+    /// standing for both facts makes that sentence unstateable — the first
+    /// draft overloaded them and row 4 failed against its own instrument.
+    DirectFunnelReturned { identity: ContinuationCallIdentity },
     /// The bridge scope finished, and what it and the two feeds then said.
     BridgeExit {
         identity: ContinuationCallIdentity,
@@ -3175,6 +3184,33 @@ pub(in crate::cranelift_backend) enum D3Event {
         disposition: CandidateDisposition,
         seat: D3Seat,
     },
+}
+
+#[cfg(test)]
+impl D3Event {
+    /// The live identity this observation is about.
+    ///
+    /// Clause 2 of the `AC-6` proof shape is that the unmutated and armed arms
+    /// reach the mutation's seat **for the same derived identity**. Without an
+    /// accessor a row can only compare event *kinds*, which two different
+    /// edges would satisfy equally well.
+    pub(in crate::cranelift_backend) fn identity(&self) -> &ContinuationCallIdentity {
+        match self {
+            Self::BridgeEntry { identity, .. }
+            | Self::ComposedRecorded { identity }
+            | Self::DirectFunnelReturned { identity }
+            | Self::BridgeExit { identity, .. }
+            | Self::Settle { identity, .. } => identity,
+        }
+    }
+
+    /// The seat, when this observation is a settlement attempt.
+    pub(in crate::cranelift_backend) fn settle_seat(&self) -> Option<D3Seat> {
+        match self {
+            Self::Settle { seat, .. } => Some(*seat),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

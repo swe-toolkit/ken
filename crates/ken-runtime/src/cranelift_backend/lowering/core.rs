@@ -9152,40 +9152,51 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let answer = self.claim_and_call_resolved_continuation_inner(builder, identity, fields, recursive_position, producer_env)?;
-        // `D3` — the funnel was REACHED and returned. Recorded before the
-        // settlement branch, so mutation 4's row can prove the direct call and
-        // its return were preserved and only the settlement was withheld.
+        // `D3` — the funnel was REACHED and RETURNED. A distinct event from a
+        // settlement attempt, because mutation 4's row must say "the call was
+        // preserved AND nothing was settled", and one event standing for both
+        // facts makes that sentence unstateable.
         #[cfg(test)]
-        super::units::d3_record(super::units::D3Event::Settle {
+        super::units::d3_record(super::units::D3Event::DirectFunnelReturned {
             identity: identity.clone(),
-            disposition: super::units::CandidateDisposition::DirectCall,
-            seat: super::units::D3Seat::DirectFunnel,
         });
+        // Recorded immediately before each ledger call, so a REFUSED second
+        // settlement still leaves its attempt in the trace.
+        #[cfg(test)]
+        let mark = |identity: &ContinuationCallIdentity| {
+            super::units::d3_record(super::units::D3Event::Settle {
+                identity: identity.clone(),
+                disposition: super::units::CandidateDisposition::DirectCall,
+                seat: super::units::D3Seat::DirectFunnel,
+            });
+        };
         match super::units::d3_mutation() {
             // `D3` mutation 4 -- withhold the settlement, leaving a real
             // direct call unsettled. The call itself is unchanged.
             super::units::D3Mutation::OmitFinalDisposition => {}
             // `D3` mutation 5 -- settle the same candidate twice.
             super::units::D3Mutation::DoubleDisposition => {
+                #[cfg(test)]
+                mark(identity);
                 self.settle_continuation_candidate(
                     identity,
                     super::units::CandidateDisposition::DirectCall,
                 )?;
                 #[cfg(test)]
-                super::units::d3_record(super::units::D3Event::Settle {
-                    identity: identity.clone(),
-                    disposition: super::units::CandidateDisposition::DirectCall,
-                    seat: super::units::D3Seat::DirectFunnel,
-                });
+                mark(identity);
                 self.settle_continuation_candidate(
                     identity,
                     super::units::CandidateDisposition::DirectCall,
                 )?;
             }
-            _ => self.settle_continuation_candidate(
-                identity,
-                super::units::CandidateDisposition::DirectCall,
-            )?,
+            _ => {
+                #[cfg(test)]
+                mark(identity);
+                self.settle_continuation_candidate(
+                    identity,
+                    super::units::CandidateDisposition::DirectCall,
+                )?;
+            }
         }
         Ok(answer)
     }
