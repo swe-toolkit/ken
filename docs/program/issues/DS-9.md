@@ -1,7 +1,7 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: draft
+status: ready
 owner: foundation
 size: L
 gate: none
@@ -47,12 +47,31 @@ origin: Phase 3 of the catalog data-structures enrichment program (docs/program/
 > Runtime dependency it does not have. ⛔ Do not infer the node's blockers from
 > its `depends_on` edge alone — the edge is whole-node, the need is `D5`.
 >
-> **Status stays `draft`** because `D5` has not merged. The flip to `ready` is
-> owed the moment it does, and it is the Steward's.
+> ## FLIPPED TO `ready` 2026-08-09 — `D5` MERGED AT `82918b6a`.
 >
-> **Foundation remains stood down until then** — the stand-down below is still
-> in force, and every re-encoding it forbids by name is still forbidden. What
-> changed is *when* the stand-down lifts and *what event* lifts it.
+> `KERNEL-NESTED-IND` `D5` landed as an accepted partial (PR #1743, exact
+> `5903b664`), delivering elaborator lockstep, interpreter evaluation, and
+> provenance-gated checked-artifact erasure. **That is the event this node was
+> waiting on**, and the `AC-K12` independence is now confirmed against `D6`'s
+> own text rather than by grep: the acceptance test elaborates the `.ken.md`
+> through `ElabEnv::elaborate_ken_md_file`, asserts the laws are real globals,
+> and measures the `trusted_base()` delta — it **asserts behavior through the
+> elaborator**, per the operator's 2026-07-26 test policy. Nothing in it
+> executes natively.
+>
+> ⛔ **`ready` is NOT released.** It means framed-and-shovel-ready
+> (`steward.md §4e`). **Foundation is still stood down** and every re-encoding
+> the stand-down forbids by name — W-shaped, `Fin n`, flattening, Church
+> encodings, postulates, extra malformed spine states — is still forbidden. The
+> diagnostic scaffold at `4dfdb21d` is still evidence, ⛔ not a candidate.
+>
+> ⚠ **What now gates it is the operator's two-lane cap, not the kernel.**
+> Kernel holds a lane (`D6`, `D7` remain) and Runtime holds the other
+> (`RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-id`). When a lane frees, DS-9 and Verify's
+> `CI-ASSERTIONLESS-L1` both want it. ⛔ **That is a priority call between two
+> `ready` WPs, which `steward.md §3` routes to the operator** — the Steward does
+> not decide it, and the previously recorded "Verify is first back in" predates
+> DS-9 becoming eligible.
 >
 > The original block, now partly superseded, follows.
 >

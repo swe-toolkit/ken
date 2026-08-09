@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-09 21:43:46Z — from 193 issue file(s) in `docs/program/issues/`.
+2026-08-09 22:41:27Z — from 193 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -99,7 +99,7 @@ the committed file matches the generator's output.
 | `DOC-W5C-CARDS-CAPABILITY` | Wave 5 slice 3 — apply the settled card format to Capability (19): nineteen complete cards, closing the 39-package set | merged | doc | M | none | — |
 | `DOC-W5D-INDEXES` | Wave 5 closeout — build the four cross-package indexes the cards can support (declaration/type, law, effect/capability, assurance) and record why the four held-class indexes cannot be built | merged | doc | M | none | — |
 | `DOC-W6-AGENT-EVAL` | Wave 6 residual — the cold-context agent evaluation certifies agent_core_ready against a corpus 3.4x smaller than today's, and three of the four pack-selected core modules have changed since | merged | doc | M | none | — |
-| `DS-9` | lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections | draft | foundation | L | none | — |
+| `DS-9` | lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections | ready | foundation | L | none | — |
 | `EFF-SPACE-ENSURES-PRESTATE` | `old` is transparent, so a space operation's `ensures` cannot express the pre/post distinction `36 §4.3` is built on | closed | language | M | none | — |
 | `F1-37` | F1 [task-list #37] — bignum Int soundness review for K3 trusted-base promotion | draft | runtime | TBD | none | — |
 | `F3-39` | F3 [task-list #39] — reducer: degrade-not-wrap + retire legacy arms | draft | runtime | TBD | none | — |
