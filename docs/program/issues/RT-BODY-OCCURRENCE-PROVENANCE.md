@@ -11,6 +11,54 @@ github: null
 origin: Architect standalone mechanism ruling evt_172ag7hdbttkc (2026-08-09), selecting the correction for the authority named by RT-JOIN-ORIGIN-ATTRIBUTION's merged record (exact 72e0d7c, PR #1686). Steward-filed and framed on that bound per COORDINATION §2. AMENDED AND RE-RELEASED 2026-08-09 on ruling evt_5ncj9jd6fjt8f, which withdrew the StaticBodyTarget carve-out after the AC-2 integration gate measured the identical alias in that class; the relation is now keyed over plan.entries UNION every StaticBody target. No merge verdict transfers across the re-release.
 ---
 
+> # THE UNION INCREMENT IS ALREADY ON `main`. THE RESIDUAL IS `AC-2` ALONE.
+>
+> **Steward ruling 2026-08-09, `evt_6enxfcbvcm7mx`, on the Runtime implementer's
+> `D1` stop-and-route.** Everything the re-release below enumerates as "the
+> remaining increment" **landed at `1f706520`** (`AC-1b and the class-selective
+> AC-3 arm (accepted partial)`), which is an ancestor of `main`.
+>
+> **Do not re-implement it.** Verified on `origin/main` by blob and symbol, not
+> by ancestry — the WP branch was squash-landed, so ancestry says nothing:
+> `register_static_body` x3, `record_planned_entry_body` x3, `PlannedEntryBody`
+> x4, `validate_planned_entry_bodies` x3, `body_occurrence` x158; both the
+> `AC-1b` control and the class-selective `AC-3` arm present; the
+> `StaticOriginId(edge.to.0)` fallback retired, with every surviving occurrence
+> either a comment or the `BodyOccurrenceMutation::CollapseStaticBodyTargetBody`
+> arm that deliberately reconstructs it to prove the control reddens. **A live
+> fallback and a mutation that reconstructs it are indistinguishable to a grep
+> and are opposites.** `AC-1`, `AC-3b`'s in-range `None` refusal, and
+> `swapping_two_declaration_occurrences_is_refused` are likewise on `main`.
+>
+> **The one open acceptance criterion is `AC-2`**: the exact `LiftRose`
+> synthetic witness reaches and **closes** owner 2's required `{26, 33, 39, 53}`,
+> measured on venue 4. It is **not blocked by Kernel** — venue 4 is the
+> *synthetic* venue (held Kernel `dd3cd050` with Runtime `f0217c67` and its
+> projection snapshot), already built and reproducible. That is what separates
+> it from `AC-5`, which needs the real capability on `main` and is correctly
+> deferred to the first post-Kernel closure candidate.
+>
+> `crates/.../static_transition.rs:16928` warns in its own voice that a
+> neighbouring test is **not** this `AC-2`; an earlier revision mislabelled it
+> and claimed a gate it does not touch. **The node's acceptance table is the
+> authority.**
+>
+> ### [[KERNEL-NESTED-IND]] IS NOT RELEASED BY THE MECHANISM HAVING LANDED
+>
+> `AC-2` is the instrument that refuted the carve-out — it measured owner 2's
+> entered-list containing `58` and none of `{26, 33, 39, 53}` — and it is the
+> instrument that would detect a **third** seed class. Releasing Kernel against
+> an unmeasured union correction is **landed-implies-capability**, the exact
+> error this node's own `D7` documents. The block stands until `AC-2` closes.
+>
+> ### HOW THIS TEXT WENT STALE, so the next reader recognises the shape
+>
+> An **accepted partial discharges deliverables without moving the node's
+> status.** `2d820e55` re-released on the union contract, `1f706520` landed that
+> increment, and this section was never updated — so the node's own scope prose
+> silently became a claim about the past. The tracker cannot catch it: `status`
+> stayed `active` throughout and that was correct the whole time.
+
 > # THE TRAVERSAL CALL IS NOT MISSING. THE IDENTITY PASSED TO IT IS WRONG.
 >
 > ### THE PAIRING AUTHORITY IS ONE, AND IT COVERS EVERY SEED CLASS
@@ -235,7 +283,15 @@ it red rather than vacuous.
 the attribution node with a named release condition; this is where the first
 half lands and where the second half is assigned.
 
-## Size — M, RECONFIRMED not inherited
+## Size — SUPERSEDED: the increment below landed at `1f706520`
+
+> **Read the leading block first.** Every item this section sizes is on `main`.
+> The remaining work is `AC-2` on venue 4 — a measurement, not an increment.
+> The stop-and-route condition at the end of this section **still binds**: if
+> `AC-2` measures a third seed class, or the union key population is not exactly
+> `plan.entries ∪ StaticBody targets`, stop and route rather than absorbing it.
+
+### Original sizing, retained for the record — M, RECONFIRMED not inherited
 
 **The population widened; the remaining work did not.** `9e5b8d7f` already
 carries the `SchedulingEntry` class complete, QA-approved on its predecessor
