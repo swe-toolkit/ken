@@ -17,7 +17,16 @@ origin: Adversary finding evt_4mwy8tmfmm7tw (F2), triaged and independently conf
 > [`CI-IGNORED-SWEEP`](../wp/CI-IGNORED-SWEEP.md)
 >
 > **The frame governs; this file is the origin record.** Where the two differ,
-> the frame is later and was ground against `origin/main` `368ff87e`.
+> the frame is later and was re-ground against `origin/main` `20c7a291` at
+> release.
+>
+> **The count below is superseded: the population is 51, not 50** — `ken-cli`
+> 33, `ken-verify` 10, `ken-runtime` 5, `ken-interp` 3. The frame pins the
+> anchored **derivation** rather than a literal, because the population moved
+> twice while this node sat `ready`, and accounts for both moves in its `1a`.
+> One of them is a `ken-cli` row that `RT-CARRIER-BYTESPAN-OBSERVE` `D5`
+> correctly repaired and un-ignored — the good-news event this node exists to
+> route, which nothing reported.
 >
 > **Two things the frame settles, which this record leaves open:**
 >
