@@ -2874,7 +2874,7 @@ pub(super) fn define_root_adapter<M: Module>(
         DeclaredUnitCall {
             function: module.declare_func_in_func(root_id, &mut func),
             origin: root_origin,
-            // ⛔ The body occurrence, NOT the scheduling entry. They coincide
+            // The body occurrence, NOT the scheduling entry. They coincide
             // for an ordinary root and deliberately do not when the root body
             // schedules something before itself; `call_site_origin` is matched
             // against the `body_origin` the unit actually lowers, so naming the
@@ -4675,7 +4675,7 @@ fn define_unit_body<M: Module>(
             compiler.root_terminal_authority =
                 compiler.take_distinguished_root_answer_authority()?;
         }
-        // ⛔ **No root special case.** The planner issues every unit's body
+        // **No root special case.** The planner issues every unit's body
         // occurrence at the visit that registered its scheduling entry, so the
         // carried value is already the right one for the root and for every
         // declaration alike.

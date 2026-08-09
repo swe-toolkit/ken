@@ -802,7 +802,7 @@ pub(super) struct PredeclaredFunction {
     pub(super) planned_node: StaticNodeId,
     /// The **body-occurrence** axis — the origin ordinary emission lowers.
     ///
-    /// ⛔ Named for the axis rather than `origin`, which read as "this unit's
+    /// Named for the axis rather than `origin`, which read as "this unit's
     /// origin" and was filled with an alias of `planned_node`. The two axes
     /// coincide for every ordinary body and deliberately do not when the body
     /// schedules something before itself; a field name that does not say which
@@ -898,7 +898,7 @@ struct OwnershipPartition {
     seeds: Vec<StaticNodeId>,
     /// Each seed's body occurrence, dense by the same ordinal as `seeds`.
     ///
-    /// ⛔ **Two seed classes, two different authorities, and neither is the
+    /// **Two seed classes, two different authorities, and neither is the
     /// seed's own ordinal.**
     ///
     /// - A `SchedulingEntry` seed takes the **exact pair issued** at its
@@ -909,7 +909,7 @@ struct OwnershipPartition {
     ///   relation: the seed **is** the body node, so its own origin is the
     ///   correct one by the same rule, not by coincidence.
     ///
-    /// ⚠ Resolved here, where the class is known from which loop pushed the
+    /// Resolved here, where the class is known from which loop pushed the
     /// seed, rather than at the consumer — a consumer holding only a node has
     /// no way to tell the classes apart and would have to infer.
     seed_body_occurrences: Vec<StaticOriginId>,
@@ -1064,7 +1064,7 @@ fn declaration_owned_pairs(
 /// visit issued. This is the defect exactly — `origin: StaticOriginId(seed.0)`
 /// — reinstated at the seat that now resolves it.
 ///
-/// ⛔ **Population-side, deliberately.** The property `AC-3` asserts is that the
+/// **Population-side, deliberately.** The property `AC-3` asserts is that the
 /// issued pair REACHES ordinary emission. A detector-side mutation — narrowing
 /// an assertion, neutering a validator arm — would redden a correctly-named
 /// test while the carried value never moved, and would stay green-reddening for
@@ -1410,7 +1410,7 @@ pub(super) fn build_semantic_plane(
         plane.functions.push(PredeclaredFunction {
             id,
             planned_node: *seed,
-            // ⛔ Was `StaticOriginId(seed.0)` — an alias of the SCHEDULING
+            // Was `StaticOriginId(seed.0)` — an alias of the SCHEDULING
             // entry. For every unit whose body schedules something before
             // itself the two are different nodes, so ordinary emission entered
             // the entry and never reached the body occurrence or its join
@@ -1932,7 +1932,7 @@ impl SemanticPlane {
             if caller == callee {
                 continue;
             }
-            // ⛔ The **scheduling-entry** axis, deliberately. A call names the
+            // The **scheduling-entry** axis, deliberately. A call names the
             // unit it enters, which is its entry; the body occurrence is where
             // that unit's source traversal begins once inside. The old `origin`
             // field was an alias of `planned_node`, so this read is unchanged in
@@ -2079,7 +2079,7 @@ impl SemanticPlane {
         // **The body-occurrence axis, checked against operands the plane did
         // NOT derive it from.**
         //
-        // ⛔ Deliberately *not* re-derived from the partition and compared.
+        // Deliberately *not* re-derived from the partition and compared.
         // `build_semantic_plane` fills this field from
         // `partition.seed_body_occurrences`, so recomputing that here would put
         // one value on both sides of the comparison and could never disagree —

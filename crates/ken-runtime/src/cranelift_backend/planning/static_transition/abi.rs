@@ -476,7 +476,7 @@ pub(super) struct AbiDescriptor {
     pub(super) planned_node: StaticNodeId,
     /// The occurrence ordinary emission lowers as this unit's body.
     ///
-    /// ⛔ Carried, never derived from `planned_node`: the two coincide for
+    /// Carried, never derived from `planned_node`: the two coincide for
     /// an ordinary body and deliberately differ when the body schedules
     /// something before itself.
     pub(super) body_occurrence: StaticOriginId,

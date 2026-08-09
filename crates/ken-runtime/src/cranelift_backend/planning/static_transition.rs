@@ -141,18 +141,18 @@ struct PlannedExpr {
 /// One scheduling entry paired with the body occurrence its own planning visit
 /// returned.
 ///
-/// ⛔ **This is the SOLE scheduling-entry/body pairing authority.** Both fields
+/// **This is the SOLE scheduling-entry/body pairing authority.** Both fields
 /// come from one [`PlannedExpr`], so the pair is *issued* at the moment the two
 /// identities exist together and is never recovered afterwards.
 ///
-/// ⚠ Recovering the body by asking which resume is "outermost" — by graph
+/// Recovering the body by asking which resume is "outermost" — by graph
 /// traversal, completion-edge shape, an owner scan, expression shape, origin
 /// arithmetic, or a first-match rule — is the inference this record exists to
 /// retire. A nested match supplies several resumes under one entry and **no
 /// property of the graph distinguishes the unit boundary among them**; only the
 /// returning visit knows, and only at the instant it returns.
 ///
-/// ⛔ `root_occurrence` and `declaration_occurrences` are projections of this
+/// `root_occurrence` and `declaration_occurrences` are projections of this
 /// table, equality-checked against it by
 /// [`StaticTransitionPlan::validate_scheduling_entry_bodies`].
 /// `declaration_origins` stays a membership projection and is never a pairing
@@ -2427,7 +2427,7 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// The exact `entry -> body_occurrence` pairing, one row per `entries` row
     /// and in the same order.
     ///
-    /// ⛔ Kept **beside** `entries` rather than replacing its element type: the
+    /// Kept **beside** `entries` rather than replacing its element type: the
     /// scheduling-entry population is frozen topology consumed by the owner
     /// partition, the ABI plane and their validators, and reshaping it would
     /// churn all of them for no gain. Exactness comes from the constructor
@@ -3103,7 +3103,7 @@ fn build_join_result_plan(
 ) -> Result<Vec<Option<PlannedJoinResult>>, CraneliftBackendError> {
     let mut joins = vec![None; plan.source_occurrences.len()];
     for descriptor in &plan.abi.descriptors {
-        // ⛔ The carried body occurrence, with NO root special case. This is
+        // The carried body occurrence, with NO root special case. This is
         // the same compensation `define_unit_body` used to carry and for the
         // same reason: the field it read was an alias of the scheduling entry,
         // so the root was patched and every other unit silently rooted its join
@@ -9578,7 +9578,7 @@ impl<'plan> EmittableUnit<'plan> {
     /// The occurrence origin of this unit's body, for
     /// [`StaticTransitionPlan::source_occurrence`].
     ///
-    /// ⛔ The **issued** body occurrence, carried from the planner. It is not
+    /// The **issued** body occurrence, carried from the planner. It is not
     /// this unit's entry and must not be substituted with one.
     pub(in crate::cranelift_backend) fn body_occurrence(self) -> StaticOriginId {
         self.body_occurrence
@@ -9587,7 +9587,7 @@ impl<'plan> EmittableUnit<'plan> {
     /// This unit's **scheduling-entry** origin — the axis a call edge's
     /// `callee_origin` names.
     ///
-    /// ⛔ Exists so a call-identity consumer can say which axis it means
+    /// Exists so a call-identity consumer can say which axis it means
     /// instead of inheriting whichever one the carrier happens to hold. The two
     /// coincide for every unit whose body does not schedule something before
     /// itself, so a site that reads the wrong one is green on most fixtures.
@@ -10693,12 +10693,12 @@ impl<'src> StaticTransitionPlan<'src> {
 
     /// The pairing table's own fail-closed laws.
     ///
-    /// ⛔ Every operand here is **independent of the table**: the scheduling
+    /// Every operand here is **independent of the table**: the scheduling
     /// entry population, the source-occurrence table, and the two projections.
     /// A law that re-derived the pair from the same visit that issued it would
     /// be comparing one value with itself and could not fail.
     ///
-    /// ⚠ **No completion edge is walked.** Reconstructing the answer from graph
+    /// **No completion edge is walked.** Reconstructing the answer from graph
     /// shape is the inference the table replaced; a validator that did it would
     /// re-admit it under the name of a check, and would agree with a wrong table
     /// exactly when the wrong table was wrong for the reason the walk shares.
@@ -10770,13 +10770,13 @@ impl<'src> StaticTransitionPlan<'src> {
     /// Register one scheduling entry together with the body occurrence its
     /// planning visit returned.
     ///
-    /// ⛔ **The only writer of `entries` and of `scheduling_entry_bodies`**, and
+    /// **The only writer of `entries` and of `scheduling_entry_bodies`**, and
     /// it writes both or neither. That is what makes the pairing exact-total by
     /// construction: there is no ordering of calls that registers an entry
     /// without its pair, so "missing pair" is a shape the constructor cannot
     /// produce rather than a state a checker has to catch after the fact.
     ///
-    /// ⚠ Deliberately **generic in the planned form**. It takes a
+    /// Deliberately **generic in the planned form**. It takes a
     /// [`PlannedExpr`] and stores the two fields it was handed; it does not ask
     /// what shape produced them and must never learn. A registration helper that
     /// branches on the form is the special case the ruling exists to avoid —
@@ -10793,7 +10793,7 @@ impl<'src> StaticTransitionPlan<'src> {
 
     /// The body occurrence issued for one scheduling entry.
     ///
-    /// ⛔ Reads the pairing authority. `None` means this node is not a
+    /// Reads the pairing authority. `None` means this node is not a
     /// scheduling entry at all — it is never a licence to substitute the entry's
     /// own origin, which is precisely the alias this table replaced.
     fn scheduling_entry_body(&self, entry: StaticNodeId) -> Option<StaticOriginId> {
@@ -16322,18 +16322,18 @@ mod tests {
     /// > unselected"* — a required join reached by neither consumption nor
     /// > disposition, which is the attribution record's failure exactly.
     ///
-    /// ⛔ **Population-side is the whole point.** `AC-3` asserts REACH. A
+    /// **Population-side is the whole point.** `AC-3` asserts REACH. A
     /// detector-side mutation would redden this same test name while the
     /// carried value never moved, and would keep reddening for the entire life
     /// of a correction that reached nothing.
     ///
-    /// ⚠ **The `Exact` arm is not a fourth assertion — it is what validates the
+    /// **The `Exact` arm is not a fourth assertion — it is what validates the
     /// other three.** A refusal control only has to reach its own guard; the
     /// success arm has to traverse every guard, so it is the only arm that
     /// establishes the fixture could have lowered at all. Without it, a fixture
     /// broken upstream would refuse under both settings and read as a discharge.
     ///
-    /// ⚠ **Honest scope of the two arms.** The root arm exercises the arm that
+    /// **Honest scope of the two arms.** The root arm exercises the arm that
     /// previously carried a *workaround* (`define_unit_body`'s `is_root`
     /// substitution), so it demonstrates the mechanism rather than the shipped
     /// defect. The **non-root** arm is the population that was actually broken:
@@ -16348,7 +16348,7 @@ mod tests {
             .find(|(name, _)| *name == "computational")
             .expect("the computational fixture");
 
-        // ── Arm 1: the ROOT unit.
+        // Arm 1: the ROOT unit.
         let empty = BTreeMap::new();
         assert_eq!(
             ac3_emit(&computational, &empty),
@@ -16372,7 +16372,7 @@ mod tests {
              finds a required join neither consumed nor dispositioned"
         );
 
-        // ── Arm 2: a NON-ROOT unit — the population that actually shipped broken.
+        // Arm 2: a NON-ROOT unit — the population that actually shipped broken.
         let declaration = b2o_transparent_declaration(computational.clone());
         let mut declarations = BTreeMap::new();
         declarations.insert("decl:fixture::b2o", &declaration);
@@ -16401,7 +16401,7 @@ mod tests {
     /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-5` — the deferred synthetic
     /// exact-witness control, CARRIED here, RUNNABLE later.**
     ///
-    /// ⛔ **This control has never executed and this candidate does not claim it
+    /// **This control has never executed and this candidate does not claim it
     /// has.** It is carried in the tree, per `AC-5`, so the obligation is an
     /// artifact rather than a sentence in a handoff that evaporates when the
     /// terminal closes. The **committed runnable form is owned by the first
@@ -16426,7 +16426,7 @@ mod tests {
     /// 4. sibling owners still close normally, so the fixture discriminates this
     ///    owner rather than reporting a whole-plan change.
     ///
-    /// ⚠ **Fail-closed by construction.** The body panics rather than returning,
+    /// **Fail-closed by construction.** The body panics rather than returning,
     /// so removing `#[ignore]` without supplying the witness is a RED. An
     /// ignored test whose body would pass vacuously is the shape that lets a
     /// deferred obligation read as a discharged one.
@@ -16457,7 +16457,7 @@ mod tests {
     /// > DIFFER, or the equality holds for both readings and the pin cannot
     /// > tell which axis it measured.
     ///
-    /// ⛔ **This is the invariant most easily broken by accident, and the one a
+    /// **This is the invariant most easily broken by accident, and the one a
     /// green suite is least likely to catch.** The old `origin` field was an
     /// alias of `planned_node`, so every consumer read the entry axis whether or
     /// not it meant to. Renaming that field in bulk would have silently moved
@@ -16499,7 +16499,7 @@ mod tests {
             }
         }
 
-        // ── Non-vacuity, both axes.
+        // Non-vacuity, both axes.
         assert!(
             fixtures_with_split_axes > 0,
             "AC-4 precondition: at least one fixture must have a unit whose entry \
@@ -16526,14 +16526,14 @@ mod tests {
     /// > fixture never planned, so the exclusion carries no information until
     /// > the excluded thing is shown to be the real, competing candidate.
     ///
-    /// ⛔ **The non-vacuity arms are the test.** Both are asserted here rather
+    /// **The non-vacuity arms are the test.** Both are asserted here rather
     /// than assumed: `n5 != n10` (two distinct resumes exist under one entry, so
     /// there is a genuine choice to get wrong) and `origin_of(n18) != n5` (the
     /// entry is not the body, so a pin that read the entry would differ). On a
     /// fixture where the axes coincide this test would pass while measuring
     /// nothing.
     ///
-    /// ⚠ The exact node identities are a **normative compatibility vector**:
+    /// The exact node identities are a **normative compatibility vector**:
     /// they are the frozen `B2AC_BASE_TOPOLOGY` row for this fixture, which
     /// pins `nodes=19`, `n5`/`n10` as the two `SourceReturnResume` nodes and
     /// `entries=[StaticNodeId(18)]`. A topology change reddens that row first.
@@ -16549,7 +16549,7 @@ mod tests {
         let n5 = origin_of(StaticNodeId(5));
         let n10 = origin_of(StaticNodeId(10));
 
-        // ── Non-vacuity, before anything is concluded from an absence.
+        // Non-vacuity, before anything is concluded from an absence.
         assert_ne!(
             n5, n10,
             "AC-1 precondition: the fixture must supply TWO distinct resumes \
@@ -16571,7 +16571,7 @@ mod tests {
              competing candidate, not an absent node"
         );
 
-        // ── The issued pairing itself.
+        // The issued pairing itself.
         assert_eq!(
             plan.scheduling_entry_bodies,
             vec![SchedulingEntryBody {
@@ -16582,7 +16582,7 @@ mod tests {
              outer body occurrence its own visit returned"
         );
 
-        // ── And no unit claims the nested call's occurrence as its body.
+        // And no unit claims the nested call's occurrence as its body.
         assert!(
             plan.semantic
                 .functions
@@ -16608,7 +16608,7 @@ mod tests {
     /// > passing it off as coverage would leave the entire defect population
     /// > unmeasured.
     ///
-    /// ⛔ This is the discriminating pair the old code could not produce: before
+    /// This is the discriminating pair the old code could not produce: before
     /// the correction `body_occurrence` was `StaticOriginId(seed.0)`, so the
     /// first assertion below was an identity and could not fail.
     #[test]
