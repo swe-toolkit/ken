@@ -89,6 +89,69 @@ origin: Architect re-rule evt_3r4j14fv1jtj2 (2026-08-08) on the nine-expression 
 > premise holds today — but it is small and it is the guard against the exact
 > edit it is designed to catch.
 
+> # `D10` — ADDED 2026-08-09. STRIP THE RELEASE GATE OUT OF A CODE COMMENT.
+>
+> **Confirmed Adversary finding `evt_37y39vcj7y695` on `82918b6a` (`D5`),
+> triaged by the Steward and folded here rather than filed as a node** — it is a
+> comment edit in a file this node's campaign already owns (`steward.md §4c`).
+>
+> `planning/static_transition.rs` carries an `#[ignore]`d control,
+> `liftrose_synthetic_witness_closes_owner_two_required_joins`, authored by the
+> now-**closed** `RT-BODY-OCCURRENCE-PROVENANCE`. Its doc comment states a
+> release condition — *"nested-inductive admission is on `main`"* — and then
+> gives the reader exactly one concrete way to decide it, at `:16518-16522`:
+> `ken-elaborator/src/{compiler_driver,elab}.rs`,
+> `ken-elaborator/tests/nc14_data_match_lowering.rs` and `ken-interp/src/eval.rs`
+> *"each remain at their pre-change state."*
+>
+> **All four moved in `82918b6a`**, measured `afb38934..44c0ceab`:
+> `compiler_driver.rs` `+8/-1`, `elab.rs` `+703/-217`,
+> `nc14_data_match_lowering.rs` `+149/-2`, `eval.rs` `+233/-66`.
+>
+> ⇒ **A reader applying the comment's own test concludes the capability arrived
+> and un-ignores the control** — verbatim the harm the same paragraph predicts
+> three lines later. The sentence is grammatically scoped to `afb38934`, so a
+> careful reader parses it as historical; the defect is that **the comment
+> offers no current test and the one it offers reads GO.**
+>
+> **Direction, stated honestly: this is not a soundness defect and not urgent by
+> severity.** The body is `panic!`, so un-ignoring yields a RED, not a vacuous
+> green. The cost is a wasted red and a misdirected reader. What makes it worth
+> doing now is *proximity*: Runtime is working in these exact files, so the
+> reader is imminent rather than hypothetical.
+>
+> ### The repair is a DELETION plus a pointer. It is deliberately not a rewording.
+>
+> This condition has needed correction three times — `afb38934` pulled the
+> predicates apart, `D7` re-keyed the gate from a merge event to a capability,
+> and `D5` falsified the re-keyed version's evidence clause. **A gate re-keyed
+> from event to capability but operationalized by a path-state snapshot is still
+> event-keyed**; `D7` moved the problem one level down rather than removing it.
+> A paragraph needing the same correction three times is tracking state that
+> lives somewhere else.
+>
+> **The owner is now `KERNEL-NESTED-IND` `AC-K12`**, recorded in that node the
+> same day. `AC-K12` *is* the capability — a nested-IH constructor lowers and
+> evaluates — so the condition finally sits somewhere a status check can see it.
+>
+> | AC | criterion | control |
+> |---|---|---|
+> | `AC-10a` | the four-path snapshot at `:16518-16522` is **deleted**, not re-worded and not re-dated | grep the doc comment for `nc14_data_match_lowering` and for `pre-change state`: both absent. A fourth wording of the same test fails this row |
+> | `AC-10b` | the comment names `KERNEL-NESTED-IND` `AC-K12` as the tracked owner, and offers the reader **no** local test for the release condition | the comment states where the condition is tracked and stops. It must not substitute a different snapshot, path list, or SHA |
+> | `AC-10c` | the control stays **carried and fail-closed** — `#[ignore]` retained, `panic!` body and its four asserted properties byte-unchanged | the test still does not run, and removing `#[ignore]` still reds. This deliverable changes prose only |
+>
+> ⛔ **Do not discharge `AC-5` here and do not delete the control.** `D10`
+> relocates the *condition*; the *obligation* is untouched and remains carried.
+> Making the witness runnable requires the capability, which is not this node's.
+>
+> **Scope: one doc comment.** No production change, no test-body change, no
+> `#[ignore]` removal. Prose-only, so no new suite is owed beyond the file still
+> compiling.
+>
+> **Sequencing: alongside `D9`**, whenever Runtime's lane next turns. Both are
+> small instrument-hygiene items in this campaign's own files and neither depends
+> on the other.
+
 > # THIS NODE EXISTS BECAUSE `D2`'s RECORD OVERCLAIMED — NOT BECAUSE `D3`
 > # BROKE SOMETHING
 >

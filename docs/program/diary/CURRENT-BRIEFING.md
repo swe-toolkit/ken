@@ -33,7 +33,7 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-09 ~22:2xZ · BOTH LANES TURNING; FOUR STALE BLOCKERS CLEARED
+## LIVE — 2026-08-09 ~22:5xZ · KERNEL ON D6; RUNTIME HELD ON AN ARCHITECT RULING
 
 > ### POWER LOSS ~20:0xZ WAS RECOVERED WITH NOTHING LOST.
 >
@@ -42,7 +42,7 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `bdccd97a`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `de338ab4`.** Worktree clean. Nothing of mine is unpublished.
 
 > ### SINCE THE TABLE BELOW WAS WRITTEN — read these four first
 >
@@ -57,16 +57,28 @@
 >    `RT-DYNAMIC-ARM-SCALAR-MERGE` section below — my two-branch taxonomy was
 >    not exhaustive and my own Forbidden bullet had banned the repair.
 >
-> ### OPEN AND UNTRIAGED — the first thing to pick up on resume
+> ### DISPOSITIONED — Adversary `evt_37y39vcj7y695`, closed as CONFIRMED
 >
-> **Adversary finding `evt_37y39vcj7y695` on `82918b6a`**, arrived while I was
-> compacting and **I have not read it in full or dispositioned it.** Reported
-> substance: the carried `AC-5` control's release gate at
-> `static_transition.rs:16514` has **flipped to GO**, and `D5`'s accepted
-> partial is what flipped it. ⚠ **This is the THIRD correction that one gate has
-> needed**, and the Adversary says explicitly that its recommendation is *not* a
-> fourth wording. ⇒ Treat a fourth re-wording as the wrong answer by default;
-> the repeated-defeat pattern says the gate's default branch is wrong.
+> Read in full and triaged. **Confirmed at the source**: the release condition
+> in `planning/static_transition.rs:16513-16523` gives the reader one concrete
+> test — four elaborator/interp paths *"each remain at their pre-change
+> state"* — and all four moved in `82918b6a`. The `#[ignore]` string and the
+> `panic!` body are clean; the snapshot lives **only** in the doc comment.
+>
+> **Split across two nodes, no new node created** (`steward.md §4c`):
+>
+> - the **condition** now has a tracked owner — `KERNEL-NESTED-IND` `AC-K12`,
+>   which *is* that capability. Discharging `AC-K12` also obliges running the
+>   carried control; it may not be reported green while still `#[ignore]`d.
+> - the **code edit** is [[RT-MATCH-RECURSOR-CONSUMERS]] `D10`: delete the
+>   snapshot, point at `AC-K12`, keep the control carried and fail-closed.
+>   Prose-only. Sequenced alongside `D9`.
+>
+> **The repair is a deletion, not a fourth wording — that was the whole point
+> of the finding.** A gate re-keyed from a merge event to a capability but
+> operationalized by a path-state snapshot is still event-keyed; `D7` moved the
+> problem one level down instead of removing it. Not soundness: the body
+> panics, so un-ignoring reds rather than passing vacuously.
 >
 > ### TRAP I HIT TWICE THIS SESSION — `cd /workspaces/ken` in a git command
 >
@@ -89,11 +101,41 @@
 
 | team | node | state |
 |---|---|---|
-| **Kernel** | `KERNEL-NESTED-IND` | `D5` accepted partial. Architect **rejected** `ec577ec0` for a real reachability regression; repair landed as candidate `5903b664`, awaiting fresh QA |
-| **Runtime** | `RT-DYNAMIC-ARM-SCALAR-MERGE` | `D8` of `RT-MATCH-RECURSOR-CONSUMERS` **merged** (`26f1bc50`, PR #1741). `D0` closed; **`D1` framed at `b92b3f3f`**; `D1a` is next |
+| **Kernel** | `KERNEL-NESTED-IND` | `D5` accepted partial **merged** (`5903b664`, PR #1743). Both retros in. **`D6` kicked 2026-08-09 ~22:5xZ** — a *binding* task, contract-point-4 subset only. `D7` after it |
+| **Runtime** | `RT-DYNAMIC-ARM-SCALAR-MERGE` | **HELD pending an Architect design ruling** (`evt_7ek8j2wzzc3e6`). Branch FREE, tree byte-identical to `44c0ceab`, no production edit |
 | **Verify** | `CI-ASSERTIONLESS-L1` | **HELD on the lane cap**, WIP preserved, `AC-2` ruling durable. **First node back in when a slot frees.** |
 
 Neither node is closed, so no slot has freed.
+
+> ### WHY RUNTIME IS HELD, AND WHY I DID NOT RE-KICK VERIFY INTO THE GAP
+>
+> **`D1b-id`'s producer premise was false and the recut is mine.** I cut it
+> against the process-starter path: `compiler_driver.rs:3336-3337` resolves the
+> Nat pair, but the implementer instrumented it and measured **0** lines on the
+> `D5` value path with the instrument confirmed present and the refusal
+> confirmed firing. A second measurement at `erase_checked_core_package_for_target`
+> (`erasure.rs:77`) shows the erased program carries **two function declarations
+> and zero `Data` declarations** — the package's `Nat` is not in it at all.
+>
+> ⇒ **Controls #1 and #3 of `D1b-id` are WITHDRAWN as unsatisfiable.** #1 wants a
+> pair equal to the package `Nat` and different from `legacy_prelude()`; no such
+> pair exists on this path from either source, and the prelude ids resolve
+> byte-equal to legacy. #3's swap cannot discriminate. **Had the implementer
+> built what I framed, it would have compiled, transported a value identical to
+> the existing fallback, changed nothing, and greened its own controls
+> vacuously.** Two measurements are what stopped that.
+>
+> **The open question is above every build seat:** may erasure carry
+> checked-package type and constructor identity into `RuntimeProgram`? That
+> changes what an erased artifact *is*. Architect picked the fork up 22:48:53.
+> The answer also decides whether `AC-K12` is reachable on this architecture.
+>
+> **Verify stays held.** Runtime's lane is blocked but not released — the
+> Architect is actively on it and Runtime resumes the moment it rules. Three
+> turning lanes within the hour would breach the operator's cap for a gap
+> measured in minutes. **If the ruling has not landed by the next pass, the
+> fallback is `D9`+`D10` of [[RT-MATCH-RECURSOR-CONSUMERS]]** — both small,
+> both in Runtime's own files, neither dependent on the ruling.
 
 > ### THE SWEEP THAT PAID: FOUR STALE "BLOCKED ON X" CLAIMS, ONE ROOT CAUSE.
 >
