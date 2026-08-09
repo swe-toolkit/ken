@@ -3062,6 +3062,135 @@ pub(super) struct ContinuationClaimLedger {
     composed: BTreeSet<ContinuationCallIdentity>,
 }
 
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — what lowering settled a binding
+/// candidate to.**
+///
+/// The three are settled at three different seats, each of which knows
+/// something the other two do not, and none of them is a discharge on its own:
+/// a discharge is what [`ContinuationClaimLedger`] records, and this enum sits
+/// in front of it.
+///
+/// `InlineNoCall` is deliberately **not** a third arm of the discharge
+/// partition. A third arm would let a program that made no call satisfy a law
+/// whose entire purpose is to say a call was answered. It never enters the
+/// equality, and `D2` derives the call-obligation subset from the other two.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum CandidateDisposition {
+    /// The verified direct producer/call seat claimed and emitted.
+    DirectCall,
+    /// A raw-worker call was emitted AND passed finished-CLIF verification.
+    ComposedCall,
+    /// The exact deferred bridge scope completed successfully with this
+    /// candidate still unconsumed.
+    InlineNoCall,
+}
+
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the binding-candidate ledger, a
+/// SIBLING of the claim ledger on the same artifact lifetime.**
+///
+/// A candidate is minted by the planner and carries the exact worker provenance
+/// and selector already present in [`ContinuationCallIdentity`] — deliberately
+/// no new key, because a second key would be a second authority over which edge
+/// is which.
+///
+/// **A candidate authorizes environment installation. It does not assert a
+/// call.** That separation is the whole node: the same planner edge was
+/// carrying both roles, and suppressing it to remove the obligation also
+/// removed the binding.
+///
+/// This does not widen [`ContinuationClaimLedger`], add a per-owner close, or
+/// traverse failed or non-selected compilations. It opens and closes in the
+/// same two wrappers, beside the aggregate-allocation and effect-seat ledgers,
+/// which is the established one-artifact-one-ledger idiom.
+///
+/// **`D1` records settlement; it does not enforce totality.** The ordered
+/// closeout — exact one-disposition/disjointness first, then the derived
+/// `DirectCall ∪ ComposedCall` subset, then the unchanged equality — is `D2`.
+/// Until it lands, an `InlineNoCall` candidate still reaches the existing
+/// closeout as an undischarged planned token and is refused there, which is
+/// `D1`'s own witness oracle.
+pub(super) struct ContinuationCandidateLedger {
+    /// Every candidate the planner minted for this artifact.
+    candidates: BTreeSet<ContinuationCallIdentity>,
+    /// The disposition each settled candidate took, and the seat is the only
+    /// writer of each variant.
+    settled: BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+}
+
+impl ContinuationCandidateLedger {
+    fn open(plan: &StaticTransitionPlan<'_>) -> Result<Self, CraneliftBackendError> {
+        // The SAME projection the claim ledger's `planned` is read from, so the
+        // candidate population cannot drift from the population whose
+        // obligations `D2` will derive out of it.
+        let candidates = plan
+            .continuation_calls()?
+            .iter()
+            .map(|call| {
+                plan.continuation_call_binding_for(
+                    call.producer_construct_origin(),
+                    call.continuation_origin(),
+                    call.producer_alternative(),
+                    call.recursive_position(),
+                )?
+                .ok_or_else(|| {
+                    backend_module(
+                        "a planned continuation call has no binding at its own four coordinates,                          so the candidate population cannot be built from the projection that                          produced it"
+                            .to_string(),
+                    )
+                })
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        Ok(Self {
+            candidates,
+            settled: BTreeMap::new(),
+        })
+    }
+
+    /// Settle one candidate, once.
+    ///
+    /// A second settlement is refused **here**, at the seat that makes it, and
+    /// not deferred to closeout: the refusal names which two dispositions
+    /// collided, which a set-difference at close cannot.
+    pub(super) fn settle(
+        &mut self,
+        identity: &ContinuationCallIdentity,
+        disposition: CandidateDisposition,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.candidates.contains(identity) {
+            return Err(backend_module(format!(
+                "lowering settled a disposition for an identity the planner never minted a                  binding candidate for, so the candidate population and the settling seats                  disagree about which edges exist: {disposition:?}"
+            )));
+        }
+        if let Some(existing) = self.settled.insert(identity.clone(), disposition) {
+            if existing != disposition {
+                return Err(backend_module(format!(
+                    "one binding candidate was settled twice, as {existing:?} and then as                      {disposition:?}; a candidate has exactly one disposition"
+                )));
+            }
+            return Err(backend_module(format!(
+                "one binding candidate was settled twice, both times as {disposition:?}; a                  candidate is settled exactly once"
+            )));
+        }
+        Ok(())
+    }
+
+    pub(super) fn is_settled(&self, identity: &ContinuationCallIdentity) -> bool {
+        self.settled.contains_key(identity)
+    }
+
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn dispositions(
+        &self,
+    ) -> &BTreeMap<ContinuationCallIdentity, CandidateDisposition> {
+        &self.settled
+    }
+
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn candidate_count(&self) -> usize {
+        self.candidates.len()
+    }
+}
+
 impl ContinuationClaimLedger {
     pub(super) fn open(
         plan: &StaticTransitionPlan<'_>,
@@ -3412,6 +3541,27 @@ impl ContinuationClaimLedger {
 /// would discard whatever the first had accumulated and leave a partial
 /// equality reading as a global one, which is the failure mode checkpoint 2
 /// exists to remove — so re-opening rejects rather than replacing.
+/// **`D1`** — the disposition tally from the most recent artifact close, so a
+/// witness can assert WHICH disposition its candidate settled to without the
+/// ledger outliving the artifact it belongs to.
+#[cfg(test)]
+thread_local! {
+    static D1_LAST_DISPOSITIONS: std::cell::RefCell<
+        std::collections::BTreeMap<CandidateDisposition, usize>,
+    > = const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d1_last_dispositions()
+-> std::collections::BTreeMap<CandidateDisposition, usize> {
+    D1_LAST_DISPOSITIONS.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_d1_dispositions() {
+    D1_LAST_DISPOSITIONS.with(|cell| cell.borrow_mut().clear());
+}
+
 pub(super) fn open_continuation_claim_ledger(
     compiler: &mut Lowering<'_>,
     bundle: &UnitBundle,
@@ -3426,6 +3576,13 @@ pub(super) fn open_continuation_claim_ledger(
         &compiler.static_transition_plan,
         bundle,
     )?);
+    // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the candidate ledger opens on
+    // the SAME boundary and for the same reason the two below do: one artifact
+    // has exactly one of it, and every pass settles into it. Sharing the
+    // lifetime is what makes it a sibling in front of the claim ledger rather
+    // than a widening of it.
+    compiler.continuation_candidates =
+        Some(ContinuationCandidateLedger::open(&compiler.static_transition_plan)?);
     // `D7` — the aggregate allocation relation opens on the same boundary and
     // for the same reason: one artifact has exactly one relation, and every
     // body's events commit into it.
@@ -3445,6 +3602,24 @@ pub(super) fn open_continuation_claim_ledger(
 pub(super) fn close_continuation_claim_ledger(
     compiler: &mut Lowering<'_>,
 ) -> Result<(), CraneliftBackendError> {
+    // `D1` — the candidate ledger is taken on the same boundary. `D1` records
+    // settlement and does NOT enforce totality here: the ordered closeout is
+    // `D2`, and adding it now would convert this node's own witness to
+    // compile-OK before the derivation that is supposed to do that exists.
+    let _candidates = compiler.continuation_candidates.take().ok_or_else(|| {
+        backend_module("the continuation candidate ledger went missing".to_string())
+    })?;
+    #[cfg(test)]
+    D1_LAST_DISPOSITIONS.with(|cell| {
+        *cell.borrow_mut() = _candidates
+            .dispositions()
+            .values()
+            .copied()
+            .fold(std::collections::BTreeMap::new(), |mut acc, d| {
+                *acc.entry(d).or_insert(0usize) += 1;
+                acc
+            });
+    });
     compiler
         .continuation_claims
         .take()
