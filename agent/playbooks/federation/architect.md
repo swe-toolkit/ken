@@ -122,7 +122,7 @@ exists only in whatever context happens to be resident, and it is the first
 thing a compaction discards. **This is why the global picture was lost: nothing
 was holding it.**
 
-## 1b-ii. The trigger — at the 3rd entry, name the predicate or rule them independent
+## 1b-ii. The trigger — at the 3rd entry, name the predicate or split them
 
 On the **3rd inventory entry** — and every 3rd after — **before you rule**,
 answer exactly one question in-thread:

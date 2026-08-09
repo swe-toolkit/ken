@@ -171,9 +171,10 @@ fleet is not allowed to run. **Demonstrate the binding; do not testify to it.**
 
 ## 12. Running a mutation campaign at the review gate
 
-Promoted from `build/qa-test-design.md`'s Causality gate, which is where this is
-applied: before Approve, demonstrate that breaking the claimed mechanism at
-its seam makes the unchanged test fail with the expected opposite.
+Promoted from `agent/playbooks/build/qa-test-design.md`'s Causality gate, which
+is where this is applied: before Approve, demonstrate that breaking the claimed
+mechanism at its seam makes the unchanged test fail with the expected
+opposite.
 
 - **Enumerate your probes by the STATE each one builds, then look for the
   missing cell (promoted ORACLE-VIS-*; four instances, three seats, one day).**

@@ -36,9 +36,9 @@ watching the base.**
 
 ## The CI gate is not a reason to hold an accepted base
 
-**Corollary.** Operator,
-same ruling: *"Adjust tests as necessary to clear CI gates (mark skip, add
-comment — it's light technical debt that enables a more sane git history)."*
+**Corollary to the rule above.** Operator, same ruling: *"Adjust tests as
+necessary to clear CI gates (mark skip, add comment — it's light technical
+debt that enables a more sane git history)."*
 A failing test on an accepted base is **skipped with a comment naming its exact
 signature and an owning node**, not a reason to leave the base off `main`.
 **Every skip needs an owner**; a skipped row measures nothing, so the node that
@@ -62,11 +62,11 @@ is not partial-WP merging, it is shipping a fragment.
 
 **The cut needs both.** Checkpoint reviews bind exact SHAs *for a deliverable's
 own claim* — they do not assert the tree is green at that commit, because
-nobody ever asked them that. **A prefix every one of whose commits carries a live approval can
-still be red.** Before publishing any cut, establish that the target is green
-**and** that `main` is green, so a red is attributable to the cut rather than
-inherited. CI is the instrument; the local `--workspace` run is still banned
-(§12).
+nobody ever asked them that. **A prefix every one of whose commits carries a
+live approval can still be red.** Before publishing any cut, establish that the
+target is green **and** that `main` is green, so a red is attributable to the
+cut rather than inherited. CI is the instrument; the local `--workspace` run is
+still banned (§12).
 
 > **Measured 2026-08-06, one hour after the rule above was written.** I cut
 > `RT-DECL-CLOSURE-PORT` at `fc758323` — 34 commits, `D1`-`D6a`, every
