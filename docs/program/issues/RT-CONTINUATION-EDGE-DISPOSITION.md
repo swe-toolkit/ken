@@ -182,7 +182,55 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > fixtures are characterized but never verified to discriminate from one
 > another. This cut's `+1` there is inert.
 >
-> ### `D3` REMAINS STOPPED.
+> ### `D2` IS MERGED at exact `495b0b36`, PR #1671, CI GREEN — 2026-08-09
+>
+> Original base `c6e6f23f`, three paths `+465/-131` (`lowering/core.rs`,
+> `lowering/units.rs`, `lowering/core/tests/control.rs`). Decision
+> `dec_6dhj49m7mqdn6` resolved APPROVED by the Architect **for this exact SHA
+> only — no earlier `D2` verdict transfers.** Blob identity verified on all
+> three paths against the landed tree. Adversary notified.
+>
+> **SUPERSEDED, NOT PUBLISHABLE:** `ebbc1ccc`, `b339f15c`, `008b9a15`.
+>
+> **The lifecycle is phase-accurate.** Candidate and claim ledgers share the
+> selected `FunctionizedUnits` artifact lifetime; candidate population comes
+> from the exact planned call/binding projection; settlement is **affine**; and
+> **candidate totality closes BEFORE** the `DirectCall ∪ ComposedCall` subset is
+> derived. `DirectCall` settles only after the shared resolved-continuation
+> funnel returns `Ok` — covering **both** retained-frame and detached-result
+> consumers; `InlineNoCall` only after a successful bridge result with neither
+> prior settlement nor pending composed discharge; `ComposedCall` only after
+> finished-CLIF verification and the double-discharge refusal.
+>
+> **Which law ranges over which population, and this is the whole point of the
+> node:** `resolved` and `declared` stay exact over **full planned**;
+> `discharged` and `claimed` are exact over the **derived call-obligation
+> subset**. An unclaimed `InlineNoCall` is lawful; an extra inline claim and a
+> missing obligation are both refused. `InlineNoCall` never enters the equality.
+>
+> **The sentinel inverted under review, as designed.** `D1`'s refusal string is
+> now labelled **historical/free rather than an oracle** — the one drift I
+> flagged at `D2`'s release, and it did not happen. The stale-claim sweep found
+> no surviving singular-law assertion; the lone remaining "discharged population
+> is not the planned one" is the intentional mismatch diagnostic.
+>
+> ### `D3` IS RELEASED — 2026-08-09, on the merge confirmation, no added gate
+>
+> **I said `D3` would release on `D2`'s handback with no extra condition and
+> that is what happened.** The only reason it waited at all is that `D3`'s
+> mutations consume the **post-`D2` successful witness**, which was not a merged
+> fact until CI reported.
+>
+> **The five mutations must red INDEPENDENTLY** — each proven on its own, not
+> the suite reddening when all five are applied. **No `D3` control may
+> substitute `D1`'s refusal for `D2`'s success**; a mutation proven against the
+> refusing witness proves nothing about the repaired path and is the cheapest
+> available way to make this node's whole proof vacuous.
+>
+> **Check whether each control is free before writing it** — the campaign's
+> standing trap is a control asserting the absence of a refusal the repair just
+> deleted from production. And **derive witnesses; do not pin counts or literal
+> indices.**
 >
 > **`D1` was released 2026-08-09 against the refusing-witness contract and has
 > now MERGED — that release is history, not a pending instruction.**
