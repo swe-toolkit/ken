@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+from contextlib import redirect_stdout
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -78,13 +80,27 @@ class IgnoredSweepTests(unittest.TestCase):
 
     def test_completed_report_names_passing_rows(self) -> None:
         log_text = """
+        Starting 47 tests across 4 binaries
         PASS [  0.001s] l1_acceptance sec24_char_excludes_surrogates
         Summary [  1.000s] 47 tests run: 1 passed, 46 failed
         """
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "run.log"
             log.write_text(log_text, encoding="utf-8")
-            SWEEP.report(log, 47, 100)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                SWEEP.report(log, 47, 100)
+
+        report = output.getvalue()
+        identity = "l1_acceptance sec24_char_excludes_surrogates"
+        self.assertIn("47 selected; 1 passed", report)
+        self.assertIn(f"- {identity}", report)
+        self.assertIn(
+            f"::notice title=Ignored row now passes::{identity}; route to the "
+            "owner node named by its ignore attribute, or to the Steward when "
+            "no live node is named",
+            report,
+        )
 
     def test_report_rejects_zero_or_incomplete_measurements(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
