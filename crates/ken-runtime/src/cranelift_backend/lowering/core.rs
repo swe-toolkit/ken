@@ -16710,7 +16710,15 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // ── The ABI domain, on that exact target.
         let mut found = None;
         for unit in self.static_transition_plan.emittable_units()? {
-            if unit.body_occurrence() != declared.origin {
+            // `declared.origin` is the callee's SCHEDULING ENTRY by its own
+            // contract, filled from `edge.callee_origin()` in
+            // `resolve_call_edges`. So the resolution must compare the entry
+            // axis. Reading the body axis happened to agree because a
+            // callable-declaration unit is seeded on its body node, where the
+            // two coincide -- but agreement on the current population is not
+            // authority, and a split-axis unit elsewhere in the same plan could
+            // false-match a call that names an entry.
+            if unit.entry_origin() != declared.origin {
                 continue;
             }
             if found.is_some() {

@@ -2473,6 +2473,13 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// asymmetric with the two `lower_expr` closure arms
     ///.
     declaration_occurrences: BTreeMap<String, StaticOriginId>,
+    /// Each transparent declaration's SCHEDULING ENTRY, by the same symbol key.
+    ///
+    /// Retained so `declaration_occurrences` can be checked against the pairing
+    /// authority **per symbol**. Without the association, a validator can only
+    /// ask whether a recorded occurrence was issued to some entry, and a swap
+    /// between two declarations survives that question untouched.
+    declaration_entries: BTreeMap<String, StaticNodeId>,
     /// Which of the two lawful target classes each `DeclarationRef`
     /// occurrence's `DeclarationCall` edge resolved to, keyed by the
     /// **reference** occurrence.
@@ -8518,6 +8525,7 @@ impl<'src> Planner<'src> {
                 semantic: SemanticPlane::default(),
                 root_occurrence: None,
                 declaration_occurrences: BTreeMap::new(),
+                declaration_entries: BTreeMap::new(),
                 declaration_call_targets: BTreeMap::new(),
                 trap_catalog: Vec::new(),
                 source_occurrences: Vec::new(),
@@ -10722,9 +10730,17 @@ impl<'src> StaticTransitionPlan<'src> {
                     "scheduling entry has more than one issued body occurrence",
                 ));
             }
+            // `source_occurrences` is dense-by-ordinal and its slots are
+            // `Option`: an in-range `None` is a CONTROL NODE with no source
+            // term. `.get(..).is_none()` only rejects an out-of-RANGE ordinal,
+            // so `Some(None)` -- a real planned node that carries no source --
+            // passed. That is the exact substitution this law exists to refuse,
+            // and the owner check does not close it because descriptors exist
+            // for control nodes too and a same-owner control node satisfies it.
             if self
                 .source_occurrences
                 .get(pair.body_occurrence.0 as usize)
+                .and_then(Option::as_ref)
                 .is_none()
             {
                 return Err(planner_error(
@@ -10757,10 +10773,24 @@ impl<'src> StaticTransitionPlan<'src> {
                 ));
             }
         }
-        for occurrence in self.declaration_occurrences.values() {
-            if !bodies.contains(occurrence) {
+        // Keyed equality per SYMBOL, not set membership. Membership asks only
+        // whether each recorded occurrence is issued to SOMEONE, which two
+        // declarations swapping body occurrences preserves exactly -- the set is
+        // unchanged and every element is still issued. Only comparing each
+        // symbol's own entry against its own recorded occurrence can see a swap,
+        // which is what "equality-checked projection" has to mean.
+        if self.declaration_entries.len() != self.declaration_occurrences.len() {
+            return Err(planner_error(
+                "declaration entry and occurrence projections have different populations",
+            ));
+        }
+        for (symbol, entry) in &self.declaration_entries {
+            let recorded = self.declaration_occurrences.get(symbol).ok_or_else(|| {
+                planner_error("declaration entry projection names an unrecorded symbol")
+            })?;
+            if self.scheduling_entry_body(*entry) != Some(*recorded) {
                 return Err(planner_error(
-                    "declaration occurrence projection is not an issued body occurrence",
+                    "declaration occurrence projection disagrees with the issued pairing",
                 ));
             }
         }
@@ -13106,6 +13136,13 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
                     "transparent declaration planned more than one scheduling entry",
                 ));
             }
+            // Retained on the plan so the occurrence projection can be checked
+            // against the pairing authority under this symbol, rather than
+            // merely shown to be issued to somebody.
+            planner
+                .plan
+                .declaration_entries
+                .insert((*symbol).to_owned(), planned.entry);
         }
     }
     planner.connect_declaration_calls(&declaration_entries)?;
@@ -16446,6 +16483,122 @@ mod tests {
         );
     }
 
+    /// **Fail-closed law: a body occurrence must be a SOURCE occurrence, and an
+    /// in-range control node is not one.**
+    ///
+    /// > **MEASURED:** the plan validator rejects a pairing whose body names an
+    /// > in-range slot holding `None`.
+    /// > **CLAIMED:** the law refuses a body occurrence that is not a planned
+    /// > source occurrence.
+    /// > **THE GAP:** `source_occurrences` is `Vec<Option<..>>`. An
+    /// > out-of-range ordinal and an in-range `None` are DIFFERENT refusals, and
+    /// > `.get(..).is_none()` only performs the first. The mutation here is
+    /// > deliberately the in-range one, because the out-of-range case passes
+    /// > under both the broken and the fixed predicate and so discriminates
+    /// > nothing.
+    ///
+    /// The owner check does not subsume this: descriptors exist for control
+    /// nodes too, so a control node owned by the same unit satisfies it.
+    #[test]
+    fn a_body_occurrence_naming_an_in_range_control_node_is_refused() {
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let plan = plan_static_transition_graph(&computational, &BTreeMap::new())
+            .expect("plannable");
+
+        // A control node: in range, and its source slot is empty.
+        let (control_index, _) = plan
+            .source_occurrences
+            .iter()
+            .enumerate()
+            .find(|(_, slot)| slot.is_none())
+            .expect("precondition: the fixture must contain a control node");
+        assert!(
+            control_index < plan.source_occurrences.len(),
+            "precondition: the mutation must be IN RANGE, or it tests the \
+             out-of-range arm instead"
+        );
+
+        let mut mutated = plan.clone();
+        mutated.scheduling_entry_bodies[0].body_occurrence =
+            StaticOriginId(control_index as u32);
+        assert_eq!(
+            mutated.validate().unwrap_err(),
+            planner_error("scheduling entry body occurrence is not a planned source occurrence"),
+            "an in-range control node carries no source term and must not be \
+             accepted as a unit body"
+        );
+    }
+
+    /// **Fail-closed law: the declaration view is EQUALITY-checked per symbol,
+    /// not merely a member of the issued set.**
+    ///
+    /// > **MEASURED:** swapping two declarations' recorded occurrences is
+    /// > refused.
+    /// > **CLAIMED:** the surviving view agrees with the pairing authority.
+    /// > **THE GAP:** a swap preserves the SET exactly — same elements, every
+    /// > one still issued to some entry — so a membership test passes on it.
+    /// > Only a per-symbol comparison can see it, which is what makes this an
+    /// > equality-checked projection rather than a co-existing table.
+    #[test]
+    fn swapping_two_declaration_occurrences_is_refused() {
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let first = b2o_transparent_declaration(computational.clone());
+        let second = b2o_transparent_declaration(RuntimeExpr::Value(RuntimeValue::Bool(false)));
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::one", &first);
+        declarations.insert("decl:fixture::two", &second);
+        let root = RuntimeExpr::Value(RuntimeValue::Bool(true));
+        let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+
+        let one = plan
+            .declaration_occurrence_origin("decl:fixture::one")
+            .expect("first declaration planned");
+        let two = plan
+            .declaration_occurrence_origin("decl:fixture::two")
+            .expect("second declaration planned");
+        assert_ne!(
+            one, two,
+            "precondition: the two declarations must have DISTINCT occurrences, \
+             or a swap is the identity and the control is vacuous"
+        );
+
+        let mut mutated = plan.clone();
+        mutated
+            .declaration_occurrences
+            .insert("decl:fixture::one".to_owned(), two);
+        mutated
+            .declaration_occurrences
+            .insert("decl:fixture::two".to_owned(), one);
+
+        // The set is provably unchanged, which is why membership cannot see it.
+        assert_eq!(
+            plan.declaration_occurrences
+                .values()
+                .copied()
+                .collect::<BTreeSet<_>>(),
+            mutated
+                .declaration_occurrences
+                .values()
+                .copied()
+                .collect::<BTreeSet<_>>(),
+            "the swap must preserve the value SET, or this control would be \
+             discharged by a membership test and would not pin keyed equality"
+        );
+
+        assert_eq!(
+            mutated.validate().unwrap_err(),
+            planner_error("declaration occurrence projection disagrees with the issued pairing"),
+            "each symbol's recorded occurrence must equal the body issued to \
+             THAT symbol's own scheduling entry"
+        );
+    }
+
     /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-4` — call identity is the ENTRY
     /// axis and did not move with the body axis.**
     ///
@@ -16594,8 +16747,16 @@ mod tests {
         );
     }
 
-    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-2` — a NON-ROOT unit whose body
-    /// schedules something before itself has entry != body.**
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` supporting discrimination — a NON-ROOT
+    /// unit whose body schedules something before itself has entry != body.**
+    ///
+    /// **This is NOT the node's `AC-2`, and it must not be read as discharging
+    /// it.** The node's `AC-2` is the exact `LiftRose` synthetic-venue result:
+    /// owner 2's required `{26, 33, 39, 53}` reached and closed. This test is
+    /// obligation 2 of the LEADER'S DISPATCH list, which numbers differently
+    /// from the node's acceptance table — an earlier revision of this file
+    /// labelled it `AC-2` and thereby claimed a gate it does not touch. The
+    /// node's table is the authority; a dispatch's ordering is not.
     ///
     /// > **MEASURED:** for a transparent declaration whose body is a
     /// > computational match, the unit's `body_occurrence` differs from
@@ -16634,18 +16795,18 @@ mod tests {
             .scheduling_entry_bodies
             .iter()
             .find(|pair| pair.entry != root_entry)
-            .expect("AC-2 precondition: a non-root scheduling entry exists");
+            .expect("precondition: a non-root scheduling entry exists");
 
         assert_ne!(
             origin_of(pair.entry),
             pair.body_occurrence,
-            "AC-2: a non-root unit whose body schedules its scrutinee first must \
+            "a non-root unit whose body schedules its scrutinee first must \
              not have its entry aliased as its body — this equality is what the \
              correction removed"
         );
         assert_eq!(
             pair.body_occurrence, declaration_body,
-            "AC-2: the issued body is the occurrence the declaration's own visit \
+            "the issued body is the occurrence the declaration's own visit \
              returned"
         );
 
@@ -16658,12 +16819,12 @@ mod tests {
             .expect("the non-root seed built a function unit");
         assert_eq!(
             unit.body_occurrence, declaration_body,
-            "AC-2: the carried field is the issued body occurrence"
+            "the carried field is the issued body occurrence"
         );
         assert_ne!(
             unit.body_occurrence,
             origin_of(unit.planned_node),
-            "AC-2: and it is NOT an alias of the scheduling entry"
+            "and it is NOT an alias of the scheduling entry"
         );
     }
 
