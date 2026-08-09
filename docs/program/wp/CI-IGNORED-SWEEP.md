@@ -3,8 +3,14 @@
 Owner: **verify**. Size: **S**. Gate: none. Depends on: nothing.
 Origin record: [`CI-IGNORED-SWEEP`](../issues/CI-IGNORED-SWEEP.md)
 
-Ground: `origin/main` **`368ff87e`**. Every line number and tool fact below was
-read at that ref.
+Ground: `origin/main` **`20c7a291`**, re-grounded at release. Every line number
+and tool fact below was re-read at that ref.
+
+**Re-grounding note, and it is evidence for this node rather than bookkeeping.**
+The frame was first ground at `368ff87e`, where the population was **50**. It is
+now **51**, and the delta is fully accounted in `1a`. The population moved twice
+while this node sat `ready` — which is precisely the claim the node makes about
+the population being unmonitored.
 
 ## 0. Posture
 
@@ -24,22 +30,49 @@ correctness.
 
 ## 1. Fixed inputs
 
-### 1a. The population is 50, and it is selected by attribute, not provenance
+### 1a. The population is selected by attribute, not provenance — and it MOVES
 
-Anchored count at `b0a0a20c` — use `^[[:space:]]*#\[ignore`, since the
-unanchored form also matches doc-comment lines that merely mention the
-attribute and inflates every file:
+**Pin the derivation, not the number.** The population is whatever this command
+returns; the count below is its value at one instant, not a constant.
+
+```sh
+git grep -cE '^[[:space:]]*#\[ignore' <ref> -- crates/<crate>
+```
+
+Use the **anchored** form. The unanchored form also matches doc-comment lines
+that merely mention the attribute, and inflates every file.
+
+Value at `20c7a291`:
 
 ```
-total 50 — ken-cli 34, ken-verify 10, ken-runtime 3, ken-interp 3
+total 51 — ken-cli 33, ken-verify 10, ken-runtime 5, ken-interp 3
 ```
+
+**The delta from the `368ff87e` grounding is fully accounted, and you should
+not re-derive it:**
+
+| crate | was | now | cause |
+|---|---|---|---|
+| `ken-cli` | 34 | 33 | `RT-CARRIER-BYTESPAN-OBSERVE` `D5` (`e0fc15c3`) repaired the `ConsoleWrite` byte-span seat and **un-ignored its row** in `tests/px4b_native_production.rs`. A correct repair-and-un-ignore by the owning node |
+| `ken-runtime` | 3 | 5 | two rows added: `cranelift_backend/artifact/api/tests.rs:95` (`RT-FNUNIT-RESULT-TOKEN`) and `cranelift_backend/planning/static_transition.rs:16537` (the carried `KERNEL-NESTED-IND` control) |
+
+**Two things follow, and they are the reason this section was rewritten.**
+
+1. **A literal count is the wrong pin.** It moved twice in two days from
+   ordinary, correct work. An `AC` or hard stop keyed on `50` would fire on
+   healthy activity and train its reader to re-baseline, which `4` bans.
+2. **The `ken-cli` un-ignore is the good-news event this node exists to
+   route, and nothing reported it.** The owner repaired the seat and lifted its
+   own row, which is the *correct* path — but it is visible here only because
+   the Steward diffed two refs by hand at release time. That is the same
+   luck-of-scope that `1g` records, in the healthy direction.
 
 The node's original `46` was a scope error, not a miscount: it summed the
 42-row authorized set and the four pre-existing `px4b` ignores, counting the
 population this program **authored** rather than the population the mechanism
 will **select**. A sweep selects on the attribute.
 
-### 1b. Only 44 of the 50 have ever been measured
+### 1b. Only 44 of the 51 have ever been measured, and the run is now stale
 
 The one hand-run, at `7d204438`:
 
@@ -48,9 +81,17 @@ ken-cli    --no-fail-fast -- --ignored   ->  0 passed / 34 failed
 ken-verify --no-fail-fast -- --ignored   ->  0 passed / 10 failed
 ```
 
-That covered `ken-cli` and `ken-verify` only. **The three `ken-runtime` and
+That covered `ken-cli` and `ken-verify` only. **The five `ken-runtime` and
 three `ken-interp` ignores were never in it**, so the over-annotation question
-is open for those six. Closing it is `D5`.
+is open for those **eight**. Closing it is `D5`.
+
+**Two caveats on the 44, both of which widen `D5` rather than the frame's
+estimate of it:**
+
+- The `ken-cli` half was `34` rows at `7d204438` and the crate now holds `33`,
+  so that number does not describe today's tree either.
+- `ken-runtime` grew from three rows to five *after* the hand-run, so two of the
+  eight unmeasured rows did not exist when the gap was first described.
 
 ### 1c. Two independent classification axes, and rows can be in both
 
@@ -60,10 +101,16 @@ is open for those six. Closing it is `D5`.
 
   | row | class |
   |---|---|
-  | `crates/ken-runtime/src/boundary_value_clif.rs:7473` | **COST** — `"~142s of arena work; the fast instance at depth 3000 runs by default"` |
+  | `crates/ken-runtime/src/boundary_value_clif.rs:7884` | **COST** — `"~142s of arena work; the fast instance at depth 3000 runs by default"` |
   | `crates/ken-interp/tests/l1_acceptance.rs:242` | **UNBUILT CAPABILITY** |
   | `crates/ken-interp/tests/l1_acceptance.rs:284` | **UNBUILT CAPABILITY** |
   | `crates/ken-interp/tests/l1_acceptance.rs:334` | **UNBUILT CAPABILITY** |
+
+  **The cost row moved from `:7473` to `:7884` between grounding and release,
+  with no change to the row itself.** That is the concrete justification for
+  `D1`'s decision to key the registry on **test path** rather than `file:line`:
+  had the registry existed and been keyed on position, it would already be
+  stale, and it would have failed *toward exempting the wrong row*.
 
 - **Axis 2 — where the row dies:** some rows fail *upstream of their own
   property*, at an `expect` before any assertion runs.
@@ -74,15 +121,27 @@ is open for those six. Closing it is `D5`.
 The axes are independent — a row can be base debt *and* die before its
 assertion.
 
+**A third shape, added at release, and it is not a new axis.** The carried
+control at `static_transition.rs:16537` is base debt awaiting a repair, so
+axis 1 classifies it correctly — but **its `#[ignore]` reason states a release
+condition that is itself wrong.** `RT-BODY-OCCURRENCE-PROVENANCE` `D7` is open
+precisely because that condition names a *merge event* rather than the
+capability, and it has already gone true without the capability arriving.
+
+⇒ **Do not treat an `#[ignore]` reason string as authority for anything except
+routing.** `D4` may read the owner-node id out of it. Nothing in this node may
+read a *release condition* out of it, and the sweep must not attempt to decide
+whether a row is ready to be un-ignored — it reports, the owner decides.
+
 ### 1d. The cost row is not merely noise, it is a budget
 
-`boundary_value_clif.rs:7473` costs about 142 seconds. **A sweep that re-runs
+`boundary_value_clif.rs:7884` costs about 142 seconds. **A sweep that re-runs
 the whole ignored population pays that on every run, unbudgeted.** It must be
 exempt from the first run, not after someone notices.
 
 ### 1e. The two venues use DIFFERENT tools, and this decides the shape
 
-Measured at `368ff87e`:
+Measured at `20c7a291`:
 
 - **CI runs nextest.** Main gate is `cargo nextest run --workspace --locked`
   (`.github/workflows/ci.yml:121`); the dedicated native jobs are at `:213`,
@@ -159,8 +218,8 @@ sweep reports the change, restore it.
 base-debt `#[ignore]` string is the natural address; say what happens for a row
 whose id names no live node.
 
-**`D5` — close the open over-annotation question for the six unmeasured rows**
-(three `ken-runtime`, three `ken-interp` from `1b`). Run them per-crate
+**`D5` — close the open over-annotation question for the eight unmeasured rows**
+(five `ken-runtime`, three `ken-interp` from `1b`). Run them per-crate
 locally. Expect the three `ken-interp` L1 rows to fail for unbuilt-capability
 reasons, which is the `1c` policy class, not over-annotation.
 
@@ -168,14 +227,24 @@ reasons, which is the `1c` policy class, not over-annotation.
 
 ### `AC-1` — the sweep asserts a POSITIVE, never the absence of a failure token
 
-> **MEASURED:** the job asserts the expected suppressed-row **count** and the
-> exit status.
+> **MEASURED:** the job asserts a suppressed-row **count** and the exit status.
 > **CLAIMED:** the sweep ran and observed the population.
+>
+> **The count is asserted against `1a`'s derivation, not against a literal
+> baked into the job.** The population legitimately moves — it moved twice
+> between grounding and release. So the assertion is *"the number of rows the
+> sweep selected equals the number the anchored grep finds at the commit under
+> test, minus the registry"*, which stays true across healthy activity and
+> still fails when the sweep selects nothing. **A hard-coded `51` would be a
+> stale pin within days and would train its reader to re-baseline**, which
+> section 4 bans.
 > **THE GAP:** a job that selects zero tests and exits 0 satisfies a required
 > check while carrying no signal. **That exact defect already shipped here** —
-> two `px8f` jobs went to zero selection, and the aggregator
-> (`ci.yml:296-304`) tests only `result == success`. A check for "no failure
-> token in the output" passes identically when nothing ran.
+> two `px8f` jobs went to zero selection, and the `build-test` aggregator
+> (`ci.yml:333`, result loop `:344-360`) tests only `[ "$result" != "success" ]`.
+> A check for "no failure token in the output" passes identically when nothing
+> ran. Note both `px8f` jobs still carry `--no-tests=pass` (`:213`, `:262`),
+> so zero selection is *by construction* not an error there.
 
 ### `AC-2` — the sweep is proved live by mutation, not by its colour
 
@@ -206,10 +275,21 @@ reasons, which is the `1c` policy class, not over-annotation.
 > **THE GAP:** "we set it non-blocking" is a claim about intent. The
 > aggregator's wiring is the thing that decides, and it already reads job
 > results.
+>
+> **Concretely:** `build-test` (`ci.yml:333`) declares
+> `needs: [test-shard, native-write-partition, native-buffer, native-rt-parity]`
+> at `:336` and re-checks each result at `:344-360`. **The sweep job must not
+> appear in that `needs:` list, and must not be added to the result loop.**
+> Those two edits are the whole of what "blocking" means here, so the control
+> is a diff check on `:336` and `:344-360` plus the observed green.
+>
+> Read the comment at `ci.yml:158-167` before touching any of this — it records
+> the inverse hazard, a job whose result stops being inspected while `needs:`
+> still names it.
 
 ### `AC-5` — bounded wall-clock, cost row exempt from run one
 
-> **MEASURED:** the cost row at `boundary_value_clif.rs:7473` is in the registry
+> **MEASURED:** the cost row at `boundary_value_clif.rs:7884` is in the registry
 > from `D1`, and the job's observed duration is recorded.
 > **CLAIMED:** the sweep is affordable to run standing.
 > **THE GAP:** ~142 seconds is not visible in a pass/fail bit, and an
@@ -232,8 +312,11 @@ Green in CI. Per `COORDINATION §12` this means CI, **not** a local
   substring match on wording is the one form explicitly excluded.
 - **Do not make the sweep a required check.** `D2` and `AC-4`.
 - **Do not re-baseline the expected count to whatever the first run produces.**
-  If the observed population differs from `1a`'s 50, that is a finding to
-  report — the anchored grep is reproducible and the delta has a cause.
+  The count is derived from `1a`'s anchored grep at the commit under test, and
+  **a delta always has a nameable cause** — `1a` names both of the two that have
+  happened so far. If the sweep's selection disagrees with the grep and you
+  cannot say which commit moved it and why, that is a finding to report, not a
+  number to adjust.
 
 ## 5. Hard stop
 
@@ -246,17 +329,42 @@ Stop and report rather than proceeding if:
 - `D5` finds a row that **passes** while ignored. That is over-annotation: a
   live repair with its cover switched off, exactly `1g`'s shape. Report it to
   the Steward with the row and its owner node; do not un-ignore it here.
-- The population at `368ff87e` is not 50 by the anchored grep.
+- The sweep's selected-row count disagrees with `1a`'s anchored grep at the
+  commit under test **and you cannot attribute the difference to a specific
+  commit.** An accounted delta is normal and is not a hard stop; an unaccounted
+  one means the selection logic and the grep disagree about what the population
+  is, which is the whole mechanism.
 
 Per the one-hour turn target, a genuine hard stop is a good outcome.
 
 ## 6. Contention
 
-Touches `.github/workflows/ci.yml` and adds a registry file. **`ci.yml` is
-shared and is the file `RT-SRCBODY-BIND-ORDER`'s CI companion last edited**, so
-check for an in-flight candidate touching it before starting.
+Touches `.github/workflows/ci.yml` and adds a registry file.
 
-Adds no `crates/` change, so it does not contend with the runtime nodes on
-source. It reads their ignored rows; it does not modify them.
+**Re-grounded at release, `20c7a291`, and this is the basis on which the node is
+being released while Runtime works.** Measured, not assumed:
 
-The fleet is single-threaded, so this node runs when Runtime is not.
+- The two live Runtime candidates, `de1434cd` and `bb9fad0a`, touch **zero**
+  `ci.yml` paths. Their scope is `crates/ken-cli/tests/`,
+  `crates/ken-runtime/src/cranelift_backend.rs`, and
+  `.../lowering/core.rs`.
+- This node adds **no `crates/` change at all.** It reads other nodes' ignored
+  rows; it does not modify them, and `4` forbids un-ignoring any of them.
+
+⇒ **The intersection with in-flight Runtime work is empty**, so the
+single-threaded posture is satisfied rather than waived. That posture exists to
+prevent contention, and the operator's standing doc-track exception is granted
+on exactly this basis — contention-free-ness, not priority.
+
+**This is a Steward sequencing call and it is re-derivable, so re-derive it
+rather than trusting this paragraph.** A disjointness claim of the Steward's has
+died twice on the Runtime chain, both times because the *other* lane's repair
+moved into a file the claim had checked earlier. Before starting, re-run the
+check against the then-current tree:
+
+```sh
+git diff --name-only $(git merge-base origin/main <candidate>) <candidate> | grep -c 'ci\.yml'
+```
+
+If any in-flight candidate touches `ci.yml`, **stop and return to the Steward**;
+do not sequence around it yourself.
