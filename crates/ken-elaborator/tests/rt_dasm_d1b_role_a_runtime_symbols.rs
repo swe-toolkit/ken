@@ -26,11 +26,17 @@ use ken_elaborator::compiler_driver::{
     CompilerTargetKind, CompilerSource, TargetSelector,
 };
 
-/// A package that declares its **own** `Nat`, so its constructor identities are
-/// package-qualified and cannot coincide with the prelude's.
-const SOURCE: &str = r#"data Nat = Zero | Suc Nat
-
-const two : Nat = Suc (Suc Zero)
+/// A package whose `Nat` is the one the prelude `GlobalId`s denote — the same
+/// situation as the real D5 package.
+///
+/// ⚠ **An earlier revision of this fixture declared its own `data Nat`, and that
+/// was the wrong witness.** A shadowing declaration creates a *second* `Nat`, so
+/// the prelude ids correctly denote the prelude's one and the record spells
+/// that — the control went red against a producer that was right. Measured on
+/// the real `nested_inductive_pkg` path, the produced pair is
+/// `ctor:nested_inductive_pkg::Nat::{Zero,Suc}`: the ids' prelude **origin** and
+/// their package-qualified **spelling** are different axes.
+const SOURCE: &str = r#"const two : Nat = Suc (Suc Zero)
 "#;
 
 const PACKAGE: &str = "d1b_role_a_pkg";
