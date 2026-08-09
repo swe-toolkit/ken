@@ -143,6 +143,35 @@ exist on `DataMetadata` *and* be projected by `runtime_data_metadata`. The
 first without the second is the same drop that made the held snapshot
 insufficient.
 
+### RE-MEASURED at `main = 678acebc`, after `D5`: STILL NOT RELEASED
+
+**Taken 2026-08-09 by the capability rows below, not by any name grep.** `D5`'s
+accepted partial (`5903b664`, squashed `82918b6a`) is the second
+`KERNEL-NESTED-IND` partial to land since this gate was written, so the
+`3a1ed7da` reading above was stale and is superseded by this one.
+
+| row | answer at `678acebc` |
+|---|---|
+| 1. does `DataMetadata` carry the terminal-support relation under **any** name? | **No.** `checked_core.rs` still has exactly `parameter_count`, `index_count`, `constructors`, `eliminator`, `lowerability` |
+| 2. does `runtime_data_metadata` **project** it? | **No.** `erasure.rs:6045` builds `RuntimeDataAuditMetadata` from `parameter_count`, `index_count`, `constructors` (symbol, `argument_count`, `target_index_count`, `recursive_positions`, lowerability), `eliminator`, `lowerability`. No origin relation |
+| 3. does what it projects carry all **five** facts? | **No** — it carries none of them. Not a partial projection; the relation is absent from this lane entirely |
+
+**Where `all_support_origins` actually sits, since `D5` did land it.**
+`checked_core.rs:176`, as `BTreeMap<StableSymbol, StableSymbol>` on the
+**semantic record** — not on `DataMetadata`. It is hash-covered (`:1297-1298`),
+collected into symbols (`:1872-1873`) and references (`:1928-1930`), and read by
+admission checks (`:4251`, `:4348`). ⇒ It is **fact 2 alone**, exactly as this
+node predicted, and it reaches the erased core's symbol lane while never
+reaching the runtime audit projection `D1` consumes.
+
+⇒ **The verdict is unchanged and the reason is now current rather than
+inherited.** Do not release this node. ⚠ Note the direction: two partials have
+now landed and each moved a different piece of the relation into a lane this
+node does not read. **Landing more `KERNEL-NESTED-IND` partials is not
+convergence on this gate** — re-run the three rows against whatever `main` you
+stand on, and expect the answer to stay No until something reaches
+`runtime_data_metadata`.
+
 ### THE GREP IS KEYED ON A NAME THE IMPLEMENTATION DID NOT CHOOSE
 
 **Measured 2026-08-09 against `KERNEL-NESTED-IND` `D5` WIP `51c482a5`.** That
