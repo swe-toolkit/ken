@@ -10,7 +10,7 @@ use ken_elaborator::compiler_driver::{
     TargetSelector,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabError, ElabEnv};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 use ken_runtime::{
@@ -236,6 +236,29 @@ fn nested_recursive_field_elaborates_checks_erases_and_interprets_at_nat_three()
             .any(|declaration| declaration.symbol == target.to_string()),
         "checked runtime program contains the selected liftSize declaration"
     );
+}
+
+#[test]
+fn duplicate_nested_lift_arm_is_reachability_error() {
+    // Durable invariant: the residual-All path consumes every source arm just
+    // as the ordinary dependent-match path does. Keep the accepted fixture as
+    // the positive side, and change only one duplicate-arm axis here.
+    let source = NESTED_LIFT_NAT_THREE_SOURCE.replacen(
+        "Empty |-> Suc Zero ; ",
+        "Empty |-> Suc Zero ; Empty |-> Suc Zero ; ",
+        1,
+    );
+    assert_ne!(
+        source, NESTED_LIFT_NAT_THREE_SOURCE,
+        "duplicate-arm mutation must change the shared fixture"
+    );
+
+    let mut env = ElabEnv::new().expect("prelude env");
+    match env.elaborate_file(&source) {
+        Err(ElabError::ReachabilityError { .. }) => {}
+        Ok(_) => panic!("duplicate nested lift arm was silently accepted"),
+        Err(other) => panic!("expected ReachabilityError, got {other}"),
+    }
 }
 
 #[test]

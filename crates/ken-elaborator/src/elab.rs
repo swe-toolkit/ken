@@ -1089,17 +1089,20 @@ fn check_match_with_lift(
     );
 
     let mut methods = Vec::with_capacity(support_decl.constructors.len());
+    let mut arm_used = vec![false; arms.len()];
     for (ordinal, support_ctor) in support_decl.constructors.iter().enumerate() {
         let host_ctor = &host.constructors[ordinal];
-        let arm = arms
+        let (arm_index, arm) = arms
             .iter()
-            .find(|arm| {
+            .enumerate()
+            .find(|(_, arm)| {
                 matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(host_ctor.id))
             })
             .ok_or_else(|| ElabError::ExhaustivenessError {
                 missing: ctor_name(cx, host_ctor.id),
                 span: span.clone(),
             })?;
+        arm_used[arm_index] = true;
         let sub_pats = match &arm.pat.kind {
             RPatKind::Ctor(_, fields) => fields,
             _ => unreachable!("arm selected by constructor guard"),
@@ -1202,6 +1205,13 @@ fn check_match_with_lift(
             ))
         })?;
         methods.push(method);
+    }
+    for (i, used) in arm_used.iter().enumerate() {
+        if !used {
+            return Err(ElabError::ReachabilityError {
+                span: arms[i].span.clone(),
+            });
+        }
     }
 
     let elim = Term::Elim {
