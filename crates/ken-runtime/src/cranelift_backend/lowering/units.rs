@@ -3480,11 +3480,19 @@ impl ContinuationClaimLedger {
     /// and is not an error, while an `InlineNoCall` member that WAS claimed
     /// still is.
     ///
-    /// ⭐ The emitted set is the one that is not bookkeeping: an identity enters
-    /// it only after its emitted callee was decoded from the finished CLIF and
-    /// matched the planner-issued target. Set equality against it is therefore
-    /// "every call obligation became exactly one correct direct call, and no
-    /// other continuation call was emitted."
+    /// ⭐ Neither discharge set is bookkeeping. An identity enters `emitted`
+    /// only after its emitted callee was decoded from the finished CLIF and
+    /// matched the planner-issued target, and enters `composed` only after a
+    /// raw-worker call passed every clause of the finished-CLIF verification.
+    ///
+    /// ⛔ There is no equality against `emitted` alone. The equality is over
+    /// their **union** against `call_obligations`, and that is not a detail: a
+    /// lawful `ComposedCall` obligation is answered by verified composed
+    /// consumption and never becomes a direct call, so an "every obligation
+    /// became one direct call" reading would exclude a legal member of the very
+    /// representation this documents. What the union equality says is "every
+    /// call obligation was answered exactly once, in exactly one of the two
+    /// forms, and nothing that was not an obligation was answered at all."
     ///
     /// ⛔ Equality is asserted between sets, not between counts. Two sets of the
     /// same size can differ, and a length comparison here would pass for a
@@ -3684,10 +3692,13 @@ pub(super) fn open_continuation_claim_ledger(
 ///
 /// Since `D2`, two global laws rather than one: `resolved = declared =
 /// planned` over the full planner population, and `discharged = claimed =
-/// call_obligations` over the derived subset.
-/// equality. ⛔ Not a per-pass partial: a pass that discharges nothing is
-/// normal, and only the whole-artifact set answers whether every planned causal
-/// token was discharged exactly once.
+/// call_obligations` over the derived `DirectCall ∪ ComposedCall` subset.
+///
+/// ⛔ Not a per-pass partial: a pass that discharges nothing is normal, and
+/// only the whole-artifact sets answer whether **every call obligation** was
+/// answered exactly once. Deliberately not "every planned token": an
+/// `InlineNoCall` candidate is planned and is lawfully never discharged, which
+/// is the whole point of the derived subset.
 pub(super) fn close_continuation_claim_ledger(
     compiler: &mut Lowering<'_>,
 ) -> Result<(), CraneliftBackendError> {

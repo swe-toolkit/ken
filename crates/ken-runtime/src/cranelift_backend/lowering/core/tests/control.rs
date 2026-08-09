@@ -27529,20 +27529,21 @@ fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obliga
          a witness -- or the candidate was consumed and settled some other way: {dispositions:?}"
     );
 
-    // Clause 3 -- it reached the existing closeout, and the closeout refused,
-    // with the EXACT pre-D2 sentence.
+    // Clause 3 -- it reaches the existing closeout and is NOT refused by it.
+    //
     // **INVERTED BY `D2`, deliberately and under review.** This assertion read
-    // `outcome.contains(PRE_D2_REFUSAL)` for the whole of `D1`, and the refusal
-    // was the deliverable: the candidate was in the equality by construction
-    // and nothing could take it out. `D2`'s ordered closeout derives the
+    // `outcome.contains(...)` for the whole of `D1`, and the refusal was the
+    // deliverable: the candidate was in the equality by construction and
+    // nothing could take it out. `D2`'s ordered closeout derives the
     // call-obligation subset from `DirectCall ∪ ComposedCall`, `InlineNoCall`
     // is not in it, and the same witness now compiles.
     //
-    // The sentinel is spent. It is kept, inverted, because the pair of
-    // assertions below is what makes the conversion auditable: the refusal
-    // string is still live production text, so asserting its ABSENCE is not
-    // free, and a regression that put the candidate back into the equality
-    // would red here rather than pass quietly.
+    // The sentinel is spent. **The absence check below is FREE**, because `D2`
+    // also corrected the production diagnostic to name the call-obligation
+    // population, so the `D1`-era sentence no longer exists anywhere in
+    // production. It is retained as historical evidence of the crossing, not
+    // as an oracle, and the discriminator is the exact `Ok` together with the
+    // binding and `InlineNoCall` settlement asserted above.
     assert!(
         !outcome.contains(HISTORICAL_D1_REFUSAL),
         "the D1-era refusal must not reappear. This clause is free now that the production \
