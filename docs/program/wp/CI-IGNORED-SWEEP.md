@@ -102,15 +102,52 @@ estimate of it:**
   | row | class |
   |---|---|
   | `crates/ken-runtime/src/boundary_value_clif.rs:7884` | **COST** — `"~142s of arena work; the fast instance at depth 3000 runs by default"` |
-  | `crates/ken-interp/tests/l1_acceptance.rs:242` | **UNBUILT CAPABILITY** |
-  | `crates/ken-interp/tests/l1_acceptance.rs:284` | **UNBUILT CAPABILITY** |
-  | `crates/ken-interp/tests/l1_acceptance.rs:334` | **UNBUILT CAPABILITY** |
+  | `crates/ken-interp/tests/l1_acceptance.rs:243` | **UNBUILT CAPABILITY**, and **assertion-free** — see `1c.1` |
+  | `crates/ken-interp/tests/l1_acceptance.rs:285` | **UNBUILT CAPABILITY**, and **assertion-free** — see `1c.1` |
+  | `crates/ken-interp/tests/l1_acceptance.rs:335` | **VACUOUS** — comment-only body; **passes** — see `1c.1` |
 
   **The cost row moved from `:7473` to `:7884` between grounding and release,
   with no change to the row itself.** That is the concrete justification for
   `D1`'s decision to key the registry on **test path** rather than `file:line`:
   had the registry existed and been keyed on position, it would already be
   stale, and it would have failed *toward exempting the wrong row*.
+
+#### `1c.1` — THREE of these four assert nothing. Do NOT seed them as policy.
+
+**Steward disposition of the `D5` hard stop, `evt_15argr23kn3rq`, 2026-08-09,
+re-measured at `d75d8c48`.** The implementer found
+`sec24_char_excludes_surrogates` **passing while ignored** and correctly stopped
+— then correctly refused to call it a repair, because the body is a comment and
+nothing else.
+
+Measured across `l1_acceptance.rs`: of 17 tests, **four contain no `assert*` and
+no `panic!`**, and **three of those four are exactly the three ignored rows
+above**. `#[ignore]` has been the storage mechanism for unfinished tests.
+
+⇒ **The `UNBUILT CAPABILITY` label on rows `243` and `285` is true and
+insufficient.** Their bodies `unwrap()` an elaboration and check nothing, so on
+the day their capability lands they go green **without ever testing the property
+their names claim**. The `#[ignore]` is the only thing preventing a false green,
+and it is held there by an unrelated fact that expires on repair.
+
+**Consequences for `D1`, which override its "seed exactly the four rows"
+instruction:**
+
+- Seed **only the cost row** as an ordinary policy exemption. It is the one row
+  whose exemption is unconditional and whose reason cannot expire.
+- The three `l1_acceptance` rows are seeded in a **third class**,
+  `placeholder-no-assertions`, which is **exempt from the sweep but NOT from
+  scrutiny**: the registry entry must record *what re-admission requires*, which
+  for these rows is **an assertion**, not a capability.
+- **A registry entry that records only "exempt" is what this section forbids.**
+  Permanently exempting a vacuous test is how it stops being looked at, which is
+  the same write-only failure one level up.
+
+**Out of scope here, and already filed:** the assertion-free rows themselves,
+including `ac2_expected_type_overrides_default:110` — which is **live, green,
+un-ignored, and counted as cover today**, and is therefore structurally
+invisible to this sweep. That is [[CI-ASSERTIONLESS-L1]]. **This node does not
+fix, un-ignore, or rewrite any of those bodies.**
 
 - **Axis 2 — where the row dies:** some rows fail *upstream of their own
   property*, at an `expect` before any assertion runs.
@@ -205,7 +242,11 @@ Rationale, so the constraint is legible rather than aesthetic:
   policy row omitted costs a missed regression. **Noise is self-correcting and
   a missed regression is the thing this node exists to prevent**, so the
   default must be "sweep it".
-- Seed it with exactly the four rows in `1c`, including the cost row from `1d`.
+- Seed it per `1c` **as amended by `1c.1`**: the cost row from `1d` as an
+  ordinary policy exemption, and the three `l1_acceptance` rows in the
+  `placeholder-no-assertions` class, each recording that **an assertion** is
+  what re-admission requires. Do not seed all four as plain policy — `1c.1` says
+  why.
 
 **`D2` — the sweep job itself.** Non-blocking by construction: a row that
 starts passing is good news needing routing, not a red gate. It must not become
@@ -326,9 +367,17 @@ Stop and report rather than proceeding if:
   wired non-blocking without touching the aggregator's contract.
 - `AC-3` fires — the registry can narrow the main gate. That is a mechanism
   question, not a tuning exercise.
-- `D5` finds a row that **passes** while ignored. That is over-annotation: a
-  live repair with its cover switched off, exactly `1g`'s shape. Report it to
-  the Steward with the row and its owner node; do not un-ignore it here.
+- `D5` finds a row that **passes** while ignored. Report it to the Steward with
+  the row and its owner node; do not un-ignore it here.
+
+  **This stop has fired once and its disposition is recorded in `1c.1` — that
+  row is settled, do not re-stop on it.** It also taught the distinction the
+  stop's original wording missed: a passing ignored row is **either**
+  over-annotation (a live repair with its cover switched off, `1g`'s shape)
+  **or** vacuity (a body that asserts nothing and passes for free). They look
+  identical from the exit status and have opposite dispositions — the first
+  wants un-ignoring by its owner, the second must stay ignored until someone
+  writes the assertion. **Check the body before classifying.**
 - The sweep's selected-row count disagrees with `1a`'s anchored grep at the
   commit under test **and you cannot attribute the difference to a specific
   commit.** An accounted delta is normal and is not a hard stop; an unaccounted
