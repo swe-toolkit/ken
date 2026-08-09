@@ -52,6 +52,38 @@ validation = [
 owner = "doc"
 
 [[document]]
+path = "library/reference/linear-causal-obligation-calculus.md"
+kind = "reference"
+audience = ["human-reader", "agent-reader"]
+authority = "explanatory"
+availability = "partial"
+sources = [
+  "research/linear-causal-obligation-calculus.md#executive-assessment",
+  "research/causal-obligation-calculus.md#5-the-closest-prior-art",
+  "research/causal-obligation-calculus.md#6-the-unsolved-attott-boundary",
+  "spec/00-overview.md#5-scope-of-this-spec",
+  "docs/adr/0021-resource-lifetime-and-ward-delegation.md#decision",
+  "crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs",
+  "crates/ken-runtime/src/cranelift_backend/lowering/units.rs",
+  "crates/ken-runtime/src/cranelift_backend/lowering/mod.rs",
+  "crates/ken-runtime/src/cranelift_backend/lowering/core.rs",
+  "crates/ken-runtime/src/cranelift_backend/lowering/core/tests/constructors.rs",
+  "crates/ken-runtime/src/cranelift_backend/lowering/core/tests/control.rs",
+]
+validation = [
+  "manifest-coverage",
+  "manifest-completeness",
+  "document-kind",
+  "links",
+  "source-anchors",
+  "availability-label",
+  "authority-class",
+  "transport-delimiter",
+  "source-currency",
+]
+owner = "doc"
+
+[[document]]
 path = "library/reference/catalog/declarations.md"
 kind = "reference"
 audience = ["human-reader", "agent-reader"]

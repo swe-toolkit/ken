@@ -44,6 +44,11 @@ The checked literate guides are the
 [decomposition and abstraction](guide/decomposition-abstraction.ken.md).
 `catalog/guide/` contains compatibility pointers rather than a second copy.
 
+The technical-reference collection also includes [Linear causal obligations in
+compiler lowering](reference/linear-causal-obligation-calculus.md), a
+non-normative paper extracting the native backend's planner, discharge,
+evidence, and closure protocols into a small calculus.
+
 ## Scope and authority
 
 - `library/` is explanatory and derived; `spec/` remains the sole normative
