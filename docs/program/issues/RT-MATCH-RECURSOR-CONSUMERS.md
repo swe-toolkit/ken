@@ -11,6 +11,84 @@ github: null
 origin: Architect re-rule evt_3r4j14fv1jtj2 (2026-08-08) on the nine-expression census evt_16cmej481q7ns, partitioning RT-RECURSOR-TRANSPORT hard stop 4 by measured residual population. Row 6 (d8d) is a D2 completeness defect in Position A, not a lexical-successor row. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # `D9` — ADDED 2026-08-09. `D8`'s PIN READS 3 OF 8 WORKSPACE MEMBERS.
+>
+> **Confirmed Adversary finding `evt_1wxdxmpkxsakc` on the merged `D8`
+> (`74c60c5d`), triaged by the Steward and folded here rather than filed as a
+> node** — the repair is the same reader plus one loop, in the same file, on the
+> same premise (`steward.md §4c`).
+>
+> **`D8`'s header says the premise "rests on exactly three facts". It rests on
+> four.** The fourth: *no other workspace member enables `px8-ds-test-support`
+> on a normal `[dependencies]` edge to `ken-runtime`.* The workspace declares
+> **eight** members (`Cargo.toml:3-12`); the pin opens **three**
+> (`mrc_d8_manifest_premise.rs:305-307`). Three it never opens already hold a
+> normal edge to `ken-runtime`, each one `features = [...]` token away:
+>
+> | member | edge |
+> |---|---|
+> | `crates/ken-elaborator/Cargo.toml` | `:14` |
+> | `crates/ken-interp/Cargo.toml` | `:13` |
+> | `crates/ken-verify/Cargo.toml` | `:16` |
+>
+> ⭐⭐ **Resolver 2 withholds unification for DEV-dependency edges — which is
+> exactly what fact 3 buys — but NOT across NORMAL edges of sibling members in
+> one invocation.** CI runs `cargo build --workspace --locked`
+> (`.github/workflows/ci.yml:58`), which is that invocation.
+>
+> **Measured, with a positive control.** Mutation: add
+> `features = ["px8-ds-test-support"]` to the existing normal edge at
+> `ken-verify/Cargo.toml:16`. Probe: `cargo tree --offline --workspace -e
+> features,no-dev -p ken-runtime`.
+>
+> | leg | baseline | mutated |
+> |---|---|---|
+> | workspace normal-edge resolution | **0** | **1** — feature ON for `ken-runtime`'s normal build |
+> | `-p ken-cli` normal graph (what `--bin ken` selects) | 0 | **0 — structurally blind** |
+> | `mrc_d8_manifest_premise` | 10 passed | **10 passed** — the pin does not notice |
+>
+> ⛔ **THE TWO PINS DO NOT COMPOSE, AND THIS RETIRES THE `D8` SCOPE RULING'S
+> SAFETY ARGUMENT.** `D8` was closed on manifest facts because
+> `mrc_4a1_feature_gate_holds_at_the_artifact` was held to carry the
+> artifact-level link. But 4a.1 builds `--bin ken`, selecting only `ken-cli`'s
+> graph — **an invocation in which cross-member unification structurally cannot
+> appear.** Both pins are keyed on `ken-cli`'s graph while the hazard lives in a
+> sibling's. ⚠ **The `D8` ruling was still correct** — it declined to re-prove
+> *Cargo resolver semantics*, which is not this. This is an unchecked fact about
+> *this repository*, which is squarely what `D8` exists to pin.
+>
+> **Severity, stated in the honest direction: NOT a present defect.** No member
+> enables it today; the baseline `0` is measured. This is a blind spot in the
+> instrument whose entire purpose is catching the future manifest edit — and the
+> natural future edit is precisely a sibling wanting test support and writing it
+> into `[dependencies]`.
+>
+> ### `D9` — extend the pin to the workspace's own declared population
+>
+> ⛔ **Iterate `[workspace] members` from the root manifest. Do not enumerate
+> the three members named above.** The declared member list is the artifact's
+> own population, so iterating it closes the class **by construction** and stays
+> correct when a ninth member arrives. An enumeration is correct today and
+> silently wrong at the next `cargo new`.
+>
+> | AC | criterion | control |
+> |---|---|---|
+> | `AC-9a` | the pin reads **every** member in `[workspace] members` and asserts none enables `px8-ds-test-support` on a normal edge to `ken-runtime` | mutate the `ken-verify` normal edge as above → the pin **reds**; revert → green. ⚠ `D8`'s current pin stays **green** under that mutation, so this is a genuine new discrimination and not a restatement |
+> | `AC-9b` | the member list is **read**, not transcribed | add a synthetic ninth member with the offending edge → the pin reds **without** editing the test. ⛔ A test naming eight paths fails this row |
+> | `AC-9c` | the dev-dependency edge stays **accepted** | `ken-cli`'s existing featured `[dev-dependencies]` edge must not red — the non-degenerate pair. Without it, `D9` could pass by rejecting every featured edge anywhere |
+>
+> ⚠ **One thing the Adversary explicitly did NOT measure, and I am not
+> inferring it:** which invocation cuts a release artifact. The hazard is
+> established for `cargo build --workspace`, the invocation **CI** runs. If
+> releases are cut `-p ken-cli` or `--bin ken`, the exposure is **CI-only** and
+> this is instrument coverage alone. ⛔ Do not report `D9` as closing a
+> shipped-binary exposure unless someone measures that separately. The repair is
+> cheap under either answer, which is why `D9` does not wait on it.
+>
+> **Sequencing:** after `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1`. Not urgent — the
+> premise holds today — but it is small and it is the guard against the exact
+> edit it is designed to catch.
+
 > # THIS NODE EXISTS BECAUSE `D2`'s RECORD OVERCLAIMED — NOT BECAUSE `D3`
 > # BROKE SOMETHING
 >
