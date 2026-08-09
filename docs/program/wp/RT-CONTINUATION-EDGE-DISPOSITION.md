@@ -124,13 +124,13 @@ must still refuse in value position.**
 
 | AC | criterion | control |
 |---|---|---|
-| `AC-1` | The census is complete, with denominators and named excluded controls | `D0` record |
+| `AC-1` | **DISCHARGED** at `e93afb06` (PR #1659) — 637 candidates, one disposition each, zero orphans, controls named and excluded | `D0` record |
 | `AC-2` | Every candidate has exactly one disposition; no unresolved, no double | closeout check, plus mutations 4 and 5 |
 | `AC-3` | `InlineNoCall` never enters the call-obligation equality | read the derivation site; mutation 3 |
 | `AC-4` | The law is unchanged: exact set equality, both-sets refusal intact, `composed` still fed only from `function_local.composed_discharges` | verbatim check at the three sites |
 | `AC-5` | `d8e` keeps binding count **1** and still **refuses** in value position | the four-cell table, both variants |
 | `AC-6` | Each of the five mutations reds **independently** | five proofs, from the committed tree |
-| `AC-7` | `InlineNoCall` has a real named member | `D0`; **vacuous otherwise** |
+| `AC-7` | `InlineNoCall` has a real named member — **`D0` measured this class EMPTY, so the member must be AUTHORED under `D1`** | `D1`, not `D0`; **vacuous otherwise** |
 | `AC-8` | No `#[ignore]` added; `issues/` untouched; the five landed repairs and the predecessor's `D0`/`D1` intact | mechanical |
 | `AC-9` | Workspace green **in CI** | CI, never a local `--workspace` run |
 
@@ -161,6 +161,31 @@ refusing has not implemented the distinction — it has erased it.
 > **`D0`'s census is the early instrument for this**, which is why it comes
 > first. A traversal-contract problem shows up there as a population that does
 > not partition, rather than as a surprise at review.
+
+### WHAT `D0` FOUND — half measured, half open, and a second candidate stop
+
+**The instrument did its job, and it fired.** Recorded at `e93afb06`
+(PR #1659), with the Architect ruling requested at `evt_7hzmgfyedd70v`:
+
+- **Not closed:** `b2f_last_unit_emission()` returns `(0, 0)` after a successful
+  compile of the witness, so **it is not observing the emission path this
+  question needs.** The ring stopped rather than substitute a different number,
+  which is correct — a substituted counter would have answered a different
+  question and read as an answer to this one.
+- **What is measured:** the `px8j` witness plans 3 calls, carries 5 emittable
+  units, compiles `OK`, and one of its candidates settles `InlineNoCall`. ⇒ **an
+  interned-but-uncalled specialization already exists inside a successful
+  compile.** That **argues against the strong form** of this hard stop and does
+  **not** settle it.
+- **A SECOND candidate hard stop, adjacent to this one.** The closeout ranges
+  over **210 of 637** candidates. `D2`'s "exact disposition for every candidate"
+  therefore **changes the population the seat ranges over** rather than adding a
+  check to it. **Do not absorb this into `D2`.** It is with the Architect.
+
+**The population DID partition — 637, one disposition each, zero orphans.** So
+the failure predicted here did not take the predicted shape: it is not a
+population that refuses to partition, it is **a lawful partition most of which
+the law never inspects.**
 
 ## 5. Untouched
 
