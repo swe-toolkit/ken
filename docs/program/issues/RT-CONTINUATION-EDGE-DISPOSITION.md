@@ -65,12 +65,36 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > **Unfired is not cleared.** The condition was evaluated and did not hold, so
 > it stays live as a **`D1`** obligation on the five named axes.
 >
+> ### `AC-7` IS SPLIT ACROSS `D1` AND `D2` — ruling `evt_5n735c2e9r52k`
+>
+> **`D1` owes a real REFUSING witness and MUST NOT claim compile success.**
+> This follows from the released component boundary: `open` seeds `planned`
+> from the full `plan.continuation_calls()` projection, the unchanged `close`
+> requires the disjoint exact equality `planned = emitted ∪ composed`, and a
+> genuine `InlineNoCall` candidate is in the first set and in **neither**
+> discharge set. ⇒ compile-OK before `D2` is impossible without weakening the
+> law, silently doing `D2`, or reviving the withdrawn planner-side exclusion.
+>
+> The `D1` witness is non-vacuous because it pins **selection of a real
+> `FunctionizedUnits` artifact, binding installation, disposition settlement
+> after the deferred bridge succeeds, and arrival at the existing `close`**
+> producing the **exact pre-`D2` missing-call refusal**.
+>
+> **`D2` converts that SAME witness to compile-OK**, after total/disjoint
+> disposition close and subset derivation — the node's only lawful population
+> change. **`D3` consumes the post-`D2` successful witness, and no `D3` control
+> may substitute `D1`'s refusal for `D2`'s success.**
+>
+> **This is a phase correction, not a weakening.** The final bar is still a real
+> binding-installed, closeout-checked, compile-OK member.
+>
 > ### `D1` IS RELEASED. `D2` AND `D3` REMAIN STOPPED.
 >
-> **Steward release, 2026-08-09.** `D1`'s only gate was the frame's
-> *"measurements before mechanism"* rule, and `D0` has returned, been corrected,
-> and been accepted with the stop unfired. **There is nothing left for `D1` to
-> wait on**, so it starts.
+> **Steward release, 2026-08-09, re-issued after the phase correction above.**
+> `D1`'s only gate was the frame's *"measurements before mechanism"* rule, and
+> `D0` has returned, been corrected, and been accepted with the stop unfired.
+> **There is nothing left for `D1` to wait on**, so it starts — now against the
+> refusing-witness contract rather than the compile-OK one.
 >
 > **`D2` and `D3` stay stopped, and this is not caution.** `D3`'s five mutations
 > need an `InlineNoCall` witness that **does not exist yet and is `D1`'s to

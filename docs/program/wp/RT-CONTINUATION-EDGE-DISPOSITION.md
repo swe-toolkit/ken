@@ -91,6 +91,27 @@ retains **binding count 1** and **refuses**.
 > If your implementation makes it easier to add an arm than to add a layer,
 > that is the signal you are building the forbidden thing.
 
+> ### `D1`'s WITNESS MUST REFUSE, AND IT MUST NOT CLAIM COMPILE SUCCESS
+>
+> **Architect ruling `evt_5n735c2e9r52k`, and it follows from the released
+> component boundary rather than from scheduling.** `open` seeds `planned` from
+> the full `plan.continuation_calls()` projection; the unchanged `close`
+> requires the disjoint exact equality `planned = emitted ∪ composed`; and a
+> genuine `InlineNoCall` candidate is **in the first set and in neither
+> discharge set**. ⇒ **compile-OK before `D2` is impossible** without weakening
+> the law, silently doing `D2`, or reviving the withdrawn planner-side
+> exclusion. All three are forbidden.
+>
+> **What `D1` owes is a real, non-vacuous, REFUSING witness.** It is
+> non-vacuous because it pins four things at once: **selection** of a real
+> `FunctionizedUnits` artifact, **binding installation**, **disposition
+> settlement** recorded only after the deferred bridge succeeds, and **arrival
+> at the existing `close`** — where it must produce the **exact pre-`D2`
+> missing-call refusal**.
+>
+> **`D1` MUST NOT claim compile success**, and a `D1` that compiles green has
+> either done `D2`'s work early or weakened the law.
+
 ### `D2` — closeout, in this order
 
 **First** require an **exact, disjoint disposition for every candidate.**
@@ -101,6 +122,16 @@ apply the existing law **unchanged**.
 first and checking dispositions afterwards would let an unresolved candidate
 pass silently, which is exactly the failure the predecessor's `close` refuses.
 
+> ### `D2` OWNS THE CONVERSION OF `D1`'s REFUSING WITNESS TO COMPILE-OK
+>
+> **Over the SAME witness `D1` built** — not a new one. In this order: close the
+> candidate ledger with **exactly one disposition and disjointness**; derive
+> `DirectCall ∪ ComposedCall`; apply the **unchanged** call equality to that
+> derived subset; **and only here require compile-OK.**
+>
+> **This is the only lawful population change in the node**, which is why
+> `AC-7`'s compile-OK clause lives here and not in `D1`.
+
 ### `D3` — the five mutations, each reddening independently
 
 | # | mutation | must red |
@@ -110,6 +141,11 @@ pass silently, which is exactly the failure the predecessor's `close` refuses.
 | 3 | mark inline **after** a composed call | yes |
 | 4 | omit a final disposition | yes |
 | 5 | present one candidate in **two** dispositions | yes |
+
+**`D3`'s mutations consume the POST-`D2` SUCCESSFUL witness.** **No `D3`
+control may substitute `D1`'s refusal for `D2`'s success** — a mutation proven
+against the refusing witness proves nothing about the repaired path, and it is
+the cheapest available way to make this node's whole proof vacuous.
 
 **Independently** means each is proven on its own, not that the suite reds when
 all five are applied. **Check whether each control is free before you write
@@ -130,7 +166,7 @@ must still refuse in value position.**
 | `AC-4` | The law is unchanged: exact set equality, both-sets refusal intact, `composed` still fed only from `function_local.composed_discharges` | verbatim check at the three sites |
 | `AC-5` | `d8e` keeps binding count **1** and still **refuses** in value position | the four-cell table, both variants |
 | `AC-6` | Each of the five mutations reds **independently** | five proofs, from the committed tree |
-| `AC-7` | `InlineNoCall` has a real named member. **The CLASS is not empty — `D0` measured 21 members.** What is empty is the **non-vacuous witness cell**, `binding-installed ∩ closeout-checked ∩ compile-OK`, so the witness must be **AUTHORED under `D1`** | `D1`, not `D0`; **vacuous otherwise** |
+| `AC-7` | `InlineNoCall` has a real named member. **The CLASS is not empty — `D0` measured 21 members**; what is empty is the **witness cell** `binding-installed ∩ closeout-checked ∩ compile-OK`. **The clause is SPLIT ACROSS TWO PHASES** (`evt_5n735c2e9r52k`): **`D1`** authors a real **refusing** witness pinning selection, binding installation, disposition settlement and close arrival, and **must not claim compile-OK**; **`D2`** converts that same witness to **compile-OK** after total/disjoint disposition close and subset derivation. **The final bar is unchanged** — a real binding-installed, closeout-checked, compile-OK member — **only the clause's owner moves from `D1` alone to `D1`+`D2` in that order** | `D1` then `D2`; **vacuous otherwise** |
 | `AC-8` | No `#[ignore]` added; `issues/` untouched; the five landed repairs and the predecessor's `D0`/`D1` intact | mechanical |
 | `AC-9` | Workspace green **in CI** | CI, never a local `--workspace` run |
 
