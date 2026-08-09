@@ -248,9 +248,11 @@ Rationale, so the constraint is legible rather than aesthetic:
   what re-admission requires. Do not seed all four as plain policy — `1c.1` says
   why.
 
-**`D2` — the sweep job itself.** Non-blocking by construction: a row that
-starts passing is good news needing routing, not a red gate. It must not become
-a fourth way for an unrelated candidate to be blocked.
+**`D2` — the sweep job itself.** Non-blocking **for findings**: a row that
+starts passing is good news needing routing, not a red gate, and must not become
+a fourth way for an unrelated candidate to be blocked. **Instrument failure
+stays blocking** — see `AC-4a`, which is operative and was written after this
+interaction blocked a real merge.
 
 **`D3` — the positive control.** Un-ignore one known-failing row, observe the
 sweep reports the change, restore it.
@@ -327,6 +329,48 @@ reasons, which is the `1c` policy class, not over-annotation.
 > Read the comment at `ci.yml:158-167` before touching any of this — it records
 > the inverse hazard, a job whose result stops being inspected while `needs:`
 > still names it.
+
+#### `AC-4a` — the EXIT STATUS must separate a broken instrument from a finding
+
+**Steward decision, 2026-08-09, on verify-leader's proposal `evt_6azs3wbbe5551`,
+after PR #1714 was blocked by this exact interaction. This is operative.**
+
+`AC-4` as written is satisfiable while the defect it exists to prevent still
+occurs. Measured: the sweep job sits outside `build-test`'s `needs:` and result
+loop, so the required aggregator is untouched and `AC-4`'s control passes — **and
+a red sweep still blocked a merge**, because the publisher path fails on *any*
+failing check. That is section 4's banned "fourth way for an unrelated candidate
+to be blocked", reaching the repository through a gate `AC-4` never modelled.
+
+**Three outcomes, and the exit status alone must distinguish them**, because the
+publisher sees nothing else. A summary the publisher cannot read does not count.
+
+| outcome | exit | blocks a merge |
+|---|---|---|
+| **Instrument failure** — the sweep could not run, or could not be trusted: bad filterset, selection error, a registry entry that does not resolve against the nextest listing, a listing/count mismatch | **non-zero** | **yes, and that is correct** |
+| **Finding** — the sweep completed and one or more ignored rows now pass | **zero**, with notices and a summary | **never** |
+| **Nominal** — the sweep completed and every selected row still fails | **zero** | no |
+
+**Why instrument failure must stay blocking, rather than being softened along
+with the rest.** Section 0: the failure mode of an instrument is reporting when
+it measured nothing. A sweep that cannot fail is that defect. `AC-1` already
+forbids asserting the absence of a failure token; making every outcome exit zero
+would be the same mistake at the job level. **The non-blocking requirement is
+about findings, not about the instrument's own health**, and the frame did not
+previously say so.
+
+**One case verify-leader's proposal did not name, ruled here: a registry entry
+that resolves to no test is INSTRUMENT FAILURE, not a finding, and not
+silently skippable.** The corrective mechanism resolves each `test_path` against
+the nextest listing; if that resolution fails, the exemption set no longer
+describes reality and a rename could silently carry an exemption onto the wrong
+row — or off the intended one. `D1`'s stated principle is **fail toward
+sweeping**, and an unresolvable exemption is the one case where quietly dropping
+the entry would instead fail toward *exempting*. Make it loud.
+
+**Control.** Force each of the three outcomes and record the observed exit
+status for each. A test that only exercises the nominal path does not discharge
+this row — the two interesting outcomes are the ones that have never run.
 
 ### `AC-5` — bounded wall-clock, cost row exempt from run one
 
