@@ -41,19 +41,27 @@ data D (Δ_p) : (Δ_i) → Type ℓ where
 - `ℓ` is the family's universe level; constructor argument types must live at
   `ℓ` or below (predicativity, `12 §2`).
 
-The kernel admits the declaration only if it passes (a) ordinary type-checking
-of all constructor signatures in context `Δ_p`, (b) the **strict-positivity**
-check (§2), and (c) universe-level checks. For every carrier parameter position
+The declaration supplied to `declare_inductive` is the **host declaration**.
+The kernel admits it only if it passes (a) ordinary type-checking of all
+constructor signatures in context `Δ_p`, (b) the **strict-positivity** check
+(§2), and (c) universe-level checks. For every host carrier parameter position
 thereby recorded as strictly positive, it must also generate and ordinarily
 check the two internal source-indexed families of §3.2 and their constructors
-before the new former may serve as a positive enclosing path.
+before the host may serve as a positive enclosing path.
+
+Generated `All` declarations are **terminal support declarations**. They pass
+ordinary formation, positivity, universe, constructor, and eliminator checks,
+but their admission does not trigger another support-generation round and does
+not register them as enclosing formers for §8.5. Thus a host with `p` checked
+strictly-positive carrier parameters has the fixed first-order support set of
+exactly `2p` families. There is no `All`-of-`All` closure to compute.
 
 This is one atomic admission transaction. Success publishes the type former
 `D`, constructors `cₖ`, **eliminator** `elim_D` (§3), and all required internal
-`All^Type` / `All^Omega` declarations and their ordinary eliminators. Failure
-of either the host checks or any generated-family check publishes none of them
-and leaves the global environment `Σ` unchanged. A partially admitted host with
-missing lift families is never observable.
+`All^Type` / `All^Omega` declarations, their constructors, and their ordinary
+eliminators. Failure of either the host checks or any generated-family check
+publishes none of them and leaves the global environment `Σ` unchanged. A
+partially admitted host with missing lift families is never observable.
 
 ### Canonical examples (elaborated forms)
 
@@ -348,10 +356,11 @@ only the recursive-shape record checked at admission. In particular, its type
 is available while the kernel constructs a method type, before any method term
 exists.
 
-For every admitted inductive former `F` and every carrier parameter `q`
-recorded as strictly positive, admission also generates a kernel-internal
-indexed family `All^S_{F,q}`. The displayed name is metanotation, not a public
-identifier. Here `S` records whether its leaf predicate is type-valued or
+For every admitted **host** inductive former `F` and every carrier parameter
+`q` recorded as strictly positive, admission also generates a kernel-internal
+indexed family `All^S_{F,q}`. A generated `All` support declaration is not a
+host for this rule. The displayed name is metanotation, not a public identifier.
+Here `S` records whether its leaf predicate is type-valued or
 proposition-valued.
 
 The telescope is closed as follows. Suppose the admitted former has bound level
@@ -386,11 +395,14 @@ composed positive path, the result level is the maximum of `l` and every
 host-family level on that path. This is the exact predicative level
 calculation, not a level inferred from the recursive leaf alone.
 
-`All^S_{F,q}` is an ordinary checked indexed inductive family. For every host
-constructor `c_k`, it has one internal constructor indexed by the original
-source value `c_k ā`. That constructor binds the original fields `ā` and, in
-declaration order, exactly the following evidence fields for occurrences of
-parameter `q`:
+`All^S_{F,q}` is an ordinary checked indexed inductive family. Its check covers
+formation, positivity, universes, constructors, and its ordinary eliminator.
+It is nevertheless terminal support: positive positions found by that check do
+not generate support families and are not installed in the general enclosing-
+former lookup of §8.5. For every host constructor `c_k`, it has one internal
+constructor indexed by the original source value `c_k ā`. That constructor
+binds the original fields `ā` and, in declaration order, exactly the following
+evidence fields for occurrences of parameter `q`:
 
 - a direct parameter leaf `x : A` contributes `P x`;
 - a Π/W-style field contributes the corresponding Π-abstracted evidence;
@@ -410,6 +422,13 @@ constructor targets exactly its matching source topology; it cannot directly
 construct evidence at an unrelated source index. The generated families and
 constructors are kernel-internal and add ordinary `Inductive` declarations,
 never an `Opaque` or `Primitive` declaration.
+
+The generator may reference an already-published terminal support family while
+forming or checking a composed support constructor. Such references consume
+the earlier host's checked lifting structure; they neither expose the support
+family as a user enclosing former nor enqueue support for that support family.
+The terminal classification is kernel-originated and cannot be requested by a
+caller to bypass host generation.
 
 `Lift_D` is then defined structurally:
 
@@ -724,10 +743,11 @@ general mechanism; decidability does not depend on it (§9.4).
 For a nested argument position `j`, §3.2 fixes the lifted-IH **type** before
 method checking as an application of the generated `All` family. Admission of
 a host former is transactional: after its declaration checks, the kernel
-generates and checks all required `All^S_{F,q}` declarations before publishing
-that former as an enclosing positive path. A failure to form any required
-family rejects the host declaration; a later guest declaration never invents
-one on demand.
+computes the fixed set of two terminal `All` declarations per checked positive
+carrier, checks that first-order set, and publishes it with the host. Checking
+a support declaration never re-enters this generation step. A failure to form
+any required family rejects the host declaration; a later guest declaration
+never invents one on demand.
 
 Once the complete guest method vector exists, `lift-elim_D` constructs an
 inhabitant of that fixed type by eliminating the actual enclosing value `a_j`.
@@ -752,8 +772,9 @@ elim_D M m₁…mₙ t̄ r
 - a primitive Σ occurrence contributes the recursively constructed components;
 - a recursive host child uses the host eliminator's own IH, whose type is
   already `All^S_{F,q} P_q child`;
-- a composed admitted-positive child uses the previously generated `All`
-  family and its corresponding structural construction;
+- a composed admitted-positive child uses the previously generated terminal
+  `All` family and its corresponding structural construction, without
+  generating support for that support family;
 - an ordinary field contributes no evidence argument.
 
 When `Lift_D` has several declared-former components, this construction runs
@@ -958,10 +979,12 @@ former to the occurrence.
 **Nested-parameter rule (normative).** First collect an application into its
 maximal spine `F a₁ … aₙ`. For that spine at positive polarisation:
 
-1. Resolve `F` to a previously admitted type-former declaration, transparently
-   unfolding an admitted definition before classification. If it does not
-   resolve, or the resulting former carries no checked parameter-polarity
-   information, every argument position is **unknown** and an argument
+1. Resolve `F` to a previously admitted **host** type-former declaration,
+   transparently unfolding an admitted definition before classification. A
+   terminal `All` support declaration never qualifies as a host in this lookup,
+   even if its ordinary positivity check found positive positions. If `F` does
+   not resolve to an eligible host, or the host carries no checked parameter-
+   polarity information, every argument position is **unknown** and an argument
    containing `D` is rejected.
 2. A parameter position is **declared strictly positive** only when the
    declaration's checked definition or constructor telescopes establish that
@@ -971,8 +994,10 @@ maximal spine `F a₁ … aₙ`. For that spine at positive polarisation:
    native former may obtain the same fact from its kernel formation rule only
    if that rule also supplies the source-indexed intrinsic lifting, constructor
    behavior, and ι required by §3.2/§7.8. The fact is computed and
-   kernel-checked when the declaration is admitted; it is not an unchecked user
-   assertion.
+   kernel-checked when the host declaration is admitted; it is not an unchecked
+   user assertion. A terminal support check may retain polarity information for
+   generator-internal checking of later support declarations, but that
+   information is absent from this general host lookup.
 3. If `D` occurs in `a_j`, position `j` must be declared strictly positive and
    `check-pos-arg(D, +, a_j)` must itself hold. This composes through any finite
    chain of declared strictly-positive parameter positions.
@@ -1179,13 +1204,15 @@ need not be convertible: distinct neutral eliminators remain distinct.
 is the outer `D` value's structural size. Its second is the host-lifting measure
 `(declaration rank, host structural size)`: recursion through a child of the
 same host former decreases structural size, while a composed positive-former
-step enters a previously admitted former and decreases declaration rank. The
-Π-bound cases use the finite branching measure of §9.4. Applying `elim_D` to a
-contained child strictly decreases the first component, so the second may reset
-for that child. Every host former was admitted only with a terminating
-eliminator, and the declaration order forbids a cycle among composed host
-formers. Nested ι therefore terminates without an SCT edge or a general
-recursive δ-definition.
+step enters a previously admitted host and decreases declaration rank. Terminal
+support declarations do not add ranks or enclosing-former edges; an internal
+reference to earlier support follows the rank decrease already established by
+its host. The Π-bound cases use the finite branching measure of §9.4. Applying
+`elim_D` to a contained child strictly decreases the first component, so the
+second may reset for that child. Every host former was admitted only with a
+terminating eliminator, and the declaration order forbids a cycle among
+composed host formers. Nested ι therefore terminates without an SCT edge or a
+general recursive δ-definition.
 
 **Surface consumability.** Surface `match` and structural recursion elaborate
 to the generated method type, whose nested binder is the source-indexed `All`
@@ -1199,12 +1226,14 @@ exposed enclosing child carries the residual `All` inhabitant
 must therefore be writable from the generated IHs.
 
 **Trust boundary.** The generated families and constructors pass the ordinary
-inductive admission checker and enter the environment as `Inductive`
-declarations. They add exactly zero entries to `trusted_base()` (`18 §5`): no
+inductive checks and enter the environment as terminal-support `Inductive`
+declarations. For `p` checked positive host carriers, exactly `2p` such families
+enter; none recursively generates another family or enters the general host
+lookup. They add exactly zero entries to `trusted_base()` (`18 §5`): no
 postulate, opaque declaration, primitive, equality principle, or transport is
 introduced. This zero environment delta does **not** mean zero TCB work—the
-generator, its transactional admission, and the nested ι construction are new
-kernel code and remain inside the audited trusted implementation.
+generator, terminal classification, transactional admission, and nested ι
+construction are new kernel code inside the audited trusted implementation.
 
 **Required conformance population.**
 
@@ -1229,3 +1258,7 @@ kernel code and remain inside the audited trusted implementation.
 7. A positive host constructor with no dynamic recursive leaf produces the
    aligned zero-evidence `All` constructor. Replacing it with an arbitrary
    inhabitant, omitting it, or flattening it into a neighboring leaf must fail.
+8. A one-positive-carrier host publishes exactly its two first-order support
+   families. Neither support family triggers `All`-of-`All` generation or
+   becomes an enclosing host; recursively applying host generation to either
+   support declaration must fail the control.
