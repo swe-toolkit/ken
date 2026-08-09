@@ -171,12 +171,20 @@ fn parse_envelope(text: &str) -> Result<Envelope, String> {
     })
 }
 
-/// Read the one envelope an observation directory must contain.
+/// Read the one envelope an observation directory must contain, checking BOTH
+/// identity axes the parent controls.
 ///
 /// "Exactly one" is checked against the DIRECTORY, not against the path we
 /// chose: a transport that appended, or that shared a sink between children,
 /// shows up here as a wrong file count rather than as a plausible census.
-fn read_sole_envelope(dir: &Path, expected_session: &str) -> Envelope {
+///
+/// The parent check is not redundant with the session check. The merged identity
+/// is `(session, parent test/thread, ordinal)`, and a control that validates only
+/// the session is insensitive to a parent value that is missing, substituted, or
+/// shared between children -- distinct sessions alone would keep every downstream
+/// uniqueness assertion green. Validating it on EVERY observed path is what makes
+/// the second axis load-bearing rather than merely present.
+fn read_sole_envelope(dir: &Path, expected_session: &str, expected_parent: &str) -> Envelope {
     let mut found: Vec<PathBuf> = std::fs::read_dir(dir)
         .unwrap_or_else(|error| panic!("observation dir {} unreadable: {error}", dir.display()))
         .map(|entry| entry.expect("dir entry").path())
@@ -195,6 +203,11 @@ fn read_sole_envelope(dir: &Path, expected_session: &str) -> Envelope {
     assert_eq!(
         envelope.session, expected_session,
         "wrong-session envelope: the child wrote an observation this parent did not open"
+    );
+    assert_eq!(
+        envelope.parent, expected_parent,
+        "wrong-parent envelope: the child did not carry the invoking test/thread identity, so \
+         the second axis of the merged identity is not established"
     );
     envelope
 }
@@ -316,13 +329,18 @@ struct ChildResult {
 
 /// One child invocation. `observation` is `Some((session, sink))` to open a
 /// session, `None` to leave the child unobserved.
-fn run_child(args: &[&str], observation: Option<(&str, &Path)>) -> ChildResult {
+///
+/// The parent identity is passed IN rather than read here, so that every child
+/// in this test -- serial and spawned alike -- carries one value captured once on
+/// the test thread. Reading it per call site invites a caller on some other
+/// thread to hand a child a different identity than the one asserted against.
+fn run_child(args: &[&str], observation: Option<(&str, &Path)>, parent: &str) -> ChildResult {
     let mut command = Command::new(ken_binary());
     command.args(args);
     if let Some((session, sink)) = observation {
         command
             .env("KEN_MRC_CENSUS_SESSION", session)
-            .env("KEN_MRC_CENSUS_PARENT", parent_identity())
+            .env("KEN_MRC_CENSUS_PARENT", parent)
             .env("KEN_MRC_CENSUS_SINK", sink);
     }
     let output = command.output().expect("child `ken` runs");
@@ -354,6 +372,13 @@ fn normalize(text: &str, root: &Path) -> String {
 /// no zero anywhere below means anything.
 #[test]
 fn mrc_4a1_child_transport_and_its_controls() {
+    // The parent test/thread identity, captured ONCE on this thread and threaded
+    // through every child below -- serial and spawned alike. Reading it again at
+    // each call site would let a spawned worker hand its child a different
+    // identity than the one asserted against, and both sides would still agree
+    // because each would have re-derived the same wrong value.
+    let parent = parent_identity();
+
     // ---- CONTROL 1: the positive child entry. Load-bearing; runs first. ----
     let root = case_root("mrc_4a1_positive");
     let source = census_source(&root);
@@ -370,6 +395,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             out.to_str().unwrap(),
         ],
         Some((session, &sink)),
+        &parent,
     );
     // The child must have terminated normally rather than by signal. Its
     // COMPILE OUTCOME is deliberately not pinned here: this fixture reaches the
@@ -385,12 +411,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
     );
     println!("MRC-4A1-POSITIVE-EXIT\t{:?}", observed.code);
 
-    let envelope = read_sole_envelope(&observations, session);
-    assert_eq!(
-        envelope.parent,
-        parent_identity(),
-        "the envelope must carry the parent test/thread identity this test passed"
-    );
+    let envelope = read_sole_envelope(&observations, session, &parent);
     assert!(
         !envelope.rows.is_empty(),
         "BROKEN INSTRUMENT -- a known child native compile produced zero rows. The child \
@@ -440,6 +461,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             absent_root.join("out").to_str().unwrap(),
         ],
         None,
+        &parent,
     );
 
     let present_root = case_root("mrc_4a1_parity_present");
@@ -453,6 +475,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             present_root.join("out").to_str().unwrap(),
         ],
         Some(("mrc-4a1-parity", &present_obs.join("parity.envelope"))),
+        &parent,
     );
 
     assert_eq!(
@@ -475,7 +498,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
         "an unobserved child created an observation artifact"
     );
     // And the observed one is still a real census, not an empty stand-in.
-    let parity_envelope = read_sole_envelope(&present_obs, "mrc-4a1-parity");
+    let parity_envelope = read_sole_envelope(&present_obs, "mrc-4a1-parity", &parent);
     assert_eq!(
         parity_envelope.rows.len(),
         envelope.rows.len(),
@@ -495,7 +518,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
         let session = format!("mrc-4a1-concurrent-{index}");
         let sink = concurrent_obs.join(format!("{session}.envelope"));
         let binary = ken_binary();
-        let parent = parent_identity();
+        let parent = parent.clone();
         handles.push(std::thread::spawn(move || {
             let output = Command::new(binary)
                 .args([
@@ -508,14 +531,18 @@ fn mrc_4a1_child_transport_and_its_controls() {
                 .env("KEN_MRC_CENSUS_SINK", &sink)
                 .output()
                 .expect("concurrent child runs");
-            (session, sink, output.status.code())
+            (session, sink, parent, output.status.code())
         }));
     }
 
     let mut union: Vec<(String, String, u64)> = Vec::new();
     let mut expected_total = 0usize;
     for handle in handles {
-        let (session, sink, code) = handle.join().expect("concurrent child joins");
+        let (session, sink, worker_parent, code) = handle.join().expect("concurrent child joins");
+        assert_eq!(
+            worker_parent, parent,
+            "each spawned worker must hand its child the identity captured on the test thread"
+        );
         assert_eq!(
             code, observed.code,
             "concurrent child {session} must reach the same outcome as the serial one"
@@ -573,6 +600,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
             inert_root.join("out").to_str().unwrap(),
         ],
         None,
+        &parent,
     );
     assert_eq!(
         inert.code, observed.code,
@@ -605,6 +633,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
     let non_entry = run_child(
         &["check", non_entry_source.to_str().unwrap()],
         Some((non_entry_session, &non_entry_obs.join("non-entry.envelope"))),
+        &parent,
     );
     assert_eq!(
         non_entry.code,
@@ -616,7 +645,7 @@ fn mrc_4a1_child_transport_and_its_controls() {
     // The envelope must EXIST. That is the whole content of "classified as a
     // non-entry, not silently omitted": a present envelope with zero rows says
     // the instrument ran and saw nothing, which no absent file can say.
-    let non_entry_envelope = read_sole_envelope(&non_entry_obs, non_entry_session);
+    let non_entry_envelope = read_sole_envelope(&non_entry_obs, non_entry_session, &parent);
     assert!(
         non_entry_envelope.rows.is_empty(),
         "`ken check` reached the common native compilation entry, which contradicts the ruled \
