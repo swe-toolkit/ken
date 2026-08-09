@@ -22,7 +22,7 @@ POPULATION_PATHS = (
 )
 ALLOWED_CLASSES = {"policy-cost", "placeholder-no-assertions"}
 SUMMARY_RE = re.compile(r"\b(\d+) tests? run:")
-PASS_RE = re.compile(r"^\s*PASS\s+\[[^]]+\]\s+(.+?)\s*$")
+PASS_RE = re.compile(r"^\s*PASS\s+\[[^]]+\]\s+(.+?)\s*$", re.MULTILINE)
 
 
 class SweepError(RuntimeError):
