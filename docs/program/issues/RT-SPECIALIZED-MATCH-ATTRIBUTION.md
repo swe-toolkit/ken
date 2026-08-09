@@ -77,14 +77,34 @@ production native-lowering seats.**
 > blanket refusal before any shape test, and it does **not** refuse a
 > `Specialized(Lowered::Constructor)` — that is accepted at `core.rs:6086`.
 >
-> It is **the remainder after explicit acceptance** of `BoundedNat`,
-> `StructuralNat`, `Bool`, `HostResult` (`:6054`), `DynamicConstructor`
-> (`:6075`) and `Constructor` (`:6086`). **So the wildcard still covers
-> materially different scalar, capability, aggregate, closure, protocol and trap
-> variants**, and which one arrives is precisely the unmeasured fact.
+> It is **the remainder after explicit acceptance** of six `Specialized`
+> variants. **The reading is the Architect's**; the enumeration below is the
+> grounding measurement, taken on `876450ab` (`evt_46t985br8ek23`):
+>
+> | line | arm |
+> |---|---|
+> | `5973` | `Specialized(Lowered::BoundedNat(..))` |
+> | `5985` | `Specialized(Lowered::StructuralNat(..))` |
+> | `5997` | `Specialized(Lowered::Bool { .. })` |
+> | `6054` | `Specialized(Lowered::HostResult { .. })` |
+> | `6075` | `Specialized(Lowered::DynamicConstructor(..))` |
+> | `6086` | `Specialized(Lowered::Constructor { .. })` |
+> | `6155` | `Carried(word)` |
+> | **`6178`** | **`Specialized(_)` — the remainder, the firing arm** |
+>
+> **So the remainder still covers materially different scalar, capability,
+> aggregate, closure, protocol and trap variants**, and which one arrives is
+> precisely the unmeasured fact.
 >
 > ⇒ **`Specialized` is a phase, not an answer.** Any statement about whether the
 > refusal's message is true here requires the exact `LoweredVariant`.
+>
+> **One source, then measured — not two sources agreeing.** The remainder
+> reading came from the ruling alone; the ring's later post supplied the
+> enumeration and explicitly declined credit for the reading, having named the
+> arm without characterising it. **Recorded because a claim that looks
+> independently corroborated is weighed more heavily than one that is not**, and
+> here there was one source until the measurement made it grounded.
 
 **There is a documented precedent at this exact seat.** The `Carried(word)` arm
 immediately above carries a comment saying that without it the value *"fell past
