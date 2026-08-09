@@ -20,11 +20,54 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > [[RT-BODY-OCCURRENCE-PROVENANCE]] closed with every AC discharged —
 > production at `1f706520`, `D7` at `1105671a` (PR #1727, CI green).
 >
-> **Resume by rebasing the retained work onto `origin/main` and re-running the
-> exact differential**: interpreter Nat 3, native present, verifier passed,
-> native Nat 3. The retained branches are `wp/KERNEL-NESTED-IND` (the relation
-> projection snapshot) and `wp/KERNEL-NESTED-IND-relation-partial` (tip: pin
-> `All` evidence field identity), both preserved with the durable RED.
+> ### THE NEXT SLICE IS `D3a`. THE DIFFERENTIAL IS NOT A RESUME STEP.
+>
+> **Corrected 2026-08-09 after it cost the ring a turn.** The release above
+> first said to rebase the retained work and re-run the exact `AC-K12`
+> differential. **That instruction was wrong**, and Kernel measured why in ten
+> minutes: `nested_recursive_field_lowers_and_native_agrees_at_nat_three` fails
+> at `ken-elaborator/tests/nc14_data_match_lowering.rs:136` with
+> `KernelRejected TypeMismatch`, before any interpreter or native stage.
+>
+> **That refusal is the designed state, not a defect and not a boundary.** The
+> frame's §4 is explicit: admittance opens at `D1b`, which is **fourth** in the
+> order, and *"the nested declaration stays rejected"* until it does — the whole
+> point of putting `D1b` late is to keep the inert outcome unreachable. The
+> `AC-K12` differential is the node's **terminal** control. It cannot pass until
+> `D1b`/`D2` land, so it is a completion check, never a resume step.
+>
+> The instruction was inherited from the hold, where its job was to test whether
+> the Runtime wall had cleared. **It has: the first refusal is no longer
+> Runtime's, it is this node's own unbuilt admittance.** That question is
+> answered and the instruction is retired.
+>
+> **Resume at `D3a`** — inert preparation: the exhaustive recursive-shape
+> descriptor, its producer, and API plumbing, with the population including
+> direct, Pi/W-style, `D`-free, declared-positive-former nesting and primitive
+> `Sigma`. It must leave admission, `method_type`, `iota_reduct`, and every
+> observable eliminator signature and reduct behaviour unchanged, and it does
+> **not** discharge `D3` or `AC-K3`. Then `D3b`+`D4` atomic, then `D1b`/`D2`,
+> then `D5`.
+>
+> **On the retained branches:** `wp/KERNEL-NESTED-IND-relation-partial` rebases
+> to an empty tree — both its commits are already upstream in `afb38934`.
+> `wp/KERNEL-NESTED-IND` still holds the full snapshot and the durable RED.
+> Nothing there is owed forward.
+>
+> ### Scope: `ken-elaborator/src` is this node's, and `D3a` does not need it
+>
+> The release above described the lane surface as `ken-kernel` plus
+> `ken-elaborator/tests`. **That was measured off the retained snapshot branch,
+> not off the node, and it under-describes the node.** `D5` is *surface
+> consumability: matching, elaboration, structural-recursion/termination*, so
+> `ken-elaborator/src` is in scope for this WP when `D5` is reached. It is
+> disjoint from Runtime's `ken-runtime`/`ken-cli` either way, so the concurrent
+> lane stays clean.
+>
+> **`D3a` is kernel-side and does not reach it. Do not widen now** — not
+> because the path is forbidden, but because `D5` is fifth and the frame notes
+> the elaborator half of `D5` may largely fall out of `D3`. Widening at `D3a`
+> would build against a seam `D3b`/`D4` have not yet defined.
 >
 > ### Two things the unblock does NOT change
 >
