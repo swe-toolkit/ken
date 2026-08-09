@@ -139,7 +139,9 @@ Unaffected same-family controls stay green.
   discharge claim is an amendment to this AC rather than a hedge. The
   `ken-runtime --lib` census merged at `28edeb00` is a **partial** and claims no
   `AC-1`. The remaining domain is the cross-crate `px8-ds-test-support` census
-  authorized in section 4a.
+  authorized in section 4a — **in-process entries under 4a items 1-5, and
+  child-process native-compile entries under 4a.1.** Both are inside this AC;
+  neither closes it alone.
 - **AC-2 — every repaired root has a committed discriminating control.**
   *Control:* the control reds under a mutation at that root and greens without
   it, **from the committed tree**, with evidence the detector was reached. A
@@ -221,6 +223,103 @@ semantic reshaping, **stop and return rather than widening the hook.**
 evidence does not range over these compilation entries. **No successor node and
 no residual transfer** — this remains `AC-1` of this node.
 
+### 4a.1 Child-process native-compile entries: a bounded transport extension
+
+**Architect ruling `evt_7shkn2kebhswm`, 2026-08-09.** Items 1-5 above authorize
+an *in-process* scoped recorder and do not name an environment-carried artifact
+transport. **The implementer was right to stop.** This subsection is the
+operative text that unblocks it. It extends the transport of the same recorder
+and **authorizes no second census mechanism.**
+
+**The population boundary is the real compilation gate** — not `Command::new`,
+not "runs in a child":
+
+- A child `ken native-build` invocation reaches `ken_cli::build_native_program`
+  (`crates/ken-cli/src/lib.rs:21`) and the common Runtime compilation entry, so
+  it **is in `AC-1`**.
+- Child `ken run`, `ken check`, and `ken fmt` do not reach that native
+  compilation entry, and are outside this census **for that reason**.
+  **Launching the same binary is not membership.**
+- Any additional child command is classified by the same gate. **Do not
+  classify by process shape or command-name resemblance.**
+
+**Authorized transport**, under the existing default-off `px8-ds-test-support`
+feature:
+
+1. The parent test creates a **unique per-child census session** and a **unique
+   private output artifact** in its own test temp directory, and passes the
+   child a hidden session identity, the parent test/thread identity, and the
+   artifact location. **These values may select only the observation session and
+   sink.** They may not choose residuals, exclusion, authority, lane, source,
+   planner/ABI state, or any compilation behavior.
+2. The feature-enabled child installs the **existing**
+   `with_match_recursor_census` scope around the native-build compilation
+   attempt, using the same pre-validator rows and the same later
+   validator/selector/authority correlation as the in-process path. **No second
+   enumerator, row schema, or sampling rule is permitted.**
+3. After the attempt, **before the CLI converts its result to an exit**, the
+   child writes **one versioned envelope** — session, parent test/thread
+   identity, and the complete ordered row vector — to that unique artifact.
+   Create it with **no-overwrite semantics**; never append to, or share, one
+   sink across children. The parent reads it **only after the child exits**.
+4. The merged identity is exactly **`(session/run, parent test/thread,
+   child-local compilation ordinal)`**. A PID or the child thread name is
+   **supplementary evidence, not an identity axis** — PIDs are reused, and the
+   child thread is commonly just `main`. Ordinals stay **dense from zero within
+   each child session**, and rows stay a **vector, never a deduplicating set or
+   map**.
+5. **Observation failure is a broken instrument in the parent test.** Missing,
+   duplicate, malformed, wrong-session, or incomplete output **must fail the
+   census control**. It must not change the child's compiler exit status,
+   stdout/stderr, artifact result, or diagnostic. Environment absent means no
+   scope and no artifact; feature-off stays byte- and behavior-equivalent;
+   feature-on with no session stays inert.
+
+**Committed transport controls must show:**
+
+- the same child native-build command with observation **absent and present**
+  has the same compilation result and output, after normalizing **only** the
+  test-chosen artifact path;
+- a known child native compile yields **exactly one** matching envelope, **at
+  least one** entry row, dense ordinals, and the exact
+  `entry = selector-arrival ⊎ pre-selector-return` partition;
+- **two concurrent child launches** use distinct sessions and artifacts, and
+  union without collision or loss;
+- feature-on with no session is **inert**;
+- a command that never reaches the common compilation entry yields **zero rows
+  and is classified as a non-entry**, not silently omitted.
+
+**Why the "at least one entry row" control is load-bearing, and may not be
+weakened.** Measured on `main` at `8729e493`: `ken-cli` receives
+`px8-ds-test-support` only through **`[dev-dependencies]`**
+(`crates/ken-cli/Cargo.toml:25`), under workspace `resolver = "2"`. Whether the
+`ken` **binary** the parent launches is itself built with that feature is a
+property of Cargo's unit graph, **not something this frame asserts**. If it is
+not, the child installs no scope and the census reports **zero rows** — which is
+also the correct answer for a non-member command. **A zero-row result is
+therefore ambiguous between "correctly a non-entry" and "the instrument never
+existed in the child", and the positive control is the only thing that separates
+them.** Establish it by measurement before reading any zero as clean.
+
+**Fixed input, measured, and it is not on `main`.**
+`with_match_recursor_census` exists **only on Runtime's unmerged census
+candidates** — `crates/ken-runtime/src/cranelift_backend/lowering/core.rs:472`,
+re-exported at `cranelift_backend.rs:85`, on `de1434cd` and `bb9fad0a`. `git
+grep` across `crates/` at `main` `8729e493` returns nothing. The word
+"existing" in item 2 means **existing on that candidate lineage**. If that
+lineage is re-cut, re-verify the symbol before building on it.
+
+**Scope, stated as a boundary.** This is still `RT-MATCH-RECURSOR-CONSUMERS`
+`AC-1` **observation** work. It authorizes **no activation, no production
+repair, no `D2`/`D3` work, no successor, no tracker change, and no `AC`
+discharge.** Any newly observed residual row **preserves the exact input** and
+returns through this node's existing `D1`/hard-stop route, exactly as the
+in-process path does.
+
+**`bb9fad0a` and `de1434cd` receive no Architect approval from this ruling.**
+Runtime may continue the mechanical in-process wiring and the comment-only QA
+correction on that lineage; review and merge remain separate events.
+
 ## 5. Banned scope
 
 - **No `#[ignore]`.** Quarantine was ruled out for this population and the
@@ -233,7 +332,10 @@ no residual transfer** — this remains `AC-1` of this node.
   cannot change a result; any cross-crate **activation** seam, feature-gated or
   otherwise, is still banned. If a change makes the selector behave differently
   when the feature is on, it is activation and it is out of scope regardless of
-  how it is spelled.
+  how it is spelled. **Section 4a.1 does not relax this either** — the values
+  the parent hands a child may select only the observation session and sink, so
+  a child input that reaches compilation behavior is activation carried by a
+  new route, not transport.
 - **No reinterpreting a retained `RecursiveDescent` run as activation.**
 - **No touching rows 1-5** or the `LexicalCallArgumentRecursor` population.
 - **No resume or cherry-pick of `10369776252861e8b15e613576256a3682c70066`** —
