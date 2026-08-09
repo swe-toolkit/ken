@@ -60,9 +60,9 @@ is not partial-WP merging, it is shipping a fragment.
 
 ## "Reviewed" and "releasable" are different properties
 
-**The cut needs both.** Checkpoint reviews bind exact SHAs *for a deliverable's own claim* —
-they do not assert the tree is green at that commit, because nobody ever asked
-them that. **A prefix every one of whose commits carries a live approval can
+**The cut needs both.** Checkpoint reviews bind exact SHAs *for a deliverable's
+own claim* — they do not assert the tree is green at that commit, because
+nobody ever asked them that. **A prefix every one of whose commits carries a live approval can
 still be red.** Before publishing any cut, establish that the target is green
 **and** that `main` is green, so a red is attributable to the cut rather than
 inherited. CI is the instrument; the local `--workspace` run is still banned
