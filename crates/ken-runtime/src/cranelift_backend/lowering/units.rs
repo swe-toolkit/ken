@@ -3186,7 +3186,7 @@ impl ContinuationCandidateLedger {
     /// dispositions and reach here. What is checked here is **totality** — that
     /// every minted candidate was settled by some seat.
     ///
-    /// ⛔ **Totality is checked BEFORE the subset is derived, and deriving
+    /// **Totality is checked BEFORE the subset is derived, and deriving
     /// first would defeat the whole check**: an unsettled candidate is in
     /// neither `DirectCall` nor `ComposedCall`, so it would simply fall out of
     /// the subset and pass silently — which is the exact failure the existing
@@ -3480,12 +3480,12 @@ impl ContinuationClaimLedger {
     /// and is not an error, while an `InlineNoCall` member that WAS claimed
     /// still is.
     ///
-    /// ⭐ Neither discharge set is bookkeeping. An identity enters `emitted`
+    /// **Neither discharge set is bookkeeping.** An identity enters `emitted`
     /// only after its emitted callee was decoded from the finished CLIF and
     /// matched the planner-issued target, and enters `composed` only after a
     /// raw-worker call passed every clause of the finished-CLIF verification.
     ///
-    /// ⛔ There is no equality against `emitted` alone. The equality is over
+    /// **There is no equality against `emitted` alone.** The equality is over
     /// their **union** against `call_obligations`, and that is not a detail: a
     /// lawful `ComposedCall` obligation is answered by verified composed
     /// consumption and never becomes a direct call, so an "every obligation
@@ -3503,7 +3503,7 @@ impl ContinuationClaimLedger {
     /// population, which is what lets a candidate that made no call stop being
     /// an obligation without any arm being added to the partition.
     ///
-    /// ⛔ `resolved` and `declared` still range over the FULL planned set.
+    /// **`resolved` and `declared` still range over the FULL planned set.**
     /// Declaration is bulk over planned by `D8k`'s own design, so narrowing
     /// those two would refuse every artifact with an `InlineNoCall` candidate
     /// for the opposite reason.
@@ -3528,7 +3528,7 @@ impl ContinuationClaimLedger {
                 )));
             }
         }
-        // ⭐⭐ `D8k` -- THE PARTITION, since `D2` over the derived subset:
+        // **`D8k` -- THE PARTITION**, since `D2` over the derived subset:
         // `call obligations = direct-emitted ⊎ composed-consumed`, asserted as
         // a disjoint union of two sets that
         // were accumulated from two different kinds of evidence: decoded direct
@@ -3694,7 +3694,7 @@ pub(super) fn open_continuation_claim_ledger(
 /// planned` over the full planner population, and `discharged = claimed =
 /// call_obligations` over the derived `DirectCall ∪ ComposedCall` subset.
 ///
-/// ⛔ Not a per-pass partial: a pass that discharges nothing is normal, and
+/// **Not a per-pass partial:** a pass that discharges nothing is normal, and
 /// only the whole-artifact sets answer whether **every call obligation** was
 /// answered exactly once. Deliberately not "every planned token": an
 /// `InlineNoCall` candidate is planned and is lawfully never discharged, which

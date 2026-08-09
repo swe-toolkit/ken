@@ -15702,7 +15702,7 @@ fn d5a_a_superseded_worker_body_keeps_its_raw_descriptor_authority() {
 /// `DirectCall ∪ ComposedCall` subset first lets an unsettled candidate simply
 /// disappear from it.
 ///
-/// ⭐ The mutation still moves only the **window**, not any equality, so the
+/// The mutation still moves only the **window**, not any equality, so the
 /// refusal remains attributable to the lifetime and to nothing else — which is
 /// what "the defect was the lifetime, not the equality" meant and still means.
 ///
