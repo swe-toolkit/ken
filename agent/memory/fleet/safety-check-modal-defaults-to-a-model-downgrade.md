@@ -40,6 +40,56 @@ the tail and check for a numbered option list.** If one is present, the seat is
 not stranded — leave it. Any pane-sweep script that sends a bare `Enter` must
 refuse when it sees numbered options.
 
+## THE DETECTIVE HALF: once the modal clears, the FOOTER is the only trace
+
+**Measured 2026-08-09 on `kernel-implementer`, mid-`D5`.** Everything above is a
+**preventive** control — it stops you causing the downgrade. It says nothing
+about finding one that already happened, and that gap is what cost this fleet a
+turn.
+
+| | value |
+|---|---|
+| configured, `moot.toml` | `gpt-5.6-sol`, `model_reasoning_effort = "medium"` |
+| actually running, pane footer | `gpt-5.6-luna low` |
+
+Sol is T1, luna is T3, and the effort dropped with it. **The modal was gone by
+the time anyone looked.** It leaves no error, no log line, and no channel event
+— so after it resolves, the running model line is the *entire* evidence that
+anything happened.
+
+⇒ **A pane read must capture the model footer, not just the state.** The modal
+answers *is this seat alive*; the footer answers *at what tier*. Two different
+questions, and only the first one had a rule.
+
+**The trap that makes this specifically hard to catch:** proving the seat is
+*working* feels like it settles the matter, and it does not. The Steward
+measured a live PID with a queued build and correctly concluded "not wedged" —
+a true statement about liveness that is silent about tier, from a check that
+could never have surfaced the downgrade. **Liveness and tier are independent,
+so a liveness instrument reports all-clear over this every time.**
+
+**The cheap sweep, and the discriminator is fleet-relative:**
+
+```sh
+for s in $(tmux ls -F '#{session_name}' | grep '^moot-'); do
+  printf '%-34s %s\n' "$s" \
+    "$(tmux capture-pane -p -t "$s" | grep -oE '(gpt-5\.6-(sol|terra|luna)|Opus [0-9]+)( (low|medium|high))?' | tail -1)"
+done
+```
+
+**One seat on luna while every peer is sol/terra is the signal** — a genuine
+credit-window failover moves the whole fleet, so a lone outlier is a downgrade,
+not a policy. Compare against `moot.toml`, never against the role: per
+`MODELS.md` a seat's tier is an **observation**, and the Roles column is a
+default that Runtime already legitimately inverts.
+
+**Act on it at a turn boundary, not mid-turn.** The work product is usually
+fine — a downgraded seat writes structurally correct code. What you cannot
+accept at T3 is its **self-reported evidence** ("controls fired, mutations
+reddened"), which is exactly what a handback asserts and what the next reviewer
+would spend a full T1 cycle on. Hold the handback, reseat, resume. Killing
+mid-turn destroys grounding to pre-empt a risk the review gates already cover.
+
 ## RETRACTED — "an unanswered modal blocks the turn"
 
 An earlier version of this lesson claimed an unanswered modal **blocks** the turn
