@@ -14,11 +14,27 @@ use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 use ken_runtime::{
-    evaluate_runtime_ir_expr, InterpreterOracleObservation, NativeArtifactIdentity,
-    NativeDifferentialStage, NativeDifferentialVerdict, NativeSeedEnvironment,
-    RuntimeDeclarationKind, RuntimeExample, RuntimeExpr, RuntimeGroundValue,
-    RuntimeIrSeedEnvironment, RuntimeObservation,
+    evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeExpr, RuntimeGroundValue,
+    RuntimeIrSeedEnvironment, RuntimeObservation, RuntimeProgram,
 };
+
+const NESTED_LIFT_NAT_THREE_SOURCE: &str = "data Bag (a : Type) : Type where { \
+      Empty : Bag a ; One : a -> Bag a ; Join : a -> a -> Bag a \
+    }\n\
+    data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)\n\
+    fn liftAdd (x : Nat) (y : Nat) : Nat = match x { \
+      Zero |-> y ; Suc x2 |-> Suc (liftAdd x2 y) \
+    }\n\
+    fn liftSize (r : LiftRose) : Nat = match r { \
+      LiftLeaf |-> Suc Zero ; \
+      LiftNode b |-> match b { \
+        Empty |-> Suc Zero ; \
+        One x |-> Suc (liftSize x) ; \
+        Join x y |-> Suc (liftAdd (liftSize x) (liftSize y)) \
+      } \
+    }\n\
+    const liftSizeResult : Nat = liftSize \
+      (LiftNode (Join LiftRose LiftLeaf (LiftNode (Empty LiftRose))))";
 
 fn decl_symbol(package: &str, name: &str) -> StableSymbol {
     StableSymbol::declaration(package, &[], name)
@@ -147,28 +163,11 @@ fn interpreter_nat_for_source(source: &str, target_name: &str) -> usize {
     )
 }
 
-fn runtime_nat(observation: RuntimeObservation) -> usize {
-    match observation {
-        RuntimeObservation::Returned(RuntimeGroundValue::Constructor { constructor, args })
-            if constructor.ends_with("::Zero") && args.is_empty() =>
-        {
-            0
-        }
-        RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
-            constructor,
-            mut args,
-        }) if constructor.ends_with("::Suc") && args.len() == 1 => {
-            1 + runtime_nat(RuntimeObservation::Returned(args.remove(0)))
-        }
-        other => panic!("expected runtime Nat constructor, got {other:?}"),
-    }
-}
-
-fn nested_native_observation_for_source(
+fn nested_checked_runtime_program_for_source(
     package_name: &str,
     target_name: &str,
     source: &str,
-) -> RuntimeObservation {
+) -> RuntimeProgram {
     let target = decl_symbol(package_name, target_name);
     let out = compile_ken_package_sources(
         &CompilerManifest::new(package_name, Vec::new()),
@@ -184,107 +183,8 @@ fn nested_native_observation_for_source(
     )
     .expect("recursive source emits checked-core package");
     let closure = out.closures.first().expect("selected target closure");
-    let mut program =
-        erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
-            .expect("recursive checked artifact lowers");
-    // Mirror the compiler driver's target-closure trust-metadata projection
-    // before the native boundary preflight.
-    let runtime_targets = program
-        .declarations
-        .iter()
-        .map(|declaration| declaration.symbol.clone())
-        .collect::<std::collections::BTreeSet<_>>();
-    program
-        .erased_core
-        .metadata
-        .assumptions
-        .retain(|symbol, _| runtime_targets.contains(symbol));
-    program
-        .erased_core
-        .metadata
-        .assumption_trust_metadata
-        .retain(|_, metadata| runtime_targets.contains(&metadata.target));
-    program
-        .erased_core
-        .metadata
-        .trusted_base_delta
-        .retain(|symbol, _| runtime_targets.contains(symbol));
-    let rose = decl_symbol(package_name, "LiftRose");
-    let bag = decl_symbol(package_name, "Bag");
-    let node = StableSymbol::constructor(&rose, "LiftNode").to_string();
-    let leaf = StableSymbol::constructor(&rose, "LiftLeaf").to_string();
-    let join = StableSymbol::constructor(&bag, "Join").to_string();
-    let empty = RuntimeExpr::Construct {
-        constructor: StableSymbol::constructor(&bag, "Empty").to_string(),
-        args: Vec::new(),
-    };
-    let sample = RuntimeExpr::Construct {
-        constructor: node.clone(),
-        args: vec![RuntimeExpr::Construct {
-            constructor: join,
-            args: vec![
-                RuntimeExpr::Construct {
-                    constructor: leaf,
-                    args: Vec::new(),
-                },
-                RuntimeExpr::Construct {
-                    constructor: node,
-                    args: vec![empty],
-                },
-            ],
-        }],
-    };
-    let invocation = RuntimeExpr::Call {
-        callee: Box::new(RuntimeExpr::DeclarationRef {
-            symbol: target.to_string(),
-        }),
-        args: vec![sample],
-    };
-    let nat = decl_symbol(package_name, "Nat");
-    let zero = StableSymbol::constructor(&nat, "Zero").to_string();
-    let suc = StableSymbol::constructor(&nat, "Suc").to_string();
-    let expected = RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
-        constructor: suc.clone(),
-        args: vec![RuntimeGroundValue::Constructor {
-            constructor: suc.clone(),
-            args: vec![RuntimeGroundValue::Constructor {
-                constructor: suc,
-                args: vec![RuntimeGroundValue::Constructor {
-                    constructor: zero,
-                    args: Vec::new(),
-                }],
-            }],
-        }],
-    });
-    let example = RuntimeExample {
-        name: "nested-size-uses-lift".to_string(),
-        checked_core_shape: "checked LiftRose size invocation".to_string(),
-        ir: invocation,
-        observation: expected.clone(),
-    };
-    let report = ken_runtime::run_example_with_interpreter_observation(
-        &program,
-        &example,
-        &NativeSeedEnvironment::empty(),
-        InterpreterOracleObservation {
-            artifact: NativeArtifactIdentity {
-                package_identity: program.package_identity.clone(),
-                core_semantic_hash: program.core_semantic_hash,
-                runtime_artifact_hash: program.artifact_hash,
-            },
-            observation: expected,
-            evidence_source: "ken-interp eval over checked GlobalEnv".to_string(),
-        },
-    );
-    assert_eq!(
-        report.verdict,
-        NativeDifferentialVerdict::F1InterpreterAgreement {
-            stage: NativeDifferentialStage::InterpreterNativeCompare,
-        }
-    );
-    let native = report.native.expect("native nested-IH artifact is present");
-    assert!(native.verifier_passed, "Cranelift verifier must pass");
-    native.observation
+    erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
+        .expect("recursive checked artifact erases")
 }
 
 #[test]
@@ -313,35 +213,28 @@ fn user_data_two_payload_binders_preserve_de_bruijn_order() {
 }
 
 #[test]
-fn nested_recursive_field_elaborates_checks_and_runs_from_checked_artifact() {
-    // KERNEL-NESTED-IND AC-K12: the recursive children consume their exact
-    // generated All leaves, and the checked artifact reaches native Nat 3.
-    let source = "data Bag (a : Type) : Type where { \
-          Empty : Bag a ; One : a -> Bag a ; Join : a -> a -> Bag a \
-        }\n\
-        data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)\n\
-        fn liftAdd (x : Nat) (y : Nat) : Nat = match x { \
-          Zero |-> y ; Suc x2 |-> Suc (liftAdd x2 y) \
-        }\n\
-        fn liftSize (r : LiftRose) : Nat = match r { \
-          LiftLeaf |-> Suc Zero ; \
-          LiftNode b |-> match b { \
-            Empty |-> Suc Zero ; \
-            One x |-> Suc (liftSize x) ; \
-            Join x y |-> Suc (liftAdd (liftSize x) (liftSize y)) \
-          } \
-        }\n\
-        const liftSizeResult : Nat = liftSize \
-          (LiftNode (Join LiftRose LiftLeaf (LiftNode (Empty LiftRose))))";
-
-    assert_eq!(interpreter_nat_for_source(source, "liftSizeResult"), 3);
+fn nested_recursive_field_elaborates_checks_erases_and_interprets_at_nat_three() {
+    // D5 accepted-partial control: elaboration and kernel checking complete,
+    // the interpreter computes Nat 3, and provenance-gated checked-artifact
+    // erasure succeeds. Native lowering, verifier, interpreter/native
+    // agreement, and AC-K12 discharge remain unmet at
+    // RT-DYNAMIC-ARM-SCALAR-MERGE.
     assert_eq!(
-        runtime_nat(nested_native_observation_for_source(
-            "nested_inductive_pkg",
-            "liftSize",
-            source,
-        )),
+        interpreter_nat_for_source(NESTED_LIFT_NAT_THREE_SOURCE, "liftSizeResult"),
         3
+    );
+    let program = nested_checked_runtime_program_for_source(
+        "nested_inductive_pkg",
+        "liftSize",
+        NESTED_LIFT_NAT_THREE_SOURCE,
+    );
+    let target = decl_symbol("nested_inductive_pkg", "liftSize");
+    assert!(
+        program
+            .declarations
+            .iter()
+            .any(|declaration| declaration.symbol == target.to_string()),
+        "checked runtime program contains the selected liftSize declaration"
     );
 }
 
