@@ -256,7 +256,7 @@ ABI signatures/populations, or closeout equations.
 |---|---|
 | `AC-1` | The `SchedulingEntry` nested construction control pins `n18 -> n5` and proves `n10` is **not** registered as that unit's body |
 | `AC-1b` | A **`StaticBodyTarget` control pins `n58 -> SOI(26)`** and proves **`SOI(58)` is not** that unit's body |
-| `AC-2` | The exact `LiftRose` synthetic witness **reaches and closes** the owner-2 required set `{26,33,39,53}`, measured on venue 4 |
+| `AC-2` | The exact `LiftRose` synthetic witness **REACHES** owner 2 — issued body `SOI(26)` not `SOI(58)`, entered list `26 -> 58 -> 56 -> 55 -> 53 -> 52` — measured on venue 4. **The "and closes" half was ruled OUT of this node**; see below |
 | `AC-3` | A **body-to-entry collapse mutation** recreates the existing traversal/closeout failure, and **discriminates BOTH classes** — see below |
 | `AC-3b` | The two carried-forward validation mutations red: an **in-range `None`** control node, and a **two-declaration body swap** that preserves the value set |
 | `AC-4` | Root and healthy-sibling topology, function population, join population, ownership, selection, call identity and ABI signature all unchanged |
@@ -270,6 +270,41 @@ ABI signatures/populations, or closeout equations.
 > **class-selective or exact-row** mutation that collapses **that row itself**.
 > This is the A/B discipline the chain already pays elsewhere: the informative
 > side is the one that would green if the arm were absent.
+
+> ### `AC-2`'s CLOSURE HALF IS NOT THIS NODE'S — ruled out 2026-08-09
+>
+> **Architect residual ruling `evt_2y5q0vg45g4km`, at exact accepted partial
+> `876450ab`, moved the `AC-2` *closure* half to a Runtime successor boundary.**
+> It was filed as [[RT-SPECIALIZED-MATCH-ATTRIBUTION]], which has since
+> **merged**, and whose own disposition routed onward via Architect ruling
+> `evt_33v0hx3k3ygjm` to [[RT-TERMINAL-ALL-ELIM-AUTHORITY]] — a node that
+> `depends_on: [KERNEL-NESTED-IND]`. **The lowering repair therefore sits AFTER
+> Kernel, not before it.**
+>
+> The row above said "reaches **and closes**" because it was written before that
+> ruling and never updated. **As written it was unsatisfiable**, and an
+> implementer measuring against it would find owner 2 absent from closeout and be
+> unable to tell a genuine shortfall from an orthogonal, pre-existing refusal.
+> That happened; see Steward ruling `evt_69n02vbcq57t1`.
+>
+> **What closeout legitimately shows, and it is not a defect here:** only the
+> siblings `{8}` and `{14,20}` close; owner 2 never reaches closeout, because
+> native lowering refuses first with `Unsupported { stage:
+> NativeLoweringOrExecution, construct: "Match", reason: "scrutinee is not a
+> constructor value" }`. The merged sibling measured that string present **6x at
+> base `19d2695c`** with the raise site untouched by the provenance diff — a
+> fail-closed refusal meeting a newly reachable population, which the campaign's
+> standing record does not treat as a defect in the node that exposes it.
+>
+> ⇒ **Instrument at the firing arm, not at closeout.** Closeout is the one point
+> that provably cannot observe this node's property.
+>
+> **Do not key any committed control on the pair `("Match", "scrutinee is not a
+> constructor value")`** — the `#[cfg(test)]` mutation hook at
+> `lowering/core.rs:6164` fabricates that identical pair by construction, so such
+> a control cannot distinguish the production refusal from the injected one.
+> This is the sibling's `AC-7` and it binds here too. Key on the seat or the
+> measured operand.
 
 **`AC-2` IS THE GATE THAT CAUGHT THE CARVE-OUT, AND IT IS NOT RELABELLABLE.**
 The prior candidate labelled an unrelated non-root split-axis planning test as
