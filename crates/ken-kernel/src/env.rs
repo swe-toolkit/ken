@@ -12,7 +12,7 @@
 //! pure data structure, lookup, and the type-former/constructor type generation
 //! that makes `infer` O(1).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::term::{GlobalId, Level, LevelVar, Term};
 
@@ -148,6 +148,13 @@ pub enum ParameterPolarity {
     NonPositive,
 }
 
+/// Leaf sort of a generated source-indexed `All` support family (`14 §3.2`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AllSupportSort {
+    Type,
+    Omega,
+}
+
 /// An inductive family declaration (`14 §1`).
 ///
 /// `data D (Δ_p) : (Δ_i) → Type ℓ where cₖ : (Δₖ) → D Δ_p t̄ₖ`.
@@ -241,6 +248,17 @@ pub struct GlobalEnv {
     /// constructors).
     ctor_index: HashMap<GlobalId, (usize, usize)>,
     next_id: u32,
+    /// `(host former, positive parameter, leaf sort) -> generated All family`.
+    /// These entries are installed only after the complete host transaction
+    /// succeeds; callers cannot mark declarations as terminal support.
+    all_supports: HashMap<(GlobalId, usize, AllSupportSort), GlobalId>,
+    /// Kernel-originated terminal support families. They remain ordinary
+    /// inductives but never re-enter host support generation or the enclosing-
+    /// former lookup (`14 §1`, §3.2).
+    terminal_supports: HashSet<GlobalId>,
+    /// Fixed first-order host-to-support relation, retained for audit and
+    /// conformance at the actual environment-carrier boundary.
+    support_edges: HashMap<GlobalId, Vec<GlobalId>>,
     /// The prelude `Top : Ω_0` constant (`16 §1.3`) — the truth proposition,
     /// produced by Eq-by-type at `Trunc` (`Eq ‖A‖ _ _ ⇝ Top`) and the canonical
     /// "trivial proof" target. Set by [`GlobalEnv::new`].
@@ -275,8 +293,7 @@ impl GlobalEnv {
         // constants (`16 §1.3`; the unsound general `Up : Type → Ω` coercion is
         // dropped, so these are standalone declarations, not wrappings). They
         // are kernel vocabulary (like `Type`/`Ω`), kept out of `trusted_base`.
-        env.bottom_id =
-            Some(env.declare_prelude_const("Bottom", Term::Omega(Level::zero())));
+        env.bottom_id = Some(env.declare_prelude_const("Bottom", Term::Omega(Level::zero())));
         env.top_id = Some(env.declare_prelude_const("Top", Term::Omega(Level::zero())));
         // K5: `tt : Top` — `Top`'s sole inhabitant, a genuine sub-singleton
         // admissible in Ω (`16 §1.1`). Typed at `Top` itself (not `Ω_0`), so
@@ -354,6 +371,62 @@ impl GlobalEnv {
         id
     }
 
+    /// Read-only declaration sequence in publication order.
+    pub fn declarations(&self) -> &[Decl] {
+        &self.decls
+    }
+
+    /// Next allocator position, exposed for atomic-admission conformance.
+    pub fn next_global_id(&self) -> GlobalId {
+        GlobalId(self.next_id)
+    }
+
+    /// Generated `All` family for one checked-positive host carrier.
+    pub fn all_support(
+        &self,
+        host: GlobalId,
+        parameter: usize,
+        sort: AllSupportSort,
+    ) -> Option<GlobalId> {
+        self.all_supports.get(&(host, parameter, sort)).copied()
+    }
+
+    /// Fixed terminal-support children of a host declaration.
+    pub fn all_supports_for(&self, host: GlobalId) -> &[GlobalId] {
+        self.support_edges.get(&host).map_or(&[], Vec::as_slice)
+    }
+
+    /// Kernel-recorded origin of a generated terminal support family.
+    pub fn all_support_origin(
+        &self,
+        family: GlobalId,
+    ) -> Option<(GlobalId, usize, AllSupportSort)> {
+        self.all_supports
+            .iter()
+            .find_map(|(&(host, parameter, sort), &candidate)| {
+                (candidate == family).then_some((host, parameter, sort))
+            })
+    }
+
+    /// Whether kernel provenance classifies an inductive as terminal support.
+    pub fn is_terminal_support(&self, family: GlobalId) -> bool {
+        self.terminal_supports.contains(&family)
+    }
+
+    pub(crate) fn register_all_supports(
+        &mut self,
+        host: GlobalId,
+        supports: Vec<(usize, AllSupportSort, GlobalId)>,
+    ) {
+        let mut edges = Vec::with_capacity(supports.len());
+        for (parameter, sort, family) in supports {
+            self.all_supports.insert((host, parameter, sort), family);
+            self.terminal_supports.insert(family);
+            edges.push(family);
+        }
+        self.support_edges.insert(host, edges);
+    }
+
     pub fn lookup(&self, id: GlobalId) -> Option<&Decl> {
         self.by_id.get(&id).map(|&i| &self.decls[i])
     }
@@ -375,6 +448,9 @@ impl GlobalEnv {
         // so provisional admission rollback restores the allocator as well as
         // the lookup tables.
         self.next_id = self.next_id.min(decl.id().0);
+        self.terminal_supports.remove(&decl.id());
+        self.support_edges.remove(&decl.id());
+        self.all_supports.retain(|_, family| *family != decl.id());
         Some(decl)
     }
 

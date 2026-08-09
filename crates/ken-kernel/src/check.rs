@@ -12,9 +12,11 @@
 //! gates inductives on strict positivity (`14 §8`).
 
 use crate::conv::{convert, convert_type, level_eq, whnf};
-use crate::env::{telescope_to_pi, Context, Decl, GlobalEnv, InductiveDecl};
+use crate::env::{telescope_to_pi, AllSupportSort, Context, Decl, GlobalEnv, InductiveDecl};
 use crate::error::{KernelError, KernelResult};
-use crate::inductive::{check_positivity, method_type};
+use crate::inductive::{
+    build_all_support_decl, check_positivity, check_support_positivity, method_type,
+};
 use crate::subst::{apply_args, subst0, subst_levels, subst_outer, subst_tel, weaken};
 use crate::term::{GlobalId, Level, LevelVar, Term};
 
@@ -151,7 +153,7 @@ impl Sort {
 
 /// `Γ ⊢ A type` ⇒ the sort (and level) of `A` (`11 §3`: a type is `Type ℓ` or
 /// `Ω_ℓ`). Generalizes [`synth_type`] to admit proposition types (`16 §1.1`).
-fn classify(env: &GlobalEnv, ctx: &Context, a: &Term) -> KernelResult<Sort> {
+pub(crate) fn classify(env: &GlobalEnv, ctx: &Context, a: &Term) -> KernelResult<Sort> {
     let ty = infer(env, ctx, a)?;
     match whnf(env, ctx, &ty) {
         Term::Type(l) => Ok(Sort::Type(l)),
@@ -946,18 +948,88 @@ where
 
     // Generate former + constructor types (`Π Δ_p. Π Δ_i. Type ℓ`, etc.).
     ind.build_types();
-    ind.parameter_polarities = crate::inductive::derive_parameter_polarities(&ind);
+    ind.parameter_polarities = crate::inductive::derive_parameter_polarities(env, &ind);
 
     // Provisionally admit so every admission clause can roll back both the
     // declaration and its allocated ids on failure.
     env.add_decl(Decl::Inductive(ind.clone()));
 
-    // Admission has three independent clauses (`14 §1`): (a) ordinary
-    // signature type-checking, (b) strict positivity, and (c) constructor
-    // universe checks.
-    if let Err(error) = check_positivity(&ind) {
+    if let Err(error) = validate_inductive_decl(env, &ind) {
         env.remove_last();
         return Err(error);
+    }
+
+    let mut parameter_ctx = Context::new();
+    let mut positive_parameters = Vec::new();
+    for (position, (parameter_type, polarity)) in
+        ind.params.iter().zip(&ind.parameter_polarities).enumerate()
+    {
+        if *polarity == crate::env::ParameterPolarity::StrictlyPositive
+            && matches!(whnf(env, &parameter_ctx, parameter_type), Term::Type(_))
+        {
+            positive_parameters.push(position);
+        }
+        parameter_ctx.push(parameter_type.clone());
+    }
+    let mut supports = Vec::with_capacity(positive_parameters.len() * 2);
+    let mut published_supports = 0usize;
+    for parameter in positive_parameters {
+        for sort in [AllSupportSort::Type, AllSupportSort::Omega] {
+            let family = env.fresh_id();
+            let constructor_ids = ind
+                .constructors
+                .iter()
+                .map(|_| env.fresh_id())
+                .collect::<Vec<_>>();
+            let support = match build_all_support_decl(
+                env,
+                &ind,
+                parameter,
+                sort,
+                family,
+                &constructor_ids,
+            ) {
+                Ok(support) => support,
+                Err(error) => {
+                    for _ in 0..published_supports {
+                        env.remove_last();
+                    }
+                    env.remove_last();
+                    return Err(error);
+                }
+            };
+            env.add_decl(Decl::Inductive(support.clone()));
+            if let Err(error) = validate_inductive_decl_inner(env, &support, true) {
+                env.remove_last();
+                for _ in 0..published_supports {
+                    env.remove_last();
+                }
+                env.remove_last();
+                return Err(error);
+            }
+            published_supports += 1;
+            supports.push((parameter, sort, family));
+        }
+    }
+    env.register_all_supports(ind.id, supports);
+    Ok(d_id)
+}
+
+fn validate_inductive_decl(env: &GlobalEnv, ind: &InductiveDecl) -> KernelResult<()> {
+    validate_inductive_decl_inner(env, ind, false)
+}
+
+fn validate_inductive_decl_inner(
+    env: &GlobalEnv,
+    ind: &InductiveDecl,
+    terminal_support: bool,
+) -> KernelResult<()> {
+    // Admission has three independent clauses (14 §1): ordinary signatures,
+    // strict positivity, and constructor universes.
+    if terminal_support {
+        check_support_positivity(env, ind)?;
+    } else {
+        check_positivity(env, ind)?;
     }
 
     // Check only each constructor-local telescope Δₖ. Family parameters Δ_p
@@ -972,14 +1044,12 @@ where
             let argument_level = match classify(env, &ctor_ctx, argument) {
                 Ok(sort) => sort.level().clone(),
                 Err(error) => {
-                    env.remove_last();
                     return Err(KernelError::IllFormedDecl(format!(
                         "constructor argument failed to type-check: {error}"
                     )));
                 }
             };
             if !level_eq(&argument_level.clone().max(ind.level.clone()), &ind.level) {
-                env.remove_last();
                 return Err(KernelError::ConstructorUniverseViolation {
                     argument: argument_level,
                     family: ind.level.clone(),
@@ -996,12 +1066,11 @@ where
             .iter()
             .all(|c| synth_type(env, &empty, &c.type_).is_ok());
     if !sig_ok {
-        env.remove_last();
         return Err(KernelError::IllFormedDecl(
             "inductive signature failed to type-check".into(),
         ));
     }
-    Ok(d_id)
+    Ok(())
 }
 
 /// `declare_def` — admit a transparent definition `c : A := t` after checking

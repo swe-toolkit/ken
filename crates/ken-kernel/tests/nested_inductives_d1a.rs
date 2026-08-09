@@ -108,7 +108,7 @@ fn admission_records_positive_and_non_positive_parameters() {
         }],
     })
     .expect("foreign carrier use remains admissible while its polarity fails closed");
-    let unknown_double_negative_id = declare_inductive(&mut env, |_| InductiveSpec {
+    let nested_double_negative_id = declare_inductive(&mut env, |_| InductiveSpec {
         level_params: vec![U],
         params: vec![Term::Type(level_u())],
         indices: vec![],
@@ -124,7 +124,7 @@ fn admission_records_positive_and_non_positive_parameters() {
             target_indices: vec![],
         }],
     })
-    .expect("unknown remains absorbing across multiple polarity flips");
+    .expect("declared-positive nesting preserves ordinary polarity flips");
     let ordinary_double_negative_id = declare_inductive(&mut env, |_| InductiveSpec {
         level_params: vec![U],
         params: vec![Term::Type(level_u())],
@@ -184,11 +184,11 @@ fn admission_records_positive_and_non_positive_parameters() {
         "unknown carrier positions must absorb nested polarity flips"
     );
     assert_eq!(
-        env.inductive(unknown_double_negative_id)
-            .expect("recorded unknown double-negative use")
+        env.inductive(nested_double_negative_id)
+            .expect("recorded nested double-negative use")
             .parameter_polarities,
-        vec![ParameterPolarity::NonPositive],
-        "unknown must remain absorbing across every nested Pi"
+        vec![ParameterPolarity::StrictlyPositive],
+        "declared-positive carrier positions must preserve nested polarity"
     );
     assert_eq!(
         env.inductive(ordinary_double_negative_id)
@@ -244,12 +244,12 @@ fn recorded_polarity_is_a_causal_admission_input() {
     .expect("correctly recorded negative position is admitted");
 
     let admitted = env.inductive(contra_id).expect("Contra in environment");
-    assert!(check_positivity(admitted).is_ok());
+    assert!(check_positivity(&env, admitted).is_ok());
 
     let mut perturbed = admitted.clone();
     perturbed.parameter_polarities[0] = ParameterPolarity::StrictlyPositive;
     assert!(matches!(
-        check_positivity(&perturbed),
+        check_positivity(&env, &perturbed),
         Err(KernelError::PositivityViolation(message))
             if message == "recorded parameter polarity does not match the declaration"
     ));
@@ -257,16 +257,16 @@ fn recorded_polarity_is_a_causal_admission_input() {
     let mut missing = admitted.clone();
     missing.parameter_polarities.clear();
     assert!(matches!(
-        check_positivity(&missing),
+        check_positivity(&env, &missing),
         Err(KernelError::PositivityViolation(message))
             if message == "parameter polarity record does not match the parameter telescope"
     ));
 }
 
 #[test]
-fn d1a_preserves_the_nested_occurrence_rejection() {
-    // Transition sentinel for the SPEC-NESTED-IND gate: D1a must keep this
-    // exact nested declaration rejected until D1b deliberately retires it.
+fn d1b_retires_the_nested_occurrence_rejection() {
+    // Transition sentinel retired by KERNEL-NESTED-IND D1b: the same generic
+    // List path is now admitted through its recorded positive parameter.
     let mut env = GlobalEnv::new();
     let list_id = declare_list(&mut env);
     let result = declare_inductive(&mut env, |rose| InductiveSpec {
@@ -289,10 +289,5 @@ fn d1a_preserves_the_nested_occurrence_rejection() {
         ],
     });
 
-    assert!(matches!(
-        result,
-        Err(KernelError::PositivityViolation(message))
-            if message.contains("non-strictly-positive occurrence of D")
-                && message.ends_with("arg 0")
-    ));
+    assert!(result.is_ok());
 }

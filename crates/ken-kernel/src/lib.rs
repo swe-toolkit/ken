@@ -58,8 +58,8 @@ pub use check::{
 };
 pub use conv::{convert, convert_type, level_eq, normalize, whnf};
 pub use env::{
-    ConstructorDecl, Context, Decl, DecEqCert, GlobalEnv, InductiveDecl, ParameterPolarity,
-    PrimReduction,
+    AllSupportSort, ConstructorDecl, Context, DecEqCert, Decl, GlobalEnv, InductiveDecl,
+    ParameterPolarity, PrimReduction,
 };
 pub use error::{KernelError, KernelResult};
 pub use term::{GlobalId, Level, LevelVar, Term};

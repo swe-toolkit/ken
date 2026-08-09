@@ -23,14 +23,14 @@
 //! `check_no_pi_bound_recursive` is retired; strict positivity (`14 §8.2`) is
 //! the sole structural admission test. The eliminator and ι handle the
 //! Π-abstracted IH and the λ-threaded recursive call (`14 §3.1`, `14 §7.7`).
-
 use crate::check::{infer_motive_level, Sort};
 use crate::conv::normalize;
-use crate::env::{ConstructorDecl, Context, GlobalEnv, InductiveDecl, ParameterPolarity};
+use crate::env::{
+    AllSupportSort, ConstructorDecl, Context, GlobalEnv, InductiveDecl, ParameterPolarity,
+};
 use crate::error::{KernelError, KernelResult};
 use crate::subst::{apply_args, shift, subst_levels, subst_outer, subst_tel, weaken};
-use crate::term::{GlobalId, Level, Term};
-
+use crate::term::{GlobalId, Level, LevelVar, Term};
 /// Does the inductive former `d` occur anywhere in `t` (syntactic sub-term)?
 /// Used by the positivity guards (`14 §8`). de Bruijn indices make this
 /// unambiguous: a former is a `Term::IndFormer { id, .. }` node.
@@ -87,10 +87,36 @@ pub fn peel_pi(t: &Term) -> (Vec<Term>, Term) {
 /// Every position that would discard a subterm without inspection is guarded
 /// by an `occurs` check (the fixed algorithm): application arguments, the
 /// indices of a recursive occurrence, and bare type parameters.
-fn check_pos_arg(d: GlobalId, pol: Pol, a: &Term) -> bool {
+fn check_pos_arg(
+    env: &GlobalEnv,
+    d: GlobalId,
+    pol: Pol,
+    a: &Term,
+    allow_terminal_supports: bool,
+) -> bool {
+    let normalized = normalize(env, &Context::new(), a);
+    check_pos_arg_normalized(env, d, pol, &normalized, allow_terminal_supports)
+}
+
+fn check_pos_arg_normalized(
+    env: &GlobalEnv,
+    d: GlobalId,
+    pol: Pol,
+    a: &Term,
+    allow_terminal_supports: bool,
+) -> bool {
     match a {
-        Term::Pi(dom, cod) => check_pos_arg(d, pol.flip(), dom) && check_pos_arg(d, pol, cod),
-        Term::Sigma(dom, cod) => check_pos_arg(d, pol, dom) && check_pos_arg(d, pol, cod),
+        Term::Pi(dom, cod) => {
+            check_pos_arg(env, d, pol.flip(), dom, allow_terminal_supports)
+                && check_pos_arg(env, d, pol, cod, allow_terminal_supports)
+        }
+        Term::Sigma(dom, cod) => {
+            check_pos_arg(env, d, pol, dom, allow_terminal_supports)
+                && check_pos_arg(env, d, pol, cod, allow_terminal_supports)
+        }
+        Term::Lam(domain, body) => {
+            !occurs(d, domain) && check_pos_arg(env, d, pol, body, allow_terminal_supports)
+        }
         Term::App(_, _) => {
             // `C u` (or `D Δ_p t̄` if the head is `D`).
             let (head, args) = peel_app(a);
@@ -100,13 +126,33 @@ fn check_pos_arg(d: GlobalId, pol: Pol, a: &Term) -> bool {
                     // `D` must not occur in the (index) arguments.
                     pol == Pol::Plus && args.iter().all(|x| !occurs(d, x))
                 }
-                Term::IndFormer { .. }
-                | Term::Const { .. }
-                | Term::Constructor { .. }
-                | Term::Var(_) => {
-                    // `C u` with a non-`D` head: recurse into the (atomic) head
-                    // and `occurs`-guard every argument.
-                    check_pos_arg(d, pol, &head) && args.iter().all(|x| !occurs(d, x))
+                Term::IndFormer { id, .. } => {
+                    if args.iter().all(|argument| !occurs(d, argument)) {
+                        return true;
+                    }
+                    if env.is_terminal_support(id) && !allow_terminal_supports {
+                        return false;
+                    }
+                    if pol != Pol::Plus {
+                        return false;
+                    }
+                    let Some(former) = env.inductive(id) else {
+                        return false;
+                    };
+                    args.iter().enumerate().all(|(position, argument)| {
+                        if !occurs(d, argument) {
+                            return true;
+                        }
+                        position < former.params.len()
+                            && former.parameter_polarities.get(position)
+                                == Some(&ParameterPolarity::StrictlyPositive)
+                            && check_pos_arg(env, d, Pol::Plus, argument, allow_terminal_supports)
+                    })
+                }
+                Term::Const { .. } | Term::Constructor { .. } | Term::Var(_) => {
+                    // An unresolved application head has no checked parameter
+                    // polarity. Every argument therefore remains guarded.
+                    args.iter().all(|argument| !occurs(d, argument))
                 }
                 Term::Type(_) => {
                     // `Type ℓ` applied is ill-formed as a type; conservatively
@@ -148,10 +194,12 @@ fn parameter_index(
 }
 
 struct ParameterPolarityDeriver<'a> {
+    env: &'a GlobalEnv,
     d: GlobalId,
     parameter_count: usize,
     prior_constructor_args: usize,
     positive: &'a mut [bool],
+    allow_terminal_supports: bool,
 }
 
 impl ParameterPolarityDeriver<'_> {
@@ -167,7 +215,7 @@ impl ParameterPolarityDeriver<'_> {
             }
             Term::Lam(dom, body) => {
                 self.visit(local_depth, Pol::Unknown, dom);
-                self.visit(local_depth + 1, Pol::Unknown, body);
+                self.visit(local_depth + 1, pol, body);
             }
             Term::Let { ty, val, body } => {
                 self.visit(local_depth, Pol::Unknown, ty);
@@ -176,17 +224,46 @@ impl ParameterPolarityDeriver<'_> {
             }
             Term::App(_, _) => {
                 let (head, args) = peel_app(term);
-                if matches!(head, Term::IndFormer { id, .. } if id == self.d) {
-                    for arg in &args {
-                        self.visit(local_depth, pol, arg);
+                match head {
+                    Term::IndFormer { id, .. } if id == self.d => {
+                        for arg in &args {
+                            self.visit(local_depth, pol, arg);
+                        }
                     }
-                } else {
-                    // D1a does not open structural traversal through another
-                    // former. Until D1b supplies that rule, every such
-                    // argument is unknown and therefore fails closed.
-                    self.visit(local_depth, Pol::Unknown, &head);
-                    for arg in &args {
-                        self.visit(local_depth, Pol::Unknown, arg);
+                    Term::IndFormer { id, .. } => {
+                        let former = self.env.inductive(id).filter(|_| {
+                            self.allow_terminal_supports || !self.env.is_terminal_support(id)
+                        });
+                        for (position, argument) in args.iter().enumerate() {
+                            let argument_polarity = former
+                                .filter(|declaration| position < declaration.params.len())
+                                .and_then(|declaration| {
+                                    declaration.parameter_polarities.get(position)
+                                });
+                            let nested_polarity = match argument_polarity {
+                                Some(ParameterPolarity::StrictlyPositive) => pol,
+                                Some(ParameterPolarity::NonPositive) | None => Pol::Unknown,
+                            };
+                            self.visit(local_depth, nested_polarity, argument);
+                        }
+                    }
+                    Term::Var(_) => {
+                        // A higher-kinded parameter used as the head of a type
+                        // application occurs at the application's polarity.
+                        // Its operands remain unclassified. Generated All
+                        // predicates use exactly this shape, P x.
+                        self.visit(local_depth, pol, &head);
+                        for argument in &args {
+                            self.visit(local_depth, Pol::Unknown, argument);
+                        }
+                    }
+                    _ => {
+                        // An unresolved head has no checked parameter polarity.
+                        // Every argument therefore remains fail-closed.
+                        self.visit(local_depth, Pol::Unknown, &head);
+                        for arg in &args {
+                            self.visit(local_depth, Pol::Unknown, arg);
+                        }
                     }
                 }
             }
@@ -224,19 +301,68 @@ impl ParameterPolarityDeriver<'_> {
 
 /// Derive the fail-closed polarity record for an inductive family's parameters.
 ///
-/// D1a deliberately does not traverse applications of other type formers:
-/// those positions remain unknown until the D1b structural rule lands.
-pub fn derive_parameter_polarities(ind: &InductiveDecl) -> Vec<ParameterPolarity> {
+/// Applications of an already-admitted inductive former inherit only that
+/// former's recorded strictly-positive parameter positions. Unresolved,
+/// non-parameter, and non-positive positions remain fail-closed.
+fn derive_parameter_polarities_inner(
+    env: &GlobalEnv,
+    ind: &InductiveDecl,
+    allow_terminal_supports: bool,
+) -> Vec<ParameterPolarity> {
     let mut positive = vec![true; ind.params.len()];
+
+    // Dependent parameter types are not declared positive positions. Any
+    // earlier parameter they mention is therefore conservatively non-positive.
+    for (position, parameter_type) in ind.params.iter().enumerate() {
+        ParameterPolarityDeriver {
+            env,
+            d: ind.id,
+            parameter_count: position,
+            prior_constructor_args: 0,
+            positive: &mut positive[..position],
+            allow_terminal_supports,
+        }
+        .visit(0, Pol::Unknown, parameter_type);
+    }
+
+    // Inductive indices likewise carry no declared parameter polarity. The
+    // preceding indices occupy ordinary outer-context slots.
+    for (position, index_type) in ind.indices.iter().enumerate() {
+        ParameterPolarityDeriver {
+            env,
+            d: ind.id,
+            parameter_count: ind.params.len(),
+            prior_constructor_args: position,
+            positive: &mut positive,
+            allow_terminal_supports,
+        }
+        .visit(0, Pol::Unknown, index_type);
+    }
+
     for constructor in &ind.constructors {
         for (argument, term) in constructor.args.iter().enumerate() {
             ParameterPolarityDeriver {
+                env,
                 d: ind.id,
                 parameter_count: ind.params.len(),
                 prior_constructor_args: argument,
                 positive: &mut positive,
+                allow_terminal_supports,
             }
             .visit(0, Pol::Plus, term);
+        }
+        // Target indices are values, not declared positive parameter
+        // positions. They are scoped under the complete constructor telescope.
+        for target_index in &constructor.target_indices {
+            ParameterPolarityDeriver {
+                env,
+                d: ind.id,
+                parameter_count: ind.params.len(),
+                prior_constructor_args: constructor.args.len(),
+                positive: &mut positive,
+                allow_terminal_supports,
+            }
+            .visit(0, Pol::Unknown, target_index);
         }
     }
     positive
@@ -251,19 +377,42 @@ pub fn derive_parameter_polarities(ind: &InductiveDecl) -> Vec<ParameterPolarity
         .collect()
 }
 
+pub fn derive_parameter_polarities(env: &GlobalEnv, ind: &InductiveDecl) -> Vec<ParameterPolarity> {
+    derive_parameter_polarities_inner(env, ind, false)
+}
+
+pub(crate) fn derive_support_parameter_polarities(
+    env: &GlobalEnv,
+    ind: &InductiveDecl,
+) -> Vec<ParameterPolarity> {
+    derive_parameter_polarities_inner(env, ind, true)
+}
+
 /// Run the strict-positivity check on a family declaration (`14 §8`): every
 /// constructor argument type must be strictly positive in `D`. The family's
 /// own parameters, indices, and each constructor's result target indices are
 /// also `occurs`-checked (K1 rejects `D` appearing in its own indices, `Bad4`,
 /// and nested parameter occurrences).
-pub fn check_positivity(ind: &InductiveDecl) -> KernelResult<()> {
+pub fn check_positivity(env: &GlobalEnv, ind: &InductiveDecl) -> KernelResult<()> {
+    check_positivity_inner(env, ind, false)
+}
+
+pub(crate) fn check_support_positivity(env: &GlobalEnv, ind: &InductiveDecl) -> KernelResult<()> {
+    check_positivity_inner(env, ind, true)
+}
+
+fn check_positivity_inner(
+    env: &GlobalEnv,
+    ind: &InductiveDecl,
+    allow_terminal_supports: bool,
+) -> KernelResult<()> {
     let d = ind.id;
     if ind.parameter_polarities.len() != ind.params.len() {
         return Err(KernelError::PositivityViolation(
             "parameter polarity record does not match the parameter telescope".into(),
         ));
     }
-    let derived = derive_parameter_polarities(ind);
+    let derived = derive_parameter_polarities_inner(env, ind, allow_terminal_supports);
     if ind
         .parameter_polarities
         .iter()
@@ -290,7 +439,7 @@ pub fn check_positivity(ind: &InductiveDecl) -> KernelResult<()> {
     }
     for c in &ind.constructors {
         for (j, a) in c.args.iter().enumerate() {
-            if !check_pos_arg(d, Pol::Plus, a) {
+            if !check_pos_arg(env, d, Pol::Plus, a, allow_terminal_supports) {
                 return Err(KernelError::PositivityViolation(format!(
                     "non-strictly-positive occurrence of D in constructor {:?} arg {j}",
                     c.id
@@ -334,6 +483,642 @@ pub fn recursive_args(
         }
     }
     out
+}
+
+#[derive(Clone)]
+enum CarrierShape {
+    Direct,
+    Pi {
+        body: Box<CarrierShape>,
+    },
+    Sigma {
+        domain: Option<Box<CarrierShape>>,
+        codomain: Option<Box<CarrierShape>>,
+    },
+    Former {
+        former: GlobalId,
+        arguments: Vec<Option<Box<CarrierShape>>>,
+    },
+}
+
+fn occurs_context_var(term: &Term, target: usize, depth: usize) -> bool {
+    match term {
+        Term::Var(index) => *index == target + depth,
+        Term::Pi(domain, codomain)
+        | Term::Lam(domain, codomain)
+        | Term::Sigma(domain, codomain) => {
+            occurs_context_var(domain, target, depth)
+                || occurs_context_var(codomain, target, depth + 1)
+        }
+        Term::Let { ty, val, body } => {
+            occurs_context_var(ty, target, depth)
+                || occurs_context_var(val, target, depth)
+                || occurs_context_var(body, target, depth + 1)
+        }
+        _ => term
+            .children()
+            .iter()
+            .any(|child| occurs_context_var(child, target, depth)),
+    }
+}
+
+fn derive_carrier_shape(
+    env: &GlobalEnv,
+    term: &Term,
+    target: usize,
+) -> KernelResult<Option<CarrierShape>> {
+    if !occurs_context_var(term, target, 0) {
+        return Ok(None);
+    }
+    if matches!(term, Term::Var(index) if *index == target) {
+        return Ok(Some(CarrierShape::Direct));
+    }
+    match term {
+        Term::Pi(_, _) => {
+            let (domains, body) = peel_pi(term);
+            // Function domains do not contain runtime carrier values. A
+            // covariant parameter occurrence that is visible only through
+            // an even number of domain flips contributes no evidence field;
+            // only the codomain supplies Π-abstracted evidence.
+            Ok(
+                derive_carrier_shape(env, &body, target + domains.len())?.map(|body| {
+                    CarrierShape::Pi {
+                        body: Box::new(body),
+                    }
+                }),
+            )
+        }
+        Term::Sigma(domain, codomain) => Ok(Some(CarrierShape::Sigma {
+            domain: derive_carrier_shape(env, domain, target)?.map(Box::new),
+            codomain: derive_carrier_shape(env, codomain, target + 1)?.map(Box::new),
+        })),
+        Term::App(_, _) | Term::IndFormer { .. } => {
+            let (head, arguments) = peel_app(term);
+            let Term::IndFormer { id, .. } = head else {
+                return Err(unsupported_recursive_shape(
+                    "carrier occurrence has an unresolved application head",
+                ));
+            };
+            let former = env.inductive(id).ok_or_else(|| {
+                unsupported_recursive_shape("carrier occurrence lost former metadata")
+            })?;
+            let mut shapes = Vec::with_capacity(arguments.len());
+            for (position, argument) in arguments.iter().enumerate() {
+                let shape = derive_carrier_shape(env, argument, target)?;
+                if shape.is_some()
+                    && (position >= former.params.len()
+                        || former.parameter_polarities.get(position)
+                            != Some(&ParameterPolarity::StrictlyPositive))
+                {
+                    return Err(unsupported_recursive_shape(
+                        "carrier occurrence is not in a checked positive parameter",
+                    ));
+                }
+                shapes.push(shape.map(Box::new));
+            }
+            if shapes.iter().all(Option::is_none) {
+                Ok(None)
+            } else {
+                Ok(Some(CarrierShape::Former {
+                    former: id,
+                    arguments: shapes,
+                }))
+            }
+        }
+        _ => Err(unsupported_recursive_shape(
+            "positive carrier occurs in an unsupported type form",
+        )),
+    }
+}
+
+fn support_application(
+    support: GlobalId,
+    host: &InductiveDecl,
+    host_level_args: &[Level],
+    leaf_level: Level,
+    arguments: &[Term],
+    predicate: Term,
+    value: Term,
+) -> Term {
+    let mut result = Term::indformer(
+        support,
+        host_level_args
+            .iter()
+            .cloned()
+            .chain(std::iter::once(leaf_level))
+            .collect(),
+    );
+    for argument in arguments.iter().take(host.params.len()) {
+        result = Term::app(result, argument.clone());
+    }
+    result = Term::app(result, predicate);
+    for argument in arguments.iter().skip(host.params.len()) {
+        result = Term::app(result, argument.clone());
+    }
+    Term::app(result, value)
+}
+
+fn pack_component_types(mut components: Vec<Term>) -> KernelResult<Term> {
+    let Some(mut result) = components.pop() else {
+        return Err(unsupported_recursive_shape(
+            "carrier lift contains no evidence component",
+        ));
+    };
+    while let Some(component) = components.pop() {
+        result = Term::sigma(component, weaken(&result, 1));
+    }
+    Ok(result)
+}
+
+fn recursive_shape_sort(
+    env: &GlobalEnv,
+    shape: &RecursiveShape,
+    leaf: &Sort,
+) -> KernelResult<Sort> {
+    match shape {
+        RecursiveShape::Direct { .. } => Ok(leaf.clone()),
+        RecursiveShape::Pi { domains, body } => {
+            let inner = recursive_shape_sort(env, body, leaf)?;
+            let level = domains
+                .iter()
+                .try_fold(inner.level().clone(), |level, domain| {
+                    Ok::<_, KernelError>(
+                        level.max(
+                            crate::check::classify(env, &Context::new(), domain)?
+                                .level()
+                                .clone(),
+                        ),
+                    )
+                })?
+                .normalize();
+            Ok(match inner {
+                Sort::Type(_) => Sort::Type(level),
+                Sort::Omega(_) => Sort::Omega(level),
+            })
+        }
+        RecursiveShape::Sigma { domain, codomain } => {
+            let sorts = domain
+                .iter()
+                .chain(codomain)
+                .map(|shape| recursive_shape_sort(env, shape, leaf))
+                .collect::<KernelResult<Vec<_>>>()?;
+            let level = sorts
+                .iter()
+                .fold(Level::zero(), |level, sort| level.max(sort.level().clone()))
+                .normalize();
+            Ok(if sorts.iter().all(|sort| matches!(sort, Sort::Omega(_))) {
+                Sort::Omega(level)
+            } else {
+                Sort::Type(level)
+            })
+        }
+        RecursiveShape::Former {
+            former,
+            level_args,
+            arguments,
+        } => {
+            let leaf_level = arguments
+                .iter()
+                .filter_map(|argument| argument.shape.as_deref())
+                .map(|shape| recursive_shape_sort(env, shape, leaf))
+                .collect::<KernelResult<Vec<_>>>()?
+                .into_iter()
+                .fold(Level::zero(), |level, sort| level.max(sort.level().clone()));
+            let host = env.inductive(*former).ok_or_else(|| {
+                unsupported_recursive_shape("recursive sort lost host declaration")
+            })?;
+            let host_level = subst_levels(
+                &Term::Type(host.level.clone()),
+                &host.level_params,
+                level_args,
+            );
+            let Term::Type(host_level) = host_level else {
+                unreachable!("inductive level instantiation is a Type")
+            };
+            // Every declared-former All boundary carries topology in Type.
+            // The caller combines this leaf-side level with the instantiated
+            // host level while forming the concrete support application.
+            Ok(Sort::Type(leaf_level.max(host_level).normalize()))
+        }
+    }
+}
+
+fn carrier_shape_sort(
+    env: &GlobalEnv,
+    shape: &CarrierShape,
+    field_type: &Term,
+    leaf: &Sort,
+) -> KernelResult<Sort> {
+    match shape {
+        CarrierShape::Direct => Ok(leaf.clone()),
+        CarrierShape::Pi { body } => {
+            let (domains, codomain) = peel_pi(field_type);
+            let inner = carrier_shape_sort(env, body, &codomain, leaf)?;
+            let level = domains
+                .iter()
+                .try_fold(inner.level().clone(), |level, domain| {
+                    Ok::<_, KernelError>(
+                        level.max(
+                            crate::check::classify(env, &Context::new(), domain)?
+                                .level()
+                                .clone(),
+                        ),
+                    )
+                })?
+                .normalize();
+            Ok(match inner {
+                Sort::Type(_) => Sort::Type(level),
+                Sort::Omega(_) => Sort::Omega(level),
+            })
+        }
+        CarrierShape::Sigma { domain, codomain } => {
+            let Term::Sigma(first, second) = field_type else {
+                return Err(unsupported_recursive_shape(
+                    "carrier sort lost its Sigma type",
+                ));
+            };
+            let mut sorts = Vec::new();
+            if let Some(shape) = domain {
+                sorts.push(carrier_shape_sort(env, shape, first, leaf)?);
+            }
+            if let Some(shape) = codomain {
+                sorts.push(carrier_shape_sort(env, shape, second, leaf)?);
+            }
+            let level = sorts
+                .iter()
+                .fold(Level::zero(), |level, sort| level.max(sort.level().clone()))
+                .normalize();
+            Ok(if sorts.iter().all(|sort| matches!(sort, Sort::Omega(_))) {
+                Sort::Omega(level)
+            } else {
+                Sort::Type(level)
+            })
+        }
+        CarrierShape::Former { former, arguments } => {
+            let (head, actual_arguments) = peel_app(field_type);
+            let Term::IndFormer { id, level_args } = head else {
+                return Err(unsupported_recursive_shape("carrier sort lost its former"));
+            };
+            if id != *former {
+                return Err(unsupported_recursive_shape("carrier sort former mismatch"));
+            }
+            let host = env
+                .inductive(*former)
+                .ok_or_else(|| unsupported_recursive_shape("carrier sort lost host declaration"))?;
+            let nested_level = arguments
+                .iter()
+                .zip(actual_arguments)
+                .filter_map(|(shape, argument)| shape.as_deref().map(|shape| (shape, argument)))
+                .map(|(shape, argument)| carrier_shape_sort(env, shape, &argument, leaf))
+                .collect::<KernelResult<Vec<_>>>()?
+                .into_iter()
+                .fold(Level::zero(), |level, sort| level.max(sort.level().clone()));
+            let host_level = subst_levels(
+                &Term::Type(host.level.clone()),
+                &host.level_params,
+                &level_args,
+            );
+            let Term::Type(host_level) = host_level else {
+                unreachable!("inductive level instantiation is a Type")
+            };
+            Ok(Sort::Type(nested_level.max(host_level).normalize()))
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn carrier_lift_type(
+    env: &GlobalEnv,
+    ctx: &Context,
+    shape: &CarrierShape,
+    field_type: &Term,
+    value: &Term,
+    predicate: &Term,
+    current_host: GlobalId,
+    current_parameter: usize,
+    current_sort: AllSupportSort,
+    current_support: GlobalId,
+    leaf_sort: &Sort,
+) -> KernelResult<Term> {
+    match shape {
+        CarrierShape::Direct => Ok(Term::app(predicate.clone(), value.clone())),
+        CarrierShape::Pi { body } => {
+            let (domains, codomain) = peel_pi(field_type);
+            let binder_count = domains.len();
+            let mut applied = weaken(value, binder_count as i64);
+            for binder in 0..binder_count {
+                applied = Term::app(applied, Term::var(binder_count - 1 - binder));
+            }
+            let mut inner_ctx = ctx.clone();
+            inner_ctx.extend_tel(&domains);
+            let mut lifted = carrier_lift_type(
+                env,
+                &inner_ctx,
+                body,
+                &codomain,
+                &applied,
+                &weaken(predicate, binder_count as i64),
+                current_host,
+                current_parameter,
+                current_sort,
+                current_support,
+                leaf_sort,
+            )?;
+            for domain in domains.into_iter().rev() {
+                lifted = Term::pi(domain, lifted);
+            }
+            Ok(lifted)
+        }
+        CarrierShape::Sigma { domain, codomain } => {
+            let Term::Sigma(first_type, second_family) = field_type else {
+                return Err(unsupported_recursive_shape(
+                    "carrier Sigma shape lost its Sigma type",
+                ));
+            };
+            let first_value = Term::proj1(value.clone());
+            let second_value = Term::proj2(value.clone());
+            let mut components = Vec::new();
+            if let Some(shape) = domain {
+                components.push(carrier_lift_type(
+                    env,
+                    ctx,
+                    shape,
+                    first_type,
+                    &first_value,
+                    predicate,
+                    current_host,
+                    current_parameter,
+                    current_sort,
+                    current_support,
+                    leaf_sort,
+                )?);
+            }
+            if let Some(shape) = codomain {
+                let second_type = crate::subst::subst0(second_family, &first_value);
+                components.push(carrier_lift_type(
+                    env,
+                    ctx,
+                    shape,
+                    &second_type,
+                    &second_value,
+                    predicate,
+                    current_host,
+                    current_parameter,
+                    current_sort,
+                    current_support,
+                    leaf_sort,
+                )?);
+            }
+            pack_component_types(components)
+        }
+        CarrierShape::Former { former, arguments } => {
+            let (head, actual_arguments) = peel_app(field_type);
+            let Term::IndFormer {
+                id,
+                level_args: host_level_args,
+            } = head
+            else {
+                return Err(unsupported_recursive_shape(
+                    "carrier former shape lost its former",
+                ));
+            };
+            if id != *former || actual_arguments.len() != arguments.len() {
+                return Err(unsupported_recursive_shape(
+                    "carrier former shape and instantiated type disagree",
+                ));
+            }
+            let host = env
+                .inductive(*former)
+                .ok_or_else(|| unsupported_recursive_shape("carrier lift lost host declaration"))?;
+            let mut components = Vec::new();
+            for (parameter, shape) in arguments.iter().enumerate() {
+                let Some(shape) = shape.as_deref() else {
+                    continue;
+                };
+                let argument_type = actual_arguments[parameter].clone();
+                let mut predicate_ctx = ctx.clone();
+                predicate_ctx.push(argument_type.clone());
+                let predicate_body = carrier_lift_type(
+                    env,
+                    &predicate_ctx,
+                    shape,
+                    &weaken(&argument_type, 1),
+                    &Term::var(0),
+                    &weaken(predicate, 1),
+                    current_host,
+                    current_parameter,
+                    current_sort,
+                    current_support,
+                    leaf_sort,
+                )?;
+                let predicate_sort = carrier_shape_sort(env, shape, &argument_type, leaf_sort)?;
+                let support_sort = match predicate_sort {
+                    Sort::Type(_) => AllSupportSort::Type,
+                    Sort::Omega(_) => AllSupportSort::Omega,
+                };
+                let support = if *former == current_host
+                    && parameter == current_parameter
+                    && support_sort == current_sort
+                {
+                    current_support
+                } else {
+                    env.all_support(*former, parameter, support_sort)
+                        .ok_or_else(|| {
+                            unsupported_recursive_shape(
+                                "composed carrier lift has no generated support family",
+                            )
+                        })?
+                };
+                let lifted_predicate = if matches!(shape, CarrierShape::Direct) {
+                    predicate.clone()
+                } else {
+                    Term::lam(argument_type, predicate_body)
+                };
+                components.push(support_application(
+                    support,
+                    host,
+                    &host_level_args,
+                    predicate_sort.level().clone(),
+                    &actual_arguments,
+                    lifted_predicate,
+                    value.clone(),
+                ));
+            }
+            pack_component_types(components)
+        }
+    }
+}
+
+/// Build one terminal source-indexed All declaration for a checked-positive
+/// host carrier. Allocation and transactional publication remain in check.
+pub(crate) fn build_all_support_decl(
+    env: &GlobalEnv,
+    host: &InductiveDecl,
+    parameter: usize,
+    sort: AllSupportSort,
+    family: GlobalId,
+    constructor_ids: &[GlobalId],
+) -> KernelResult<InductiveDecl> {
+    if constructor_ids.len() != host.constructors.len() {
+        return Err(KernelError::IllFormedDecl(
+            "generated All constructor-id arity mismatch".into(),
+        ));
+    }
+    let leaf_var = LevelVar(
+        host.level_params
+            .iter()
+            .map(|variable| variable.0)
+            .max()
+            .map_or(0, |maximum| maximum + 1),
+    );
+    let leaf_level = Level::Var(leaf_var);
+    let mut level_params = host.level_params.clone();
+    level_params.push(leaf_var);
+    let mut params = host.params.clone();
+    let carrier = Term::var(host.params.len() - 1 - parameter);
+    let leaf_sort = match sort {
+        AllSupportSort::Type => Term::Type(leaf_level.clone()),
+        AllSupportSort::Omega => Term::Omega(leaf_level.clone()),
+    };
+    params.push(Term::pi(carrier, leaf_sort));
+    let leaf_class = match sort {
+        AllSupportSort::Type => Sort::Type(leaf_level.clone()),
+        AllSupportSort::Omega => Sort::Omega(leaf_level.clone()),
+    };
+    let mut indices = host
+        .indices
+        .iter()
+        .enumerate()
+        .map(|(position, index)| shift(index, 1, position))
+        .collect::<Vec<_>>();
+    let host_level_args = host
+        .level_params
+        .iter()
+        .map(|variable| Level::Var(*variable))
+        .collect::<Vec<_>>();
+    let mut source_type = Term::indformer(host.id, host_level_args.clone());
+    let index_count = host.indices.len();
+    for position in 0..host.params.len() {
+        source_type = Term::app(
+            source_type,
+            Term::var(index_count + 1 + host.params.len() - 1 - position),
+        );
+    }
+    for position in 0..index_count {
+        source_type = Term::app(source_type, Term::var(index_count - 1 - position));
+    }
+    indices.push(source_type);
+
+    let mut constructors = Vec::with_capacity(host.constructors.len());
+    for (constructor_index, constructor) in host.constructors.iter().enumerate() {
+        let field_count = constructor.args.len();
+        let mut args = constructor
+            .args
+            .iter()
+            .enumerate()
+            .map(|(position, argument)| shift(argument, 1, position))
+            .collect::<Vec<_>>();
+        let mut ctor_ctx = Context::new();
+        ctor_ctx.extend_tel(&params);
+        ctor_ctx.extend_tel(&args);
+        let mut evidence_count = 0usize;
+        for (position, original_type) in constructor.args.iter().enumerate() {
+            let target = position + host.params.len() - 1 - parameter;
+            let Some(shape) = derive_carrier_shape(env, original_type, target)? else {
+                continue;
+            };
+            let field_value = Term::var(evidence_count + field_count - 1 - position);
+            let field_type = crate::check::infer(env, &ctor_ctx, &field_value)?;
+            let predicate = Term::var(evidence_count + field_count);
+            let evidence = carrier_lift_type(
+                env,
+                &ctor_ctx,
+                &shape,
+                &field_type,
+                &field_value,
+                &predicate,
+                host.id,
+                parameter,
+                sort,
+                family,
+                &leaf_class,
+            )?;
+            args.push(evidence.clone());
+            ctor_ctx.push(evidence);
+            evidence_count += 1;
+        }
+
+        let mut target_indices = constructor
+            .target_indices
+            .iter()
+            .map(|index| weaken(&shift(index, 1, field_count), evidence_count as i64))
+            .collect::<Vec<_>>();
+        let mut source = Term::constructor(constructor.id, host_level_args.clone());
+        for position in 0..host.params.len() {
+            source = Term::app(
+                source,
+                Term::var(evidence_count + field_count + 1 + host.params.len() - 1 - position),
+            );
+        }
+        for position in 0..field_count {
+            source = Term::app(
+                source,
+                Term::var(evidence_count + field_count - 1 - position),
+            );
+        }
+        target_indices.push(source);
+        constructors.push(ConstructorDecl {
+            id: constructor_ids[constructor_index],
+            args,
+            target_indices,
+            type_: Term::Type(Level::zero()),
+            recursive_positions: Vec::new(),
+        });
+    }
+    let mut declaration = InductiveDecl {
+        id: family,
+        level_params,
+        params,
+        parameter_polarities: Vec::new(),
+        indices,
+        level: leaf_level.max(host.level.clone()).normalize(),
+        constructors,
+        former_type: Term::Type(Level::zero()),
+    };
+    declaration.build_types();
+    declaration.parameter_polarities = derive_support_parameter_polarities(env, &declaration);
+    Ok(declaration)
+}
+
+/// Original host-field positions carrying one evidence argument in an aligned
+/// generated `All` constructor. The returned order is the evidence-field order.
+pub fn all_support_evidence_positions(
+    env: &GlobalEnv,
+    support: GlobalId,
+    constructor: usize,
+) -> KernelResult<Vec<usize>> {
+    let (host, parameter, _) = env
+        .all_support_origin(support)
+        .ok_or_else(|| unsupported_recursive_shape("family is not a generated All support"))?;
+    let declaration = env
+        .inductive(host)
+        .ok_or_else(|| unsupported_recursive_shape("All support lost its host declaration"))?;
+    let host_constructor = declaration.constructors.get(constructor).ok_or_else(|| {
+        unsupported_recursive_shape("All support constructor is not aligned with its host")
+    })?;
+    host_constructor
+        .args
+        .iter()
+        .enumerate()
+        .filter_map(|(position, argument)| {
+            let target = position + declaration.params.len() - 1 - parameter;
+            match derive_carrier_shape(env, argument, target) {
+                Ok(Some(_)) => Some(Ok(position)),
+                Ok(None) => None,
+                Err(error) => Some(Err(error)),
+            }
+        })
+        .collect()
 }
 
 /// One constructor argument whose type contains structurally recursive
@@ -501,6 +1286,11 @@ fn derive_recursive_shape(
                     }))
                 }
                 Term::IndFormer { id, level_args } => {
+                    if env.is_terminal_support(id) {
+                        return Err(unsupported_recursive_shape(
+                            "terminal All support cannot become an enclosing nested former",
+                        ));
+                    }
                     let former = env.inductive(id).ok_or_else(|| {
                         unsupported_recursive_shape(
                             "nested occurrence has no admitted former metadata",
@@ -588,144 +1378,51 @@ fn apply_motive(motive: &Term, indices: &[Term], value: Term) -> Term {
     Term::app(result, value)
 }
 
-fn evidence_sigma(mut components: Vec<Term>, terminal: Term) -> Term {
-    let mut result = terminal;
-    while let Some(component) = components.pop() {
-        result = Term::sigma(component, weaken(&result, 1));
-    }
-    result
-}
-
-fn terminal_type(
-    ind: &InductiveDecl,
-    level_args: &[Level],
-    params: &[Term],
-    source_type: &Term,
-    motive: &Term,
-) -> Term {
-    let index_count = ind.indices.len();
-    let params_under_source = params
-        .iter()
-        .map(|parameter| weaken(parameter, 1))
-        .collect::<Vec<_>>();
-    let instantiated_indices = ind
-        .indices
-        .iter()
-        .map(|index| subst_levels(index, &ind.level_params, level_args))
-        .collect::<Vec<_>>();
-    let index_types = instantiated_indices
-        .iter()
-        .enumerate()
-        .map(|(position, index)| {
-            subst_outer(index, ind.params.len(), &params_under_source, position)
-        })
-        .collect::<Vec<_>>();
-
-    let mut family = Term::indformer(ind.id, level_args.to_vec());
-    for parameter in &params_under_source {
-        family = Term::app(family, weaken(parameter, index_count as i64));
-    }
-    for position in 0..index_count {
-        family = Term::app(family, Term::var(index_count - 1 - position));
-    }
-
-    let mut motive_at_value = weaken(motive, (index_count + 2) as i64);
-    for position in 0..index_count {
-        motive_at_value = Term::app(motive_at_value, Term::var(index_count - position));
-    }
-    motive_at_value = Term::app(motive_at_value, Term::var(0));
-    let evidence_type = motive_at_value;
-    let mut result = Term::pi(
-        family,
-        Term::pi(evidence_type.clone(), weaken(&evidence_type, 1)),
-    );
-    for index_type in index_types.into_iter().rev() {
-        result = Term::pi(index_type, result);
-    }
-    Term::pi(source_type.clone(), result)
-}
-
-fn terminal_term(env: &GlobalEnv, ctx: &Context, terminal_type: &Term) -> KernelResult<Term> {
-    let normalized = crate::whnf(env, ctx, terminal_type);
-    let (domains, _) = peel_pi(&normalized);
-    Ok(domains
-        .into_iter()
-        .rev()
-        .fold(Term::var(0), |body, domain| Term::lam(domain, body)))
-}
-
-fn pack_checked(
-    env: &GlobalEnv,
-    ctx: &Context,
-    expected: Term,
-    values: &[Term],
-) -> KernelResult<Term> {
-    match values.split_first() {
-        Some((value, rest)) => match crate::whnf(env, ctx, &expected) {
-            Term::Sigma(domain, codomain) => {
-                crate::check::check(env, ctx, value, &domain)?;
-                let tail_expected = crate::subst::subst0(&codomain, value);
-                let tail = pack_checked(env, ctx, tail_expected, rest)?;
-                Ok(Term::pair(value.clone(), tail))
-            }
-            _ => Err(unsupported_recursive_shape(
-                "evidence component has no expected Sigma domain",
-            )),
-        },
-        None => {
-            let terminal = terminal_term(env, ctx, &expected)?;
-            crate::check::check(env, ctx, &terminal, &expected)?;
-            Ok(terminal)
-        }
-    }
-}
-
-fn extract_host_ih(shape: &RecursiveShape, ih: Term, as_types: bool) -> KernelResult<Vec<Term>> {
+fn guest_params_from_shape(
+    field_type: &Term,
+    shape: &RecursiveShape,
+    parameter_count: usize,
+) -> Option<Vec<Term>> {
     match shape {
-        RecursiveShape::Direct { .. } => Ok(vec![ih]),
-        RecursiveShape::Pi { domains, body } => {
-            let binder_count = domains.len();
-            let mut applied = weaken(&ih, binder_count as i64);
-            for binder in 0..binder_count {
-                applied = Term::app(applied, Term::var(binder_count - 1 - binder));
-            }
-            let mut components = extract_host_ih(body, applied, as_types)?;
-            for component in &mut components {
-                for domain in domains.iter().rev() {
-                    *component = if as_types {
-                        Term::pi(domain.clone(), component.clone())
-                    } else {
-                        Term::lam(domain.clone(), component.clone())
-                    };
-                }
-            }
-            Ok(components)
+        RecursiveShape::Direct { .. } => {
+            let (_, arguments) = peel_app(field_type);
+            (arguments.len() >= parameter_count)
+                .then(|| arguments.into_iter().take(parameter_count).collect())
+        }
+        RecursiveShape::Pi { body, .. } => {
+            let (_, codomain) = peel_pi(field_type);
+            guest_params_from_shape(&codomain, body, parameter_count)
         }
         RecursiveShape::Sigma { domain, codomain } => {
-            let both = domain.is_some() && codomain.is_some();
-            let mut components = Vec::new();
-            if let Some(shape) = domain {
-                let value = if both {
-                    Term::proj1(ih.clone())
-                } else {
-                    ih.clone()
-                };
-                components.extend(extract_host_ih(shape, value, as_types)?);
-            }
-            if let Some(shape) = codomain {
-                let value = if both { Term::proj2(ih) } else { ih };
-                components.extend(extract_host_ih(shape, value, as_types)?);
-            }
-            Ok(components)
+            let Term::Sigma(first, second) = field_type else {
+                return None;
+            };
+            domain
+                .as_deref()
+                .and_then(|shape| guest_params_from_shape(first, shape, parameter_count))
+                .or_else(|| {
+                    codomain
+                        .as_deref()
+                        .and_then(|shape| guest_params_from_shape(second, shape, parameter_count))
+                })
         }
-        RecursiveShape::Former { .. } => Err(unsupported_recursive_shape(
-            "nested former evidence inside a host recursive IH is unsupported",
-        )),
+        RecursiveShape::Former { arguments, .. } => {
+            let (_, actual_arguments) = peel_app(field_type);
+            arguments
+                .iter()
+                .zip(actual_arguments)
+                .find_map(|(argument, actual)| {
+                    argument
+                        .shape
+                        .as_deref()
+                        .and_then(|shape| guest_params_from_shape(&actual, shape, parameter_count))
+                })
+        }
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn structured_former_lift_type(
+fn intrinsic_former_lift_type(
     env: &GlobalEnv,
     former: GlobalId,
     former_level_args: &[Level],
@@ -737,153 +1434,80 @@ fn structured_former_lift_type(
     guest_level_args: &[Level],
 ) -> KernelResult<Term> {
     let former_decl = env.inductive(former).ok_or_else(|| {
-        unsupported_recursive_shape("declared-former lift lost its admitted declaration")
+        unsupported_recursive_shape("intrinsic All lift lost its host declaration")
     })?;
-    let guest_decl = env
-        .inductive(d)
-        .ok_or_else(|| unsupported_recursive_shape("nested evidence lost its guest declaration"))?;
+    let guest_decl = env.inductive(d).ok_or_else(|| {
+        unsupported_recursive_shape("intrinsic All lift lost its guest declaration")
+    })?;
     if arguments.len() < former_decl.params.len() {
         return Err(unsupported_recursive_shape(
-            "declared-former lift is under-saturated",
+            "intrinsic All lift is under-saturated",
         ));
     }
-
-    let mut source_type = Term::indformer(former, former_level_args.to_vec());
-    for argument in arguments {
-        source_type = Term::app(source_type, argument.term.clone());
-    }
-    let source_params = arguments[..former_decl.params.len()]
+    let guest_params = arguments
+        .iter()
+        .find_map(|argument| {
+            argument
+                .shape
+                .as_deref()
+                .and_then(|shape| guest_params_from_shape(&argument.term, shape, parameter_count))
+        })
+        .ok_or_else(|| unsupported_recursive_shape("intrinsic All lift has no guest path"))?;
+    let leaf_sort = infer_motive_level(
+        env,
+        &Context::new(),
+        guest_decl,
+        guest_level_args,
+        &guest_params,
+        motive,
+    )?;
+    let actual_arguments = arguments
         .iter()
         .map(|argument| argument.term.clone())
         .collect::<Vec<_>>();
-    let guest_params = {
-        let first_shape = arguments
-            .iter()
-            .find_map(|argument| argument.shape.as_deref())
-            .ok_or_else(|| unsupported_recursive_shape("former lift has no recursive path"))?;
-        let field = arguments
-            .iter()
-            .find(|argument| argument.shape.is_some())
-            .expect("shape found");
-        let normalized = normalize(env, &Context::new(), &field.term);
-        let mut cursor = (&normalized, first_shape);
-        while let RecursiveShape::Pi { body, .. } = cursor.1 {
-            cursor = (cursor.0, body);
+    let mut components = Vec::new();
+    for (parameter, argument) in arguments.iter().enumerate() {
+        let Some(shape) = argument.shape.as_deref() else {
+            continue;
+        };
+        if parameter >= former_decl.params.len() {
+            return Err(unsupported_recursive_shape(
+                "intrinsic All path enters a host index",
+            ));
         }
-        let (_, application) = peel_app(cursor.0);
-        application
-            .into_iter()
-            .take(parameter_count)
-            .collect::<Vec<_>>()
-    };
-    let motive_sort =
-        infer_motive_level(env, &Context::new(), guest_decl, guest_level_args, &guest_params, motive)?;
-    let host_level = subst_levels(
-        &Term::Type(former_decl.level.clone()),
-        &former_decl.level_params,
-        former_level_args,
-    );
-    let Term::Type(host_level) = host_level else {
-        unreachable!("inductive levels instantiate to Type")
-    };
-    let evidence_level = host_level.max(motive_sort.level().clone()).normalize();
-    let type_motive = Term::Ascript(
-        Box::new(Term::lam(
-            source_type.clone(),
-            Term::Type(evidence_level.clone()),
-        )),
-        Box::new(Term::pi(
-            source_type.clone(),
-            Term::Type(evidence_level.clone().suc()),
-        )),
-    );
-
-    let mut host_methods = Vec::with_capacity(former_decl.constructors.len());
-    for (constructor_index, constructor) in former_decl.constructors.iter().enumerate() {
-        let host_recursive = recursive_shapes(env, constructor, former, former_decl.params.len())?;
-        let host_method_type = method_type(
+        let predicate_body = structured_lift_type(
             env,
-            former_decl,
-            constructor_index,
-            &type_motive,
-            &source_params,
-            former_level_args,
-        )?;
-        let (method_domains, _) = peel_pi(&host_method_type);
-        let field_count = constructor.args.len();
-        let ih_count = host_recursive.len();
-        let binder_count = method_domains.len();
-        let mut components = Vec::new();
-
-        for position in 0..field_count {
-            let field_type = shift(
-                &subst_levels(
-                    &subst_outer(
-                        &constructor.args[position],
-                        former_decl.params.len(),
-                        &source_params,
-                        position,
-                    ),
-                    &former_decl.level_params,
-                    former_level_args,
-                ),
-                (field_count - position + ih_count) as i64,
-                0,
-            );
-            if let Some((ordinal, recursive)) = host_recursive
-                .iter()
-                .enumerate()
-                .find(|(_, recursive)| recursive.position == position)
-            {
-                components.extend(extract_host_ih(
-                    &recursive.shape,
-                    Term::var(ih_count - 1 - ordinal),
-                    true,
-                )?);
-            } else if let ShapeDerivation::Recursive(shape) =
-                derive_recursive_shape(env, &field_type, d, parameter_count)?
-            {
-                components.push(structured_lift_type(
-                    env,
-                    &shape,
-                    &field_type,
-                    &Term::var(ih_count + field_count - 1 - position),
-                    &weaken(motive, binder_count as i64),
-                    d,
-                    parameter_count,
-                    guest_level_args,
-                )?);
-            }
-        }
-        let terminal = terminal_type(
-            guest_decl,
+            shape,
+            &weaken(&argument.term, 1),
+            &Term::var(0),
+            &weaken(motive, 1),
+            d,
+            parameter_count,
             guest_level_args,
-            &guest_params
-                .iter()
-                .map(|parameter| weaken(parameter, binder_count as i64))
-                .collect::<Vec<_>>(),
-            &weaken(&source_type, binder_count as i64),
-            &weaken(motive, binder_count as i64),
-        );
-        let mut body = evidence_sigma(components, terminal);
-        for domain in method_domains.into_iter().rev() {
-            body = Term::lam(domain, body);
-        }
-        host_methods.push(body);
+        )?;
+        let predicate_sort = recursive_shape_sort(env, shape, &leaf_sort)?;
+        let support_sort = match predicate_sort {
+            Sort::Type(_) => AllSupportSort::Type,
+            Sort::Omega(_) => AllSupportSort::Omega,
+        };
+        let support = env
+            .all_support(former, parameter, support_sort)
+            .ok_or_else(|| {
+                unsupported_recursive_shape(
+                    "intrinsic All lift has no generated support declaration",
+                )
+            })?;
+        components.push(support_application(
+            support,
+            former_decl,
+            former_level_args,
+            predicate_sort.level().clone(),
+            &actual_arguments,
+            Term::lam(argument.term.clone(), predicate_body),
+            value.clone(),
+        ));
     }
-
-    Ok(Term::Elim {
-        fam: former,
-        level_args: former_level_args.to_vec(),
-        params: source_params,
-        motive: Box::new(type_motive),
-        methods: host_methods,
-        indices: arguments[former_decl.params.len()..]
-            .iter()
-            .map(|argument| argument.term.clone())
-            .collect(),
-        scrut: Box::new(value.clone()),
-    })
+    pack_component_types(components)
 }
 
 /// Build `Lift_D(M, A, a)` from the D3a skeleton (`14 §3.2`).
@@ -991,16 +1615,20 @@ fn structured_lift_type(
         }
         RecursiveShape::Former {
             former,
-            level_args: former_level_args,
+            level_args: _,
             arguments,
         } => {
             let (actual_head, actual_arguments) = peel_app(&field_type);
-            let Term::IndFormer { id: actual_former, level_args: actual_former_level_args } = actual_head else {
-                return Err(unsupported_recursive_shape("declared-former lift head is not an IndFormer"));
+            let Term::IndFormer {
+                id: actual_former,
+                level_args: actual_former_level_args,
+            } = actual_head
+            else {
+                return Err(unsupported_recursive_shape(
+                    "declared-former lift head is not an IndFormer",
+                ));
             };
-            if actual_former != *former
-                || actual_arguments.len() != arguments.len()
-            {
+            if actual_former != *former || actual_arguments.len() != arguments.len() {
                 return Err(unsupported_recursive_shape(
                     "declared-former lift skeleton and normalized field disagree",
                 ));
@@ -1013,7 +1641,7 @@ fn structured_lift_type(
                     shape: shape_argument.shape.clone(),
                 })
                 .collect::<Vec<_>>();
-            structured_former_lift_type(
+            intrinsic_former_lift_type(
                 env,
                 *former,
                 &actual_former_level_args,
@@ -1149,16 +1777,20 @@ fn structured_lift_term(
         }
         RecursiveShape::Former {
             former,
-            level_args: former_level_args,
+            level_args: _,
             arguments,
         } => {
             let (actual_head, actual_arguments) = peel_app(&field_type);
-            let Term::IndFormer { id: actual_former, level_args: actual_former_level_args } = actual_head else {
-                return Err(unsupported_recursive_shape("declared-former lifted term head is not an IndFormer"));
+            let Term::IndFormer {
+                id: actual_former,
+                level_args: actual_former_level_args,
+            } = actual_head
+            else {
+                return Err(unsupported_recursive_shape(
+                    "declared-former lifted term head is not an IndFormer",
+                ));
             };
-            if actual_former != *former
-                || actual_arguments.len() != arguments.len()
-            {
+            if actual_former != *former || actual_arguments.len() != arguments.len() {
                 return Err(unsupported_recursive_shape(
                     "declared-former lifted term skeleton and normalized field disagree",
                 ));
@@ -1171,7 +1803,7 @@ fn structured_lift_term(
                     shape: shape_argument.shape.clone(),
                 })
                 .collect::<Vec<_>>();
-            structured_former_lift_term(
+            intrinsic_former_lift_term(
                 env,
                 *former,
                 &actual_former_level_args,
@@ -1189,11 +1821,13 @@ fn structured_lift_term(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn structured_former_lift_term(
+fn single_all_lift_term(
     env: &GlobalEnv,
     former: GlobalId,
     former_level_args: &[Level],
     arguments: &[RecursiveFormerArgument],
+    parameter: usize,
+    parameter_shape: &RecursiveShape,
     value: &Term,
     motive: &Term,
     methods: &[Term],
@@ -1201,71 +1835,69 @@ fn structured_former_lift_term(
     parameter_count: usize,
     d_level_args: &[Level],
     d_params: &[Term],
+    predicate_sort: &Sort,
 ) -> KernelResult<Term> {
-    let former_decl = env.inductive(former).ok_or_else(|| {
-        unsupported_recursive_shape("declared-former lift lost its admitted declaration")
-    })?;
-    let guest_decl = env
-        .inductive(d)
-        .ok_or_else(|| unsupported_recursive_shape("nested evidence lost its guest declaration"))?;
-    if arguments.len() < former_decl.params.len() {
-        return Err(unsupported_recursive_shape(
-            "declared-former lift is under-saturated",
-        ));
-    }
-
-    let mut source_type = Term::indformer(former, former_level_args.to_vec());
-    for argument in arguments {
-        source_type = Term::app(source_type, argument.term.clone());
-    }
-    let source_params = arguments[..former_decl.params.len()]
+    let former_decl = env
+        .inductive(former)
+        .ok_or_else(|| unsupported_recursive_shape("All lift term lost its host declaration"))?;
+    let support_sort = match predicate_sort {
+        Sort::Type(_) => AllSupportSort::Type,
+        Sort::Omega(_) => AllSupportSort::Omega,
+    };
+    let support = env
+        .all_support(former, parameter, support_sort)
+        .ok_or_else(|| unsupported_recursive_shape("All lift term lost its support family"))?;
+    let support_decl = env
+        .inductive(support)
+        .ok_or_else(|| unsupported_recursive_shape("All support is not an inductive"))?;
+    let actual_arguments = arguments
         .iter()
         .map(|argument| argument.term.clone())
         .collect::<Vec<_>>();
-    let motive_sort = infer_motive_level(
+    let predicate_body = structured_lift_type(
         env,
-        &Context::new(),
-        guest_decl,
-        d_level_args,
-        d_params,
-        motive,
-    )?;
-    let host_level = subst_levels(
-        &Term::Type(former_decl.level.clone()),
-        &former_decl.level_params,
-        former_level_args,
-    );
-    let Term::Type(host_level) = host_level else {
-        unreachable!("inductive levels instantiate to Type")
-    };
-    let evidence_level = host_level.max(motive_sort.level().clone()).normalize();
-    let evidence_sort = match motive_sort {
-        Sort::Type(_) => Term::Type(evidence_level),
-        Sort::Omega(_) => Term::Omega(evidence_level),
-    };
-    let lifted_arguments = arguments
-        .iter()
-        .map(|argument| RecursiveFormerArgument {
-            term: weaken(&argument.term, 1),
-            shape: argument.shape.clone(),
-        })
-        .collect::<Vec<_>>();
-    let body_type = structured_former_lift_type(
-        env,
-        former,
-        former_level_args,
-        &lifted_arguments,
+        parameter_shape,
+        &weaken(&arguments[parameter].term, 1),
         &Term::var(0),
         &weaken(motive, 1),
         d,
         parameter_count,
         d_level_args,
     )?;
+    let predicate = Term::lam(arguments[parameter].term.clone(), predicate_body);
+    let mut source_type = Term::indformer(former, former_level_args.to_vec());
+    for argument in &actual_arguments {
+        source_type = Term::app(source_type, argument.clone());
+    }
+    let lifted_arguments = actual_arguments
+        .iter()
+        .map(|argument| weaken(argument, 1))
+        .collect::<Vec<_>>();
+    let body_type = support_application(
+        support,
+        former_decl,
+        former_level_args,
+        predicate_sort.level().clone(),
+        &lifted_arguments,
+        weaken(&predicate, 1),
+        Term::var(0),
+    );
+    let host_level = subst_levels(
+        &Term::Type(former_decl.level.clone()),
+        &former_decl.level_params,
+        former_level_args,
+    );
+    let Term::Type(host_level) = host_level else {
+        unreachable!("inductive level instantiation is a Type")
+    };
     let host_motive = Term::Ascript(
         Box::new(Term::lam(source_type.clone(), body_type)),
-        Box::new(Term::pi(source_type.clone(), evidence_sort)),
+        Box::new(Term::pi(
+            source_type.clone(),
+            Term::Type(predicate_sort.level().clone().max(host_level).normalize()),
+        )),
     );
-
+    let source_params = actual_arguments[..former_decl.params.len()].to_vec();
     let mut host_methods = Vec::with_capacity(former_decl.constructors.len());
     for (constructor_index, constructor) in former_decl.constructors.iter().enumerate() {
         let host_recursive = recursive_shapes(env, constructor, former, former_decl.params.len())?;
@@ -1277,19 +1909,29 @@ fn structured_former_lift_term(
             &source_params,
             former_level_args,
         )?;
-        let (method_domains, expected_body) = peel_pi(&host_method_type);
-        let mut host_ctx = Context::new();
-        host_ctx.extend_tel(&method_domains);
+        let (method_domains, _) = peel_pi(&host_method_type);
         let field_count = constructor.args.len();
         let ih_count = host_recursive.len();
-        if method_domains.len() != field_count + ih_count {
+        let binder_count = method_domains.len();
+        if binder_count != field_count + ih_count {
             return Err(unsupported_recursive_shape(
-                "host former method binder count disagrees with its recursive skeleton",
+                "All host method binder count disagrees with its shape",
             ));
         }
-        let binder_count = method_domains.len();
-        let mut components = Vec::new();
+        let mut evidence = Vec::new();
         for position in 0..field_count {
+            let carrier_target = position + former_decl.params.len() - 1 - parameter;
+            if derive_carrier_shape(env, &constructor.args[position], carrier_target)?.is_none() {
+                continue;
+            }
+            if let Some((ordinal, _)) = host_recursive
+                .iter()
+                .enumerate()
+                .find(|(_, recursive)| recursive.position == position)
+            {
+                evidence.push(Term::var(ih_count - 1 - ordinal));
+                continue;
+            }
             let field_type = shift(
                 &subst_levels(
                     &subst_outer(
@@ -1304,59 +1946,135 @@ fn structured_former_lift_term(
                 (field_count - position + ih_count) as i64,
                 0,
             );
-            if let Some((ih_ordinal, recursive)) = host_recursive
-                .iter()
-                .enumerate()
-                .find(|(_, recursive)| recursive.position == position)
-            {
-                components.extend(extract_host_ih(
-                    &recursive.shape,
-                    Term::var(ih_count - 1 - ih_ordinal),
-                    false,
-                )?);
-            } else if let ShapeDerivation::Recursive(shape) =
+            let ShapeDerivation::Recursive(shape) =
                 derive_recursive_shape(env, &field_type, d, parameter_count)?
-            {
-                components.push(structured_lift_term(
-                    env,
-                    &shape,
-                    &field_type,
-                    &Term::var(ih_count + field_count - 1 - position),
-                    &weaken(motive, binder_count as i64),
-                    &methods
-                        .iter()
-                        .map(|method| weaken(method, binder_count as i64))
-                        .collect::<Vec<_>>(),
-                    d,
-                    parameter_count,
-                    d_level_args,
-                    &d_params
-                        .iter()
-                        .map(|parameter| weaken(parameter, binder_count as i64))
-                        .collect::<Vec<_>>(),
-                )?);
-            }
+            else {
+                return Err(unsupported_recursive_shape(
+                    "All evidence field lost its guest recursive shape",
+                ));
+            };
+            evidence.push(structured_lift_term(
+                env,
+                &shape,
+                &field_type,
+                &Term::var(ih_count + field_count - 1 - position),
+                &weaken(motive, binder_count as i64),
+                &methods
+                    .iter()
+                    .map(|method| weaken(method, binder_count as i64))
+                    .collect::<Vec<_>>(),
+                d,
+                parameter_count,
+                d_level_args,
+                &d_params
+                    .iter()
+                    .map(|parameter| weaken(parameter, binder_count as i64))
+                    .collect::<Vec<_>>(),
+            )?);
         }
-        let mut body = pack_checked(env, &host_ctx, expected_body.clone(), &components)?;
+        let mut body = Term::constructor(
+            support_decl.constructors[constructor_index].id,
+            former_level_args
+                .iter()
+                .cloned()
+                .chain(std::iter::once(predicate_sort.level().clone()))
+                .collect(),
+        );
+        for source_parameter in &source_params {
+            body = Term::app(body, weaken(source_parameter, binder_count as i64));
+        }
+        body = Term::app(body, weaken(&predicate, binder_count as i64));
+        for position in 0..field_count {
+            body = Term::app(body, Term::var(ih_count + field_count - 1 - position));
+        }
+        for component in evidence {
+            body = Term::app(body, component);
+        }
         for domain in method_domains.into_iter().rev() {
             body = Term::lam(domain, body);
         }
         crate::check::check(env, &Context::new(), &body, &host_method_type)?;
         host_methods.push(body);
     }
-
     Ok(Term::Elim {
         fam: former,
         level_args: former_level_args.to_vec(),
         params: source_params,
         motive: Box::new(host_motive),
         methods: host_methods,
-        indices: arguments[former_decl.params.len()..]
-            .iter()
-            .map(|argument| argument.term.clone())
-            .collect(),
+        indices: actual_arguments[former_decl.params.len()..].to_vec(),
         scrut: Box::new(value.clone()),
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn intrinsic_former_lift_term(
+    env: &GlobalEnv,
+    former: GlobalId,
+    former_level_args: &[Level],
+    arguments: &[RecursiveFormerArgument],
+    value: &Term,
+    motive: &Term,
+    methods: &[Term],
+    d: GlobalId,
+    parameter_count: usize,
+    d_level_args: &[Level],
+    d_params: &[Term],
+) -> KernelResult<Term> {
+    let guest = env
+        .inductive(d)
+        .ok_or_else(|| unsupported_recursive_shape("intrinsic All term lost guest declaration"))?;
+    let guest_params = arguments
+        .iter()
+        .find_map(|argument| {
+            argument
+                .shape
+                .as_deref()
+                .and_then(|shape| guest_params_from_shape(&argument.term, shape, parameter_count))
+        })
+        .ok_or_else(|| unsupported_recursive_shape("intrinsic All term has no guest path"))?;
+    let leaf_sort = infer_motive_level(
+        env,
+        &Context::new(),
+        guest,
+        d_level_args,
+        &guest_params,
+        motive,
+    )?;
+    let mut components = Vec::new();
+    for (parameter, argument) in arguments.iter().enumerate() {
+        let Some(shape) = argument.shape.as_deref() else {
+            continue;
+        };
+        let predicate_sort = recursive_shape_sort(env, shape, &leaf_sort)?;
+        components.push(single_all_lift_term(
+            env,
+            former,
+            former_level_args,
+            arguments,
+            parameter,
+            shape,
+            value,
+            motive,
+            methods,
+            d,
+            parameter_count,
+            d_level_args,
+            d_params,
+            &predicate_sort,
+        )?);
+    }
+    match components.len() {
+        0 => Err(unsupported_recursive_shape(
+            "intrinsic All term has no evidence component",
+        )),
+        1 => Ok(components.pop().expect("length checked")),
+        _ => Ok(components
+            .into_iter()
+            .rev()
+            .reduce(|tail, head| Term::pair(head, tail))
+            .expect("length checked")),
+    }
 }
 
 /// The dependent eliminator's method type for constructor `k`:
@@ -1567,6 +2285,7 @@ mod tests {
 
     #[test]
     fn positivity_nat_accepted() {
+        let env = GlobalEnv::new();
         // data Nat : Type 0 where zero : Nat ; suc : Nat → Nat
         let mut ind = InductiveDecl {
             id: d(0),
@@ -1594,11 +2313,12 @@ mod tests {
             former_type: Term::Type(Level::zero()),
         };
         ind.build_types();
-        assert!(check_positivity(&ind).is_ok());
+        assert!(check_positivity(&env, &ind).is_ok());
     }
 
     #[test]
     fn positivity_bad_rejected() {
+        let env = GlobalEnv::new();
         // data Bad : Type 0 where mk : (Bad → Bool) → Bad
         let bool_ = Term::indformer(d(9), vec![]); // some other type `Bool`
         let arg = Term::pi(Term::indformer(d(0), vec![]), bool_); // Bad → Bool
@@ -1619,11 +2339,12 @@ mod tests {
             former_type: Term::Type(Level::zero()),
         };
         ind.build_types();
-        assert!(check_positivity(&ind).is_err());
+        assert!(check_positivity(&env, &ind).is_err());
     }
 
     #[test]
     fn positivity_bad3_in_application_rejected() {
+        let env = GlobalEnv::new();
         // data Bad3 : Type 0 where mk : Pair (Bad3 → Empty) Unit → Bad3
         // `Pair` is an inductive former (id 7); arg = Pair (Bad3→Empty) Unit.
         let empty = Term::indformer(d(8), vec![]);
@@ -1651,13 +2372,14 @@ mod tests {
         };
         ind.build_types();
         assert!(
-            check_positivity(&ind).is_err(),
+            check_positivity(&env, &ind).is_err(),
             "Bad3 nested-negative-in-application must be rejected"
         );
     }
 
     #[test]
     fn positivity_bad4_in_own_indices_rejected() {
+        let env = GlobalEnv::new();
         // data Bad4 : (Bad4 → Empty) → Type 0 where mk : Bad4 Empty
         let empty = Term::indformer(d(8), vec![]);
         let bad4 = Term::indformer(d(0), vec![]);
@@ -1675,13 +2397,14 @@ mod tests {
         let _ = telescope_to_pi; // keep import
         ind.build_types();
         assert!(
-            check_positivity(&ind).is_err(),
+            check_positivity(&env, &ind).is_err(),
             "Bad4 D-in-own-indices must be rejected"
         );
     }
 
     #[test]
     fn w_style_pi_bound_admitted_in_k1p5() {
+        let env = GlobalEnv::new();
         // data W : Type 0 where mk : (Nat → W) → W   (strictly positive W-style;
         // K1.5 admits it, `14 §2.1`, `14 §8.4`).
         let nat = Term::indformer(d(5), vec![]);
@@ -1705,7 +2428,7 @@ mod tests {
         };
         ind.build_types();
         assert!(
-            check_positivity(&ind).is_ok(),
+            check_positivity(&env, &ind).is_ok(),
             "W-style is strictly positive"
         );
         // K1.5: recursive_args now includes the W-style arg.
@@ -1718,6 +2441,7 @@ mod tests {
 
     #[test]
     fn w_style_branching_domain_not_d_free_rejected() {
+        let env = GlobalEnv::new();
         // data Bad5 : Type 0 where mk : (Bad5 → Bad5) → Bad5
         // The branching domain `Bad5` is not D-free: §8.2 checks the domain at
         // flipped (−) polarity and finds D there, so it rejects.
@@ -1745,7 +2469,7 @@ mod tests {
         };
         ind.build_types();
         assert!(
-            check_positivity(&ind).is_err(),
+            check_positivity(&env, &ind).is_err(),
             "branching domain not D-free must be rejected by §8.2 polarity check"
         );
     }
