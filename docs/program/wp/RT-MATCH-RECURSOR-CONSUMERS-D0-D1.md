@@ -2,10 +2,14 @@
 
 > **SUPERSEDED ON ITS OPERATIVE QUESTION — read section 6 first.** This section
 > records the measurement at base `89aa1550`, where the population refused. Five
-> successor authorities have merged since, and **at base `166641c8` every row in
-> this population compiles.** The enumeration and causal work below stand as the
-> record of that base; the answer to *"does it refuse?"* has flipped, and
-> section 6 is the current one.
+> successor authorities have merged since, and **at base `166641c8` every row
+> the `ken-runtime --lib` census reaches compiles.** The enumeration and causal
+> work below stand as the record of that base; the answer to *"does it
+> refuse?"* has flipped **over the censused domain**, and section 6 is the
+> current one.
+>
+> **Neither section closes the node's population.** `AC-1` is unqualified and
+> both censuses are `ken-runtime --lib` only — see 1.6.1 and 6.7.
 
 **Base: `89aa15502d6f76e6d42aac1b97ea3ff5032cd889`** (`origin/main`, the merged
 corrected `RT-RECURSOR-TRANSPORT` `D0`-`D2`). Branch
@@ -356,22 +360,38 @@ matters, but a test-keyed reading of either population will double-count.
 - **CI has not run.** `AC-8` is a CI claim and no local `--workspace` run was
   performed, per `COORDINATION §12`.
 
-# 6. THE RESUMPTION — `D0`/`D1` re-measured at base `166641c8`
+# 6. THE RESUMPTION — a `ken-runtime --lib` `D0`/`D1` PARTIAL census at base `166641c8`
 
 **Record only. No production change.** `git diff 166641c8 -- crates/` is empty
 at this checkpoint SHA; every instrument below was disposable and is reverted.
 No `D2` code was written. Suite: `-p ken-runtime --lib`, **838 passed, 0 failed,
 5 ignored** (the 5 are the base's).
 
-> ## THE RESULT, AND IT IS A CHANGED ANSWER RATHER THAN A CHANGED METHOD
+> ## THE RESULT, STATED AT THE SCOPE IT WAS MEASURED AT
 >
-> **Every compilable program in the `MatchScrutineeRecursor` population now
-> reaches `FunctionizedUnits` under A-only exclusion and compiles `Ok`. There
-> are zero red roots, so no `D2` repair is owed.**
+> **This is a `ken-runtime --lib` `D0`/`D1` PARTIAL census with zero measured
+> red roots.** Every program the census reaches reaches `FunctionizedUnits`
+> under A-only exclusion and compiles `Ok`, so **no `D2` repair is owed on any
+> root measured here.**
 >
 > Section 2.3 measured 6 failures at base `89aa1550`. The five merged successor
-> authorities closed them. This is the event `AC-1` was written to close on:
-> the refusal has run out of walls.
+> authorities closed them over this domain.
+>
+> ### WHAT THIS IS NOT
+>
+> **It does NOT discharge `AC-1`, and it does not close the node's
+> population.** `AC-1` is unqualified — the frame requires *every compilation
+> entry that can supply the production predicate* — while both censuses are
+> `#[cfg(test)]` in `ken-runtime` and therefore reach only that crate's own
+> unit tests. `ken-cli`, `ken-verify` and elaborator-driven entries are
+> **uncensused** (6.7). **A closed subset cannot discharge an unqualified AC**,
+> and narrowing the AC to fit the subset is not this record's to do.
+>
+> An earlier revision of this section and of commit `f9539c00`'s message said
+> this discharged `AC-1` "for the in-crate domain" and was "the event `AC-1` was
+> written to close on." **Both claims are withdrawn and are corrected here
+> rather than annotated.** Whether the residual is measured here or framed
+> elsewhere is an Architect/Steward scoping ruling, not a build call.
 
 ## 6.1 The gate, re-derived rather than inherited
 
@@ -437,7 +457,7 @@ per fragment, interleaving concurrent test threads mid-record — was avoided by
 construction: every row is one `write_all` of a pre-formatted buffer. Zero
 malformed records across all three censuses.
 
-## 6.3 The population, by root
+## 6.3 The censused population, by root
 
 | root | carrier | tests | compiled? |
 |---|---|---|---|
@@ -455,7 +475,7 @@ identical `Match` over the same scrutinee, same two constructors, `binders: 1`,
 same `EXIT_SUCCESS` body, differing **only** in the default trap's message and
 the object symbol. All six were compiled separately, with identical results.
 
-## 6.4 `D1` — activation and outcome
+## 6.4 `D1` — activation and outcome, over the censused domain
 
 **The activation denominator is measured, not derived:**
 `select_body_emission_authority` was called directly under the exclusion and its
@@ -545,17 +565,25 @@ the feature. I have not made that run and am not claiming closure over it.
 
 ## 6.8 Hard stops, and what is owed next
 
-**No hard stop fires.** `D1` found no materially distinct authorities because it
-found **no red roots**; no repair needs a new planner or ABI population because
-no repair is needed; no shared root with `RT-LEXICAL-RECURSOR-CONSUMERS` arises,
-since this population has nothing left to attribute. The fourth stop
-(reduced-predecessor merge shape) is not reached for the same reason.
+**No hard stop fires on the censused domain.** `D1` found no materially distinct
+authorities because it found **no red roots there**; no repair needs a new
+planner or ABI population because no repair is needed on any measured root; no
+shared root with `RT-LEXICAL-RECURSOR-CONSUMERS` arises, since nothing measured
+here is left to attribute. The fourth stop (reduced-predecessor merge shape) is
+not reached for the same reason. **A hard stop could still fire on the
+uncensused domain; nothing here is evidence either way about it.**
 
-**The open question is a scoping call, not a mechanism one:** `D2` and `D3` as
-framed presuppose a repair. With zero red roots there is no root to repair and
-no mutation-at-a-repaired-root for `D3` to key on. `D3`'s standing obligation to
-give the `D2` counters a consumer (or state at the declaration site that they
-are unread) is **not** discharged by this and survives independently.
+**The open question is a scoping call, not a mechanism one, and it is not
+mine.** `D2` and `D3` as framed presuppose a repair. With zero red roots *over
+the measured domain* there is no root to repair and no
+mutation-at-a-repaired-root for `D3` to key on — but that is an argument about
+what was measured, not a licence to declare the node complete. **The residual
+in 6.7 has to be measured or reassigned by a ruling before any completion
+claim is available to anyone.**
+
+`D3`'s standing obligation to give the `D2` counters a consumer (or state at the
+declaration site that they are unread) is **not** discharged by this and
+survives independently.
 
 ## 6.9 Bans held
 
