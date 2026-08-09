@@ -70,71 +70,118 @@ production native-lowering seats.**
 > mutation at `6164`.** A successor control that keys on the string will pass or
 > fail for the wrong reason. Key on the **seat**, or on the measured operand.
 
-> ### `6181` AND `13919` DIFFER IN A WAY THAT LIKELY DECIDES THE MECHANISM
+> ### `Specialized(_)` IS A REMAINDER, NOT A CLASS — AND NOT A PRE-SHAPE WILDCARD
 >
-> `13919` destructures for `Constructor` and refuses what is not one — the
-> message is true there. **`6181` refuses `Specialized(_)` as a wildcard**, so
-> it refuses **even a `Specialized(Lowered::Constructor)`**, before any shape
-> test runs. Whether the message is true at `6181` therefore depends on the
-> operand, and that is exactly what has not been measured.
+> **Corrected by Architect ruling `evt_3cmv9e3kms2bx`; the Steward's earlier
+> reading of this seat was wrong and is withdrawn.** The arm is **not** a
+> blanket refusal before any shape test, and it does **not** refuse a
+> `Specialized(Lowered::Constructor)` — that is accepted at `core.rs:6086`.
+>
+> It is **the remainder after explicit acceptance** of `BoundedNat`,
+> `StructuralNat`, `Bool`, `HostResult` (`:6054`), `DynamicConstructor`
+> (`:6075`) and `Constructor` (`:6086`). **So the wildcard still covers
+> materially different scalar, capability, aggregate, closure, protocol and trap
+> variants**, and which one arrives is precisely the unmeasured fact.
+>
+> ⇒ **`Specialized` is a phase, not an answer.** Any statement about whether the
+> refusal's message is true here requires the exact `LoweredVariant`.
 
-**There is a documented precedent at this exact seat, and it is the same shape.**
-The `Carried(word)` arm immediately above `6181` carries a comment saying that
-without it the value *"fell past every shape test onto the refusal below — a
-true sentence about the wrong thing, naming a cause that is not the cause: the
-value is fine, the question is."* It also records that **the generic `lower_expr`
-`Match` emitter and the source machine's `ComputationalMatchScrutinee` both
-already carried that arm, and this seat was the only one of the three missing
-it.** ⇒ **This refusal has already once named a cause that was not the cause, at
-this seat, for the adjacent operand class.** Weigh that as a prior; it is not a
-finding.
+**There is a documented precedent at this exact seat.** The `Carried(word)` arm
+immediately above carries a comment saying that without it the value *"fell past
+every shape test onto the refusal below — a true sentence about the wrong thing,
+naming a cause that is not the cause: the value is fine, the question is."* It
+also records that the generic `lower_expr` `Match` emitter and the source
+machine's `ComputationalMatchScrutinee` both already carried that arm, and
+**this seat was the only one of the three missing it.**
 
-## Deliverable — ONE, and it is measurement before mechanism
+⇒ **This refusal has already once named a cause that was not the cause, at this
+seat, for an adjacent operand class.** **Weigh it as a prior. It is not a
+finding, and it must not be used to skip the measurement** — the Architect ruled
+that choosing consumer widening, upstream composition or terminal propagation
+without the variant and producer would repeat the representation guess this stop
+exists to prevent.
 
-The Architect's ordered list, verbatim in substance:
+## Ownership, as narrowed — read this before the deliverable
 
-1. **Identify the exact raise seat.**
-2. **Record the `LoweringOperand` phase and the exact `LoweredVariant`.**
-3. **Record the immediate producer and the continuation/frame, if any.**
-4. **Preserve the current fail-closed refusal.**
-5. **Then route to an existing authority only if that measured class is already
-   in its population; otherwise return for a fresh mechanism ruling.**
+**Architect ruling `evt_3cmv9e3kms2bx` settled the seat and the stage.** This is
+**Runtime's source-machine ORDINARY-`Match` specialized-scrutinee boundary**, at
+`lowering/core.rs:6178-6183` in `SourceContinuation::MatchScrutinee`, operand
+phase `LoweringOperand::Specialized`, reached by
+`lower_source_machine_with_continuation -> lower_source_machine ->
+lower_carried_computational_match -> lower_computational_match_expr ->
+define_unit_body`. **The candidate did not create or alter it.**
 
-> ### DELIVERABLE 1 MAY ALREADY BE DISCHARGED — CONFIRM, DO NOT REDO
+**Four owners are ruled OUT, by seat and not by resemblance:**
+
+| not | because |
+|---|---|
+| Kernel | it has already admitted, erased and interpreted the witness |
+| `runtime_ir_evaluator` | no inner `RuntimeIrEvaluation` error and no re-stamp |
+| [[RT-COMPMATCH-TREE-SCRUTINEE]] | it owns `SourceContinuation::ComputationalMatchScrutinee`, a different arm |
+| #6g [[RT-SPECIALIZED-ACTIVE-RESUME]] | its seat is `lower_computational_match_value_composed` with a first `Active` frame |
+
+## `D0` — the four-field measurement, and NOTHING ELSE
+
+**`876450ab` stays unchanged. Measurement only. DO NOT FRAME OR ATTEMPT A
+PRODUCTION REPAIR** — the Architect authorized this node's `D0` and withheld
+everything past it.
+
+1. At the firing arm, record **`lowered.variant()` exactly**, not merely
+   `Specialized`.
+2. Record the ordinary `Match`'s **`static_origin`**, its **case
+   constructors**, and the **immediately preceding source-machine
+   value-producing occurrence/route**.
+3. Record the **continuation stack at arrival**.
+4. **Preserve the exact refusal and stop.**
+
+**The backtrace identifies the CONSUMER, not the producer.** That is why field 2
+is not optional.
+
+> ### THE DISPOSITION IS DETERMINISTIC — IT IS ALREADY DECIDED BY THE VARIANT
+>
+> - **`ProcessExitStatus`** ⇒ route the new row into the existing **`draft`
+>   `RT-PROCESS-EXIT-STATUS`** for a population/seat recut. **Do not create an
+>   eighth mechanism, and do not teach this consumer to accept it by
+>   assumption.**
+> - **any other variant** ⇒ **return for the fresh mechanism ruling** the
+>   Architect's prior stop requires. **Do not relabel it into a nearby node by
+>   message similarity.**
+
+> ### THE SEAT IS SETTLED. DO NOT RE-MEASURE IT.
 >
 > Routing measurement `evt_7j7jc1kj2vqsw` instrumented the `surface::unsupported`
-> constructor with a forced backtrace — exhaustive rather than probing tabled
-> guesses — and identified **one** raise, firing **once**, at `6181`:
+> constructor with a forced backtrace — exhaustive, rather than probing tabled
+> guesses — and found **one** raise firing **once**, with the path above. The
+> Architect accepted those facts in `evt_3cmv9e3kms2bx`.
 >
-> ```
-> surface::unsupported
->   <- lower_source_machine_with_continuation   <- the raise
->   <- lower_source_machine
->   <- lower_carried_computational_match
->   <- lower_computational_match_expr
->   <- units::define_unit_body
-> ```
+> **The `6164` control hazard did not confound it, and this was checked rather
+> than assumed.** `source_carried_control_refusal` builds its refusal through
+> **the same `surface::unsupported`** (`core.rs:2119`), so the hook was **inside
+> the probe's field of view, not outside it**. No mutation was armed, and the
+> backtrace carries **no `source_carried_control_refusal` frame** — so the
+> attribution rests on the frame list and the arming state, **not on
+> elimination**.
 >
-> **That measurement and the ruling crossed in the thread**, so the ruling's
-> site enumeration was written without it. **Deliverables 2 and 3 are
-> untouched by it** — a backtrace names the seat, not the operand.
+> **That instrument avoided the trap by placement, not by design. The next one
+> must avoid it by design** — see `AC-7`.
 
-**`2` and `3` are the substance.** The Architect was explicit that the evidence
-does not reveal whether the rejected specialized value is a **boundary value,
-process result, protocol marker, or another `Lowered` class**, and that this
-distinction decides whether an existing composition/elimination authority should
-have caught it or whether this is a new one.
+**The variant and the producer are the whole substance of `D0`.** The Architect
+was explicit that `Specialized(_)` does not reveal whether the rejected value is
+a **boundary value, process result, protocol marker, or another `Lowered`
+class**, and that this decides whether an existing composition/elimination
+authority should have caught it or whether this is a new one.
 
 ## Acceptance
 
 | AC | criterion |
 |---|---|
-| `AC-1` | The exact raise seat is confirmed by instrumentation, not by string or construct match |
-| `AC-2` | The `LoweringOperand` phase and the exact `LoweredVariant` are recorded |
-| `AC-3` | The immediate producer and the enclosing continuation/frame are recorded |
-| `AC-4` | **No production change.** The fail-closed refusal is preserved exactly; test-only, `crates/` behaviour unchanged |
-| `AC-5` | Either the measured class is shown to be **already in** a named existing authority's population, or the node returns for a fresh mechanism ruling. **Neither is chosen by resemblance** |
+| `AC-1` | **`lowered.variant()` recorded exactly** at the firing arm — `Specialized` alone does not discharge this |
+| `AC-2` | The ordinary `Match`'s `static_origin`, case constructors, and the immediately preceding source-machine value-producing occurrence/route are recorded |
+| `AC-3` | The continuation stack at arrival is recorded |
+| `AC-4` | **No production change.** The fail-closed refusal preserved exactly; test-only, `crates/` behaviour unchanged |
+| `AC-5` | The deterministic disposition is applied: `ProcessExitStatus` routes to `RT-PROCESS-EXIT-STATUS`, anything else returns for a fresh mechanism ruling. **Neither is chosen by resemblance** |
 | `AC-6` | No consumer widening, Kernel workaround, selection/disposition change, or graph inference |
+| `AC-7` | **No control keys on `("Match", "scrutinee is not a constructor value")`** — the `6164` mutation hook produces that pair by construction |
 
 ## Forbidden
 
