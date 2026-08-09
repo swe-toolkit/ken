@@ -21,7 +21,10 @@ SWEEP = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SWEEP)
 
 
-def listing(identities: set[tuple[str, str, str]]) -> dict[str, object]:
+def listing(
+    identities: set[tuple[str, str, str]],
+    nonmatching_count: int = 0,
+) -> dict[str, object]:
     suites: dict[str, object] = {}
     for index, (package, binary, test) in enumerate(sorted(identities)):
         suites[str(index)] = {
@@ -35,7 +38,23 @@ def listing(identities: set[tuple[str, str, str]]) -> dict[str, object]:
                 }
             },
         }
-    return {"test-count": len(identities), "rust-suites": suites}
+    if nonmatching_count:
+        suites["nonmatching"] = {
+            "package-name": "fixture-package",
+            "binary-name": "ordinary-tests",
+            "binary-id": "fixture-package::ordinary-tests",
+            "testcases": {
+                f"ordinary_test_{index}": {
+                    "ignored": False,
+                    "filter-match": {"status": "mismatch"},
+                }
+                for index in range(nonmatching_count)
+            },
+        }
+    return {
+        "test-count": len(identities) + nonmatching_count,
+        "rust-suites": suites,
+    }
 
 
 def write_selected_listing(path: Path, *human_identities: str) -> None:
@@ -111,7 +130,7 @@ class IgnoredSweepTests(unittest.TestCase):
         with self.assertRaisesRegex(SWEEP.SweepError, "resolves to 2"):
             SWEEP.resolve_exemptions([row], ambiguous)
 
-    def test_list_count_must_equal_the_anchored_derivation(self) -> None:
+    def test_listing_matching_count_must_equal_the_anchored_derivation(self) -> None:
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
         exempt = registry_identities(rows)
         selected_identities = {
@@ -123,13 +142,37 @@ class IgnoredSweepTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             all_listing = Path(directory) / "all.json"
             selected_listing = Path(directory) / "selected.json"
-            all_listing.write_text(json.dumps(listing(all_identities)), encoding="utf-8")
+            all_listing.write_text(
+                json.dumps(listing(all_identities, 2646 - len(all_identities))),
+                encoding="utf-8",
+            )
             selected_listing.write_text(
-                json.dumps(listing(selected_identities)), encoding="utf-8"
+                json.dumps(
+                    listing(
+                        selected_identities,
+                        2646 - len(selected_identities),
+                    )
+                ),
+                encoding="utf-8",
             )
             SWEEP.verify_lists(all_listing, selected_listing, 47, rows)
-            with self.assertRaises(SWEEP.SweepError):
+            with self.assertRaises(SWEEP.SweepError) as mismatch:
                 SWEEP.verify_lists(all_listing, selected_listing, 46, rows)
+            diagnostic = str(mismatch.exception)
+            self.assertIn("source attribute census reports 50 ignored rows", diagnostic)
+            self.assertIn("2646 total discovered tests", diagnostic)
+            self.assertIn("51 rows matching the ignored-only filter", diagnostic)
+            self.assertIn("ken-runtime::ken-runtime::base_debt_0", diagnostic)
+
+            selected_document = json.loads(selected_listing.read_text())
+            selected_document["test-count"] = 2645
+            selected_listing.write_text(
+                json.dumps(selected_document), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                SWEEP.SweepError, "listings disagree on total discovered tests"
+            ):
+                SWEEP.verify_lists(all_listing, selected_listing, 47, rows)
 
     def test_listing_derives_one_exact_human_identity_per_selected_row(self) -> None:
         document = listing({("fixture-package", "binary-name", "selected_test")})
@@ -162,6 +205,22 @@ class IgnoredSweepTests(unittest.TestCase):
             selected_listing.write_text(json.dumps(duplicate), encoding="utf-8")
             with self.assertRaisesRegex(SWEEP.SweepError, "multiple selected rows"):
                 SWEEP.read_listing(selected_listing)
+
+    def test_listing_total_is_not_the_ignored_matching_population(self) -> None:
+        identities = {
+            ("fixture-package", "ignored-tests", f"ignored_test_{index}")
+            for index in range(51)
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            all_listing = Path(directory) / "all.json"
+            all_listing.write_text(
+                json.dumps(listing(identities, 2646 - len(identities))),
+                encoding="utf-8",
+            )
+            discovered, matching, _ = SWEEP.read_listing(all_listing)
+
+        self.assertEqual(discovered, 2646)
+        self.assertEqual(len(matching), 51)
 
     def test_completed_report_names_passing_rows(self) -> None:
         log_text = """

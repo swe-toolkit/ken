@@ -178,12 +178,26 @@ def read_listing(
                         "multiple selected rows"
                     )
                 human_identities[human_identity] = identity
-    if len(identities) != count:
+    if len(identities) > count:
         raise SweepError(
-            f"{path} reports {count} tests but exposes {len(identities)} matching "
-            "ignored identities"
+            f"{path} reports {count} total discovered tests but exposes "
+            f"{len(identities)} matching ignored identities"
         )
     return count, identities, human_identities
+
+
+def matching_identity_evidence(
+    identities: set[tuple[str, str, str]],
+) -> str:
+    rendered = [
+        f"{package}::{binary}::{test}"
+        for package, binary, test in sorted(identities)
+    ]
+    limit = 20
+    evidence = [f"  - {identity}" for identity in rendered[:limit]]
+    if len(rendered) > limit:
+        evidence.append(f"  - ... {len(rendered) - limit} more")
+    return "\n".join(evidence)
 
 
 def verify_lists(
@@ -192,19 +206,35 @@ def verify_lists(
     expected: int,
     rows: list[dict[str, str]],
 ) -> None:
-    all_count, all_identities, _ = read_listing(all_path)
-    selected, selected_identities, _ = read_listing(selected_path)
-    if all_count != expected + len(rows):
+    all_discovered, all_identities, _ = read_listing(all_path)
+    selected_discovered, selected_identities, _ = read_listing(selected_path)
+    all_matching = len(all_identities)
+    selected_matching = len(selected_identities)
+    source_ignored = expected + len(rows)
+    if all_discovered != selected_discovered:
         raise SweepError(
-            f"nextest discovered {all_count} ignored rows; anchored derivation "
-            f"expects {expected + len(rows)}"
+            "nextest listings disagree on total discovered tests: "
+            f"unfiltered ignored listing reports {all_discovered}, selected "
+            f"listing reports {selected_discovered}"
         )
-    if selected != expected:
+    if all_matching != source_ignored:
         raise SweepError(
-            f"nextest selected {selected} ignored rows; anchored derivation expects "
-            f"{expected}"
+            f"source attribute census reports {source_ignored} ignored rows; "
+            f"nextest listing reports {all_discovered} total discovered tests and "
+            f"{all_matching} rows matching the ignored-only filter. Matching "
+            "listing identities:\n"
+            f"{matching_identity_evidence(all_identities)}"
         )
-    if selected == 0:
+    if selected_matching != expected:
+        raise SweepError(
+            f"anchored source census minus {len(rows)} registry exemptions "
+            f"expects {expected} selected ignored rows; nextest listing reports "
+            f"{selected_discovered} total discovered tests and "
+            f"{selected_matching} rows matching the sweep filter. Matching "
+            "selected identities:\n"
+            f"{matching_identity_evidence(selected_identities)}"
+        )
+    if selected_matching == 0:
         raise SweepError("nextest selected zero ignored rows")
     exemptions = resolve_exemptions(rows, all_identities)
     if exemptions & selected_identities:
@@ -212,8 +242,9 @@ def verify_lists(
     if selected_identities != all_identities - exemptions:
         raise SweepError("selected identities are not population minus registry")
     print(
-        f"ignored sweep selection: {selected} of {all_count} rows; "
-        "anchored derivation and registry subtraction agree"
+        f"ignored sweep selection: {selected_matching} selected of "
+        f"{all_matching} ignored-only matches from {all_discovered} total "
+        "discovered tests; source census and registry subtraction agree"
     )
 
 
@@ -223,10 +254,15 @@ def report(
     expected: int,
     exit_status: int,
 ) -> None:
-    selected_count, _, selected_human_identities = read_listing(selected_path)
-    if selected_count != expected:
+    selected_discovered, selected_identities, selected_human_identities = (
+        read_listing(selected_path)
+    )
+    selected_matching = len(selected_identities)
+    if selected_matching != expected:
         raise SweepError(
-            f"selected listing reports {selected_count} rows; expected {expected}"
+            f"selected listing reports {selected_discovered} total discovered "
+            f"tests and {selected_matching} rows matching the sweep filter; "
+            f"expected {expected} matching rows"
         )
     text = path.read_text(encoding="utf-8", errors="replace")
     summaries = [
