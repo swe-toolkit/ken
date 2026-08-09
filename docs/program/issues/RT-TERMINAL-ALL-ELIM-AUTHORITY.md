@@ -143,6 +143,44 @@ exist on `DataMetadata` *and* be projected by `runtime_data_metadata`. The
 first without the second is the same drop that made the held snapshot
 insufficient.
 
+### THE GREP IS KEYED ON A NAME THE IMPLEMENTATION DID NOT CHOOSE
+
+**Measured 2026-08-09 against `KERNEL-NESTED-IND` `D5` WIP `51c482a5`.** That
+WIP carries the family-to-origin relation into checked erasure — and it calls
+it **`all_support_origins`**, a `BTreeMap<StableSymbol, StableSymbol>` on the
+semantic record, threaded through the symbol and reference collectors. It does
+**not** introduce `terminal_support` anywhere.
+
+⇒ **The grep above returns empty against that tree, and would keep returning
+empty however much of the relation arrived, because it tests for a string the
+implementation never adopted.**
+
+**Read the direction carefully before acting on this.** `all_support_origins`
+is **fact 2 alone** — the family-to-`(host, parameter, sort)` relation. This
+node needs **five** facts as one issued relation, and the section above already
+rules that an inverse accessor detached from the declarations is not the
+authority. **So the gate's current answer — not released — is still the
+correct answer.** It is correct for the wrong reason, and that is the defect:
+the test cannot distinguish *"the capability has not arrived"* from *"the
+capability arrived under a different identifier."* Those need different
+responses and the instrument reports them identically.
+
+**The fix is to key on capability, and it needs no new string.** Ask the three
+rows of the re-measurement table above:
+
+1. does `DataMetadata` (or its successor record) carry the terminal-support
+   relation under **any** name;
+2. does `runtime_data_metadata` **project** it to the runtime audit record;
+3. does what it projects carry all five facts, or only the origin relation.
+
+**Row 3 is the one a name-keyed grep can never answer**, and it is the row
+this node actually turns on. Re-derive it by reading
+`runtime_data_metadata`'s constructed fields against the five-fact list in
+*What it is*, at whatever `main` you are standing on. **Do not restore a
+string test by swapping `terminal_support` for `all_support_origins`** — that
+reproduces the same defect one identifier over, and the next cut may name it
+something else again.
+
 ## Deliverables
 
 - **`D1` — issue the relation.** In checked erasure/planning, emit the
