@@ -8,8 +8,10 @@
 > refuse?"* has flipped **over the censused domain**, and section 6 is the
 > current one.
 >
-> **Neither section closes the node's population.** `AC-1` is unqualified and
-> both censuses are `ken-runtime --lib` only — see 1.6.1 and 6.7.
+> **Sections 1 and 6 do not close the node's population.** `AC-1` is
+> unqualified and both of their censuses are `ken-runtime --lib` only — see
+> 1.6.1 and 6.7. **Section 7 is the cross-crate census that closes the domain
+> those two left open**, and it is the current statement of `AC-1`'s coverage.
 
 **Base: `89aa15502d6f76e6d42aac1b97ea3ff5032cd889`** (`origin/main`, the merged
 corrected `RT-RECURSOR-TRANSPORT` `D0`-`D2`). Branch
@@ -613,3 +615,238 @@ token, no invocation-local state in ABI data. Zero new `#[ignore]`. No tracker
 classifier insertions, both collector insertions and the per-variant hook
 present and unchanged — all discharged by the empty `crates/` diff rather than
 by inspection.
+
+# 7. `AC-1` CLOSURE — the cross-crate census, at base `1729ef34`
+
+**Record only. No production change.** `git diff origin/main -- crates/` is
+**empty** at this checkpoint SHA: every instrument below was disposable and is
+reverted. No `D2` code was written, no activation seam was widened, no fixture
+was reshaped.
+
+Branch `wp/RT-MATCH-RECURSOR-CONSUMERS`, cut at exactly
+`origin/main` `1729ef34`, so no rebase was required.
+
+> ## THE RESULT
+>
+> **Over the entire cross-crate domain — 47 compilation entries across
+> `ken-cli`, `ken-verify`, `ken-interp` and `ken-elaborator`, including their
+> `#[ignore]`d population and their child `ken native-build` processes — the
+> `MatchScrutineeRecursor` residual fires ZERO times.** Every entry carries the
+> empty residual set and reaches production's own `FunctionizedUnits`.
+>
+> **This is the domain `AC-1` named as remaining** (frame `AC-1`: *"the
+> cross-crate `px8-ds-test-support` census authorized in section 4a —
+> in-process entries under 4a items 1-5, and child-process native-compile
+> entries under 4a.1"*). Frame section 4a's outcome routing states that no
+> additional `MatchScrutineeRecursor` row closes `AC-1`'s population coverage;
+> none was found, so nothing routes through the `D1`/hard-stop path.
+
+## 7.1 The committed 4a/4a.1 controls, run first
+
+Run before any measurement, because a census whose instrument is unproven
+measures the instrument.
+
+| control | result |
+|---|---|
+| 4a in-process census + its three controls | **pass** — 1 entry, 1 selector arrival, 0 pre-selector returns, 0 firing, authority `FunctionizedUnits` |
+| 4a.1 CONTROL 1, the positive child entry | **fires** — a real child `ken native-build` recorded 1 row (`thread=main`, admitted, reached selector) |
+| 4a.1 CONTROL 2, observation absent vs present | **pass** — identical exit, stdout, stderr; unobserved child left no artifact |
+| 4a.1 CONTROL 3, two concurrent children | **pass** — two sessions, two envelopes, union without collision or loss |
+| 4a.1 CONTROL 4, feature-on with no session | **pass** — inert, no artifact |
+| 4a.1 CONTROL 5, a non-entry command | **pass** — `ken check` wrote an envelope with **zero rows**, classified rather than omitted |
+| 4a.1 feature gate at the artifact | **pass** — each of the four transport strings 0 with the feature off and exactly 1 with it on, read from two physically distinct binaries |
+
+**CONTROL 1 is the load-bearing one and it is why every zero below is
+readable.** Frame 4a.1 states that whether the launched `ken` binary carries
+`px8-ds-test-support` is a property of Cargo's unit graph that no frame
+asserts, so a zero-row child is otherwise ambiguous between *"correctly a
+non-entry"* and *"the instrument never existed in the child."* It recorded a
+real row, so that ambiguity is resolved by measurement rather than argument.
+
+## 7.2 The instrument, and the one defect it has
+
+Section 6.7 named what would close this domain: *"re-gate the census to
+`#[cfg(any(test, feature = "px8-ds-test-support"))]` and run those suites with
+the feature."* That is what was built — **disposable, and reverted**.
+
+The committed recorder is a thread-local scope, so it observes only
+compilations a harness explicitly wraps. The disposable variant changes exactly
+one thing: **the sink**. `KEN_MRC_CENSUS_DIR` selects a per-process append
+file, and when it is set the recorder installs itself on first use. It is the
+**same production walk** (`enumerate_recursive_descent_residuals`), the **same
+row schema**, and the same two terminal points — the pre-selector return and
+the selector arrival. No second enumerator and no sampling rule. Child
+processes inherit the variable, so child native-build entries land in the same
+directory as in-process ones.
+
+Rows are one `write_all` of a pre-formatted buffer, which is section 1.1's own
+fix for `writeln!` interleaving concurrent threads mid-record. The sink is
+keyed by pid **and a process-start stamp**, because pids are reused inside a
+long run and an append-mode collision would merge two processes' rows.
+
+**The defect, stated rather than discovered later.** `(run, thread, ordinal)`
+is **not** a unique key under this variant. `with_match_recursor_census`
+replaces the thread-local row buffer, so ordinals restart at zero inside a
+nested committed scope; `mrc_4a_cross_crate_census_and_its_controls` therefore
+produced two rows both keyed `(196489, …, 0)`. Those are two genuinely distinct
+compilations — the outside build and the inside build — and because the sink is
+append-only they appear as **two rows rather than one merged row**, so the
+population count is unaffected. The committed instrument's key uniqueness holds
+within a scope; it is this disposable harness that does not extend it across a
+nested one, and no claim here rests on that key.
+
+## 7.3 The known-answer control — why the zero is a measurement
+
+**A negative check passes for any reason.** Every cross-crate row carries an
+empty residual set, which is equally consistent with a correct census and with
+a residual column that can never be non-empty. So the instrument was run
+against a population whose answer is already recorded: `ken-runtime --lib`,
+measured independently in sections 1 and 6.
+
+| quantity | section 6.2a, base `166641c8` | this instrument, base `1729ef34` |
+|---|---:|---:|
+| entries reaching function entry | 680 | **680** |
+| reaching the selector | 665 | **665** |
+| refused before the selector | 15 | **15** |
+| residual set of those 15 | `{}` every one | **`{}` every one** |
+| `MatchScrutineeRecursor` at the compile site | 15 | **15** |
+| `LexicalCallArgumentRecursor` | 16 (section 1.3) | **16** |
+
+Every cell agrees with a measurement this record did not produce. The
+`MatchScrutineeRecursor` authority split is **11 `FunctionizedUnits` / 4
+`RecursiveDescent`**, which is section 1.4's point restated: several A-firing
+compilations select `FunctionizedUnits` because those tests arm the committed
+one-variant hook themselves, and production's unhooked answer is
+`RecursiveDescent`.
+
+⇒ **The instrument sees this class where the class exists.** The cross-crate
+zero is therefore a property of the programs, not of the instrument.
+
+Suite outcome: **838 passed, 0 failed, 5 ignored** — the base's own figure.
+
+## 7.4 The censused domain, by crate
+
+Non-ignored population, each crate run targeted (`-p <crate> --tests`), never
+`--workspace`:
+
+| crate | test targets | passed / failed | entries | firing |
+|---|---:|---|---:|---:|
+| `ken-cli` | 33 | 124 / 0 | **25** | **0** |
+| `ken-verify` | 2 | 14 / 0 | 0 | 0 |
+| `ken-interp` | 24 | 182 / 0 | **4** | **0** |
+| `ken-elaborator` | 137 | 1106 / 0 | **6** | **0** |
+| total | **196** | **1426 / 0** | **35** | **0** |
+
+**`ken-verify`'s zero here is NOT a result, and was not read as one.** Its only
+integration target holds a single test and that test is `#[ignore]`d, so the 14
+passing tests are lib unit tests that compile nothing. A zero from a suite
+whose compiling tests never ran means *not measured*, which is the same
+ambiguity CONTROL 1 exists to defeat. It is settled in 7.5.
+
+## 7.5 The `#[ignore]`d population, censused rather than assumed
+
+Section 1.6.3 hit this and closed it by running `--ignored`; that measurement
+was at a different base, so it was re-taken here rather than carried.
+
+| crate | ignored targets run | passed / failed | entries | firing |
+|---|---:|---|---:|---:|
+| `ken-verify` | 1 | 0 / 9 | **9** | **0** |
+| `ken-interp` | 15 | 1 / 2 | 0 | 0 |
+| `ken-cli` | 16 | 0 / 3 | **3** | **0** |
+| total | | | **12** | **0** |
+
+**Their failures are their own and are declared at the `#[ignore]` site**, each
+naming a different campaign node — `RT-CARRIER-BYTESPAN-OBSERVE` `D5` for the
+nine `ken-verify` scenario rows and the three `ken-cli` fs rows, L-classes and
+div-op registration for the two `ken-interp` rows. The census is unaffected by
+them: an entry row is recorded **before** the transport validator, so a
+compilation that later fails still has a census, which is exactly why 4a.1
+writes the envelope before the CLI converts its result to an exit.
+
+**This is what settles `ken-verify`.** Its compiling population is nine
+entries, every one empty-residual and `FunctionizedUnits` — a measured
+non-member, not an unmeasured suite.
+
+## 7.6 The combined classification
+
+| quantity | value |
+|---|---|
+| cross-crate compilation entries | **47** |
+| selector arrivals | **47** |
+| pre-selector returns | **0** |
+| distinct residual sets observed | **1** — the empty set, on every row |
+| `MatchScrutineeRecursor` rows | **0** |
+| `LexicalCallArgumentRecursor` rows | **0** |
+| authority, production's own and unmodified | `FunctionizedUnits`, all 47 |
+
+The equation `entry = selector-arrival ⊎ pre-selector-return` holds with an
+empty second cell: nothing in this domain is refused by
+`validate_oriented_subcontinuation_transport` before the selector, so the
+enumeration is not short by construction.
+
+**Activation denominators.** No row fired, so no refusal is credited to any
+path — there is no first refusal to report, and none of the 47 is a retained
+`RecursiveDescent` run misread as activation. Activation stayed crate-local
+through the existing `#[cfg(test)]` one-variant hook, which was neither
+widened nor reached from any of these entries.
+
+## 7.7 Candidate selectors, and what each missed
+
+`AC-1`'s control requires stating which selectors were candidates. A grep was
+used to *generate* the domain, and — as in section 1.5 — **none of them closed
+it**; the enumeration did.
+
+| candidate axis | hits | relation to the measured domain |
+|---|---:|---|
+| cross-crate callers of the runtime compile API | 5 files | finds `px4b_native_production`, three `ken-interp` tests, and `ken-elaborator/src/erasure.rs` — **misses every entry reached through `build_native_program`**, which is most of them |
+| `build_native_program` / `compile_native_program_sources` | 20 files | over-generates: names files, not compilations, and says nothing about what any one enumerates |
+| `CARGO_BIN_EXE_ken`, the child launchers | 12 files | over-generates badly — `ken run`, `ken check` and `ken fmt` launch the same binary and are ruled non-entries |
+| crates declaring a `ken-runtime` dependency | 4 | correct as a **crate** boundary, and that is why the runs are whole-crate rather than per-file |
+
+**The grep axes were used only to bound which crates to run.** Every entry in
+7.4 and 7.5 is a measurement of a compilation that happened, with its complete
+residual set recorded at the seam the selector consumes.
+
+## 7.8 What this closes, and what it does not
+
+**Closes:** `AC-1`'s remaining domain. The in-crate partial (sections 1 and 6,
+merged at `28edeb00` and after) plus this cross-crate census together range
+over every compilation entry the repository's harnesses reach, in-process and
+child-process, ignored and not. **The `MatchScrutineeRecursor` population
+contains no member outside `ken-runtime`'s own unit tests.**
+
+**Does not close, and is not claimed:**
+
+- **A Ken program outside the repository's test corpus is not measured.** This
+  is campaign Trap 1's standing caveat and it is unchanged: every member of the
+  in-crate population is a hand-built `RuntimeExpr`, and the cross-crate result
+  says those shapes do not arise from real elaborated programs in this corpus —
+  not that no such program could exist.
+- **`D8` is unbuilt.** Frame section 4a.2 added it 2026-08-09 and only the
+  frame text is on `main`; no pin asserts the three manifest facts that keep the
+  transport out of the shipped binary. The artifact-level gate control in 7.1
+  measures the premise **today**; it is not the committed pin `D8` asks for.
+- **`AC-2` through `AC-8` are untouched by this record.** `AC-2` and `AC-3`
+  presuppose a repaired root, and this census produced none.
+
+## 7.9 Bans held
+
+`RecursiveBackedge` untouched and still protocol-only. No generalized
+activation hook and no simultaneous exclusion — the disposable recorder cannot
+remove a residual, set an exclusion, choose an authority, or alter a
+planner/ABI value, and the 4a parity control is what holds that to account. No
+`RecursiveDescent` fallback, no `BoundaryUse`, no `PlannedEffectSeat` widening,
+no lowering-minted token, no invocation-local state in ABI data. **Zero new
+`#[ignore]`**, and no existing one retired or reinterpreted. No tracker
+`status:` change. No resume of `10369776`. Both residual variants, both
+classifier insertions, both collector insertions and the per-variant hook
+present and unchanged — all discharged by the **empty `crates/` diff** rather
+than by inspection.
+
+**No control here keys on the pair `("Match", "scrutinee is not a constructor
+value")`**, which the `#[cfg(test)]` mutation hook at `lowering/core.rs` can
+fabricate by construction. Nothing in this record keys on a refusal string at
+all; the rows key on the owner, the residual set and the authority.
+
+**`AC-8` is a CI claim** and no local `--workspace` run was performed, per
+`COORDINATION §12`.
