@@ -1815,8 +1815,16 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 project_public_scalar_root,
             )?;
             // Every generated `Function` that can own a causal token now exists
-            // and has recorded itself, so the ONE global exact-set equality
-            // runs here.
+            // and has recorded itself, so the composite closeout runs here.
+            //
+            // **Composite, not one equality.** Since `D2` this seat closes the
+            // candidate ledger first -- totality, then the derived
+            // `DirectCall union ComposedCall` subset -- and then the claim
+            // ledger's exact-set laws over TWO populations: `resolved =
+            // declared = planned` over the full planner population, and
+            // `discharged = claimed = call_obligations` over the derived
+            // subset. The singular phrasing this replaces predates `D2` and
+            // became false when the populations separated.
             //
             // ⚠ Closing right after the last definition pass and before the
             // root adapter is the tempting spot. It is closed after the adapter
