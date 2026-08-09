@@ -138,12 +138,21 @@ struct PlannedExpr {
     occurrence: StaticOriginId,
 }
 
-/// One scheduling entry paired with the body occurrence its own planning visit
+/// One planned entry paired with the body occurrence its own planning visit
 /// returned.
 ///
-/// **This is the SOLE scheduling-entry/body pairing authority.** Both fields
-/// come from one [`PlannedExpr`], so the pair is *issued* at the moment the two
-/// identities exist together and is never recovered afterwards.
+/// **This is the SOLE entry/body pairing authority, for EVERY seed class.** Its
+/// exact key population is `plan.entries` UNION every `StaticBody` target. Both
+/// fields come from one [`PlannedExpr`], so the pair is *issued* at the moment
+/// the two identities exist together and is never recovered afterwards.
+///
+/// **One authority extended, not a parallel ledger.** The first attempt scoped
+/// this to scheduling-entry registration and let `StaticBodyTarget` seeds keep
+/// a child-0 relation, on the ground that a body node's own origin is already
+/// grounded. That holds for an ordinary body and **diverges for a body that
+/// schedules something before itself** — the identical two-axis split, one seat
+/// class over. Measured: owner 2 seeded on `n58` was issued `SOI(58)` while its
+/// real body was `SOI(26)`, and its four planned joins were never entered.
 ///
 /// Recovering the body by asking which resume is "outermost" — by graph
 /// traversal, completion-edge shape, an owner scan, expression shape, origin
@@ -154,11 +163,11 @@ struct PlannedExpr {
 ///
 /// `root_occurrence` and `declaration_occurrences` are projections of this
 /// table, equality-checked against it by
-/// [`StaticTransitionPlan::validate_scheduling_entry_bodies`].
+/// [`StaticTransitionPlan::validate_planned_entry_bodies`].
 /// `declaration_origins` stays a membership projection and is never a pairing
 /// authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct SchedulingEntryBody {
+struct PlannedEntryBody {
     entry: StaticNodeId,
     body_occurrence: StaticOriginId,
 }
@@ -2434,7 +2443,7 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// instead — [`Self::register_scheduling_entry`] is the only writer of
     /// either vector and pushes to both, so an entry without a pair is
     /// unconstructible rather than merely rejected.
-    scheduling_entry_bodies: Vec<SchedulingEntryBody>,
+    planned_entry_bodies: Vec<PlannedEntryBody>,
     nodes: Vec<StaticNode>,
     edges: Vec<StaticEdge>,
     stores: Vec<PersistentStoreNode>,
@@ -8510,7 +8519,7 @@ impl<'src> Planner<'src> {
         let mut planner = Self {
             plan: StaticTransitionPlan {
                 entries: Vec::new(),
-                scheduling_entry_bodies: Vec::new(),
+                planned_entry_bodies: Vec::new(),
                 nodes: Vec::new(),
                 edges: Vec::new(),
                 stores: Vec::new(),
@@ -9014,6 +9023,30 @@ impl<'src> Planner<'src> {
     /// (D9): the `entry` the parent schedules and the `occurrence` the parent
     /// records at its source position. Every arm but `ComputationalMatch` returns
     /// them equal, by going through `expression_node`.
+    /// **Issuance seat 2 — register a static body.**
+    ///
+    /// Atomically emits `source -> body.entry` as [`EdgeKind::StaticBody`] and
+    /// records `body.entry -> body.occurrence` in the pairing relation. It
+    /// replaces every bare `StaticBody` edge write, so a body edge without its
+    /// issued pair is unconstructible rather than merely rejected — the same
+    /// property `register_scheduling_entry` gives seat 1.
+    ///
+    /// **Generic in the planned form.** It takes the body's returned
+    /// [`PlannedExpr`] and names no expression shape. At both call sites the
+    /// planner already holds `body.entry` and `body.occurrence` together, so
+    /// recording the pair here is issued identity; selecting child 0 afterwards,
+    /// scanning the occurrence graph, or using `origin_of(edge.to)` all discard
+    /// an identity that was in hand and reconstruct it.
+    fn register_static_body(
+        &mut self,
+        source: StaticNodeId,
+        body: PlannedExpr,
+    ) -> Result<(), CraneliftBackendError> {
+        self.edge(source, body.entry, EdgeKind::StaticBody)?;
+        self.plan.record_planned_entry_body(body);
+        Ok(())
+    }
+
     fn plan_expr(
         &mut self,
         expr: &'src RuntimeExpr,
@@ -9217,7 +9250,7 @@ impl<'src> Planner<'src> {
                     &[body.occurrence],
                 )?;
                 self.edge(node.entry, successor, exit_kind)?;
-                self.edge(node.entry, body.entry, EdgeKind::StaticBody)?;
+                self.register_static_body(node.entry, body)?;
                 Ok(node)
             }
             RuntimeExpr::LexicalClosure { captures, body, .. } => {
@@ -9243,7 +9276,7 @@ impl<'src> Planner<'src> {
                         EdgeKind::Continue
                     },
                 )?;
-                self.edge(node.entry, body.entry, EdgeKind::StaticBody)?;
+                self.register_static_body(node.entry, body)?;
                 Ok(node)
             }
             RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
@@ -9354,9 +9387,9 @@ impl<'src> Planner<'src> {
     ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
         let (synthesized_identities, synthesized_io_roles) =
             build_synthesized_constructor_inventory(&mut self.plan.semantic_material, symbols)?;
-        let scheduling_entry_bodies = self.plan.scheduling_entry_bodies.clone();
+        let planned_entry_bodies = self.plan.planned_entry_bodies.clone();
         let entry_bodies = |entry: StaticNodeId| {
-            scheduling_entry_bodies
+            planned_entry_bodies
                 .iter()
                 .find(|pair| pair.entry == entry)
                 .map(|pair| pair.body_occurrence)
@@ -10710,24 +10743,47 @@ impl<'src> StaticTransitionPlan<'src> {
     /// shape is the inference the table replaced; a validator that did it would
     /// re-admit it under the name of a check, and would agree with a wrong table
     /// exactly when the wrong table was wrong for the reason the walk shares.
-    fn validate_scheduling_entry_bodies(&self) -> Result<(), CraneliftBackendError> {
-        // Exact-total against the entry population, in both directions.
-        if self.scheduling_entry_bodies.len() != self.entries.len() {
+    fn validate_planned_entry_bodies(&self) -> Result<(), CraneliftBackendError> {
+        // The exact key population: every scheduling entry, UNION every
+        // `StaticBody` target. Derived here from the graph the relation is
+        // validated against, so a row can be checked for membership without the
+        // relation being consulted about its own domain.
+        //
+        // A declaration-owned scheduling entry stays a KEY even though `D2a`
+        // excludes it from the emitted-function population: it was registered at
+        // seat 1 and its declaration projection is checked against that row.
+        // Dropping it here would make the relation disagree with its own writer.
+        let mut population = self.entries.iter().copied().collect::<BTreeSet<_>>();
+        let mut static_body_targets = 0usize;
+        for edge in &self.edges {
+            if edge.kind == EdgeKind::StaticBody {
+                if !population.insert(edge.to) {
+                    return Err(planner_error(
+                        "static body target is also a scheduling entry",
+                    ));
+                }
+                static_body_targets += 1;
+            }
+        }
+        // Exact-total in both directions, over the union.
+        if self.planned_entry_bodies.len() != population.len()
+            || population.len() != self.entries.len() + static_body_targets
+        {
             return Err(planner_error(
-                "scheduling entry bodies are not exact for the scheduling entry population",
+                "planned entry bodies are not exact for the planned entry population",
             ));
         }
         let mut keys = BTreeSet::new();
         let mut bodies = BTreeSet::new();
-        for pair in &self.scheduling_entry_bodies {
-            if !self.entries.contains(&pair.entry) {
+        for pair in &self.planned_entry_bodies {
+            if !population.contains(&pair.entry) {
                 return Err(planner_error(
-                    "scheduling entry body names a key outside the scheduling entry population",
+                    "planned entry body names a key outside the planned entry population",
                 ));
             }
             if !keys.insert(pair.entry) {
                 return Err(planner_error(
-                    "scheduling entry has more than one issued body occurrence",
+                    "planned entry has more than one issued body occurrence",
                 ));
             }
             // `source_occurrences` is dense-by-ordinal and its slots are
@@ -10749,16 +10805,16 @@ impl<'src> StaticTransitionPlan<'src> {
             }
             if !bodies.insert(pair.body_occurrence) {
                 return Err(planner_error(
-                    "two scheduling entries claim one body occurrence",
+                    "two planned entries claim one body occurrence",
                 ));
             }
         }
-        // Every entry has a pair. With the length check above, this is set
-        // equality rather than containment in one direction.
-        for entry in &self.entries {
+        // Every member of the union has a pair. With the length check above,
+        // this is set equality rather than containment in one direction.
+        for entry in &population {
             if !keys.contains(entry) {
                 return Err(planner_error(
-                    "scheduling entry has no issued body occurrence",
+                    "planned entry has no issued body occurrence",
                 ));
             }
         }
@@ -10767,7 +10823,7 @@ impl<'src> StaticTransitionPlan<'src> {
         // something wrote a pairing that did not come through the registration
         // helper.
         if let Some(root_entry) = self.root_entry {
-            if self.scheduling_entry_body(root_entry) != self.root_occurrence {
+            if self.planned_entry_body(root_entry) != self.root_occurrence {
                 return Err(planner_error(
                     "root occurrence projection disagrees with the issued pairing",
                 ));
@@ -10788,7 +10844,7 @@ impl<'src> StaticTransitionPlan<'src> {
             let recorded = self.declaration_occurrences.get(symbol).ok_or_else(|| {
                 planner_error("declaration entry projection names an unrecorded symbol")
             })?;
-            if self.scheduling_entry_body(*entry) != Some(*recorded) {
+            if self.planned_entry_body(*entry) != Some(*recorded) {
                 return Err(planner_error(
                     "declaration occurrence projection disagrees with the issued pairing",
                 ));
@@ -10800,7 +10856,7 @@ impl<'src> StaticTransitionPlan<'src> {
     /// Register one scheduling entry together with the body occurrence its
     /// planning visit returned.
     ///
-    /// **The only writer of `entries` and of `scheduling_entry_bodies`**, and
+    /// **The only writer of `entries` and of `planned_entry_bodies`**, and
     /// it writes both or neither. That is what makes the pairing exact-total by
     /// construction: there is no ordering of calls that registers an entry
     /// without its pair, so "missing pair" is a shape the constructor cannot
@@ -10815,7 +10871,17 @@ impl<'src> StaticTransitionPlan<'src> {
     /// not.
     fn register_scheduling_entry(&mut self, planned: PlannedExpr) {
         self.entries.push(planned.entry);
-        self.scheduling_entry_bodies.push(SchedulingEntryBody {
+        self.record_planned_entry_body(planned);
+    }
+
+    /// Record one issued `entry -> body_occurrence` row.
+    ///
+    /// **The single writer of the relation**, shared by both issuance seats so
+    /// the two cannot drift into two ledgers with two shapes. It takes a
+    /// [`PlannedExpr`] and stores the two fields it was handed; it does not ask
+    /// what produced them and must never learn.
+    fn record_planned_entry_body(&mut self, planned: PlannedExpr) {
+        self.planned_entry_bodies.push(PlannedEntryBody {
             entry: planned.entry,
             body_occurrence: planned.occurrence,
         });
@@ -10826,8 +10892,8 @@ impl<'src> StaticTransitionPlan<'src> {
     /// Reads the pairing authority. `None` means this node is not a
     /// scheduling entry at all — it is never a licence to substitute the entry's
     /// own origin, which is precisely the alias this table replaced.
-    fn scheduling_entry_body(&self, entry: StaticNodeId) -> Option<StaticOriginId> {
-        self.scheduling_entry_bodies
+    fn planned_entry_body(&self, entry: StaticNodeId) -> Option<StaticOriginId> {
+        self.planned_entry_bodies
             .iter()
             .find(|pair| pair.entry == entry)
             .map(|pair| pair.body_occurrence)
@@ -12509,12 +12575,12 @@ impl<'src> StaticTransitionPlan<'src> {
                 "closed graph contains unreachable transitions",
             ));
         }
-        self.validate_scheduling_entry_bodies()?;
+        self.validate_planned_entry_bodies()?;
         self.semantic.validate(
             &self.nodes,
             &self.edges,
             &self.entries,
-            &|entry| self.scheduling_entry_body(entry),
+            &|entry| self.planned_entry_body(entry),
             self.root_entry,
             &self.semantic_sources,
             &self.semantic_material,
@@ -13903,7 +13969,7 @@ mod tests {
             &plan.nodes,
             &plan.edges,
             &plan.entries,
-            &|entry| plan.scheduling_entry_body(entry),
+            &|entry| plan.planned_entry_body(entry),
             plan.root_entry,
             &reversed_sources,
             &plan.semantic_material,
@@ -13931,7 +13997,7 @@ mod tests {
             &changed_frames,
             &plan.edges,
             &plan.entries,
-            &|entry| plan.scheduling_entry_body(entry),
+            &|entry| plan.planned_entry_body(entry),
             plan.root_entry,
             &reversed_sources,
             &plan.semantic_material,
@@ -14000,7 +14066,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -14033,7 +14099,7 @@ mod tests {
                     &equal_plan.nodes,
                     &equal_plan.edges,
                     &equal_plan.entries,
-                    &|entry| equal_plan.scheduling_entry_body(entry),
+                    &|entry| equal_plan.planned_entry_body(entry),
                     equal_plan.root_entry,
                     &equal_plan.semantic_sources,
                     &equal_plan.semantic_material,
@@ -14052,7 +14118,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -14071,7 +14137,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -14102,7 +14168,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -14526,7 +14592,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -14561,7 +14627,7 @@ mod tests {
                     &child_plan.nodes,
                     &child_plan.edges,
                     &child_plan.entries,
-                    &|entry| child_plan.scheduling_entry_body(entry),
+                    &|entry| child_plan.planned_entry_body(entry),
                     child_plan.root_entry,
                     &child_plan.semantic_sources,
                     &child_plan.semantic_material,
@@ -14646,7 +14712,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -14916,7 +14982,7 @@ mod tests {
                 &plan.nodes,
                 &plan.edges,
                 &plan.entries,
-                &|entry| plan.scheduling_entry_body(entry),
+                &|entry| plan.planned_entry_body(entry),
                 plan.root_entry,
                 &plan.semantic_sources,
                 &plan.semantic_material,
@@ -14989,7 +15055,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -15085,7 +15151,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -15102,7 +15168,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -15145,7 +15211,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -15168,7 +15234,7 @@ mod tests {
                     &plan.nodes,
                     &plan.edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -16522,7 +16588,7 @@ mod tests {
         );
 
         let mut mutated = plan.clone();
-        mutated.scheduling_entry_bodies[0].body_occurrence =
+        mutated.planned_entry_bodies[0].body_occurrence =
             StaticOriginId(control_index as u32);
         assert_eq!(
             mutated.validate().unwrap_err(),
@@ -16726,8 +16792,8 @@ mod tests {
 
         // The issued pairing itself.
         assert_eq!(
-            plan.scheduling_entry_bodies,
-            vec![SchedulingEntryBody {
+            plan.planned_entry_bodies,
+            vec![PlannedEntryBody {
                 entry: n18,
                 body_occurrence: n5,
             }],
@@ -16792,7 +16858,7 @@ mod tests {
             .expect("the declaration was planned");
 
         let pair = plan
-            .scheduling_entry_bodies
+            .planned_entry_bodies
             .iter()
             .find(|pair| pair.entry != root_entry)
             .expect("precondition: a non-root scheduling entry exists");
@@ -17110,7 +17176,7 @@ mod tests {
                     &plan.nodes,
                     &redirected_edges,
                     &plan.entries,
-                    &|entry| plan.scheduling_entry_body(entry),
+                    &|entry| plan.planned_entry_body(entry),
                     plan.root_entry,
                     &plan.semantic_sources,
                     &plan.semantic_material,
@@ -17449,7 +17515,7 @@ mod tests {
                 nodes,
                 edges,
                 entries,
-                &|entry| plan.scheduling_entry_body(entry),
+                &|entry| plan.planned_entry_body(entry),
                 plan.root_entry,
                 &plan.semantic_sources,
                 &plan.semantic_material,
@@ -17514,7 +17580,7 @@ mod tests {
                 &plan.nodes,
                 &plan.edges,
                 &plan.entries,
-                &|entry| plan.scheduling_entry_body(entry),
+                &|entry| plan.planned_entry_body(entry),
                 plan.root_entry,
                 &plan.semantic_sources,
                 &plan.semantic_material,
@@ -17881,12 +17947,43 @@ mod tests {
             .iter()
             .map(|node| node.id)
             .find(|id| {
-                plan.semantic.descriptors[id.0 as usize].owner == source_owner && *id != edge.to
+                plan.semantic.descriptors[id.0 as usize].owner == source_owner
+                    && *id != edge.to
+                    // Must carry a source term. A control node would redden the
+                    // pairing relation's non-source law instead, moving this
+                    // control onto a different axis from the one it names.
+                    && plan
+                        .source_occurrences
+                        .get(id.0 as usize)
+                        .and_then(Option::as_ref)
+                        .is_some()
             })
-            .expect("the caller unit must hold a second node to repoint at");
+            .expect("the caller unit must hold a second source node to repoint at");
 
         let mut edges = plan.edges.clone();
         edges[index].to = same_unit_target;
+
+        // `RT-BODY-OCCURRENCE-PROVENANCE`: a `StaticBody` edge and its issued
+        // `entry -> body_occurrence` row are written together by one operation,
+        // so repointing the edge alone builds a state the planner cannot
+        // produce -- and the relation's own fail-closed law reddens FIRST,
+        // stealing this control's witness and teaching that registration rather
+        // than overlap is the primary detector.
+        //
+        // Repoint the row with the edge, giving the new target a well-formed
+        // row of its own. The plan is then internally coherent and the ONLY
+        // remaining defect is the ownership overlap this control names -- the
+        // axis it claims is varied and its neighbours are held fixed.
+        let mut relation = plan.planned_entry_bodies.clone();
+        for row in &mut relation {
+            if row.entry == edge.to {
+                row.entry = same_unit_target;
+                row.body_occurrence = origin_of(same_unit_target);
+            }
+        }
+        let mut coherent = plan.clone();
+        coherent.edges = edges.clone();
+        coherent.planned_entry_bodies = relation;
 
         let after = {
             let mut repointed = plan.clone();
@@ -17913,7 +18010,13 @@ mod tests {
         // next reader that the edge law is load-bearing. Asserting the exact
         // error is the only reason this was visible.
         assert_eq!(
-            b2o_err(&plan.semantic, &plan.nodes, &edges, &plan.entries, &plan),
+            b2o_err(
+                &plan.semantic,
+                &plan.nodes,
+                &edges,
+                &plan.entries,
+                &coherent,
+            ),
             planner_error("planned node is owned by more than one function unit"),
             "AC-10c: a static body edge repointed inside one unit must be REFUSED \
              by planning, not merely reclassified"

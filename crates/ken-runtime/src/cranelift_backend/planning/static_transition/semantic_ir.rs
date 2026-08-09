@@ -898,20 +898,16 @@ struct OwnershipPartition {
     seeds: Vec<StaticNodeId>,
     /// Each seed's body occurrence, dense by the same ordinal as `seeds`.
     ///
-    /// **Two seed classes, two different authorities, and neither is the
-    /// seed's own ordinal.**
+    /// **ONE authority for both seed classes.** Every seed — `SchedulingEntry`
+    /// and `StaticBodyTarget` alike — takes the exact pair issued at whichever
+    /// seat registered it. There is no per-class rule and no fallback.
     ///
-    /// - A `SchedulingEntry` seed takes the **exact pair issued** at its
-    ///   registration visit. Its entry and its body coincide for every ordinary
-    ///   form and deliberately differ when the body schedules something before
-    ///   it, so the entry's ordinal is not an answer.
-    /// - A `StaticBodyTarget` seed keeps its already-grounded defining child-0
-    ///   relation: the seed **is** the body node, so its own origin is the
-    ///   correct one by the same rule, not by coincidence.
-    ///
-    /// Resolved here, where the class is known from which loop pushed the
-    /// seed, rather than at the consumer — a consumer holding only a node has
-    /// no way to tell the classes apart and would have to infer.
+    /// The `StaticBodyTarget` fallback `StaticOriginId(edge.to.0)` is
+    /// **retired**. It read as grounded because a body node's own origin *is*
+    /// its occurrence for an ordinary body — and it diverges for a body that
+    /// schedules something before itself, which is the same two-axis split this
+    /// relation exists to carry. A rule that is right on the common shape and
+    /// silently wrong on the shape under repair is the defect, not a shortcut.
     seed_body_occurrences: Vec<StaticOriginId>,
     /// One owner per planned node, dense by node index.
     owners: Vec<SemanticOwner>,
@@ -1187,12 +1183,15 @@ fn partition_function_units(
             }
             None => *slot = Some(SeedClass::StaticBodyTarget),
         }
-        // The already-grounded class: this seed IS the body node, so its
-        // defining child-0 relation is its own origin. Unchanged by this
-        // correction, and stated rather than shared with the entry class so the
-        // two authorities cannot be collapsed into one rule later.
+        // Same authority as the entry class: the pair issued when this body's
+        // `StaticBody` edge was registered. Fail closed -- the one substitution
+        // available here is `StaticOriginId(edge.to.0)`, which is precisely the
+        // retired fallback, so it must not be reachable as a default.
+        let body = entry_bodies(edge.to).ok_or_else(|| {
+            planner_error("static body target has no issued body occurrence")
+        })?;
         seeds.push(edge.to);
-        seed_body_occurrences.push(StaticOriginId(edge.to.0));
+        seed_body_occurrences.push(body);
     }
     // `D2a`: the declaration occurrence traverses WITH its callable unit. ⭐ It
     // remains that unit's ownership, provenance and `D3` signature authority —
