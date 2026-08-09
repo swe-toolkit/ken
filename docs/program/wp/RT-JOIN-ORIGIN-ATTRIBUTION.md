@@ -190,3 +190,71 @@ git worktree add --detach <path> <resulting-commit>
 ```
 
 Confirm `git rev-parse HEAD^{tree}` is `11edde07` before trusting any result.
+
+## 8. Kernel's exact invocation stops two stages before the join authority
+
+The Kernel ring supplied the invocation §4 asked for: package
+`nested_inductive_pkg`, source `src/main.ken`, selected executable `liftSize`,
+first selected target closure, `RuntimeExample` `nested-size-uses-lift`, runtime
+IR argument `LiftNode(Join(LiftLeaf, LiftNode(Empty)))`, through
+`run_example_with_interpreter_observation` with an empty `NativeSeedEnvironment`
+and a `Nat 3` interpreter oracle.
+
+It differs from the Rose program materially, and the difference is real rather
+than cosmetic: `Bag` carries `Empty`/`One`/`Join`, and the `Join` arm makes
+**two** nested recursive calls combined by `liftAdd`.
+
+**Reproduced exactly, on the synthetic venue. The verdict is:**
+
+```
+Unsupported {
+  stage: BoundaryPreflight,
+  construct: "RuntimeProgram",
+  reason: "package carries trust metadata outside the supported native subset"
+}
+```
+
+### The join authority is never reached, and that is measured, not inferred
+
+**Zero `RTJOA-SEAT-OK` lines were emitted.** That instrument prints on every
+successful `finalize_join_disposition`, and it printed four times for the Rose
+program in §3b. Here it prints nothing at all: **the compile is refused at the
+native boundary preflight, strictly before lowering, so `required`, `consumed`
+and `dispositioned` are never computed for this program.**
+
+⇒ **`SOI(26)` cannot be attributed on either venue, because the run that would
+produce it does not happen.** There is no set difference to classify.
+
+### The differential again, and again it rules out the interesting explanation
+
+The identical harness on **bare `dd3cd050`** returns the **same
+`BoundaryPreflight` refusal**. So the gate is **not** something Runtime's `main`
+introduced since `120b426b`, and *"current integration tightened a preflight and
+masked the join defect"* is **false by measurement**.
+
+### What this places SOI(26) behind
+
+The refusal is `artifact/api.rs`'s trust-metadata preflight. It is the same wall
+the Architect was separately ruling on when authorizing an **erasure-time
+reachability projection** — `erase_checked_core_package_for_target` emitting
+beyond the checked declaration closure it is handed, so the program carries
+trust metadata the native subset does not admit.
+
+**No branch in the repository carries that projection** — searched, none exists.
+
+⇒ **`SOI(26)` is downstream of an unlanded erasure correction**, and Kernel must
+have observed it on a tree carrying that correction locally. **A third venue is
+needed**: the synthetic integration tree **plus** the erasure-time reachability
+projection.
+
+### Why I stop here rather than reconstruct the projection
+
+Writing the erasure correction myself to reach the join seat would be a
+**production repair**, which `AC-3` forbids and the frame names twice. It would
+also be *my* reconstruction of a mechanism the Architect has ruled on but not
+yet seen landed — so any SOI(26) trace taken on it would be a trace of my guess
+at their correction, which is the substitute-witness failure with an extra layer.
+
+**The ask is now exact:** the tree, patch or branch on which Kernel observed
+`BackendFailure` at `StaticOriginId(26)`. Given it, the four measurements in §2
+run unchanged and the classification follows.
