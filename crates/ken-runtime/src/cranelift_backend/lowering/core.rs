@@ -3401,6 +3401,20 @@ impl<'a> Lowering<'a> {
                             bypassed
                         }
                     };
+                    // `D3` mutation 2 — settle on ENTRY, before the scope is
+                    // known to have completed. Nothing else moves.
+                    if super::units::d3_mutation()
+                        == super::units::D3Mutation::MarkInlineBeforeBridgeCompletion
+                    {
+                        for identity in &bypassed {
+                            if !self.continuation_candidate_is_consumed(identity) {
+                                self.settle_continuation_candidate(
+                                    identity,
+                                    super::units::CandidateDisposition::InlineNoCall,
+                                )?;
+                            }
+                        }
+                    }
                     let outcome = self.lower_computational_producer_expr(
                         builder,
                         selected,
@@ -3412,9 +3426,17 @@ impl<'a> Lowering<'a> {
                     // completion -- `D0` measured 25 such candidates and folding
                     // them in would manufacture members. And a candidate the
                     // bridge's own body went on to discharge is already settled,
-                    // so the `is_settled` guard is what makes "unconsumed" a
-                    // read of the ledger rather than an assumption about order.
-                    if outcome.is_ok() {
+                    // so the consumed test is what makes "unconsumed" a read of
+                    // the ledger rather than an assumption about order.
+                    let completed = match super::units::d3_mutation() {
+                        // `D3` mutation 2 -- settle as though the scope had
+                        // completed, whatever it actually did. Only this one
+                        // bit moves; the settlement itself is the production
+                        // one below.
+                        super::units::D3Mutation::MarkInlineBeforeBridgeCompletion => true,
+                        _ => outcome.is_ok(),
+                    };
+                    if completed {
                         for identity in &bypassed {
                             if !self.continuation_candidate_is_consumed(identity) {
                                 self.settle_continuation_candidate(
@@ -4987,6 +5009,10 @@ impl<'a> Lowering<'a> {
                 // way around. Until then this binding is intentionally
                 // unreadable, and nothing here manufactures a consumer for it.
                 for (position, lowered) in constructor_args.into_iter().enumerate() {
+                    // `D3` mutation 1 — withhold the binding the candidate
+                    // authorizes, leaving the candidate itself untouched.
+                    let suppress_binding = super::units::d3_mutation()
+                        == super::units::D3Mutation::SuppressBindingInstallation;
                     let binding = match self.composed_recursive_argument_binding(
                         case,
                         deferred.construct_origin,
@@ -4995,7 +5021,12 @@ impl<'a> Lowering<'a> {
                         position,
                         &lowered,
                     )? {
-                        Some(worker) => LoweringEnvironmentBinding::StaticWorker(worker),
+                        Some(worker) if !suppress_binding => {
+                            LoweringEnvironmentBinding::StaticWorker(worker)
+                        }
+                        Some(_) => LoweringEnvironmentBinding::Value(
+                            LoweringOperand::Specialized(lowered),
+                        ),
                         None => LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                             lowered,
                         )),
@@ -8557,6 +8588,12 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         {
             return true;
         }
+        // `D3` mutation 3 -- drop the pending half, so a candidate a composed
+        // call is about to claim reads as unconsumed and is settled inline
+        // first. The settled half above is untouched.
+        if super::units::d3_mutation() == super::units::D3Mutation::MarkInlineAfterComposedCall {
+            return false;
+        }
         self.function_local
             .pending_composed_discharges
             .iter()
@@ -9051,10 +9088,26 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let answer = self.claim_and_call_resolved_continuation_inner(builder, identity, fields, recursive_position, producer_env)?;
-        self.settle_continuation_candidate(
-            identity,
-            super::units::CandidateDisposition::DirectCall,
-        )?;
+        match super::units::d3_mutation() {
+            // `D3` mutation 4 -- withhold the settlement, leaving a real
+            // direct call unsettled. The call itself is unchanged.
+            super::units::D3Mutation::OmitFinalDisposition => {}
+            // `D3` mutation 5 -- settle the same candidate twice.
+            super::units::D3Mutation::DoubleDisposition => {
+                self.settle_continuation_candidate(
+                    identity,
+                    super::units::CandidateDisposition::DirectCall,
+                )?;
+                self.settle_continuation_candidate(
+                    identity,
+                    super::units::CandidateDisposition::DirectCall,
+                )?;
+            }
+            _ => self.settle_continuation_candidate(
+                identity,
+                super::units::CandidateDisposition::DirectCall,
+            )?,
+        }
         Ok(answer)
     }
 

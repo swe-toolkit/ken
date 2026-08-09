@@ -3062,6 +3062,57 @@ pub(super) struct ContinuationClaimLedger {
     composed: BTreeSet<ContinuationCallIdentity>,
 }
 
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D3` — the five mutations, one per
+/// property the candidate/disposition layer promises.**
+///
+/// Each arms exactly one defect and must red for its OWN refusal. They are
+/// deliberately separate variants rather than flags: a run arms at most one, so
+/// a control cannot pass because some other mutation was still set.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D3Mutation {
+    None,
+    /// Withhold the static-worker binding the candidate authorizes.
+    SuppressBindingInstallation,
+    /// Settle `InlineNoCall` on bridge ENTRY rather than on a successful exit.
+    MarkInlineBeforeBridgeCompletion,
+    /// Drop the pending-composed half of the consumed test, so a candidate a
+    /// composed call will claim is settled inline first.
+    MarkInlineAfterComposedCall,
+    /// Withhold the `DirectCall` settlement, leaving a candidate unsettled.
+    OmitFinalDisposition,
+    /// Settle one candidate twice.
+    DoubleDisposition,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D3_MUTATION: std::cell::Cell<D3Mutation> = const {
+        std::cell::Cell::new(D3Mutation::None)
+    };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_d3_mutation(mutation: D3Mutation) {
+    D3_MUTATION.with(|cell| cell.set(mutation));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d3_mutation() -> D3Mutation {
+    D3_MUTATION.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D3Mutation {
+    None,
+}
+
+#[cfg(not(test))]
+pub(in crate::cranelift_backend) fn d3_mutation() -> D3Mutation {
+    D3Mutation::None
+}
+
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — what lowering settled a binding
 /// candidate to.**
 ///
