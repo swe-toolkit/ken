@@ -3103,12 +3103,12 @@ pub(in crate::cranelift_backend) enum CandidateDisposition {
 /// same two wrappers, beside the aggregate-allocation and effect-seat ledgers,
 /// which is the established one-artifact-one-ledger idiom.
 ///
-/// **`D1` records settlement; it does not enforce totality.** The ordered
-/// closeout — exact one-disposition/disjointness first, then the derived
-/// `DirectCall ∪ ComposedCall` subset, then the unchanged equality — is `D2`.
-/// Until it lands, an `InlineNoCall` candidate still reaches the existing
-/// closeout as an undischarged planned token and is refused there, which is
-/// `D1`'s own witness oracle.
+/// **The ordered closeout is `D2` and it has landed:** exact
+/// one-disposition/disjointness first, then the derived
+/// `DirectCall ∪ ComposedCall` subset, then the unchanged exact equality and
+/// claim equality over that subset. An `InlineNoCall` member is therefore not
+/// a call obligation and no longer reaches the closeout as an undischarged
+/// token.
 pub(super) struct ContinuationCandidateLedger {
     /// Every candidate the planner minted for this artifact.
     candidates: BTreeSet<ContinuationCallIdentity>,
@@ -3176,6 +3176,52 @@ impl ContinuationCandidateLedger {
 
     pub(super) fn is_settled(&self, identity: &ContinuationCallIdentity) -> bool {
         self.settled.contains_key(identity)
+    }
+
+    /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D2` — totality first, then the
+    /// derived call-obligation subset. The ORDER is the mechanism.**
+    ///
+    /// Disjointness is already structural: [`Self::settle`] refuses a second
+    /// settlement at the seat that makes it, so a candidate cannot hold two
+    /// dispositions and reach here. What is checked here is **totality** — that
+    /// every minted candidate was settled by some seat.
+    ///
+    /// **Totality is checked BEFORE the subset is derived, and deriving
+    /// first would defeat the whole check**: an unsettled candidate is in
+    /// neither `DirectCall` nor `ComposedCall`, so it would simply fall out of
+    /// the subset and pass silently — which is the exact failure the existing
+    /// closeout refuses and this layer exists to make impossible.
+    ///
+    /// The domain needs no filtering. A candidate ledger only exists inside the
+    /// selected `FunctionizedUnits` arm and only reaches this call on the
+    /// success path, so plan-only rows, `Err` compilations and non-selected
+    /// `RecursiveDescent` plans are absent **by construction** rather than
+    /// removed after the fact.
+    fn close(self) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        let unsettled = self.candidates.difference(
+            &self.settled.keys().cloned().collect::<BTreeSet<_>>(),
+        ).count();
+        if unsettled > 0 {
+            return Err(backend_module(format!(
+                "{unsettled} binding candidates reached the artifact closeout without a \
+                 disposition; every candidate is settled exactly once by the seat that observed \
+                 its event, so an unsettled candidate means a consumption path exists that no \
+                 seat reports"
+            )));
+        }
+        // The call-obligation subset. `InlineNoCall` is deliberately absent: it
+        // is not a discharge and never enters the equality below.
+        Ok(self
+            .settled
+            .into_iter()
+            .filter(|(_, disposition)| {
+                matches!(
+                    disposition,
+                    CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall
+                )
+            })
+            .map(|(identity, _)| identity)
+            .collect())
     }
 
     #[cfg(test)]
@@ -3424,20 +3470,47 @@ impl ContinuationClaimLedger {
         })
     }
 
-    /// No claim may be left over once every unit has been defined -- and, since
-    /// `4b`, the exact planned population must equal the population that was
-    /// resolved, declared, and **emitted**.
+    /// The closeout, over **two** populations since `D2`.
     ///
-    /// ⭐ The emitted set is the one that is not bookkeeping: an identity enters
-    /// it only after its emitted callee was decoded from the finished CLIF and
-    /// matched the planner-issued target. Set equality against it is therefore
-    /// "every planned continuation call became exactly one correct direct call,
-    /// and no other continuation call was emitted."
+    /// `resolved` and `declared` are checked against the **full planned**
+    /// population, because declaration is bulk over planned by `D8k`'s design.
+    /// `discharged` and `claimed` are checked against **`call_obligations`**,
+    /// the `DirectCall ∪ ComposedCall` subset the candidate ledger derives —
+    /// so an `InlineNoCall` member is deliberately unclaimed and undischarged
+    /// and is not an error, while an `InlineNoCall` member that WAS claimed
+    /// still is.
+    ///
+    /// **Neither discharge set is bookkeeping.** An identity enters `emitted`
+    /// only after its emitted callee was decoded from the finished CLIF and
+    /// matched the planner-issued target, and enters `composed` only after a
+    /// raw-worker call passed every clause of the finished-CLIF verification.
+    ///
+    /// **There is no equality against `emitted` alone.** The equality is over
+    /// their **union** against `call_obligations`, and that is not a detail: a
+    /// lawful `ComposedCall` obligation is answered by verified composed
+    /// consumption and never becomes a direct call, so an "every obligation
+    /// became one direct call" reading would exclude a legal member of the very
+    /// representation this documents. What the union equality says is "every
+    /// call obligation was answered exactly once, in exactly one of the two
+    /// forms, and nothing that was not an obligation was answered at all."
     ///
     /// ⛔ Equality is asserted between sets, not between counts. Two sets of the
     /// same size can differ, and a length comparison here would pass for a
     /// population that swapped one token for another.
-    pub(super) fn close(self) -> Result<(), CraneliftBackendError> {
+    /// `D2` — `call_obligations` is the derived `DirectCall ∪ ComposedCall`
+    /// subset. **The discharge equality's FORM is unchanged**; only the set it
+    /// ranges over is the derived subset rather than the full planned
+    /// population, which is what lets a candidate that made no call stop being
+    /// an obligation without any arm being added to the partition.
+    ///
+    /// **`resolved` and `declared` still range over the FULL planned set.**
+    /// Declaration is bulk over planned by `D8k`'s own design, so narrowing
+    /// those two would refuse every artifact with an `InlineNoCall` candidate
+    /// for the opposite reason.
+    pub(super) fn close(
+        self,
+        call_obligations: &BTreeSet<ContinuationCallIdentity>,
+    ) -> Result<(), CraneliftBackendError> {
         // `D8k` -- DECLARATION may remain over the full planned set. An unused
         // declaration is a `FuncRef` nobody called, not an emitted call, so the
         // declared population stays equal to planned even where the discharge
@@ -3455,8 +3528,9 @@ impl ContinuationClaimLedger {
                 )));
             }
         }
-        // ⭐⭐ `D8k` -- THE PARTITION. `planned = direct-emitted ⊎
-        // composed-consumed`, asserted as a disjoint union of two sets that
+        // **`D8k` -- THE PARTITION**, since `D2` over the derived subset:
+        // `call obligations = direct-emitted ⊎ composed-consumed`, asserted as
+        // a disjoint union of two sets that
         // were accumulated from two different kinds of evidence: decoded direct
         // specialization emissions, and verified composed source-continuation
         // consumptions.
@@ -3478,8 +3552,8 @@ impl ContinuationClaimLedger {
         if !both.is_empty() {
             return Err(backend_module(format!(
                 "{} causal tokens were discharged BOTH by a decoded direct emission and by a \
-                 verified composed consumption; the two forms partition the planned population \
-                 and an identity in both means one obligation was answered twice",
+                 verified composed consumption; the two forms partition the call-obligation \
+                 population and an identity in both means one obligation was answered twice",
                 both.len()
             )));
         }
@@ -3488,37 +3562,58 @@ impl ContinuationClaimLedger {
             .union(&self.composed)
             .cloned()
             .collect::<BTreeSet<_>>();
-        if discharged != self.planned {
-            let missing = self.planned.difference(&discharged).count();
-            let extra = discharged.difference(&self.planned).count();
+        // `D2` — the SAME equality, over the derived call-obligation subset.
+        // `InlineNoCall` candidates are not in `call_obligations`, so they are
+        // simply not obligations; nothing here treats them as discharged.
+        if discharged != *call_obligations {
+            let missing = call_obligations.difference(&discharged).count();
+            let extra = discharged.difference(call_obligations).count();
             return Err(backend_module(format!(
-                "the discharged continuation call population is not the planned one: {missing} \
-                 planned tokens were neither directly emitted nor compositionally consumed, and \
-                 {extra} discharged tokens were never planned. Direct: {}, composed: {}",
+                "the discharged continuation call population is not the call-obligation one: \
+                 {missing} call obligations were neither directly emitted nor compositionally \
+                 consumed, and {extra} discharged tokens are not call obligations. Direct: {}, \
+                 composed: {}",
                 self.emitted.len(),
                 self.composed.len()
             )));
         }
-        let leftover = self
+        // `D2` — the claim law, as EXACT SET EQUALITY over the same derived
+        // subset, not as a count of unclaimed slots.
+        //
+        // A count would have to be written as "ignore every unclaimed identity
+        // outside the subset", and that hides the dual error: an `InlineNoCall`
+        // candidate that was **accidentally claimed**. Equality catches both
+        // directions and reports them separately, because they are opposite
+        // defects — a missing obligation is a call nobody answered, an extra
+        // claim is an inline non-call that answered for a call it never made.
+        let claimed = self
             .claims
-            .values()
-            .filter(|consumed| consumed.is_none())
-            .count();
-        if leftover != 0 {
+            .iter()
+            .filter(|(_, consumed)| consumed.is_some())
+            .map(|(identity, _)| identity.clone())
+            .collect::<BTreeSet<_>>();
+        if claimed != *call_obligations {
+            let missing = call_obligations.difference(&claimed).count();
+            let extra = claimed.difference(call_obligations).count();
             return Err(backend_module(format!(
-                "{leftover} planned continuation call tokens were never claimed by the unit that \
-                 owns them"
+                "the claimed continuation call population is not the call-obligation one: \
+                 {missing} call obligations were never claimed by the unit that owns them, and \
+                 {extra} claims were made for identities that are not call obligations"
             )));
         }
-        // Owner agreement, asserted on the RECORDED consumer.
+        // Owner agreement, asserted on the RECORDED consumer, over the
+        // claimed/call-obligation members.
         //
         // Honest note: selection above is already by the token's own owner, so
         // this holds by construction today and cannot fire against the current
         // code. It is kept because it is the property `D3` actually promises,
         // and it is the check that would fire if selection were ever decoupled
-        // from ownership. A wrong owner under today's structure does not reach
-        // here -- it surfaces as a leftover claim above.
-        for (identity, consumed) in &self.claims {
+        // from ownership.
+        for (identity, consumed) in self
+            .claims
+            .iter()
+            .filter(|(identity, _)| call_obligations.contains(*identity))
+        {
             if *consumed != Some(identity.emission_owner()) {
                 return Err(backend_module(
                     "a continuation call token was claimed by a unit that does not own it"
@@ -3595,23 +3690,27 @@ pub(super) fn open_continuation_claim_ledger(
 
 /// **`D5a` checkpoint 2 — close it, once, after every generated `Function`.**
 ///
-/// The single global `planned = resolved = declared = claimed = emitted`
-/// equality. ⛔ Not a per-pass partial: a pass that discharges nothing is
-/// normal, and only the whole-artifact set answers whether every planned causal
-/// token was discharged exactly once.
+/// Since `D2`, two global laws rather than one: `resolved = declared =
+/// planned` over the full planner population, and `discharged = claimed =
+/// call_obligations` over the derived `DirectCall ∪ ComposedCall` subset.
+///
+/// **Not a per-pass partial:** a pass that discharges nothing is normal, and
+/// only the whole-artifact sets answer whether **every call obligation** was
+/// answered exactly once. Deliberately not "every planned token": an
+/// `InlineNoCall` candidate is planned and is lawfully never discharged, which
+/// is the whole point of the derived subset.
 pub(super) fn close_continuation_claim_ledger(
     compiler: &mut Lowering<'_>,
 ) -> Result<(), CraneliftBackendError> {
-    // `D1` — the candidate ledger is taken on the same boundary. `D1` records
-    // settlement and does NOT enforce totality here: the ordered closeout is
-    // `D2`, and adding it now would convert this node's own witness to
-    // compile-OK before the derivation that is supposed to do that exists.
-    let _candidates = compiler.continuation_candidates.take().ok_or_else(|| {
+    // The candidate ledger is taken on the same boundary as the claim ledger,
+    // and `D2` closes it FIRST: totality, then the derived subset, then the
+    // claim ledger's exact laws over that subset.
+    let candidates = compiler.continuation_candidates.take().ok_or_else(|| {
         backend_module("the continuation candidate ledger went missing".to_string())
     })?;
     #[cfg(test)]
     D1_LAST_DISPOSITIONS.with(|cell| {
-        *cell.borrow_mut() = _candidates
+        *cell.borrow_mut() = candidates
             .dispositions()
             .values()
             .copied()
@@ -3620,11 +3719,15 @@ pub(super) fn close_continuation_claim_ledger(
                 acc
             });
     });
+    // `D2` — the order, and it is the mechanism rather than a style choice.
+    // Totality and disjointness FIRST, then the derived subset, then the
+    // unchanged equality over it.
+    let call_obligations = candidates.close()?;
     compiler
         .continuation_claims
         .take()
         .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?
-        .close()
+        .close(&call_obligations)
 }
 
 /// **`D7` — close the aggregate allocation relation once, over the whole

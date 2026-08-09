@@ -1730,9 +1730,14 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             let (unit_bundle, call_edges) = functionized_bundle
                 .as_ref()
                 .expect("the functionized selector arm owns its bundle");
-            // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2 — THE ONE LEDGER'S
+            // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2, extended by
+            // `RT-CONTINUATION-EDGE-DISPOSITION` `D2` — THE ONE ARTIFACT
             // LIFETIME, opened and closed HERE rather than inside any single
             // definition pass.
+            //
+            // **Two sibling ledgers share it since `D2`**: the claim ledger
+            // opened just below, and the candidate ledger opened beside it.
+            // One lifetime, not one ledger and not one equality.
             //
             // ⛔ It used to open and close inside `define_unit_bodies`, which
             // is the FIRST of the passes that declare, claim and emit causal
@@ -1742,13 +1747,20 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // to be discharged. ⇒ The defect was the *lifetime*, not the
             // equality.
             //
-            // ⭐ The position is the whole deliverable. Both endpoints sit in
+            // The position is the whole deliverable. Both endpoints sit in
             // this one block, around every pass that can own a causal token, so
-            // "one global equality" is visible in a single place instead of
-            // being a property a reader must reconstruct from three files.
-            // There is deliberately no per-pass partial close and no second
-            // mirrored ledger — the passes accumulate into this one and it is
-            // checked once.
+            // the global laws are visible in a single place instead of being a
+            // property a reader must reconstruct from three files. Since `D2`
+            // there are two of them over two populations -- `resolved =
+            // declared = planned` over the full planner set, and `discharged =
+            // claimed = call_obligations` over the derived subset -- preceded
+            // by the candidate ledger's totality check.
+            //
+            // There is deliberately no per-pass partial close and no MIRRORED
+            // ledger. The candidate ledger is not a mirror: it holds a
+            // different population, settled by different seats, and it exists
+            // so a candidate can authorize a binding without asserting a call.
+            // The passes accumulate into these two and they are checked once.
             super::units::open_continuation_claim_ledger(&mut compiler, unit_bundle)?;
             let root_result = super::units::define_unit_bodies(
                 &mut module,
@@ -1758,11 +1770,21 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 call_edges,
                 staged_process_input,
             )?;
-            // `D5a` checkpoint 4 step 3 — the reaching mutation for the ONE
-            // ledger's lifetime, and it is the checkpoint-2 defect itself:
-            // close after the FIRST definition pass, before any generated
-            // `Function` exists. ⛔ Nothing about the equality moves; only the
-            // window it is taken over.
+            // `D5a` checkpoint 4 step 3 — the reaching mutation for the
+            // shared artifact lifetime, and it is the checkpoint-2 defect
+            // itself: close after the FIRST definition pass, before any
+            // generated `Function` exists.
+            //
+            // **It moves the COMPOSITE closeout's window.** Since `D2` this
+            // call closes the candidate ledger's totality check and the claim
+            // ledger's two laws together, so the mutation varies when all of
+            // them are taken -- not one ledger and not one equality. Nothing
+            // about any of the laws themselves moves; only the window they are
+            // taken over, which is what keeps the refusal attributable to the
+            // lifetime. Candidates are genuinely unsettled at that point, so
+            // candidate totality is the refusal it reaches, and
+            // `ced_d2_the_composite_early_close_reaches_candidate_totality_on_the_generalized_owner_domain`
+            // is the control that pins it.
             #[cfg(test)]
             if d5a_route_mutation() == D5aRouteMutation::CloseLedgerAfterTheFirstPass {
                 record_d5a_route_application();
@@ -1815,14 +1837,22 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 project_public_scalar_root,
             )?;
             // Every generated `Function` that can own a causal token now exists
-            // and has recorded itself, so the ONE global exact-set equality
-            // runs here.
+            // and has recorded itself, so the composite closeout runs here.
+            //
+            // **Composite, not one equality.** Since `D2` this seat closes the
+            // candidate ledger first -- totality, then the derived
+            // `DirectCall union ComposedCall` subset -- and then the claim
+            // ledger's exact-set laws over TWO populations: `resolved =
+            // declared = planned` over the full planner population, and
+            // `discharged = claimed = call_obligations` over the derived
+            // subset. The singular phrasing this replaces predates `D2` and
+            // became false when the populations separated.
             //
             // ⚠ Closing right after the last definition pass and before the
             // root adapter is the tempting spot. It is closed after the adapter
             // instead: the adapter is itself a generated `Function`, and
             // closing before it would make a causal ref declared there
-            // invisible to the equality rather than caught by it. It declares
+            // invisible to the laws rather than caught by them. It declares
             // none today — that is a fact about the adapter, not a reason to
             // narrow the window.
             super::units::close_continuation_claim_ledger(&mut compiler)?;
@@ -8581,6 +8611,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         };
         #[cfg(test)]
         d5a_trace(format!("  CLAIM bound identity={identity:?}"));
+        // `D1`/`D2` — settlement is NOT here. It sits inside
+        // `claim_and_call_resolved_continuation`, which both direct consumption
+        // seats funnel through. See the note there.
         let claimed = self.claim_and_call_resolved_continuation(
             builder,
             &identity,
@@ -8588,11 +8621,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             recursive_position,
             producer_env,
         )?;
-        // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — `DirectCall`, settled only
-        // on a SUCCESSFUL claim/emit. Reaching this seat and failing is a
-        // different outcome and must not read as a direct call: the `?` above
-        // is what makes that structural rather than a convention.
-        self.settle_continuation_candidate(&identity, super::units::CandidateDisposition::DirectCall)?;
         Ok(Some(claimed))
     }
 
@@ -8984,7 +9012,53 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             )),
         }
     }
+    /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`/`D2` — `DirectCall` settles
+    /// HERE, at the funnel, and that placement is a measured correction.**
+    ///
+    /// `D1` settled inside `claim_and_call_continuation`, which is only the
+    /// **retained-frame** seat. This function is shared: the **detached-result**
+    /// seat calls it directly from `eliminate_detached_producer_continuation`.
+    /// So a candidate consumed by a direct call at that second seat was left
+    /// unsettled and carried no pending composed discharge — which meant the
+    /// deferred bridge's two negative conditions both held and it would have
+    /// been settled `InlineNoCall`. **A real direct call would have been
+    /// recorded as an inline non-call.**
+    ///
+    /// `D1` never surfaced it because nothing required the population to be
+    /// total. `D2` is that requirement, which is exactly why the Steward asked
+    /// for this audit at this checkpoint rather than at `D3`.
+    ///
+    /// ⇒ **This is the third time on this campaign that an instrument or a
+    /// settlement placed at one consumer was blind to another.** The rule that
+    /// keeps being relearned: put it at the funnel every caller passes through,
+    /// not at the caller you happened to be reading.
+    ///
+    /// Settling on `Ok` only, and covering every return including the
+    /// mutation-driven early one, is what the wrapper buys over a per-return
+    /// call.
     fn claim_and_call_resolved_continuation(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        identity: &ContinuationCallIdentity,
+        // `D9` — the producer constructor's WHOLE lowered field run and the
+        // ruled recursive position, not a pre-assembled ordinary run. ⛔ The
+        // assembly moved here because `unit` is resolved here: both callers
+        // previously built their own run from the nonrecursive fields alone,
+        // and each carried a comment claiming the captures were appended by the
+        // other side. One authority, one assembly, both callers.
+        fields: &[LoweringOperand],
+        recursive_position: usize,
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<RoutedAnswer, CraneliftBackendError> {
+        let answer = self.claim_and_call_resolved_continuation_inner(builder, identity, fields, recursive_position, producer_env)?;
+        self.settle_continuation_candidate(
+            identity,
+            super::units::CandidateDisposition::DirectCall,
+        )?;
+        Ok(answer)
+    }
+
+    fn claim_and_call_resolved_continuation_inner(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         identity: &ContinuationCallIdentity,
@@ -9902,7 +9976,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     ///   retained-frame seat already emitted it. The ordinary path is correct
     ///   and untouched. ⚠ This is *not* the contract's "zero member is a hard
     ///   stop": an owner that genuinely owes a call and emits none is caught by
-    ///   the whole-pass `planned = resolved = declared = emitted` equality,
+    ///   the whole-pass laws -- `resolved = declared = planned`, and since
+    ///   `D2` `discharged = claimed = call_obligations` over the derived subset --
     ///   which is the global affine closure of contract 5. A local stop here
     ///   would red every unit in the program that lawfully owns no call.
     /// - **More than one residual edge** — an unresolved multi-member
