@@ -116,19 +116,51 @@ seconds, and they answer the questions a reviewer should not have to spend
 judgement on. They are an authoring aid, not a gate: do not wire them into CI,
 which would make them a test asserting facts about documentation lines.
 
+Every command below reads `norm`, which drops fenced code blocks and unwraps
+one level of blockquote. **Both are load-bearing — see the blind spots below.**
+
 ```sh
 f=agent/playbooks/<path>.md
+norm() { awk '/^[[:space:]]*```/{fence=!fence; next}
+              !fence{sub(/^[[:space:]]*>[[:space:]]?/,""); print}' "$1"; }
+
 wc -l "$f"
-# largest section and its size
-awk '/^#{2,3} /{if(n)print l" "n; n=$0; l=0; next}{l++}END{print l" "n}' "$f" \
-  | sort -rn | head -3
 # headings per 100 lines
-echo "$(grep -c '^#\+ ' "$f") headings / $(wc -l < "$f") lines"
+norm "$f" | awk '/^#+ /{h++} END{printf "%d headings / %d non-code lines\n", h, NR}'
+# largest TOPIC, with each topic's own subsections folded into it
+norm "$f" | awk '/^#{1,2} /{if(t)print s" "t; t=$0; s=0; next}{s++}END{if(t)print s" "t}' \
+  | sort -rn | head -3
 # duplicate section identifiers
-grep -oE '^#+ (§?[0-9]+[a-z-]*)\.' "$f" | sed 's/^#* //' | sort | uniq -d
+norm "$f" | grep -oE '^#+ (§?[0-9]+[a-z-]*)\.' | sed 's/^#* //' | sort | uniq -d
 # withdrawn items still in the body
-grep -nE '~~|WITHDRAWN|SUPERSEDED|RETIRED' "$f"
+norm "$f" | grep -nE '~~|WITHDRAWN|SUPERSEDED|RETIRED'
 ```
+
+> ### THREE BLIND SPOTS THE OBVIOUS VERSION HAS, AND WHY IT IS WORSE THAN NONE
+>
+> The earlier form of this block matched `^#{2,3} ` on the raw file and counted
+> `^#\+ `. **Each of these returned a confident wrong number rather than
+> declining to answer**, and every one was found by measuring files whose real
+> shape was already known:
+>
+> 1. **A fenced code block's shell comments counted as headings.** This file
+>    reported 12 headings; four were `#` comments in its own example above, so
+>    the true count is 8. `merge-procedure.md` reported 21 and has 18.
+> 2. **A heading inside a blockquote was invisible**, so its content was
+>    charged to the previous section. `librarian.md` hides a `> ### ` this way.
+> 3. **Treating `###` as a section boundary hid an oversized topic.** Splitting
+>    one big `##` into subsections made it *measure* small: `steward.md`'s
+>    `## 4. Work packages` is **45%** of the file and reported **13%**. This
+>    was the worst of the three, because it rewards the exact move — subdivide
+>    without reducing — that the budget exists to catch.
+>
+> ⇒ **Measure the topic, not the heading.** A `###` is part of its parent `##`,
+> and fragmenting a topic is not the same as splitting it.
+>
+> **Do not hand-write a pattern for a class you are trying to measure.** Every
+> failure above is one form of that: the pattern matched what its author
+> remembered and reported clean about the rest. When a number here disagrees
+> with your reading of the file, the number is the thing to check first.
 
 ## Adversarial review
 

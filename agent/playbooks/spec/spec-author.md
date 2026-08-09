@@ -90,9 +90,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
     (group cases by shared metatheory class, assert verdict-agreement), not only
     per-case verdict-flip. Author-side mirror of `conformance-reconcile-inherits-
     spec-metatheory-bugs`.
-- **Divergences are already recorded** in the spec (e.g. `Int` from day one,
-  checked universes, no hard slot ceiling) — these are Ken's own design, not
-  gaps to close.
+- **Divergences are already recorded** in the spec — see the grounding rule
+  above; they are design, not gaps to close.
 - **Reconcile the level calculus — don't just cite it (promoted K1+K2,
   soundness).** For every formation rule, **inline its explicit level
   computation** (e.g. `Eq A a b : Omega_l` for `A : Type l`; a funext Π lands at

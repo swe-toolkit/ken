@@ -91,8 +91,8 @@ progress bar renders a few lines *above* the input, so a narrow tail shows a
 stale prompt plus the pre-compaction ctx and reads as a confident "did not
 land" — observed on a pane at 4% `Compacting` that looked idle under `tail -5`.
 
-**The fix is not a bigger number.** This instruction used to say `tail -20, not
-tail -5`, and a bigger N only moves the cliff. **The rule is positional: if the
+**The fix is not a bigger number** — a bigger `N` only moves the cliff.
+**The rule is positional: if the
 evidence renders above the region your window covers, that window structurally
 cannot answer the question, and it does not return "unknown" — it returns a
 confident wrong answer.** Search the full stream and truncate the result, never
