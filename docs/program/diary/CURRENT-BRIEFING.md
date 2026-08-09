@@ -33,79 +33,103 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-09 ~20:5xZ · POWER LOSS RECOVERED; TWO LANES, BOTH TURNING
+## LIVE — 2026-08-09 ~21:4xZ · TWO LANES TURNING; D5 REACHED THE RUNTIME WALL
 
-> ### THE MACHINE LOST POWER ~20:0xZ. NOTHING WAS LOST.
+> ### POWER LOSS ~20:0xZ WAS RECOVERED WITH NOTHING LOST.
 >
 > All 28 seats restarted 20:04-20:17 with fresh contexts; worktrees and
 > branches survived. `main` was at the last landed commit, no publish was
-> interrupted, no orphaned PRs. Watchdog re-armed at 900s — it is
-> process-local and dies with every MCP restart, so **re-arm it on every
-> resume**.
+> interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
+> is process-local and dies with every MCP restart.
 
-**`main` = `8c4c6af6`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `7dcda4a1`.** Worktree clean. Nothing of mine is unpublished.
 
 ### The two lanes — this is the operator's cap of two
 
 | team | node | state |
 |---|---|---|
-| **Kernel** | `KERNEL-NESTED-IND` | **at `D5`**, formally handed off; implementer on `wp/KERNEL-NESTED-IND-D5` from base `8c4c6af6` |
-| **Runtime** | `RT-MATCH-RECURSOR-CONSUMERS` | `AC-1` closure, step 5 of the node's own sequence; all five `depends_on` merged |
-| **Verify** | `CI-ASSERTIONLESS-L1` | **HELD on the lane cap**, WIP preserved, its `AC-2` ruling landed durably. **First node back in when a slot frees.** |
+| **Kernel** | `KERNEL-NESTED-IND` | `D5`. Interpreter Nat-3 and erasure PASS; native lowering blocked in Runtime. Routing WIP `51c482a5` as an **accepted partial** |
+| **Runtime** | `RT-MATCH-RECURSOR-CONSUMERS` | `AC-1` merged (`09c3ec8b`, PR #1737). Retros in. `D8` pin is the next slice |
+| **Verify** | `CI-ASSERTIONLESS-L1` | **HELD on the lane cap**, WIP preserved, `AC-2` ruling durable. **First node back in when a slot frees.** |
 
-Crate surfaces measured disjoint: Kernel `ken-kernel` + `ken-elaborator`,
-Runtime `ken-runtime` + `ken-cli`. They serialize on the machine-wide
-`ken-cargo` lock by design — a seat queued behind it is working, not stalled.
+Neither node is closed, so no slot has freed.
 
-### KERNEL-NESTED-IND is at `D5`. I got its position wrong TWICE.
+### CHECK THE MODEL FOOTER ON EVERY PANE READ. A T1 SEAT WAS SILENTLY AT T3.
 
-**Landed, each verified an ancestor of `main`:** `88196527` `D1a` ·
-`ac86b2d7` `D3a` · `433dd12b` `D3b`+`D4` atomic · **`afb38934` `D1b` —
-production nested admission is OPEN.**
+`kernel-implementer` was configured `gpt-5.6-sol`/medium and measured **running
+`gpt-5.6-luna low`** mid-`D5` — the only seat of 28 on luna. Cause: the
+"additional safety checks" modal, whose pre-selected option 1 is *retry with a
+faster model*. **It had already cleared, so the footer was the only remaining
+trace.**
 
-`afb38934`'s commit subject names only the terminal-All source relation, which
-is why it reads as a `D1a` partial. **It is not.** Its diff rewrites
-`check_pos_arg` from the blanket non-`D`-head guard to traversal through
-recorded `StrictlyPositive` positions.
+> **Liveness and tier are independent questions.** I proved that seat was
+> working by its live PID and never read what it was running — a true claim
+> about liveness, structurally incapable of surfacing the downgrade. Detective
+> half now in `agent/memory/fleet/safety-check-modal-defaults-to-a-model-downgrade.md`.
 
-> **⛔ THE LESSON, because I paid for it twice in one hour: the frame states
-> the PLAN, the node records EXECUTION, and the node wins.** I inferred
-> position from the frame's §4 order and from a commit subject, and rerouted
-> the ring to `D3a` — work already landed — in a file I had edited twice
-> without reading its landed record. Architect `evt_3cnnt1megm88h` and
-> `kernel-leader` both caught it. Cost: two Kernel turns, no code, nothing to
-> unwind.
+Repair shape, validated: **hold the handback, not the code.** A downgraded seat
+writes structurally correct code; what you cannot accept at T3 is its
+self-reported control and mutation evidence. Reseat at a turn boundary via
+`moot exec <role>` — **run it from `/workspaces/ken`, never from a worktree**,
+or it derives the wrong project root and fails *after* stopping the seat.
 
-**The `AC-K12` refusal is the remaining `D5` elaborator boundary** — not
-pre-`D1b`, not Runtime-owned. `elab.rs:1252` derives hidden method binders via
-legacy `recursive_args` (no entry for `LiftNode : Bag LiftRose -> LiftRose`)
-while `inductive.rs:2101` builds the checked method type from
-`recursive_shapes` and requires the lifted `All` binder. The ruled five-step
-surface-lockstep mechanism is transcribed in the node.
+### `D5`'s LANE SURFACE IS `AC-K12`'s STAGES. I MISREAD IT THREE TIMES.
 
-**`AC-K12` is the node's TERMINAL control** — it is a completion check, never
-a resume step. Do not name it as one again.
+Ruled durably in the node (`46c12adb`): **`ken-interp::eval::elim_reduce` and
+`ken-elaborator/src/erasure.rs` are IN; `crates/ken-runtime` is OUT.**
 
-### Open residual — the frame's `D1b`/`D2` gate is stale
+> **Every time I wrote `D5`'s surface as a crate list, the omitted path turned
+> out to be required by `AC-K12`'s own stages** — first `ken-elaborator/src`,
+> then a false Runtime attribution, then the evaluator. A crate list written
+> from the current failure site is always one consumer short of the next one.
+> **The surface is every path an `AC-K12` stage traverses, minus
+> `crates/ken-runtime`.** Ask which stage a consumer blocks, not whether it is
+> "in the lane".
 
-`docs/program/wp/kernel-nested-inductives.md` §3's gate block still reads
-present-tense that `derive_parameter_polarities` *"scans only
-`constructor.args`"*. **False at `main`:** `derive_parameter_polarities_inner`
-visits all four positions — dependent parameter types and inductive indices at
-`Pol::Unknown`, constructor args at `Pol::Plus`, target indices at
-`Pol::Unknown`.
+Landed `D1a`/`D3a`/`D3b`+`D4`/`D1b` — see the node. **The frame states the
+PLAN, the node records EXECUTION, and the node wins**; I rerouted a ring to
+already-landed `D3a` by reading the plan instead.
 
-⚠ **NOT thereby discharged.** The gate's AC demands one discriminating control
-**per position**, recorded per-position. Producer coverage is a different
-claim and I have **not** measured the controls. Whoever closes `D2` owns it.
+### `D5` progress and the wall it hit
 
-### Framing debt — the one real gap
+Interpreter Nat-3 **evaluates to 3**. Erasure admits the generated support
+`Elim` **only** via `all_support_origin`, arbitrary dependent motives still
+rejecting — the provenance discriminator holding in both directions. Native
+then refuses at `merge_scalar_operand`,
+`ken-runtime/src/cranelift_backend/lowering/mod.rs:15898`. Kernel stopped
+without Runtime edits, correctly.
 
-`RT-TERMINAL-ALL-ELIM-AUTHORITY` is `status: ready` with **no frame file at
-all**, and it is a direct successor of the live Kernel node. `ready` here is
-not startable depth. **This is the next Steward work unless redirected.**
-(`DS-9` is fine — its frame is `docs/program/wp/ds-9-json-codec.md`, a non-id
-filename.)
+**Filed `RT-DYNAMIC-ARM-SCALAR-MERGE`** (`ready`, runtime, `size: TBD`). `D0`
+is measurement only and `D1` is deliberately unframed — nothing measured bounds
+the repair. Sequenced **after** Runtime's current slice. **No reverse edge**:
+`AC-K12`'s native stage is Kernel's acceptance condition, not an implementation
+dependency, so neither node waits on the other.
+
+### Two carried residuals — neither is discharged
+
+1. **`docs/program/wp/kernel-nested-inductives.md` §3's `D1b`/`D2` gate is
+   stale.** It reads present-tense that `derive_parameter_polarities` *"scans
+   only `constructor.args`"*; at `main`,
+   `derive_parameter_polarities_inner` visits all four positions. **NOT thereby
+   discharged** — the AC demands one discriminating control *per position*,
+   recorded per-position, and I have not measured them. Whoever closes `D2`
+   owns it.
+2. **`RT-TERMINAL-ALL-ELIM-AUTHORITY`'s release gate was keyed on a name the
+   implementation did not choose.** It grepped for `terminal_support`; `D5`
+   names the relation `all_support_origins`. Re-keyed on capability at
+   `7dcda4a1`. Its answer — not released — was right, but **for the wrong
+   reason**: only fact 2 of five has arrived, and a string test cannot
+   distinguish that from a rename.
+
+### CORRECTION — the framing debt I reported last checkpoint does not exist
+
+`RT-TERMINAL-ALL-ELIM-AUTHORITY` **is** fully framed (`D1`-`D4`, `AC-1`-`AC-8`,
+forbidden list, ruled sequencing). It lives in **`docs/program/issues/`**, not
+`docs/program/wp/`, and my sweep was directory-scoped. Its capability gate is
+measurably not fired, so `ready`-and-held is correct. **All four successors of
+the two live nodes are framed; there is no framing debt on the frontier.**
+`status: ready` means framed-and-shovel-ready (§4e), which is a *different act*
+from released — do not "fix" a held node's status.
 
 ### Settled this session, do not redo
 
