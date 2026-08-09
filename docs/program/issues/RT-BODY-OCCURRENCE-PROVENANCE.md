@@ -1,7 +1,7 @@
 ---
 id: RT-BODY-OCCURRENCE-PROVENANCE
 title: "Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -296,7 +296,7 @@ pulled them apart:
 |---|---|---|
 | `16511` | released when **nested-inductive admission is on `main`** | the real capability — **not** established |
 | `16514` | **`Release condition:`** `KERNEL-NESTED-IND` **merged** | **TRUE** |
-| `16537`, `16542` | needs/requires `KERNEL-NESTED-IND` **on main** | **TRUE** |
+| `16537`, `16543` | needs/requires `KERNEL-NESTED-IND` **on main** | **TRUE** |
 | `16510` | owned by the first **post-Kernel closure** candidate | FALSE — the node is not closed |
 
 **The line explicitly labelled `Release condition:` is the weakest of the three,
@@ -326,7 +326,7 @@ pass*; it does not defend against the **release gate itself being wrong**.
   **closure**". The doc already contains both phrasings in its own words; pick
   one. **Choosing between them is the owner's call.**
 - `AC-D7-2` **All five occurrences agree.** A fix that corrects the labelled line
-  and leaves `16537`/`16542` keyed on merged-or-on-main reproduces the defect one
+  and leaves `16537`/`16543` keyed on merged-or-on-main reproduces the defect one
   line down — this is the third instance today of a correction reaching one site
   and not the one a reader binds to first.
 - `AC-D7-3` Comment-only. The `#[ignore]`, the `panic!` body, and the control's
