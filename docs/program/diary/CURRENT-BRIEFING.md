@@ -33,110 +33,98 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-09 ~00:0xZ · TWO LANES; #6i `D0` MERGED AND STOPPED ON A RULING
+## LIVE — 2026-08-09 ~20:5xZ · POWER LOSS RECOVERED; TWO LANES, BOTH TURNING
 
-> ### STANDING SEQUENCING POLICY — DECIDE IT, DO NOT ASK IT
+> ### THE MACHINE LOST POWER ~20:0xZ. NOTHING WAS LOST.
 >
-> **Operator, 2026-08-08, after a lane question of mine blocked the session for
-> several hours while they were away:** *"Let's make sure sequencing is
-> determined well in advance so you don't have to ask me questions like that."*
->
-> **Sequencing and lane posture are the Steward's to decide.** A blocking
-> question halts every seat, and the cost is not the question — it is that the
-> whole fleet idles behind it with no way to proceed.
->
-> 1. **Never block on a sequencing question.** Pick the default, act, and flag
->    it in the next report as a decision the operator may reverse. Reversal is
->    cheap; a stalled fleet is not.
-> 2. **Keep every team fed with dependency-clear, genuinely framed work.** A
->    team idle next to a startable node is a Steward defect.
-> 3. **Concurrency is justified by CRATE DISJOINTNESS, measured — never by a
->    general allowance and never by a frame's declared paths.** Re-derive it at
->    every handback; today's claim died on the *other* lane's repair.
-> 4. **Escalate only:** a scope fork the roadmap does not settle, anything that
->    grows the TCB, or a gate-readiness call. Not lane count, not ordering.
-> 5. **Verify a node's OWNER and its FRAME before kicking.** Both bit today —
->    `PX8-ERRID-SCOPE` is Verify's, not Foundation's, and several frames sit
->    under non-id filenames.
+> All 28 seats restarted 20:04-20:17 with fresh contexts; worktrees and
+> branches survived. `main` was at the last landed commit, no publish was
+> interrupted, no orphaned PRs. Watchdog re-armed at 900s — it is
+> process-local and dies with every MCP restart, so **re-arm it on every
+> resume**.
 
-> ### LANE CAP IS TWO — OPERATOR, 2026-08-08
->
-> *"stick to 2 lanes for now. don't halt a lane, but let one of them naturally
-> finish and then don't start another task for it."*
->
-> **Three build lanes were open when this was issued. VERIFY IS THE ONE THAT
-> WINDS DOWN**, because `PX8-ERRID-SCOPE` was already in CI and finishes on its
-> own — no lane is halted and no work is discarded.
->
-> ⇒ **DONE 2026-08-08:** `PX8-ERRID-SCOPE` merged at `e0abf72a` and Verify's
-> ring was stood down at `evt_5bfzjp5phktbb`. `CI-IGNORED-SWEEP` stays `ready`
-> and unstarted. **The cap is now SATISFIED at Runtime + Kernel.**
->
-> **`PX8` is NOT yet unblocked** — it still needs `PX8-F-CAP-41` and
-> `PX8-WROTE-ABS`, both `draft`. Do not read this merge as opening `PX9`.
->
-> **Steady state is Runtime + Kernel.** Foundation is already idle by plan.
-> **The cap binds the STEWARD, not the teams** — teams never self-start, so the
-> only way it gets violated is by me sending a kick. Before any kickoff, count
-> the live lanes first.
->
-> **This overrides the "keep every team fed" default above.** That default
-> still governs *within* the cap; it does not authorize a third lane.
+**`main` = `8c4c6af6`.** Worktree clean. Nothing of mine is unpublished.
 
-### The forward queue, settled in advance
+### The two lanes — this is the operator's cap of two
 
-| team | now | next | then |
-|---|---|---|---|
-| **Verify** | **MERGED `e0abf72a`, ring STOOD DOWN** (`evt_5bfzjp5phktbb`) | **nothing — lane cap.** `CI-IGNORED-SWEEP` stays `ready`, unstarted | — |
-| **Kernel** | `KERNEL-NESTED-IND` — **Architect REQUEST-CHANGES on `e8cdc8b9`**; implementer is working the correction | unblocks Foundation's `DS-9` | — |
-| **Runtime** | `RT-CONTINUATION-EDGE-DISPOSITION` (#6i) — **`D0` MERGED `e93afb06` (#1659); `D1`/`D2`/`D3` STOPPED on an Architect ruling** | `RT-MATCH-RECURSOR-CONSUMERS` `AC-1` | `RT-LEXICAL-RECURSOR-CONSUMERS` (#6d) |
-| **Foundation** | idle, nothing dependency-clear | `DS-9` after `KERNEL-NESTED-IND` | `PX9` after `PX8` |
+| team | node | state |
+|---|---|---|
+| **Kernel** | `KERNEL-NESTED-IND` | **at `D5`**, formally handed off; implementer on `wp/KERNEL-NESTED-IND-D5` from base `8c4c6af6` |
+| **Runtime** | `RT-MATCH-RECURSOR-CONSUMERS` | `AC-1` closure, step 5 of the node's own sequence; all five `depends_on` merged |
+| **Verify** | `CI-ASSERTIONLESS-L1` | **HELD on the lane cap**, WIP preserved, its `AC-2` ruling landed durably. **First node back in when a slot frees.** |
 
-> ### OPERATOR 2026-08-09: KEEP THE SEQUENCE AS STATED
->
-> Asked whether `RT-FNUNIT-RESULT-TOKEN` should be pulled forward — it is the
-> capstone's **one prerequisite not behind the seven-wall chain**
-> (`depends_on: []`, `blocks: RT-DESCENT-RETIRE`), and its surface is
-> `cranelift_backend/surface.rs` plus `artifact/api/tests.rs`, **not**
-> `lowering/core.rs`, so it does not contend with the recursor chain's files.
->
-> **Ruling: the sequence stands.** It stays `ready` and **unstarted**. Do not
-> re-propose it as free parallelism — the disjoint surface is real and is not
-> the point; Runtime is single-threaded and the cap is two.
+Crate surfaces measured disjoint: Kernel `ken-kernel` + `ken-elaborator`,
+Runtime `ken-runtime` + `ken-cli`. They serialize on the machine-wide
+`ken-cargo` lock by design — a seat queued behind it is working, not stalled.
 
-> **Runtime's `ready` count is NOT startable depth.** Ten runtime nodes read
-> `ready`; at least `RT-FNUNIT-RESULT-TOKEN` has **no frame at all** — only
-> mentions inside other frames. **Audit a `ready` node's frame before treating
-> it as queue depth.**
+### KERNEL-NESTED-IND is at `D5`. I got its position wrong TWICE.
 
-### Session state
+**Landed, each verified an ancestor of `main`:** `88196527` `D1a` ·
+`ac86b2d7` `D3a` · `433dd12b` `D3b`+`D4` atomic · **`afb38934` `D1b` —
+production nested admission is OPEN.**
 
-`main` = **`2f522481`** or later. Worktree clean. **Nothing of mine is unpublished.**
+`afb38934`'s commit subject names only the terminal-All source relation, which
+is why it reads as a `D1a` partial. **It is not.** Its diff rewrites
+`check_pos_arg` from the blanket non-`D`-head guard to traversal through
+recorded `StrictlyPositive` positions.
 
-> ### MY ADDRESS: BOTH LANES ARE WAITING ON SOMEONE WHO IS NOT ME
->
-> 1. **Runtime `#6i`** — `D0` merged at `e93afb06` (#1659); tracker, node and
->    frame corrections at #1660. **The ring is idle BY DESIGN**, holding for an
->    Architect ruling requested at `evt_7hzmgfyedd70v`
->    (`thr_6aybmqmz24scm`). **Do not read the idle implementer as a stall and do
->    not queue work onto Runtime.** Two questions are out: whether the
->    210-of-637 closeout visibility gap is the named hard stop, and whether `D1`
->    may proceed before it closes. **Sizing stays `TBD`; refuse any number that
->    arrives before that ruling.**
-> 2. **Kernel `KERNEL-NESTED-IND`** — QA approved `e8cdc8b9`, then the Architect
->    issued **REQUEST-CHANGES** on it. The prior approval and `dec_7j9cezkb8vvrw`
->    **do not transfer to the child**; the leader has already said so and the
->    implementer is working the correction. **Expect a fresh exact-SHA handback,
->    fresh QA, and a new Decision** — then a publish request.
->
-> **Nothing is owed by me to either ring.** The next Steward action on both is
-> reactive.
->
-> **Verify the implementer's idleness with `capture-pane -e`, not the text.**
-> A dim `^[[2m` composer line is a PLACEHOLDER and the composer is EMPTY; the
-> placeholder is generated from the seat's own recent work, so it reads exactly
-> like a stranded instruction and it **changes between captures**. Cost me two
-> no-op `Enter`s tonight.
+> **⛔ THE LESSON, because I paid for it twice in one hour: the frame states
+> the PLAN, the node records EXECUTION, and the node wins.** I inferred
+> position from the frame's §4 order and from a commit subject, and rerouted
+> the ring to `D3a` — work already landed — in a file I had edited twice
+> without reading its landed record. Architect `evt_3cnnt1megm88h` and
+> `kernel-leader` both caught it. Cost: two Kernel turns, no code, nothing to
+> unwind.
+
+**The `AC-K12` refusal is the remaining `D5` elaborator boundary** — not
+pre-`D1b`, not Runtime-owned. `elab.rs:1252` derives hidden method binders via
+legacy `recursive_args` (no entry for `LiftNode : Bag LiftRose -> LiftRose`)
+while `inductive.rs:2101` builds the checked method type from
+`recursive_shapes` and requires the lifted `All` binder. The ruled five-step
+surface-lockstep mechanism is transcribed in the node.
+
+**`AC-K12` is the node's TERMINAL control** — it is a completion check, never
+a resume step. Do not name it as one again.
+
+### Open residual — the frame's `D1b`/`D2` gate is stale
+
+`docs/program/wp/kernel-nested-inductives.md` §3's gate block still reads
+present-tense that `derive_parameter_polarities` *"scans only
+`constructor.args`"*. **False at `main`:** `derive_parameter_polarities_inner`
+visits all four positions — dependent parameter types and inductive indices at
+`Pol::Unknown`, constructor args at `Pol::Plus`, target indices at
+`Pol::Unknown`.
+
+⚠ **NOT thereby discharged.** The gate's AC demands one discriminating control
+**per position**, recorded per-position. Producer coverage is a different
+claim and I have **not** measured the controls. Whoever closes `D2` owns it.
+
+### Framing debt — the one real gap
+
+`RT-TERMINAL-ALL-ELIM-AUTHORITY` is `status: ready` with **no frame file at
+all**, and it is a direct successor of the live Kernel node. `ready` here is
+not startable depth. **This is the next Steward work unless redirected.**
+(`DS-9` is fine — its frame is `docs/program/wp/ds-9-json-codec.md`, a non-id
+filename.)
+
+### Settled this session, do not redo
+
+- **Adversary `D7` finding — CONFIRMED and fixed at three sites.** `D7`
+  re-keyed a `crates/` control from a node-closure event to the admission
+  capability but swept only that one file. `RT-BODY-OCCURRENCE-PROVENANCE`'s
+  `AC-5` row and `AC-D7-1` carried the phrase its own diagnosis table calls
+  FALSE; `RT-JOIN-ORIGIN-ATTRIBUTION`'s frame — where the phrase was coined —
+  had **both** cells event-keyed and was **not** in the report. Sweep the
+  phrase, never the cited lines.
+- **`CI-ASSERTIONLESS-L1` `AC-2`** — mutation site is the owner's call, the
+  producer mutation is retired as uninformative (the legacy body reds first at
+  its own `unwrap()`), observation-seam permitted with the anti-needle
+  constraint. In the frame, blob `8336a525`.
+- **The "additional safety checks" modal needs NO answer.** `kernel-leader`
+  read it as a wedge and asked me to clear it; option 1 "retry with a faster
+  model" is pre-selected and `Enter` would have downgraded a T1 seat mid-`D5`.
+  The lesson was filed Steward-only; **moved to `agent/memory/fleet/`** so
+  every leader running a pane sweep reads it.
 
 ### PX8 #1646 is ONE defect wearing four shard failures
 
