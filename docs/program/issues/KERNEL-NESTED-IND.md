@@ -5,7 +5,7 @@ status: active
 owner: kernel
 size: L
 gate: none
-depends_on: [SPEC-NESTED-IND, RT-JOIN-ORIGIN-ATTRIBUTION]
+depends_on: [SPEC-NESTED-IND, RT-JOIN-ORIGIN-ATTRIBUTION, RT-BODY-OCCURRENCE-PROVENANCE]
 blocks: [DS-9]
 github: null
 origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved. Demand-pulled by DS-9, which blocked at its first deliverable on `JsonArray (List Json)`; fork raised by the Steward as evt_1ykvpj7yvtg18. The five-point prerequisite contract below is the Architect's, transcribed verbatim in substance. Steward-filed; Steward owns the frame and AC/control placement.
