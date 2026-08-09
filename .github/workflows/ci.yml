@@ -130,11 +130,10 @@ jobs:
       # add a `cargo test --workspace --doc --locked` step back here.
 
   # This observation job is deliberately outside build-test's needs/result
-  # loop. A newly passing ignored row is a routing signal, not a reason to block
-  # an unrelated candidate. Instrument failures remain visible on this job, but
-  # continue-on-error keeps this observation lane non-blocking.
+  # loop. Findings exit zero and route without blocking; an instrument failure
+  # exits nonzero and intentionally blocks because no measurement was made.
   ignored-row-sweep:
-    name: ignored-row sweep (non-blocking)
+    name: ignored-row sweep (findings non-blocking)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -146,10 +145,11 @@ jobs:
       - name: Select and run ignored rows
         shell: bash
         run: |
-          filter=$(python3 scripts/ci-ignored-sweep.py filter)
-          expected=$(python3 scripts/ci-ignored-sweep.py expected)
           cargo nextest list --workspace --locked --run-ignored=only \
             --message-format json > ignored-row-all.json
+          filter=$(python3 scripts/ci-ignored-sweep.py filter \
+            ignored-row-all.json)
+          expected=$(python3 scripts/ci-ignored-sweep.py expected)
           cargo nextest list --workspace --locked --run-ignored=only \
             -E "$filter" --message-format json > ignored-row-list.json
           python3 scripts/ci-ignored-sweep.py verify-list \
