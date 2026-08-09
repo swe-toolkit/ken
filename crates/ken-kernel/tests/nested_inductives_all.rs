@@ -1,4 +1,5 @@
 use ken_kernel::inductive::{all_support_evidence_positions, peel_app};
+use ken_kernel::subst::weaken;
 use ken_kernel::{
     check, declare_inductive, infer, AllSupportSort, Context, CtorSpec, Decl, GlobalEnv, GlobalId,
     InductiveSpec, KernelError, Level, LevelVar, Term,
@@ -175,6 +176,24 @@ fn issued_origin_aligns_real_empty_one_join_support_constructors() {
                 positions.len(),
                 "the actual support constructor has one evidence suffix field per position"
             );
+            let field_count = host_constructor.args.len();
+            let evidence_count = expected_positions[ordinal].len();
+            for (evidence_ordinal, host_position) in
+                expected_positions[ordinal].iter().copied().enumerate()
+            {
+                let evidence_type = &support_constructor.args[field_count + evidence_ordinal];
+                let later_evidence = evidence_count - 1 - evidence_ordinal;
+                let evidence_in_full_telescope = weaken(evidence_type, later_evidence as i64);
+                assert_eq!(
+                    evidence_in_full_telescope,
+                    Term::app(
+                        Term::var(evidence_count + field_count - 1),
+                        Term::var(evidence_count + field_count - 2 - host_position),
+                    ),
+                    "actual evidence suffix entry {evidence_ordinal} must target host field \
+                     position {host_position} after aligning telescope depths"
+                );
+            }
             let source = support_constructor
                 .target_indices
                 .last()
