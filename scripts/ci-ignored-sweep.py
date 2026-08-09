@@ -205,7 +205,9 @@ def report(path: Path, expected: int, exit_status: int) -> None:
             f"nextest exit {exit_status} is neither complete success nor test failure"
         )
 
-    passing = [match.group(1) for match in PASS_RE.finditer(text)]
+    passing = list(
+        dict.fromkeys(match.group(1) for match in PASS_RE.finditer(text))
+    )
     print(f"Ignored-row sweep completed: {observed} selected; {len(passing)} passed.")
     if passing:
         print("Passing ignored rows need owner routing:")
