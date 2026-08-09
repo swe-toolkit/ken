@@ -2571,6 +2571,9 @@ struct Lowering<'a> {
     /// the whole unit-definition pass so a token claimed at one producer
     /// occurrence cannot be claimed again at another.
     continuation_claims: Option<units::ContinuationClaimLedger>,
+    /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`** — the binding-candidate
+    /// ledger, a sibling of the claim ledger on the same artifact lifetime.
+    continuation_candidates: Option<units::ContinuationCandidateLedger>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a`** — the emission owner of the context
     /// currently being defined, in the generalized domain.
     ///
@@ -6957,6 +6960,7 @@ impl<'a> Lowering<'a> {
                      that was in force"
                 )));
             }
+            let settled_identity = record.identity.clone();
             if self
                 .function_local
                 .composed_discharges
@@ -6966,6 +6970,21 @@ impl<'a> Lowering<'a> {
                 return Err(backend_module(
                     "one causal identity was discharged twice in a single function".to_string(),
                 ));
+            }
+            // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — `ComposedCall`, settled
+            // at the ONE seat where a composed claim has passed every clause and
+            // is admitted to the verified population, so the disposition is
+            // downstream of finished-CLIF verification by construction and the
+            // composed feed itself is untouched.
+            //
+            // ⇒ **AFTER the existing double-discharge refusal, and the order is
+            // load-bearing.** Settling first made this layer refuse a second
+            // arrival before the law did, replacing `d8f`'s expected
+            // "discharged twice in a single function" with a candidate-ledger
+            // message. A layer in front of the law must not preempt the law's
+            // own refusals: it derives from them, it does not speak for them.
+            if let Some(ledger) = self.continuation_candidates.as_mut() {
+                ledger.settle(&settled_identity, units::CandidateDisposition::ComposedCall)?;
             }
         }
         Ok(())

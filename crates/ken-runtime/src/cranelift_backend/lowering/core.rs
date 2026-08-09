@@ -1675,6 +1675,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let mut func_ctx = FunctionBuilderContext::new();
     let mut compiler = Lowering {
         continuation_claims: None,
+        continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
         defining_emission_owner: None,
@@ -3338,12 +3339,62 @@ impl<'a> Lowering<'a> {
                     });
                     composed.push(EliminatorFrame::Active(selected_active));
                     let selected = self.child_occurrence(static_origin, field, &args[field])?;
-                    return self.lower_computational_producer_expr(
+                    // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the candidates
+                    // whose call seat this bridge bypasses, read from the plan's
+                    // own binding query rather than reconstructed here.
+                    let bypassed = match selected_computational.as_ref() {
+                        None => Vec::new(),
+                        Some((frame_origin, case_index, recursive_positions)) => {
+                            let mut bypassed = Vec::new();
+                            for position in recursive_positions.iter().copied() {
+                                if let Some(identity) =
+                                    self.static_transition_plan.continuation_call_binding_for(
+                                        static_origin,
+                                        *frame_origin,
+                                        u32::try_from(*case_index).map_err(|_| {
+                                            unsupported(
+                                                "ComputationalMatch",
+                                                "continuation alternative exhausted",
+                                            )
+                                        })?,
+                                        u32::try_from(position).map_err(|_| {
+                                            unsupported(
+                                                "ComputationalMatch",
+                                                "continuation recursive position exhausted",
+                                            )
+                                        })?,
+                                    )?
+                                {
+                                    bypassed.push(identity);
+                                }
+                            }
+                            bypassed
+                        }
+                    };
+                    let outcome = self.lower_computational_producer_expr(
                         builder,
                         selected,
                         producer_env,
                         &composed,
                     );
+                    // **Settled only on `Ok`, and only while still unconsumed.**
+                    // A bridge that is ENTERED and then fails is not an inline
+                    // completion -- `D0` measured 25 such candidates and folding
+                    // them in would manufacture members. And a candidate the
+                    // bridge's own body went on to discharge is already settled,
+                    // so the `is_settled` guard is what makes "unconsumed" a
+                    // read of the ledger rather than an assumption about order.
+                    if outcome.is_ok() {
+                        for identity in &bypassed {
+                            if !self.continuation_candidate_is_consumed(identity) {
+                                self.settle_continuation_candidate(
+                                    identity,
+                                    super::units::CandidateDisposition::InlineNoCall,
+                                )?;
+                            }
+                        }
+                    }
+                    return outcome;
                 }
 
                 let lowered_args = args
@@ -8438,6 +8489,50 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     /// The call goes through the **existing** unit-call protocol with the full
     /// declared target, so no second ABI is invented here.
     #[allow(clippy::too_many_arguments)]
+    /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`** — settle one candidate at
+    /// the seat that observed the event. Inert when no candidate ledger is open,
+    /// which is every non-`FunctionizedUnits` path.
+    fn settle_continuation_candidate(
+        &mut self,
+        identity: &ContinuationCallIdentity,
+        disposition: super::units::CandidateDisposition,
+    ) -> Result<(), CraneliftBackendError> {
+        match self.continuation_candidates.as_mut() {
+            Some(ledger) => ledger.settle(identity, disposition),
+            None => Ok(()),
+        }
+    }
+
+    /// The "still unconsumed" half of the `InlineNoCall` condition, and it is
+    /// **two** reads rather than one.
+    ///
+    /// Settling on the ledger is not sufficient, and that is a measurement:
+    /// composed discharges are settled at `verify_recorded_composed_discharges`,
+    /// which runs on the FINISHED CLIF — strictly after this bridge has
+    /// returned. So a composed candidate is still unsettled here, and a
+    /// settled-only test classified 17 committed `D8*` controls' candidates
+    /// `InlineNoCall` and then hit the double-settlement refusal when
+    /// verification promoted them.
+    ///
+    /// The pending feed is the one thing visible at both times: the composed
+    /// claim is RECORDED during lowering and PROMOTED after verification. So
+    /// consumption is "already settled, or a composed claim is pending" —
+    /// and it reads `pending_composed_discharges` rather than duplicating the
+    /// decision about what will be promoted.
+    fn continuation_candidate_is_consumed(&self, identity: &ContinuationCallIdentity) -> bool {
+        if self
+            .continuation_candidates
+            .as_ref()
+            .is_some_and(|ledger| ledger.is_settled(identity))
+        {
+            return true;
+        }
+        self.function_local
+            .pending_composed_discharges
+            .iter()
+            .any(|pending| &pending.identity == identity)
+    }
+
     fn claim_and_call_continuation(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -8486,14 +8581,19 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         };
         #[cfg(test)]
         d5a_trace(format!("  CLAIM bound identity={identity:?}"));
-        self.claim_and_call_resolved_continuation(
+        let claimed = self.claim_and_call_resolved_continuation(
             builder,
             &identity,
             fields,
             recursive_position,
             producer_env,
-        )
-            .map(Some)
+        )?;
+        // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — `DirectCall`, settled only
+        // on a SUCCESSFUL claim/emit. Reaching this seat and failing is a
+        // different outcome and must not read as a direct call: the `?` above
+        // is what makes that structural rather than a convention.
+        self.settle_continuation_candidate(&identity, super::units::CandidateDisposition::DirectCall)?;
+        Ok(Some(claimed))
     }
 
     /// **`RT-DECL-CLOSURE-PORT` `D5a` — the claim/call machinery, factored to
