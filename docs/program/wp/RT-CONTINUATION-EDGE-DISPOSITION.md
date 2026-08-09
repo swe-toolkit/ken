@@ -16,12 +16,13 @@ then [[RT-CONTINUATION-CALL-DISCHARGE]]'s `D0`/`D1` record on `main` at
 `docs/program/wp/RT-CONTINUATION-CALL-DISCHARGE-D0-D1.md`. **That record is this
 node's input, not its background.**
 
-> ### DO NOT INHERIT THE PREDECESSOR'S `S`
+> ### SIZE IS SETTLED AT `M` — this block is now history
 >
-> `S` was priced against an **edge-exclusion** repair, and the Architect
-> **withdrew** that mechanism (`evt_dakdkqk4wbg6`). Carrying the number forward
-> is the single easiest way to under-size a representation split. **The size is
-> `TBD` until `D0` reports.**
+> `S` was priced against an **edge-exclusion** repair the Architect **withdrew**
+> (`evt_dakdkqk4wbg6`), so it was never inherited. `D0` declined to size on its
+> own census, and **`M` was settled on the census plus the `D1` cut**. The
+> original instruction — *"the size is `TBD` until `D0` reports"* — is
+> **discharged, not pending.**
 
 ---
 
