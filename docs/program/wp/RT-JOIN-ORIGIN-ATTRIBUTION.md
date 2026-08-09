@@ -194,9 +194,19 @@ discriminate.
 | owed by | what | released when |
 |---|---|---|
 | the Runtime **correction candidate** | run the exact witness on this same synthetic integration venue before merge | immediately — the venue is reproducible from the two parent SHAs |
-| the **first post-Kernel integration/closure candidate** | the committed **runnable** exact-witness control | nested-inductive admission has merged, so the witness can exist on `main` |
+| the **first candidate to run once nested-inductive admission is on `main`** | the committed **runnable** exact-witness control | the admission capability is exercisable on `main`, so the witness can exist there |
 
 Neither is a bare deferral: both have an owner and a stated release condition.
+
+> **CORRECTED 2026-08-09.** This row is where the phrase "first post-Kernel
+> integration/closure candidate" was coined, and both of its cells were keyed
+> on **events** — a closure in the owner cell, "has merged" in the release
+> cell. Neither event implies the capability: [[KERNEL-NESTED-IND]] can close,
+> and has already merged an accepted partial at `afb38934`, without the
+> admission path landing. The carried control in
+> `crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs` was
+> re-keyed to the capability by [[RT-BODY-OCCURRENCE-PROVENANCE]]'s `D7`; this
+> is the same correction at the phrase's source.
 
 ## 7. Reproducing the venue
 
