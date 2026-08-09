@@ -2,32 +2,20 @@ version = 1
 
 [[exemption]]
 test_path = "ken-runtime::boundary_value_clif::tests::b2v_ac10_a_deep_acyclic_chain_adopts_at_thirty_thousand"
-package = "ken-runtime"
-binary = "ken-runtime"
-test = "boundary_value_clif::tests::b2v_ac10_a_deep_acyclic_chain_adopts_at_thirty_thousand"
 class = "policy-cost"
 readmission = "not applicable: the fast depth-3000 instance is the standing gate"
 
 [[exemption]]
 test_path = "ken-interp::l1_acceptance::ac5_explicit_conversion_is_partial_option"
-package = "ken-interp"
-binary = "l1_acceptance"
-test = "ac5_explicit_conversion_is_partial_option"
 class = "placeholder-no-assertions"
 readmission = "add an assertion for the explicit partial-conversion result"
 
 [[exemption]]
 test_path = "ken-interp::l1_acceptance::sec31_int_div_zero_emits_obligation"
-package = "ken-interp"
-binary = "l1_acceptance"
-test = "sec31_int_div_zero_emits_obligation"
 class = "placeholder-no-assertions"
 readmission = "add an assertion that division emits the required obligation"
 
 [[exemption]]
 test_path = "ken-interp::l1_acceptance::sec24_char_excludes_surrogates"
-package = "ken-interp"
-binary = "l1_acceptance"
-test = "sec24_char_excludes_surrogates"
 class = "placeholder-no-assertions"
 readmission = "add an assertion that surrogate code points are rejected"

@@ -38,14 +38,7 @@ def load_registry(path: Path) -> list[dict[str, str]]:
     if not isinstance(rows, list) or not rows:
         raise SweepError("registry must contain at least one exemption")
 
-    required = {
-        "test_path",
-        "package",
-        "binary",
-        "test",
-        "class",
-        "readmission",
-    }
+    required = {"test_path", "class", "readmission"}
     seen: set[str] = set()
     for row in rows:
         if not isinstance(row, dict) or set(row) != required:
@@ -56,17 +49,47 @@ def load_registry(path: Path) -> list[dict[str, str]]:
             raise SweepError(f"unknown exemption class: {row['class']}")
         if row["test_path"] in seen:
             raise SweepError(f"duplicate test_path: {row['test_path']}")
-        if not row["test_path"].startswith(f"{row['package']}::"):
+        if "::" not in row["test_path"]:
             raise SweepError(f"test_path is not keyed by package: {row['test_path']}")
         seen.add(row["test_path"])
     return rows
 
 
-def filter_expression(rows: list[dict[str, str]]) -> str:
+def possible_test_paths(identity: tuple[str, str, str]) -> set[str]:
+    package, binary, test = identity
+    return {f"{package}::{test}", f"{package}::{binary}::{test}"}
+
+
+def resolve_exemptions(
+    rows: list[dict[str, str]],
+    identities: set[tuple[str, str, str]],
+) -> set[tuple[str, str, str]]:
+    resolved: set[tuple[str, str, str]] = set()
+    for row in rows:
+        matches = {
+            identity
+            for identity in identities
+            if row["test_path"] in possible_test_paths(identity)
+        }
+        if len(matches) != 1:
+            raise SweepError(
+                f"registry test_path {row['test_path']!r} resolves to "
+                f"{len(matches)} ignored listing rows; expected exactly one"
+            )
+        resolved.update(matches)
+    if len(resolved) != len(rows):
+        raise SweepError("multiple registry test_paths resolve to one listing row")
+    return resolved
+
+
+def filter_expression(
+    rows: list[dict[str, str]],
+    identities: set[tuple[str, str, str]],
+) -> str:
+    exemptions = sorted(resolve_exemptions(rows, identities))
     members = [
-        f"(package(={row['package']}) & binary(={row['binary']}) & "
-        f"test(={row['test']}))"
-        for row in rows
+        f"(package(={package}) & binary(={binary}) & test(={test}))"
+        for package, binary, test in exemptions
     ]
     return f"not ({' + '.join(members)})"
 
@@ -156,12 +179,7 @@ def verify_lists(
         )
     if selected == 0:
         raise SweepError("nextest selected zero ignored rows")
-    exemptions = {
-        (row["package"], row["binary"], row["test"]) for row in rows
-    }
-    missing = exemptions - all_identities
-    if missing:
-        raise SweepError(f"registry identities absent from ignored population: {missing}")
+    exemptions = resolve_exemptions(rows, all_identities)
     if exemptions & selected_identities:
         raise SweepError("a registered exemption remains selected")
     if selected_identities != all_identities - exemptions:
@@ -208,7 +226,8 @@ def parse_args() -> argparse.Namespace:
         "--registry", type=Path, default=DEFAULT_REGISTRY, help=argparse.SUPPRESS
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
-    subcommands.add_parser("filter")
+    filter_parser = subcommands.add_parser("filter")
+    filter_parser.add_argument("all_listing", type=Path)
     subcommands.add_parser("expected")
     verify = subcommands.add_parser("verify-list")
     verify.add_argument("all_listing", type=Path)
@@ -226,7 +245,8 @@ def main() -> int:
     try:
         rows = load_registry(args.registry)
         if args.command == "filter":
-            print(filter_expression(rows))
+            _, identities = read_listing(args.all_listing)
+            print(filter_expression(rows, identities))
         elif args.command == "expected":
             print(expected_count(rows))
         elif args.command == "verify-list":
