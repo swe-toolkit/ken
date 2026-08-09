@@ -27,7 +27,7 @@ copied or close-paraphrased copyleft source**. If your spec text would let a
 reader reconstruct a reference's code structure line-for-line, you have gone
 too far: describe the *what*, not the *how* of any particular implementation.
 
-## Method
+## Grounding
 
 - **Ground every premise (§7):** to claim "the spec says X" or "the correct
   behavior is Y", verify against the existing `/spec`, permissive references
@@ -35,7 +35,12 @@ too far: describe the *what*, not the *how* of any particular implementation.
   Where Ken deliberately diverges from a known reference behavior (e.g. `Int`
   from day one, checked universes, no hard slot ceiling), record the divergence
   inline with a rationale — these are Ken's own design choices, not gaps.
-- ** AUTHORING A RELAXATION: write the DOMAIN-SUBTRACTION LEDGER before you
+- **Divergences are already recorded** in the spec — see the grounding rule
+  above; they are design, not gaps to close.
+
+## Authoring a relaxation: the domain-subtraction ledger
+
+- **AUTHORING A RELAXATION: write the DOMAIN-SUBTRACTION LEDGER before you
   draft (promoted SPEC-CLOSURE-BOUNDARY, 2026-07-26 — reached independently by
   spec-author and spec-leader in the same WP).** When a revision *narrows* a
   semantic domain — a blanket noun stops applying to a case, a universal
@@ -70,6 +75,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
   derived library pages were asserting the falsified reading, past a
   correct-and-empty changed-path intersection. Companion:
   [[a-multi-clause-ac-reads-as-satisfied-when-you-discharge-the-subset-you-built-for]].
+## Resolving silences
+
 - **Resolve silences when structurally determined (§6);** record the resolution
   inline with a rationale. Escalate only genuine forks (→ Decision, → Steward
   for scope).
@@ -90,8 +97,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
     (group cases by shared metatheory class, assert verdict-agreement), not only
     per-case verdict-flip. Author-side mirror of `conformance-reconcile-inherits-
     spec-metatheory-bugs`.
-- **Divergences are already recorded** in the spec — see the grounding rule
-  above; they are design, not gaps to close.
+## Level and universe discipline
+
 - **Reconcile the level calculus — don't just cite it (promoted K1+K2,
   soundness).** For every formation rule, **inline its explicit level
   computation** (e.g. `Eq A a b : Omega_l` for `A : Type l`; a funext Π lands at
@@ -111,6 +118,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
   this exact element-vs-proof conflation in **both** K2 and K2c conversion — a
   recurring confusion, so state the distinction explicitly wherever Ω conversion
   or proof-irrelevance appears.
+## Lawful classes and zero-delta instances
+
 - **A lawful class over a DECIDABLE operation states every law as a Bool-equation
   → Ω-clean, no truncation (promoted ES4-classes).** The truncation obligation
   ([[proof-relevant-inductive-cannot-be-declared-at-omega]]) bites only a law
@@ -141,6 +150,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
   explicitly deferred** (awaiting reduction rules + an induction principle), never
   as a zero-delta canonical exemplar. (Found by the build's producer-grep on the
   merged `51 §6` — a false zero-delta claim for `Ord Int`, erratum'd on main.)
+## Worked examples and kernel-currency claims
+
 - **A worked example that illustrates a guard must *flip* on the bug (promoted
   V0, soundness).** When your `/spec` prose carries a worked trace to show a
   correctness-critical pass behaving correctly (e.g. the §5.3 name-resolution
@@ -169,6 +180,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
   kernel admits" routinely diverge. When a construct needs a not-yet-landed
   kernel feature, **declare which stage gates it and split the deliverable**
   (buildable-now vs blocked-on-stage) rather than presenting it as satisfied.
+## Operational semantics and proof obligations
+
 - **Elaborating an operational semantics over a strict core? Name the non-strict
   positions explicitly — a paradigm label is not a uniform rule (promoted X1).**
   "CBV / strict" does **not** mean strict-everywhere: in X1's interpreter the one
@@ -215,6 +228,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
   direction is over-asserting equality/inertness.) And: if a decidability claim
   and a conformance case can both be read literally and **disagree on whether a
   redex fires**, one encodes a bug — reconcile before merge.
+## Reconstructing WP state from landed code
+
 - **At pickup of a kernel/spec-completion WP, reconstruct each deliverable's
   *current* state from the **landed code**, not from any artifact — the WP frame
   included (promoted K2c-series-2).** A sibling chapter, a conformance seed, a
@@ -242,6 +257,8 @@ too far: describe the *what*, not the *how* of any particular implementation.
     (often *the frame you were handed as ground truth*). So when a ref appears in
     your frame **and** sibling files, that's a signal to **open the target and
     read it**, not a reason to trust it — and file the others as a doc-erratum.
+## Formatting: whole-file reflow only on new files
+
 - **Whole-file reflow only on a NEW file; for targeted edits in an existing file,
   fix over-80 manually, scoped to the edited region (promoted ES4-classes).** A
   whole-file markdown-reflow re-wraps *every* paragraph → a spurious diff
