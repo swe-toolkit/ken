@@ -76,6 +76,26 @@ pub use artifact::api::{
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::with_px8ds_retired_flat_order;
 
+// `RT-MATCH-RECURSOR-CONSUMERS` 4a: the cross-crate census surface, reached as
+// `ken_runtime::{with_match_recursor_census, MatchRecursorCensusRow}` through
+// `lib.rs`. Same reachability caveat as the item above -- only a consumer can
+// observe a break in this path, so the `ken-cli`/`ken-verify`/`ken-elaborator`
+// census suites are what keep it honest.
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::core::{with_match_recursor_census, MatchRecursorCensusRow};
+
+// `RT-MATCH-RECURSOR-CONSUMERS` 4a.1: the child-process transport of that same
+// recorder, and the one item in this pair that is deliberately NOT gated.
+//
+// The gate is on this crate's feature and the call site is in `ken-cli`'s
+// binary, which has no feature of its own to test -- it receives
+// `px8-ds-test-support` only through a `[dev-dependencies]` edge, which enables
+// the feature on this crate's unit without defining any `cfg` visible to
+// `ken-cli`'s sources. A gated re-export would leave the call site unwritable in
+// the default build. The behaviour, not the item, is what the feature gates:
+// with it off the function is a direct call to its argument.
+pub use lowering::core::with_child_match_recursor_census;
+
 // ⛔ This list is DERIVED, not authored: it is exactly the set of module-level
 // bare-`pub` items in `surface.rs`, enumerated mechanically and checked for set
 // equality in BOTH directions. A name dropped here vanishes from

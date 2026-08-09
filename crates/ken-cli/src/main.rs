@@ -6,27 +6,56 @@ use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 
 fn main() {
+    // `RT-MATCH-RECURSOR-CONSUMERS` 4a.1. The census scope wraps the whole
+    // dispatch, and `dispatch` RETURNS its exit code instead of taking the exit
+    // itself, so the envelope is written after the compilation attempt and
+    // before this process converts that result to an exit -- on the refusing
+    // path as well as the succeeding one. A refused compile is precisely the
+    // case `AC-1` cares about, so losing its rows to an early `exit` would
+    // hollow out the census.
+    //
+    // With no session in the environment, or with the feature off, this is a
+    // direct call to `dispatch` and nothing else happens.
+    let exit_code = ken_runtime::with_child_match_recursor_census(dispatch);
+    if exit_code != 0 {
+        std::process::exit(exit_code);
+    }
+}
+
+fn dispatch() -> i32 {
     let args: Vec<OsString> = std::env::args_os().collect();
     match args.get(1).and_then(|s| s.to_str()).unwrap_or("") {
-        "repl" => repl::run(),
+        "repl" => {
+            repl::run();
+            0
+        }
         "run" => match parse_run_invocation(&args[2..]) {
-            Ok(invocation) => run_file(invocation.path.as_os_str(), &invocation.arguments),
+            Ok(invocation) => {
+                run_file(invocation.path.as_os_str(), &invocation.arguments);
+                0
+            }
             Err(RunArgumentError::MissingPath) => {
                 eprintln!("ken run: missing <file> argument");
                 eprintln!("Usage: ken run <file.ken> [-- <arguments>...]");
-                std::process::exit(1);
+                1
             }
             Err(RunArgumentError::UnexpectedBeforeSeparator(argument)) => {
                 eprintln!("ken run: unexpected argument before '--': {:?}", argument);
-                std::process::exit(1);
+                1
             }
         },
-        "check" => check_file(args.get(2).map(OsString::as_os_str)),
+        "check" => {
+            check_file(args.get(2).map(OsString::as_os_str));
+            0
+        }
         "native-build" => native_build_file(
             args.get(2).map(OsString::as_os_str),
             args.get(3).map(OsString::as_os_str),
         ),
-        "fmt" => format_files(&args[2..]),
+        "fmt" => {
+            format_files(&args[2..]);
+            0
+        }
         "version" | "--version" | "-V" => {
             println!(
                 "ken {} — verified topos-oriented language",
@@ -34,16 +63,22 @@ fn main() {
             );
             println!("kernel {}", ken_kernel::version());
             println!("{}", ken_interp::describe());
+            0
         }
-        "" | "--help" | "-h" | "help" => print_help(),
+        "" | "--help" | "-h" | "help" => {
+            print_help();
+            0
+        }
         unknown => {
             eprintln!("ken: unknown subcommand '{}' — try 'ken help'", unknown);
-            std::process::exit(1);
+            1
         }
     }
 }
 
-fn native_build_file(path: Option<&OsStr>, output_dir: Option<&OsStr>) {
+/// Returns the process exit code rather than taking the exit, so that 4a.1's
+/// envelope is written while this result is still a value. See `main`.
+fn native_build_file(path: Option<&OsStr>, output_dir: Option<&OsStr>) -> i32 {
     let Some(path) = path else {
         eprintln!("ken native-build: missing <file> argument");
         eprintln!("Usage: ken native-build <file.ken> <output-dir>");
@@ -72,10 +107,13 @@ fn native_build_file(path: Option<&OsStr>, output_dir: Option<&OsStr>) {
         "native-program",
         PathBuf::from(output_dir),
     ) {
-        Ok(output) => println!("{}", output.artifact.executable_path.display()),
+        Ok(output) => {
+            println!("{}", output.artifact.executable_path.display());
+            0
+        }
         Err(error) => {
             eprintln!("ken native-build: {error}");
-            std::process::exit(1);
+            1
         }
     }
 }

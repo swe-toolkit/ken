@@ -401,6 +401,277 @@ pub(in crate::cranelift_backend) fn reset_observed_recursive_descent_residuals()
     OBSERVED_RESIDUALS.with(|cell| *cell.borrow_mut() = None);
 }
 
+// `RT-MATCH-RECURSOR-CONSUMERS` `AC-1`, frame section 4a.
+//
+// The cross-crate census recorder. **OBSERVATION ONLY.**
+//
+// **The split this rests on is a property of the code, not a convention.**
+// [`enumerate_recursive_descent_residuals`] is **ordinary production code**
+// that already walks the exact `RuntimeExpr` and declarations exhaustively;
+// only the recorder below is gated. By contrast
+// [`set_selector_variant_exclusion`] **and the selector branch it controls**
+// are both `#[cfg(test)]`, so making either reachable cross-crate would build
+// the behaviour-changing activation seam section 5 bans. The observation
+// extends; the activation does not.
+//
+// **The recorder may not remove a residual, set an exclusion, choose an
+// authority, alter a planner/ABI value, or affect any result.** Every function
+// here takes `&` inputs and returns either nothing or an index into its own
+// row buffer. With no recorder installed each one is a thread-local read and a
+// return, which is what "feature-on with no recorder installed is inert"
+// means.
+//
+// **Rows accumulate in a `Vec`, never a set or a map.** A census key that
+// collides **deduplicates**, so the population would read smaller *and
+// cleaner* than it is — the failure mode that looks like success. Appending
+// makes that unrepresentable rather than merely avoided.
+//
+// **The recorder is thread-local, so a scope observes compilations on its
+// own thread.** A harness that compiles on a spawned thread must install the
+// scope there. Stated because a silently empty census and a genuinely empty
+// population are the two readings this must never conflate.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MatchRecursorCensusRow {
+    /// Test-binary / process identity.
+    pub run: u32,
+    /// Test / thread identity. `<unnamed>` when the thread carries no name.
+    pub thread: String,
+    /// Per-run compilation ordinal. The three fields together are the row key;
+    /// a test name alone is not an identity.
+    pub ordinal: u64,
+    /// The **complete** residual set for this entry, recorded for every entry
+    /// and not only for firing rows. A census of firings is a numerator, not a
+    /// population.
+    pub residuals: Vec<String>,
+    /// Whether `validate_oriented_subcontinuation_transport` admitted this
+    /// compilation. `false` means it returned before the selector.
+    pub validator_admitted: bool,
+    /// Whether this entry reached the selector. Preserves the equation
+    /// `entry = selector-arrival ⊎ pre-selector-return`: every entry is a row,
+    /// and this flag partitions them.
+    pub reached_selector: bool,
+    /// The **unmodified production** authority, when the entry reached the
+    /// selector. Recorded, never chosen.
+    pub authority: Option<String>,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static MRC_CENSUS: std::cell::RefCell<Option<Vec<MatchRecursorCensusRow>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Run `body` with the census recorder installed on this thread, and return its
+/// value together with the rows recorded.
+///
+/// Hidden and default-off: with no scope active the recorder is `None` and
+/// every hook below returns immediately. Prior state is restored on unwind.
+#[cfg(feature = "px8-ds-test-support")]
+#[doc(hidden)]
+pub fn with_match_recursor_census<R>(
+    body: impl FnOnce() -> R,
+) -> (R, Vec<MatchRecursorCensusRow>) {
+    struct Restore(Option<Vec<MatchRecursorCensusRow>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            MRC_CENSUS.with(|cell| *cell.borrow_mut() = self.0.take());
+        }
+    }
+
+    let previous = MRC_CENSUS.with(|cell| cell.borrow_mut().replace(Vec::new()));
+    let restore = Restore(previous);
+    let value = body();
+    let rows = MRC_CENSUS
+        .with(|cell| cell.borrow_mut().take())
+        .unwrap_or_default();
+    drop(restore);
+    (value, rows)
+}
+
+/// Record one entry row, before the transport validator runs. Returns the row
+/// index, or `None` when no recorder is installed.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn mrc_census_begin(
+    expr: &RuntimeExpr,
+    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+) -> Option<usize> {
+    // The installed check and the push take separate short borrows, with the
+    // production walk between them holding none -- so the recorder cannot
+    // deadlock on a re-entrant borrow however that walk grows.
+    if !MRC_CENSUS.with(|cell| cell.borrow().is_some()) {
+        return None;
+    }
+    let residuals = enumerate_recursive_descent_residuals(expr, declarations)
+        .into_iter()
+        .map(|residual| format!("{residual:?}"))
+        .collect();
+    MRC_CENSUS.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let rows = slot.as_mut()?;
+        let ordinal = rows.len() as u64;
+        rows.push(MatchRecursorCensusRow {
+            run: std::process::id(),
+            thread: std::thread::current()
+                .name()
+                .unwrap_or("<unnamed>")
+                .to_string(),
+            ordinal,
+            residuals,
+            validator_admitted: false,
+            reached_selector: false,
+            authority: None,
+        });
+        Some(rows.len() - 1)
+    })
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn mrc_census_validator(index: Option<usize>, admitted: bool) {
+    let Some(index) = index else { return };
+    MRC_CENSUS.with(|cell| {
+        if let Some(row) = cell.borrow_mut().as_mut().and_then(|rows| rows.get_mut(index)) {
+            row.validator_admitted = admitted;
+        }
+    });
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn mrc_census_selector(index: Option<usize>, authority: BodyEmissionAuthority) {
+    let Some(index) = index else { return };
+    MRC_CENSUS.with(|cell| {
+        if let Some(row) = cell.borrow_mut().as_mut().and_then(|rows| rows.get_mut(index)) {
+            row.reached_selector = true;
+            row.authority = Some(format!("{authority:?}"));
+        }
+    });
+}
+
+/// The child-process transport for the census above (frame section 4a.1).
+///
+/// This wraps the child's native-build compilation attempt and, when the parent
+/// has opened a session, writes exactly one envelope after the attempt and
+/// before the CLI converts its result to an exit. It installs the SAME scope and
+/// the same rows as the in-process path; there is no second enumerator, schema,
+/// or sampling rule here.
+///
+/// # Why this item is not feature-gated
+///
+/// The gate is on this crate's feature, and the call site is in `ken-cli`'s
+/// binary. `ken-cli` declares no feature of its own: it receives
+/// `px8-ds-test-support` only through its `[dev-dependencies]` edge onto this
+/// crate, which enables the feature on *this* crate's unit without ever defining
+/// a `cfg` that `ken-cli`'s own sources could test. A gated item would therefore
+/// not exist for the binary in the default build, and the call could not be
+/// written at all.
+///
+/// So the item is always present and the entire behaviour is gated. With the
+/// feature off this is a direct call to `body` and nothing below is compiled in.
+#[doc(hidden)]
+pub fn with_child_match_recursor_census<R>(body: impl FnOnce() -> R) -> R {
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    return body();
+
+    #[cfg(feature = "px8-ds-test-support")]
+    {
+        let Some(session) = ChildCensusSession::from_environment() else {
+            // Feature on, no session: inert. No scope is installed and no
+            // artifact is created, so this child is indistinguishable from one
+            // that was never observed.
+            return body();
+        };
+        let (value, rows) = with_match_recursor_census(body);
+        session.write_envelope(&rows);
+        value
+    }
+}
+
+/// The observation session a parent test opened for one child.
+///
+/// These three values select only *which* observation session is recorded and
+/// *where* its envelope is written. Nothing reachable from here can choose a
+/// residual, an exclusion, an authority, a lane, a source, or any planner/ABI
+/// value -- the rows come from the same production walk as the in-process path.
+#[cfg(feature = "px8-ds-test-support")]
+struct ChildCensusSession {
+    session: String,
+    parent: String,
+    sink: std::path::PathBuf,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+impl ChildCensusSession {
+    const SESSION_VAR: &'static str = "KEN_MRC_CENSUS_SESSION";
+    const PARENT_VAR: &'static str = "KEN_MRC_CENSUS_PARENT";
+    const SINK_VAR: &'static str = "KEN_MRC_CENSUS_SINK";
+
+    /// All three must be present and non-empty. A partial environment is
+    /// treated as no session at all rather than as a half-open one, so the
+    /// inert case has a single definition.
+    fn from_environment() -> Option<Self> {
+        let session = std::env::var(Self::SESSION_VAR).ok()?;
+        let parent = std::env::var(Self::PARENT_VAR).ok()?;
+        let sink = std::env::var(Self::SINK_VAR).ok()?;
+        if session.is_empty() || parent.is_empty() || sink.is_empty() {
+            return None;
+        }
+        Some(Self {
+            session,
+            parent,
+            sink: std::path::PathBuf::from(sink),
+        })
+    }
+
+    /// Write one versioned envelope with no-overwrite semantics.
+    ///
+    /// Every failure here is silent on purpose. Frame 4a.1 puts observation
+    /// failure in the *parent* test: a missing, short, or wrong-session envelope
+    /// must red the parent's control, and must not change this child's exit
+    /// status, stdout, stderr, artifact, or diagnostic. So there is nothing to
+    /// report here and nowhere to report it that would not violate that.
+    ///
+    /// `pid` is written as supplementary evidence only. The merged identity is
+    /// `(session, parent, ordinal)`: PIDs are reused, and the child thread is
+    /// commonly just `main`, so neither can carry an identity axis.
+    ///
+    /// The trailing `end` line is what makes a truncated write detectable as
+    /// *incomplete* rather than as a legitimately smaller census.
+    fn write_envelope(&self, rows: &[MatchRecursorCensusRow]) {
+        use std::fmt::Write as _;
+        use std::io::Write as _;
+
+        let mut text = String::new();
+        let _ = writeln!(text, "mrc-census-envelope\tv1");
+        let _ = writeln!(text, "session\t{}", self.session);
+        let _ = writeln!(text, "parent\t{}", self.parent);
+        let _ = writeln!(text, "pid\t{}", std::process::id());
+        let _ = writeln!(text, "rows\t{}", rows.len());
+        for row in rows {
+            let _ = writeln!(
+                text,
+                "row\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                row.ordinal,
+                row.run,
+                row.thread,
+                row.validator_admitted,
+                row.reached_selector,
+                row.authority.as_deref().unwrap_or("-"),
+                row.residuals.join(","),
+            );
+        }
+        let _ = writeln!(text, "end\t{}", rows.len());
+
+        let Ok(mut file) = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&self.sink)
+        else {
+            return;
+        };
+        let _ = file.write_all(text.as_bytes());
+    }
+}
+
 /// The bounded re-entry depth for continuing a composed suffix behind a carried
 /// ordinary elimination.
 ///
@@ -1470,11 +1741,20 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         RECURSIVE_POSITION_UNIT_CALLS.with(|calls| calls.set(0));
         reset_d8_join_conversion_counts();
     }
-    validate_oriented_subcontinuation_transport(
+    // `RT-MATCH-RECURSOR-CONSUMERS` 4a: the census entry row, recorded BEFORE
+    // the transport validator, because that validator returns `?` and a row
+    // taken after it could not see a pre-selector return. Every entry is a row;
+    // `reached_selector` partitions them.
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    let census_row = mrc_census_begin(expr, &declarations);
+    let transport_validated = validate_oriented_subcontinuation_transport(
         expr,
         &declarations,
         oriented_subcontinuation_plan.as_ref(),
-    )?;
+    );
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    mrc_census_validator(census_row, transport_validated.is_ok());
+    transport_validated?;
     // `RT-SEED-CALL-PORT` `D1` — observe the FULL residual set on the real
     // program, at the same site and from the same inputs the selector consumes.
     // Recording it anywhere else would measure a reconstruction of the program
@@ -1485,6 +1765,10 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         OBSERVED_RESIDUALS.with(|cell| *cell.borrow_mut() = Some(observed));
     }
     let body_emission_authority = select_body_emission_authority(expr, &declarations);
+    // Recorded, never chosen: the authority above is production's own answer
+    // and is already bound before the census sees it.
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    mrc_census_selector(census_row, body_emission_authority);
     // Boundary A of RT-NATIVE-FNSPLIT: close and validate the factored static
     // graph before Cranelift sees any semantic body. The plan's positional
     // child-origin table is reachable from the lowering, so
