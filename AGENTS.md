@@ -139,28 +139,37 @@ blind and mute together: no `post_response` to unblock a ring waiting on you, no
 fleet keeps posting into a channel you can no longer hear, and your seat looks
 merely quiet.
 
-**Know why you will be tempted, so you can catch yourself.** It is the only
-read that returns message **bodies**; `get_recent_context` and `get_mentions`
-return headers only (timestamp, speaker, event id). So the moment you need the
-full text of a **truncated notification** — precisely when something is blocked
-and you are in a hurry — `get_transcript` is the obvious reach. **That urgency is
-the trap: it is the worst possible moment to lose transport.**
+**The reason you used to be tempted is GONE. Use `detail: "standard"`.**
 
-**Use instead — the HTTP read path**, the same API the MCP adapter wraps,
-with **your own** credential ( never another seat's `api_key`; never dump
-`.moot/actors.json` to learn its shape):
+Verified 2026-08-09 against the upgraded `mootup` dependency, which added event
+search/pagination and better thread ergonomics. `get_recent_context` and
+`get_mentions` **now take a `detail` argument, and `detail: "standard"` returns
+the full message text** — with a real `limit` and a `since_event_id` cursor:
 
-```python
-API = tomllib.load(open('/workspaces/ken/moot.toml','rb'))['convo']['api_url'].rstrip('/')
-me  = json.load(open('/workspaces/ken/.moot/actors.json'))['actors']['<your-role>']
-# GET {API}/api/spaces/{space_id}/events?limit=N   → full `text` per event
-# Authorization: Bearer me['api_key']
+```
+get_mentions(detail="standard", limit=1)                   full body, latest mention
+get_recent_context(detail="standard", limit=N)             full bodies, newest N
+get_recent_context(detail="standard", since_event_id=ID)   cursor poll
 ```
 
-**Temporary measure** pending a new convo release; the operator is raising the
-method's utility with the convo team. Until then the prohibition is absolute —
-a working `get_transcript` in some future version is not a reason to try it
-now to find out.
+⇒ **The old rationale — *"`get_transcript` is the only read that returns
+bodies"* — is FALSE.** That was the entire pull toward it, and the moment it bit
+was when you needed the full text of a **truncated notification** while
+something was blocked. **That case is now served by a bounded, cursored call.**
+`detail` defaults to `"minimal"`, so pass it explicitly; a thin result means you
+omitted the argument, **never** that you need `get_transcript`.
+
+The HTTP read path still works as a fallback, with **your own** credential
+(never another seat's `api_key`; never dump `.moot/actors.json` to learn its
+shape): `GET {API}/api/spaces/{space_id}/events?limit=N` with `Authorization:
+Bearer <own key>`, `API` from `moot.toml`'s `convo.api_url`. **Prefer
+`detail: "standard"` — one call, and no credential handling.**
+
+**The `get_transcript` prohibition itself is UNCHANGED and remains absolute.**
+It is the operator's to lift, not yours, and the upgrade is **not** a licence to
+retry it. A working `get_transcript` in some future version is still not a
+reason to try it now to find out — the failure costs you the ability to **post**,
+and there is now no read it uniquely provides.
 
 ## Conventions
 
