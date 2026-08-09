@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-09 05:44:53Z — from 185 issue file(s) in `docs/program/issues/`.
+2026-08-09 05:47:46Z — from 187 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -131,6 +131,7 @@ the committed file matches the generator's output.
 | `Q-RESIDUE` | the Track Q rework residue — 10 tests, folded from Q3-Q7 | closed | runtime | S | none | 818 |
 | `RT-AGG-COMPOSE` | escaping two Resources into one aggregate (Prod (Resource _) (Resource _)) fails at erasure — checked endpoints do not compose | draft | runtime | TBD | none | — |
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
+| `RT-CANDIDATE-LEDGER-RESIDUALS` | Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed | ready | runtime | S | none | — |
 | `RT-CARRIED-CONTINUATION-RESUME` | A carried scrutinee reaching a continuation frame has no resume path — the carried elimination does not implement the Carried x {PendingLet, Active} arm | merged | runtime | M | none | — |
 | `RT-CARRIED-ORDINARY-COMPOSITION` | Carried ordinary elimination consumes exactly one frame — a composed suffix behind an ordinary carried eliminator is refused rather than continued | merged | runtime | M | none | — |
 | `RT-CARRIED-RESOURCE-SCALAR` | A carried word cannot satisfy a ResourceScalar effect seat -- same Need-not-in-Avail shape as the byte-span gap, different need, different seats | draft | runtime | TBD | none | — |
@@ -175,6 +176,7 @@ the committed file matches the generator's output.
 | `RT-FNUNIT-RESULT-TOKEN` | Broad starter shapes fail the result-token table on the FunctionizedUnits lane — pre-existing, unmasked by retiring SeedClosureCall | ready | runtime | M | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
+| `RT-JOIN-ORIGIN-ATTRIBUTION` | A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong | ready | runtime | S | none | — |
 | `RT-LEXICAL-RECURSOR-CONSUMERS` | Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam | ready | runtime | M | none | — |
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
 | `RT-MATCH-RECURSOR-CONSUMERS` | Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population | active | runtime | M | none | — |
@@ -230,12 +232,14 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CI-IGNORED-SWEEP` — nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off
+- `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
 - `RT-CENSUS-CAVEAT-GUARD` — The identifier-census caveat's staleness guard is an existence check standing in for a count check, so it cannot detect the drift it was written to catch
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-FNUNIT-RESULT-TOKEN` — Broad starter shapes fail the result-token table on the FunctionizedUnits lane — pre-existing, unmasked by retiring SeedClosureCall
+- `RT-JOIN-ORIGIN-ATTRIBUTION` — A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 
 ## Blockers
@@ -258,6 +262,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
+- `KERNEL-NESTED-IND` blocked by `RT-JOIN-ORIGIN-ATTRIBUTION` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-MODULE-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
