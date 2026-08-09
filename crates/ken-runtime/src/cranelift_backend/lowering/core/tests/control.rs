@@ -27718,7 +27718,7 @@ fn ced_d2_an_unclaimed_planned_token_is_missing_from_the_exact_equality_in_isola
 // keyed by the live `ContinuationCallIdentity`, and the seat is what tells
 // them apart.
 //
-// ⛔ **No production diagnostic was changed to manufacture different strings.**
+// **No production diagnostic was changed to manufacture different strings.**
 // That was available and it is the wrong trade: it would buy a cheap
 // discriminator by making production say something less true.
 //
@@ -27897,7 +27897,7 @@ const D3_DOUBLE_SETTLEMENT: &str = "one binding candidate was settled twice";
 
 /// **`D3` `AC-6` row 1 — suppressing the binding installation.**
 ///
-/// ⭐⭐ **This row is the reason the ruling forbade a count.** The mutation
+/// **This row is the reason the ruling forbade a count.** The mutation
 /// withholds the `StaticWorker` binding the candidate authorizes, substituting
 /// a plain value binding. **`d8d_bindings` does not move** — it is 1 in both
 /// arms, because a binding IS still installed at that site; only its KIND
@@ -27972,14 +27972,14 @@ fn ced_d3_m1_suppressing_the_binding_installation_degrades_composed_to_inline_si
     // structure moves.
     assert_eq!(
         armed.bindings, baseline.bindings,
-        "⭐ the binding COUNT must not move -- a binding is still installed, only its kind \
+        "the binding COUNT must not move -- a binding is still installed, only its kind \
          changed. If this ever differs, a count-keyed oracle would suffice and this row's whole \
          design premise has changed: baseline={} armed={}",
         baseline.bindings, armed.bindings
     );
     assert_eq!(
         armed_answer, baseline_answer,
-        "⭐ and the RESULT must not move either. This row is stated on a program the mutation \
+        "and the RESULT must not move either. This row is stated on a program the mutation \
          leaves behaviorally inert, which is why its oracle has to be structural: \
          baseline={baseline_answer} armed={armed_answer}"
     );
@@ -28049,7 +28049,7 @@ fn ced_d3_m2_settling_inline_on_bridge_entry_collides_at_promotion_from_the_entr
     assert_eq!(
         baseline.settle_seats(),
         vec![D3Seat::ComposedPromotion],
-        "⭐ the baseline makes exactly ONE settlement attempt, at the promotion seat. It performs \
+        "the baseline makes exactly ONE settlement attempt, at the promotion seat. It performs \
          no entry settlement and no exit settlement: the exit path reads a pending composed claim \
          and correctly leaves the candidate alone: {:?}",
         baseline.settle_seats()
@@ -28131,7 +28131,7 @@ fn ced_d3_m2_settling_inline_on_bridge_entry_collides_at_promotion_from_the_entr
 /// 3. it therefore settles `InlineNoCall` **at the exit seat**;
 /// 4. finished-CLIF promotion collides.
 ///
-/// ⭐ **And it proves the NEGATIVE that separates it from row 2: no entry
+/// **And it proves the NEGATIVE that separates it from row 2: no entry
 /// settlement occurred.** Without that clause the two rows would be
 /// distinguishable only by their shared terminal string, which is the collapse
 /// the ruling forbids.
@@ -28192,7 +28192,7 @@ fn ced_d3_m3_dropping_the_pending_half_settles_inline_at_the_exit_seat_and_colli
             (*completed, *settled, *pending_composed),
             (true, false, true),
             "step 2 -- at bridge completion the scope must have COMPLETED, the candidate must be \
-             UNSETTLED, and a composed claim must be PENDING. ⭐ That last one is the whole row: \
+             UNSETTLED, and a composed claim must be PENDING. That last one is the whole row: \
              the pending half is TRUE here, and the mutation makes the exit path fail to read it. \
              These three are read straight from the ledger and the feed, NOT through \
              `continuation_candidate_is_consumed` -- that is the function the mutation mutates, \
@@ -28217,7 +28217,7 @@ fn ced_d3_m3_dropping_the_pending_half_settles_inline_at_the_exit_seat_and_colli
          promotion={promotion}"
     );
 
-    // ⭐⭐ Clause 4b — THE NEGATIVE THAT SEPARATES THIS ROW FROM ROW 2.
+    // Clause 4b — THE NEGATIVE THAT SEPARATES THIS ROW FROM ROW 2.
     assert!(
         !armed.settle_seats().contains(&D3Seat::BridgeEntry),
         "NO entry settlement may have occurred. This is what makes rows 2 and 3 two proofs \
@@ -28241,7 +28241,7 @@ fn ced_d3_m3_dropping_the_pending_half_settles_inline_at_the_exit_seat_and_colli
 /// closeout with no disposition, and `D2`'s totality check — which runs BEFORE
 /// the call-obligation subset is derived — refuses.
 ///
-/// ⭐ **This row is the one that proves `D2`'s ordering is load-bearing.** An
+/// **This row is the one that proves `D2`'s ordering is load-bearing.** An
 /// unsettled candidate is in neither `DirectCall` nor `ComposedCall`, so if the
 /// subset were derived first it would simply fall out and pass silently. The
 /// refusal below only exists because totality is checked first.
@@ -28267,7 +28267,7 @@ fn ced_d3_m4_omitting_the_direct_settlement_preserves_the_call_and_fails_candida
     assert_eq!(
         baseline.dispositions.get(&CandidateDisposition::DirectCall).copied(),
         Some(1),
-        "and settle exactly one candidate DirectCall. ⭐ Exactly one is what lets this row speak \
+        "and settle exactly one candidate DirectCall. Exactly one is what lets this row speak \
          about the WHOLE population without a fixed count standing in for it: {:?}",
         baseline.dispositions
     );
@@ -28284,7 +28284,7 @@ fn ced_d3_m4_omitting_the_direct_settlement_preserves_the_call_and_fails_candida
     // that suppressed the call itself, which is a different defect entirely.
     assert!(
         armed.returned_from_funnel(),
-        "⭐ the direct call must still have been made and the funnel must still have RETURNED. \
+        "the direct call must still have been made and the funnel must still have RETURNED. \
          Without this clause the row is equally consistent with a mutation that suppressed the \
          call itself, which is a different defect and would fail totality for a different reason: \
          {:?}",
@@ -28333,7 +28333,7 @@ fn ced_d3_m4_omitting_the_direct_settlement_preserves_the_call_and_fails_candida
 /// to closeout — which is why its message can name the collision, and why this
 /// row's terminal differs from row 4's even though both mutate the same funnel.
 ///
-/// ⭐ **It is also the both-times-the-SAME-disposition arm of that refusal**,
+/// **It is also the both-times-the-SAME-disposition arm of that refusal**,
 /// which rows 2 and 3 do not reach: they collide `InlineNoCall` against
 /// `ComposedCall`. So `settle`'s two refusal arms are both covered by this
 /// node, by different rows, rather than one arm standing in for both.
@@ -28357,7 +28357,7 @@ fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settle
     assert_eq!(
         baseline.settle_seats(),
         vec![D3Seat::DirectFunnel],
-        "⭐ making exactly ONE settlement attempt, at the funnel. This is the clause the armed \
+        "making exactly ONE settlement attempt, at the funnel. This is the clause the armed \
          arm below moves, and pinning it as the whole sequence rather than as a count is what \
          makes 'twice' mean twice at this seat: {:?}",
         baseline.settle_seats()
@@ -28405,7 +28405,7 @@ fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settle
     );
     assert!(
         armed.outcome.contains("both times as DirectCall"),
-        "⭐ and on the both-times-the-SAME-disposition arm of that refusal, which rows 2 and 3 do \
+        "and on the both-times-the-SAME-disposition arm of that refusal, which rows 2 and 3 do \
          not reach -- they collide InlineNoCall against ComposedCall. This is what keeps the two \
          arms of `settle`'s refusal separately witnessed: {}",
         armed.outcome
@@ -28415,7 +28415,7 @@ fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settle
 /// **`D3` `AC-6` — the five rows are FIVE proofs, and this is the residue of
 /// proving it.**
 ///
-/// ⭐⭐ **Why this exists as a committed test rather than a verified claim.**
+/// **Why this exists as a committed test rather than a verified claim.**
 /// The five rows above were each shown to red when their own mutation is not
 /// armed — a clean 5×5 diagonal. That is necessary and it is **not
 /// sufficient**, because it does not rule out the one failure the ruling

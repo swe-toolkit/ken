@@ -3069,7 +3069,7 @@ pub(super) struct ContinuationClaimLedger {
 /// deliberately separate variants rather than flags: a run arms at most one, so
 /// a control cannot pass because some other mutation was still set.
 ///
-/// ⛔ **ONE declaration, not a `cfg(test)`/`cfg(not(test))` pair.** It was
+/// **ONE declaration, not a `cfg(test)`/`cfg(not(test))` pair.** It was
 /// authored as a pair, and the `cfg(not(test))` half carried only `None` while
 /// the mutation *sites* in `core.rs` name all five variants unconditionally —
 /// so the **production lib did not compile**, while the lib-**test** profile,
@@ -3163,7 +3163,7 @@ pub(in crate::cranelift_backend) enum D3Event {
     ComposedRecorded { identity: ContinuationCallIdentity },
     /// The shared direct funnel was REACHED and RETURNED an answer.
     ///
-    /// ⛔ Deliberately a separate event from [`Self::Settle`], and the
+    /// Deliberately a separate event from [`Self::Settle`], and the
     /// separation was forced by a row that could not be written without it:
     /// row 4 withholds the settlement while preserving the call, so it must
     /// assert "the funnel returned AND nothing was settled". One event
