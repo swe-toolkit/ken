@@ -5,12 +5,29 @@ status: active
 owner: kernel
 size: L
 gate: none
-depends_on: [SPEC-NESTED-IND]
+depends_on: [SPEC-NESTED-IND, RT-JOIN-ORIGIN-ATTRIBUTION]
 blocks: [DS-9]
 github: null
 origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved. Demand-pulled by DS-9, which blocked at its first deliverable on `JsonArray (List Json)`; fork raised by the Steward as evt_1ykvpj7yvtg18. The five-point prerequisite contract below is the Architect's, transcribed verbatim in substance. Steward-filed; Steward owns the frame and AC/control placement.
 ---
 
+> ## HELD AGAIN 2026-08-09 — BLOCKED ON [[RT-JOIN-ORIGIN-ATTRIBUTION]]
+>
+> **Architect ruling `evt_j8t0ktxbmck`: the native RED is HELD EVIDENCE, not
+> `AC-K12` discharge, and no production correction is authorized yet.**
+> Component attribution is **Runtime**. **Kernel must NOT edit
+> `crates/ken-runtime` for this wall** — the Steward authorized that and was
+> overruled. Runtime owns the planner/lowering invariant and its correction.
+>
+> The merged contract requires the nested-IH constructor to lower **and
+> evaluate**: the checked-artifact control must reach native execution, pass the
+> Cranelift verifier, and agree with the interpreter at Nat 3. **A production
+> native refusal cannot be the terminal positive control.**
+>
+> **Held with the erasure projection and the RED preserved.** After Runtime's
+> correction merges independently, rebase the retained work and re-run the exact
+> differential: interpreter Nat 3, native present, verifier passed, native Nat 3.
+>
 > ## RE-RELEASED 2026-08-09 — AND THE RELATIONAL ZIPPER IS NOT THE ROUTE
 >
 > **The Spec representation contract merged at exact `c7f8913c` (PR #1678, CI
