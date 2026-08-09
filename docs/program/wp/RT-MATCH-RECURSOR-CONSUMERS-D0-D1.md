@@ -31,7 +31,12 @@ and unchanged) trivially rather than by inspection.
 > **And the two are one root, not two.** Their refusal backtraces are identical
 > frame for frame and line for line. Neither frame hard stop fires.
 
-## 1. `D0` — the population, closed by measurement
+## 1. `D0` — the `ken-runtime --lib` population, by measurement
+
+> **Scoped 2026-08-09.** This heading read *"the population, closed by
+> measurement"*. It is a `ken-runtime --lib` census (see 1.6.1) and closes no
+> unqualified `AC-1`; a heading is what a reader quotes, so the claim is
+> corrected here rather than only in the bounds section below.
 
 ### 1.1 The instrument, and why it is at this seam
 
@@ -82,7 +87,7 @@ gap is closed by measurement, not by argument.
 | `{MatchScrutineeRecursor}` | **8** |
 | both variants together | **0** |
 
-### 1.4 The `MatchScrutineeRecursor` population — `AC-1`
+### 1.4 The `MatchScrutineeRecursor` population, as censused (`AC-1` NOT discharged)
 
 Eight compilations across five tests. Every one enumerates exactly
 `{MatchScrutineeRecursor}`; none also carries `LexicalCallArgumentRecursor`.
@@ -408,7 +413,7 @@ moved this file underneath it and a line number does not survive that.
   *value* is that same line; every other construction is in a `#[cfg(test)]`
   support file building a `Lowering` directly.
 
-## 6.2 Three censuses, because the first gate was the wrong one
+## 6.2 Three censuses, and what each one is evidence about
 
 Each row records thread name (libtest names the thread after the test), pid,
 exclusion state, and the **complete** residual set.
@@ -418,12 +423,26 @@ exclusion state, and the **complete** residual set.
 | compile-site | `core.rs:1484`, beside the selector | 665 | 15 |
 | selector-site | `select_body_emission_authority` entry | 731 | 50 |
 
-**The compile-site census was incomplete, and the selector-site census is what
-found it.** The first sees programs that are *compiled*; the population is
-programs that are *classified*. Three tests classify a member and never compile
-it, so a compile-keyed enumeration under-reports by a whole root. Section 1.1
-placed its instrument at the compile seam for good reasons; at this base that
-choice is measurably short, and the fix is the gate, not a wider sweep.
+**The two censuses answer two different questions, and section 2.4 already said
+so.** The compile-site census answers *which programs compile through the
+selector*; the selector-site census answers *which programs the corpus
+classifies at all*, which is the wider set because controls call the selector
+directly without compiling. Three tests do exactly that, and the compile-keyed
+census cannot see them.
+
+**An earlier revision of this subsection said the compile-keyed census
+"under-reports by a whole root" and was "measurably short". That overstates it
+and contradicted section 2.4, so it is withdrawn.** `AC-1`'s population is
+*compilation entries* — section 2.4's reading, that production reaches the
+selector only from the compile path, is correct and stands. R3 is a selector
+control, not a compilation entry, so its absence from the compile census is not
+an under-report of `AC-1`'s population.
+
+**Running the selector census was still worth it, for a different reason:** it
+is how R3 was found at all, and finding it is what let 6.6 establish by
+measurement that it has no well-formed compilable form rather than leaving it
+an unexamined name. An instrument that answers a wider question than the AC
+asks is not thereby measuring the AC.
 
 **All 50 hits carry the complete set `{MatchScrutineeRecursor}`.** No program in
 the corpus fires it alongside another variant, so the one-variant exclusion is
