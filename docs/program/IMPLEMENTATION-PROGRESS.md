@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-09 19:27:06Z — from 192 issue file(s) in `docs/program/issues/`.
+2026-08-09 19:43:25Z — from 192 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -132,7 +132,7 @@ the committed file matches the generator's output.
 | `Q-RESIDUE` | the Track Q rework residue — 10 tests, folded from Q3-Q7 | closed | runtime | S | none | 818 |
 | `RT-AGG-COMPOSE` | escaping two Resources into one aggregate (Prod (Resource _) (Resource _)) fails at erasure — checked endpoints do not compose | draft | runtime | TBD | none | — |
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
-| `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | active | runtime | M | none | — |
+| `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
 | `RT-CALL-EDGE-EXECUTABILITY-AXIS` | executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error | ready | runtime | S | none | — |
 | `RT-CANDIDATE-LEDGER-RESIDUALS` | Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed | ready | runtime | S | none | — |
 | `RT-CARRIED-CONTINUATION-RESUME` | A carried scrutinee reaching a continuation frame has no resume path — the carried elimination does not implement the Carried x {PendingLet, Active} arm | merged | runtime | M | none | — |
@@ -267,7 +267,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
-- `KERNEL-NESTED-IND` blocked by `RT-BODY-OCCURRENCE-PROVENANCE` (status: active)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-MODULE-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)

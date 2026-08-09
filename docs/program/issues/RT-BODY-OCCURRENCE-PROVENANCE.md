@@ -1,7 +1,7 @@
 ---
 id: RT-BODY-OCCURRENCE-PROVENANCE
 title: "Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,7 +11,21 @@ github: null
 origin: Architect standalone mechanism ruling evt_172ag7hdbttkc (2026-08-09), selecting the correction for the authority named by RT-JOIN-ORIGIN-ATTRIBUTION's merged record (exact 72e0d7c, PR #1686). Steward-filed and framed on that bound per COORDINATION §2. AMENDED AND RE-RELEASED 2026-08-09 on ruling evt_5ncj9jd6fjt8f, which withdrew the StaticBodyTarget carve-out after the AC-2 integration gate measured the identical alias in that class; the relation is now keyed over plan.entries UNION every StaticBody target. No merge verdict transfers across the re-release.
 ---
 
-> # THE UNION INCREMENT IS ALREADY ON `main`. THE RESIDUAL IS `AC-2` ALONE.
+> # CLOSED 2026-08-09. EVERY AC DISCHARGED. [[KERNEL-NESTED-IND]] IS UNBLOCKED.
+>
+> Production work landed at `1f706520` (accepted partial); `D7` at `1105671a`
+> (PR #1727, CI green). `AC-2`'s reaches half measured at `1f706520` and
+> independently reproduced by Runtime QA on evidence `84a71614`: owner 2 issued
+> `body_occurrence = SOI(26)`, not the aliased `SOI(58)`; distinct first-entry
+> sequence `26 -> 58 -> 56 -> 55 -> 53 -> 52`; `33`/`39` never entered, as the
+> already-routed successor boundary expects. `AC-2`'s closure half was ruled out
+> of this node by `evt_2y5q0vg45g4km`. Steward discharge `evt_4j7k7jzkr0hwb`.
+>
+> **`rt-bop-ac2-venue` (tip `f6f646a6`, evidence `9cd8e981`, `84a71614`) and
+> held `9e5b8d7f` must NEVER be published** — the venue merge carries Kernel's
+> snapshot.
+
+> # THE UNION INCREMENT WAS ALREADY ON `main` WHEN THIS WAS RE-RELEASED.
 >
 > **Steward ruling 2026-08-09, `evt_6enxfcbvcm7mx`, on the Runtime implementer's
 > `D1` stop-and-route.** Everything the re-release below enumerates as "the
