@@ -1,6 +1,6 @@
 ---
 id: RT-SPECIALIZED-MATCH-ATTRIBUTION
-title: "A Match scrutinee arriving as a Specialized operand is refused before any shape test, and the outer stage does not say which seat or which Lowered class"
+title: "A Match scrutinee arriving as a Specialized operand falls to the remainder arm, and neither the stage nor the seat says which Lowered class"
 status: ready
 owner: runtime
 size: S
