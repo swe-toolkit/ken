@@ -214,6 +214,57 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > no surviving singular-law assertion; the lone remaining "discharged population
 > is not the planned one" is the intentional mismatch diagnostic.
 >
+> ### THE CARRIED `InlineNoCall` ITEM IS DISCHARGED — BY MEASUREMENT, NOT ASSERTION
+>
+> Adversary hunt on merged `d13a2515`: **no defect**, and the item I was
+> carrying as unverified is answered with evidence.
+>
+> **`continuation_candidate_is_consumed` performs TWO reads, and the second one
+> exists because of a measured failure.** Composed discharges settle at
+> `verify_recorded_composed_discharges`, which runs on the **finished CLIF**,
+> strictly after the bridge returns — so a composed candidate is genuinely
+> unsettled at the moment `InlineNoCall` asks. **A settled-only predicate
+> classified 17 committed `D8*` controls' candidates as `InlineNoCall` and then
+> hit the double-settlement refusal when verification promoted them.** The
+> predicate was widened to read `pending_composed_discharges`.
+>
+> ⇒ **A third consumption path was not searched for in the abstract — it was
+> discovered by 17 controls going wrong.** That is the strongest form this
+> answer could have taken.
+>
+> > #### THE INVARIANT A FOURTH PATH WOULD BREAK, AND ITS PRECISE SHAPE
+> >
+> > *"The pending feed is the one thing visible at both times — the composed
+> > claim is RECORDED during lowering and PROMOTED after verification."*
+> >
+> > ⇒ **A fourth path is not "another consumer" in general. It is a consumption
+> > decided AFTER the bridge that leaves NO lowering-time record.**
+> > `pending_composed_discharges` is currently the only such feed, and **nothing
+> > structurally forces a future post-verification promotion mechanism to
+> > register one.** Carry this sentence, not the vaguer "watch for a fourth
+> > path" — a vague warning cannot be checked and this one can.
+>
+> **`D1`'s refusal string is fully retired, checked on READS not assertions.**
+> The sentence occurs **exactly once** in all of `crates/`
+> (`control.rs:27473`); **the production producer at `units.rs:3495` is gone.**
+> The const is renamed `HISTORICAL_D1_REFUSAL`, its comment states the freeness
+> at the site and names the replacement discriminator (`Ok`, not the absence).
+> It also **explicitly declines** the trade of retaining a knowingly false
+> `planned` diagnostic so an absence assertion would stay non-free — keeping
+> production wrong to keep a test meaningful is a real temptation at exactly
+> that moment.
+>
+> **STILL OPEN, NOT REACHED, carried honestly:** (1) the **shared
+> resolved-continuation funnel** was not audited for a silently dropped
+> consumer; (2) whether a case can **fall between** the split composite-totality
+> and isolated-`D5a` controls. Neither is cleared.
+>
+> **Structural note, not a defect:** the three settlement paths use two idioms —
+> `core.rs:3420` and `core.rs:9054` go through `settle_continuation_candidate`
+> (inert when no ledger is open), while `mod.rs:6987` calls `ledger.settle`
+> directly under its own `if let Some(..)` guard. Both safe; the `Option` makes
+> the guard unforgettable. The funnel question above lives on the first path.
+>
 > ### `D3` IS RELEASED — 2026-08-09, on the merge confirmation, no added gate
 >
 > **I said `D3` would release on `D2`'s handback with no extra condition and
