@@ -34,15 +34,47 @@ class IgnoredSweepTests(unittest.TestCase):
         self.assertTrue(expression.startswith("not ("))
         for row in rows:
             self.assertIn(f"package(={row['package']})", expression)
+            self.assertIn(f"binary(={row['binary']})", expression)
             self.assertIn(f"test(={row['test']})", expression)
 
     def test_list_count_must_equal_the_anchored_derivation(self) -> None:
+        rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
+        exempt = {
+            (row["package"], row["binary"], row["test"]) for row in rows
+        }
+        selected_identities = {
+            ("ken-runtime", "ken-runtime", f"base_debt_{index}")
+            for index in range(47)
+        }
+        all_identities = selected_identities | exempt
+
+        def listing(
+            identities: set[tuple[str, str, str]],
+        ) -> dict[str, object]:
+            suites: dict[str, object] = {}
+            for index, (package, binary, test) in enumerate(sorted(identities)):
+                suites[str(index)] = {
+                    "package-name": package,
+                    "binary-name": binary,
+                    "testcases": {
+                        test: {
+                            "ignored": True,
+                            "filter-match": {"status": "matches"},
+                        }
+                    },
+                }
+            return {"test-count": len(identities), "rust-suites": suites}
+
         with tempfile.TemporaryDirectory() as directory:
-            listing = Path(directory) / "list.json"
-            listing.write_text(json.dumps({"test-count": 47}), encoding="utf-8")
-            SWEEP.verify_list(listing, 47)
+            all_listing = Path(directory) / "all.json"
+            selected_listing = Path(directory) / "selected.json"
+            all_listing.write_text(json.dumps(listing(all_identities)), encoding="utf-8")
+            selected_listing.write_text(
+                json.dumps(listing(selected_identities)), encoding="utf-8"
+            )
+            SWEEP.verify_lists(all_listing, selected_listing, 47, rows)
             with self.assertRaises(SWEEP.SweepError):
-                SWEEP.verify_list(listing, 46)
+                SWEEP.verify_lists(all_listing, selected_listing, 46, rows)
 
     def test_completed_report_names_passing_rows(self) -> None:
         log_text = """
