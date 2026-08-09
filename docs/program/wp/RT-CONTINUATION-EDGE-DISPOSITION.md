@@ -6,7 +6,8 @@ asserting a call, and so a candidate can be settled `InlineNoCall` without ever
 entering the discharge partition. The partition itself does not change.**
 
 **Owner:** Team Runtime. **Branch:** `wp/RT-CONTINUATION-EDGE-DISPOSITION`.
-**Size:** `TBD` — **`D0`'s census sizes it, and the frame will not guess.**
+**Size:** **`M`** — settled 2026-08-09 on `D0`'s census plus the `D1` cut, not
+inherited. **`D0`/`D1`/`D2` are MERGED; `D3` is the last deliverable.**
 **Risk:** high — a new representation in front of a fail-closed law, with a
 named hard stop that can fork the node again.
 
@@ -141,6 +142,38 @@ pass silently, which is exactly the failure the predecessor's `close` refuses.
 | 3 | mark inline **after** a composed call | yes |
 | 4 | omit a final disposition | yes |
 | 5 | present one candidate in **two** dispositions | yes |
+
+> ### WITNESS CONSTRUCTION IS AUTHORIZED INSIDE `D3` — Steward, 2026-08-09
+>
+> **Ruled on `evt_2g86m27bnv91a`.** The corpus does not supply all five live
+> mutation seats: `d8j` reaches only composed settlement (where 2/3 collapse
+> onto one refusal), `d8e` refuses **before** settlement, and **mutations 1, 4
+> and 5 have no witness at all.**
+>
+> **Authoring a reaching witness is ENTAILED BY `AC-6`, not additional to it.**
+> A mutation over a seat no witness reaches does not red for the right reason —
+> it reds vacuously or not at all, which is **Trap 3**, and this node has
+> already been bitten by the empty-population form of it at `AC-7`. A `D3` that
+> skipped 1/4/5 for want of a witness would satisfy the letter of the frame and
+> prove less than nothing.
+>
+> **The precedent is inside this node.** `AC-7`'s witness was **authored** under
+> `D1` and **converted** under `D2`. Witness authoring is already how this node
+> discharges acceptance criteria.
+>
+> **AUTHORIZED:** witness construction to the extent needed to **reach** the
+> mutation seats — including a direct-calling `FunctionizedUnits` witness for
+> 4/5, and anything the Architect's independent-oracle ruling requires for 2/3.
+>
+> **NOT AUTHORIZED, and a real rescope — route it:** changing the settlement
+> mechanism, the ledger, the equality, the `composed` feed, the empty resume, or
+> the planner **in order to make a seat reachable**. **If a seat can only be
+> reached by changing production, that is not a witness problem.**
+>
+> **No recut.** `#6i` has already been re-sized, phase-corrected and errata'd; a
+> fourth boundary producing `D3a`/`D3b` and no merge would be subdivision, not
+> decomposition. Size stays `M` — **report a size change at the checkpoint
+> rather than absorbing one.**
 
 **`D3`'s mutations consume the POST-`D2` SUCCESSFUL witness.** **No `D3`
 control may substitute `D1`'s refusal for `D2`'s success** — a mutation proven
