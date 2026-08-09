@@ -2,9 +2,9 @@
 
 Format: `../../README.md`. These are the conformance obligations for the
 nested-positive extension of `spec/10-kernel/14-inductive.md`: structural
-admission through checked strictly-positive parameter positions, a generated
-lifted induction hypothesis whose leaves cover every contained recursive
-occurrence, nested ι, and the fail-closed boundary.
+admission through checked strictly-positive parameter positions, intrinsic
+source-indexed `All^Type` / `All^Omega` families whose leaves cover every
+contained recursive occurrence, nested ι, and the fail-closed boundary.
 
 Ground truth: `14 §3.2` (lifted IH), `§7.8` (nested ι), `§8.5` (structural
 parameter-polarity rule), and `§9.5` (subject reduction, termination, and
@@ -32,10 +32,17 @@ data Bag (A : Type 0) : Type 0 where
 data Rose : Type 0 where
   leaf : Rose
   node : Bag Rose -> Rose
+
+data Box (A : Type 0) : Type 0 where
+  box : A -> Box A
+
+data Slot (A : Type 0) : Type 0 where
+  vacant   : Slot A
+  occupied : A -> Slot A
 ```
 
-`Bag`'s parameter is checked strictly positive from its own constructor
-telescopes. No later rule may recognize `Bag` by name.
+Each carrier parameter is checked strictly positive from its own constructor
+telescopes. No later rule may recognize `Bag`, `Box`, or `Slot` by name.
 
 ---
 
@@ -96,16 +103,17 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
 - given: the generated `elim_Rose` for the `Bag`/`Rose` declarations above,
   under motive `M : Rose -> Type 0`
 - expect: the `node` method receives the original `b : Bag Rose` and exactly
-  one structured hypothesis `ih : Lift_Rose(M, Bag Rose, b)`. The lift preserves
-  `b`'s `empty`/`one`/`join` topology and has exactly one leaf of type `M r` for
-  every contained `r : Rose`; it has no leaf where `b` contains no `Rose`
-- why: this asserts the spec's locked granularity: one structured lifted
-  hypothesis per nested field, with leaves in bijection with dynamic recursive
-  occurrences. It does not pin a new surface type former or a private kernel
-  representation for `Lift`. **Structural discriminator:** omitting the lift,
-  emitting a single unstructured summary, or emitting one leaf per constructor
-  field rather than per contained `Rose` produces a different generated method
-  type.
+  one structured hypothesis
+  `ih : All^Type_{Bag,0} (λr. M r) b`. The displayed family name is
+  metanotation for a kernel-internal declaration, not a surface name. Its
+  constructors preserve `b`'s `empty`/`one`/`join` topology and carry exactly
+  one leaf of type `M r` for every contained `r : Rose`; the `empty` topology
+  carries no evidence leaf
+- why: this asserts the spec's newly locked representation granularity: one
+  intrinsic, source-indexed `All` application per nested field, with leaves in
+  bijection with dynamic recursive occurrences. **Structural discriminator:**
+  a metatheoretic placeholder, a decorated copy of `b`, a single unstructured
+  summary, or one leaf per constructor field produces a different method type.
 
 ### kernel/inductive/nested-iota-preserves-topology [KERNEL-NESTED-IND]
 
@@ -114,8 +122,9 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
   `b = join (one r1) (join empty (one r2))`
 - expect: the outer ι-step selects only `mn` and supplies
   `lift-elim_Rose(M, ml, mn, Bag Rose, b)`. Reducing that lift preserves the
-  `join (one _) (join empty (one _))` topology and places
-  `elim_Rose M ml mn r1` and `elim_Rose M ml mn r2` at its two recursive leaves
+  source index and constructs the aligned internal topology (metanotationally
+  `all_join` / `all_one` / `all_empty`), placing `elim_Rose M ml mn r1` and
+  `elim_Rose M ml mn r2` at its two recursive leaves
 - why: nested ι is the admitted host former's constructor/eliminator traversal
   followed by `Rose` elimination at each child. **Structural discriminator:**
   dropping either leaf, changing the enclosing topology, evaluating an untaken
@@ -126,8 +135,9 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
 
 - spec: `14 §3.2`, `§7.8`, `§9.5`; `39 §2.2`; `43 §1`
 - given: define `size : Rose -> Nat` by the generated eliminator. The `leaf`
-  method returns `1`; the `node` method folds the supplied `Bag`-shaped lifted
-  `Nat` values and adds `1`. Evaluate
+  method returns `1`; the `node` method eliminates the supplied
+  `All^Type_{Bag,0} (λ_. Nat) b` inhabitant, folds its `Bag`-indexed
+  `Nat` leaves, and adds `1`. Evaluate
   `size (node (join (one leaf) (one (node empty))))`
 - expect: **reduces-to `3`**. The two contained children contribute `1` each,
   and the outer node contributes `1`
@@ -142,14 +152,175 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
 
 - spec: `14 §3.2`, `§9.5`; `34 §3.1`; `39 §2.2`
 - given: a dependent motive `AllGood : Rose -> Omega_0` whose `node` proof
-  matches the `Bag Rose` field and consumes the motive instance attached to each
-  exposed child by the lifted IH
+  matches the `Bag Rose` field and its
+  `All^Omega_{Bag,0} (λr. AllGood r) b` inhabitant in lockstep, consuming
+  the motive instance attached to each exposed child
 - expect: **accepts**. Each exposed `Rose` child is accompanied by its exact
   `AllGood child` proof; each residual `Bag Rose` value is accompanied by the
-  correspondingly residual lift
+  correspondingly indexed residual `All^Omega` inhabitant. The leaf proofs
+  remain irrelevant at their `Omega_0` proposition types, while the
+  topology-carrying `All^Omega` application itself is in `Type 0`
 - why: a non-dependent recursor or an elaborator that binds the field but loses
   the correlated lift cannot construct the branch proof. This pins that the
   feature is induction, not merely a constant-result fold.
+
+---
+
+## AC2a — a neutral source uses one literal, method-independent family
+
+Spec: `14 §3.2`, `§7.8`, `§9.5` item 5.
+
+### kernel/inductive/nested-neutral-source-same-family [KERNEL-NESTED-IND]
+
+- spec: `14 §3.2`, `§7.8`, `§9.5` item 5
+- given: the admitted `Box` above, a context variable `v : Box Bool`, and the
+  constant type-valued predicate `P = λx. Bool`
+- expect: the generated method binder has the literal type
+  `All^Type_{Box,0} P v`; after the guest method vector exists, the neutral
+  `lift-elim` term also checks at exactly `All^Type_{Box,0} P v`. Neither side
+  reduces on neutral `v`, and no equality or transport is inserted
+- why: source indexing makes the two types syntactically the same family
+  application before conversion. **Structural discriminator:** replacing the
+  source index by a decorated copy, rebuilding the type from method terms, or
+  using two separately generated host eliminators changes the neutral type and
+  fails this exact-type check.
+
+### kernel/inductive/nested-neutral-method-dependent-substitute-rejected [KERNEL-NESTED-IND] (soundness)
+
+- spec: `14 §3.2`, `§9.5` item 5
+- given: the same neutral `v : Box Bool`. As a mutation, replace the binder's
+  `All^Type_{Box,0} (λx. Bool) v` with the first projection of the
+  method-dependent decoder
+  `(elim_Box (λ_. Sigma (T : Type 0). T)
+             (λx. (Bool, true)) v).1`
+- expect: **rejected with a type mismatch** when the generated lift inhabitant
+  is checked against the mutated binder type. The neutral eliminator projection
+  does not convert to `All^Type_{Box,0} (λx. Bool) v`
+- why: the joint decoder is internally meaningful—its second projection checks
+  at its first—but it cannot replace the public, method-independent family.
+  **Controlled mutation:** `v`, the leaf type `Bool`, and the host topology are
+  unchanged; only the binder's authority changes from the generated `All`
+  declaration to a method-dependent neutral eliminator. Acceptance would
+  silently reintroduce the representation-contract failure this revision
+  resolves.
+
+---
+
+## AC2b — sort and level behavior is exact on both sides of the boundary
+
+Spec: `14 §3.2`, `§9.5` item 6; `12 §2`; `16 §1.1`.
+
+### kernel/inductive/nested-ordinary-omega-lifts-stay-omega [KERNEL-NESTED-IND]
+
+- spec: `14 §3.2`; `12 §2`; `16 §1.1`
+- given: a motive `P : D -> Omega_l`, exercised separately at a direct child
+  `r : D`, a W-style child `k : B -> D` with `B : Type b`, and a primitive
+  Sigma containing two direct `D` components, both at leaf level `l`
+- expect: the direct lift is `P r : Omega_l`; the W-style lift is
+  `(x : B) -> P (k x) : Omega_(max b l)`; and the two-component
+  primitive-Sigma lift is `Omega_l`. None is reclassified into `Type` merely
+  because nested lifting exists
+- why: the deliberate `Type` crossing belongs only to a generated declared-
+  former `All` boundary. This three-part control prevents an implementation
+  from applying that exception to the direct, Pi, or primitive-Sigma clauses.
+
+### kernel/inductive/nested-declared-former-omega-crosses-to-exact-type [KERNEL-NESTED-IND]
+
+- spec: `14 §3.2`; `§9.5` item 6; `12 §2`; `16 §1.1`
+- given: a level-polymorphic positive host `Box_h (A : Type h) : Type h`, a
+  predicate `P : A -> Omega_l`, and `v : Box_h A`, with independent symbolic
+  levels `h` and `l`
+- expect: `All^Omega_{Box_h,0} P v : Type (max l h)`. Its leaf proofs remain
+  irrelevant at `P x : Omega_l`, but the source-topology family is not itself
+  a proposition
+- why: this pins every locked axis. Mutations to `Omega_(max l h)`,
+  `Type (suc (max l h))`, `Type l`, or `Type h` all produce a different
+  classifier. Keeping `h` and `l` symbolic makes dropping either maximum
+  operand observable.
+
+### kernel/inductive/nested-declared-former-type-crosses-to-exact-type [KERNEL-NESTED-IND]
+
+- spec: `14 §3.2`; `12 §2`
+- given: the same `Box_h`, now with `P : A -> Type l`
+- expect: `All^Type_{Box_h,0} P v : Type (max l h)`; the successor needed by
+  the generated former's own classifier does not appear in this applied result
+- why: this is the type-valued sibling of the Omega control. Together they
+  prevent an implementation from sharing the two families by smuggling a
+  wildcard sort or from applying the Omega exception only accidentally.
+
+---
+
+## AC2c — zero-evidence topology and trust accounting remain observable
+
+Spec: `14 §3.2`, `§7.8`, `§9.5` item 7; `18 §5`.
+
+### kernel/inductive/nested-zero-evidence-topology [KERNEL-NESTED-IND]
+
+- spec: `14 §3.2`, `§7.8`, `§9.5` item 7
+- given: the admitted `Slot` above, a predicate `P : A -> Type l`, and the two
+  source values `vacant` and `occupied x`
+- expect: lifting `vacant` constructs the aligned `all_vacant` inhabitant at
+  source index `vacant` with **zero evidence fields**; lifting `occupied x`
+  constructs the distinct aligned inhabitant at source index `occupied x` with
+  exactly one field `px : P x`
+- why: the zero-leaf case still carries source topology. Omitting the vacant
+  constructor, inventing an arbitrary `P` inhabitant for it, or flattening it
+  into the occupied case either makes the indexed family incomplete or produces
+  a term at the wrong source index.
+
+### kernel/inductive/nested-generated-all-has-zero-ledger-delta [KERNEL-NESTED-IND] (soundness)
+
+- spec: `14 §3.2`, `§7.8`, `§9.5`; `18 §5`
+- given: record the exact `trusted_base()` set, transactionally admit `Box`, and
+  generate and check its `All^Type_{Box,0}` and `All^Omega_{Box,0}` families,
+  their constructors, method-type use, and nested lift/ι machinery
+- expect: the before/after `trusted_base()` sets are **identical**, not merely
+  equal in length. The generated families are ordinary checked `Inductive`
+  declarations; no generated declaration is `Opaque` or `Primitive`
+- why: `trusted_base()` enumerates postulates and real primitives, while checked
+  inductives add no environment assumption. This does **not** classify the
+  feature as untrusted: the generator, transactional rollback, method-type
+  construction, and nested ι implementation are new audited kernel TCB code.
+  A mutation that registers either `All` family as a postulate/primitive changes
+  the ledger set and fails this control.
+
+### kernel/inductive/nested-generated-all-support-is-terminal [KERNEL-NESTED-IND] (soundness)
+
+- spec: `14 §1`, `§3.2`, `§7.8`, `§9.5` item 8; `18 §4.2`, `§4.3`
+- given: record the exact `Σ` declarations, next-id state, and host-to-support
+  relation, then transactionally admit the one-positive-carrier `Box`
+  declaration above
+- expect: `Σ` gains exactly three `Inductive` declarations: `Box`,
+  `All^Type_{Box,0}`, and `All^Omega_{Box,0}`. Exactly six fresh `GlobalId`s
+  are allocated: one former id and one constructor id for each declaration.
+  Each stored declaration carries exactly one constructor record, aligned with
+  `box`. The support relation has exactly two outgoing edges from `Box`, one to
+  each support family, and no outgoing edge from either support. Each of the
+  three family ids supports an ordinary, successfully checked
+  `Term::Elim { fam, … }` use. Those eliminators are derived term forms, not
+  declarations, and allocate no ids. Both support families are terminal and
+  absent from the general enclosing-former lookup; no `All`-of-`All` declaration
+  exists
+- why: ordinary positivity checking of either first-order support family again
+  sees the carrier `A` positively. Terminal kernel provenance must stop that
+  fact from re-entering host generation while retaining ordinary checking. A
+  mutation that feeds either support declaration back through host generation
+  adds declarations, ids, and a support-to-support edge or fails to terminate.
+  A mutation that invents a global eliminator declaration or id also changes
+  the locked carrier. Neither can satisfy this exact finite-delta control.
+
+### kernel/inductive/nested-all-generation-is-transactional [KERNEL-NESTED-IND] (soundness)
+
+- spec: `14 §7.8`; `18 §4.2`
+- given: an admission mutation under which one required generated `All` family
+  fails ordinary inductive checking after the host declaration has been checked
+- expect: the entire host admission rejects. Declaration lookup and the exact
+  `trusted_base()` set are unchanged: no host former, constructor, partial
+  `All` family, or audit entry is observable
+- why: positive-path metadata without its checked consumer would license a
+  later nested declaration whose required method type or ι cannot be built.
+  Transactional rollback keeps admission and eliminator availability one
+  indivisible contract.
 
 ---
 
@@ -261,7 +432,23 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
 - Correct custom-positive and DS-9 paths accept; unknown, known non-positive,
   nested-negative, and mutual paths reject for distinct named guards.
 - The real `size` computation and the structural nested-ι case both require the
-  same `Bag`-shaped lift. Neither can pass by deleting the old `occurs` guard.
+  same source-indexed `All^Type_{Bag,0}` inhabitant. Neither can pass by deleting
+  the old `occurs` guard.
+- On neutral `v : Box Bool`, the method binder and generated inhabitant share
+  one literal `All^Type` application; the method-dependent eliminator mutation
+  rejects rather than being papered over by an equality or transport.
+- Direct, Pi, and primitive-Sigma proposition lifts retain their ordinary
+  Omega classifiers. The declared-former crossing alone lands in the exact
+  `Type (max leaf-level host-level)` result, for both `All^Type` and
+  `All^Omega`, with no successor in the applied result.
+- `Slot.vacant` produces a source-aligned zero-evidence constructor, distinct
+  from the one-leaf `occupied` topology.
+- Generated `All` declarations leave the exact `trusted_base()` set unchanged,
+  while the generator, transaction, and nested iota remain audited kernel TCB
+  code. The one-constructor, one-carrier `Box` transaction adds exactly three
+  `Inductive` declarations and six `GlobalId`s, with no eliminator declaration
+  or `GlobalId`. Its two support families are terminal and no `All`-of-`All`
+  exists; failure to generate either rolls the whole admission back.
 - The negative cases are not coincidental blanket rejects: after
   `KERNEL-NESTED-IND`, their paired positive controls admit while the exact
   negative/unknown mutation flips the verdict.

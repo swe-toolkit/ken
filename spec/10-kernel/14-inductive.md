@@ -41,10 +41,32 @@ data D (Δ_p) : (Δ_i) → Type ℓ where
 - `ℓ` is the family's universe level; constructor argument types must live at
   `ℓ` or below (predicativity, `12 §2`).
 
-The kernel admits the declaration only if it passes (a) ordinary type-checking
-of all constructor signatures in context `Δ_p`, (b) the **strict-positivity**
-check (§2), and (c) universe-level checks. On admission the kernel adds: the
-type former `D`, the constructors `cₖ`, and the **eliminator** `elim_D` (§3).
+The declaration supplied to `declare_inductive` is the **host declaration**.
+The kernel admits it only if it passes (a) ordinary type-checking of all
+constructor signatures in context `Δ_p`, (b) the **strict-positivity** check
+(§2), and (c) universe-level checks. For every host carrier parameter position
+thereby recorded as strictly positive, it must also generate and ordinarily
+check the two internal source-indexed families of §3.2 and their constructors
+before the host may serve as a positive enclosing path.
+
+Generated `All` declarations are **terminal support declarations**. They pass
+ordinary formation, positivity, universe, and constructor checks. Their generic
+`Term::Elim { fam, … }` forms are checked by the ordinary eliminator rules; an
+eliminator is not a declaration and receives no `GlobalId`. Support admission
+does not trigger another support-generation round and does not register the
+support as an enclosing former for §8.5. Thus a host with `p` checked strictly-
+positive carrier parameters has the fixed first-order support set of exactly
+`2p` families. There is no `All`-of-`All` closure to compute.
+
+This is one atomic admission transaction. Success appends one `Inductive`
+declaration for `D` and one for every required internal `All^Type` /
+`All^Omega` family. Each such declaration carries its constructor records and
+their allocated `GlobalId`s. The ordinary eliminator term form keyed by each
+family `GlobalId` is then usable, but no eliminator declaration or `GlobalId` is
+appended. Failure of either the host checks or any generated-family check
+publishes none of the declarations or ids and leaves the global environment
+`Σ` unchanged. A partially admitted host with missing lift families is never
+observable.
 
 ### Canonical examples (elaborated forms)
 
@@ -333,15 +355,98 @@ one structured lifted hypothesis whose leaves are in bijection with those
 contained occurrences and whose shape follows the containing value.
 
 Write `Lift_D(M, A, a)` for the kernel's dependent lifting of motive `M` through
-the type `A` of value `a`. This is a metatheoretic operation used to state the
-generated method type; it is not a new surface type former. It is defined
-structurally:
+the type `A` of value `a`. `Lift_D` is an intrinsic, kernel-generated type, not
+a surface type former and not a metatheoretic placeholder. Its formation uses
+only the recursive-shape record checked at admission. In particular, its type
+is available while the kernel constructs a method type, before any method term
+exists.
+
+For every admitted **host** inductive former `F` and every carrier parameter
+`q` recorded as strictly positive, admission also generates a kernel-internal
+indexed family `All^S_{F,q}`. A generated `All` support declaration is not a
+host for this rule. The displayed name is metanotation, not a public identifier.
+Here `S` records whether its leaf predicate is type-valued or
+proposition-valued.
+
+The telescope is closed as follows. Suppose the admitted former has bound level
+parameters `ū`, dependency-ordered parameters `ᾱ`, dependency-ordered indices
+`ī`, and q-th carrier parameter `α_q : Type a_q`:
+
+```
+F {ū} : (α₁ : A₁) ... (αₙ : Aₙ) → (ī : I_F ᾱ) → Type h_F(ū)
+
+All^Type_{F,q} {ū,l} :
+  (α₁ : A₁) ... (αₙ : Aₙ) →
+  (P : α_q → Type l) →
+  (ī : I_F ᾱ) → (v : F {ū} ᾱ ī) → Type (max(l, h_F(ū)))
+
+All^Omega_{F,q} {ū,l} :
+  (α₁ : A₁) ... (αₙ : Aₙ) →
+  (P : α_q → Ω_l) →
+  (ī : I_F ᾱ) → (v : F {ū} ᾱ ī) → Type (max(l, h_F(ū)))
+```
+
+The two families are distinct because the core has no wildcard `Sort`
+abstraction and `Ω` is non-cumulative; generation does not smuggle either one
+in through a metavariable.
+
+Each `A_j` may refer to `α₁ ... α_{j-1}`, and each entry of `I_F ᾱ` may refer
+to the full parameter telescope and earlier indices. Thus `α_q` is bound before
+`P`, and every operand needed to form `F {ū} ᾱ ī` is bound before `v`.
+Subsequent displays abbreviate this fixed prefix and write only
+`All^S_{F,q} P v`. The instantiated host level `h_F(ū)` bounds every
+constructor field that a generated `All` constructor must bind (§1). Along a
+composed positive path, the result level is the maximum of `l` and every
+host-family level on that path. This is the exact predicative level
+calculation, not a level inferred from the recursive leaf alone.
+
+`All^S_{F,q}` is an ordinary checked indexed inductive family. Its declaration
+check covers formation, positivity, universes, and constructors; ordinary
+`Term::Elim` checking applies when its eliminator form is used. It is
+nevertheless terminal support: positive positions found by the declaration
+check do not generate support families and are not installed in the general
+enclosing-former lookup of §8.5. For every host constructor `c_k`, it has one
+internal constructor indexed by the original source value `c_k ā`. That
+constructor binds the original fields `ā` and, in declaration order, exactly
+the following evidence fields for occurrences of parameter `q`:
+
+- a direct parameter leaf `x : A` contributes `P x`;
+- a Π/W-style field contributes the corresponding Π-abstracted evidence;
+- a primitive Σ field contributes its recursive components in Σ order;
+- a recursive `F` child contributes `All^S_{F,q} P child`;
+- a path through an already-admitted positive parameter `r` of a former `G`
+  contributes `All^{S'}_{G,r} P' child`, where `P'` is the recursively lifted
+  predicate and `S'` is its classified codomain sort;
+- a field with no occurrence of parameter `q` contributes no evidence field.
+
+A host constructor with no dynamic `q` occurrence therefore gives a
+zero-evidence constructor at its source index; it is the canonical terminal
+inhabitant produced for that topology, not an invented leaf value.
+
+Thus the source value is an **index**, never a decorated copy. Each generated
+constructor targets exactly its matching source topology; it cannot directly
+construct evidence at an unrelated source index. Each generated family adds
+one kernel-internal `Inductive` declaration carrying those constructor records,
+never an `Opaque` or `Primitive` declaration.
+
+The generator may reference an already-published terminal support family while
+forming or checking a composed support constructor. Such references consume
+the earlier host's checked lifting structure; they neither expose the support
+family as a user enclosing former nor enqueue support for that support family.
+The terminal classification is kernel-originated and cannot be requested by a
+caller to bypass host generation.
+
+`Lift_D` is then defined structurally:
 
 - at a direct occurrence `r : D Δ_p t̄`,
   `Lift_D(M, D Δ_p t̄, r) = M t̄ r`;
-- through a declared strictly-positive parameter position, it preserves the
-  enclosing constructor shape and recursively lifts every contained occurrence;
 - through a Π-bound recursive position, it is the Π-abstracted IH of §3.1;
+- through primitive Σ, it is the Σ of the recursively present components
+  (a single present component is used directly);
+- at `F a_1 ... a_n ī`, for every positive parameter argument `a_q` that
+  contains `D`, form `P_q = λx. Lift_D(M, a_q, x)` and the component
+  `All^{sort(P_q)}_{F,q} P_q a`; multiple such components form one right-nested
+  Σ in parameter order;
 - at a type with no occurrence of `D`, it contributes no IH.
 
 Thus a constructor argument `a_j : A_j` with nested recursive content adds
@@ -355,6 +460,12 @@ strictly-positive paths that admitted `A_j` (§8.5). An unknown or non-positive
 parameter position cannot acquire a lift and is rejected at admission; the
 eliminator generator never guesses how to traverse it.
 
+The representation is deliberately method-independent. The generated method
+type names `All^S_{F,q} P a` directly; it never computes a type by running a
+host eliminator whose methods would later need to agree with a second host
+eliminator. In particular, for neutral `a`, the method type and the eventual
+ι-term still name the same indexed family application by reflexive conversion.
+
 **Computation (ι), nested case.** The outer ι-rule still selects exactly one
 constructor method. For each nested argument, it supplies the structurally
 lifted value obtained by following the enclosing value's constructors and
@@ -366,15 +477,29 @@ elim_D M m̄ ī (cₖ … a_j …)
 ```
 
 The auxiliary `lift-elim_D` is determined by the admitted former's own
-constructor/eliminator structure. It may not be supplied by a name allow-list,
-an unchecked user function, or an axiom. §7.8 gives the reduction rule and
-§9.5 states its subject-reduction and termination obligations.
+constructor/eliminator structure. Once the complete guest method vector `m̄`
+exists, it constructs the generated `All` constructor at each host constructor,
+using `elim_D M m̄ ... r` at direct guest leaves and the host eliminator's own
+IH at recursive host children. It may not be supplied by a name allow-list, an
+unchecked user function, or an axiom. §7.8 gives the reduction rule and §9.5
+states its subject-reduction and termination obligations.
 
-**Level.** Let `ℓ_path` be the maximum level of the field domains traversed by
-the positive path. If `M` lands in `Type ℓ'`, the lifted hypothesis lands in
-`Type (max ℓ_path ℓ')`; if `M` lands in `Ω_l`, it lands in
-`Ω_(max ℓ_path l)`. These are ordinary predicative Π/Σ maxima (`12 §2`,
-`16 §1.1`), not a new universe rule or an impredicative collapse.
+**Sort and level.** Direct, Π, and primitive-Σ lifting uses the ordinary sort
+rules of `13`: a proposition-valued direct lift remains in `Ω`, a Π into `Ω`
+remains in `Ω`, and a Σ remains in `Ω` only when both components are
+propositions. Crossing a declared-former boundary uses the
+generated `All` family and therefore lands deliberately in
+`Type (max l level_F ...)` for **both** `Type l` and `Ω_l` leaf motives. The
+`Ω` case is intentionally not declared at `Ω`: its indexed source
+topology is represented by an ordinary inductive, while every stored leaf proof
+remains definitionally irrelevant at its own proposition type. This explicit
+public-sort change avoids pretending that a topology-carrying inductive is a
+proposition and requires no new `Ω` formation rule. The type of the predicate
+parameter, and hence the generated former's own classifier, uses the ordinary
+successor required to quantify over `Type l` or `Ω_l`; that classifier does not
+leak into an applied lift. Its result level is exactly the displayed maximum:
+no successor is inserted there, and no cumulativity or impredicative collapse
+is used (`12 §2`, `16 §1.1`).
 
 ## 4. Σ as a record; relationship to Π
 
@@ -621,14 +746,53 @@ general mechanism; decidability does not depend on it (§9.4).
 
 ### 7.8 Nested ι
 
-For a nested argument position `j`, §3.2's lifted IH is computed by structural
-recursion over the actual enclosing value `a_j`. At each constructor of that
-value, `lift-elim_D` preserves the constructor, recursively processes fields
-whose types lead to a declared strictly-positive parameter position, and
-replaces every contained `r : D Δ_p t̄` with:
+For a nested argument position `j`, §3.2 fixes the lifted-IH **type** before
+method checking as an application of the generated `All` family. Admission of
+a host former is transactional: after its declaration checks, the kernel
+computes the fixed set of two terminal `All` declarations per checked positive
+carrier, checks that first-order set, and publishes it with the host. Checking
+a support declaration never re-enters this generation step. A failure to form
+any required family rejects the host declaration; a later guest declaration
+never invents one on demand.
+
+Once the complete guest method vector exists, `lift-elim_D` constructs an
+inhabitant of that fixed type by eliminating the actual enclosing value `a_j`.
+For a component
+
+```
+P_q = λx. Lift_D(M, A_q, x)
+All^S_{F,q} P_q a_j
+```
+
+the host eliminator uses motive `λv. All^S_{F,q} P_q v`. Its method for host
+constructor `c_h` returns the matching internal `All` constructor. The evidence
+arguments of that constructor are built in the order fixed by §3.2:
+
+- a direct contained `r : D Δ_p t̄` contributes
 
 ```
 elim_D M m₁…mₙ t̄ r
+```
+
+- a Π/W-style occurrence contributes the corresponding λ-abstraction;
+- a primitive Σ occurrence contributes the recursively constructed components;
+- a recursive host child uses the host eliminator's own IH, whose type is
+  already `All^S_{F,q} P_q child`;
+- a composed admitted-positive child uses the previously generated terminal
+  `All` family and its corresponding structural construction, without
+  generating support for that support family;
+- an ordinary field contributes no evidence argument.
+
+When `Lift_D` has several declared-former components, this construction runs
+once per component and packs the results in the same right-nested Σ order used
+by the already-fixed method type.
+
+Consequently, when the enclosing source is constructor-headed, the host ι-rule
+selects the aligned internal constructor:
+
+```
+lift-elim_D(M, m̄, F ... A_q ..., c_h ā)
+  ⇝ all_{F,q,h} ā evidence(ā)
 ```
 
 The outer reduct is:
@@ -637,16 +801,21 @@ The outer reduct is:
 elim_D M m̄ ī (cₖ ā)  ⇝  mₖ ā [ih₁ … ih_p]
 ```
 
-where an `ih` is direct (§7.3), Π-abstracted (§7.7), or structurally lifted
-through an enclosing value (this section). A lifted `ih` contains exactly one
+where an `ih` is direct (§7.3), Π-abstracted (§7.7), or an inhabitant of the
+source-indexed `All` family (this section). A lifted `ih` contains exactly one
 recursive result for each contained recursive occurrence and preserves the
-enclosing value's constructor topology. Its own ι-reductions are the
-constructor-selects-method reductions of the enclosing former followed by the
-`D-ι` call at each contained child.
+enclosing value's constructor topology.
 
-The generated method type (§3.2), the generated lifted term, and every nested
-ι-reduct are kernel-checked. Admission alone is insufficient: if the lift
-cannot be generated and checked, the declaration is rejected.
+For a neutral enclosing source `v`, the construction is a neutral host
+eliminator, but its type is still literally `All^S_{F,q} P_q v`—the same type
+already placed in the method telescope. Subject reduction needs no equality,
+transport, conversion axiom, or definitional equality between separately
+generated host eliminators.
+
+The generated `All` declaration, method type (§3.2), lifted term, and every
+nested ι-reduct are kernel-checked. Positive-path admission alone is
+insufficient: if any one of them cannot be generated and checked, the guest
+declaration is rejected.
 
 ## 8. Strict-positivity check algorithm
 
@@ -758,21 +927,26 @@ flips to `-`, so `Nat` appears negatively and is caught.
 **Rejected (nested negative in application argument):**
 `data Bad3 = mk : Pair (Bad3 → Empty) Unit → Bad3`. Argument telescope
 `(f : Pair (Bad3 → Empty) Unit)`, argument type `Pair (Bad3 → Empty) Unit`.
-Under `+`:
+Both parameters of the already-admitted `Pair` are recorded strictly positive.
+Under `+`, `check-pos-application` therefore traverses both arguments at the
+same positive polarisation:
 
 ```
 check-pos-arg(Bad3, +, Pair (Bad3 → Empty) Unit)
-  = check-pos-arg(Bad3, +, Pair)      -- recurse into head (X → not occurs → true)
-    and not occurs(Bad3, (Bad3 → Empty, Unit))
-  = true and false                    -- occurs finds Bad3 in arguments
+  = check-pos-arg(Bad3, +, Bad3 → Empty)
+    and check-pos-arg(Bad3, +, Unit)
+  = (check-pos-arg(Bad3, -, Bad3)
+     and check-pos-arg(Bad3, +, Empty))
+    and true
   = false → FAILS
 ```
 
-The application argument `(Bad3 → Empty)` is inspected by `occurs`; `Bad3`
-appears there (and negatively, since it's under a Π whose domain flips
-polarity), so the check correctly rejects. Without the `occurs` guard on
-application arguments, the algorithm would have recursed into the head `Pair`,
-returned `true` for the unknown type, and admitted the paradox.
+The positive `Pair` boundary does not make its entire argument positive. The
+recursive descent opens `(Bad3 → Empty)`, flips polarity for the Π-domain, and
+rejects the direct `Bad3` occurrence at `-`; `Unit` is `D`-free. The residual
+`not occurs` guard of §8.5 clause 6 remains load-bearing for an unknown,
+unclassified, or discarded parameter position, but it does not decide this
+known-positive case.
 
 **Rejected (D in its own indices):**
 `data Vec (A : Type) : Nat → Type where …` is fine (the index `Nat` is not
@@ -811,18 +985,25 @@ former to the occurrence.
 **Nested-parameter rule (normative).** First collect an application into its
 maximal spine `F a₁ … aₙ`. For that spine at positive polarisation:
 
-1. Resolve `F` to a previously admitted type-former declaration, transparently
-   unfolding an admitted definition before classification. If it does not
-   resolve, or the resulting former carries no checked parameter-polarity
-   information, every argument position is **unknown** and an argument
+1. Resolve `F` to a previously admitted **host** type-former declaration,
+   transparently unfolding an admitted definition before classification. A
+   terminal `All` support declaration never qualifies as a host in this lookup,
+   even if its ordinary positivity check found positive positions. If `F` does
+   not resolve to an eligible host, or the host carries no checked parameter-
+   polarity information, every argument position is **unknown** and an argument
    containing `D` is rejected.
 2. A parameter position is **declared strictly positive** only when the
    declaration's checked definition or constructor telescopes establish that
    the parameter occurs solely at positive polarisation. An index or other
    position the checker cannot structurally classify makes the polarity
-   unknown. Native formers obtain the same fact from their kernel formation
-   rule. This fact is computed and kernel-checked when the declaration is
-   admitted; it is not an unchecked user assertion.
+   unknown. Primitive Π and Σ use §3.2's direct structural clauses. Any other
+   native former may obtain the same fact from its kernel formation rule only
+   if that rule also supplies the source-indexed intrinsic lifting, constructor
+   behavior, and ι required by §3.2/§7.8. The fact is computed and
+   kernel-checked when the host declaration is admitted; it is not an unchecked
+   user assertion. A terminal support check may retain polarity information for
+   generator-internal checking of later support declarations, but that
+   information is absent from this general host lookup.
 3. If `D` occurs in `a_j`, position `j` must be declared strictly positive and
    `check-pos-arg(D, +, a_j)` must itself hold. This composes through any finite
    chain of declared strictly-positive parameter positions.
@@ -836,9 +1017,10 @@ maximal spine `F a₁ … aₙ`. For that spine at positive polarisation:
    fails closed rather than becoming positive by default.
 
 This rule is structural and compositional: only a checked positive path admits
-the nested occurrence, and the same path determines the lifted IH and ι of
-§3.2/§7.8. Merely deleting the `occurs` guard would satisfy none of clauses
-1–6 and would not generate the required eliminator machinery.
+the nested occurrence, and the same path determines the generated `All` family,
+the lifted IH, and the ι-rule of §3.2/§7.8. Merely deleting the `occurs` guard
+would satisfy none of clauses 1–6 and would not generate the required
+eliminator machinery.
 
 **Illustrative admitted shapes.**
 
@@ -860,10 +1042,10 @@ the outer parameter is positive: the recursive descent reaches the Π-domain at
 negative polarisation and fails.
 
 **Implementation stage.** `SPEC-NESTED-IND` states this rule;
-`KERNEL-NESTED-IND` implements its admission metadata, lifted IHs, and ι. Until
-that kernel node lands, the on-`main` kernel continues to reject the newly
-specified nested-positive class. This is a safe completeness boundary, not an
-unsound kernel result.
+`KERNEL-NESTED-IND` implements its admission metadata, generated `All`
+families, lifted IHs, and ι. Until that kernel node lands, the on-`main` kernel
+continues to reject the newly specified nested-positive class. This is a safe
+completeness boundary, not an unsound kernel result.
 
 ### 8.6 Mutually-defined inductives — still deferred
 
@@ -1007,32 +1189,57 @@ and ι of §3.2/§7.8. Admitting the declaration without those consumers is not 
 conforming implementation of this chapter.
 
 **Subject reduction.** For a nested constructor argument `a : A`, the method
-type requires `Lift_D(M, A, a)`. The generated `lift-elim_D(M, m̄, A, a)` has
-exactly that type by induction on the already-admitted declaration for `A`:
-each enclosing constructor is rebuilt at the lift, each field follows its
-checked positive-parameter path, and each contained `r : D Δ_p t̄` contributes
-`elim_D M m̄ t̄ r : M t̄ r`. Supplying these lifted terms therefore gives the
-selected method its declared result `M t̄ₖ (cₖ ā)`, the same type as the
-redex.
+type requires `Lift_D(M, A, a)`. For every declared-former component this is
+the intrinsic family application `All^S_{F,q} P_q a`, fixed before any method
+term is checked. After the complete method vector `m̄` exists, the generated
+`lift-elim_D(M, m̄, A, a)` has that same type by induction on the checked shape
+of `A`: a host constructor produces the aligned `All` constructor; each field
+follows its checked positive-parameter path; each contained
+`r : D Δ_p t̄` contributes `elim_D M m̄ t̄ r : M t̄ r`; and a recursive host
+child contributes the host IH at the identical indexed family application.
+Supplying these terms therefore gives the selected guest method its declared
+result `M t̄ₖ (cₖ ā)`, the same type as the redex.
 
-**Termination.** The well-founded measure is the lexicographic pair consisting
-of the outer `D` value's structural size and the already-admitted host former's
-own eliminator measure. A recursive lift call follows a host-eliminator call and
-strictly decreases the second component (including the Π-bound measure of
-§9.4). Applying `elim_D` to a contained child strictly decreases the first,
-regardless of the second component for that child. The host former was admitted
-only with a terminating eliminator, so nested ι terminates. No SCT edge or
-general recursive δ-definition is introduced.
+This argument also covers a neutral source. In context `v : F ...`, both the
+method binder and the generated inhabitant are checked at
+`All^S_{F,q} P_q v`. Replacing that type with the first projection of an
+independently generated, method-dependent host eliminator is not licensed and
+need not be convertible: distinct neutral eliminators remain distinct.
+
+**Termination.** The well-founded measure is lexicographic. Its first component
+is the outer `D` value's structural size. Its second is the host-lifting measure
+`(declaration rank, host structural size)`: recursion through a child of the
+same host former decreases structural size, while a composed positive-former
+step enters a previously admitted host and decreases declaration rank. Terminal
+support declarations do not add ranks or enclosing-former edges; an internal
+reference to earlier support follows the rank decrease already established by
+its host. The Π-bound cases use the finite branching measure of §9.4. Applying
+`elim_D` to a contained child strictly decreases the first component, so the
+second may reset for that child. Every host former was admitted only with a
+terminating eliminator, and the declaration order forbids a cycle among
+composed host formers. Nested ι therefore terminates without an SCT edge or a
+general recursive δ-definition.
 
 **Surface consumability.** Surface `match` and structural recursion elaborate
-to the generated method type, including `Lift_D`; the elaborator and termination
-checker must preserve and consume those lifted hypotheses rather than
-reconstructing recursive calls or discarding the lift. Matching an enclosing
-value deconstructs its lift in lockstep, so an exposed recursive child carries
-its motive instance and an exposed enclosing child carries the residual lift
+to the generated method type, whose nested binder is the source-indexed `All`
+application; the elaborator and termination checker must preserve and consume
+that hypothesis rather than reconstructing recursive calls or discarding it.
+Matching an enclosing value deconstructs the value and its `All` inhabitant in
+lockstep, so an exposed recursive child carries its motive instance and an
+exposed enclosing child carries the residual `All` inhabitant
 (`../30-surface/34 §3.1`, `../30-surface/39 §2.2`,
 `../40-runtime/43 §1`). A theorem or recursive computation over a nested branch
 must therefore be writable from the generated IHs.
+
+**Trust boundary.** The generated families and constructors pass the ordinary
+inductive checks and enter the environment as terminal-support `Inductive`
+declarations. For `p` checked positive host carriers, exactly `2p` such families
+enter; none recursively generates another family or enters the general host
+lookup. They add exactly zero entries to `trusted_base()` (`18 §5`): no
+postulate, opaque declaration, primitive, equality principle, or transport is
+introduced. This zero environment delta does **not** mean zero TCB work—the
+generator, terminal classification, transactional admission, and nested ι
+construction are new kernel code inside the audited trusted implementation.
 
 **Required conformance population.**
 
@@ -1045,3 +1252,19 @@ must therefore be writable from the generated IHs.
    separately asserted non-positive-position rejection.
 4. Direct recursive and existing Π-bound/W-style declarations and their ι
    behavior remain unchanged.
+5. A neutral one-constructor positive container, in context `v : Box Bool`:
+   the method binder and generated inhabitant both check at the literal family
+   application `All^Type_{Box,0} (λx. Bool) v`. A mutation that rebuilds the
+   binder type with an independent method-dependent host eliminator must reject.
+6. Exact sort/level controls: direct and Π/primitive-Σ proposition-valued lifts
+   retain their ordinary `Ω` classifications, while crossing a declared
+   `Box` boundary produces `All^Omega_{Box,0} P v : Type (max l level_Box)`.
+   Reclassifying that indexed lift as `Ω`, adding a successor, or dropping
+   either operand of the maximum must make the control fail.
+7. A positive host constructor with no dynamic recursive leaf produces the
+   aligned zero-evidence `All` constructor. Replacing it with an arbitrary
+   inhabitant, omitting it, or flattening it into a neighboring leaf must fail.
+8. A one-positive-carrier host publishes exactly its two first-order support
+   families. Neither support family triggers `All`-of-`All` generation or
+   becomes an enclosing host; recursively applying host generation to either
+   support declaration must fail the control.
