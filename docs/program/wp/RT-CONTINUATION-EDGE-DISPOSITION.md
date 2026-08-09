@@ -167,16 +167,13 @@ refusing has not implemented the distinction — it has erased it.
 **The instrument did its job, and it fired.** Recorded at `e93afb06`
 (PR #1659), with the Architect ruling requested at `evt_7hzmgfyedd70v`:
 
-- **Not closed:** `b2f_last_unit_emission()` returns `(0, 0)` after a successful
-  compile of the witness, so **it is not observing the emission path this
-  question needs.** The ring stopped rather than substitute a different number,
-  which is correct — a substituted counter would have answered a different
-  question and read as an answer to this one.
-- **What is measured:** the `px8j` witness plans 3 calls, carries 5 emittable
-  units, compiles `OK`, and one of its candidates settles `InlineNoCall`. ⇒ **an
-  interned-but-uncalled specialization already exists inside a successful
-  compile.** That **argues against the strong form** of this hard stop and does
-  **not** settle it.
+- **`px8j` is NON-SELECTED**, measured with a same-run probe-alive control. It
+  sits outside the selected `FunctionizedUnits` artifact, so its
+  `b2f_last_unit_emission() == (0, 0)` is a **non-selected-authority result**,
+  not a blind instrument. **No further direct ABI probe is required.**
+- **The selected-side reachability controls are `sar_d3`, `ccr_d3` and
+  `coc_d3`.** Those are the members inside the selected artifact, and they are
+  what any later reachability claim must be made against — **not** `px8j`.
 - **The 210-of-637 result is NOT a second hard stop** — ruled
   `evt_40rf074xsj3y1`. Production has **one artifact-wide ledger**, opened in
   the selected `FunctionizedUnits` arm before `define_unit_bodies`, seeded from
@@ -196,12 +193,18 @@ ledger and **shares its artifact lifetime**: it does not widen
 non-selected compilations.
 
 **The population DID partition — 637, one disposition each, zero orphans**, and
-637 is retained as the **observational superpopulation**. **The stop above is
-OPEN BUT UNFIRED.** It fires only if the exact prospective `InlineNoCall` target
-cannot be declared, defined, and ABI-reachable through the already selected
-`UnitBundle` without a post-lowering call-graph rebuild or a planner
-traversal-contract change — and that is exactly what the outstanding `px8j`
-measurement decides.
+637 is retained as the **observational superpopulation**.
+
+> ### THE §4 STOP IS **UNFIRED AT `D0`** — AND HERE IS ITS RE-ROUTE CONDITION
+>
+> **`UNFIRED AT D0; re-route only if `D1` changes unit population, declaration,
+> definition, ABI projection, or traversal.`**
+>
+> `D0` owes **nothing further** on this axis. Do not re-run the ABI probe, and
+> do not treat the stop as an open measurement — it is **unfired**, not
+> **cleared**, and those are different claims: unfired means the condition was
+> evaluated and did not hold, so it stays live as a **`D1` obligation** against
+> the five named axes above.
 
 ## 5. Untouched
 
