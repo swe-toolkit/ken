@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-09 15:46:43Z — from 191 issue file(s) in `docs/program/issues/`.
+2026-08-09 16:29:01Z — from 191 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -58,7 +58,7 @@ the committed file matches the generator's output.
 | `CAT-C2` | Localized Map/Set key-interface split: a non-canonical carrier becomes a lawful Map/Set key under a weaker key-order dictionary while staying an unlawful Ord key wherever antisym concludes kernel Equal | draft | spec-enclave | M | none | — |
 | `CAT-CAPEX` | catalog exhibits no checked capability/authority exemplar — write one against the landed Cap/Auth surface | merged | ergo | M | none | — |
 | `CB-HYGIENE` | cranelift_backend facade: strip WP-token narration, separate test material from implementation | merged | runtime | S | none | — |
-| `CI-IGNORED-SWEEP` | nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off | ready | verify | S | none | — |
+| `CI-IGNORED-SWEEP` | nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off | active | verify | S | none | — |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
 | `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | draft | spec-enclave | S | none | — |
@@ -235,7 +235,6 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `CI-IGNORED-SWEEP` — nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off
 - `RT-BODY-OCCURRENCE-PROVENANCE` — Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
