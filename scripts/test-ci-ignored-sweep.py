@@ -171,6 +171,67 @@ class IgnoredSweepTests(unittest.TestCase):
                 with self.assertRaisesRegex(SWEEP.SweepError, "malformed"):
                     SWEEP.report(log, 47, 100)
 
+    def test_pass_line_census_assigns_every_input_class(self) -> None:
+        identity = "l1_acceptance sec24_char_excludes_surrogates"
+        finding_logs = {
+            "well-formed counter": [f"PASS [ 0.001s] (1/47) {identity}"],
+            "no counter": [f"PASS [ 0.001s] {identity}"],
+            "duplicate live/final identity": [
+                f"PASS [ 0.001s] (1/47) {identity}",
+                f"PASS [ 0.001s] {identity}",
+            ],
+        }
+        instrument_lines = {
+            "counter mismatch": "PASS [ 0.001s] (1/46) suite repaired_row",
+            "counter index zero": "PASS [ 0.001s] (0/47) suite repaired_row",
+            "counter out of range": "PASS [ 0.001s] (48/47) suite repaired_row",
+            "non-numeric counter": "PASS [ 0.001s] (x/47) suite repaired_row",
+            "unterminated counter": "PASS [ 0.001s] (1/47 suite repaired_row",
+            "empty identity": "PASS [ 0.001s]   ",
+            "decorated identity": "PASS [ 0.001s] [1/47] suite repaired_row",
+            "malformed status": "PASS suite repaired_row",
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "run.log"
+            for label, lines in finding_logs.items():
+                log.write_text(
+                    "\n".join(lines)
+                    + "\nSummary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
+                    encoding="utf-8",
+                )
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    SWEEP.report(log, 47, 100)
+                report = output.getvalue()
+                self.assertIn("47 selected; 1 passed", report, label)
+                self.assertEqual(report.count(f"- {identity}"), 1, label)
+                self.assertEqual(
+                    report.count("::notice title=Ignored row now passes::"),
+                    1,
+                    label,
+                )
+
+            for label, line in instrument_lines.items():
+                log.write_text(
+                    f"{line}\n"
+                    "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaises(SWEEP.SweepError, msg=label):
+                    SWEEP.report(log, 47, 100)
+
+            log.write_text(
+                "an unrelated line that matches nothing\n"
+                "Summary [ 1.000s] 47 tests run: 0 passed, 47 failed\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                SWEEP.report(log, 47, 100)
+            self.assertIn("47 selected; 0 passed", output.getvalue())
+            self.assertIn("No ignored row passed", output.getvalue())
+
     def test_cli_exit_contract_distinguishes_all_three_outcomes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
