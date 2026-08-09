@@ -50,7 +50,7 @@ telescopes. No later rule may recognize `Bag`, `Box`, or `Slot` by name.
 
 Spec: `14 §8.5` clauses 1–3.
 
-### kernel/inductive/nested-ds9-shapes-admitted [KERNEL-NESTED-IND]
+### kernel/inductive/nested-ds9-shapes-admitted
 
 - spec: `14 §8.5`; `18 §4.3`
 - given: previously admitted positive `List` and `Pair`, followed by an ordinary
@@ -65,7 +65,7 @@ Spec: `14 §8.5` clauses 1–3.
   custom-carrier case below prevents a `List`/`Pair` allow-list from satisfying
   the corpus.
 
-### kernel/inductive/nested-fresh-carrier-admitted [KERNEL-NESTED-IND]
+### kernel/inductive/nested-fresh-carrier-admitted
 
 - spec: `14 §8.5` clauses 1–3; `18 §4.3`
 - given: admit the `Bag A` declaration above, then submit the `Rose` declaration
@@ -131,7 +131,7 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
   `Rose` method, or passing `b` unchanged yields a different reduct. This pins
   reduction without over-specifying an internal runtime representation.
 
-### kernel/inductive/nested-size-uses-lift [KERNEL-NESTED-IND]
+### kernel/inductive/nested-size-uses-lift
 
 - spec: `14 §3.2`, `§7.8`, `§9.5`; `39 §2.2`; `43 §1`
 - given: define `size : Rose -> Nat` by the generated eliminator. The `leaf`
@@ -328,7 +328,7 @@ Spec: `14 §3.2`, `§7.8`, `§9.5` item 7; `18 §5`.
 
 Spec: `14 §8.5` clauses 1, 2, 4, and 6.
 
-### kernel/inductive/nested-unknown-head-rejected [KERNEL-NESTED-IND] (soundness)
+### kernel/inductive/nested-unknown-head-rejected (soundness)
 
 - spec: `14 §8.5` clauses 1 and 6; `18 §4.3`
 - given: declare
@@ -344,7 +344,7 @@ Spec: `14 §8.5` clauses 1, 2, 4, and 6.
   accept proves the corpus is not merely demanding blanket rejection of every
   nested application.
 
-### kernel/inductive/nested-nonpositive-rejected [KERNEL-NESTED-IND] (soundness)
+### kernel/inductive/nested-nonpositive-rejected (soundness)
 
 - spec: `14 §8.5` clauses 2 and 4; `18 §4.3`
 - given: first admit
@@ -364,7 +364,7 @@ Spec: `14 §8.5` clauses 1, 2, 4, and 6.
 
 Spec: `14 §8.3`, `§8.5` clause 5.
 
-### kernel/inductive/nested-negative-under-positive [KERNEL-NESTED-IND] (soundness)
+### kernel/inductive/nested-negative-under-positive (soundness)
 
 - spec: `14 §8.3`; `§8.5` clauses 3 and 5
 - given: with positive `Bag` already admitted, declare
