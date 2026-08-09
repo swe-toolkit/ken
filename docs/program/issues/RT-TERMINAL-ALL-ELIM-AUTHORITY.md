@@ -105,6 +105,44 @@ building the five-part relation; the Kernel cut owns making its answer
 authoritative. That is the whole of the sequencing problem below, and it is a
 measurement, not an inference.
 
+### RE-MEASURED at `main = 3a1ed7da`: the partial landed, the gate did NOT fire
+
+`KERNEL-NESTED-IND` merged a partial at `afb38934`, reported as
+*"relation-bearing"*. **That report is accurate and it is not the release
+trigger.** What landed is one of the three pieces:
+
+| identifier | on `main` at `3a1ed7da` |
+|---|---|
+| `all_support_origin` | **now present** — `ken-kernel/src/env.rs`, the inverse accessor the table above recorded as reachable only on `a577f136` |
+| `DataMetadata` carries a terminal-support field | **absent.** The struct in `ken-elaborator/src/checked_core.rs` has `parameter_count`, `index_count`, `constructors`, `eliminator`, `lowerability`. Not even the `bool` the held branch had |
+| `runtime_data_metadata` projects it | **absent, unchanged.** It still builds `RuntimeDataAuditMetadata` from `parameter_count`, `index_count`, and `constructors` only |
+
+⇒ **The conclusion above is unchanged and is now literally sharper: a Boolean
+and an inverse accessor are not the authority — and `main` has the accessor
+without the Boolean.** Nothing of this relation reaches the Runtime side, so
+`D1` still cannot derive facts 1 and 2. **Do not release this node.**
+
+**Why this needed measuring rather than reading.** The ruled condition is *"land
+a coherent relation-bearing accepted partial"*, and a partial that bears `a`
+relation satisfies that sentence while carrying none of the capability `D1`
+consumes. A release condition keyed on a merge event fires when an accepted
+partial lands; **landing does not imply capability.** Check the three rows, not
+the merge.
+
+**The check, as a phrase rather than a coordinate** — the line numbers in the
+table above have already drifted once (`checked_core.rs:1136` → the struct is
+at `1133` and lacks the field; `erasure.rs:6026` → `5982`), so re-find by name:
+
+```sh
+git grep -n 'terminal_support' -- crates/ken-elaborator/src/checked_core.rs \
+                                  crates/ken-elaborator/src/erasure.rs
+```
+
+**Empty output means not released.** Both files must name it: the field must
+exist on `DataMetadata` *and* be projected by `runtime_data_metadata`. The
+first without the second is the same drop that made the held snapshot
+insufficient.
+
 ## Deliverables
 
 - **`D1` — issue the relation.** In checked erasure/planning, emit the
@@ -176,7 +214,11 @@ Also unauthorized:
 **This node is framed and NOT released.** The two conditions are separate and
 both are open:
 
-1. **The kernel-issued relation must be on `main`.** Measured above: it is not.
+1. **The kernel-issued relation must be on `main`.** Re-measured at
+   `3a1ed7da` after the `afb38934` partial landed: **still not.** See the
+   dated re-measurement above and run its grep — the partial added
+   `all_support_origin` and neither the `DataMetadata` field nor the runtime
+   projection. Measured originally, and still true: it is not.
    `D1` cannot derive facts 1 and 2 from a relation that `crates/` does not
    contain, and the `D0` measurement itself only reached those facts on a
    disposable venue composing `main` with `a577f136`.
