@@ -15750,13 +15750,29 @@ fn d5a_the_one_causal_ledger_closes_over_the_generalized_emission_owner_domain()
         d5a_route_applications() > 0,
         "the early close must actually have happened"
     );
+    // **RE-POINTED BY `D2`, and the reason is that this mutation no longer
+    // moves one authority.** It moved the CLAIM ledger's window when it was
+    // written; the wrapper now owns two sibling ledgers, so the same mutation
+    // moves BOTH closeouts early. Candidate totality is the first production
+    // refusal under it, and that is correct rather than a preemption to undo:
+    // the claim law's `D2` domain does not exist until totality has closed,
+    // because deriving the subset first lets an unsettled candidate simply
+    // disappear from it.
+    //
+    // ⇒ This row is now the `D2` **composite-close** control, and it is named
+    // for the authority it actually reaches. `D5a`'s original single-authority
+    // promise — that the specialization-owned token is missing from the exact
+    // claim/discharge equality — is NOT abandoned; it is owed a separate
+    // isolated ledger-unit control whose candidate domain is already complete.
+    // Rewriting only this string, keeping the old name and prose, would have
+    // retired that oracle while looking like a fix.
     assert!(
-        refusal.contains("does not equal the planned one") && refusal.contains("absent"),
-        "the refusal must come from the EQUALITY finding an undischarged token -- measured: \
-         `1 planned tokens absent, 0 unplanned tokens present`, which is exactly the \
-         specialization-owned call the early window excludes. Anything else, in particular \
-         `the continuation claim ledger went missing`, would mean the early close SUCCEEDED and \
-         this row is measuring the aftermath instead of the closeout: {refusal}"
+        refusal.contains("reached the artifact closeout without a disposition"),
+        "under the composite early close, candidate TOTALITY is the first production refusal: \
+         the mutation closes both sibling ledgers before the generated pass, so candidates are \
+         genuinely unsettled. Anything else -- in particular `the continuation candidate ledger \
+         went missing` -- would mean the early close SUCCEEDED and this row is measuring the \
+         aftermath instead of the closeout: {refusal}"
     );
 }
 

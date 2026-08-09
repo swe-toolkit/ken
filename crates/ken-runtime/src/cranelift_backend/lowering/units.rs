@@ -3561,26 +3561,43 @@ impl ContinuationClaimLedger {
                 self.composed.len()
             )));
         }
-        let leftover = self
+        // `D2` — the claim law, as EXACT SET EQUALITY over the same derived
+        // subset, not as a count of unclaimed slots.
+        //
+        // A count would have to be written as "ignore every unclaimed identity
+        // outside the subset", and that hides the dual error: an `InlineNoCall`
+        // candidate that was **accidentally claimed**. Equality catches both
+        // directions and reports them separately, because they are opposite
+        // defects — a missing obligation is a call nobody answered, an extra
+        // claim is an inline non-call that answered for a call it never made.
+        let claimed = self
             .claims
-            .values()
-            .filter(|consumed| consumed.is_none())
-            .count();
-        if leftover != 0 {
+            .iter()
+            .filter(|(_, consumed)| consumed.is_some())
+            .map(|(identity, _)| identity.clone())
+            .collect::<BTreeSet<_>>();
+        if claimed != *call_obligations {
+            let missing = call_obligations.difference(&claimed).count();
+            let extra = claimed.difference(call_obligations).count();
             return Err(backend_module(format!(
-                "{leftover} planned continuation call tokens were never claimed by the unit that \
-                 owns them"
+                "the claimed continuation call population is not the call-obligation one: \
+                 {missing} call obligations were never claimed by the unit that owns them, and \
+                 {extra} claims were made for identities that are not call obligations"
             )));
         }
-        // Owner agreement, asserted on the RECORDED consumer.
+        // Owner agreement, asserted on the RECORDED consumer, over the
+        // claimed/call-obligation members.
         //
         // Honest note: selection above is already by the token's own owner, so
         // this holds by construction today and cannot fire against the current
         // code. It is kept because it is the property `D3` actually promises,
         // and it is the check that would fire if selection were ever decoupled
-        // from ownership. A wrong owner under today's structure does not reach
-        // here -- it surfaces as a leftover claim above.
-        for (identity, consumed) in &self.claims {
+        // from ownership.
+        for (identity, consumed) in self
+            .claims
+            .iter()
+            .filter(|(identity, _)| call_obligations.contains(*identity))
+        {
             if *consumed != Some(identity.emission_owner()) {
                 return Err(backend_module(
                     "a continuation call token was claimed by a unit that does not own it"
