@@ -84,15 +84,26 @@ Landed structure the authority has to travel through, measured on `f9146b91`:
 
 **The relation itself is absent from `main`.** `git grep` for
 `terminal_support`, `all_support_origin`, `support_family`, and `support_origin`
-across `crates/` at `f9146b91` returns **nothing**. Both identifiers exist only
-on Kernel's held work:
+across `crates/` at `f9146b91` returns **nothing**.
 
-- `dd3cd050` — `ken-kernel/src/{inductive.rs,env.rs,check.rs}`;
-- `a577f136` — the elaborator projection snapshot, parent `dd3cd050`
-  (`checked_core.rs`, `erasure.rs`, `elab.rs`, `compiler_driver.rs`).
+Where the pieces actually are, measured per branch — **they are not both on
+both**, and the difference decides what the Kernel cut has to contain:
 
-That is the whole of the sequencing problem below, and it is a measurement, not
-an inference.
+| identifier | `dd3cd050` | `a577f136` (child) |
+|---|---|---|
+| support registry / generation | present (`ken-kernel/src/{inductive.rs,env.rs,check.rs}`) | inherited |
+| `all_support_origin` | **absent** | present — `ken-kernel/src/env.rs:400`, `inductive.rs:1101` |
+| `DataMetadata.terminal_support` | absent | present, but only as a **`bool`** (`checked_core.rs:1136`) |
+
+**And the runtime projection drops it.** `runtime_data_metadata`
+(`a577f136:erasure.rs:6026`) carries `parameter_count`, `index_count`, and
+`constructors` — `terminal_support` is not among them. So even on the held
+snapshot, nothing of this relation reaches the Runtime side today.
+
+⇒ **A Boolean and an inverse accessor are not the authority.** `D1` still owns
+building the five-part relation; the Kernel cut owns making its answer
+authoritative. That is the whole of the sequencing problem below, and it is a
+measurement, not an inference.
 
 ## Deliverables
 
@@ -151,20 +162,45 @@ both are open:
    then-current tree rather than trusting this sentence — a disjointness claim
    of the Steward's has died twice on this chain.
 
-**On the apparent circularity.** The Architect's ruling states that
-[[KERNEL-NESTED-IND]] remains blocked until this node closes, while this node
-needs Kernel's relation. That is **not** a DAG cycle, and it is deliberately not
-recorded as one: KERNEL-NESTED-IND's own `D5` is *surface consumability*, so
-"blocked until Runtime can consume" is that node's existing deliverable rather
-than a new edge. The order that discharges both is the one this chain has
-already used twice:
+### The order is RULED, not proposed
 
-```
-Kernel's relation-bearing partial lands on `main`
-  -> RT-TERMINAL-ALL-ELIM-AUTHORITY is released and closes
-  -> KERNEL-NESTED-IND `D5` discharges and the node closes
-```
+Architect, `evt_26dtkkpc3gngw` (2026-08-09). Kernel-partial-first satisfies the
+constraint; it is the only sound way to make the ruled source authority
+available without asking Runtime to reconstruct it.
 
-That first step is the standing merge policy — a team's accepted base belongs on
-`main` — and is exactly how [[RT-BODY-OCCURRENCE-PROVENANCE]] reached `main` as
-an accepted partial while its own `AC-2` stayed open.
+1. Land a coherent **relation-bearing** [[KERNEL-NESTED-IND]] accepted partial
+   on `main`.
+2. Re-ground Runtime contention, then **explicitly release** this node.
+3. This node closes.
+4. That result discharges KERNEL-NESTED-IND `D5`, and the Kernel node closes.
+
+**Not circular, and no reverse edge may be added.** This node has a real *input*
+dependency on Kernel's issued representation. `D5`'s Runtime-consumability
+requirement is a later **acceptance condition** of the Kernel node, not a
+reverse implementation dependency. The recorded tracker direction is correct.
+
+**The Kernel partial may land while native execution still refuses.** That
+refusal is fail-closed and already measured. The partial must be labelled
+exactly that: it does not claim native consumability, does not discharge `D5`,
+does not close KERNEL-NESTED-IND, and does not by itself release this node.
+
+### What "relation-bearing" means, and what it does not
+
+**Load-bearing sharpening from the same ruling.** It does **not** mean a naked
+accessor or a `terminal_support: bool`. The accepted Kernel cut must coherently
+retain, together:
+
+- the generated terminal-`All` declarations;
+- their **atomic admission/provenance**;
+- the family-to-`(host, parameter, sort)` relation;
+- the checked constructor/evidence alignment that relation certifies.
+
+**Do not cherry-pick an inverse accessor detached from the declarations and
+transaction that make its answer authoritative.** Neither raw `dd3cd050` nor an
+env-only child qualifies — see the per-branch table above for why.
+
+**Conversely, the Kernel partial need not pre-build `D1`'s finished Runtime
+projection.** `D1` still owns carrying the family identity, origin, constructor
+alignment, evidence topology, and the exact `Match` occurrence as one
+checked-erasure/planning relation. That is precisely why this node stays held
+until the coherent source cut is actually on `main` — and not one moment longer.
