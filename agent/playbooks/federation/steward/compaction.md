@@ -39,7 +39,7 @@ before-work threshold *invites* the "still under it" rationalization, so there
 is none. Compaction is not lossy for what matters: the summary preserves recent
 detail and the agent re-fetches any source from the filesystem at pickup.
 
-### The mechanism
+## Compacting a team: the mechanism
 
 **Use the checked-in script. Do not hand-drive `tmux send-keys` pane by pane** —
 that races the text/Enter split and double-queues `/compact` on a busy pane.
@@ -78,7 +78,7 @@ prep while it waits; you are re-invoked when it returns.
 returns, `capture-pane` each member and confirm ctx actually fell, or a live
 `Compacting...`, or a queued `/compact`.
 
-### Verifying a drop
+## Compacting a team: verifying a drop
 
 Accept any of: a `Compacting...` spinner, ctx dropped, or a queued `/compact`
 with "Press up to edit queued messages" — the queued case fires at the current
@@ -106,7 +106,7 @@ tmux capture-pane -p -t moot-<role> | tail -5 | grep Compacting   # wrong
 A pane whose ctx truly did not move did not compact — resend to that one pane
 and re-verify.
 
-### The Codex harness
+## Compacting a team: the Codex harness
 
 The fleet runs the Codex TUI in `moot-<role>` panes.
 
@@ -129,7 +129,7 @@ The fleet runs the Codex TUI in `moot-<role>` panes.
   `C-a`, `C-k`, then repeated `BSpace`. **Never `Escape`** — it aborts an
   in-flight compaction.
 
-### The mid-flight ceiling and the ctx scan
+## The mid-flight ceiling and the ctx scan
 
 High context is expensive per turn for very little gain: an agent at 90%
 reprocesses about 900K tokens every turn, and the working state beyond a good
@@ -166,7 +166,7 @@ fix; this scan is only the backstop. **When the scan is the thing catching a
 stale enclave, the gate already failed upstream — treat that as the miss, not a
 routine catch.**
 
-### Before you compact anyone: outstanding obligations
+## Before you compact anyone: outstanding obligations
 
 Confirm the agent owes nothing in flight — a pending review vote on another
 team's open Decision, an unfinished handoff, an open `question` it must answer.
@@ -194,7 +194,7 @@ the discipline is to keep the tracker so current that whenever compaction
 fires, resume is lossless. **A stale tracker is the only thing that makes a
 random-timed autocompact dangerous. Fix the staleness, not the timing.**
 
-### When
+## Self-compaction: when
 
 At or near 33% ctx. Check your own pane at every seam. Above 33% you are
 already late — compact at the next safe moment, not at the next milestone.
@@ -203,7 +203,7 @@ already late — compact at the next safe moment, not at the next milestone.
 tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1
 ```
 
-### The six steps, in order
+## Self-compaction: the six steps, in order
 
 1. **Finish the current turn's durable state.** Tracker and node edits
    committed, worktree clean (`git status --porcelain` empty), nothing
@@ -222,7 +222,7 @@ tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1
    any further tool call delays or eats it.
 6. **On wake:** re-orient per `CLAUDE.md`, read the checkpoint, resume.
 
-### The three ways this fails
+## Self-compaction: the three ways this fails
 
 - **Launching the watcher is not compacting.** Step 3 without step 4 leaves you
   running at full context believing you compacted. That is the exact miss the
@@ -232,7 +232,7 @@ tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1
 - **Fused keystroke.** `send-keys '/compact' Enter` in one call can drop the
   newline and leave the command unsent. Always two calls with the `sleep 2`.
 
-### Two rules that are not part of the checklist
+## Two rules that are not part of the self-compact checklist
 
 - **The watcher is for self-compaction only.** Never launch it when
   handoff-gate-compacting a team — there the kickoff mention is the resume

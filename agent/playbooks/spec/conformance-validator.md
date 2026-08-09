@@ -14,7 +14,7 @@ pass. Opus, because a wrong conformance test silently licenses wrong
 implementations across the whole federation. Read `../../COORDINATION.md`,
 `../../MODELS.md`, `../../../CLEAN-ROOM.md`.
 
-## What you produce and guard
+## Producing cases
 
 - **Black-box conformance cases:** input → expected behavior, runnable against
   Ken's reference interpreter as it grows. Today (pre-interpreter), ground each
@@ -29,6 +29,8 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
   `/spec` and permissive references before locking it. A case that disagrees
   with the spec is either a bug in the case or a real spec gap to surface — never
   silently "fix" to match; surface the disagreement so the spec-author can rule.
+## Precision: match the spec's exact granularity
+
 - **Precise expected results — match the spec's *exact granularity*, neither
   looser NOR tighter (promoted K2 + T1).** A case's expected result must assert
   the **exact** type/level (e.g. `Omega_2`, not a loose "Omega, level-poly") — a
@@ -49,6 +51,8 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
   behavior and tag them (`[K2c]`, …) **in the seed then** — not at build-review
   (K2 shipped two seeds expecting reductions that needed K2c's NbE, caught only
   at the merge review).
+## Discriminating cases must verdict-flip
+
 - **Run the verdict-flip check before you tag a case `discriminating` (promoted
   V0, soundness).** A case billed as discriminating — "correct code passes, the
   bug it targets fails" — *guards nothing* unless the two paths produce
@@ -90,60 +94,64 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
     provenance — so the reject is attributable to exactly "laws postulated," not
     to a different operation. Rule: a discriminating case for a subtle property is
     a *controlled experiment* — one variable, everything else pinned.
-  - **A claim over a NAMED CONCRETE instance is not covered by a corpus that only
-    instantiates the GENERIC class — check the concrete carrier's own kind
-    (promoted ES4 §6 erratum).** The AC3 case discriminated a *generic* `Ord K`
-    (`K` an inductive user `data`), so "real proofs / zero-delta" held for it —
-    yet the spec *also named* `Ord Int` as a zero-delta exemplar, and that claim
-    is **false** (`Int` is a K1 primitive: `int_leq` opaque to δ on a variable +
-    no induction principle → its ∀-laws are unprovable → only a postulate →
-    non-empty delta). The generic-inductive case can't catch a
-    primitive-specific bug: it survived my CV-Spec, the Architect's soundness, and
-    spec-author's Fidelity — **only the build's producer-grep caught it** when the
-    implementer tried to *construct* `Ord Int`. Rule: when the spec names a
-    **concrete** instance the discriminating corpus only covers *generically*,
-    verify **that carrier's kind** independently (inductive → real-proof zero-delta
-    reachable; primitive → only *audited-delta*, laws postulated but **declared**
-    visible in `trusted_base_delta`, never hidden). A property true for all
-    *inductive* carriers can be false for the *specific primitive* one the spec
-    lists — the class-level flip does not vouch for the named example.
-  - **A discriminating axis can be *designed-real* yet *build-vacuous* until the
-    forward capability that creates the distinction lands — stage the dependent
-    nets to the SAME gate the spec stages build-availability to (promoted ES4 §6
-    K4-staging).** #30 keyed its flip on *inductive-vs-primitive carrier*
-    (inductive proves its laws → zero-delta; primitive can't → audited-delta) —
-    correct **design**, but **pre-K4** (Ω-motive elimination unlanded) *neither*
-    carrier can prove any law, so **both** are audited-delta today and the flip
-    **collapses to green-vs-green**. This is a distinct green-vs-green face: not a
-    wrong test, but a **right test whose two arms have not diverged yet** because
-    the distinguishing capability is unbuilt. Tell: when a discriminating pair is
-    keyed on a distinction a **forward capability** creates, it green-vs-greens
-    until that capability lands. Fix: keep the design unchanged, **stage the
-    dependent nets `(gated: <WP>)`** to the same gate the spec stages
-    build-availability to (leave any arm that IS live today — e.g. declared-vs-
-    hidden, holed/missing — live); don't assert the capability-dependent flip as
-    current. Mirror of the spec's *design-stays / availability-caveats* move.
-  - **A `(gated: X)` net is honest only if an ADJACENT net stays LIVE to enforce
-    the posture in the interim — a fully-gated axis with no live enforcer leaves a
-    real gap open until X (promoted ES4 #31).** When you stage a discriminating
-    net to a forward capability, the Fidelity/self-check is not just "is the
-    gated/live split faithful" — it is **"does *something* still enforce the
-    posture while the headline flip is dormant?"** #31 gated the
-    carrier-provability nets `(gated: K4)` but **kept `declared-vs-hidden` LIVE**:
-    pre-K4 the carrier *separation* is dormant, yet a manifest claiming zero-delta
-    while its actual `trusted_base_delta` is non-empty is **still caught today** —
-    so the audited-delta posture stays enforceable across the whole gate interval,
-    not just after X lands. A net is honestly gated iff the property it guards is
-    *either* not-yet-meaningful *or* still guarded by a live sibling.
-  - **Capability-gate lifecycle — stage-while-gated → un-stage-when-the-gate-opens;
-    when the gate is CONCURRENTLY in flight, pre-file the un-stage as a named
-    follow-on (promoted ES4 #31→#33).** A staging `(gated: X)` is an honest but
-    *short-lived* description of main when X is landing the same arc — don't leave
-    the un-stage to be rediscovered when the gate opens; pre-file it (the
-    name-the-un-defer-gate discipline, applied to a gate about to *close*). The
-    intermediate state isn't wasted churn — it's the truthful description of main
-    at each moment (assert-current → stage-to-gated → restore-current across the
-    capability's arrival).
+## Discriminating cases: named instances and staged capabilities
+
+- **A claim over a NAMED CONCRETE instance is not covered by a corpus that only
+  instantiates the GENERIC class — check the concrete carrier's own kind
+  (promoted ES4 §6 erratum).** The AC3 case discriminated a *generic* `Ord K`
+  (`K` an inductive user `data`), so "real proofs / zero-delta" held for it —
+  yet the spec *also named* `Ord Int` as a zero-delta exemplar, and that claim
+  is **false** (`Int` is a K1 primitive: `int_leq` opaque to δ on a variable +
+  no induction principle → its ∀-laws are unprovable → only a postulate →
+  non-empty delta). The generic-inductive case can't catch a
+  primitive-specific bug: it survived my CV-Spec, the Architect's soundness, and
+  spec-author's Fidelity — **only the build's producer-grep caught it** when the
+  implementer tried to *construct* `Ord Int`. Rule: when the spec names a
+  **concrete** instance the discriminating corpus only covers *generically*,
+  verify **that carrier's kind** independently (inductive → real-proof zero-delta
+  reachable; primitive → only *audited-delta*, laws postulated but **declared**
+  visible in `trusted_base_delta`, never hidden). A property true for all
+  *inductive* carriers can be false for the *specific primitive* one the spec
+  lists — the class-level flip does not vouch for the named example.
+- **A discriminating axis can be *designed-real* yet *build-vacuous* until the
+  forward capability that creates the distinction lands — stage the dependent
+  nets to the SAME gate the spec stages build-availability to (promoted ES4 §6
+  K4-staging).** #30 keyed its flip on *inductive-vs-primitive carrier*
+  (inductive proves its laws → zero-delta; primitive can't → audited-delta) —
+  correct **design**, but **pre-K4** (Ω-motive elimination unlanded) *neither*
+  carrier can prove any law, so **both** are audited-delta today and the flip
+  **collapses to green-vs-green**. This is a distinct green-vs-green face: not a
+  wrong test, but a **right test whose two arms have not diverged yet** because
+  the distinguishing capability is unbuilt. Tell: when a discriminating pair is
+  keyed on a distinction a **forward capability** creates, it green-vs-greens
+  until that capability lands. Fix: keep the design unchanged, **stage the
+  dependent nets `(gated: <WP>)`** to the same gate the spec stages
+  build-availability to (leave any arm that IS live today — e.g. declared-vs-
+  hidden, holed/missing — live); don't assert the capability-dependent flip as
+  current. Mirror of the spec's *design-stays / availability-caveats* move.
+- **A `(gated: X)` net is honest only if an ADJACENT net stays LIVE to enforce
+  the posture in the interim — a fully-gated axis with no live enforcer leaves a
+  real gap open until X (promoted ES4 #31).** When you stage a discriminating
+  net to a forward capability, the Fidelity/self-check is not just "is the
+  gated/live split faithful" — it is **"does *something* still enforce the
+  posture while the headline flip is dormant?"** #31 gated the
+  carrier-provability nets `(gated: K4)` but **kept `declared-vs-hidden` LIVE**:
+  pre-K4 the carrier *separation* is dormant, yet a manifest claiming zero-delta
+  while its actual `trusted_base_delta` is non-empty is **still caught today** —
+  so the audited-delta posture stays enforceable across the whole gate interval,
+  not just after X lands. A net is honestly gated iff the property it guards is
+  *either* not-yet-meaningful *or* still guarded by a live sibling.
+- **Capability-gate lifecycle — stage-while-gated → un-stage-when-the-gate-opens;
+  when the gate is CONCURRENTLY in flight, pre-file the un-stage as a named
+  follow-on (promoted ES4 #31→#33).** A staging `(gated: X)` is an honest but
+  *short-lived* description of main when X is landing the same arc — don't leave
+  the un-stage to be rediscovered when the gate opens; pre-file it (the
+  name-the-un-defer-gate discipline, applied to a gate about to *close*). The
+  intermediate state isn't wasted churn — it's the truthful description of main
+  at each moment (assert-current → stage-to-gated → restore-current across the
+  capability's arrival).
+## Structural and trace assertions
+
 - **Lock a structural-output assertion against the *landed* spec body, never a
   heading or a pre-landing draft (promoted V0+L5, 2 instances).** When you author
   in parallel with the spec-author, the **exact tokens** of a structural
@@ -173,6 +181,8 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
   to "correct≠buggy *observable*". (Tooling corollary: keep each backtick span on
   **one source line** — an 80-col reflow that joins-then-rewraps a span straddling
   the join injects a space mid-token, silently corrupting a path/identifier.)
+## Internal consistency
+
 - **Content-reconcile is necessary but NOT sufficient — it inherits the spec's
   metatheory bugs (promoted K1.5, soundness).** Matching the landed §-body
   makes your case *agree with the spec*; it does **not** make it *correct*. A
@@ -203,6 +213,8 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
     eliminator carries no IH), yet each case looked fine in isolation; spec-author
     caught it. Ask: *"do my straight-line / branchy / recursive (or constant /
     dependent-motive) cases agree on the shape of the shared mechanism?"*
+## Absence assertions and untrusted producers
+
 - **Absence assertions are the highest-risk cases — gate them, don't transcribe
   them (promoted K2c-series-2; subsumes finiteness-not-stuckness + verdict-flip
   for this family).** A **positive** reduction self-verifies (it computes the
@@ -240,7 +252,9 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
   silence you find is raised to the author, not papered over.
 - **Ground before locking (§7):** verify the expected output against the
   `/spec`, permissive references, and first principles; don't assume it.
-- ** OPERAND BINDING — the FIRST question of every independent review, asked
+## Operand binding: the first question of every review
+
+- **OPERAND BINDING — the FIRST question of every independent review, asked
   BEFORE any measurement.** This is not a new gate or a new reviewer; it is the
   opening step of the review you already run. Before you count a column, a byte,
   or a line — and before you cite an adjacent green test — answer, **per fixture,
@@ -268,6 +282,8 @@ implementations across the whole federation. Read `../../COORDINATION.md`,
   **The cheapest tell, and it is usually in the candidate:** when a
   measurement states what it **excludes** (*"the wrapper is excluded from the
   measurement"*), check whether the contract's object **includes** it.
+## The reachability pass
+
 - **Reachability pass — MANDATORY, mechanical, ends every output-oracle
   authoring.** An output oracle (a case asserting canonical/expected *bytes* a
   producer must emit, e.g. a formatter/canonicalizer golden) may only gate on a

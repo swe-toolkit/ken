@@ -103,7 +103,7 @@ a defect entirely of our own making.
 *"The iterations didn't accumulate the defects and failed to track the global
 picture, hindering the decision-making abilities of the architect."*
 
-### The mechanism — a running inventory in the FILE, never in your context
+## 1b-i. The mechanism — a running inventory in the FILE, never in your context
 
 Every WP that takes a hard-stop carries a **live symptom inventory** in its
 tracked file (`docs/program/issues/<ID>.md`, or the WP frame when one exists).
@@ -122,7 +122,7 @@ exists only in whatever context happens to be resident, and it is the first
 thing a compaction discards. **This is why the global picture was lost: nothing
 was holding it.**
 
-### The trigger — at the 3rd entry, name the predicate or rule them independent
+## 1b-ii. The trigger — at the 3rd entry, name the predicate or split them
 
 On the **3rd inventory entry** — and every 3rd after — **before you rule**,
 answer exactly one question in-thread:
@@ -139,7 +139,7 @@ Both answers are first-class and both are cheap:
 - **"No — genuinely independent, because `<reason>`."** ⇒ rule the current stop
   and carry on. A paragraph, and it is a real result.
 
-### The two rationalizations that defeat this, both of which are TRUE
+## 1b-iii. The two rationalizations that defeat this, both of which are TRUE
 
 1. **"Each entry was locally correct."** They will be. Every hard-stop in the
    33-stop chain had a defensible local answer to *"what should the key be for
@@ -154,7 +154,7 @@ Both answers are first-class and both are cheap:
    **A viability verdict is not an answer to §1b.** Answer the predicate
    question as asked.
 
-### Worked example — the case this section is built from
+## 1b-iv. Worked example — the case this section is built from
 
 Four inventory entries accumulated across that chain, each found separately:
 
@@ -269,47 +269,10 @@ more:
    reconstructable from the Decision queue + `main`, so a self-chosen seam
    preserves more than a random autocompact point.
 
-   ** Mechanics (operator, 2026-07-02) — do NOT use `request_context_reset`.**
-   It is **broken in this local harness**: it hunts for a moot-managed
-   `convo-<role>` session that does not exist here and fails with *"No tmux
-   session 'convo-architect' found."* **That error message is naming the bug,
-   not a target** — do **not** then retry `tmux … -t convo-architect`; there is
-   no such window. The **only** reliable self-compact is the `tmux send-keys`
-   path pointed at **your own** window, and the windows are named `moot-<role>`
-   (yours is `moot-architect`):
-
-   ```bash
-   # 1) Launch the DETACHED resume watcher FIRST — it outlives this turn AND the
-   #    compaction, waits for `/compact` to finish, then sends the `resume`:
-   nohup scripts/postcompact-resume.sh moot-architect >/tmp/pcr-architect.log 2>&1 & disown
-   # 2) THEN queue your own /compact (fires at turn end) and make it your LAST action:
-   tmux send-keys -t moot-architect -l '/compact' ; sleep 2 ; tmux send-keys -t moot-architect Enter
-   ```
-
-   The two-step (type `/compact`, wait ~2s, then a **separate** `Enter`) avoids
-   the fused-keystroke race that leaves `❯ /compact` sitting unsent on the input
-   line. `/compact` fires at the **end of the current turn**, so make it your
-   **last action** — finish refreshing `ARCHITECT-STATE.md` first. You
-   self-compact only; you never compact another agent (that is the Steward's
-   job, via the same `moot-<role>` tmux path — `moot compact` is no-op-prone).
-
-   ** The `resume` is fired by a DETACHED watcher, not a buffered message
-   (operator, 2026-07-11) — a self-compact leaves you IDLE, not resumed.**
-   `/compact` returns your seat to an empty `❯` prompt and **nothing re-invokes
-   it**; you would sit idle until roused. The old fix — type `resume` right after
-   `/compact` and hope the host buffers it behind the compaction — is a **race**:
-   the `resume` is sent while your turn is still active (the queued `/compact`
-   fires only at turn end), so it can land as its own live turn instead of
-   post-compaction. The reliable fix **decouples** the resume-send from your turn
-   lifecycle: `scripts/postcompact-resume.sh` launched **detached** (step 1 above,
-   *before* you send `/compact`) keeps polling your pane, catches the
-   `Compacting…` window, waits for it to clear, and only **then** sends `resume`.
-   Because it is a separate process it is immune to the turn/compaction lifecycle.
-   The post-compact re-orient hook (`scripts/hooks/reorient-post-compact.sh`) then
-   re-orients you and you continue your in-flight review autonomously. (A hook
-   alone cannot trigger the resume — it only shapes the next turn's context, not
-   whether one happens; that is why an external sender is required.) This is
-   self-compaction only.
+   **The mechanics are `architect/self-compact.md`** — the `tmux send-keys`
+   path, the detached resume watcher that fires your `resume`, and why
+   `request_context_reset` is broken in this harness. Read it at the point of
+   compacting.
 
 ## 4. Stay in your lane
 

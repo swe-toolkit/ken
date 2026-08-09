@@ -54,7 +54,9 @@ transport relay could. The mechanism is `../architect.md` section 1a.
 
 You never adjudicate the mechanism and research never rules.
 
-**The count is only a trigger if it is armed** (operator, 2026-07-24). On one
+## The count is only a trigger if it is armed
+
+Operator, 2026-07-24. On one
 chain the count reached **ten** hard stops with no research pull: the
 Architect's self-trigger lapsed across its compactions *and* the backstop
 lapsed because the count lived only as a prose list of fork numbers, never as
@@ -72,7 +74,7 @@ picture, hindering the decision-making abilities of the architect."*
 advisories fired at #24, #27, #30, #33 and were genuinely useful — and the
 chain still ran to 33, because nothing was holding the pattern across stops.
 
-### Your duties: three, all mechanical
+## Symptom inventory: your duties, three, all mechanical
 
 1. **Seed the section when you frame or release any WP.** It goes in the
    tracked file — `docs/program/issues/<ID>.md`, or the WP frame if one exists:
@@ -102,7 +104,7 @@ chain still ran to 33, because nothing was holding the pattern across stops.
    - **Freeze** the old chain's count and open a fresh one; carry the last
      clean checkpoint forward as a semantic oracle, not an acceptance path.
 
-### Two things that will make you skip this
+## Symptom inventory: two things that will make you skip it
 
 - **"The architecture is still viable."** It usually is, and a viability
   verdict is not an answer to the predicate question. One review correctly
@@ -134,7 +136,7 @@ the runtime implementer run 30 hours without guidance."*
 > without hard-stopping gets an Architect WIP audit. You request it; the
 > Architect reviews; any redirect flows Architect to leader to implementer.
 
-### The clock, and the one way to make this rule vacuous
+## WIP audit: the clock, and the one way to make the rule vacuous
 
 **Reset the clock on:** a kickoff or corrected re-kickoff; a genuine hard stop
 (the seat stops and routes a question for a ruling); an Architect WIP audit or
@@ -151,7 +153,7 @@ life.**
 Carry that line in the resume checkpoint and re-read it every tick. An
 index-shaped trigger reads as a confident "not due" when an append is missed.
 
-### This overrides "do not nudge a ring that is building"
+## WIP audit: this overrides "do not nudge a ring that is building"
 
 The watchdog tick prompt says not to nudge a ring that is building, and that is
 still right for a nudge. **An audit request is not a nudge** — it is
@@ -159,7 +161,7 @@ operator-mandated periodic guidance, and the seat it protects is by
 construction one that is building. Do not let the tick prompt's line talk you
 out of firing this.
 
-### Ask for three outcomes; the third will not be reached by default
+## WIP audit: ask for three outcomes; the third is not reached by default
 
 Operator, 2026-07-31: *"one of the options should be to reconsider the
 integrity of the WP and evaluate whether it would be better approached as a
@@ -189,7 +191,7 @@ be one honestly hard problem. **The signal that is nearly conclusive is
 repetition:** firing audit after audit on one node means the sizing was the
 defect and you have been treating it as a guidance problem.
 
-### Route, and the edge you must not create
+## WIP audit: route, and the edge you must not create
 
 Post the request to the **Architect**, naming the seat, the elapsed time, the
 clock's anchoring event, and the last few status posts. **You do not review the
@@ -201,7 +203,7 @@ Steward-to-implementer edge here would make you the ring's de-facto leader.
 topology rule reserves to the operator. **The operator authorized it in the
 directive above.** Do not simplify it back as drift.
 
-### Why a clean progress record is not the check
+## WIP audit: why a clean progress record is not the check
 
 The 2026-07-31 turn that produced this rule ran about 30 hours. The Architect's
 audit opened by affirming the progress record as disciplined, then found the

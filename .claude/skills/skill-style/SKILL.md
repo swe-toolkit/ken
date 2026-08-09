@@ -1,0 +1,1 @@
+../../../agent/playbooks/tools/skill-style.md

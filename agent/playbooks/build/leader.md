@@ -18,6 +18,8 @@ load and follow it after this generic archetype.
 
 - **One task at a time** through the ring (implementer → QA → back), per
   COORDINATION §0. Coherence beats opportunistic parallelism inside a team.
+## How you assign: by mootup mention, never by spawning
+
 - **HOW you assign — by mootup mention, NEVER by spawning** (sharpened: leaders
   have mis-delegated by trying to `claude(prompt)`-launch a teammate).
   Your implementer and QA are **already-running, persistent agents** — their own
@@ -32,6 +34,8 @@ load and follow it after this generic archetype.
   Claude** that fails with "503 provider not configured" and is not how this
   federation delegates. All delegation, queries, and handoffs are mootup mentions;
   local git only.
+## Threading, pipelining, and branch hygiene
+
 - **Thread every WP exchange — reply *in* the thread, never post to the space
   root** (operator 2026-06-29, COORDINATION §2). One WP is **one thread**: your
   kickoff/pickup-ack, the implementer→QA handoffs, your queries, the merge
@@ -80,6 +84,8 @@ load and follow it after this generic archetype.
     watchdog has to break the deadlock (it recurred *identically* twice before
     this was written down — the tell is you're about to `@mention` the implementer
     while your own `git worktree list` still shows you on `wp/<ID>`).
+## Compaction is the Steward's, not yours
+
 - **Compaction is the Steward's, not yours (operator 2026-06-29).** You do **not**
   compact your members. The Steward compacts your whole team (you + implementer +
   QA) *before* it delivers each WP, so you arrive already clean — and it does so
@@ -88,7 +94,7 @@ load and follow it after this generic archetype.
   all are in, and **signal the Steward "retros in"** (it then reviews them and
   compacts the team for the next WP). Don't `moot compact` anyone.
 
-## Own the watchdog (the only poll on your team)
+## Own the watchdog: rousing your ring and arming the tick
 
 **Rousing your ring is YOUR job, not the Steward's.** The Steward watchdog is a
 fleet-level *backstop* — it catches a stalled *leader*, an open gate, a
@@ -140,6 +146,8 @@ them). Re-arm on session start, after any compaction, and after any reconnect;
 `schedule_list` at the top of each tick — an empty list while work is open means
 your watchdog fell over, so re-arm it. The tick discipline below is identical
 regardless of what fires it.
+
+## The tick: stall recognition and recovery
 
 Workers are event-driven and never poll; the wake keeps **you** the only poller
 on the team. On each fire, run your *own* `get_recent_context`/`get_space_status`
@@ -199,13 +207,10 @@ assignment. So after every kickoff, **confirm the worker actually engaged** —
 (the `kicked-but-never-engaged` pattern above) — the Steward's top-layer sweep is
 the only backstop, and it should not have to be.
 
-**You do not touch GitHub or CI** — that is the publisher path's
-(COORDINATION §14). After you hand a WP off for merge handling, CI status comes
-back as a mootup mention from the publisher caller: a CI-**red** `blocked`
-mentioning your implementer — make sure they pick it up (relay if needed) — or a
-merge + ship Event. You never run `gh` or read checks yourself.
 
-** Never instruct your ring to run a local `--workspace` build/test.** The
+## Never instruct your ring to run a local `--workspace` build
+
+**Operator hard rule.** The
 full-workspace + `--locked` + conformance gate is **CI's** job (COORDINATION §12,
 operator hard rule — a local `--workspace` OOMs the shared box). When you relay a
 WP-frame acceptance criterion that says "workspace-green," translate it to
@@ -216,6 +221,12 @@ GitHub workspace checks before merging. If a frame's AC literally says "run
 the Steward, don't push a full local build onto your implementer/QA.
 
 ## External interface (you are the front desk)
+
+**You do not touch GitHub or CI** — that is the publisher path's
+(COORDINATION §14). After you hand a WP off for merge handling, CI status comes
+back as a mootup mention from the publisher caller: a CI-**red** `blocked`
+mentioning your implementer — make sure they pick it up (relay if needed) — or a
+merge + ship Event. You never run `gh` or read checks yourself.
 
 - **Outbound queries** for your team go to the right target's leader (§9):
   behavioral-contract → Spec leader; component-design → Architect; scope/workflow

@@ -59,7 +59,7 @@ everyone sees — never use it for the watchdog. A bash `while true` loop, the
 they only watch git refs, blind to pane-level stalls, or leak a CPU-spinning
 orphan. Do not resurrect a script.
 
-### The reconnect regression: the one way this backstop silently dies
+## The reconnect regression: the one way this backstop silently dies
 
 `schedule_create` schedules live only for the convo-channel MCP process's
 lifetime and **do not survive an MCP reconnect** — a package upgrade, a network
@@ -86,7 +86,7 @@ fleet uniformity.
 
 ## The tick, in order
 
-### 1. The stranded-delivery sweep — the first action of every tick
+## Tick step 1: the stranded-delivery sweep — the first action of every tick
 
 **It is a check; do not re-derive it as vigilance.** The single most common
 transport failure in this federation is a convo mention that lands in a seat's
@@ -127,12 +127,12 @@ Two properties worth knowing when you read its output:
   `Working` check.** Likewise a `busy` verdict is never repaired: a run
   reporting four `busy` seats has answered nothing about those four.
 
-### 2. The ctx scan
+## Tick step 2: the ctx scan
 
 See `compaction.md`. It is the mandatory first *reading* step and the one that
 silently lapses.
 
-### 3. The idle sweep
+## Tick step 3: the idle sweep
 
 **Every tick proactively sweeps active seats' panes for idle, not only
 reactively after a convo signal.** Operator-grounded, 2026-07-11: an
@@ -154,7 +154,7 @@ at its durable in-thread assignment>'`, then a **separate** `Enter` — and
 confirm the pane flips to `Working`. **A fresh convo mention alone will not
 wake a no-poll idle seat.**
 
-### 4. Read the Adversary's threads
+## Tick step 4: read the Adversary's threads
 
 Its reports do not surface in the space-level event read, so a clear tick is
 not evidence it has filed nothing. The command is in `merge-procedure.md`, M8.
