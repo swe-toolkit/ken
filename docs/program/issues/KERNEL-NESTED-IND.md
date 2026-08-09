@@ -82,6 +82,77 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > of the next one. Do not ask whether a consumer is "in the lane" — ask which
 > `AC-K12` stage it blocks.
 >
+> ### KERNEL'S LANE DOES NOT FREE AFTER `D5`. `D6` IS NEXT.
+>
+> **Steward ruling, 2026-08-09.** `AC-K12` is blocked at
+> [[RT-DYNAMIC-ARM-SCALAR-MERGE]], and the tempting inference —
+> *node blocked on Runtime, therefore Kernel is idle, therefore a lane frees* —
+> is **false**. Two deliverables remain that native lowering does not gate:
+>
+> | deliverable | gated on native? | why |
+> |---|---|---|
+> | `D6` — the four conformance rows of contract point 4 | **no** | every row is admission, rejection, or reduction; the one computation row says *reduces-to `3`*, which is the evaluator, not codegen |
+> | `D7` — the `trusted_base()` delta report (`AC-K10`) | **no** | an accounting number over the declaration ledger |
+>
+> ⇒ **Do not release a lane on the strength of `AC-K12` being blocked.** Verify
+> stays held on the two-lane cap; Kernel goes `D5`-partial → `D6` → `D7`.
+>
+> **`D6` IS A BINDING TASK, NOT A TEST-AUTHORING TASK. Size it accordingly.**
+> Most of the contract-point-4 *behaviour* is already covered by landed kernel
+> tests — what is missing is the **binding to the conformance corpus**:
+>
+> | contract point 4 clause | already covered on `main` by |
+> |---|---|
+> | positive nested admission | `nested_inductives_remaining.rs::declared_positive_paths_admit_list_pair_and_fresh_container_nesting` |
+> | the three rejections, **separately** | `nested_inductives_remaining.rs::nested_negative_unknown_and_non_positive_paths_reject_separately` |
+> | a real recursive computation | `production_nested_lift_is_consumed_and_iota_computes`, plus `D5`'s interpreter Nat-3 |
+> | direct and W-style unchanged | `k1p5_wstyle.rs`, green and untouched (`AC-K8`) |
+>
+> ⇒ **The gap is provenance, not coverage.** `k1p5_wstyle.rs` opens with a `//!`
+> line binding it to `conformance/kernel/inductive/seed-wstyle.md` AC1–AC5.
+> **No file in `crates/` references `seed-nested.md` at all** — verified by grep
+> over `crates/` and `scripts/`; `k1p5_wstyle.rs` is the only conformance
+> binding in the tree. So the corpus's cases stay `[KERNEL-NESTED-IND]`-gated
+> while the behaviour they describe is landed and green, and **nothing detects
+> the divergence** — the gate marker and a genuinely unimplemented case read
+> identically.
+>
+> `D6` therefore is: bind the executing tests to the named seed cases, fill the
+> rows that have no executing test, and drop the `[KERNEL-NESTED-IND]` gate
+> marker on exactly the contract-point-4 subset. ⚠ **Do not assume the four
+> clauses are fully covered because the table above is dense** — the table is
+> keyed on the clause, and a seed case names specifics (`Bag`/`Rose` carriers,
+> the `Deep` composition chain) that a landed test keyed on `List`/`Pair` may
+> not exercise. Check case by case.
+>
+> The four clauses map to these seed cases:
+>
+> | contract point 4 clause | seed case(s) | AC |
+> |---|---|---|
+> | positive nested Rose-style with a real recursive computation | `nested-size-uses-lift`, `nested-ds9-shapes-admitted`, `nested-fresh-carrier-admitted` | `AC-K1`–`AC-K4` |
+> | retained nested-negative rejection | `nested-negative-under-positive`, `nested-negative-existing-pair-control` | `AC-K5` |
+> | retained rejection through unknown or non-positive | `nested-unknown-head-rejected`, `nested-nonpositive-rejected` | `AC-K6`, `AC-K7` |
+> | direct and W-style unchanged | `nested-direct-and-wstyle-controls-unchanged` | `AC-K8` |
+>
+> **The implementation pattern already exists as a sibling.**
+> `crates/ken-kernel/tests/k1p5_wstyle.rs` implements
+> `conformance/kernel/inductive/seed-wstyle.md`'s AC1–AC5. There is no automatic
+> harness that reads these markdown seeds — `conformance/README.md` records the
+> harness as an open question — so `D6` is a Rust test file mirroring that
+> sibling, ⛔ **not** a new harness. Building one is out of scope and would be
+> the mechanism expansion `§4c` exists to stop.
+>
+> ⚠ **`D6` is the contract-point-4 subset, NOT all of `seed-nested.md`.** The
+> seed carries roughly eighteen cases across `AC1`–`AC5`, including the
+> sort/level and transactional-rollback soundness rows. Those belong to
+> `SPEC-NESTED-IND`, which the seed itself names as its frame. ⛔ Do not absorb
+> them into `D6` because they sit in the same file.
+>
+> **`D5`'s delivered capability feeds `D6`'s headline row directly.**
+> `nested-size-uses-lift` expects
+> `size (node (join (one leaf) (one (node empty))))` to reduce to `3` — the same
+> `LiftRose`/`Bag` Nat-3 result `D5`'s interpreter path now computes.
+>
 > ### THE NEXT SLICE IS `D5`. THE POSITION IS FOUR DELIVERABLES FURTHER ON.
 >
 > **Architect ruling `evt_3cnnt1megm88h`, 2026-08-09, and it is the authority
@@ -109,10 +180,29 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 >
 > ### The refusal is the remaining `D5` elaborator boundary
 >
-> `nested_recursive_field_lowers_and_native_agrees_at_nat_three` fails at
+> ⚠ **SUPERSEDED 2026-08-09 — the producer split described below is FIXED, and
+> the boundary moved.** `D5`'s WIP `51c482a5` closed it: the elaborator now takes
+> the method telescope from kernel `method_type`/`recursive_shapes`, the
+> interpreter evaluates the `LiftRose`/`Bag` Nat-3 case to `3`, and
+> checked-artifact erasure admits the generated support `Elim` gated on
+> `all_support_origins`. **The `TypeMismatch` at
+> `nc14_data_match_lowering.rs:136` no longer reproduces, and the test that
+> reported it has been renamed.** The block is retained because the mechanism
+> section under it is still the ruled design — read it as *how `D5` was built*,
+> ⛔ not as a live failure to reproduce.
+>
+> **The live boundary is now Runtime's**, one stage further on: a carried `Match`
+> arm refuses at `merge_scalar_operand`
+> (`ken-runtime/src/cranelift_backend/lowering/mod.rs:15898`) with *dynamic arms
+> must produce scalar Int or Bool values*. That is
+> [[RT-DYNAMIC-ARM-SCALAR-MERGE]], not this node, and Kernel may not edit it.
+>
+> The original, now-historical statement of the split follows.
+>
+> `nested_recursive_field_lowers_and_native_agrees_at_nat_three` failed at
 > `ken-elaborator/tests/nc14_data_match_lowering.rs:136` with `KernelRejected
-> TypeMismatch`. **The source gets past declaration admission; its first
-> failure is method checking**, exactly where the error location says.
+> TypeMismatch`. **The source got past declaration admission; its first
+> failure was method checking**, exactly where the error location said.
 >
 > It is a **producer split**, verified at `origin/main`:
 >
@@ -312,10 +402,35 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > controls. `D3a` took **six** candidates — five rejected objects preserved as
 > ancestors on `wp/KERNEL-NESTED-IND-D3`, none rewritten.
 >
-> ⛔ **The node is NOT complete.** Four of eight deliverables are in; **`D1b`,
-> `D2`, `D5`, `D6`, `D7` remain**, and ⛔ **a nested inductive is still rejected on
-> `origin/main`** — `D1b` is the slice that opens admittance and none of the
-> landed work widens it.
+> ⛔ **The node is NOT complete** — but the sentence that used to stand here was
+> **STALE IN THE DIRECTION THAT CHANGES WHAT YOU DO**, so read the correction
+> before the table. It said *"`D1b`, `D2`, `D5`, `D6`, `D7` remain"* and *"a
+> nested inductive is still rejected on `origin/main`"*. ⛔ **Both are false as
+> of 2026-08-09**, and the second would send a reader to re-open admittance that
+> is already open.
+>
+> **Corrected, verified against the code on `origin/main` rather than against
+> either prose block in this file:**
+>
+> | deliverable | state | verified by |
+> |---|---|---|
+> | `D1a`, `D3a`, `D3b`, `D4` | in | the table above |
+> | `D1b` — nested admittance OPEN | **in**, `afb38934` | `inductive.rs` `check_pos_arg` traverses recorded `ParameterPolarity::StrictlyPositive`; `declared_positive_paths_admit_list_pair_and_fresh_container_nesting` |
+> | `D2` — fail-closed unknown / non-positive | **in** | `nested_inductives_remaining.rs::nested_negative_unknown_and_non_positive_paths_reject_separately`, which reds the three reasons **separately** as `AC-K5`–`AC-K7` require |
+> | `D5` — surface consumability | accepted partial in flight; native stage blocked at [[RT-DYNAMIC-ARM-SCALAR-MERGE]] | |
+> | `D6`, `D7` | remain | see the successor ruling at the top of this file |
+>
+> ⇒ **Six of eight are in and a nested inductive is ADMITTED on `origin/main`.**
+>
+> ⚠ **Why this went stale invisibly, and the lesson for the next editor.**
+> `afb38934`'s commit subject is *"issue the terminal-All source relation
+> (accepted partial)"* — it names one part of what it did and never says
+> `D1b`. The node's status stayed `active` correctly throughout, so no tracker
+> check could see the drift, and **this file simultaneously contained the
+> correct claim** (the landed-record table near the top, which does attribute
+> `D1b` to `afb38934`) **and the false one, roughly three hundred lines apart.**
+> A grep for either statement finds a true sentence. ⛔ **Verify a
+> remaining-work claim against the code, never against a sibling paragraph.**
 >
 > ⭐ **What `D3b`+`D4` actually bought** (Decision `dec_b1hj6th3363a`, resolved
 > APPROVE): the structured recursive-shape descriptor is consumed **atomically**
