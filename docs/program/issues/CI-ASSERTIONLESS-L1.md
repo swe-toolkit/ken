@@ -1,16 +1,41 @@
 ---
 id: CI-ASSERTIONLESS-L1
-title: "Four tests in l1_acceptance.rs assert nothing — three are hidden behind #[ignore] and one is live, green, and counted as cover"
-status: draft
+title: "Four registered conformance claims whose only cover does not check them — l1_acceptance.rs, three ignored and one live, green, and counted as cover"
+status: ready
 owner: verify
 size: S
 gate: none
-depends_on: []
+depends_on: [CI-IGNORED-SWEEP]
 blocks: []
 github: null
 origin: verify-implementer D5 hard stop evt_15argr23kn3rq on CI-IGNORED-SWEEP (2026-08-09), independently re-measured by the Steward at origin/main d75d8c48. Filed as its own node because the live assertion-free row is structurally invisible to the sweep, so folding it into CI-IGNORED-SWEEP would leave the worse half uncovered. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> ## FRAMED 2026-08-09 — `docs/program/wp/CI-ASSERTIONLESS-L1.md`
+>
+> Status is `ready`, and `depends_on` now names `CI-IGNORED-SWEEP`: three of
+> the four rows are registered exemptions in that node's registry, whose
+> **shape is changing** under the `AC-4a` re-cut. The frame's section 4 is the
+> hard part — under `AC-4a` a registry entry resolving to no test is loud
+> instrument failure, so **deleting a test here without removing its registry
+> row blocks every merge in the repository.**
+>
+> ### Two corrections to the measurement below, re-grounded at `a22f1a87`
+>
+> **`ac2_expected_type_overrides_default` has 3 statements, not 7** — that
+> figure was a line count. Everything else in the table below is unchanged
+> from `d75d8c48`.
+>
+> **The defect is larger than "asserts nothing".** All four rows name a
+> **registered conformance claim** in their doc comments, and
+> `conformance/surface/numbers/seed-numbers.md` lists all four in its coverage
+> map against a spec AC. So this is conformance integrity, not test hygiene.
+> Nothing mechanical binds a claim id to a test — the link is doc-comment
+> convention — which means nothing will ever catch this, and also that
+> severing a claim link is cheap and honest. The frame reframes the node on
+> that axis: **a test that names a claim must check what the claim's `expect:`
+> says.**
+>
 > ## The finding came from a hard stop that was CORRECTLY taken
 >
 > `CI-IGNORED-SWEEP` `D5` mandates a stop if an ignored row **passes**.
