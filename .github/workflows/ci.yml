@@ -129,13 +129,12 @@ jobs:
       # opening fence is `text`). If a real ```rust doctest is ever added,
       # add a `cargo test --workspace --doc --locked` step back here.
 
-  # This observation job is deliberately outside build-test's needs/result
-  # loop. Findings exit zero and route without blocking; an instrument failure
-  # exits nonzero and intentionally blocks because no measurement was made.
+  # Findings exit zero and route without blocking. Instrument failures exit
+  # nonzero and are enforced by build-test's needs/result gate below because no
+  # trustworthy measurement was made.
   ignored-row-sweep:
     name: ignored-row sweep (findings non-blocking)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Install cargo-nextest
@@ -164,7 +163,8 @@ jobs:
           set -e
 
           python3 scripts/ci-ignored-sweep.py report \
-            ignored-row-sweep.log "$expected" "$run_status" \
+            ignored-row-list.json ignored-row-sweep.log \
+            "$expected" "$run_status" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
   # ── Slow native binaries, each restored to the gate in its own job ───────
@@ -371,7 +371,12 @@ jobs:
   build-test:
     name: build + test
     runs-on: ubuntu-latest
-    needs: [test-shard, native-write-partition, native-buffer, native-rt-parity]
+    needs:
+      - test-shard
+      - native-write-partition
+      - native-buffer
+      - native-rt-parity
+      - ignored-row-sweep
     # `always()` so this reports a definite conclusion even when a job fails
     # or is skipped. Without it, a failed dependency leaves this job *skipped*,
     # and a skipped required check blocks the PR with no useful signal.
@@ -383,15 +388,18 @@ jobs:
           write='${{ needs.native-write-partition.result }}'
           buffer='${{ needs.native-buffer.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
+          ignored_sweep='${{ needs.ignored-row-sweep.result }}'
           echo "test-shard matrix:      $shards"
           echo "native-write-partition: $write"
           echo "native-buffer:          $buffer"
           echo "native-rt-parity:       $rt_parity"
+          echo "ignored-row-sweep:      $ignored_sweep"
           failed=0
           for pair in "test shards:$shards" \
                       "native-write-partition:$write" \
                       "native-buffer:$buffer" \
-                      "native-rt-parity:$rt_parity"; do
+                      "native-rt-parity:$rt_parity" \
+                      "ignored-row-sweep:$ignored_sweep"; do
             name="${pair%:*}"; result="${pair##*:}"
             if [ "$result" != "success" ]; then
               echo "::error::$name did not pass ($result)." >&2
