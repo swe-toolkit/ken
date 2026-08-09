@@ -1070,7 +1070,11 @@ fn declaration_owned_pairs(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum BodyOccurrenceMutation {
     Exact,
-    CollapseBodyToSchedulingEntry,
+    /// Collapse only the `SchedulingEntry` class.
+    CollapseSchedulingEntryBody,
+    /// Collapse only the `StaticBodyTarget` class -- the arm a global collapse
+    /// cannot prove, because it reddens first through the entry class.
+    CollapseStaticBodyTargetBody,
 }
 
 #[cfg(test)]
@@ -1153,10 +1157,9 @@ fn partition_function_units(
             })?;
             #[cfg(test)]
             let body = match BODY_OCCURRENCE_MUTATION.with(std::cell::Cell::get) {
-                BodyOccurrenceMutation::Exact => body,
-                BodyOccurrenceMutation::CollapseBodyToSchedulingEntry => {
-                    StaticOriginId(entry.0)
-                }
+                BodyOccurrenceMutation::Exact
+                | BodyOccurrenceMutation::CollapseStaticBodyTargetBody => body,
+                BodyOccurrenceMutation::CollapseSchedulingEntryBody => StaticOriginId(entry.0),
             };
             seeds.push(*entry);
             seed_body_occurrences.push(body);
@@ -1190,6 +1193,15 @@ fn partition_function_units(
         let body = entry_bodies(edge.to).ok_or_else(|| {
             planner_error("static body target has no issued body occurrence")
         })?;
+        // The retired fallback, restorable per class so the `StaticBodyTarget`
+        // arm has a mutation of its own. A global collapse reddens first
+        // through the entry class and would say nothing about this one.
+        #[cfg(test)]
+        let body = match BODY_OCCURRENCE_MUTATION.with(std::cell::Cell::get) {
+            BodyOccurrenceMutation::Exact
+            | BodyOccurrenceMutation::CollapseSchedulingEntryBody => body,
+            BodyOccurrenceMutation::CollapseStaticBodyTargetBody => StaticOriginId(edge.to.0),
+        };
         seeds.push(edge.to);
         seed_body_occurrences.push(body);
     }

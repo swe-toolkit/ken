@@ -16460,7 +16460,7 @@ mod tests {
              pairing, or the refusals below prove nothing about the pairing"
         );
         let collapsed_root = with_body_occurrence_mutation(
-            BodyOccurrenceMutation::CollapseBodyToSchedulingEntry,
+            BodyOccurrenceMutation::CollapseSchedulingEntryBody,
             || ac3_emit(&computational, &empty),
         );
         assert_eq!(
@@ -16487,7 +16487,7 @@ mod tests {
              exact pairing"
         );
         let collapsed_declaration = with_body_occurrence_mutation(
-            BodyOccurrenceMutation::CollapseBodyToSchedulingEntry,
+            BodyOccurrenceMutation::CollapseSchedulingEntryBody,
             || ac3_emit(&root, &declarations),
         );
         assert!(
@@ -16662,6 +16662,115 @@ mod tests {
             planner_error("declaration occurrence projection disagrees with the issued pairing"),
             "each symbol's recorded occurrence must equal the body issued to \
              THAT symbol's own scheduling entry"
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-1b` — the `StaticBodyTarget` class
+    /// takes its ISSUED pair, not its seed's own ordinal.**
+    ///
+    /// > **MEASURED:** for a closure whose body is a computational match, the
+    /// > unit seeded on the `StaticBody` target carries a body occurrence that
+    /// > differs from `origin_of(seed)`, and equals the pair issued when that
+    /// > body's `StaticBody` edge was registered.
+    /// > **CLAIMED:** the retired `StaticOriginId(edge.to.0)` fallback is gone
+    /// > and this class reads the one relation.
+    /// > **THE GAP:** the fixture's closure body must genuinely schedule
+    /// > something before itself. For an ordinary body the seed's own ordinal
+    /// > IS its occurrence, so the fallback and the relation agree and the test
+    /// > passes under both -- which is exactly how the carve-out survived
+    /// > review the first time.
+    ///
+    /// This is the class the original bounded contract exempted as
+    /// already-grounded. On venue 4 that exemption issued `SOI(58)` to a unit
+    /// whose real body was `SOI(26)`, and its four planned joins were never
+    /// entered.
+    #[test]
+    fn a_static_body_target_whose_body_is_computational_takes_its_issued_pair() {
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let expr = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["x".to_string()],
+                body: Box::new(computational),
+            }),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
+        };
+        let plan = plan_static_transition_graph(&expr, &BTreeMap::new()).expect("plannable");
+
+        let body_edge = plan
+            .edges
+            .iter()
+            .find(|edge| edge.kind == EdgeKind::StaticBody)
+            .expect("precondition: the fixture must carry a static body edge");
+        let unit = plan
+            .semantic
+            .functions
+            .iter()
+            .find(|function| function.planned_node == body_edge.to)
+            .expect("the static body target seeded a function unit");
+
+        assert_ne!(
+            unit.body_occurrence,
+            origin_of(unit.planned_node),
+            "AC-1b precondition AND claim: the closure body must schedule \
+             something before itself, so the retired fallback \
+             `StaticOriginId(edge.to.0)` and the issued pair DISAGREE here. If \
+             they agreed, this test would pass under the carve-out too"
+        );
+        assert_eq!(
+            plan.planned_entry_body(body_edge.to),
+            Some(unit.body_occurrence),
+            "AC-1b: the unit reads the row issued when its static body edge was \
+             registered -- one relation, not a per-class rule"
+        );
+    }
+
+    /// **`AC-3` `StaticBodyTarget` arm — the CLASS-SELECTIVE collapse.**
+    ///
+    /// > **OPERAND THAT MOVED:** the population, restricted to the
+    /// > `StaticBodyTarget` class -- the retired `StaticOriginId(edge.to.0)`
+    /// > fallback restored for that class ONLY.
+    ///
+    /// A global collapse reddens first through the `SchedulingEntry` class and
+    /// therefore says nothing about this one. The informative side is the arm
+    /// that would still green if this class were left on the fallback, which is
+    /// why the mutation has to be class-selective rather than plan-wide.
+    #[test]
+    fn collapsing_only_the_static_body_target_class_is_refused() {
+        use super::semantic_ir::{with_body_occurrence_mutation, BodyOccurrenceMutation};
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let expr = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["x".to_string()],
+                body: Box::new(computational),
+            }),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
+        };
+        let empty = BTreeMap::new();
+        assert_eq!(
+            ac3_emit(&expr, &empty),
+            Ok(()),
+            "AC-3 positive control: the fixture must lower under the exact \
+             relation, or the refusal below proves nothing about the relation"
+        );
+        let collapsed = with_body_occurrence_mutation(
+            BodyOccurrenceMutation::CollapseStaticBodyTargetBody,
+            || ac3_emit(&expr, &empty),
+        );
+        assert!(
+            collapsed
+                .as_ref()
+                .err()
+                .is_some_and(|message| message.contains("planned source join")),
+            "AC-3: restoring the retired fallback for this class alone must \
+             recreate the traversal/closeout failure. got {collapsed:?}"
         );
     }
 
