@@ -33,7 +33,7 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-08 ~20:0xZ · THREE LANES OPEN; PX8-ERRID-ALLOC MERGED
+## LIVE — 2026-08-09 ~00:0xZ · TWO LANES; #6i `D0` MERGED AND STOPPED ON A RULING
 
 > ### STANDING SEQUENCING POLICY — DECIDE IT, DO NOT ASK IT
 >
@@ -88,9 +88,21 @@
 | team | now | next | then |
 |---|---|---|---|
 | **Verify** | **MERGED `e0abf72a`, ring STOOD DOWN** (`evt_5bfzjp5phktbb`) | **nothing — lane cap.** `CI-IGNORED-SWEEP` stays `ready`, unstarted | — |
-| **Kernel** | `KERNEL-NESTED-IND` (L, kicked `evt_6cm2d60a1140z`) | unblocks Foundation's `DS-9` | — |
-| **Runtime** | between WPs | `RT-CONTINUATION-EDGE-DISPOSITION` (#6i) **once I frame it — STEWARD DEBT** | `RT-MATCH-RECURSOR-CONSUMERS` |
+| **Kernel** | `KERNEL-NESTED-IND` — **Architect REQUEST-CHANGES on `e8cdc8b9`**; implementer is working the correction | unblocks Foundation's `DS-9` | — |
+| **Runtime** | `RT-CONTINUATION-EDGE-DISPOSITION` (#6i) — **`D0` MERGED `e93afb06` (#1659); `D1`/`D2`/`D3` STOPPED on an Architect ruling** | `RT-MATCH-RECURSOR-CONSUMERS` `AC-1` | `RT-LEXICAL-RECURSOR-CONSUMERS` (#6d) |
 | **Foundation** | idle, nothing dependency-clear | `DS-9` after `KERNEL-NESTED-IND` | `PX9` after `PX8` |
+
+> ### OPERATOR 2026-08-09: KEEP THE SEQUENCE AS STATED
+>
+> Asked whether `RT-FNUNIT-RESULT-TOKEN` should be pulled forward — it is the
+> capstone's **one prerequisite not behind the seven-wall chain**
+> (`depends_on: []`, `blocks: RT-DESCENT-RETIRE`), and its surface is
+> `cranelift_backend/surface.rs` plus `artifact/api/tests.rs`, **not**
+> `lowering/core.rs`, so it does not contend with the recursor chain's files.
+>
+> **Ruling: the sequence stands.** It stays `ready` and **unstarted**. Do not
+> re-propose it as free parallelism — the disjoint surface is real and is not
+> the point; Runtime is single-threaded and the cap is two.
 
 > **Runtime's `ready` count is NOT startable depth.** Ten runtime nodes read
 > `ready`; at least `RT-FNUNIT-RESULT-TOKEN` has **no frame at all** — only
@@ -99,21 +111,32 @@
 
 ### Session state
 
-`main` = **`a1b7c068`**. Worktree clean. **Nothing of mine is unpublished.**
+`main` = **`2f522481`** or later. Worktree clean. **Nothing of mine is unpublished.**
 
-> ### MY ADDRESS: two handbacks, and I own neither piece of work
+> ### MY ADDRESS: BOTH LANES ARE WAITING ON SOMEONE WHO IS NOT ME
 >
-> 1. **Foundation owes me a corrected `PX8-ERRID-ALLOC` SHA.** PR **#1646** at
->    `668bbf73` is **RED** and left **OPEN** on `wp/PX8-ERRID-ALLOC`; they push
->    the fix to that same branch. Told at `evt_1w8yeh1x86908`
->    (`thr_6h0jfk1cwfe1y`).
-> 2. **Runtime owes me a `D2` checkpoint** naming its pinned base. Released to
->    start planner-side work at `evt_6kpy0smysw9ww` (`thr_68hxpbfv5tk4b`).
+> 1. **Runtime `#6i`** — `D0` merged at `e93afb06` (#1659); tracker, node and
+>    frame corrections at #1660. **The ring is idle BY DESIGN**, holding for an
+>    Architect ruling requested at `evt_7hzmgfyedd70v`
+>    (`thr_6aybmqmz24scm`). **Do not read the idle implementer as a stall and do
+>    not queue work onto Runtime.** Two questions are out: whether the
+>    210-of-637 closeout visibility gap is the named hard stop, and whether `D1`
+>    may proceed before it closes. **Sizing stays `TBD`; refuse any number that
+>    arrives before that ruling.**
+> 2. **Kernel `KERNEL-NESTED-IND`** — QA approved `e8cdc8b9`, then the Architect
+>    issued **REQUEST-CHANGES** on it. The prior approval and `dec_7j9cezkb8vvrw`
+>    **do not transfer to the child**; the leader has already said so and the
+>    implementer is working the correction. **Expect a fresh exact-SHA handback,
+>    fresh QA, and a new Decision** — then a publish request.
 >
-> **On the corrected PX8 landing:** blob-verify every changed path, **notify the
-> Adversary** (code merge, one-directional, never acknowledge), flip
-> `PX8-ERRID-ALLOC` to `merged`, post on **both** threads, then kick Foundation
-> on `PX8-ERRID-SCOPE` (`ready`, frame exists, 231 lines).
+> **Nothing is owed by me to either ring.** The next Steward action on both is
+> reactive.
+>
+> **Verify the implementer's idleness with `capture-pane -e`, not the text.**
+> A dim `^[[2m` composer line is a PLACEHOLDER and the composer is EMPTY; the
+> placeholder is generated from the seat's own recent work, so it reads exactly
+> like a stranded instruction and it **changes between captures**. Cost me two
+> no-op `Enter`s tonight.
 
 ### PX8 #1646 is ONE defect wearing four shard failures
 
