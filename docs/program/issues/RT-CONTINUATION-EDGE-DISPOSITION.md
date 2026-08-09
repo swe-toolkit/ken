@@ -53,18 +53,38 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > **Trap 3**. ⇒ **A `D3` witness must be AUTHORED under `D1`.** That is a
 > measurement, not a shortfall in the search.
 >
-> **The §4 stop is OPEN BUT UNFIRED, and `D0` still owes its measurement.**
-> `b2f_last_unit_emission()` returning `(0, 0)` settles **none** of the required
-> axes. For the exact `px8j` candidate target, `D0` owes: **selected authority;
-> `UnitBundle` membership and declared `FuncId`; definition evidence at the real
-> `define_function` seat; and ABI descriptor reachability.** The stop fires only
-> if that target cannot be declared, defined, and ABI-reachable through the
-> already selected `UnitBundle` without a post-lowering call-graph rebuild or a
-> planner traversal-contract change. **Report it unfired, not cleared.**
+> **THE §4 STOP IS UNFIRED AT `D0`, AND `D0` OWES NOTHING FURTHER ON IT.**
+> Verbatim condition: **`UNFIRED AT D0; re-route only if D1 changes unit
+> population, declaration, definition, ABI projection, or traversal.`**
+> `px8j` is **non-selected**, measured with a same-run probe-alive control, so
+> its `b2f_last_unit_emission() == (0, 0)` is a non-selected-authority result
+> rather than a blind instrument. **No further direct ABI probe is required.**
+> The selected-side reachability controls are **`sar_d3`, `ccr_d3` and
+> `coc_d3`** — any later reachability claim is made against those, not `px8j`.
 >
-> **`D1`/`D2`/`D3` REMAIN STOPPED under that open measurement.** No size, no
-> representation, no witness authoring, no `D2` closeout edit, and no node fork
-> is authorized before the corrected `D0` returns. Sizing stays `TBD`.
+> **Unfired is not cleared.** The condition was evaluated and did not hold, so
+> it stays live as a **`D1`** obligation on the five named axes.
+>
+> ### `D1` IS RELEASED. `D2` AND `D3` REMAIN STOPPED.
+>
+> **Steward release, 2026-08-09.** `D1`'s only gate was the frame's
+> *"measurements before mechanism"* rule, and `D0` has returned, been corrected,
+> and been accepted with the stop unfired. **There is nothing left for `D1` to
+> wait on**, so it starts.
+>
+> **`D2` and `D3` stay stopped, and this is not caution.** `D3`'s five mutations
+> need an `InlineNoCall` witness that **does not exist yet and is `D1`'s to
+> author**, and `D2`'s closeout ordering is only meaningful once the
+> representation exists. Releasing them now would authorize work whose input is
+> missing.
+>
+> **`AC-7` stays open** — it is `D1`'s to discharge, against the empty witness
+> cell, not the class.
+>
+> **Sizing stays `TBD`, and I want the number at `D1`'s checkpoint, not before
+> it.** The two inputs that made `D0` decline to size are now settled — the
+> 427-candidate reading is withdrawn and the stop is unfired — but the third,
+> the cost of authoring a witness, is exactly what `D1` measures first.
 >
 > **The merged `D0` is valid as a census artifact** — no code revert and no
 > Runtime production work is requested. Its causal interpretation is what was
