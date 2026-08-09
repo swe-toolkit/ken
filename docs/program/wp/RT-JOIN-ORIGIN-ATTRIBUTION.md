@@ -1,4 +1,16 @@
-# RT-JOIN-ORIGIN-ATTRIBUTION — the causal checkpoint, and the input it is missing
+# RT-JOIN-ORIGIN-ATTRIBUTION — the causal checkpoint and its authority
+
+> **THE ANSWER IS IN §10: the first missing general authority is the GENERAL
+> TRAVERSAL ROUTE.** §9 carries the four measurements it is argued from.
+>
+> **§§1-8 are retained CHRONOLOGY, and §4 in particular is SUPERSEDED.** It
+> records that no authority could be named *at that time*, on the venues then
+> available and before Kernel supplied the exact invocation and its projection
+> snapshot. It is kept because the two negative results in it are load-bearing
+> — they are what established that the defect is neither a `D3` regression nor
+> reachable from a substitute program — **not because its headline claim is
+> still current.** Read §4 as "what was true before §8", never as this
+> document's finding.
 
 > ## THE VENUE, FIRST, BECAUSE EVERY NUMBER BELOW DEPENDS ON IT
 >
@@ -116,7 +128,14 @@ origin sets, the same successful native build.
 landed on `main` since `120b426b` already repaired this — is **false**, and it
 is ruled out by measurement rather than left as a possibility.
 
-## 4. THE FIRST MISSING GENERAL AUTHORITY IS NOT NAMED, AND THIS IS THE FINDING
+## 4. SUPERSEDED BY §10 — no authority could be named AT THIS POINT
+
+> **This section is the first measurement, and its conclusion is spent.** It
+> was written before Kernel supplied the exact invocation (§8) and the
+> projection snapshot that made the defect reachable (§9). **§10 names the
+> authority.** What survives here is the reasoning about why a wrong program's
+> trace must not be used to name one — which is why the section is retained
+> rather than deleted.
 
 **I cannot attribute an authority for a failure I cannot reproduce, and I will
 not name one from the node text.**
@@ -305,6 +324,31 @@ body of `liftSize` itself**, not a nested or conditional sub-expression.
 
 **The entire owner population is uncovered, not merely SOI(26).** SOI(26) is
 simply the least element of a four-member set of which **none** was reached.
+
+#### The closing function
+
+**The closing function is `PredeclaredFunctionId(2)` — the same function that
+owns SOI(26)**, and this is a derivation from two measured fields rather than a
+third direct observation. Stated that way deliberately, because the required
+measurement list names it explicitly and an asserted field would read as
+observed:
+
+1. `semantic.function_owner(SOI(26))` was **measured** as
+   `Some(PredeclaredFunctionId(2))` (measurement 1);
+2. `required_join_origins(function)` admits an origin **only** when
+   `function_owner(origin) == function` — it iterates the occurrence table and
+   inserts on exactly that equality, refusing outright if the population is not
+   keyed by source origin.
+
+⇒ Since SOI(26) is present in the `required` set the closeout raised on, the
+`function` that closeout was called with is necessarily the owner of SOI(26),
+namely `PredeclaredFunctionId(2)`. The call site is
+`define_unit_body`'s `validate_join_plan_consumption(unit.function)`
+(`lowering/units.rs:4696`), which passes the emitting unit's own id.
+
+**There is no second closing function in play**: the two sibling closures in
+the positive control below carry disjoint `required` sets, so no other function
+could have raised this one.
 
 ### Measurement 3 — traversal, selection, and subtree
 
