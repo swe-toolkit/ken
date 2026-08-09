@@ -1,7 +1,7 @@
 ---
 id: CI-IGNORED-SWEEP
 title: "nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off"
-status: ready
+status: active
 owner: verify
 size: S
 gate: none
@@ -11,10 +11,13 @@ github: null
 origin: Adversary finding evt_4mwy8tmfmm7tw (F2), triaged and independently confirmed by the Steward against origin/main 533f7c06. Filed as its own node on the operator's ruling 2026-08-07, which kept the RT-SRCBODY-BIND-ORDER candidate's diff minimal rather than folding the sweep into it. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> ## FRAMED — `ready`, size S
+> ## RELEASED to Team Verify 2026-08-09 — `active`, size S
 >
 > Frame:
 > [`CI-IGNORED-SWEEP`](../wp/CI-IGNORED-SWEEP.md)
+>
+> Kickoff `evt_7x5bhde9ttts5`, which is the thread anchor. The ring was
+> compacted and reset to `e3e9994c` first; verify-leader confirmed `Working`.
 >
 > **The frame governs; this file is the origin record.** Where the two differ,
 > the frame is later and was re-ground against `origin/main` `20c7a291` at
