@@ -401,11 +401,11 @@ pub(in crate::cranelift_backend) fn reset_observed_recursive_descent_residuals()
     OBSERVED_RESIDUALS.with(|cell| *cell.borrow_mut() = None);
 }
 
-// ── `RT-MATCH-RECURSOR-CONSUMERS` `AC-1`, frame section 4a ──────────────────
+// `RT-MATCH-RECURSOR-CONSUMERS` `AC-1`, frame section 4a.
 //
 // The cross-crate census recorder. **OBSERVATION ONLY.**
 //
-// ⛔ The split this rests on is a property of the code, not a convention.
+// **The split this rests on is a property of the code, not a convention.**
 // [`enumerate_recursive_descent_residuals`] is **ordinary production code**
 // that already walks the exact `RuntimeExpr` and declarations exhaustively;
 // only the recorder below is gated. By contrast
@@ -414,20 +414,20 @@ pub(in crate::cranelift_backend) fn reset_observed_recursive_descent_residuals()
 // the behaviour-changing activation seam section 5 bans. The observation
 // extends; the activation does not.
 //
-// ⛔ The recorder may not remove a residual, set an exclusion, choose an
-// authority, alter a planner/ABI value, or affect any result. Every function
+// **The recorder may not remove a residual, set an exclusion, choose an
+// authority, alter a planner/ABI value, or affect any result.** Every function
 // here takes `&` inputs and returns either nothing or an index into its own
 // row buffer. With no recorder installed each one is a thread-local read and a
 // return, which is what "feature-on with no recorder installed is inert"
 // means.
 //
-// ⚠ Rows accumulate in a `Vec`, never a set or a map. A census key that
+// **Rows accumulate in a `Vec`, never a set or a map.** A census key that
 // collides **deduplicates**, so the population would read smaller *and
 // cleaner* than it is — the failure mode that looks like success. Appending
 // makes that unrepresentable rather than merely avoided.
 //
-// ⚠ The recorder is thread-local, so a scope observes compilations on **its
-// own thread**. A harness that compiles on a spawned thread must install the
+// **The recorder is thread-local, so a scope observes compilations on its
+// own thread.** A harness that compiles on a spawned thread must install the
 // scope there. Stated because a silently empty census and a genuinely empty
 // population are the two readings this must never conflate.
 #[cfg(any(test, feature = "px8-ds-test-support"))]
