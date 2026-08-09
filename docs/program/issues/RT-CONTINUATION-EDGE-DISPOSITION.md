@@ -24,15 +24,27 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > completed**, kept separate on purpose — the frame settles `InlineNoCall` only
 > on a scope that **completes**, and folding the two would manufacture members.
 >
-> **The closeout ranges over 210 of the 637.** A ledger only closes over
-> candidates whose owner function reaches closeout, so **427 are never
-> checked** — including **52 `DIRECT` and 11 `COMPOSED`** discharged at seats no
-> closeout sees. ⇒ `D2`'s *"an exact, disjoint disposition for every candidate"*
-> is **not a check added at the existing seat; it changes which population that
-> seat ranges over.** Routed to the Architect (`evt_7hzmgfyedd70v`), not ruled
-> by the ring — the right call, and it is why `D1` is stopped.
+> **RULED `evt_40rf074xsj3y1`: the 210-of-637 result is NOT a second hard
+> stop.** The counts stand — 427 candidates carry `CLOSE_CHECKED = false`,
+> including 52 `DIRECT` and 11 `COMPOSED` — and **637 is retained as the
+> observational superpopulation**. What is withdrawn is the causal reading.
+> **There is no per-owner closeout.** One artifact-wide ledger opens in the
+> selected `FunctionizedUnits` arm before `define_unit_bodies`, is seeded from
+> the plan's full `continuation_calls()`, and closes only after every definition
+> pass and the root adapter succeed. ⇒ `CLOSE_CHECKED = false` means **that
+> compile never reached a successful functionized-artifact closure, or selected
+> another authority** — it does **not** show a healthy candidate lying outside a
+> successful closeout's authority.
 >
-> **`AC-7` is measured OPEN, and the empty cell is the finding.** No
+> **`D2`'s quantifier is narrower and exact:** every activated binding candidate
+> in **one selected `FunctionizedUnits` artifact**, settled once before that
+> artifact closes. **Plan-only rows, `Err` compilations, and non-selected
+> `RecursiveDescent` plans are not obligations.** The candidate layer shares the
+> ledger's artifact lifetime and does not widen it, add a per-owner close, or
+> traverse failed compilations.
+>
+> **`AC-7` is measured OPEN, and it is the WITNESS CELL that is empty, not the
+> class** — `D0` measured **21** `InlineNoCall` members. No
 > `InlineNoCall` member has a binding, a closeout, **and** a successful compile.
 > The three closeout-visible members are this campaign's own controls
 > (`ccr_d3`, `coc_d3`, `sar_d3`), all refusing; the two inside successful
@@ -41,16 +53,22 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > **Trap 3**. ⇒ **A `D3` witness must be AUTHORED under `D1`.** That is a
 > measurement, not a shortfall in the search.
 >
-> **The declaration/definition/ABI half of the hard stop is NOT closed.**
-> `b2f_last_unit_emission()` returns `(0, 0)` after a successful compile of the
-> witness, so it is not observing the path the question needs, and the ring
-> stopped rather than substitute a different number. An **interned-but-uncalled
-> specialization already exists inside a successful compile**, which weakens the
-> strong form without settling it. The exact remaining measurement is named in
-> the record.
+> **The §4 stop is OPEN BUT UNFIRED, and `D0` still owes its measurement.**
+> `b2f_last_unit_emission()` returning `(0, 0)` settles **none** of the required
+> axes. For the exact `px8j` candidate target, `D0` owes: **selected authority;
+> `UnitBundle` membership and declared `FuncId`; definition evidence at the real
+> `define_function` seat; and ABI descriptor reachability.** The stop fires only
+> if that target cannot be declared, defined, and ABI-reachable through the
+> already selected `UnitBundle` without a post-lowering call-graph rebuild or a
+> planner traversal-contract change. **Report it unfired, not cleared.**
 >
-> **Sizing stays `TBD`, and no number was proposed.** Two of the three inputs a
-> size rests on are the ones this census moved, and the hard stop is open.
+> **`D1`/`D2`/`D3` REMAIN STOPPED under that open measurement.** No size, no
+> representation, no witness authoring, no `D2` closeout edit, and no node fork
+> is authorized before the corrected `D0` returns. Sizing stays `TBD`.
+>
+> **The merged `D0` is valid as a census artifact** — no code revert and no
+> Runtime production work is requested. Its causal interpretation is what was
+> corrected, in this node, its frame, the `D0` record, and campaign row #6i.
 
 > # THIS IS THE SEVENTH WALL, AND IT IS A REPRESENTATION SPLIT, NOT A REPAIR.
 
