@@ -27,6 +27,7 @@ def listing(identities: set[tuple[str, str, str]]) -> dict[str, object]:
         suites[str(index)] = {
             "package-name": package,
             "binary-name": binary,
+            "binary-id": binary,
             "testcases": {
                 test: {
                     "ignored": True,
@@ -35,6 +36,22 @@ def listing(identities: set[tuple[str, str, str]]) -> dict[str, object]:
             },
         }
     return {"test-count": len(identities), "rust-suites": suites}
+
+
+def write_selected_listing(path: Path, *human_identities: str) -> None:
+    identities = {
+        ("fixture-package", binary_id, test)
+        for binary_id, test in (
+            human_identity.split(" ", 1) for human_identity in human_identities
+        )
+    }
+    filler = 0
+    while len(identities) < 47:
+        identities.add(
+            ("fixture-package", "all_failing", f"ignored_row_{filler}")
+        )
+        filler += 1
+    path.write_text(json.dumps(listing(identities)), encoding="utf-8")
 
 
 def registry_identities(rows: list[dict[str, str]]) -> set[tuple[str, str, str]]:
@@ -114,6 +131,38 @@ class IgnoredSweepTests(unittest.TestCase):
             with self.assertRaises(SWEEP.SweepError):
                 SWEEP.verify_lists(all_listing, selected_listing, 46, rows)
 
+    def test_listing_derives_one_exact_human_identity_per_selected_row(self) -> None:
+        document = listing({("fixture-package", "binary-name", "selected_test")})
+        suite = next(iter(document["rust-suites"].values()))
+        suite["binary-id"] = "fixture-package::binary-id"
+
+        with tempfile.TemporaryDirectory() as directory:
+            selected_listing = Path(directory) / "selected.json"
+            selected_listing.write_text(json.dumps(document), encoding="utf-8")
+            count, _, human_identities = SWEEP.read_listing(selected_listing)
+            self.assertEqual(count, 1)
+            self.assertEqual(
+                set(human_identities),
+                {"fixture-package::binary-id selected_test"},
+            )
+
+            duplicate = json.loads(json.dumps(document))
+            duplicate["test-count"] = 2
+            duplicate["rust-suites"]["second"] = {
+                "package-name": "other-package",
+                "binary-name": "other-binary",
+                "binary-id": "fixture-package::binary-id",
+                "testcases": {
+                    "selected_test": {
+                        "ignored": True,
+                        "filter-match": {"status": "matches"},
+                    }
+                },
+            }
+            selected_listing.write_text(json.dumps(duplicate), encoding="utf-8")
+            with self.assertRaisesRegex(SWEEP.SweepError, "multiple selected rows"):
+                SWEEP.read_listing(selected_listing)
+
     def test_completed_report_names_passing_rows(self) -> None:
         log_text = """
         Starting 47 tests across 4 binaries
@@ -123,11 +172,16 @@ class IgnoredSweepTests(unittest.TestCase):
         Summary [  1.000s] 47 tests run: 1 passed, 46 failed
         """
         with tempfile.TemporaryDirectory() as directory:
+            selected_listing = Path(directory) / "selected.json"
             log = Path(directory) / "run.log"
+            write_selected_listing(
+                selected_listing,
+                "l1_acceptance sec24_char_excludes_surrogates",
+            )
             log.write_text(log_text, encoding="utf-8")
             output = io.StringIO()
             with redirect_stdout(output):
-                SWEEP.report(log, 47, 100)
+                SWEEP.report(selected_listing, log, 47, 100)
 
         report = output.getvalue()
         identity = "l1_acceptance sec24_char_excludes_surrogates"
@@ -142,26 +196,28 @@ class IgnoredSweepTests(unittest.TestCase):
 
     def test_report_rejects_zero_or_incomplete_measurements(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
+            selected_listing = Path(directory) / "selected.json"
             log = Path(directory) / "run.log"
+            write_selected_listing(selected_listing, "l1_acceptance repaired_row")
             log.write_text(
                 "Summary [ 0.001s] 0 tests run: 0 passed, 0 failed\n",
                 encoding="utf-8",
             )
             with self.assertRaises(SWEEP.SweepError):
-                SWEEP.report(log, 47, 0)
+                SWEEP.report(selected_listing, log, 47, 0)
             log.write_text(
                 "Summary [ 0.001s] 47 tests run: 0 passed, 47 failed\n",
                 encoding="utf-8",
             )
             with self.assertRaises(SWEEP.SweepError):
-                SWEEP.report(log, 47, 4)
+                SWEEP.report(selected_listing, log, 47, 4)
             log.write_text(
                 "PASS [ 0.001s] (1/46) l1_acceptance repaired_row\n"
                 "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(SWEEP.SweepError, "counter 1/46"):
-                SWEEP.report(log, 47, 100)
+                SWEEP.report(selected_listing, log, 47, 100)
             for malformed in ("(x/47) row", "(1/x) row", "(1/47 row"):
                 log.write_text(
                     f"PASS [ 0.001s] {malformed}\n"
@@ -169,7 +225,23 @@ class IgnoredSweepTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 with self.assertRaisesRegex(SWEEP.SweepError, "malformed"):
-                    SWEEP.report(log, 47, 100)
+                    SWEEP.report(selected_listing, log, 47, 100)
+
+            for summary_passed, status_line in (
+                (1, "an unrelated line that matches nothing"),
+                (0, "PASS [ 0.001s] l1_acceptance repaired_row"),
+            ):
+                with self.subTest(summary_passed=summary_passed):
+                    log.write_text(
+                        f"{status_line}\n"
+                        f"Summary [ 1.000s] 47 tests run: {summary_passed} passed, "
+                        f"{47 - summary_passed} failed\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(
+                        SWEEP.SweepError, "summary reports"
+                    ):
+                        SWEEP.report(selected_listing, log, 47, 100)
 
     def test_pass_line_census_assigns_every_input_class(self) -> None:
         identity = "l1_acceptance sec24_char_excludes_surrogates"
@@ -193,7 +265,9 @@ class IgnoredSweepTests(unittest.TestCase):
         }
 
         with tempfile.TemporaryDirectory() as directory:
+            selected_listing = Path(directory) / "selected.json"
             log = Path(directory) / "run.log"
+            write_selected_listing(selected_listing, identity)
             for label, lines in finding_logs.items():
                 log.write_text(
                     "\n".join(lines)
@@ -202,7 +276,7 @@ class IgnoredSweepTests(unittest.TestCase):
                 )
                 output = io.StringIO()
                 with redirect_stdout(output):
-                    SWEEP.report(log, 47, 100)
+                    SWEEP.report(selected_listing, log, 47, 100)
                 report = output.getvalue()
                 self.assertIn("47 selected; 1 passed", report, label)
                 self.assertEqual(report.count(f"- {identity}"), 1, label)
@@ -213,13 +287,29 @@ class IgnoredSweepTests(unittest.TestCase):
                 )
 
             for label, line in instrument_lines.items():
-                log.write_text(
-                    f"{line}\n"
-                    "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
-                    encoding="utf-8",
-                )
-                with self.assertRaises(SWEEP.SweepError, msg=label):
-                    SWEEP.report(log, 47, 100)
+                with self.subTest(input_class=label):
+                    log.write_text(
+                        f"{line}\n"
+                        "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(SWEEP.SweepError):
+                        SWEEP.report(selected_listing, log, 47, 100)
+
+            for label, fabricated in (
+                ("decorated test token", "l1_acceptance [1/47]"),
+                ("fabricated test token", "l1_acceptance not_a_listed_test"),
+            ):
+                with self.subTest(input_class=label):
+                    log.write_text(
+                        f"PASS [ 0.001s] {fabricated}\n"
+                        "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(
+                        SWEEP.SweepError, "not in the selected listing"
+                    ):
+                        SWEEP.report(selected_listing, log, 47, 100)
 
             log.write_text(
                 "an unrelated line that matches nothing\n"
@@ -228,7 +318,7 @@ class IgnoredSweepTests(unittest.TestCase):
             )
             output = io.StringIO()
             with redirect_stdout(output):
-                SWEEP.report(log, 47, 100)
+                SWEEP.report(selected_listing, log, 47, 100)
             self.assertIn("47 selected; 0 passed", output.getvalue())
             self.assertIn("No ignored row passed", output.getvalue())
 
@@ -238,6 +328,7 @@ class IgnoredSweepTests(unittest.TestCase):
             nominal_log = root / "nominal.log"
             finding_log = root / "finding.log"
             malformed_log = root / "malformed.log"
+            selected_listing = root / "selected.json"
             all_listing = root / "all.json"
             missing_registry = root / "missing.toml"
             nominal_log.write_text(
@@ -256,6 +347,7 @@ class IgnoredSweepTests(unittest.TestCase):
                 encoding="utf-8",
             )
             all_listing.write_text(json.dumps(listing(set())), encoding="utf-8")
+            write_selected_listing(selected_listing, "l1_acceptance repaired_row")
             missing_registry.write_text(
                 "version = 1\n\n"
                 "[[exemption]]\n"
@@ -279,7 +371,15 @@ class IgnoredSweepTests(unittest.TestCase):
                 text=True,
             )
             finding = subprocess.run(
-                [sys.executable, str(SCRIPT), "report", str(finding_log), "47", "100"],
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "report",
+                    str(selected_listing),
+                    str(finding_log),
+                    "47",
+                    "100",
+                ],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -289,6 +389,7 @@ class IgnoredSweepTests(unittest.TestCase):
                     sys.executable,
                     str(SCRIPT),
                     "report",
+                    str(selected_listing),
                     str(malformed_log),
                     "47",
                     "100",
@@ -298,7 +399,15 @@ class IgnoredSweepTests(unittest.TestCase):
                 text=True,
             )
             nominal = subprocess.run(
-                [sys.executable, str(SCRIPT), "report", str(nominal_log), "47", "100"],
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "report",
+                    str(selected_listing),
+                    str(nominal_log),
+                    "47",
+                    "100",
+                ],
                 check=False,
                 capture_output=True,
                 text=True,

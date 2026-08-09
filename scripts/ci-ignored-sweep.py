@@ -21,7 +21,9 @@ POPULATION_PATHS = (
     "crates/ken-interp",
 )
 ALLOWED_CLASSES = {"policy-cost", "placeholder-no-assertions"}
-SUMMARY_RE = re.compile(r"\b(\d+) tests? run:")
+SUMMARY_RE = re.compile(
+    r"\b(?P<total>\d+) tests? run:\s+(?P<passed>\d+) passed\b"
+)
 PASS_RE = re.compile(
     r"^\s*PASS\s+\[[^]]+\]\s+(?P<payload>.+?)\s*$"
 )
@@ -29,7 +31,6 @@ PASS_PREFIX_RE = re.compile(r"^\s*PASS(?:\s|$)")
 COUNTER_RE = re.compile(
     r"^\((?P<index>\d+)/(?P<total>\d+)\)\s+(?P<identity>.+)$"
 )
-IDENTITY_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*\s+\S+$")
 
 
 class SweepError(RuntimeError):
@@ -132,38 +133,57 @@ def expected_count(rows: list[dict[str, str]]) -> int:
     return expected
 
 
-def read_listing(path: Path) -> tuple[int, set[tuple[str, str, str]]]:
+def read_listing(
+    path: Path,
+) -> tuple[
+    int,
+    set[tuple[str, str, str]],
+    dict[str, tuple[str, str, str]],
+]:
     with path.open("rb") as source:
         listing = json.load(source)
     count = listing.get("test-count")
     if not isinstance(count, int):
         raise SweepError(f"{path} has no integer test-count")
     identities: set[tuple[str, str, str]] = set()
+    human_identities: dict[str, tuple[str, str, str]] = {}
     suites = listing.get("rust-suites")
     if not isinstance(suites, dict):
         raise SweepError(f"{path} has no rust-suites map")
     for suite in suites.values():
         package = suite.get("package-name")
         binary = suite.get("binary-name")
+        binary_id = suite.get("binary-id")
         testcases = suite.get("testcases")
         if (
             not isinstance(package, str)
             or not isinstance(binary, str)
+            or not isinstance(binary_id, str)
+            or not binary_id
             or not isinstance(testcases, dict)
         ):
             raise SweepError(f"{path} contains a malformed suite")
         for test, metadata in testcases.items():
-            if not isinstance(metadata, dict):
+            if not isinstance(test, str) or not test or not isinstance(metadata, dict):
                 raise SweepError(f"{path} contains malformed test metadata")
             filter_match = metadata.get("filter-match", {})
             if metadata.get("ignored") and filter_match.get("status") == "matches":
-                identities.add((package, binary, test))
+                identity = (package, binary, test)
+                identities.add(identity)
+                human_identity = f"{binary_id} {test}"
+                prior = human_identities.get(human_identity)
+                if prior is not None and prior != identity:
+                    raise SweepError(
+                        f"{path} maps human identity {human_identity!r} to "
+                        "multiple selected rows"
+                    )
+                human_identities[human_identity] = identity
     if len(identities) != count:
         raise SweepError(
             f"{path} reports {count} tests but exposes {len(identities)} matching "
             "ignored identities"
         )
-    return count, identities
+    return count, identities, human_identities
 
 
 def verify_lists(
@@ -172,8 +192,8 @@ def verify_lists(
     expected: int,
     rows: list[dict[str, str]],
 ) -> None:
-    all_count, all_identities = read_listing(all_path)
-    selected, selected_identities = read_listing(selected_path)
+    all_count, all_identities, _ = read_listing(all_path)
+    selected, selected_identities, _ = read_listing(selected_path)
     if all_count != expected + len(rows):
         raise SweepError(
             f"nextest discovered {all_count} ignored rows; anchored derivation "
@@ -197,12 +217,25 @@ def verify_lists(
     )
 
 
-def report(path: Path, expected: int, exit_status: int) -> None:
+def report(
+    selected_path: Path,
+    path: Path,
+    expected: int,
+    exit_status: int,
+) -> None:
+    selected_count, _, selected_human_identities = read_listing(selected_path)
+    if selected_count != expected:
+        raise SweepError(
+            f"selected listing reports {selected_count} rows; expected {expected}"
+        )
     text = path.read_text(encoding="utf-8", errors="replace")
-    summaries = [int(match.group(1)) for match in SUMMARY_RE.finditer(text)]
+    summaries = [
+        (int(match.group("total")), int(match.group("passed")))
+        for match in SUMMARY_RE.finditer(text)
+    ]
     if not summaries:
         raise SweepError("nextest output has no completed-run summary")
-    observed = summaries[-1]
+    observed, summary_passed = summaries[-1]
     if observed != expected:
         raise SweepError(
             f"nextest summary reports {observed} rows; expected {expected}"
@@ -236,10 +269,17 @@ def report(path: Path, expected: int, exit_status: int) -> None:
             identity = counter.group("identity")
         else:
             identity = payload
-        if IDENTITY_RE.fullmatch(identity) is None:
-            raise SweepError(f"malformed nextest PASS identity: {identity}")
+        if identity not in selected_human_identities:
+            raise SweepError(
+                f"nextest PASS identity is not in the selected listing: {identity}"
+            )
         if identity not in passing:
             passing.append(identity)
+    if len(passing) != summary_passed:
+        raise SweepError(
+            f"nextest summary reports {summary_passed} passed rows but "
+            f"status output identifies {len(passing)} unique selected rows"
+        )
     print(f"Ignored-row sweep completed: {observed} selected; {len(passing)} passed.")
     if passing:
         print("Passing ignored rows need owner routing:")
@@ -268,6 +308,7 @@ def parse_args() -> argparse.Namespace:
     verify.add_argument("selected_listing", type=Path)
     verify.add_argument("expected", type=int)
     report_parser = subcommands.add_parser("report")
+    report_parser.add_argument("selected_listing", type=Path)
     report_parser.add_argument("log", type=Path)
     report_parser.add_argument("expected", type=int)
     report_parser.add_argument("exit_status", type=int)
@@ -279,7 +320,7 @@ def main() -> int:
     try:
         rows = load_registry(args.registry)
         if args.command == "filter":
-            _, identities = read_listing(args.all_listing)
+            _, identities, _ = read_listing(args.all_listing)
             print(filter_expression(rows, identities))
         elif args.command == "expected":
             print(expected_count(rows))
@@ -288,7 +329,12 @@ def main() -> int:
                 args.all_listing, args.selected_listing, args.expected, rows
             )
         elif args.command == "report":
-            report(args.log, args.expected, args.exit_status)
+            report(
+                args.selected_listing,
+                args.log,
+                args.expected,
+                args.exit_status,
+            )
         else:
             raise AssertionError(args.command)
     except (OSError, ValueError, SweepError) as error:
