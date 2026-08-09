@@ -10919,7 +10919,7 @@ fn d4_an_unrecorded_continuation_emission_reds_the_clif_sweep() {
 ///
 /// ⚠ **`D8k` moved which clause catches it, and the move is the point.** The
 /// closeout no longer asserts `emitted == planned`; it asserts the disjoint
-/// partition `planned = direct-emitted ⊎ composed-consumed`. A token that was
+/// partition `call obligations = direct-emitted ⊎ composed-consumed`. A token that was
 /// never accumulated is now caught as one that is in NEITHER half, which is a
 /// strictly more informative reading of the same defect — the message names
 /// both populations, so a reader can tell "nothing was emitted" from "it was
@@ -15687,31 +15687,39 @@ fn d5a_a_superseded_worker_body_keeps_its_raw_descriptor_authority() {
     );
 }
 
-/// **`D5a` checkpoint 2 — the one global causal equality closes over the
-/// GENERALIZED emission-owner domain.**
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D2` — the COMPOSITE early close, and
+/// candidate totality is the refusal it reaches.**
 ///
-/// The ruling asks for one whole-artifact
-/// `planned = resolved = declared = claimed = emitted` equality, not per-pass
-/// partials — and the population it must close over now includes tokens whose
-/// emission owner is a **`Specialization`**, discharged in a definition pass
-/// that runs *after* the ordinary units. The failure this forbids is subtle:
-/// each individual pass can be internally consistent while the artifact as a
-/// whole loses a token.
+/// **Re-identified from `D5a` checkpoint 2, because the mutation stopped being
+/// a single-authority one.** It was written when the wrapper owned one ledger,
+/// and it moved that ledger's window back to the first definition pass. The
+/// wrapper now owns the candidate ledger as a sibling on the same lifetime, so
+/// the same mutation moves **both** closeouts — and `D2` closes candidates
+/// first, so candidate **totality** is the refusal it now reaches.
 ///
-/// ⭐ The mutation reproduces the checkpoint-2 defect exactly — the equality is
-/// untouched and only the **window** it is taken over moves back to the first
-/// definition pass. So the refusal is attributable to the lifetime and to
-/// nothing else, which is precisely what "the defect was the lifetime, not the
-/// equality" means.
+/// That ordering is not a preemption to undo: the claim law's `D2` domain does
+/// not exist until totality has closed, because deriving the
+/// `DirectCall ∪ ComposedCall` subset first lets an unsettled candidate simply
+/// disappear from it.
+///
+/// ⭐ The mutation still moves only the **window**, not any equality, so the
+/// refusal remains attributable to the lifetime and to nothing else — which is
+/// what "the defect was the lifetime, not the equality" meant and still means.
 ///
 /// The row also measures that the domain really is generalized: the witness
-/// plans a causal call whose emission owner is a `Specialization`, so a ledger
-/// closed before that owner's `Function` exists is closed over a strictly
-/// smaller population than the plan issued.
+/// plans a causal call whose emission owner is a `Specialization`, so a
+/// closeout taken before that owner's `Function` exists is taken over a
+/// strictly smaller population than the plan issued.
+///
+/// **`D5a`'s original single-authority promise is not lost with this
+/// re-identification.** It lives in
+/// `ced_d2_an_unclaimed_planned_token_is_missing_from_the_exact_equality_in_isolation`,
+/// which reaches the discharge equality directly from a supplied complete
+/// call-obligation domain.
 ///
 /// **Promise class: durable invariant.**
 #[test]
-fn d5a_the_one_causal_ledger_closes_over_the_generalized_emission_owner_domain() {
+fn ced_d2_the_composite_early_close_reaches_candidate_totality_on_the_generalized_owner_domain() {
     with_d5a_witness_plan(|plan| {
         let specialization_owned = plan
             .continuation_calls()
@@ -19461,9 +19469,14 @@ fn d8j_root_witness_identities(
 /// The whole-pass closeout no longer says `emitted == planned`. It says
 ///
 /// ```text
-/// planned = resolved = declared = claimed
-/// planned = direct-emitted  ⊎  composed-consumed
+/// resolved = declared = planned
+/// claimed  = direct-emitted  ⊎  composed-consumed  =  call_obligations
 /// ```
+///
+/// where `call_obligations` is the `DirectCall ∪ ComposedCall` subset `D2`
+/// derives from the candidate ledger. Every identity in THIS row is a call
+/// obligation, so the two populations coincide here and the clauses below read
+/// exactly as they did before `D2`.
 ///
 /// where the two halves are accumulated from two different kinds of evidence:
 /// decoded direct-specialization emissions, and verified composed
@@ -19562,9 +19575,9 @@ fn d8k_the_causal_population_is_a_disjoint_partition_of_direct_and_composed() {
         .record_composed(identities.iter().cloned(), owner)
         .expect("a verified composed discharge claims its own identity");
     ledger.close(&call_obligations).expect(
-        "planned = declared = claimed and planned = direct ⊎ composed with an EMPTY direct half. \
-         A refusal here means the partition still requires a direct emission for every planned \
-         token, which is exactly the law D8k replaced",
+        "declared = planned, and claimed = direct ⊎ composed = call_obligations with an EMPTY \
+         direct half. A refusal here means the partition still requires a direct emission for \
+         every obligation, which is exactly the law D8k replaced",
     );
 
     // Clause 2 — one obligation, one form.
@@ -27427,11 +27440,14 @@ fn sar_d3_the_ordinary_live_cell_is_routed_to_the_resume_and_the_mutation_restor
 /// obligation without adding an arm to the partition, and the same program now
 /// compiles.
 ///
-/// **The inversion is still a discriminator, not a relaxation.** The refusal
-/// string is live production text, so asserting its absence is not free, and
-/// the row additionally requires `Ok` rather than merely "not that refusal" --
-/// a derivation that moved the failure instead of removing it reds here. That
-/// is how the second `close` clause keyed on `planned` was found.
+/// **The discriminator is the `Ok`, together with the binding and the
+/// `InlineNoCall` settlement above it.** `D2` also corrected the production
+/// diagnostic to name the call-obligation population, so the `D1`-era sentence
+/// no longer exists in production and asserting its absence is free — it is
+/// retained as historical evidence of the crossing, not as the oracle. The
+/// `Ok` clause is what catches a derivation that MOVED the failure instead of
+/// removing it, and it is how the second `close` clause keyed on `planned` was
+/// found.
 ///
 /// **Promise class: spent transition sentinel, retained as an invariant.** It
 /// was named for the boundary rather than the outcome, so the crossing is
@@ -27445,7 +27461,15 @@ fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obliga
         d1_last_dispositions, reset_d1_dispositions, CandidateDisposition,
     };
 
-    const PRE_D2_REFUSAL: &str =
+    // The refusal `D1` pinned, kept ONLY as historical evidence of the
+    // crossing. `D2` corrected the production diagnostic to name the
+    // call-obligation population, so this exact sentence no longer exists in
+    // production and asserting its absence is now free.
+    //
+    // ⇒ That is why the durable discriminator below is `Ok`, not this absence.
+    // Retaining a knowingly false "planned" diagnostic so an absence assertion
+    // would stay non-free was the wrong trade, and it is not made here.
+    const HISTORICAL_D1_REFUSAL: &str =
         "the discharged continuation call population is not the planned one";
 
     struct Restore;
@@ -27520,9 +27544,10 @@ fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obliga
     // free, and a regression that put the candidate back into the equality
     // would red here rather than pass quietly.
     assert!(
-        !outcome.contains(PRE_D2_REFUSAL),
-        "D2 derives the call-obligation subset, so an InlineNoCall candidate is no longer an \
-         obligation and this witness must no longer be refused for being one: {outcome}"
+        !outcome.contains(HISTORICAL_D1_REFUSAL),
+        "the D1-era refusal must not reappear. This clause is free now that the production \
+         diagnostic has been corrected, and it is kept as historical evidence rather than as \
+         the discriminator: {outcome}"
     );
     assert_eq!(
         outcome, "Ok",
@@ -27670,7 +27695,7 @@ fn ced_d2_an_unclaimed_planned_token_is_missing_from_the_exact_equality_in_isola
     // It failed loudly rather than passing on a neighbouring refusal, which is
     // the behaviour a substring oracle has to have.
     assert!(
-        refusal.contains("the discharged continuation call population is not the planned one")
+        refusal.contains("the discharged continuation call population is not the call-obligation one")
             && refusal
                 .contains("neither directly emitted nor compositionally consumed"),
         "the refusal must come from the EQUALITY finding the obligation undischarged, which is \

@@ -9946,7 +9946,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     ///   retained-frame seat already emitted it. The ordinary path is correct
     ///   and untouched. ⚠ This is *not* the contract's "zero member is a hard
     ///   stop": an owner that genuinely owes a call and emits none is caught by
-    ///   the whole-pass `planned = resolved = declared = emitted` equality,
+    ///   the whole-pass laws -- `resolved = declared = planned`, and since
+    ///   `D2` `discharged = claimed = call_obligations` over the derived subset --
     ///   which is the global affine closure of contract 5. A local stop here
     ///   would red every unit in the program that lawfully owns no call.
     /// - **More than one residual edge** — an unresolved multi-member
