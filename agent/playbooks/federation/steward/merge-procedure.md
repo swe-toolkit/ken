@@ -6,9 +6,9 @@ Steward task procedure. Read at the point of use. Governing playbook:
 `COORDINATION §14` defines the gate; this is the mechanics. **Run every step.
 None is conditional on how routine the merge feels.**
 
-## Before you publish
+**M1-M3 run before you publish, M4-M5 publish, M6-M9 run after it lands.**
 
-### M1 — Verify the Decision is `resolved`, read fresh from the object
+## M1 — Verify the Decision is `resolved`, read fresh from the object
 
 ```sh
 # HTTP, your OWN credential. MCP list_decisions is NOT exhaustive.
@@ -19,7 +19,7 @@ None is conditional on how routine the merge feels.**
 watched resolve earlier can be voided by an intervening publish — **re-read it
 at merge time, never from memory.**
 
-### M2 — Verify the exact SHA from the ring's `git_request` exists on origin
+## M2 — Verify the exact SHA from the ring's `git_request` exists on origin
 
 ```sh
 git fetch origin && git cat-file -e <SHA>^{commit} && git rev-parse <SHA>
@@ -28,7 +28,7 @@ git fetch origin && git cat-file -e <SHA>^{commit} && git rev-parse <SHA>
 **Never `--target HEAD`** — it dies with `src refspec refs/heads/HEAD does not
 match any`. Always an explicit SHA.
 
-### M3 — Cited-source check
+## M3 — Cited-source check
 
 One command, not a judgment:
 
@@ -43,9 +43,7 @@ Hits route to the **Librarian, after the merge**. Never into the ring's frame.
 Rationale and the already-red-`main` question are in
 `release-and-handoff.md`, step 7.
 
-## Publish
-
-### M4 — Mint a token
+## M4 — Mint a token
 
 Agents hold no GitHub credential.
 
@@ -53,7 +51,7 @@ Agents hold no GitHub credential.
 export GH_TOKEN="$(/workspaces/ken/.devcontainer/mint-gh-token.sh)"
 ```
 
-### M5 — Run the publisher
+## M5 — Run the publisher
 
 ```sh
 scripts/scripted-pr-automerge.sh \
@@ -75,9 +73,7 @@ The script creates the PR, waits and polls checks for non-doc changes, and runs
 the publisher merge command. If GitHub blocks the merge it must stop and route
 that fact; it must not pretend the publisher identity can self-approve.
 
-## After it lands
-
-### M6 — Verify by blob identity, every changed path
+## M6 — Verify by blob identity, every changed path
 
 Ancestry lies after a squash; phrase greps lie on wrapped lines.
 
@@ -111,7 +107,7 @@ The publisher squashes. `git reset --hard origin/main` afterwards —
 > **Blob identity is necessary, not sufficient — it proves the file landed,
 > never that the file is right.** Keep the index post-condition below.
 
-### M7 — Flip the node, regenerate the tracker
+## M7 — Flip the node, regenerate the tracker
 
 ```sh
 sed -i 's/^status: active$/status: merged/' docs/program/issues/<ID>.md
@@ -120,7 +116,7 @@ scripts/gen-progress.sh
 
 Bundle both into your next publish.
 
-### M8 — Notify the Adversary, if the merge carries code
+## M8 — Notify the Adversary, if the merge carries code
 
 A step, not a courtesy.
 
@@ -151,7 +147,7 @@ adversary`) and post:
 > `unread_count_for_actor > 0`. Notifying it and never reading it back is the
 > same silence.
 
-### M9 — Close the loop with the ring
+## M9 — Close the loop with the ring
 
 Then run the stay-one-release-ahead check (`../steward.md`, section 4): every
 node whose `depends_on` names this one is `ready` with a shovel-ready frame
@@ -190,7 +186,7 @@ Your operational docs — the progress tracker, `agent/` playbook and
 A multi-piece corpus change is one branch (`COORDINATION §14`). Width-check
 markdown at 80 display columns (codepoints, not bytes) before routing.
 
-### The index post-condition
+## Corpus edits: the index post-condition
 
 When a corpus change carries an index — a `README.md` table, a manifest, a
 catalog — assert the post-condition, not the phrase. Blob identity proves the
@@ -245,7 +241,7 @@ wrong.** A post-condition on the merged artifact catches unions, wholesale
 takes, and bad conflict resolutions alike, without needing to know which
 occurred.
 
-### Check what you broadcast, not only what you committed
+## Corpus edits: check what you broadcast, not only what you committed
 
 The artifact and the announcement fail independently, and it is the
 announcement that reaches rings as binding instruction. Twice in one session a
@@ -259,7 +255,7 @@ thereby true. **Watch especially for a clause whose function is to tell the
 reader they need not look** — "you cannot lose X by accident", "errs in the
 safe direction", "immaterial".
 
-### Keep `steward/work` fresh against `origin/main`
+## Keep `steward/work` fresh against `origin/main`
 
 `steward/work` is a working copy, not a durable log: it should always be
 `origin/main` plus at most the current unpublished tracker delta. It drifts
@@ -284,7 +280,7 @@ the branch.
   `steward/work` is not required to publish — but a stale one misleads you
   about what has landed and is the root of phantom "unmerged work" scares.
 
-### The squash-merge trap
+## The squash-merge trap
 
 After a squash-merge the *original* branch commits dangle **ahead** of
 `origin/main` while their content is already merged. Such a branch is a stale

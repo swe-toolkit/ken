@@ -25,7 +25,7 @@ mention and feel ready to post. That feeling is the gate trigger.
 ctx-verified <n>% to ~0"* beside the kickoff in the tracker. If you cannot
 write that line truthfully, you did not run the gate.
 
-### Steps 1-2: clear the unit
+## Handoff gate, steps 1-2: clear the unit
 
 1. **No in-flight obligation** on any receiving-unit member — no pending review
    vote, open `question`, unfinished handoff, or cleanup pass. Compaction drops
@@ -33,7 +33,7 @@ write that line truthfully, you did not run the gate.
 2. **Quiescent.** `capture-pane` each member; none mid-reasoning, because
    compaction summarizes in-flight work away.
 
-### Steps 3-4: compact and verify the drop
+## Handoff gate, steps 3-4: compact and verify the drop
 
 3. **Start all compactions, before the kickoff, never after.** Mechanism and
    the unconditional-compaction rule: `compaction.md`. A post-kickoff
@@ -42,7 +42,7 @@ write that line truthfully, you did not run the gate.
    Unchanged ctx means resend that pane and re-verify. Do not post until every
    required pane is compacted, compacting, or queued.
 
-### Step 5: verify every object you are about to name
+## Handoff gate, step 5: verify every object you are about to name
 
 5. **Verify every object you are about to name exists at the base you are about
    to name.** One command per object, before the mention leaves your hands.
@@ -62,7 +62,7 @@ write that line truthfully, you did not run the gate.
    publishing it is a separate act you can complete in your head. Check it
    mechanically rather than remembering whether you published.
 
-### Steps 6-7: contention and the ledger
+## Handoff gate, steps 6-7: contention and the ledger
 
 6. **Contention check, against every WP in flight** — not just the frontier
    candidates you are choosing between. The WP that is merging right now is an
@@ -104,7 +104,7 @@ write that line truthfully, you did not run the gate.
    construction, because the attestation is the claim that someone
    re-validated.
 
-### Steps 8-11: post, confirm, record
+## Handoff gate, steps 8-11: post, confirm, record
 
 8. **Only now post the kickoff or handoff mention.**
 
@@ -182,7 +182,7 @@ integration-test crate** — that conflates permanence with placement.
 
 ## The five-step release sequence
 
-### 1. Author the brief on the frame branch
+## Release step 1: author the brief on the frame branch
 
 At `docs/program/wp/<ID>-<slug>.md`, on branch `wp/<ID>-frame`
 (`git branch wp/<ID>-frame origin/main` — the fetched ref, never a stale local
@@ -208,7 +208,7 @@ At `docs/program/wp/<ID>-<slug>.md`, on branch `wp/<ID>-frame`
 > the moment you publish it** — a Steward parked on a WP branch is a silent
 > ring-blocker.
 
-### 2. Hand the WP branch to the spec-leader for full elaboration
+## Release step 2: hand the WP branch to the spec-leader to elaborate
 
 Run the handoff gate first. Mention **only the spec-leader**; the spec-leader
 assigns spec-author and conformance-validator internally. The enclave brings
@@ -224,7 +224,7 @@ any threshold it looks.
 This elaboration step sits between you and the build team. The team never
 receives a brief the enclave has not elaborated.
 
-### 3. Merge the elaborated brief to `main`
+## Release step 3: merge the elaborated brief to `main`
 
 Via the publisher path. The spec-leader opens the merge Decision (it touches
 `/spec`, so the Spec paths apply) and posts the `git_request` handoff to you
@@ -232,7 +232,7 @@ for scripted publisher handling (`COORDINATION §14`). It must be on `main` so
 every team reads the canonical artifact from its own worktree, not a drifting
 inline message.
 
-### 4. Release and kick off the responsible team
+## Release step 4: release and kick off the responsible team
 
 Run the handoff gate first, for the whole team (leader, implementer, QA). Then
 mention the **leader only**, in the WP thread, pointing at the now-on-`main`
@@ -240,7 +240,7 @@ elaborated brief and spec. The team cuts `wp/<ID>-<slug>` fresh from current
 `origin/main`. **Confirm your own worktree is off the frame branch before you
 kick.** Leaders do not compact their members; compaction is yours.
 
-### 5. Stay one release ahead
+## Release step 5: stay one release ahead
 
 Run the successor check in `../steward.md`, section 4, as the last step.
 

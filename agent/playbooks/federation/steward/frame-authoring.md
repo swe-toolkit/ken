@@ -28,7 +28,7 @@ any current-state claim *"verify against the landed code, not this line."*
 A fixed input is only as good as the substrate it stands on, and **grounding
 the names is not grounding the obligations.**
 
-### (a) Dependency-DAG check
+## Audit (a): dependency-DAG check
 
 If the WP introduces an abstraction an existing package will consume, draw the
 load order and look for the cycle. **An abstraction module must never depend on
@@ -42,7 +42,7 @@ Cursor to CAT-5 to Decoder to Cursor. **The tell was wanting cosmetic
 symmetry** — "both instances in one module" — and cosmetic symmetry created the
 cycle.
 
-### (b) Constructibility audit, for every promised carrier field
+## Audit (b): constructibility, for every promised carrier field
 
 For each field pinned at a structural type (`Nat`, `List`, ...), ask whether
 the landed primitive can actually produce it. Opaque primitives (`Int`,
@@ -57,7 +57,7 @@ wrapper: carry the `Nat` and prove it agrees with the opaque length. Never
 convert, and never mint the missing primitive — that is a TCB delta and it goes
 to the operator, not into a build WP.
 
-### (b-prime) Seam and ABI audit: can the landed interface carry the value?
+## Audit (b-prime): seam and ABI — can the landed interface carry the value?
 
 (b) asks whether a primitive can *produce* a pinned type. This asks whether the
 landed interface can *carry* it. **Trace the value end-to-end through every
@@ -71,7 +71,7 @@ Check and use cannot share an fd. The design was coherent, the TCB verdict was
 right, and it was unbuildable through the landed ABI. **The tell: a design that
 names one seam as already pre-cut. Check the seams it did not name.**
 
-### (b-double-prime) Genericization audit
+## Audit (b-double-prime): genericization
 
 When a WP makes an existing concrete path generic over a trait, "is the trait
 public?" is the wrong question. The right one: **can the generic version
@@ -92,7 +92,7 @@ HostHandler>` was framed anyway. But the runner mints the program's capability
 via `PosixHost::mint_fs_cap`, an inherent method, and `HostHandler` has no mint
 operation at all. One line, and the whole WP was unbuildable as framed.
 
-### (b-triple-prime) The general form: expressibility
+## Audit (b-triple-prime): the general form, expressibility
 
 Architect synthesis, 2026-07-14. **This subsumes the genericization audit**,
 which is its trait-shaped special case. Full statement:
@@ -140,7 +140,7 @@ builds values and they compile; QA tests values and they pass. Only the design
 pass asks whether the shape can express its contract. That is why the
 design-review edge exists at all.
 
-### (c) Corpus-oracle enumeration
+## Audit (c): corpus-oracle enumeration
 
 If the WP adds a file to a globbed directory (`catalog/`, `examples/`,
 `conformance/`), it must satisfy every corpus-wide oracle, and those live in
@@ -163,7 +163,9 @@ forever. Re-scope the oracle to its own historical set and let a live-anchored
 property cover new files — confirming that live net exists first, or you trade
 a rubber stamp for a hole.
 
-### (c-prime) Cite prose sites by GREP-ABLE PHRASE. A coordinate is a time-sensitive operand.
+## Audit (c-prime): cite prose sites by grep-able phrase
+
+A coordinate is a time-sensitive operand.
 
 **Promoted 2026-08-08 from `RT-CONTSPEC-LEDGER`, and it binds the frame author
 first because that is where the defect originated.**
@@ -213,7 +215,7 @@ trap wearing a different hat.
 not. Where a number genuinely helps a reader navigate, write it as *"at
 `<sha>`, around `path:NNNN`"* — an anchor to re-find, never a value to check.
 
-### (d) Reuse must be proved behaviorally, not structurally
+## Audit (d): reuse must be proved behaviorally, not structurally
 
 When a WP is framed as a specialization of landed substrate ("consume CC1-CC6,
 do not rebuild them"), **the ordered shared-`ElabEnv` harness makes reuse look
