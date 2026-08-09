@@ -5062,11 +5062,42 @@ impl<'a> Lowering<'a> {
                         &lowered,
                     )? {
                         Some(worker) if !suppress_binding => {
+                            // `D3` — the binding seat, keyed by the identity
+                            // this target's own coordinate selects. Only a
+                            // COMPOSED authority is recorded: an ordinary
+                            // induction hypothesis answers for no causal
+                            // obligation, so it has no identity to key on and
+                            // is not what mutation 1 is about.
+                            #[cfg(test)]
+                            if let Ok(identity) = worker.composed_continuation_authority() {
+                                super::units::d3_record(
+                                    super::units::D3Event::BindingInstalled {
+                                        identity: identity.clone(),
+                                        kind: super::units::D3BindingKind::StaticWorker,
+                                    },
+                                );
+                            }
                             LoweringEnvironmentBinding::StaticWorker(worker)
                         }
-                        Some(_) => LoweringEnvironmentBinding::Value(
-                            LoweringOperand::Specialized(lowered),
-                        ),
+                        Some(worker) => {
+                            // The SUBSTITUTION, recorded at the same seat and
+                            // under the same key, so row 1's pair is one edge
+                            // observed twice rather than two observations that
+                            // merely resemble each other.
+                            #[cfg(test)]
+                            if let Ok(identity) = worker.composed_continuation_authority() {
+                                super::units::d3_record(
+                                    super::units::D3Event::BindingInstalled {
+                                        identity: identity.clone(),
+                                        kind: super::units::D3BindingKind::Value,
+                                    },
+                                );
+                            }
+                            let _ = &worker;
+                            LoweringEnvironmentBinding::Value(
+                                LoweringOperand::Specialized(lowered),
+                            )
+                        }
                         None => LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                             lowered,
                         )),

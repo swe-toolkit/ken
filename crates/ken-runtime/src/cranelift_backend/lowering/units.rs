@@ -3149,6 +3149,20 @@ pub(in crate::cranelift_backend) enum D3Seat {
 /// mutates; routing the observation through it would make the instrument
 /// inherit the defect it exists to detect, and the trace would agree with the
 /// mutation instead of exposing it.
+/// **`D3` — which environment binding an authorized position received.**
+///
+/// Mutation 1 substitutes one for the other, and the substitution is the whole
+/// defect: the candidate still gets a binding, so a count sees nothing.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D3BindingKind {
+    /// The capsule the candidate authorizes, callable at its recursive
+    /// position.
+    StaticWorker,
+    /// A plain specialized value substituted in its place.
+    Value,
+}
+
 #[cfg(test)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum D3Event {
@@ -3161,6 +3175,16 @@ pub(in crate::cranelift_backend) enum D3Event {
     /// A composed claim was RECORDED during lowering, which is strictly before
     /// finished-CLIF verification promotes it.
     ComposedRecorded { identity: ContinuationCallIdentity },
+    /// **The binding seat** — which KIND of environment binding a composed
+    /// candidate's authorized position actually received.
+    ///
+    /// Keyed by the identity the target's own coordinate selects, so row 1 can
+    /// bind its downstream oracle to the same edge whose binding was
+    /// suppressed rather than to "some binding somewhere in the program".
+    BindingInstalled {
+        identity: ContinuationCallIdentity,
+        kind: D3BindingKind,
+    },
     /// The shared direct funnel was REACHED and RETURNED an answer.
     ///
     /// Deliberately a separate event from [`Self::Settle`], and the
@@ -3198,6 +3222,7 @@ impl D3Event {
         match self {
             Self::BridgeEntry { identity, .. }
             | Self::ComposedRecorded { identity }
+            | Self::BindingInstalled { identity, .. }
             | Self::DirectFunnelReturned { identity }
             | Self::BridgeExit { identity, .. }
             | Self::Settle { identity, .. } => identity,
@@ -3217,6 +3242,22 @@ impl D3Event {
 thread_local! {
     static D3_TRACE: std::cell::RefCell<Vec<D3Event>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    /// The candidate population the live plan projected at ledger open.
+    static D3_PLAN_CANDIDATES: std::cell::RefCell<Vec<ContinuationCallIdentity>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// **The live plan's candidate population**, as `ContinuationCandidateLedger::
+/// open` read it — typed identities, in plan order, not deduplicated by any
+/// rendering.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d3_plan_candidates() -> Vec<ContinuationCallIdentity> {
+    D3_PLAN_CANDIDATES.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_d3_plan_candidates() {
+    D3_PLAN_CANDIDATES.with(|cell| cell.borrow_mut().clear());
 }
 
 #[cfg(test)]
@@ -3317,6 +3358,21 @@ impl ContinuationCandidateLedger {
                 })
             })
             .collect::<Result<BTreeSet<_>, _>>()?;
+        // **`D3` — the candidate population AS THE LIVE PLAN PROJECTED IT.**
+        //
+        // Recorded here rather than rebuilt in a test, and the difference is
+        // load-bearing: a test that re-plans its own witness proves a property
+        // of the plan it just built, not of the plan the compile under
+        // measurement actually used. Those can differ, and nothing would say
+        // so. This is the projection `open` itself read.
+        //
+        // It is also a seat INDEPENDENT of every settlement seat the trace
+        // observes, so an event carrying a wrong identity cannot match it by
+        // construction -- the trace is not being validated against itself.
+        #[cfg(test)]
+        D3_PLAN_CANDIDATES.with(|cell| {
+            *cell.borrow_mut() = candidates.iter().cloned().collect();
+        });
         Ok(Self {
             candidates,
             settled: BTreeMap::new(),
