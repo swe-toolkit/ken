@@ -28649,8 +28649,89 @@ fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settle
 #[test]
 fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
     use crate::cranelift_backend::lowering::units::{
-        CandidateDisposition, D3Event, D3Mutation, D3Seat,
+        CandidateDisposition, D3BindingKind, D3Event, D3Mutation, D3Seat,
     };
+
+    // ── Row 1 against all four others, on its own witness ────────────────────
+    //
+    // QA's block, and it was the same defect one layer up: the previous commit
+    // RAN this and reported it, in a message whose own subject line says a
+    // verification living in a terminal evaporates when the terminal closes.
+    // Naming a trap does not inoculate you against it. Here it is, committed.
+    //
+    // Row 1's discriminator is the pair (binding kind at the typed identity,
+    // the fail-closed guard its substitution reaches). Neither half alone is
+    // enough: another mutation could in principle reach the same guard for a
+    // different reason, or leave the binding alone and fail there anyway.
+    let m1 = d3_binding_dependent_arm(D3Mutation::SuppressBindingInstallation);
+    let c_identity = m1.the_candidate();
+    assert_eq!(
+        m1.binding_kind(&c_identity),
+        Some(D3BindingKind::Value),
+        "positive control -- mutation 1 must substitute a Value at this identity, or the four \
+         negatives below are about a discriminator nothing satisfies and pass for free: {:?}",
+        m1.trace
+    );
+    assert!(
+        m1.outcome.contains(D3_IH_MARKER_ON_VALUE),
+        "positive control -- and must reach the IH-marker guard: {}",
+        m1.outcome
+    );
+
+    for other in [
+        D3Mutation::MarkInlineBeforeBridgeCompletion,
+        D3Mutation::MarkInlineAfterComposedCall,
+        D3Mutation::OmitFinalDisposition,
+        D3Mutation::DoubleDisposition,
+    ] {
+        let arm = d3_binding_dependent_arm(other);
+        assert_eq!(
+            arm.the_candidate(),
+            c_identity,
+            "each cross-arm must be about the SAME edge as row 1, or the negatives below are \
+             about a different candidate: {other:?}"
+        );
+        assert_eq!(
+            arm.binding_kind(&c_identity),
+            Some(D3BindingKind::StaticWorker),
+            "{other:?} must leave the binding a StaticWorker. Only mutation 1 touches the \
+             binding seat, and if another mutation reached Value here, row 1's binding-seat \
+             half would be satisfied by it: {:?}",
+            arm.trace
+        );
+        assert!(
+            !arm.outcome.contains(D3_IH_MARKER_ON_VALUE),
+            "and {other:?} must NOT reach the IH-marker guard. That guard is row 1's terminal, \
+             and a second mutation arriving at it would make row 1's outcome clause satisfiable \
+             by something other than the suppression it attributes it to: {}",
+            arm.outcome
+        );
+    }
+
+    // And WHY the last two negatives hold, pinned rather than left implicit:
+    // witness C's candidate never reaches the direct funnel, so mutations 4 and
+    // 5 have no seat to act on and this program is unchanged by them. If that
+    // ever stops being true the pair above would start passing for a different
+    // reason, so it is asserted rather than assumed.
+    for inert in [D3Mutation::OmitFinalDisposition, D3Mutation::DoubleDisposition] {
+        let arm = d3_binding_dependent_arm(inert);
+        assert_eq!(
+            arm.outcome, "Ok",
+            "{inert:?} must be INERT on witness C -- its candidate never reaches the direct \
+             funnel, so there is no seat for these two to move: {}",
+            arm.outcome
+        );
+        assert_eq!(
+            arm.settlements_of(
+                &c_identity,
+                CandidateDisposition::ComposedCall,
+                D3Seat::ComposedPromotion
+            )
+            .len(),
+            1,
+            "and it must still settle once at the promotion seat, exactly as the baseline does"
+        );
+    }
 
     // ── The pair that shares a terminal refusal ──────────────────────────────
 
