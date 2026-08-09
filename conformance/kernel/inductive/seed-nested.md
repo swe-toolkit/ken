@@ -287,21 +287,27 @@ Spec: `14 §3.2`, `§7.8`, `§9.5` item 7; `18 §5`.
 ### kernel/inductive/nested-generated-all-support-is-terminal [KERNEL-NESTED-IND] (soundness)
 
 - spec: `14 §1`, `§3.2`, `§7.8`, `§9.5` item 8; `18 §4.2`, `§4.3`
-- given: record the complete declaration and host-to-support relation, then
-  transactionally admit the one-positive-carrier `Box` declaration above
-- expect: the published delta consists of exactly nine declarations in three
-  artifact groups: the host group `Box`, `box`, `elim_Box`; the first-order family
-  `All^Type_{Box,0}`, its one aligned constructor, and its ordinary eliminator;
-  and the corresponding three-artifact `All^Omega_{Box,0}` group. Both support
-  families are terminal and absent from the general enclosing-former lookup.
-  No support family has either support id as its host; in particular, no
-  `All`-of-`All` declaration exists
+- given: record the exact `Σ` declarations, next-id state, and host-to-support
+  relation, then transactionally admit the one-positive-carrier `Box`
+  declaration above
+- expect: `Σ` gains exactly three `Inductive` declarations: `Box`,
+  `All^Type_{Box,0}`, and `All^Omega_{Box,0}`. Exactly six fresh `GlobalId`s
+  are allocated: one former id and one constructor id for each declaration.
+  Each stored declaration carries exactly one constructor record, aligned with
+  `box`. The support relation has exactly two outgoing edges from `Box`, one to
+  each support family, and no outgoing edge from either support. Each of the
+  three family ids supports an ordinary, successfully checked
+  `Term::Elim { fam, … }` use. Those eliminators are derived term forms, not
+  declarations, and allocate no ids. Both support families are terminal and
+  absent from the general enclosing-former lookup; no `All`-of-`All` declaration
+  exists
 - why: ordinary positivity checking of either first-order support family again
   sees the carrier `A` positively. Terminal kernel provenance must stop that
   fact from re-entering host generation while retaining ordinary checking. A
   mutation that feeds either support declaration back through host generation
-  adds a support-of-support family or fails to terminate, so it cannot satisfy
-  this exact finite-delta control.
+  adds declarations, ids, and a support-to-support edge or fails to terminate.
+  A mutation that invents a global eliminator declaration or id also changes
+  the locked carrier. Neither can satisfy this exact finite-delta control.
 
 ### kernel/inductive/nested-all-generation-is-transactional [KERNEL-NESTED-IND] (soundness)
 
@@ -439,9 +445,10 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
   from the one-leaf `occupied` topology.
 - Generated `All` declarations leave the exact `trusted_base()` set unchanged,
   while the generator, transaction, and nested iota remain audited kernel TCB
-  code. A one-carrier host has exactly two terminal first-order support families
-  and no `All`-of-`All`; failure to generate either rolls the whole admission
-  back.
+  code. The one-constructor, one-carrier `Box` transaction adds exactly three
+  `Inductive` declarations and six `GlobalId`s, with no eliminator declaration
+  or `GlobalId`. Its two support families are terminal and no `All`-of-`All`
+  exists; failure to generate either rolls the whole admission back.
 - The negative cases are not coincidental blanket rejects: after
   `KERNEL-NESTED-IND`, their paired positive controls admit while the exact
   negative/unknown mutation flips the verdict.

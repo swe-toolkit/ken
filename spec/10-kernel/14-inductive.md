@@ -50,18 +50,23 @@ check the two internal source-indexed families of §3.2 and their constructors
 before the host may serve as a positive enclosing path.
 
 Generated `All` declarations are **terminal support declarations**. They pass
-ordinary formation, positivity, universe, constructor, and eliminator checks,
-but their admission does not trigger another support-generation round and does
-not register them as enclosing formers for §8.5. Thus a host with `p` checked
-strictly-positive carrier parameters has the fixed first-order support set of
-exactly `2p` families. There is no `All`-of-`All` closure to compute.
+ordinary formation, positivity, universe, and constructor checks. Their generic
+`Term::Elim { fam, … }` forms are checked by the ordinary eliminator rules; an
+eliminator is not a declaration and receives no `GlobalId`. Support admission
+does not trigger another support-generation round and does not register the
+support as an enclosing former for §8.5. Thus a host with `p` checked strictly-
+positive carrier parameters has the fixed first-order support set of exactly
+`2p` families. There is no `All`-of-`All` closure to compute.
 
-This is one atomic admission transaction. Success publishes the type former
-`D`, constructors `cₖ`, **eliminator** `elim_D` (§3), and all required internal
-`All^Type` / `All^Omega` declarations, their constructors, and their ordinary
-eliminators. Failure of either the host checks or any generated-family check
-publishes none of them and leaves the global environment `Σ` unchanged. A
-partially admitted host with missing lift families is never observable.
+This is one atomic admission transaction. Success appends one `Inductive`
+declaration for `D` and one for every required internal `All^Type` /
+`All^Omega` family. Each such declaration carries its constructor records and
+their allocated `GlobalId`s. The ordinary eliminator term form keyed by each
+family `GlobalId` is then usable, but no eliminator declaration or `GlobalId` is
+appended. Failure of either the host checks or any generated-family check
+publishes none of the declarations or ids and leaves the global environment
+`Σ` unchanged. A partially admitted host with missing lift families is never
+observable.
 
 ### Canonical examples (elaborated forms)
 
@@ -395,14 +400,15 @@ composed positive path, the result level is the maximum of `l` and every
 host-family level on that path. This is the exact predicative level
 calculation, not a level inferred from the recursive leaf alone.
 
-`All^S_{F,q}` is an ordinary checked indexed inductive family. Its check covers
-formation, positivity, universes, constructors, and its ordinary eliminator.
-It is nevertheless terminal support: positive positions found by that check do
-not generate support families and are not installed in the general enclosing-
-former lookup of §8.5. For every host constructor `c_k`, it has one internal
-constructor indexed by the original source value `c_k ā`. That constructor
-binds the original fields `ā` and, in declaration order, exactly the following
-evidence fields for occurrences of parameter `q`:
+`All^S_{F,q}` is an ordinary checked indexed inductive family. Its declaration
+check covers formation, positivity, universes, and constructors; ordinary
+`Term::Elim` checking applies when its eliminator form is used. It is
+nevertheless terminal support: positive positions found by the declaration
+check do not generate support families and are not installed in the general
+enclosing-former lookup of §8.5. For every host constructor `c_k`, it has one
+internal constructor indexed by the original source value `c_k ā`. That
+constructor binds the original fields `ā` and, in declaration order, exactly
+the following evidence fields for occurrences of parameter `q`:
 
 - a direct parameter leaf `x : A` contributes `P x`;
 - a Π/W-style field contributes the corresponding Π-abstracted evidence;
@@ -419,8 +425,8 @@ inhabitant produced for that topology, not an invented leaf value.
 
 Thus the source value is an **index**, never a decorated copy. Each generated
 constructor targets exactly its matching source topology; it cannot directly
-construct evidence at an unrelated source index. The generated families and
-constructors are kernel-internal and add ordinary `Inductive` declarations,
+construct evidence at an unrelated source index. Each generated family adds
+one kernel-internal `Inductive` declaration carrying those constructor records,
 never an `Opaque` or `Primitive` declaration.
 
 The generator may reference an already-published terminal support family while
