@@ -20,7 +20,7 @@
 //! the first assertion here is that the record is *present at all* — a missing
 //! record fails loudly rather than reading as a clean absence.
 
-use ken_elaborator::checked_core::{StableSymbol, SymbolNamespace};
+use ken_elaborator::checked_core::{semantic_fingerprint, CheckedCorePackage, StableSymbol, SymbolNamespace};
 use ken_elaborator::compiler_driver::{
     checked_runtime_symbols_v1_key, compile_ken_package_sources, CompilerManifest,
     CompilerTargetKind, CompilerSource, TargetSelector,
@@ -45,9 +45,9 @@ const PACKAGE: &str = "d1b_role_a_pkg";
 const LEGACY_ZERO: &str = "ctor:prelude::Nat::Zero";
 const LEGACY_SUC: &str = "ctor:prelude::Nat::Suc";
 
-#[test]
-fn d1b_role_a_generic_package_emission_produces_the_package_qualified_nat_pair() {
-    let output = compile_ken_package_sources(
+/// The one real generic package emission both controls drive.
+fn emit_package() -> CheckedCorePackage {
+    compile_ken_package_sources(
         &CompilerManifest::new(PACKAGE, Vec::new()),
         vec![CompilerSource::new("src/main.ken", SOURCE)],
         TargetSelector::StableSymbol {
@@ -62,9 +62,14 @@ fn d1b_role_a_generic_package_emission_produces_the_package_qualified_nat_pair()
             kind: CompilerTargetKind::Executable,
         },
     )
-    .expect("the generic package path compiles this source");
+    .expect("the generic package path compiles this source")
+    .package
+}
 
-    let metadata = &output.package.artifact.semantic.metadata;
+#[test]
+fn d1b_role_a_generic_package_emission_produces_the_package_qualified_nat_pair() {
+    let package = emit_package();
+    let metadata = &package.artifact.semantic.metadata;
 
     // UNCONDITIONAL: the record must EXIST on this path. A missing key is the
     // exact defect under repair, and it must fail here rather than fall through
@@ -124,4 +129,77 @@ fn d1b_role_a_generic_package_emission_produces_the_package_qualified_nat_pair()
              defect at the next special constructor"
         );
     }
+}
+
+/// Control 1b — the record's bytes are covered by the semantic core hash.
+///
+/// **Why this exists as its own test.** The implementation stores the record in
+/// `semantic.metadata` and the commit said that lane participates in
+/// `core_semantic_hash`. That was a claim in prose with nothing executing it:
+/// a later move to a non-hashed lane, or exclusion from the fingerprint, would
+/// have left every other assertion in this file green. A mechanism claim in a
+/// comment is exempt from execution, so it is pinned here instead.
+///
+/// **Established from the implementation before it was pinned:**
+/// `core_semantic_hash` is `semantic_fingerprint(&artifact.semantic)`
+/// (`checked_core.rs:1379`), and `canonical_semantic_bytes` encodes
+/// `inputs.metadata` (`:1317`). The control below discriminates on that, rather
+/// than being tuned until it agreed with the storage choice.
+#[test]
+fn d1b_role_a_the_record_is_covered_by_the_semantic_core_hash() {
+    let baseline = emit_package();
+    let repeat = emit_package();
+
+    // STABILITY HALF. Without it, "the hash moved" is consistent with a hash
+    // that moves on every compile, which would discriminate nothing.
+    assert_eq!(
+        baseline.core_semantic_hash, repeat.core_semantic_hash,
+        "two identical generic package emissions must produce the same semantic core hash"
+    );
+    assert_eq!(
+        baseline.core_semantic_hash,
+        semantic_fingerprint(&baseline.artifact.semantic),
+        "the package's recorded hash must be the fingerprint of its own semantic inputs, or the \
+         mutation below is being applied to something the hash does not read"
+    );
+
+    let key = checked_runtime_symbols_v1_key();
+
+    // MUTATION 1 — change the record's bytes. The hash must move.
+    let mut mutated = baseline.clone();
+    let record = mutated
+        .artifact
+        .semantic
+        .metadata
+        .get_mut(&key)
+        .expect("the record is present to mutate");
+    record.push(0xFF);
+    assert_ne!(
+        semantic_fingerprint(&mutated.artifact.semantic),
+        baseline.core_semantic_hash,
+        "mutating the CheckedRuntimeSymbolsV1 bytes did not change the semantic core hash -- the \
+         record is NOT hash-covered, so a corrupted or substituted role table would be invisible"
+    );
+
+    // MUTATION 2 — remove the record entirely. The hash must move.
+    let mut removed = baseline.clone();
+    removed
+        .artifact
+        .semantic
+        .metadata
+        .remove(&key)
+        .expect("the record is present to remove");
+    assert_ne!(
+        semantic_fingerprint(&removed.artifact.semantic),
+        baseline.core_semantic_hash,
+        "removing the record did not change the semantic core hash -- its presence is not covered"
+    );
+
+    // And the untouched clone still hashes to the baseline, so the two reds
+    // above are attributable to the mutations rather than to cloning.
+    assert_eq!(
+        semantic_fingerprint(&baseline.artifact.semantic),
+        baseline.core_semantic_hash,
+        "the unmutated package must still hash to its own recorded value"
+    );
 }
