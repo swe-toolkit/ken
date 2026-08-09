@@ -1,7 +1,7 @@
 ---
 id: RT-CONTINUATION-EDGE-DISPOSITION
 title: "One planner edge carries both binding projection and a causal call obligation — split the representation so a binding candidate can be settled InlineNoCall without ever entering the call-discharge partition"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,37 @@ blocks: [RT-MATCH-RECURSOR-CONSUMERS]
 github: null
 origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted the held red control a15a3e934766a1d075386ba561a9469e51a448b7 as load-bearing and withdrew the planner-side option-3 mechanism it had previously ruled at evt_4ebpfvfrvv8qy. Predecessor RT-CONTINUATION-CALL-DISCHARGE delivered D0/D1 attribution; its D2/D3 are re-homed here. Campaign docs/program/16-recursive-descent-retirement.md node #6i. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # NODE #6i IS COMPLETE — ALL FOUR DELIVERABLES MERGED, 2026-08-09
+>
+> `D0` `e93afb06` (#1659, corrected by #1662/#1663) · `D1` `fbc49ddd` (#1667) ·
+> `D2` `495b0b36` (#1671) · **`D3` `b5aa079b` (#1682)**, base `d13a2515`, four
+> lowering paths `+1563/-8`, CI green, blob identity verified on all four,
+> Adversary notified. Size settled at **M**.
+>
+> ⇒ **[[RT-MATCH-RECURSOR-CONSUMERS]] `AC-1` IS NOW REACHABLE.** That is what
+> this seven-wall chain existed to do.
+>
+> **`D3` was the hard one, and the reason is worth keeping.** `D0` measured the
+> `InlineNoCall` witness cell **empty**; the first `D3` attempt measured **all
+> five mutations compiling `Ok`** on `D2`'s witness — five proofs of nothing,
+> because the seats were unreachable and arming a variant changed no observable
+> outcome. `AC-6` was then ruled to require **five mutation-specific CAUSAL
+> proofs, not five distinct terminal strings** (`evt_6vwnj8a9qty5d`), and
+> witness construction was ruled **entailed by `AC-6` rather than added to it**
+> (`evt_109n658cm9fqq`) — a mutation over a seat no witness reaches is Trap 3.
+>
+> **The vacuity was caught by measurement twice before anything was claimed.**
+>
+> ### STILL OPEN AT CLOSURE — carried to successors, NOT cleared
+>
+> 1. The **shared resolved-continuation funnel** was never audited for a
+>    silently dropped consumer.
+> 2. Whether a case can **fall between** the split composite-totality and
+>    isolated-`D5a` controls.
+>
+> Both were named not-reached by the Adversary and neither closed since.
+> **A merged node does not clear them.**
 
 > ## `D0` IS MERGED, AND IT MOVED `D2`/`D3` RATHER THAN THE REPRESENTATION
 >
