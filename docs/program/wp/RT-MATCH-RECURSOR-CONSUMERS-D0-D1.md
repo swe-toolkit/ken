@@ -1,5 +1,12 @@
 # RT-MATCH-RECURSOR-CONSUMERS — `D0`/`D1` checkpoint
 
+> **SUPERSEDED ON ITS OPERATIVE QUESTION — read section 6 first.** This section
+> records the measurement at base `89aa1550`, where the population refused. Five
+> successor authorities have merged since, and **at base `166641c8` every row in
+> this population compiles.** The enumeration and causal work below stand as the
+> record of that base; the answer to *"does it refuse?"* has flipped, and
+> section 6 is the current one.
+
 **Base: `89aa15502d6f76e6d42aac1b97ea3ff5032cd889`** (`origin/main`, the merged
 corrected `RT-RECURSOR-TRANSPORT` `D0`-`D2`). Branch
 `wp/RT-MATCH-RECURSOR-CONSUMERS`.
@@ -348,3 +355,214 @@ matters, but a test-keyed reading of either population will double-count.
   not build.
 - **CI has not run.** `AC-8` is a CI claim and no local `--workspace` run was
   performed, per `COORDINATION §12`.
+
+# 6. THE RESUMPTION — `D0`/`D1` re-measured at base `166641c8`
+
+**Record only. No production change.** `git diff 166641c8 -- crates/` is empty
+at this checkpoint SHA; every instrument below was disposable and is reverted.
+No `D2` code was written. Suite: `-p ken-runtime --lib`, **838 passed, 0 failed,
+5 ignored** (the 5 are the base's).
+
+> ## THE RESULT, AND IT IS A CHANGED ANSWER RATHER THAN A CHANGED METHOD
+>
+> **Every compilable program in the `MatchScrutineeRecursor` population now
+> reaches `FunctionizedUnits` under A-only exclusion and compiles `Ok`. There
+> are zero red roots, so no `D2` repair is owed.**
+>
+> Section 2.3 measured 6 failures at base `89aa1550`. The five merged successor
+> authorities closed them. This is the event `AC-1` was written to close on:
+> the refusal has run out of walls.
+
+## 6.1 The gate, re-derived rather than inherited
+
+Section 1.1's closure argument is re-measured at this base, because `D2`-`D6`
+moved this file underneath it and a line number does not survive that.
+
+- `select_body_emission_authority` has **exactly one production call site**:
+  `lowering/core.rs:1487`, inside
+  `compile_expr_into_module_with_root_projection`. (Section 1.1 recorded
+  `:1276`; the seam is unchanged, the line moved.)
+- That function's only production callers are `compile_expr_into_module` and
+  `compile_expr_into_object_module`.
+- **Bypass check:** the sole production construction of a `BodyEmissionAuthority`
+  *value* is that same line; every other construction is in a `#[cfg(test)]`
+  support file building a `Lowering` directly.
+
+## 6.2 Three censuses, because the first gate was the wrong one
+
+Each row records thread name (libtest names the thread after the test), pid,
+exclusion state, and the **complete** residual set.
+
+| census | placed at | classifications | `MatchScrutineeRecursor` hits |
+|---|---|---|---|
+| compile-site | `core.rs:1484`, beside the selector | 665 | 15 |
+| selector-site | `select_body_emission_authority` entry | 731 | 50 |
+
+**The compile-site census was incomplete, and the selector-site census is what
+found it.** The first sees programs that are *compiled*; the population is
+programs that are *classified*. Three tests classify a member and never compile
+it, so a compile-keyed enumeration under-reports by a whole root. Section 1.1
+placed its instrument at the compile seam for good reasons; at this base that
+choice is measurably short, and the fix is the gate, not a wider sweep.
+
+**All 50 hits carry the complete set `{MatchScrutineeRecursor}`.** No program in
+the corpus fires it alongside another variant, so the one-variant exclusion is
+valid on every row and always leaves an empty remainder.
+
+### 6.2a The pre-selector gap — MEASURED HERE, not inherited
+
+Section 1.1's second instrument defect still binds: `validate_oriented_-`
+`subcontinuation_transport` returns `?` **before** the selector, so a compile it
+refuses is invisible to both censuses above. Section 1.2 measured that set at
+base `89aa1550` and found it empty of this class. **That is a premise about a
+different base, so it was re-measured here rather than carried.**
+
+A third census at function **entry**, above the validator:
+
+| quantity | value |
+|---|---|
+| compilations reaching entry | **680** |
+| compilations reaching the selector | **665** |
+| refused before the selector | **15** |
+| residual set of all 15 | **`{}`**, every one |
+| `MatchScrutineeRecursor` hits, entry | **15** |
+| `MatchScrutineeRecursor` hits, at-selector | **15** |
+
+**The two hit counts are equal, so no member of this population is refused
+before the selector**, and the enumeration is not short by construction. The
+conclusion agrees with section 1.2; the evidence is this base's.
+
+The other instrument defect section 1.1 records — `writeln!` issuing one syscall
+per fragment, interleaving concurrent test threads mid-record — was avoided by
+construction: every row is one `write_all` of a pre-formatted buffer. Zero
+malformed records across all three censuses.
+
+## 6.3 The population, by root
+
+| root | carrier | tests | compiled? |
+|---|---|---|---|
+| **R1** `rt_match_scrutinee_recursor_executable` over `rt_closed_active_recursor` | ordinary `Match` | 3 | yes |
+| **R2** ordinary `Match` over `px8j_deferred_recursive_field_fixture` | 6 wrapper spellings | 6 | yes |
+| **R3** `d1_match_scrutinee_recursor_witness` over `d1_active_recursor` | bare, `Let`-wrapped, declaration body | 3 | **never** |
+
+This is wider than section 1.4's two members. R2 is that population. R1 is the
+`RT-RECURSOR-TRANSPORT` `D2` witness, in the population by the predicate and
+omitted there because it was already closed; it is enumerated here because the
+population is defined by the predicate, not by what is still open.
+
+**R2's six wrappers are one program — measured, not assumed.** All six build the
+identical `Match` over the same scrutinee, same two constructors, `binders: 1`,
+same `EXIT_SUCCESS` body, differing **only** in the default trap's message and
+the object symbol. All six were compiled separately, with identical results.
+
+## 6.4 `D1` — activation and outcome
+
+**The activation denominator is measured, not derived:**
+`select_body_emission_authority` was called directly under the exclusion and its
+answer recorded per row, so no row is credited with an outcome the selector
+never routed.
+
+| row | complete residuals | authority, plain | authority, A-only | A-only outcome | plain outcome |
+|---|---|---|---|---|---|
+| R1 `rt_match_scrutinee_recursor_executable` | `{MatchScrutineeRecursor}` | `RecursiveDescent` | `FunctionizedUnits` | **`Ok`** | `Ok` |
+| R2a `D8d composed site` | `{MatchScrutineeRecursor}` | `RecursiveDescent` | `FunctionizedUnits` | **`Ok`** | `Ok` |
+| R2b `CED D1 AC-7 witness` | `{MatchScrutineeRecursor}` | `RecursiveDescent` | `FunctionizedUnits` | **`Ok`** | `Ok` |
+| R2c `CCR D3 witness` | `{MatchScrutineeRecursor}` | `RecursiveDescent` | `FunctionizedUnits` | **`Ok`** | `Ok` |
+| R2d `COC D3 witness` | `{MatchScrutineeRecursor}` | `RecursiveDescent` | `FunctionizedUnits` | **`Ok`** | `Ok` |
+| R2e `SAR D3 witness` | `{MatchScrutineeRecursor}` | `RecursiveDescent` | `FunctionizedUnits` | **`Ok`** | `Ok` |
+| R2f `direct deferred HostResult default` | `{MatchScrutineeRecursor}` | `RecursiveDescent` | `FunctionizedUnits` | **`Ok`** | `Ok` |
+
+**The frame's fixed input is superseded by measurement, as the frame instructed.**
+At `8efdfdb3` the `d8d` row refused with `Unsupported(RecursiveBackedge,
+"protocol machinery is never a source value at a boundary")`. At this base it
+compiles. Nothing here reverts any successor.
+
+## 6.5 The positive control — why the all-`Ok` table is not vacuous
+
+**A negative check passes for any reason.** Re-arming each landed wall's own
+suppression, on the **exact `d8d` witness**, through the **same harness**,
+restores a distinct refusal:
+
+| wall re-armed | refusal restored |
+|---|---|
+| `set_ccr_d2_suppress_active_route` | `Unsupported(BoundaryCarrier, "a carried scrutinee reached a continuation frame that resumes a compile-time value rather than eliminating one")` |
+| `set_coc_d2_suppress_continuation` | `Unsupported(BoundaryCarrier, "a carried producer-call scrutinee reached an ordinary eliminator with further composed eliminators behind it; the carried elimination consumes exactly one frame, so the remainder would be silently dropped")` |
+| `set_sar_d2_suppress_route` | `Unsupported(ComputationalMatch, "scrutinee is not a constructor value after ordinary expression lowering")` |
+
+Three suppressions, three **distinct** constructs and reasons: three mechanisms
+proven live and consumed on this witness, not one probe run three times.
+
+## 6.6 R3, and a control of mine that was wrong
+
+R3 is classified by three tests and compiled by none. Ruling it out as "not a
+compilation entry" alone would be a judgement, so it was measured.
+
+**My first control was wrong and is recorded rather than dropped.**
+`d1_active_recursor` scrutinises `Var(0)`, **free at the root** — the corpus says
+so in the doc comment on its closed counterpart: *"perfectly good for asking the
+classifier a question and cannot be compiled or run."* I "closed" it with a `Let`
+binding index 0 to a `Bool`, got `Unsupported(ComputationalMatch, "scrutinee is
+not a constructor value after ordinary expression lowering")`, and paired it with
+a control that removed the recursive position — which **varied case-less-ness
+while holding the ill-typed binding fixed**. Wrong axis, and the refusal briefly
+looked like an eighth wall.
+
+Holding the shape fixed and varying only the binding's well-typedness:
+
+| binding | outcome |
+|---|---|
+| `Bool` (ill-typed) | `Unsupported(ComputationalMatch, "scrutinee is not a constructor value after ordinary expression lowering")` |
+| `ctor:fixture::d1::Node` (well-typed) | `Unsupported(Match, "scrutinee is not a constructor value")` |
+
+Correcting the binding **moved** the refusal to the outer `Match` rather than
+removing it: the fixture's case body is `Var(0)`, which under
+`argument_binders: 1` yields the bound argument, so the outer `Match` receives a
+closure. Both refusals are attributable to my construction.
+
+⇒ **R3 has no well-formed compilable form via either route tried**, and the
+corpus already supplies the closed counterpart of this exact shape —
+`rt_closed_active_recursor`, which **is** R1 and compiles. Stated as *"no witness
+via the two bindings tried"*, never as a property of R3.
+
+## 6.7 The domain still not covered
+
+**Unchanged from section 1.6.1 and the closing bullets, and re-stated because it
+still binds.** Both censuses are `#[cfg(test)]` in `ken-runtime`, so they see
+only that crate's own unit tests. The native parity suites in `ken-cli` and
+`ken-verify`, and elaborator-driven programs, are **not** in this measurement.
+
+One member of that domain is measured and is **outside** this population. The
+merged `RT-SPECIALIZED-MATCH-ATTRIBUTION` `D0` record (`f8250c5a`) measured the
+`nc14` refusal's scrutinee occurrence as `RuntimeExpr::Var(0)` at
+`StaticOriginId(52)`. The predicate requires the scrutinee to be **syntactically**
+a `ComputationalMatch`; a `Var` cannot match it. That family is owned by
+`RT-TERMINAL-ALL-ELIM-AUTHORITY` — framed, explicitly **not released**, off this
+lane.
+
+**What would close it:** re-gate the census to
+`#[cfg(any(test, feature = "px8-ds-test-support"))]` and run those suites with
+the feature. I have not made that run and am not claiming closure over it.
+
+## 6.8 Hard stops, and what is owed next
+
+**No hard stop fires.** `D1` found no materially distinct authorities because it
+found **no red roots**; no repair needs a new planner or ABI population because
+no repair is needed; no shared root with `RT-LEXICAL-RECURSOR-CONSUMERS` arises,
+since this population has nothing left to attribute. The fourth stop
+(reduced-predecessor merge shape) is not reached for the same reason.
+
+**The open question is a scoping call, not a mechanism one:** `D2` and `D3` as
+framed presuppose a repair. With zero red roots there is no root to repair and
+no mutation-at-a-repaired-root for `D3` to key on. `D3`'s standing obligation to
+give the `D2` counters a consumer (or state at the declaration site that they
+are unread) is **not** discharged by this and survives independently.
+
+## 6.9 Bans held
+
+`RecursiveBackedge` untouched and still protocol-only. No `RecursiveDescent`
+fallback, no `BoundaryUse`, no `PlannedEffectSeat` widening, no lowering-minted
+token, no invocation-local state in ABI data. Zero new `#[ignore]`. No tracker
+`status:` change. No resume of `10369776`. Both residual variants, both
+classifier insertions, both collector insertions and the per-variant hook
+present and unchanged — all discharged by the empty `crates/` diff rather than
+by inspection.
