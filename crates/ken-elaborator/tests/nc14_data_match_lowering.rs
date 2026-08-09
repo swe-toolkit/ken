@@ -14,7 +14,9 @@ use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 use ken_runtime::{
-    evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeExpr, RuntimeGroundValue,
+    evaluate_runtime_ir_expr, InterpreterOracleObservation, NativeArtifactIdentity,
+    NativeDifferentialStage, NativeDifferentialVerdict, NativeSeedEnvironment,
+    RuntimeDeclarationKind, RuntimeExample, RuntimeExpr, RuntimeGroundValue,
     RuntimeIrSeedEnvironment, RuntimeObservation,
 };
 
@@ -119,6 +121,172 @@ fn assert_runtime_and_interpreter_bool_agree(package_name: &str, target_name: &s
     assert_runtime_bool(runtime, interpreter);
 }
 
+fn interpreter_nat_for_source(source: &str, target_name: &str) -> usize {
+    fn count(value: EvalVal, zero: GlobalId, suc: GlobalId) -> usize {
+        match value {
+            EvalVal::Ctor { id, args, .. } if id == zero && args.is_empty() => 0,
+            EvalVal::Ctor { id, args, .. } if id == suc && args.len() == 1 => {
+                1 + count(args[0].clone(), zero, suc)
+            }
+            other => panic!("expected interpreter Nat constructor, got {other:?}"),
+        }
+    }
+
+    let mut env = ElabEnv::new().expect("prelude env");
+    env.elaborate_file(source).expect("source elaborates");
+    let target = env.globals[target_name];
+    let body = match env.env.lookup(target) {
+        Some(Decl::Transparent { body, .. }) => body.clone(),
+        other => panic!("expected transparent target, got {:?}", other.map(|_| ())),
+    };
+    let mut store = EvalStore::new();
+    count(
+        eval(&[], &body, &env.env, &mut store),
+        env.globals["Zero"],
+        env.globals["Suc"],
+    )
+}
+
+fn runtime_nat(observation: RuntimeObservation) -> usize {
+    match observation {
+        RuntimeObservation::Returned(RuntimeGroundValue::Constructor { constructor, args })
+            if constructor.ends_with("::Zero") && args.is_empty() =>
+        {
+            0
+        }
+        RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
+            constructor,
+            mut args,
+        }) if constructor.ends_with("::Suc") && args.len() == 1 => {
+            1 + runtime_nat(RuntimeObservation::Returned(args.remove(0)))
+        }
+        other => panic!("expected runtime Nat constructor, got {other:?}"),
+    }
+}
+
+fn nested_native_observation_for_source(
+    package_name: &str,
+    target_name: &str,
+    source: &str,
+) -> RuntimeObservation {
+    let target = decl_symbol(package_name, target_name);
+    let out = compile_ken_package_sources(
+        &CompilerManifest::new(package_name, Vec::new()),
+        vec![CompilerSource::new("src/main.ken", source)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![package_name.to_string()],
+            ),
+            symbol: target.clone(),
+            kind: CompilerTargetKind::Executable,
+        },
+    )
+    .expect("recursive source emits checked-core package");
+    let closure = out.closures.first().expect("selected target closure");
+    let mut program =
+        erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
+            .expect("recursive checked artifact lowers");
+    // Mirror the compiler driver's target-closure trust-metadata projection
+    // before the native boundary preflight.
+    let runtime_targets = program
+        .declarations
+        .iter()
+        .map(|declaration| declaration.symbol.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    program
+        .erased_core
+        .metadata
+        .assumptions
+        .retain(|symbol, _| runtime_targets.contains(symbol));
+    program
+        .erased_core
+        .metadata
+        .assumption_trust_metadata
+        .retain(|_, metadata| runtime_targets.contains(&metadata.target));
+    program
+        .erased_core
+        .metadata
+        .trusted_base_delta
+        .retain(|symbol, _| runtime_targets.contains(symbol));
+    let rose = decl_symbol(package_name, "LiftRose");
+    let bag = decl_symbol(package_name, "Bag");
+    let node = StableSymbol::constructor(&rose, "LiftNode").to_string();
+    let leaf = StableSymbol::constructor(&rose, "LiftLeaf").to_string();
+    let join = StableSymbol::constructor(&bag, "Join").to_string();
+    let empty = RuntimeExpr::Construct {
+        constructor: StableSymbol::constructor(&bag, "Empty").to_string(),
+        args: Vec::new(),
+    };
+    let sample = RuntimeExpr::Construct {
+        constructor: node.clone(),
+        args: vec![RuntimeExpr::Construct {
+            constructor: join,
+            args: vec![
+                RuntimeExpr::Construct {
+                    constructor: leaf,
+                    args: Vec::new(),
+                },
+                RuntimeExpr::Construct {
+                    constructor: node,
+                    args: vec![empty],
+                },
+            ],
+        }],
+    };
+    let invocation = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::DeclarationRef {
+            symbol: target.to_string(),
+        }),
+        args: vec![sample],
+    };
+    let nat = decl_symbol(package_name, "Nat");
+    let zero = StableSymbol::constructor(&nat, "Zero").to_string();
+    let suc = StableSymbol::constructor(&nat, "Suc").to_string();
+    let expected = RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
+        constructor: suc.clone(),
+        args: vec![RuntimeGroundValue::Constructor {
+            constructor: suc.clone(),
+            args: vec![RuntimeGroundValue::Constructor {
+                constructor: suc,
+                args: vec![RuntimeGroundValue::Constructor {
+                    constructor: zero,
+                    args: Vec::new(),
+                }],
+            }],
+        }],
+    });
+    let example = RuntimeExample {
+        name: "nested-size-uses-lift".to_string(),
+        checked_core_shape: "checked LiftRose size invocation".to_string(),
+        ir: invocation,
+        observation: expected.clone(),
+    };
+    let report = ken_runtime::run_example_with_interpreter_observation(
+        &program,
+        &example,
+        &NativeSeedEnvironment::empty(),
+        InterpreterOracleObservation {
+            artifact: NativeArtifactIdentity {
+                package_identity: program.package_identity.clone(),
+                core_semantic_hash: program.core_semantic_hash,
+                runtime_artifact_hash: program.artifact_hash,
+            },
+            observation: expected,
+            evidence_source: "ken-interp eval over checked GlobalEnv".to_string(),
+        },
+    );
+    assert_eq!(
+        report.verdict,
+        NativeDifferentialVerdict::F1InterpreterAgreement {
+            stage: NativeDifferentialStage::InterpreterNativeCompare,
+        }
+    );
+    let native = report.native.expect("native nested-IH artifact is present");
+    assert!(native.verifier_passed, "Cranelift verifier must pass");
+    native.observation
+}
+
 #[test]
 fn option_match_payload_binding_lowers_and_matches_interpreter() {
     let source = "const target : Bool = \
@@ -142,6 +310,69 @@ fn user_data_two_payload_binders_preserve_de_bruijn_order() {
         match PairBoolMk True False { PairBoolMk x y |-> x }";
 
     assert_runtime_and_interpreter_bool_agree("nc14_pair_pkg", "target", source);
+}
+
+#[test]
+fn nested_recursive_field_elaborates_checks_and_runs_from_checked_artifact() {
+    // KERNEL-NESTED-IND AC-K12: the recursive children consume their exact
+    // generated All leaves, and the checked artifact reaches native Nat 3.
+    let source = "data Bag (a : Type) : Type where { \
+          Empty : Bag a ; One : a -> Bag a ; Join : a -> a -> Bag a \
+        }\n\
+        data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)\n\
+        fn liftAdd (x : Nat) (y : Nat) : Nat = match x { \
+          Zero |-> y ; Suc x2 |-> Suc (liftAdd x2 y) \
+        }\n\
+        fn liftSize (r : LiftRose) : Nat = match r { \
+          LiftLeaf |-> Suc Zero ; \
+          LiftNode b |-> match b { \
+            Empty |-> Suc Zero ; \
+            One x |-> Suc (liftSize x) ; \
+            Join x y |-> Suc (liftAdd (liftSize x) (liftSize y)) \
+          } \
+        }\n\
+        const liftSizeResult : Nat = liftSize \
+          (LiftNode (Join LiftRose LiftLeaf (LiftNode (Empty LiftRose))))";
+
+    assert_eq!(interpreter_nat_for_source(source, "liftSizeResult"), 3);
+    assert_eq!(
+        runtime_nat(nested_native_observation_for_source(
+            "nested_inductive_pkg",
+            "liftSize",
+            source,
+        )),
+        3
+    );
+}
+
+#[test]
+fn nested_dependent_motive_consumes_correlated_child_proofs() {
+    let source = "data ProofBag (a : Type) : Type where { \
+          ProofEmpty : ProofBag a ; ProofOne : a -> ProofBag a ; \
+          ProofJoin : a -> a -> ProofBag a \
+        }\n\
+        data ProofRose = ProofLeaf | ProofNode (ProofBag ProofRose)\n\
+        fn allGoodType (r : ProofRose) : Omega = match r { \
+          ProofLeaf |-> Top ; \
+          ProofNode b |-> match b { \
+            ProofEmpty |-> Top ; \
+            ProofOne x |-> allGoodType x ; \
+            ProofJoin x y |-> And (allGoodType x) (allGoodType y) \
+          } \
+        }\n\
+        theorem allGood (r : ProofRose) : allGoodType r = match r { \
+          ProofLeaf |-> Proved ; \
+          ProofNode b |-> match b { \
+            ProofEmpty |-> Proved ; \
+            ProofOne x |-> allGood x ; \
+            ProofJoin x y |-> and_intro \
+              (allGoodType x) (allGoodType y) (allGood x) (allGood y) \
+          } \
+        }";
+
+    let mut env = ElabEnv::new().expect("prelude env");
+    env.elaborate_file(source)
+        .expect("dependent nested lift proof elaborates");
 }
 
 fn bool_data_symbols(package: &str) -> (StableSymbol, StableSymbol, StableSymbol) {

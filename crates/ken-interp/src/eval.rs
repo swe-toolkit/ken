@@ -60,7 +60,11 @@ mod target_abi_tests {
             .expect("matching interpreter artifact proceeds");
     }
 }
-use ken_kernel::env::{Decl, GlobalEnv, PrimReduction};
+use ken_kernel::env::{AllSupportSort, Decl, GlobalEnv, PrimReduction};
+use ken_kernel::inductive::{
+    all_support_evidence_positions, method_type, peel_app, peel_pi, recursive_shapes,
+    RecursiveShape,
+};
 use ken_kernel::term::{GlobalId, Level, Term};
 use ken_runtime::{InternResult, Sign as RtSign, Store, Value as RtValue};
 use num_bigint::{BigInt, BigUint, Sign as NumSign};
@@ -239,6 +243,9 @@ pub enum EvalVal {
     IhClosure {
         rec_field: Rc<EvalVal>,
         fam: GlobalId,
+        level_args: Rc<[Level]>,
+        params: Rc<[Term]>,
+        motive: Rc<Term>,
         methods: Rc<[Term]>,
         ih_env: Rc<Env>,
         nb: usize,
@@ -623,40 +630,160 @@ fn eval_projection_accessor_app(
 /// Method application order (matching `iota_reduct` in `ken-kernel`):
 ///   1. Apply all constructor-specific args (args[m..] where m = params.len()).
 ///   2. Then apply the IH for each recursive position.
-/// Returns whether a constructor arg type refers to the inductive type `fam`
-/// at its head (strict positivity, simple case). This is used to identify
-/// recursive positions because `ConstructorDecl.recursive_positions` is not
-/// populated by the kernel for G1-scope inductives.
-fn is_recursive_arg(arg_ty: &Term, fam: GlobalId) -> bool {
-    match arg_ty {
-        Term::IndFormer { id, .. } => *id == fam,
-        // Descend into the operator of an application (e.g., I applied to
-        // indices) — handles `I i₁ … iₙ` in indexed families.
-        Term::App(f, _) => is_recursive_arg(f, fam),
-        _ => false,
-    }
-}
-
-/// Is constructor arg type `arg_ty` a recursive position for family `fam`,
-/// direct **or** Π-bound (K1.5 W-style, `ken-kernel/src/inductive.rs`
-/// `recursive_args`)? Peels leading `Term::Pi` domains (the branching
-/// telescope `B₁ → … → B_nb → …`) and checks whether the remaining codomain
-/// is headed by `fam`. Returns the branching arity `nb` (`0` = direct
-/// occurrence, unchanged from pre-K1.5; `≥1` = W-style, e.g. `ITree`'s
-/// `Vis : E → (Resp e → ITree r) → ITree r`, `nb = 1`).
-fn recursive_arg_arity(arg_ty: &Term, fam: GlobalId) -> Option<usize> {
-    let mut nb = 0;
-    let mut t = arg_ty;
-    loop {
-        if is_recursive_arg(t, fam) {
-            return Some(nb);
-        }
-        match t {
-            Term::Pi(_, cod) => {
-                t = cod;
-                nb += 1;
+fn lift_recursive_value(
+    env: &[EvalVal],
+    shape: &RecursiveShape,
+    value: EvalVal,
+    fam: GlobalId,
+    level_args: &[Level],
+    params: &[Term],
+    motive: &Term,
+    methods: &[Term],
+    support_sort: Option<AllSupportSort>,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
+    match shape {
+        RecursiveShape::Direct { .. } => elim_reduce(
+            env,
+            fam,
+            level_args,
+            params,
+            motive,
+            methods,
+            value,
+            globals,
+            store,
+        ),
+        RecursiveShape::Pi { domains, body } => {
+            if matches!(body.as_ref(), RecursiveShape::Direct { .. }) {
+                EvalVal::IhClosure {
+                    rec_field: Rc::new(value),
+                    fam,
+                    level_args: Rc::from(level_args.to_vec().into_boxed_slice()),
+                    params: Rc::from(params.to_vec().into_boxed_slice()),
+                    motive: Rc::new(motive.clone()),
+                    methods: Rc::from(methods.to_vec().into_boxed_slice()),
+                    ih_env: Rc::new(env.to_vec()),
+                    nb: domains.len(),
+                    applied: Rc::new(Vec::new()),
+                }
+            } else {
+                EvalVal::Neutral
             }
-            _ => return None,
+        }
+        RecursiveShape::Sigma { domain, codomain } => {
+            let EvalVal::Pair { fst, snd, .. } = value else {
+                return EvalVal::Neutral;
+            };
+            let mut components = Vec::new();
+            if let Some(shape) = domain {
+                components.push(lift_recursive_value(
+                    env,
+                    shape,
+                    (*fst).clone(),
+                    fam,
+                    level_args,
+                    params,
+                    motive,
+                    methods,
+                    support_sort,
+                    globals,
+                    store,
+                ));
+            }
+            if let Some(shape) = codomain {
+                components.push(lift_recursive_value(
+                    env,
+                    shape,
+                    (*snd).clone(),
+                    fam,
+                    level_args,
+                    params,
+                    motive,
+                    methods,
+                    support_sort,
+                    globals,
+                    store,
+                ));
+            }
+            match components.len() {
+                1 => components.pop().expect("one component"),
+                2 => make_pair(components.remove(0), components.remove(0), store),
+                _ => EvalVal::Neutral,
+            }
+        }
+        RecursiveShape::Former {
+            former, arguments, ..
+        } => {
+            let Some(sort) = support_sort else {
+                return EvalVal::Neutral;
+            };
+            let EvalVal::Ctor {
+                id: source_ctor,
+                args: source_args,
+                ..
+            } = value
+            else {
+                return EvalVal::Neutral;
+            };
+            let Some((host, ordinal)) = globals.constructor(source_ctor) else {
+                return EvalVal::Neutral;
+            };
+            if host.id != *former {
+                return EvalVal::Neutral;
+            }
+            let source_fields = &source_args[host.params.len()..];
+            let mut components = Vec::new();
+            for (parameter, argument) in arguments.iter().enumerate() {
+                let Some(argument_shape) = argument.shape.as_deref() else {
+                    continue;
+                };
+                let Some(support) = globals.all_support(*former, parameter, sort) else {
+                    return EvalVal::Neutral;
+                };
+                let Some(support_decl) = globals.inductive(support) else {
+                    return EvalVal::Neutral;
+                };
+                let Some(support_ctor) = support_decl.constructors.get(ordinal) else {
+                    return EvalVal::Neutral;
+                };
+                let Ok(evidence_positions) =
+                    all_support_evidence_positions(globals, support, ordinal)
+                else {
+                    return EvalVal::Neutral;
+                };
+                let mut support_args = vec![EvalVal::Neutral; support_decl.params.len()];
+                support_args.extend(source_fields.iter().cloned());
+                for position in evidence_positions {
+                    let Some(field) = source_fields.get(position) else {
+                        return EvalVal::Neutral;
+                    };
+                    support_args.push(lift_recursive_value(
+                        env,
+                        argument_shape,
+                        field.clone(),
+                        fam,
+                        level_args,
+                        params,
+                        motive,
+                        methods,
+                        Some(sort),
+                        globals,
+                        store,
+                    ));
+                }
+                components.push(make_ctor(support_ctor.id, support_args, store));
+            }
+            match components.len() {
+                1 => components.pop().expect("one component"),
+                _ if !components.is_empty() => components
+                    .into_iter()
+                    .rev()
+                    .reduce(|tail, head| make_pair(head, tail, store))
+                    .expect("non-empty components"),
+                _ => EvalVal::Neutral,
+            }
         }
     }
 }
@@ -761,6 +888,9 @@ fn term_var_free(t: &Term, target: usize) -> bool {
 fn elim_reduce(
     env: &[EvalVal],
     fam: GlobalId,
+    level_args: &[Level],
+    params: &[Term],
+    motive: &Term,
     methods: &[Term],
     scrut: EvalVal,
     globals: &GlobalEnv,
@@ -799,16 +929,18 @@ fn elim_reduce(
             let ctor_decl = &ind.constructors[k];
             let ctor_specific: &[EvalVal] = &args[m..];
 
-            // Compute recursive positions from arg types (kernel never populates
-            // ConstructorDecl.recursive_positions for G1-scope inductives).
-            // Each entry pairs the field index with its branching arity `nb`
-            // (`0` = direct, `≥1` = K1.5 W-style/Π-bound — `recursive_arg_arity`).
-            let rec_positions: Vec<(usize, usize)> = ctor_decl
-                .args
-                .iter()
-                .enumerate()
-                .filter_map(|(i, ty)| recursive_arg_arity(ty, fam).map(|nb| (i, nb)))
-                .collect();
+            let shapes = match recursive_shapes(globals, ctor_decl, fam, m) {
+                Ok(shapes) => shapes,
+                Err(_) => return EvalVal::Neutral,
+            };
+            let method_ty = match method_type(globals, ind, k, motive, params, level_args) {
+                Ok(method_ty) => method_ty,
+                Err(_) => return EvalVal::Neutral,
+            };
+            let (method_domains, _) = peel_pi(&method_ty);
+            if method_domains.len() != ctor_specific.len() + shapes.len() {
+                return EvalVal::Neutral;
+            }
 
             // Evaluate ONLY the selected method (the others are never touched).
             let mut mval = eval(env, &methods[k], globals, store);
@@ -845,33 +977,39 @@ fn elim_reduce(
             // (this is dead-code skip, not memoisation; nothing here needed
             // sharing, per D1's `doubleLet` finding).
             let ih_region = peel_lams(&methods[k], ctor_specific.len());
-            let body_only = peel_lams(ih_region, rec_positions.len());
-            let p = rec_positions.len();
-            for (j, (rec_pos, nb)) in rec_positions.iter().enumerate() {
+            let body_only = peel_lams(ih_region, shapes.len());
+            let p = shapes.len();
+            for (j, shape) in shapes.iter().enumerate() {
                 let used = term_var_free(body_only, p - 1 - j);
                 let ih = if !used {
                     // Provably dead — any value is behaviorally inert here;
                     // skip the recursive walk entirely (RTP1 (B') fix).
                     EvalVal::Unknown
                 } else {
-                    let rec_arg = ctor_specific[*rec_pos].clone();
-                    if *nb == 0 {
-                        // Direct recursive position — unchanged from before.
-                        elim_reduce(env, fam, methods, rec_arg, globals, store)
-                    } else {
-                        // K1.5 W-style: the IH is `λb̄. elim_D … (a_j b̄)`
-                        // (`iota_reduct`) — cannot be computed until the `nb`
-                        // branch args are known, so defer as an `IhClosure`
-                        // rather than eagerly folding here.
-                        EvalVal::IhClosure {
-                            rec_field: Rc::new(rec_arg),
-                            fam,
-                            methods: Rc::from(methods.to_vec().into_boxed_slice()),
-                            ih_env: Rc::new(env.to_vec()),
-                            nb: *nb,
-                            applied: Rc::new(Vec::new()),
-                        }
-                    }
+                    let Some(rec_arg) = ctor_specific.get(shape.position).cloned() else {
+                        return EvalVal::Neutral;
+                    };
+                    let ih_type = &method_domains[ctor_specific.len() + j];
+                    let (ih_head, _) = peel_app(ih_type);
+                    let support_sort = match ih_head {
+                        Term::IndFormer { id, .. } => globals
+                            .all_support_origin(id)
+                            .map(|(_, _, sort)| sort),
+                        _ => None,
+                    };
+                    lift_recursive_value(
+                        env,
+                        &shape.shape,
+                        rec_arg,
+                        fam,
+                        level_args,
+                        params,
+                        motive,
+                        methods,
+                        support_sort,
+                        globals,
+                        store,
+                    )
                 };
                 mval = apply(mval, ih, globals, store);
             }
@@ -1571,12 +1709,25 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
         // --- Elim: ι fires only the selected method (branch laziness) ---
         Term::Elim {
             fam,
+            level_args,
+            params,
+            motive,
             methods,
             scrut,
             ..
         } => {
             let sv = eval(env, scrut, globals, store);
-            elim_reduce(env, *fam, methods, sv, globals, store)
+            elim_reduce(
+                env,
+                *fam,
+                level_args,
+                params,
+                motive,
+                methods,
+                sv,
+                globals,
+                store,
+            )
         }
 
         // --- Refl: carry the type and value for cast C5 ---
@@ -1714,6 +1865,9 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
         EvalVal::IhClosure {
             rec_field,
             fam,
+            level_args,
+            params,
+            motive,
             methods,
             ih_env,
             nb,
@@ -1726,11 +1880,24 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
                 for a in applied2 {
                     branch_val = apply(branch_val, a, globals, store);
                 }
-                elim_reduce(&ih_env, fam, &methods, branch_val, globals, store)
+                elim_reduce(
+                    &ih_env,
+                    fam,
+                    &level_args,
+                    &params,
+                    &motive,
+                    &methods,
+                    branch_val,
+                    globals,
+                    store,
+                )
             } else {
                 EvalVal::IhClosure {
                     rec_field,
                     fam,
+                    level_args,
+                    params,
+                    motive,
                     methods,
                     ih_env,
                     nb,
