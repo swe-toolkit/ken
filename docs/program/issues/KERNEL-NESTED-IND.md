@@ -20,56 +20,92 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > [[RT-BODY-OCCURRENCE-PROVENANCE]] closed with every AC discharged —
 > production at `1f706520`, `D7` at `1105671a` (PR #1727, CI green).
 >
-> ### THE NEXT SLICE IS `D3a`. THE DIFFERENTIAL IS NOT A RESUME STEP.
+> ### THE NEXT SLICE IS `D5`. THE POSITION IS FOUR DELIVERABLES FURTHER ON.
 >
-> **Corrected 2026-08-09 after it cost the ring a turn.** The release above
-> first said to rebase the retained work and re-run the exact `AC-K12`
-> differential. **That instruction was wrong**, and Kernel measured why in ten
-> minutes: `nested_recursive_field_lowers_and_native_agrees_at_nat_three` fails
-> at `ken-elaborator/tests/nc14_data_match_lowering.rs:136` with
-> `KernelRejected TypeMismatch`, before any interpreter or native stage.
+> **Architect ruling `evt_3cnnt1megm88h`, 2026-08-09, and it is the authority
+> here.** Two earlier resume instructions of mine in this block were wrong and
+> are **withdrawn**: *re-run the `AC-K12` differential*, and its replacement
+> *resume at `D3a`*. Both rested on the premise that `D3a` and `D1b` were
+> unbuilt. **That premise is false on this node's own parent commit.**
 >
-> **That refusal is the designed state, not a defect and not a boundary.** The
-> frame's §4 is explicit: admittance opens at `D1b`, which is **fourth** in the
-> order, and *"the nested declaration stays rejected"* until it does — the whole
-> point of putting `D1b` late is to keep the inert outcome unreachable. The
-> `AC-K12` differential is the node's **terminal** control. It cannot pass until
-> `D1b`/`D2` land, so it is a completion check, never a resume step.
+> **What is actually landed**, each verified an ancestor of `origin/main`:
 >
-> The instruction was inherited from the hold, where its job was to test whether
-> the Runtime wall had cleared. **It has: the first refusal is no longer
-> Runtime's, it is this node's own unbuilt admittance.** That question is
-> answered and the instruction is retired.
+> | commit | deliverable |
+> |---|---|
+> | `88196527` | `D1a` — per-parameter polarity derived at admission |
+> | `ac86b2d7` | `D3a` — exhaustive recursive-shape descriptor, inert, with `AC-K15` invariance |
+> | `433dd12b` | `D3b`+`D4` atomic — structured descriptor with universe-level transport |
+> | `afb38934` | **`D1b` — production nested admission is OPEN** |
 >
-> **Resume at `D3a`** — inert preparation: the exhaustive recursive-shape
-> descriptor, its producer, and API plumbing, with the population including
-> direct, Pi/W-style, `D`-free, declared-positive-former nesting and primitive
-> `Sigma`. It must leave admission, `method_type`, `iota_reduct`, and every
-> observable eliminator signature and reduct behaviour unchanged, and it does
-> **not** discharge `D3` or `AC-K3`. Then `D3b`+`D4` atomic, then `D1b`/`D2`,
-> then `D5`.
+> `afb38934` rewrote `check_pos_arg` from the blanket non-`D`-head guard to
+> traversal through a former's recorded `StrictlyPositive` positions, and added
+> `declared_positive_paths_admit_list_pair_and_fresh_container_nesting` and
+> `production_nested_lift_is_consumed_and_iota_computes`. Its commit subject
+> names only the terminal-All source relation, which is what made it easy to
+> read as a `D1a` partial. **Read the node's landed record, not a commit
+> subject, and not the frame's plan.**
+>
+> ### The refusal is the remaining `D5` elaborator boundary
+>
+> `nested_recursive_field_lowers_and_native_agrees_at_nat_three` fails at
+> `ken-elaborator/tests/nc14_data_match_lowering.rs:136` with `KernelRejected
+> TypeMismatch`. **The source gets past declaration admission; its first
+> failure is method checking**, exactly where the error location says.
+>
+> It is a **producer split**, verified at `origin/main`:
+>
+> - `ken-elaborator/src/elab.rs:1252` derives hidden method binders with legacy
+>   `recursive_args(ctor, d_id, m)`, which returns **no entry** for
+>   `LiftNode : Bag LiftRose -> LiftRose`.
+> - `ken-kernel/src/inductive.rs:2101` builds the checked method type from
+>   `recursive_shapes`, so it requires
+>   `Π (b : Bag LiftRose). All^Type_{Bag,0} (λr. M r) b -> ...`.
+>
+> The elaborator emits the `b` method without the lifted binder. The reported
+> expected-`Π All` / found-body mismatch **is** that split made visible.
+>
+> ### The `D5` mechanism, as ruled — `crates/ken-elaborator/src/elab.rs`, kernel unchanged
+>
+> 1. Take the complete constructor-method telescope from kernel
+>    `method_type`/`recursive_shapes`. **Do not** reconstruct a nested lift with
+>    `recursive_args`, and do not add a second elaborator topology rule.
+> 2. For each nested source field, carry the corresponding hidden,
+>    literally source-indexed `All` binder as an elaboration-context pair
+>    `(source value, lift evidence)`.
+> 3. When source code matches that field, lower the source match and its
+>    kernel-generated `All` inhabitant **in lockstep**, validating support
+>    through kernel provenance (`all_support_origin`) and aligned evidence
+>    positions (`all_support_evidence_positions`). An exposed recursive child
+>    receives its exact motive instance; an exposed enclosing child retains its
+>    residual `All` inhabitant.
+> 4. A structural self-call on an exposed child consumes that motive instance.
+>    Do not emit an unrestricted recursive call, expose generated support names,
+>    add equality/transport, or loosen `ken-kernel`.
+> 5. Kernel-check the completed `Elim` unconditionally. Valid Nat-3 and
+>    dependent-`Omega` lockstep cases must accept; a missing, swapped, or
+>    foreign evidence association must still reject; direct and W-style methods
+>    remain unchanged.
+>
+> Normative source: `spec/30-surface/39-elaboration.md §2.2 item 5` and
+> `spec/30-surface/34-data-match.md §3.1`. **Implement the contract afresh** —
+> do not cherry-pick or revive rejected `e8cdc8b9`; retain its durable RED as
+> the adversarial input.
+>
+> ### Scope: `crates/ken-elaborator/src` is in scope and is where `D5` lands
+>
+> An earlier line in this block described the lane surface as `ken-kernel` plus
+> `ken-elaborator/tests`. **Withdrawn** — it was measured off the retained
+> snapshot branch rather than the node. `D5` is *surface consumability:
+> matching, elaboration, structural-recursion/termination*, and the ruled
+> mechanism is in `crates/ken-elaborator/src/elab.rs`. Still disjoint from
+> Runtime's `ken-runtime`/`ken-cli`, so the concurrent lane is unaffected.
 >
 > **On the retained branches:** `wp/KERNEL-NESTED-IND-relation-partial` rebases
 > to an empty tree — both its commits are already upstream in `afb38934`.
 > `wp/KERNEL-NESTED-IND` still holds the full snapshot and the durable RED.
 > Nothing there is owed forward.
 >
-> ### Scope: `ken-elaborator/src` is this node's, and `D3a` does not need it
->
-> The release above described the lane surface as `ken-kernel` plus
-> `ken-elaborator/tests`. **That was measured off the retained snapshot branch,
-> not off the node, and it under-describes the node.** `D5` is *surface
-> consumability: matching, elaboration, structural-recursion/termination*, so
-> `ken-elaborator/src` is in scope for this WP when `D5` is reached. It is
-> disjoint from Runtime's `ken-runtime`/`ken-cli` either way, so the concurrent
-> lane stays clean.
->
-> **`D3a` is kernel-side and does not reach it. Do not widen now** — not
-> because the path is forbidden, but because `D5` is fifth and the frame notes
-> the elaborator half of `D5` may largely fall out of `D3`. Widening at `D3a`
-> would build against a seam `D3b`/`D4` have not yet defined.
->
-> ### Two things the unblock does NOT change
+> ### One thing the unblock does NOT change
 >
 > **`AC-K12` still requires lowering AND evaluation.** The merged contract
 > requires the nested-IH constructor to reach native execution, pass the
@@ -77,11 +113,16 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > native refusal cannot be the terminal positive control** — that was true
 > while held and it is true now.
 >
-> **Component attribution is still Runtime, so a surviving refusal is not
-> yours to fix.** **Kernel must NOT edit `crates/ken-runtime`** — the Steward
-> authorized that once and was overruled. If the rebased differential still
-> refuses, that is a fresh Runtime attribution finding: report the exact first
-> refusal and its owner to the Steward, and do not repair it in place.
+> **`crates/ken-runtime` stays off-limits to Kernel** — the Steward authorized
+> an edit there once and was overruled; Runtime owns the planner/lowering
+> invariant.
+>
+> **But this refusal is NOT Runtime's**, and the earlier wording here — *"a
+> surviving refusal is not yours to fix, report it as a fresh Runtime
+> attribution finding"* — is **withdrawn** by `evt_3cnnt1megm88h`. The
+> `AC-K12` differential's first failure is method checking on the elaborator
+> side of the producer split, inside this node's own `D5`. Repairing it in
+> `crates/ken-elaborator/src` is the work, not an out-of-lane escalation.
 >
 > ## RE-RELEASED 2026-08-09 — AND THE RELATIONAL ZIPPER IS NOT THE ROUTE
 >
