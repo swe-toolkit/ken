@@ -258,3 +258,106 @@ at their correction, which is the substitute-witness failure with an extra layer
 **The ask is now exact:** the tree, patch or branch on which Kernel observed
 `BackendFailure` at `StaticOriginId(26)`. Given it, the four measurements in §2
 run unchanged and the classification follows.
+
+## 9. Venue 3 — SOI(26) reproduced, and the four measurements
+
+Kernel supplied the complete uncommitted projection snapshot as commit
+`a577f136454ed84113ea853ff91c59929fdd53bf`, tree
+`648548abb650e55a5bf56d2f39ed3f4efb5aae71`, parent `dd3cd050`.
+
+**Venue 3** is the clean object-level merge of the §venue synthetic commit
+`0c5be874` with that snapshot: tree
+`ccbb5ee519776c0ada29a09eb488c61299c80d68`, materialised as **unreferenced**
+commit `26bf2961`. No conflict. Kernel's branch was not moved, edited, named or
+committed to.
+
+**The exact invocation from §8, unchanged, now returns the node's error
+verbatim:**
+
+```
+BackendFailure { stage: NativeLoweringOrExecution, reason:
+  "module operation failed: function left planned source join
+   StaticOriginId(26) neither emitted nor statically unselected" }
+```
+
+### Measurement 1 — the sole origin-to-expression table
+
+| field | value |
+|---|---|
+| origin | `StaticOriginId(26)` |
+| `occurrence.keyed` | `Some(true)` — the table's own keying self-check passes |
+| `RuntimeExpr` kind | `ComputationalMatch { scrutinee: Var(0), … }` over `LiftRose`, cases `LiftLeaf` / `LiftNode` |
+| semantic function owner | `Some(PredeclaredFunctionId(2))` |
+
+The scrutinee is `Var(0)` — the function's own parameter — so **SOI(26) is the
+body of `liftSize` itself**, not a nested or conditional sub-expression.
+
+### Measurement 2 — token, predecessor bit, and membership
+
+| field | value |
+|---|---|
+| `join_result` | `PlannedJoinResult { representation: CarrierWord, has_continuing_predecessor: true }` |
+| `join_token` | `JoinPlanToken { origin: SOI(26), representation: CarrierWord, has_continuing_predecessor: true }` |
+| `required` (owner `PredeclaredFunctionId(2)`) | `{SOI(26), SOI(33), SOI(39), SOI(53)}` |
+| `consumed` | `{}` |
+| `dispositioned` | `{}` |
+| `covered` | `{}` |
+
+**The entire owner population is uncovered, not merely SOI(26).** SOI(26) is
+simply the least element of a four-member set of which **none** was reached.
+
+### Measurement 3 — traversal, selection, and subtree
+
+| observation | value |
+|---|---|
+| `enter_source_occurrence_plan` called for SOI(26) | **false** |
+| entered for this function | `8, 7, 6, 5, 4, 3, 2, 20, 19, 17, 15, 14, 13, 12, 11, 58` — **none of 26, 33, 39, 53** |
+| match selections recorded | **none** |
+| owner-subtree joins rooted at SOI(26) | `{SOI(26), SOI(33), SOI(39), SOI(53)}` |
+
+**Positive control, so "nothing was consumed" is not read as "the seat never
+ran".** Two sibling functions closed correctly in the same compile:
+`required=1 consumed=1 {SOI(8)}` and `required=2 consumed=2 {SOI(14), SOI(20)}`.
+The traversal, the ledger and the closeout all work; **they are not reached for
+this owner.**
+
+## 10. THE FIRST MISSING GENERAL AUTHORITY IS THE GENERAL TRAVERSAL ROUTE
+
+**Authority 1.** The lowering traversal that emits
+`PredeclaredFunctionId(2)`'s body never routes through
+`enter_source_occurrence_plan` for any join planned in that body.
+
+**Argued from the trace, not from the set difference:**
+
+- **It is not authority 3 (planning / ownership).** The occurrence is present
+  and correctly keyed — `required_join_origins` refuses outright if the
+  population is not keyed by source origin, and it did not. SOI(26) carries a
+  well-formed `JoinPlanToken` with a coherent representation and predecessor
+  bit, and `function_owner` returns a real function. Nothing about the planner's
+  answer is malformed; lowering simply never asks.
+- **It is not authority 2 (selection / disposition).** **No static selection was
+  recorded at all** for this function, so there is no unselected branch whose
+  subtree went undispositioned. And SOI(26) is the function's **own body**,
+  scrutinising its **own parameter** — semantically reachable by construction. A
+  body is not statically unselected, so dispositioning it would be **asserting a
+  deadness that is false**, which is the forbidden "insert it into the dead set"
+  wearing a subtree's clothes.
+- **It is authority 1, and the whole-population shape is what says so.** All
+  four planned joins of one owner are missing together, while two sibling
+  functions in the same compile consume theirs correctly. That is not a
+  per-origin omission; it is **one owner's body emission not passing through the
+  general entry route at all.**
+
+**The general statement, which is the deliverable:** an emission path exists
+that produces a function body without routing its planned source occurrences
+through `enter_source_occurrence_plan`. **The correction belongs at that general
+traversal route** — at whatever body-emission path this owner takes — and not at
+SOI(26), whose only distinction is being the least element of the set that path
+failed to visit.
+
+⇒ Per the frame: **reachable ⇒ the correction belongs at the general traversal
+route.**
+
+**Stopping here for the Architect's mechanism ruling.** Which body-emission path
+`PredeclaredFunctionId(2)` takes, and how it should reach the general entry, is
+the mechanism question and it is not mine.
