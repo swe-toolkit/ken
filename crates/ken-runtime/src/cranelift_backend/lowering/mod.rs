@@ -6983,6 +6983,16 @@ impl<'a> Lowering<'a> {
             // "discharged twice in a single function" with a candidate-ledger
             // message. A layer in front of the law must not preempt the law's
             // own refusals: it derives from them, it does not speak for them.
+            // `D3` — the promotion seat, recorded before the ledger call so a
+            // REFUSED promotion still leaves its seat in the trace. That is the
+            // terminal event both mutation 2's and mutation 3's chains end on,
+            // and the seat is what tells the two chains apart.
+            #[cfg(test)]
+            units::d3_record(units::D3Event::Settle {
+                identity: settled_identity.clone(),
+                disposition: units::CandidateDisposition::ComposedCall,
+                seat: units::D3Seat::ComposedPromotion,
+            });
             if let Some(ledger) = self.continuation_candidates.as_mut() {
                 ledger.settle(&settled_identity, units::CandidateDisposition::ComposedCall)?;
             }

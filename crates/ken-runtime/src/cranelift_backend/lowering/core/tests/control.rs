@@ -27706,3 +27706,1133 @@ fn ced_d2_an_unclaimed_planned_token_is_missing_from_the_exact_equality_in_isola
          {refusal}"
     );
 }
+
+// `RT-CONTINUATION-EDGE-DISPOSITION` `D3` / `AC-6` — the five mutation rows.
+//
+// **Five mutation-SPECIFIC CAUSAL proofs, not five distinct terminal strings**
+// (Architect ruling, held checkpoint `c17b9939`). Rows 2 and 3 deliberately
+// share a terminal refusal: they break the same invariant at two different
+// causal points, and production says the same true thing about both. The
+// ruling is that the shared string may CORROBORATE each row and may be
+// NEITHER row's sole oracle — so each row pins its own ordered causal chain,
+// keyed by the live `ContinuationCallIdentity`, and the seat is what tells
+// them apart.
+//
+// **No production diagnostic was changed to manufacture different strings.**
+// That was available and it is the wrong trade: it would buy a cheap
+// discriminator by making production say something less true.
+//
+// **Every row discharges the same five clauses**, and each is asserted rather
+// than argued:
+//
+//   1. the unmutated, production-shaped witness SUCCEEDS under merged `D2`;
+//   2. the same derived identity reaches the mutation's exact seat in BOTH arms;
+//   3. exactly one variant is armed;
+//   4. a mutation-specific causal observation proves what moved; and
+//   5. the armed run reaches its expected refusal — except row 1, where the
+//      ruling asks instead for a changed pinned downstream structural oracle,
+//      and this control shows why that is the harder bar rather than the softer
+//      one.
+//
+// **The witnesses are SELECTED from the live population, not authored.** The
+// Steward authorized authoring; a census over the lib suite's 425 successful
+// artifact closes found 73 carrying a `DirectCall`, so the authorization is
+// not exercised. `D0`'s "a `D3` control needs a witness authored for it" was
+// true of the `InlineNoCall` class and does not generalize to these five.
+
+/// Runs `body` with exactly one `D3` mutation armed, restoring `None`
+/// afterwards **even if `body` panics**, so one failing row cannot leak its
+/// mutation into every later test on the thread.
+fn with_d3_mutation<T>(
+    mutation: crate::cranelift_backend::lowering::units::D3Mutation,
+    body: impl FnOnce() -> T,
+) -> T {
+    use crate::cranelift_backend::lowering::units::{set_d3_mutation, D3Mutation};
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_d3_mutation(D3Mutation::None);
+        }
+    }
+    set_d3_mutation(mutation);
+    let _restore = Restore;
+    body()
+}
+
+/// One arm of a `D3` row: what the compile did, what the ledger recorded, and
+/// the ordered causal trace that says WHERE.
+struct D3Arm {
+    outcome: String,
+    dispositions: std::collections::BTreeMap<
+        crate::cranelift_backend::lowering::units::CandidateDisposition,
+        usize,
+    >,
+    trace: Vec<crate::cranelift_backend::lowering::units::D3Event>,
+    /// The candidate population **the live plan projected**, captured at
+    /// `ContinuationCandidateLedger::open` — typed identities, not a rendering.
+    plan_candidates: Vec<ContinuationCallIdentity>,
+    bindings: usize,
+    consumptions: usize,
+}
+
+impl D3Arm {
+    /// The seats at which a settlement was ATTEMPTED, in order.
+    fn settle_seats(&self) -> Vec<crate::cranelift_backend::lowering::units::D3Seat> {
+        self.trace.iter().filter_map(|e| e.settle_seat()).collect()
+    }
+
+    /// **THE candidate, selected from the live plan by type.**
+    ///
+    /// ⇒ Not derived from the trace, and not a rendering. Both witnesses are
+    /// chosen for carrying exactly one candidate, so "the" is a claim this
+    /// asserts rather than an assumption: a witness that grew a second
+    /// candidate would fail here instead of silently making every clause below
+    /// ambiguous about which edge it is talking about.
+    ///
+    /// Selecting from the plan rather than from the trace is what keeps the
+    /// evidence non-circular — the trace is the thing under test.
+    fn the_candidate(&self) -> ContinuationCallIdentity {
+        assert_eq!(
+            self.plan_candidates.len(),
+            1,
+            "this witness must project exactly ONE binding candidate, or no clause below can say \
+             which edge it is about: {:?}",
+            self.plan_candidates
+        );
+        self.plan_candidates[0].clone()
+    }
+
+    /// Every observation about **exactly** this identity, in order.
+    fn events_for<'a>(
+        &'a self,
+        identity: &'a ContinuationCallIdentity,
+    ) -> impl Iterator<Item = (usize, &'a crate::cranelift_backend::lowering::units::D3Event)>
+    {
+        self.trace
+            .iter()
+            .enumerate()
+            .filter(move |(_, e)| e.identity() == identity)
+    }
+
+    /// The ordered positions at which **this exact identity** was settled with
+    /// **this exact `(disposition, seat)`**.
+    ///
+    /// ⇒ The triple is the unit of evidence. A position keyed on the seat
+    /// alone would be satisfied by a settlement of a different edge, or of the
+    /// same edge to a different disposition, and both are distinct defects.
+    fn settlements_of(
+        &self,
+        identity: &ContinuationCallIdentity,
+        disposition: crate::cranelift_backend::lowering::units::CandidateDisposition,
+        seat: crate::cranelift_backend::lowering::units::D3Seat,
+    ) -> Vec<usize> {
+        use crate::cranelift_backend::lowering::units::D3Event;
+        self.events_for(identity)
+            .filter(|(_, e)| {
+                matches!(
+                    e,
+                    D3Event::Settle { disposition: d, seat: s, .. }
+                        if *d == disposition && *s == seat
+                )
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// The single position of a settlement with that exact triple, requiring
+    /// there be exactly one.
+    fn settlement_of(
+        &self,
+        identity: &ContinuationCallIdentity,
+        disposition: crate::cranelift_backend::lowering::units::CandidateDisposition,
+        seat: crate::cranelift_backend::lowering::units::D3Seat,
+        why: &str,
+    ) -> usize {
+        let found = self.settlements_of(identity, disposition, seat);
+        assert_eq!(
+            found.len(),
+            1,
+            "{why} -- expected exactly one {disposition:?} settlement at {seat:?} for this exact \
+             identity, found {}: {:?}",
+            found.len(),
+            self.trace
+        );
+        found[0]
+    }
+
+    /// The position of the sole event of a kind, **for this exact identity**.
+    fn position_of(
+        &self,
+        identity: &ContinuationCallIdentity,
+        want: fn(&crate::cranelift_backend::lowering::units::D3Event) -> bool,
+        why: &str,
+    ) -> usize {
+        let found = self
+            .events_for(identity)
+            .filter(|(_, e)| want(e))
+            .map(|(i, _)| i)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            found.len(),
+            1,
+            "{why} -- expected exactly one such event for this exact identity, found {}: {:?}",
+            found.len(),
+            self.trace
+        );
+        found[0]
+    }
+
+    /// The binding KIND this exact identity's authorized position received.
+    fn binding_kind(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<crate::cranelift_backend::lowering::units::D3BindingKind> {
+        use crate::cranelift_backend::lowering::units::D3Event;
+        self.events_for(identity).find_map(|(_, e)| match e {
+            D3Event::BindingInstalled { kind, .. } => Some(*kind),
+            _ => None,
+        })
+    }
+
+    /// Did the shared direct funnel RETURN an answer? Distinct from "a
+    /// settlement was attempted" — row 4 needs exactly that separation.
+    fn returned_from_funnel(&self, identity: &ContinuationCallIdentity) -> bool {
+        use crate::cranelift_backend::lowering::units::D3Event;
+        self.events_for(identity)
+            .any(|(_, e)| matches!(e, D3Event::DirectFunnelReturned { .. }))
+    }
+
+    /// Did a composed claim get RECORDED during lowering?
+    fn recorded_composed(&self, identity: &ContinuationCallIdentity) -> bool {
+        use crate::cranelift_backend::lowering::units::D3Event;
+        self.events_for(identity)
+            .any(|(_, e)| matches!(e, D3Event::ComposedRecorded { .. }))
+    }
+}
+
+/// **Witness A — the executing composed payload witness**, selected from the
+/// live population for rows 1, 2 and 3.
+///
+/// It is `d8l2`'s payload program: the worker RETURNS its argument, so the
+/// payload is passed through the composed call and is observable in the
+/// answer. That matters here for a reason beyond convenience — it means this
+/// witness has a **result** oracle as well as structural ones, so row 1 can
+/// show which of the two actually moves.
+///
+/// Unmutated it compiles, runs, returns `Int(41)`, installs one binding, and
+/// settles exactly one candidate `ComposedCall`.
+fn d3_payload_arm(
+    mutation: crate::cranelift_backend::lowering::units::D3Mutation,
+) -> (D3Arm, String) {
+    use crate::cranelift_backend::lowering::units::{
+        d1_last_dispositions, d3_plan_candidates, d3_trace, reset_d1_dispositions,
+        reset_d3_plan_candidates, reset_d3_trace,
+    };
+    use crate::cranelift_backend::lowering::{
+        d8d_bindings, d8e_consumptions, reset_d8d_bindings,
+    };
+
+    reset_d3_trace();
+    reset_d3_plan_candidates();
+    reset_d1_dispositions();
+    reset_d8d_bindings();
+    let expr = d8l2_payload_witness(false, 41);
+    let (outcome, answer) = with_d3_mutation(mutation, || {
+        match compile_expr(&expr, &NativeSeedEnvironment::empty()) {
+            Ok(compiled) => match compiled.run(None) {
+                Ok((observation, _)) => ("Ok".to_string(), format!("{observation:?}")),
+                Err(error) => ("Ok".to_string(), format!("run-err {error:?}")),
+            },
+            Err(error) => (format!("{error:?}"), "<did not compile>".to_string()),
+        }
+    });
+    (
+        D3Arm {
+            outcome,
+            dispositions: d1_last_dispositions(),
+            trace: d3_trace(),
+            plan_candidates: d3_plan_candidates(),
+            bindings: d8d_bindings(),
+            consumptions: d8e_consumptions(),
+        },
+        answer,
+    )
+}
+
+/// **Witness B — the one-token direct emission witness**, selected from the
+/// live population for rows 4 and 5.
+///
+/// `contspec_emission_witness` through `ac11_compiles`: a selected
+/// `FunctionizedUnits` artifact with **exactly one** candidate, settling
+/// `DirectCall` at the shared funnel, inside a successful closeout. One
+/// candidate and one disposition is what lets rows 4 and 5 name the whole
+/// population without a fixed count standing in for it.
+fn d3_contspec_arm(
+    mutation: crate::cranelift_backend::lowering::units::D3Mutation,
+) -> D3Arm {
+    use crate::cranelift_backend::lowering::units::{
+        d1_last_dispositions, d3_plan_candidates, d3_trace, reset_d1_dispositions,
+        reset_d3_plan_candidates, reset_d3_trace,
+    };
+
+    reset_d3_trace();
+    reset_d3_plan_candidates();
+    reset_d1_dispositions();
+    let outcome = with_d3_mutation(mutation, || {
+        match ac11_compiles(&contspec_emission_witness()) {
+            Ok(()) => "Ok".to_string(),
+            Err(error) => format!("{error:?}"),
+        }
+    });
+    D3Arm {
+        outcome,
+        dispositions: d1_last_dispositions(),
+        trace: d3_trace(),
+        plan_candidates: d3_plan_candidates(),
+        bindings: 0,
+        consumptions: 0,
+    }
+}
+
+/// **Witness C — the binding-dependent composed witness**, selected for row 1.
+///
+/// `d8f`'s composed program, whose baseline success is not my claim to make:
+/// `d8g_the_composed_selected_argument_reaches_its_target_at_the_shared_emitter`
+/// already asserts `d8f_compile(false)` compiles, and has since before this
+/// node. It projects exactly one candidate, installs a `StaticWorker` at that
+/// identity's authorized position, and settles it `ComposedCall`.
+///
+/// It replaces the executing payload witness for row 1, and the reason is the
+/// Architect's block: under suppression that witness **silently succeeded** —
+/// compiled, ran, returned the same answer, settled `InlineNoCall` and closed.
+/// Observing a silent degradation is not clause 5. This witness's suppression
+/// is REFUSED, by a guard that already exists in production.
+fn d3_binding_dependent_arm(
+    mutation: crate::cranelift_backend::lowering::units::D3Mutation,
+) -> D3Arm {
+    use crate::cranelift_backend::lowering::units::{
+        d1_last_dispositions, d3_plan_candidates, d3_trace, reset_d1_dispositions,
+        reset_d3_plan_candidates, reset_d3_trace,
+    };
+    use crate::cranelift_backend::lowering::{
+        d8d_bindings, d8e_consumptions, reset_d8d_bindings,
+    };
+
+    reset_d3_trace();
+    reset_d3_plan_candidates();
+    reset_d1_dispositions();
+    reset_d8d_bindings();
+    let outcome = with_d3_mutation(mutation, || match d8f_compile(false) {
+        None => "Ok".to_string(),
+        Some(error) => format!("{error:?}"),
+    });
+    D3Arm {
+        outcome,
+        dispositions: d1_last_dispositions(),
+        trace: d3_trace(),
+        plan_candidates: d3_plan_candidates(),
+        bindings: d8d_bindings(),
+        consumptions: d8e_consumptions(),
+    }
+}
+
+/// The exact fail-closed refusal a suppressed binding reaches, and it names
+/// the substitution itself rather than a downstream consequence of it.
+///
+/// This is an EXISTING production guard. Nothing was added or reworded to
+/// obtain a discriminator.
+const D3_IH_MARKER_ON_VALUE: &str = "computational IH marker was applied to an ordinary value";
+
+/// The terminal refusal rows 2 and 3 SHARE. Named once, so the fact that it is
+/// shared is visible in the source rather than being something a reader has to
+/// notice by comparing two string literals.
+const D3_DOUBLE_SETTLEMENT: &str = "one binding candidate was settled twice";
+
+/// **`D3` `AC-6` row 1 — suppressing the binding installation.**
+///
+/// The mutation withholds the `StaticWorker` capsule a composed candidate
+/// authorizes and substitutes a plain specialized value at the same position.
+/// The candidate itself is untouched, so nothing about the candidate ledger
+/// changes; what changes is what its authorized position can be CALLED as.
+///
+/// **The armed run is REFUSED, by a guard that already exists in production
+/// and whose message names the substitution itself:** a computational
+/// induction-hypothesis marker applied to an ordinary value. Nothing was added
+/// or reworded to obtain that discriminator.
+///
+/// **This row was rebuilt after an Architect block, and the reason is worth
+/// keeping.** It first ran on the executing payload witness, where suppression
+/// **silently succeeded** — the program compiled, ran, returned the identical
+/// answer, settled `InlineNoCall` instead of `ComposedCall`, and closed. The
+/// row asserted that structural difference and called it proof. It is not:
+/// `AC-6` requires the armed run to reach a refusal or a closeout failure, and
+/// *observing* a silent degradation is exactly the bad state mutation 1 exists
+/// to make red rather than an acceptable terminal outcome. The witness moved;
+/// the assertions were not inverted.
+///
+/// **The baseline's success is not my claim.**
+/// `d8g_the_composed_selected_argument_reaches_its_target_at_the_shared_emitter`
+/// has asserted `d8f_compile(false)` compiles since before this node.
+///
+/// **Promise class: durable invariant.** It asserts that a candidate's
+/// authorized position cannot lose its capsule and still reach a successful
+/// artifact — a relation between the binding kind at one identity and that
+/// same identity's fate, not a literal.
+#[test]
+fn ced_d3_m1_suppressing_the_binding_installation_is_refused_at_the_ih_marker_guard() {
+    use crate::cranelift_backend::lowering::units::{
+        CandidateDisposition, D3BindingKind, D3Mutation, D3Seat,
+    };
+
+    let baseline = d3_binding_dependent_arm(D3Mutation::None);
+    let armed = d3_binding_dependent_arm(D3Mutation::SuppressBindingInstallation);
+
+    // Clause 1 — the unmutated witness SUCCEEDS, and settles its one candidate
+    // at the downstream boundary. Without both halves the row is about a
+    // program that was already failing, or about one whose candidate never
+    // reached a disposition at all.
+    assert_eq!(
+        baseline.outcome, "Ok",
+        "the unmutated witness must compile: {}",
+        baseline.outcome
+    );
+    let identity = baseline.the_candidate();
+    baseline.settlement_of(
+        &identity,
+        CandidateDisposition::ComposedCall,
+        D3Seat::ComposedPromotion,
+        "the baseline must settle THIS identity as ComposedCall at the promotion seat, which is \
+         the downstream boundary the suppression will stop it from reaching",
+    );
+    assert_eq!(
+        baseline.dispositions.get(&CandidateDisposition::ComposedCall).copied(),
+        Some(1),
+        "and the artifact must CLOSE with that disposition recorded: {:?}",
+        baseline.dispositions
+    );
+    assert!(
+        baseline.bindings > 0 && baseline.consumptions > 0,
+        "and it must install and consume a static-worker binding, or there is nothing for this \
+         mutation to withhold: bindings={} consumptions={}",
+        baseline.bindings,
+        baseline.consumptions
+    );
+
+    // Clause 2 — the SAME identity in both arms, selected from the live plan
+    // by type rather than compared as a rendering.
+    assert_eq!(
+        armed.the_candidate(),
+        identity,
+        "both arms must project the same candidate from the live plan, or they are about two \
+         different edges and every comparison below means nothing"
+    );
+
+    // Clause 4 — THE BINDING SEAT, keyed by that identity. The mutation is
+    // observed where the choice is made, not inferred from its consequences.
+    assert_eq!(
+        baseline.binding_kind(&identity),
+        Some(D3BindingKind::StaticWorker),
+        "the baseline must install a StaticWorker at THIS identity's authorized position: {:?}",
+        baseline.trace
+    );
+    assert_eq!(
+        armed.binding_kind(&identity),
+        Some(D3BindingKind::Value),
+        "and the armed run must substitute a plain Value at the SAME identity's position. This \
+         is the one thing that moved: {:?}",
+        armed.trace
+    );
+
+    // Clause 5 — THE ARMED RUN IS REFUSED, at the guard that names the
+    // substitution. This is the clause the previous witness could not
+    // discharge, and it is why the witness was replaced rather than the
+    // assertions reworded.
+    assert!(
+        armed.outcome.contains(D3_IH_MARKER_ON_VALUE),
+        "the armed run must reach the fail-closed IH-marker guard. A different refusal would mean \
+         the suppression is being caught somewhere else and this row is not attributing it: {}",
+        armed.outcome
+    );
+
+    // Clause 5b — and it must never reach the downstream boundary the baseline
+    // did. Without this the refusal above is consistent with a compile that
+    // failed for an unrelated reason after settling normally.
+    assert!(
+        armed
+            .settlements_of(
+                &identity,
+                CandidateDisposition::ComposedCall,
+                D3Seat::ComposedPromotion
+            )
+            .is_empty(),
+        "the armed run must NOT settle this identity at the promotion seat: {:?}",
+        armed.trace
+    );
+    assert!(
+        armed.dispositions.is_empty(),
+        "and no artifact may close at all, so the candidate reaches no disposition rather than \
+         reaching a different one. A non-empty tally here would mean the suppression was absorbed \
+         into a successful close, which is precisely the silent degradation this row was rebuilt \
+         to reject: {:?}",
+        armed.dispositions
+    );
+}
+
+/// **`D3` `AC-6` row 2 — settling `InlineNoCall` on bridge ENTRY.**
+///
+/// The defect is settling before the scope is known to have completed. Its
+/// causal chain, and every step is pinned:
+///
+/// 1. bridge entry sees the candidate **unsettled and with no pending composed
+///    record**;
+/// 2. the mutation settles `InlineNoCall` **at the entry seat**, before the
+///    bridge body runs;
+/// 3. the body later records the composed claim;
+/// 4. finished-CLIF promotion collides.
+///
+/// **Shares its terminal refusal with row 3 and is not keyed on it.** The
+/// discriminator is step 2: a settlement at `BridgeEntry`, which row 3 never
+/// makes.
+///
+/// **Promise class: durable invariant** — it pins an ordering relation between
+/// two seats, not a message.
+#[test]
+fn ced_d3_m2_settling_inline_on_bridge_entry_collides_at_promotion_from_the_entry_seat() {
+    use crate::cranelift_backend::lowering::units::{
+        CandidateDisposition, D3Event, D3Mutation, D3Seat,
+    };
+
+    let (baseline, _) = d3_payload_arm(D3Mutation::None);
+    let (armed, _) = d3_payload_arm(D3Mutation::MarkInlineBeforeBridgeCompletion);
+
+    // Clause 1 — the unmutated arm succeeds and settles ONCE.
+    assert_eq!(
+        baseline.outcome, "Ok",
+        "the unmutated witness must compile: {}",
+        baseline.outcome
+    );
+    assert_eq!(
+        baseline.dispositions.get(&CandidateDisposition::ComposedCall).copied(),
+        Some(1),
+        "and settle its one candidate exactly once, as ComposedCall: {:?}",
+        baseline.dispositions
+    );
+    assert_eq!(
+        baseline.settle_seats(),
+        vec![D3Seat::ComposedPromotion],
+        "the baseline makes exactly ONE settlement attempt, at the promotion seat. It performs \
+         no entry settlement and no exit settlement: the exit path reads a pending composed claim \
+         and correctly leaves the candidate alone: {:?}",
+        baseline.settle_seats()
+    );
+
+    // Clause 2 — the same identity in both arms, typed, from the live plan.
+    let identity = baseline.the_candidate();
+    assert_eq!(
+        armed.the_candidate(),
+        identity,
+        "both arms must project the same candidate from the live plan"
+    );
+    baseline.settlement_of(
+        &identity,
+        CandidateDisposition::ComposedCall,
+        D3Seat::ComposedPromotion,
+        "the baseline must settle THIS identity as ComposedCall at the promotion seat",
+    );
+
+    // Clause 4 — THE CAUSAL CHAIN, in order. This is row 2's own oracle and it
+    // is what row 3 cannot satisfy.
+    let entry = armed.position_of(
+        &identity,
+        |e| matches!(e, D3Event::BridgeEntry { .. }),
+        "the armed run must enter the bridge with THIS identity bypassed",
+    );
+    match &armed.trace[entry] {
+        D3Event::BridgeEntry {
+            settled,
+            pending_composed,
+            ..
+        } => assert_eq!(
+            (*settled, *pending_composed),
+            (false, false),
+            "step 1 -- bridge entry must see the candidate UNSETTLED and with NO pending composed \
+             record. Either being true here would mean the mutation is settling over something \
+             that already existed, which is a different defect"
+        ),
+        other => panic!("expected a bridge entry: {other:?}"),
+    }
+    let entry_settle = armed.settlement_of(
+        &identity,
+        CandidateDisposition::InlineNoCall,
+        D3Seat::BridgeEntry,
+        "step 2 -- the mutation must settle THIS identity as InlineNoCall at the ENTRY seat. \
+         This is row 2's discriminator: row 3 makes no entry settlement at all, so a control \
+         that omitted this clause would be green under either mutation and would supply one \
+         proof rather than two",
+    );
+    let recorded = armed.position_of(
+        &identity,
+        |e| matches!(e, D3Event::ComposedRecorded { .. }),
+        "step 3 -- the body must go on to record a composed claim for the same identity",
+    );
+    let promotion = armed.settlement_of(
+        &identity,
+        CandidateDisposition::ComposedCall,
+        D3Seat::ComposedPromotion,
+        "step 4 -- finished-CLIF promotion must attempt ComposedCall on the same identity",
+    );
+    assert!(
+        entry < entry_settle && entry_settle < recorded && recorded < promotion,
+        "and the four steps must occur IN THAT ORDER. The ordering is the mechanism: settling \
+         before the composed claim is recorded is precisely the defect, and the same four events \
+         in a different order would be a different one: entry={entry} entry_settle={entry_settle} \
+         recorded={recorded} promotion={promotion}"
+    );
+
+    // Clause 5 — the terminal refusal. CORROBORATION, deliberately last, and
+    // deliberately shared with row 3.
+    assert!(
+        armed.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "the collision must reach the double-settlement refusal: {}",
+        armed.outcome
+    );
+}
+
+/// **`D3` `AC-6` row 3 — dropping the pending-composed half of the consumed
+/// test.**
+///
+/// The defect is at the OTHER end of the same window. Its causal chain:
+///
+/// 1. the composed claim is **already recorded** and pending at bridge
+///    completion;
+/// 2. the mutation suppresses the pending-half read, so the exit path believes
+///    the candidate unconsumed;
+/// 3. it therefore settles `InlineNoCall` **at the exit seat**;
+/// 4. finished-CLIF promotion collides.
+///
+/// **And it proves the NEGATIVE that separates it from row 2: no entry
+/// settlement occurred.** Without that clause the two rows would be
+/// distinguishable only by their shared terminal string, which is the collapse
+/// the ruling forbids.
+///
+/// **This is the landed timing invariant, stated as a failure:** a composed
+/// claim is RECORDED during lowering and PROMOTED after verification, and the
+/// pending feed is the only thing visible at both times. Reading only the
+/// settled half is exactly what makes the window unsafe.
+///
+/// **Promise class: durable invariant.**
+#[test]
+fn ced_d3_m3_dropping_the_pending_half_settles_inline_at_the_exit_seat_and_collides() {
+    use crate::cranelift_backend::lowering::units::{
+        CandidateDisposition, D3Event, D3Mutation, D3Seat,
+    };
+
+    let (baseline, _) = d3_payload_arm(D3Mutation::None);
+    let (armed, _) = d3_payload_arm(D3Mutation::MarkInlineAfterComposedCall);
+
+    // Clause 1 — the unmutated arm succeeds, and specifically DOES NOT settle
+    // inline at the exit seat: it reads the pending half and leaves the
+    // candidate for promotion.
+    assert_eq!(
+        baseline.outcome, "Ok",
+        "the unmutated witness must compile: {}",
+        baseline.outcome
+    );
+    assert!(
+        !baseline.settle_seats().contains(&D3Seat::BridgeExit),
+        "and must make NO exit settlement -- the pending composed claim is what stops it. If the \
+         baseline settled here, the mutation would not be suppressing anything: {:?}",
+        baseline.settle_seats()
+    );
+
+    // Clause 2 — same identity in both arms, typed, from the live plan.
+    let identity = baseline.the_candidate();
+    assert_eq!(
+        armed.the_candidate(),
+        identity,
+        "both arms must project the same candidate from the live plan"
+    );
+    baseline.settlement_of(
+        &identity,
+        CandidateDisposition::ComposedCall,
+        D3Seat::ComposedPromotion,
+        "the baseline must settle THIS identity as ComposedCall at the promotion seat",
+    );
+
+    // Clause 4 — THE CAUSAL CHAIN, and it is a different one from row 2's.
+    let recorded = armed.position_of(
+        &identity,
+        |e| matches!(e, D3Event::ComposedRecorded { .. }),
+        "step 1 -- a composed claim for THIS identity must be recorded during lowering",
+    );
+    let exit = armed.position_of(
+        &identity,
+        |e| matches!(e, D3Event::BridgeExit { .. }),
+        "the armed run must complete the bridge for the same identity",
+    );
+    match &armed.trace[exit] {
+        D3Event::BridgeExit {
+            completed,
+            settled,
+            pending_composed,
+            ..
+        } => assert_eq!(
+            (*completed, *settled, *pending_composed),
+            (true, false, true),
+            "step 2 -- at bridge completion the scope must have COMPLETED, the candidate must be \
+             UNSETTLED, and a composed claim must be PENDING. That last one is the whole row: \
+             the pending half is TRUE here, and the mutation makes the exit path fail to read it. \
+             These three are read straight from the ledger and the feed, NOT through \
+             `continuation_candidate_is_consumed` -- that is the function the mutation mutates, \
+             and an instrument reading through it would agree with the mutation instead of \
+             exposing it"
+        ),
+        other => panic!("expected a bridge exit: {other:?}"),
+    }
+    let exit_settle = armed.settlement_of(
+        &identity,
+        CandidateDisposition::InlineNoCall,
+        D3Seat::BridgeExit,
+        "step 3 -- the mutation must settle THIS identity as InlineNoCall at the EXIT seat",
+    );
+    let promotion = armed.settlement_of(
+        &identity,
+        CandidateDisposition::ComposedCall,
+        D3Seat::ComposedPromotion,
+        "step 4 -- finished-CLIF promotion must attempt ComposedCall on the same identity",
+    );
+    assert!(
+        recorded < exit && exit < exit_settle && exit_settle < promotion,
+        "and in that order: recorded={recorded} exit={exit} exit_settle={exit_settle} \
+         promotion={promotion}"
+    );
+
+    // Clause 4b — THE NEGATIVE THAT SEPARATES THIS ROW FROM ROW 2.
+    assert!(
+        armed
+            .settlements_of(&identity, CandidateDisposition::InlineNoCall, D3Seat::BridgeEntry)
+            .is_empty(),
+        "NO entry settlement of this identity may have occurred. This is what makes rows 2 and 3 \
+         two proofs rather than one: they share a terminal refusal, and without this clause a \
+         control keyed on that refusal plus 'something settled inline' would pass under either \
+         mutation: {:?}",
+        armed.trace
+    );
+
+    // Clause 5 — the shared terminal refusal, as corroboration.
+    assert!(
+        armed.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "the collision must reach the double-settlement refusal: {}",
+        armed.outcome
+    );
+}
+
+/// **`D3` `AC-6` row 4 — omitting the direct settlement.**
+///
+/// The direct call and its funnel return are **preserved**; only the
+/// settlement is withheld. The candidate therefore reaches the artifact
+/// closeout with no disposition, and `D2`'s totality check — which runs BEFORE
+/// the call-obligation subset is derived — refuses.
+///
+/// **This row is the one that proves `D2`'s ordering is load-bearing.** An
+/// unsettled candidate is in neither `DirectCall` nor `ComposedCall`, so if the
+/// subset were derived first it would simply fall out and pass silently. The
+/// refusal below only exists because totality is checked first.
+///
+/// **Promise class: durable invariant.** It asserts that an unsettled
+/// candidate cannot reach a successful close, over a witness whose whole
+/// candidate population is one.
+#[test]
+fn ced_d3_m4_omitting_the_direct_settlement_preserves_the_call_and_fails_candidate_totality() {
+    use crate::cranelift_backend::lowering::units::{CandidateDisposition, D3Mutation, D3Seat};
+
+    let baseline = d3_contspec_arm(D3Mutation::None);
+    let armed = d3_contspec_arm(D3Mutation::OmitFinalDisposition);
+
+    // Clause 1 — the unmutated witness compiles and settles its one candidate.
+    assert_eq!(
+        baseline.outcome, "Ok",
+        "the unmutated witness must compile: {}",
+        baseline.outcome
+    );
+    assert_eq!(
+        baseline.dispositions.get(&CandidateDisposition::DirectCall).copied(),
+        Some(1),
+        "and settle exactly one candidate DirectCall. Exactly one is what lets this row speak \
+         about the WHOLE population without a fixed count standing in for it: {:?}",
+        baseline.dispositions
+    );
+
+    // Clause 2 — the same identity reaches the same funnel in both arms,
+    // typed, selected from the live plan.
+    let identity = baseline.the_candidate();
+    assert_eq!(
+        armed.the_candidate(),
+        identity,
+        "both arms must project the same candidate from the live plan"
+    );
+    baseline.settlement_of(
+        &identity,
+        CandidateDisposition::DirectCall,
+        D3Seat::DirectFunnel,
+        "the baseline must settle THIS identity as DirectCall at the funnel",
+    );
+
+    // Clause 4 — the mutation-specific causal observation: THE CALL IS STILL
+    // MADE. Without this the row would be equally consistent with a mutation
+    // that suppressed the call itself, which is a different defect entirely.
+    assert!(
+        armed.returned_from_funnel(&identity),
+        "the direct call for THIS identity must still have been made and the funnel must still \
+         have RETURNED. Without this clause the row is equally consistent with a mutation that \
+         suppressed the call itself, which is a different defect and would fail totality for a \
+         different reason: {:?}",
+        armed.trace
+    );
+    assert!(
+        armed
+            .settlements_of(&identity, CandidateDisposition::DirectCall, D3Seat::DirectFunnel)
+            .is_empty(),
+        "and NO settlement of it may be attempted -- that is the only thing withheld: {:?}",
+        armed.trace
+    );
+    assert!(
+        armed.settle_seats().is_empty(),
+        "nor any settlement of anything else, so the whole population is unsettled: {:?}",
+        armed.settle_seats()
+    );
+    assert!(
+        baseline.returned_from_funnel(&identity)
+            && baseline.settle_seats() == vec![D3Seat::DirectFunnel],
+        "while the baseline both returns from the funnel and settles once, which is what makes \
+         the pair above a difference of exactly one step: {:?}",
+        baseline.trace
+    );
+    assert!(
+        armed.dispositions.is_empty(),
+        "so nothing is settled at all: {:?}",
+        armed.dispositions
+    );
+
+    // Clause 5 — candidate TOTALITY fails at the composite close, and it must
+    // be that clause rather than a later one.
+    assert!(
+        armed
+            .outcome
+            .contains("reached the artifact closeout without a disposition"),
+        "the close must refuse on candidate totality. A declared/resolved or claim-equality \
+         message here would mean the failure moved to a later clause and this row is measuring \
+         something else: {}",
+        armed.outcome
+    );
+    assert!(
+        !armed.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "and specifically not the double-settlement refusal, which is rows 2, 3 and 5's terminal: \
+         {}",
+        armed.outcome
+    );
+}
+
+/// **`D3` `AC-6` row 5 — settling the same direct candidate twice.**
+///
+/// The second settlement is refused **at the seat that makes it**, not deferred
+/// to closeout — which is why its message can name the collision, and why this
+/// row's terminal differs from row 4's even though both mutate the same funnel.
+///
+/// **It is also the both-times-the-SAME-disposition arm of that refusal**,
+/// which rows 2 and 3 do not reach: they collide `InlineNoCall` against
+/// `ComposedCall`. So `settle`'s two refusal arms are both covered by this
+/// node, by different rows, rather than one arm standing in for both.
+///
+/// **Promise class: durable invariant.**
+#[test]
+fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settlement() {
+    use crate::cranelift_backend::lowering::units::{
+        CandidateDisposition, D3Mutation, D3Seat,
+    };
+
+    let baseline = d3_contspec_arm(D3Mutation::None);
+    let armed = d3_contspec_arm(D3Mutation::DoubleDisposition);
+
+    // Clause 1 — the unmutated witness compiles, settling exactly once.
+    assert_eq!(
+        baseline.outcome, "Ok",
+        "the unmutated witness must compile: {}",
+        baseline.outcome
+    );
+    assert_eq!(
+        baseline.settle_seats(),
+        vec![D3Seat::DirectFunnel],
+        "making exactly ONE settlement attempt, at the funnel. This is the clause the armed \
+         arm below moves, and pinning it as the whole sequence rather than as a count is what \
+         makes 'twice' mean twice at this seat: {:?}",
+        baseline.settle_seats()
+    );
+    assert_eq!(
+        baseline.dispositions.get(&CandidateDisposition::DirectCall).copied(),
+        Some(1),
+        "and the candidate settles DirectCall: {:?}",
+        baseline.dispositions
+    );
+
+    // Clause 2 — the same identity, twice over, in the armed arm.
+    let identity = baseline.the_candidate();
+    assert_eq!(
+        armed.the_candidate(),
+        identity,
+        "both arms must project the same candidate from the live plan"
+    );
+
+    // Clause 4 — the mutation-specific causal observation: TWO attempts at the
+    // SAME seat. Row 4 makes none; rows 2 and 3 make theirs at bridge seats.
+    assert_eq!(
+        armed
+            .settlements_of(&identity, CandidateDisposition::DirectCall, D3Seat::DirectFunnel)
+            .len(),
+        2,
+        "exactly two DirectCall settlement attempts on THIS SAME identity at the funnel. Keyed \
+         on the triple rather than on the seat: two attempts on two different candidates would \
+         be lawful, and is not what this row is about: {:?}",
+        armed.trace
+    );
+    assert_eq!(
+        armed.settle_seats(),
+        vec![D3Seat::DirectFunnel, D3Seat::DirectFunnel],
+        "and the arm attempts nothing else anywhere: {:?}",
+        armed.settle_seats()
+    );
+    assert!(
+        armed.dispositions.is_empty(),
+        "and the artifact never closes, so no disposition tally survives: {:?}",
+        armed.dispositions
+    );
+
+    // Clause 5 — refused immediately, and on the SAME-disposition arm.
+    assert!(
+        armed.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "the second settlement must be refused: {}",
+        armed.outcome
+    );
+    assert!(
+        armed.outcome.contains("both times as DirectCall"),
+        "and on the both-times-the-SAME-disposition arm of that refusal, which rows 2 and 3 do \
+         not reach -- they collide InlineNoCall against ComposedCall. This is what keeps the two \
+         arms of `settle`'s refusal separately witnessed: {}",
+        armed.outcome
+    );
+}
+
+/// **`D3` `AC-6` — the five rows are FIVE proofs, and this is the residue of
+/// proving it.**
+///
+/// **Why this exists as a committed test rather than a verified claim.**
+/// The five rows above were each shown to red when their own mutation is not
+/// armed — a clean 5×5 diagonal. That is necessary and it is **not
+/// sufficient**, because it does not rule out the one failure the ruling
+/// actually forbids: rows 2 and 3 share a terminal refusal, so a control keyed
+/// on that refusal plus "something settled inline" would be green under
+/// **either** mutation and would supply one proof while appearing to supply
+/// two.
+///
+/// That was verified by cross-arming each row's control with its partner's
+/// mutation and watching all four fail. **A verification that lives in a
+/// terminal evaporates when the terminal closes** — so the discriminating
+/// observations are asserted here, over the partner mutation, as a committed
+/// artifact. Delete any row's causal clause above and this reds.
+///
+/// **Exactly one variant is armed per arm**, as the frame requires. This is
+/// four separate single-mutation runs, not a combined one.
+///
+/// **Promise class: durable invariant** — it asserts that four specific
+/// observations are *absent* under the partner mutation, which stays true for
+/// any future shape of these seats that keeps the rows independent.
+#[test]
+fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
+    use crate::cranelift_backend::lowering::units::{
+        CandidateDisposition, D3BindingKind, D3Event, D3Mutation, D3Seat,
+    };
+
+    // Row 1 against all four others, on its own witness.
+    //
+    // QA's block, and it was the same defect one layer up: the previous commit
+    // RAN this and reported it, in a message whose own subject line says a
+    // verification living in a terminal evaporates when the terminal closes.
+    // Naming a trap does not inoculate you against it. Here it is, committed.
+    //
+    // Row 1's discriminator is the pair (binding kind at the typed identity,
+    // the fail-closed guard its substitution reaches). Neither half alone is
+    // enough: another mutation could in principle reach the same guard for a
+    // different reason, or leave the binding alone and fail there anyway.
+    let m1 = d3_binding_dependent_arm(D3Mutation::SuppressBindingInstallation);
+    let c_identity = m1.the_candidate();
+    assert_eq!(
+        m1.binding_kind(&c_identity),
+        Some(D3BindingKind::Value),
+        "positive control -- mutation 1 must substitute a Value at this identity, or the four \
+         negatives below are about a discriminator nothing satisfies and pass for free: {:?}",
+        m1.trace
+    );
+    assert!(
+        m1.outcome.contains(D3_IH_MARKER_ON_VALUE),
+        "positive control -- and must reach the IH-marker guard: {}",
+        m1.outcome
+    );
+
+    for other in [
+        D3Mutation::MarkInlineBeforeBridgeCompletion,
+        D3Mutation::MarkInlineAfterComposedCall,
+        D3Mutation::OmitFinalDisposition,
+        D3Mutation::DoubleDisposition,
+    ] {
+        let arm = d3_binding_dependent_arm(other);
+        assert_eq!(
+            arm.the_candidate(),
+            c_identity,
+            "each cross-arm must be about the SAME edge as row 1, or the negatives below are \
+             about a different candidate: {other:?}"
+        );
+        assert_eq!(
+            arm.binding_kind(&c_identity),
+            Some(D3BindingKind::StaticWorker),
+            "{other:?} must leave the binding a StaticWorker. Only mutation 1 touches the \
+             binding seat, and if another mutation reached Value here, row 1's binding-seat \
+             half would be satisfied by it: {:?}",
+            arm.trace
+        );
+        assert!(
+            !arm.outcome.contains(D3_IH_MARKER_ON_VALUE),
+            "and {other:?} must NOT reach the IH-marker guard. That guard is row 1's terminal, \
+             and a second mutation arriving at it would make row 1's outcome clause satisfiable \
+             by something other than the suppression it attributes it to: {}",
+            arm.outcome
+        );
+    }
+
+    // And WHY the last two negatives hold, pinned rather than left implicit:
+    // witness C's candidate never reaches the direct funnel, so mutations 4 and
+    // 5 have no seat to act on and this program is unchanged by them. If that
+    // ever stops being true the pair above would start passing for a different
+    // reason, so it is asserted rather than assumed.
+    for inert in [D3Mutation::OmitFinalDisposition, D3Mutation::DoubleDisposition] {
+        let arm = d3_binding_dependent_arm(inert);
+        assert_eq!(
+            arm.outcome, "Ok",
+            "{inert:?} must be INERT on witness C -- its candidate never reaches the direct \
+             funnel, so there is no seat for these two to move: {}",
+            arm.outcome
+        );
+        assert_eq!(
+            arm.settlements_of(
+                &c_identity,
+                CandidateDisposition::ComposedCall,
+                D3Seat::ComposedPromotion
+            )
+            .len(),
+            1,
+            "and it must still settle once at the promotion seat, exactly as the baseline does"
+        );
+    }
+
+    // The pair that shares a terminal refusal.
+
+    // Row 2's discriminator is a settlement at the ENTRY seat. Mutation 3
+    // reaches the SAME terminal refusal and must NOT make one.
+    let (under_m3, _) = d3_payload_arm(D3Mutation::MarkInlineAfterComposedCall);
+    assert!(
+        under_m3.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "precondition -- mutation 3 must reach the shared terminal, or this arm is not testing \
+         the collapse at all: {}",
+        under_m3.outcome
+    );
+    let m3_identity = under_m3.the_candidate();
+    assert!(
+        under_m3
+            .settlements_of(
+                &m3_identity,
+                CandidateDisposition::InlineNoCall,
+                D3Seat::BridgeEntry
+            )
+            .is_empty(),
+        "⇒ and it must make NO entry settlement of that identity. If it did, row 2's \
+         discriminator would be satisfied by mutation 3 and the two rows would be one proof \
+         wearing two names: {:?}",
+        under_m3.trace
+    );
+
+    // Row 3's discriminator is an EXIT settlement made while a composed claim
+    // was already pending. Mutation 2 must not produce that either: it settles
+    // at entry, so by the time the exit is reached the candidate is already
+    // settled and the exit path correctly leaves it alone.
+    let (under_m2, _) = d3_payload_arm(D3Mutation::MarkInlineBeforeBridgeCompletion);
+    assert!(
+        under_m2.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "precondition -- mutation 2 must reach the shared terminal: {}",
+        under_m2.outcome
+    );
+    let m2_identity = under_m2.the_candidate();
+    assert!(
+        under_m2
+            .settlements_of(
+                &m2_identity,
+                CandidateDisposition::InlineNoCall,
+                D3Seat::BridgeExit
+            )
+            .is_empty(),
+        "⇒ and it must make NO exit settlement of that identity, or row 3's discriminator would \
+         be satisfied by mutation 2: {:?}",
+        under_m2.trace
+    );
+    // And the exit it does reach sees the candidate ALREADY settled — which is
+    // the structural reason the two chains cannot be confused, stated as a
+    // measurement rather than as the argument above.
+    let exit_at = under_m2.position_of(
+        &m2_identity,
+        |e| matches!(e, D3Event::BridgeExit { .. }),
+        "mutation 2's run must still complete the bridge for that identity",
+    );
+    let exit = match &under_m2.trace[exit_at] {
+        D3Event::BridgeExit {
+            settled,
+            pending_composed,
+            ..
+        } => (*settled, *pending_composed),
+        other => panic!("expected a bridge exit: {other:?}"),
+    };
+    assert_eq!(
+        exit,
+        (true, true),
+        "under mutation 2 the exit must see the candidate ALREADY SETTLED (by the entry seat) \
+         with the composed claim pending. Under mutation 3 the same read is (false, true) -- \
+         unsettled with a claim pending -- and that difference is what the two rows key on"
+    );
+
+    // The pair on the direct funnel.
+
+    // Row 4's discriminator is a returned funnel with NO settlement attempt.
+    // Mutation 5 returns from the same funnel and must attempt two.
+    let under_m5 = d3_contspec_arm(D3Mutation::DoubleDisposition);
+    let m5_identity = under_m5.the_candidate();
+    assert!(
+        under_m5.returned_from_funnel(&m5_identity) && !under_m5.settle_seats().is_empty(),
+        "mutation 5 must return from the funnel AND attempt a settlement, or row 4's \
+         'returned but settled nothing' would also describe it: {:?}",
+        under_m5.settle_seats()
+    );
+
+    // Row 5's discriminator is two attempts at one seat. Mutation 4 makes none.
+    let under_m4 = d3_contspec_arm(D3Mutation::OmitFinalDisposition);
+    assert_ne!(
+        under_m4.settle_seats().len(),
+        2,
+        "mutation 4 must not make two settlement attempts, or row 5's discriminator would be \
+         satisfied by it: {:?}",
+        under_m4.settle_seats()
+    );
+    assert!(
+        !under_m4.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "and it must not reach the double-settlement terminal at all -- unlike rows 2, 3 and 5, \
+         row 4's terminal is candidate totality, and that separation is what makes its row \
+         attributable without a causal clause doing all the work: {}",
+        under_m4.outcome
+    );
+}

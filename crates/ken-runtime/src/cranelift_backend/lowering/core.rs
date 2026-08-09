@@ -3401,6 +3401,38 @@ impl<'a> Lowering<'a> {
                             bypassed
                         }
                     };
+                    // `D3` — the ordered causal observation at bridge ENTRY,
+                    // recorded on EVERY run so the unmutated and armed arms are
+                    // comparable at the same seat for the same identity.
+                    #[cfg(test)]
+                    for identity in &bypassed {
+                        super::units::d3_record(super::units::D3Event::BridgeEntry {
+                            identity: identity.clone(),
+                            settled: self.d3_raw_settled(identity),
+                            pending_composed: self.d3_raw_pending_composed(identity),
+                        });
+                    }
+                    // `D3` mutation 2 — settle on ENTRY, before the scope is
+                    // known to have completed. Nothing else moves.
+                    if super::units::d3_mutation()
+                        == super::units::D3Mutation::MarkInlineBeforeBridgeCompletion
+                    {
+                        for identity in &bypassed {
+                            if !self.continuation_candidate_is_consumed(identity) {
+                                #[cfg(test)]
+                                super::units::d3_record(super::units::D3Event::Settle {
+                                    identity: identity.clone(),
+                                    disposition:
+                                        super::units::CandidateDisposition::InlineNoCall,
+                                    seat: super::units::D3Seat::BridgeEntry,
+                                });
+                                self.settle_continuation_candidate(
+                                    identity,
+                                    super::units::CandidateDisposition::InlineNoCall,
+                                )?;
+                            }
+                        }
+                    }
                     let outcome = self.lower_computational_producer_expr(
                         builder,
                         selected,
@@ -3412,11 +3444,41 @@ impl<'a> Lowering<'a> {
                     // completion -- `D0` measured 25 such candidates and folding
                     // them in would manufacture members. And a candidate the
                     // bridge's own body went on to discharge is already settled,
-                    // so the `is_settled` guard is what makes "unconsumed" a
-                    // read of the ledger rather than an assumption about order.
-                    if outcome.is_ok() {
+                    // so the consumed test is what makes "unconsumed" a read of
+                    // the ledger rather than an assumption about order.
+                    let completed = match super::units::d3_mutation() {
+                        // `D3` mutation 2 -- settle as though the scope had
+                        // completed, whatever it actually did. Only this one
+                        // bit moves; the settlement itself is the production
+                        // one below.
+                        super::units::D3Mutation::MarkInlineBeforeBridgeCompletion => true,
+                        _ => outcome.is_ok(),
+                    };
+                    // `D3` — the ordered causal observation at bridge EXIT. The
+                    // two feed reads are RAW, deliberately not routed through
+                    // `continuation_candidate_is_consumed`: that is the
+                    // function mutation 3 mutates, and an instrument reading
+                    // through it would agree with the mutation instead of
+                    // exposing it.
+                    #[cfg(test)]
+                    for identity in &bypassed {
+                        super::units::d3_record(super::units::D3Event::BridgeExit {
+                            identity: identity.clone(),
+                            completed,
+                            settled: self.d3_raw_settled(identity),
+                            pending_composed: self.d3_raw_pending_composed(identity),
+                        });
+                    }
+                    if completed {
                         for identity in &bypassed {
                             if !self.continuation_candidate_is_consumed(identity) {
+                                #[cfg(test)]
+                                super::units::d3_record(super::units::D3Event::Settle {
+                                    identity: identity.clone(),
+                                    disposition:
+                                        super::units::CandidateDisposition::InlineNoCall,
+                                    seat: super::units::D3Seat::BridgeExit,
+                                });
                                 self.settle_continuation_candidate(
                                     identity,
                                     super::units::CandidateDisposition::InlineNoCall,
@@ -4987,6 +5049,10 @@ impl<'a> Lowering<'a> {
                 // way around. Until then this binding is intentionally
                 // unreadable, and nothing here manufactures a consumer for it.
                 for (position, lowered) in constructor_args.into_iter().enumerate() {
+                    // `D3` mutation 1 — withhold the binding the candidate
+                    // authorizes, leaving the candidate itself untouched.
+                    let suppress_binding = super::units::d3_mutation()
+                        == super::units::D3Mutation::SuppressBindingInstallation;
                     let binding = match self.composed_recursive_argument_binding(
                         case,
                         deferred.construct_origin,
@@ -4995,7 +5061,43 @@ impl<'a> Lowering<'a> {
                         position,
                         &lowered,
                     )? {
-                        Some(worker) => LoweringEnvironmentBinding::StaticWorker(worker),
+                        Some(worker) if !suppress_binding => {
+                            // `D3` — the binding seat, keyed by the identity
+                            // this target's own coordinate selects. Only a
+                            // COMPOSED authority is recorded: an ordinary
+                            // induction hypothesis answers for no causal
+                            // obligation, so it has no identity to key on and
+                            // is not what mutation 1 is about.
+                            #[cfg(test)]
+                            if let Ok(identity) = worker.composed_continuation_authority() {
+                                super::units::d3_record(
+                                    super::units::D3Event::BindingInstalled {
+                                        identity: identity.clone(),
+                                        kind: super::units::D3BindingKind::StaticWorker,
+                                    },
+                                );
+                            }
+                            LoweringEnvironmentBinding::StaticWorker(worker)
+                        }
+                        Some(worker) => {
+                            // The SUBSTITUTION, recorded at the same seat and
+                            // under the same key, so row 1's pair is one edge
+                            // observed twice rather than two observations that
+                            // merely resemble each other.
+                            #[cfg(test)]
+                            if let Ok(identity) = worker.composed_continuation_authority() {
+                                super::units::d3_record(
+                                    super::units::D3Event::BindingInstalled {
+                                        identity: identity.clone(),
+                                        kind: super::units::D3BindingKind::Value,
+                                    },
+                                );
+                            }
+                            let _ = &worker;
+                            LoweringEnvironmentBinding::Value(
+                                LoweringOperand::Specialized(lowered),
+                            )
+                        }
                         None => LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
                             lowered,
                         )),
@@ -8549,6 +8651,30 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     /// consumption is "already settled, or a composed claim is pending" —
     /// and it reads `pending_composed_discharges` rather than duplicating the
     /// decision about what will be promoted.
+    /// **`D3` instrument — the settled half, read RAW.**
+    ///
+    /// Separate from [`Self::continuation_candidate_is_consumed`] on purpose:
+    /// that function is a mutation target, so the trace must not reach the
+    /// ledger through it.
+    #[cfg(test)]
+    fn d3_raw_settled(&self, identity: &ContinuationCallIdentity) -> bool {
+        self.continuation_candidates
+            .as_ref()
+            .is_some_and(|ledger| ledger.is_settled(identity))
+    }
+
+    /// **`D3` instrument — the pending-composed half, read RAW.** This is the
+    /// half mutation 3 suppresses, so reading it directly is what lets the
+    /// trace show the mutation settled inline *while a composed claim was
+    /// already pending*.
+    #[cfg(test)]
+    fn d3_raw_pending_composed(&self, identity: &ContinuationCallIdentity) -> bool {
+        self.function_local
+            .pending_composed_discharges
+            .iter()
+            .any(|pending| &pending.identity == identity)
+    }
+
     fn continuation_candidate_is_consumed(&self, identity: &ContinuationCallIdentity) -> bool {
         if self
             .continuation_candidates
@@ -8556,6 +8682,12 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             .is_some_and(|ledger| ledger.is_settled(identity))
         {
             return true;
+        }
+        // `D3` mutation 3 -- drop the pending half, so a candidate a composed
+        // call is about to claim reads as unconsumed and is settled inline
+        // first. The settled half above is untouched.
+        if super::units::d3_mutation() == super::units::D3Mutation::MarkInlineAfterComposedCall {
+            return false;
         }
         self.function_local
             .pending_composed_discharges
@@ -9051,10 +9183,52 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let answer = self.claim_and_call_resolved_continuation_inner(builder, identity, fields, recursive_position, producer_env)?;
-        self.settle_continuation_candidate(
-            identity,
-            super::units::CandidateDisposition::DirectCall,
-        )?;
+        // `D3` — the funnel was REACHED and RETURNED. A distinct event from a
+        // settlement attempt, because mutation 4's row must say "the call was
+        // preserved AND nothing was settled", and one event standing for both
+        // facts makes that sentence unstateable.
+        #[cfg(test)]
+        super::units::d3_record(super::units::D3Event::DirectFunnelReturned {
+            identity: identity.clone(),
+        });
+        // Recorded immediately before each ledger call, so a REFUSED second
+        // settlement still leaves its attempt in the trace.
+        #[cfg(test)]
+        let mark = |identity: &ContinuationCallIdentity| {
+            super::units::d3_record(super::units::D3Event::Settle {
+                identity: identity.clone(),
+                disposition: super::units::CandidateDisposition::DirectCall,
+                seat: super::units::D3Seat::DirectFunnel,
+            });
+        };
+        match super::units::d3_mutation() {
+            // `D3` mutation 4 -- withhold the settlement, leaving a real
+            // direct call unsettled. The call itself is unchanged.
+            super::units::D3Mutation::OmitFinalDisposition => {}
+            // `D3` mutation 5 -- settle the same candidate twice.
+            super::units::D3Mutation::DoubleDisposition => {
+                #[cfg(test)]
+                mark(identity);
+                self.settle_continuation_candidate(
+                    identity,
+                    super::units::CandidateDisposition::DirectCall,
+                )?;
+                #[cfg(test)]
+                mark(identity);
+                self.settle_continuation_candidate(
+                    identity,
+                    super::units::CandidateDisposition::DirectCall,
+                )?;
+            }
+            _ => {
+                #[cfg(test)]
+                mark(identity);
+                self.settle_continuation_candidate(
+                    identity,
+                    super::units::CandidateDisposition::DirectCall,
+                )?;
+            }
+        }
         Ok(answer)
     }
 
@@ -12412,6 +12586,14 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             return Ok(());
         }
         let inst = emission.inst;
+        // `D3` — the composed claim is RECORDED here, during lowering, and
+        // PROMOTED only after finished-CLIF verification. The gap between those
+        // two is the window mutations 2 and 3 exploit from opposite ends, so
+        // the recording itself is an ordered observation.
+        #[cfg(test)]
+        super::units::d3_record(super::units::D3Event::ComposedRecorded {
+            identity: identity.clone(),
+        });
         self.function_local
             .pending_composed_discharges
             .push(PendingComposedDischarge {

@@ -3062,6 +3062,224 @@ pub(super) struct ContinuationClaimLedger {
     composed: BTreeSet<ContinuationCallIdentity>,
 }
 
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D3` — the five mutations, one per
+/// property the candidate/disposition layer promises.**
+///
+/// Each arms exactly one defect and must red for its OWN refusal. They are
+/// deliberately separate variants rather than flags: a run arms at most one, so
+/// a control cannot pass because some other mutation was still set.
+///
+/// **ONE declaration, not a `cfg(test)`/`cfg(not(test))` pair.** It was
+/// authored as a pair, and the `cfg(not(test))` half carried only `None` while
+/// the mutation *sites* in `core.rs` name all five variants unconditionally —
+/// so the **production lib did not compile**, while the lib-**test** profile,
+/// which is the only thing the seam checkpoint's `818/6/4` run built, compiled
+/// perfectly. A production-only red no test profile can see.
+///
+/// ⇒ The variants are therefore declared once, for both profiles. What stays
+/// `#[cfg(test)]` is the only thing that must: the **arming** — the
+/// thread-local and its setter. In production `d3_mutation()` is a `const`
+/// `None`, every site's comparison folds to `false`, and no mutation is
+/// reachable by any caller.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D3Mutation {
+    None,
+    /// Withhold the static-worker binding the candidate authorizes.
+    SuppressBindingInstallation,
+    /// Settle `InlineNoCall` on bridge ENTRY rather than on a successful exit.
+    MarkInlineBeforeBridgeCompletion,
+    /// Drop the pending-composed half of the consumed test, so a candidate a
+    /// composed call will claim is settled inline first.
+    MarkInlineAfterComposedCall,
+    /// Withhold the `DirectCall` settlement, leaving a candidate unsettled.
+    OmitFinalDisposition,
+    /// Settle one candidate twice.
+    DoubleDisposition,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D3_MUTATION: std::cell::Cell<D3Mutation> = const {
+        std::cell::Cell::new(D3Mutation::None)
+    };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_d3_mutation(mutation: D3Mutation) {
+    D3_MUTATION.with(|cell| cell.set(mutation));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d3_mutation() -> D3Mutation {
+    D3_MUTATION.with(std::cell::Cell::get)
+}
+
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D3` — the seat a settlement was made
+/// at.**
+///
+/// Two mutations (2 and 3) converge on the SAME terminal double-settlement
+/// refusal, because they break the same invariant at different causal points.
+/// The Architect's ruling is that a shared terminal string may corroborate both
+/// rows but may not be either row's sole oracle. This enum is the
+/// discriminator: it says **where** the offending settlement was made, which
+/// the refusal text cannot.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D3Seat {
+    /// The deferred bridge's ENTRY, before its scope has run.
+    BridgeEntry,
+    /// The deferred bridge's EXIT, after its scope completed.
+    BridgeExit,
+    /// The shared direct producer/call funnel.
+    DirectFunnel,
+    /// Finished-CLIF composed-discharge verification.
+    ComposedPromotion,
+}
+
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D3` — one ordered causal observation.**
+///
+/// Keyed by the live [`ContinuationCallIdentity`], so a row proves its
+/// unmutated and armed arms reached the **same** seat for the **same** edge
+/// rather than for two different ones that happen to look alike.
+///
+/// The two boolean halves on the bridge events are read **directly from the
+/// ledger and the pending feed**, deliberately NOT through
+/// `continuation_candidate_is_consumed`. That function is what mutation 3
+/// mutates; routing the observation through it would make the instrument
+/// inherit the defect it exists to detect, and the trace would agree with the
+/// mutation instead of exposing it.
+/// **`D3` — which environment binding an authorized position received.**
+///
+/// Mutation 1 substitutes one for the other, and the substitution is the whole
+/// defect: the candidate still gets a binding, so a count sees nothing.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D3BindingKind {
+    /// The capsule the candidate authorizes, callable at its recursive
+    /// position.
+    StaticWorker,
+    /// A plain specialized value substituted in its place.
+    Value,
+}
+
+#[cfg(test)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D3Event {
+    /// The bridge entered with this candidate bypassed.
+    BridgeEntry {
+        identity: ContinuationCallIdentity,
+        settled: bool,
+        pending_composed: bool,
+    },
+    /// A composed claim was RECORDED during lowering, which is strictly before
+    /// finished-CLIF verification promotes it.
+    ComposedRecorded { identity: ContinuationCallIdentity },
+    /// **The binding seat** — which KIND of environment binding a composed
+    /// candidate's authorized position actually received.
+    ///
+    /// Keyed by the identity the target's own coordinate selects, so row 1 can
+    /// bind its downstream oracle to the same edge whose binding was
+    /// suppressed rather than to "some binding somewhere in the program".
+    BindingInstalled {
+        identity: ContinuationCallIdentity,
+        kind: D3BindingKind,
+    },
+    /// The shared direct funnel was REACHED and RETURNED an answer.
+    ///
+    /// Deliberately a separate event from [`Self::Settle`], and the
+    /// separation was forced by a row that could not be written without it:
+    /// row 4 withholds the settlement while preserving the call, so it must
+    /// assert "the funnel returned AND nothing was settled". One event
+    /// standing for both facts makes that sentence unstateable — the first
+    /// draft overloaded them and row 4 failed against its own instrument.
+    DirectFunnelReturned { identity: ContinuationCallIdentity },
+    /// The bridge scope finished, and what it and the two feeds then said.
+    BridgeExit {
+        identity: ContinuationCallIdentity,
+        completed: bool,
+        settled: bool,
+        pending_composed: bool,
+    },
+    /// A settlement was ATTEMPTED at a named seat. Recorded before the ledger
+    /// call, so a refused second settlement still leaves its seat in the trace.
+    Settle {
+        identity: ContinuationCallIdentity,
+        disposition: CandidateDisposition,
+        seat: D3Seat,
+    },
+}
+
+#[cfg(test)]
+impl D3Event {
+    /// The live identity this observation is about.
+    ///
+    /// Clause 2 of the `AC-6` proof shape is that the unmutated and armed arms
+    /// reach the mutation's seat **for the same derived identity**. Without an
+    /// accessor a row can only compare event *kinds*, which two different
+    /// edges would satisfy equally well.
+    pub(in crate::cranelift_backend) fn identity(&self) -> &ContinuationCallIdentity {
+        match self {
+            Self::BridgeEntry { identity, .. }
+            | Self::ComposedRecorded { identity }
+            | Self::BindingInstalled { identity, .. }
+            | Self::DirectFunnelReturned { identity }
+            | Self::BridgeExit { identity, .. }
+            | Self::Settle { identity, .. } => identity,
+        }
+    }
+
+    /// The seat, when this observation is a settlement attempt.
+    pub(in crate::cranelift_backend) fn settle_seat(&self) -> Option<D3Seat> {
+        match self {
+            Self::Settle { seat, .. } => Some(*seat),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static D3_TRACE: std::cell::RefCell<Vec<D3Event>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    /// The candidate population the live plan projected at ledger open.
+    static D3_PLAN_CANDIDATES: std::cell::RefCell<Vec<ContinuationCallIdentity>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// **The live plan's candidate population**, as `ContinuationCandidateLedger::
+/// open` read it — typed identities, in plan order, not deduplicated by any
+/// rendering.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d3_plan_candidates() -> Vec<ContinuationCallIdentity> {
+    D3_PLAN_CANDIDATES.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_d3_plan_candidates() {
+    D3_PLAN_CANDIDATES.with(|cell| cell.borrow_mut().clear());
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d3_record(event: D3Event) {
+    D3_TRACE.with(|cell| cell.borrow_mut().push(event));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d3_trace() -> Vec<D3Event> {
+    D3_TRACE.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_d3_trace() {
+    D3_TRACE.with(|cell| cell.borrow_mut().clear());
+}
+
+#[cfg(not(test))]
+pub(in crate::cranelift_backend) fn d3_mutation() -> D3Mutation {
+    D3Mutation::None
+}
+
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — what lowering settled a binding
 /// candidate to.**
 ///
@@ -3140,6 +3358,21 @@ impl ContinuationCandidateLedger {
                 })
             })
             .collect::<Result<BTreeSet<_>, _>>()?;
+        // **`D3` — the candidate population AS THE LIVE PLAN PROJECTED IT.**
+        //
+        // Recorded here rather than rebuilt in a test, and the difference is
+        // load-bearing: a test that re-plans its own witness proves a property
+        // of the plan it just built, not of the plan the compile under
+        // measurement actually used. Those can differ, and nothing would say
+        // so. This is the projection `open` itself read.
+        //
+        // It is also a seat INDEPENDENT of every settlement seat the trace
+        // observes, so an event carrying a wrong identity cannot match it by
+        // construction -- the trace is not being validated against itself.
+        #[cfg(test)]
+        D3_PLAN_CANDIDATES.with(|cell| {
+            *cell.borrow_mut() = candidates.iter().cloned().collect();
+        });
         Ok(Self {
             candidates,
             settled: BTreeMap::new(),
