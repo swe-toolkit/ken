@@ -145,6 +145,43 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > under review**. The sentinel was named for the boundary precisely so this is
 > visible rather than left asserting a refusal that no longer happens.
 >
+> ### ADVERSARY HUNT ON MERGED `f61b0b0d` — NO DEFECT, ONE ITEM UNTOUCHED
+>
+> **Cleared, so do not re-derive.** Shared artifact lifetime is **structural**:
+> enumerated across `crates/`, exactly one open (`units.rs:3584`, inside
+> `open_continuation_claim_ledger`, unconditional, no early return before the
+> claim ledger's own assignment) and exactly one take (`units.rs:3609`, inside
+> `close_continuation_claim_ledger`); everything else only `as_mut()`. **The
+> silent failure mode is already inverted** — the take is
+> `…take().ok_or_else(|| backend_module("the continuation candidate ledger went
+> missing"))`, so a desync fails loudly. **Do not weaken that `ok_or_else`.**
+> The refusal sentence has **one producer** today: `units.rs:3495` and the
+> control constant at `control.rs:27427`, two occurrences in all of `crates/`.
+>
+> **The `ComposedCall` seat's ordering is MEASURED, not reasoned.** Settling
+> first *did* preempt the law, replacing `d8f`'s `"discharged twice in a single
+> function"` with a candidate-ledger message, which is why it now sits after the
+> double-discharge refusal. ⇒ The invariant for all three seats: **a layer in
+> front of the law must not preempt the law's own refusals; it derives from
+> them, it does not speak for them.**
+>
+> **FOLDED INTO `D2` (`evt_39cbpgvqqb7n9`), not filed as new nodes:**
+>
+> 1. **`InlineNoCall`'s two negative conditions are UNCHECKED** — the highest-
+>    value remaining item on this node. It settles on an `Ok` bridge result plus
+>    *neither settled, nor pending-composed*; negative conditions read as safe
+>    and are what rots when a fourth path to consumption appears. **`D2` is
+>    where the population becomes total, so `D2` is when a fourth path starts
+>    mattering.**
+> 2. **A shared `const` between the production refusal and the control** would
+>    collapse the "one producer *today*" residual into a compile-time link. **A
+>    mechanism choice, offered not mandated** — a decline gets recorded as an
+>    accepted trade so it does not resurface.
+>
+> **Still open, carried, NOT cleared:** `core/tests/effects.rs`'s six per-role
+> fixtures are characterized but never verified to discriminate from one
+> another. This cut's `+1` there is inert.
+>
 > ### `D3` REMAINS STOPPED.
 >
 > **`D1` was released 2026-08-09 against the refusing-witness contract and has
