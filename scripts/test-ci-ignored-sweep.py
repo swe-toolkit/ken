@@ -118,6 +118,8 @@ class IgnoredSweepTests(unittest.TestCase):
         log_text = """
         Starting 47 tests across 4 binaries
         PASS [  0.001s] l1_acceptance sec24_char_excludes_surrogates
+        Final status:
+        PASS [  0.001s] l1_acceptance sec24_char_excludes_surrogates
         Summary [  1.000s] 47 tests run: 1 passed, 46 failed
         """
         with tempfile.TemporaryDirectory() as directory:
@@ -130,13 +132,13 @@ class IgnoredSweepTests(unittest.TestCase):
         report = output.getvalue()
         identity = "l1_acceptance sec24_char_excludes_surrogates"
         self.assertIn("47 selected; 1 passed", report)
-        self.assertIn(f"- {identity}", report)
-        self.assertIn(
+        self.assertEqual(report.count(f"- {identity}"), 1)
+        notice = (
             f"::notice title=Ignored row now passes::{identity}; route to the "
             "owner node named by its ignore attribute, or to the Steward when "
-            "no live node is named",
-            report,
+            "no live node is named"
         )
+        self.assertEqual(report.count(notice), 1)
 
     def test_report_rejects_zero_or_incomplete_measurements(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
