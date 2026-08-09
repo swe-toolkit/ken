@@ -11,6 +11,56 @@ github: null
 origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved. Demand-pulled by DS-9, which blocked at its first deliverable on `JsonArray (List Json)`; fork raised by the Steward as evt_1ykvpj7yvtg18. The five-point prerequisite contract below is the Architect's, transcribed verbatim in substance. Steward-filed; Steward owns the frame and AC/control placement.
 ---
 
+> ## RE-RELEASED 2026-08-09 — AND THE RELATIONAL ZIPPER IS NOT THE ROUTE
+>
+> **The Spec representation contract merged at exact `c7f8913c` (PR #1678, CI
+> green including conformance), and Kernel is re-released on that basis.**
+>
+> ### READ THIS BEFORE RESUMING: a superseded instruction is still in the thread
+>
+> **Architect ruling `evt_1d8dczzb9ts7h` told the ring to build a paired-decoder
+> RELATIONAL ZIPPER (`decode_ty_F` / `decode_tm_F` as separate eliminators).
+> THE MERGED CONTRACT SUPERSEDES THAT MECHANISM. Do not build it.** The ring
+> stopped before building it, which is why nothing is wasted — but **a seat
+> resuming from the last instruction it received would build the wrong thing**,
+> and that instruction sits *above* the superseding one in the same thread.
+>
+> ### What the contract settled
+>
+> Before guest methods exist, `method_type` names the **intrinsic,
+> source-indexed `All^Type` / `All^Omega` application** derived from the motive
+> and the original host source. After the complete guest method vector exists,
+> `lift-elim_D` constructs an inhabitant of **that literal same `All P v` type**
+> — guest elimination at leaves, host elimination / IHs at host children.
+>
+> ⇒ **The neutral public obligation no longer requires converting between two
+> host eliminators.** That conversion was the entire reason a zipper was
+> proposed, so the ordering answer removes the mechanism rather than
+> implementing it. **This resolves the ring's stop** — the joint decoder could
+> not inhabit the public method-independent lift *before methods exist*, and the
+> contract makes that ordering coherent instead of working around it.
+>
+> ### Still binding, none of it discharged by the merge
+>
+> Generated **closed telescopes** and exact `Type`/`Omega` behaviour; terminal
+> **first-order support only (2p)**; private composed-support use; **atomic
+> host-plus-support admission/rollback**; host-rank termination; **frozen
+> 3-Decl / 6-ID / 2-edge carrier**; **zero `trusted_base()` delta** with audited
+> generator/transaction/iota TCB; surface lockstep.
+>
+> ### Forbidden, all six
+>
+> Restoring method-dependent binders; adding equality/transport or a conversion
+> axiom; decorated containers; relaxing checking; narrowing admission; and
+> treating the merged spec as implementation approval.
+>
+> **`e8cdc8b9` REMAINS REJECTED** and the durable RED stays preserved until a
+> fresh candidate replaces it. No admission-only or test-only partial.
+>
+> **The contract merge discharges the REPRESENTATION STOP ONLY, not the
+> implementation gates** — fresh exact SHA, fresh QA, fresh Architect review,
+> new Decision, then a publish request.
+
 > ## ⛔⛔ `D1b`/`D2` GATE (2026-07-28) — THE POLARITY PRODUCER IS FAIL-OPEN
 >
 > ⛔ **Fail-open on three of the four positions the record claims to cover.**
