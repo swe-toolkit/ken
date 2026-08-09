@@ -3,7 +3,7 @@ id: RT-CONTINUATION-EDGE-DISPOSITION
 title: "One planner edge carries both binding projection and a causal call obligation — split the representation so a binding candidate can be settled InlineNoCall without ever entering the call-discharge partition"
 status: active
 owner: runtime
-size: TBD
+size: M
 gate: none
 depends_on: [RT-CONTINUATION-CALL-DISCHARGE]
 blocks: [RT-MATCH-RECURSOR-CONSUMERS]
@@ -50,8 +50,10 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > (`ccr_d3`, `coc_d3`, `sar_d3`), all refusing; the two inside successful
 > compiles carry `CLOSE_CHECKED = false`, so they compile **because nothing
 > looked**, not because anything was discharged. Counting them is exactly
-> **Trap 3**. ⇒ **A `D3` witness must be AUTHORED under `D1`.** That is a
-> measurement, not a shortfall in the search.
+> **Trap 3**. ⇒ **The witness must be AUTHORED, not found.** That is a
+> measurement, not a shortfall in the search. *(Superseded in one detail by
+> `evt_5n735c2e9r52k`: authoring is split — `D1` writes the refusing witness,
+> `D2` converts it to compile-OK. See the phase block below.)*
 >
 > **THE §4 STOP IS UNFIRED AT `D0`, AND `D0` OWES NOTHING FURTHER ON IT.**
 > Verbatim condition: **`UNFIRED AT D0; re-route only if D1 changes unit
@@ -88,19 +90,46 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > **This is a phase correction, not a weakening.** The final bar is still a real
 > binding-installed, closeout-checked, compile-OK member.
 >
-> ### `D1` IS RELEASED. `D2` AND `D3` REMAIN STOPPED.
+> ### `D1` IS MERGED at exact `fbc49ddd`, PR #1667, CI GREEN — 2026-08-09
 >
-> **Steward release, 2026-08-09, re-issued after the phase correction above.**
-> `D1`'s only gate was the frame's *"measurements before mechanism"* rule, and
-> `D0` has returned, been corrected, and been accepted with the stop unfired.
-> **There is nothing left for `D1` to wait on**, so it starts — now against the
-> refusing-witness contract rather than the compile-OK one.
+> Base `71646eb1`, seven paths `+623/-4`: six `ken-runtime` lowering/test paths
+> plus the amended `D0` correction record. Decision `dec_x31ydz3ac76p` resolved
+> APPROVED by the Architect; Runtime QA approved the same exact SHA at
+> `evt_1skf7xxyhm8x3`. **Blob identity verified on all seven paths against the
+> landed tree.** Adversary notified. Size accepted as **M**, on the census plus
+> this cut rather than inherited.
 >
-> **`D2` and `D3` stay stopped, and this is not caution.** `D3`'s five mutations
-> need an `InlineNoCall` witness that **does not exist yet and is `D1`'s to
-> author**, and `D2`'s closeout ordering is only meaningful once the
-> representation exists. Releasing them now would authorize work whose input is
-> missing.
+> **What landed:** the sibling candidate ledger — opened and taken at the **same
+> artifact boundary** as the claim ledger, keyed from the same
+> `ContinuationCallIdentity` projection — with three bounded settlement seats:
+> `DirectCall` after claim/emit, `ComposedCall` after the existing verified-feed
+> double-discharge refusal, `InlineNoCall` after an `Ok` bridge result while
+> neither settled nor pending-composed. **Dispositions only**: no totality
+> check, no subset derivation.
+>
+> **The `AC-7` witness REFUSES, and the exact string is the discriminator.** A
+> green result would mean `D2` done early, a weakened equality, or the withdrawn
+> planner-side exclusion returning — the first two green it and the third
+> deletes the refusal, **so a control keyed on "it failed" would pass under all
+> three and this one passes under none.** It is a transition sentinel named for
+> the boundary, so `D2` inverts it under review rather than leaving it to drift.
+>
+> **Two held objects are now superseded and must never be published:**
+> `652df2ea` and `487a06cc`. `a504aa96` was never publishable — it reverts the
+> erratum.
+>
+> ### `D2` AND `D3` REMAIN STOPPED.
+>
+> **`D1` was released 2026-08-09 against the refusing-witness contract and has
+> now MERGED — that release is history, not a pending instruction.**
+>
+> **`D2` and `D3` stay stopped, and this is not caution — it is a missing
+> input.** `D1` authored the **refusing** witness, which is what it owed. `D3`'s
+> five mutations need the **post-`D2` SUCCESSFUL** witness, and that does not
+> exist until `D2` converts the refusing one after total/disjoint disposition
+> close and subset derivation. **`D3` before `D2` would have to mutate against
+> the refusal**, which proves nothing about the repaired path and is the
+> cheapest available way to make this node's whole proof vacuous.
 >
 > **`AC-7` stays open** — it is `D1`'s to discharge, against the empty witness
 > cell, not the class.
