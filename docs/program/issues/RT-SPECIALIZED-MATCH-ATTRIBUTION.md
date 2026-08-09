@@ -1,7 +1,7 @@
 ---
 id: RT-SPECIALIZED-MATCH-ATTRIBUTION
 title: "A Match scrutinee arriving as a Specialized operand falls to the remainder arm, and neither the stage nor the seat says which Lowered class"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
