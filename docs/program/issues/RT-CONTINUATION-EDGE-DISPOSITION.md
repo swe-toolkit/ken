@@ -118,7 +118,34 @@ origin: Architect hard-stop ruling evt_dakdkqk4wbg6 (2026-08-08), which accepted
 > `652df2ea` and `487a06cc`. `a504aa96` was never publishable — it reverts the
 > erratum.
 >
-> ### `D2` AND `D3` REMAIN STOPPED.
+> ### `D2` IS RELEASED — 2026-08-09. `D3` REMAINS STOPPED.
+>
+> **Released after the ring confirmed its reading of `D2`'s quantifier
+> matches the ruling** (`evt_1kcyfdn7076yt`), which was the one gate I held it
+> on. That check is not ceremony: **`D2` ranging over the wrong population
+> would not red — it would go green and mean nothing**, which is exactly the
+> failure the `D0` erratum existed to prevent.
+>
+> **The confirmed population**, verbatim in substance: every **activated binding
+> candidate in one selected SUCCESSFUL `FunctionizedUnits` artifact**, each with
+> exactly one disposition before that artifact closes. It is **neither** `D0`'s
+> 637-row observational superpopulation **nor** all planned calls. Plan-only
+> rows, `Err` compilations, and non-selected `RecursiveDescent` plans are
+> **excluded by construction, not by post-hoc filtering** — that distinction is
+> load-bearing, because a post-hoc filter is a place where the population can be
+> quietly widened later.
+>
+> **Order, and the order IS the mechanism:** total/disjoint disposition close
+> **first**; only then derive `DirectCall ∪ ComposedCall`; only then apply the
+> **unchanged** exact equality. `InlineNoCall` stays outside the equality.
+> **Compile-OK is required only here.**
+>
+> **`D2` converts the SAME `sar_d3`-shaped `D1` witness** from its exact
+> missing-call refusal to compile-OK, and **must invert the transition sentinel
+> under review**. The sentinel was named for the boundary precisely so this is
+> visible rather than left asserting a refusal that no longer happens.
+>
+> ### `D3` REMAINS STOPPED.
 >
 > **`D1` was released 2026-08-09 against the refusing-witness contract and has
 > now MERGED — that release is history, not a pending instruction.**
