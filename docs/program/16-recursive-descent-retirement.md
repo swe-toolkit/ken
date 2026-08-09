@@ -660,6 +660,33 @@ measured answer about whether any remaining node must do real work inside that
 file. One exchange, far cheaper than an interlude, and it does not disturb this
 ordering if the answer is no.
 
+> ### #8 DECOMPOSES INTO MANY WPs, AND THAT ANSWERS THE IDLE-LANE WORRY — operator, 2026-08-09
+>
+> *"I expect that `RT-BACKEND-MODULE-SPLIT` will be broken down into several to
+> many individual WPs after the enclave pass. There will be ample time for
+> framing the post refactor WPs to keep the fleet running."*
+>
+> ⇒ **#8 is a phase, not a node**, and it is **not** a period during which the
+> fleet has nothing to do. Do not frame it as one unit, and do not treat its
+> arrival as a reason to open an unrelated lane for want of work.
+>
+> **What #8 gates, so the decomposition is sized against the real stake.**
+> Measured 2026-08-09: **19 nodes are transitive dependents of #8**, and they
+> are the whole remaining Linux ABI completion program
+> (`docs/program/10-linux-abi-completion.md`) — `NATIVE-HANDLE-CARRIER` →
+> `PX8-F-CAP-41` → `PX8` → {`ABI-R3`, `PX9`} → Tracks A/M/S/T. The operator's
+> standing position on that program, same day: **the Linux ABI is essential to
+> Ken's practical value, and without it the target audience would treat Ken as a
+> toy or a curio.**
+>
+> **So the decomposition has a second obligation beyond tidiness: get
+> `NATIVE-HANDLE-CARRIER` reachable as early as the split honestly allows.**
+> Its other three dependencies are already merged, so #8 is the only thing
+> holding it, and everything above waits behind it. **If some early subset of
+> the split is enough to unblock it, that subset is the first WP** — that is a
+> question for the enclave pass to answer with a measurement, not for the
+> Steward to assume in either direction.
+
 **#8 is cheaper than the precedent it is modelled on.** `static_transition.rs`
 **already has** a `static_transition/` subdirectory (`semantic_ir.rs` 3,010,
 `abi.rs` 2,571). The seam exists, so #8 **extends an established split** rather

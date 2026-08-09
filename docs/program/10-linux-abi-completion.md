@@ -62,6 +62,31 @@ unsafe pointers in application Ken."* That exit is unmet.
 
 ## 3. Operator rulings folded in
 
+> ### WHY THIS PROGRAM IS NOT OPTIONAL — operator, 2026-08-09
+>
+> *"the linux ABI is essential to the practical value of ken. Without a
+> compiler its target audience would treat it as a toy or a curio."*
+>
+> **This is a statement about what Ken IS, not about scheduling preference, and
+> it outranks convenience arguments in sequencing.** Every node in §4 is on the
+> path between a language that demonstrates and a language that can be used.
+>
+> **Two consequences that bind whoever reads this next.**
+>
+> 1. **Latency on this program is a real cost, not merely a tidiness concern.**
+>    Measured 2026-08-09: **19 of these nodes are transitive dependents of
+>    `RT-BACKEND-MODULE-SPLIT`**, through the chain `RT-DESCENT-RETIRE` →
+>    `RT-BACKEND-MODULE-SPLIT` → `NATIVE-HANDLE-CARRIER` → `PX8-F-CAP-41` →
+>    `PX8` → {`ABI-R3`, `PX9`} → the rest, and **all 19 were unstarted**. An
+>    ordering argument that buys a saved rebase and spends weeks of this
+>    program's latency is **not obviously a good trade**, and should be stated
+>    with both sides visible rather than as a local optimization.
+> 2. **"It works in the interpreter" is not the bar.** The audience judgment the
+>    operator names is made against the **native** lane. An operation that is
+>    `RepresentedUnavailable`, or available only under the interpreter, does not
+>    count toward practical value — which is exactly why the reconciliation
+>    track promotes all nine rather than selectively deferring them.
+
 - **No cross-compilation.** Manifest work stays native-target only. The
   advisory's signed/content-addressed cross-target manifest generation is
   **deferred behind a long line of other work** — it is a very late feature.
