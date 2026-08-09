@@ -129,6 +129,44 @@ jobs:
       # opening fence is `text`). If a real ```rust doctest is ever added,
       # add a `cargo test --workspace --doc --locked` step back here.
 
+  # Findings exit zero and route without blocking. Instrument failures exit
+  # nonzero and are enforced by build-test's needs/result gate below because no
+  # trustworthy measurement was made.
+  ignored-row-sweep:
+    name: ignored-row sweep (findings non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
+        with:
+          tool: nextest
+      - name: Select and run ignored rows
+        shell: bash
+        run: |
+          cargo nextest list --workspace --locked --run-ignored=only \
+            --message-format json > ignored-row-all.json
+          filter=$(python3 scripts/ci-ignored-sweep.py filter \
+            ignored-row-all.json)
+          expected=$(python3 scripts/ci-ignored-sweep.py expected)
+          cargo nextest list --workspace --locked --run-ignored=only \
+            -E "$filter" --message-format json > ignored-row-list.json
+          python3 scripts/ci-ignored-sweep.py verify-list \
+            ignored-row-all.json ignored-row-list.json "$expected"
+
+          set +e
+          cargo nextest run --workspace --locked --run-ignored=only \
+            --no-fail-fast --color never --status-level pass \
+            --final-status-level pass -E "$filter" \
+            2>&1 | tee ignored-row-sweep.log
+          run_status=${PIPESTATUS[0]}
+          set -e
+
+          python3 scripts/ci-ignored-sweep.py report \
+            ignored-row-list.json ignored-row-sweep.log \
+            "$expected" "$run_status" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   # ── Slow native binaries, each restored to the gate in its own job ───────
   #
   # WHY A JOB EACH rather than letting them back into the shards: two of the
@@ -333,7 +371,12 @@ jobs:
   build-test:
     name: build + test
     runs-on: ubuntu-latest
-    needs: [test-shard, native-write-partition, native-buffer, native-rt-parity]
+    needs:
+      - test-shard
+      - native-write-partition
+      - native-buffer
+      - native-rt-parity
+      - ignored-row-sweep
     # `always()` so this reports a definite conclusion even when a job fails
     # or is skipped. Without it, a failed dependency leaves this job *skipped*,
     # and a skipped required check blocks the PR with no useful signal.
@@ -345,15 +388,18 @@ jobs:
           write='${{ needs.native-write-partition.result }}'
           buffer='${{ needs.native-buffer.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
+          ignored_sweep='${{ needs.ignored-row-sweep.result }}'
           echo "test-shard matrix:      $shards"
           echo "native-write-partition: $write"
           echo "native-buffer:          $buffer"
           echo "native-rt-parity:       $rt_parity"
+          echo "ignored-row-sweep:      $ignored_sweep"
           failed=0
           for pair in "test shards:$shards" \
                       "native-write-partition:$write" \
                       "native-buffer:$buffer" \
-                      "native-rt-parity:$rt_parity"; do
+                      "native-rt-parity:$rt_parity" \
+                      "ignored-row-sweep:$ignored_sweep"; do
             name="${pair%:*}"; result="${pair##*:}"
             if [ "$result" != "success" ]; then
               echo "::error::$name did not pass ($result)." >&2
