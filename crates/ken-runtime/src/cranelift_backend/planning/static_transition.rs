@@ -16508,10 +16508,23 @@ mod tests {
     /// has.** It is carried in the tree, per `AC-5`, so the obligation is an
     /// artifact rather than a sentence in a handoff that evaporates when the
     /// terminal closes. The **committed runnable form is owned by the first
-    /// post-Kernel closure candidate**, released when nested-inductive admission
-    /// is on `main`.
+    /// candidate to run once nested-inductive admission is on `main`** — keyed
+    /// to that capability, not to the closure of any node.
     ///
-    /// **Release condition:** `KERNEL-NESTED-IND` merged. Until then the
+    /// **Release condition: nested-inductive admission is on `main`.**
+    ///
+    /// Stated as the capability rather than as `KERNEL-NESTED-IND` merged,
+    /// because those two came apart. The accepted partial `afb38934` merged that
+    /// node and did **not** bring the admission path: it landed
+    /// `ken-kernel/src/inductive.rs` as a superset while
+    /// `ken-elaborator/src/{compiler_driver,elab}.rs`,
+    /// `ken-elaborator/tests/nc14_data_match_lowering.rs` and
+    /// `ken-interp/src/eval.rs` each remain at their pre-change state. A merge
+    /// event is not the capability it was expected to deliver, and gating on one
+    /// invites the next reader to un-ignore this control and take a red they
+    /// cannot fix.
+    ///
+    /// Until that capability lands the
     /// `LiftRose` witness exists only on the attribution node's disposable
     /// synthetic venue — an unreferenced composition of this Runtime tree with
     /// Kernel's held `dd3cd050` and its projection snapshot — which is a
@@ -16534,13 +16547,16 @@ mod tests {
     /// ignored test whose body would pass vacuously is the shape that lets a
     /// deferred obligation read as a discharged one.
     #[test]
-    #[ignore = "carried, not runnable: needs KERNEL-NESTED-IND on main for the \
-                LiftRose witness. The first post-Kernel closure candidate owns \
-                the runnable form."]
+    #[ignore = "carried, not runnable: needs nested-inductive admission on main \
+                for the LiftRose witness -- the capability, not the \
+                KERNEL-NESTED-IND merge event, which fired at afb38934 without \
+                delivering it. The first candidate to run once that capability \
+                is on main owns the runnable form."]
     fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
         panic!(
             "RT-BODY-OCCURRENCE-PROVENANCE AC-5 is CARRIED, not discharged. \
-             Supply the LiftRose witness (requires KERNEL-NESTED-IND on main) \
+             Supply the LiftRose witness (requires nested-inductive admission \
+             on main -- the capability, not merely KERNEL-NESTED-IND merged) \
              and assert: SOI(26) is a reachable ComputationalMatch owned by \
              PredeclaredFunctionId(2); its required join set is exactly \
              {{26, 33, 39, 53}}; consumed union dispositioned equals that set \
