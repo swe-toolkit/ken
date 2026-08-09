@@ -144,6 +144,22 @@ pass silently, which is exactly the failure the predecessor's `close` refuses.
 | 4 | omit a final disposition | yes |
 | 5 | present one candidate in **two** dispositions | yes |
 
+> ### MEASURED 2026-08-09: ALL FIVE MUTATIONS ARE **GREEN** ON `D2`'s WITNESS
+>
+> **This is the vacuity finding, and it must not be read as progress.** Each
+> individually armed mutation **compiled `Ok`** on `D2`'s witness
+> (`c17b9939`, `evt_mfzy5h9g2px9`). **Five mutations that all pass is five
+> proofs of nothing** — the witness does not discriminate, so arming a variant
+> changes no observable outcome.
+>
+> ⇒ **This is exactly why witness selection/construction is required**, and it
+> is the measured justification for the scope ruling below rather than an
+> argument for it. **Do not record any of these five as discharged.**
+>
+> **The subject line of `c17b9939` says "all five are GREEN on `D2`'s witness"
+> and that sentence is a FINDING, not a result.** A later reader skimming the
+> log will read "green" as success; it is the opposite.
+
 > ### `AC-6` IS FIVE CAUSAL PROOFS, NOT FIVE DISTINCT STRINGS — Architect, `evt_6vwnj8a9qty5d`
 >
 > **This sharpens what "independently" means, and it is the difference between
