@@ -76,6 +76,14 @@ pub use artifact::api::{
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::with_px8ds_retired_flat_order;
 
+// `RT-MATCH-RECURSOR-CONSUMERS` 4a: the cross-crate census surface, reached as
+// `ken_runtime::{with_match_recursor_census, MatchRecursorCensusRow}` through
+// `lib.rs`. Same reachability caveat as the item above -- only a consumer can
+// observe a break in this path, so the `ken-cli`/`ken-verify`/`ken-elaborator`
+// census suites are what keep it honest.
+#[cfg(feature = "px8-ds-test-support")]
+pub use lowering::core::{with_match_recursor_census, MatchRecursorCensusRow};
+
 // ⛔ This list is DERIVED, not authored: it is exactly the set of module-level
 // bare-`pub` items in `surface.rs`, enumerated mechanically and checked for set
 // equality in BOTH directions. A name dropped here vanishes from
