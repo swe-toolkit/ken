@@ -1,7 +1,8 @@
 use ken_kernel::inductive::{iota_reduct, method_type, peel_app, peel_pi};
 use ken_kernel::{
-    check, convert, convert_type, declare_inductive, infer, ConstructorDecl, Context, CtorSpec,
-    Decl, GlobalEnv, GlobalId, InductiveDecl, InductiveSpec, Level, LevelVar, Term,
+    check, convert, convert_type, declare_inductive, infer, AllSupportSort, ConstructorDecl,
+    Context, CtorSpec, Decl, GlobalEnv, GlobalId, InductiveDecl, InductiveSpec, Level, LevelVar,
+    Term,
 };
 
 const U: LevelVar = LevelVar(0);
@@ -124,8 +125,14 @@ fn declare_poly_box(env: &mut GlobalEnv) -> GlobalId {
         indices: vec![],
         level: level_u(),
         constructors: vec![
-            CtorSpec { args: vec![], target_indices: vec![] },
-            CtorSpec { args: vec![Term::var(0)], target_indices: vec![] },
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::var(0)],
+                target_indices: vec![],
+            },
         ],
     })
     .expect("polymorphic unary PolyBox declaration")
@@ -186,10 +193,7 @@ fn polymorphic_former_transport_preserves_guest_levels() {
     let box_ctor = poly.constructors[1].id;
     let d0 = Term::indformer(family, vec![Level::zero()]);
     let boxed_leaf = Term::app(
-        Term::app(
-            Term::constructor(box_ctor, vec![Level::zero()]),
-            d0.clone(),
-        ),
+        Term::app(Term::constructor(box_ctor, vec![Level::zero()]), d0.clone()),
         Term::constructor(leaf, vec![Level::zero()]),
     );
     let motive = Term::Ascript(
@@ -205,11 +209,14 @@ fn polymorphic_former_transport_preserves_guest_levels() {
         wrap_domains[0].clone(),
         Term::lam(wrap_domains[1].clone(), Term::Type(Level::zero())),
     );
-    check(&env, &Context::new(), &leaf_method,
-          &method_type(&env, declaration, 0, &motive, &[], &[Level::zero()]).unwrap())
-        .expect("PolyBox leaf method");
-    check(&env, &Context::new(), &wrap_method, &wrap_method_type)
-        .expect("PolyBox Former method");
+    check(
+        &env,
+        &Context::new(),
+        &leaf_method,
+        &method_type(&env, declaration, 0, &motive, &[], &[Level::zero()]).unwrap(),
+    )
+    .expect("PolyBox leaf method");
+    check(&env, &Context::new(), &wrap_method, &wrap_method_type).expect("PolyBox Former method");
     let methods = vec![leaf_method, wrap_method];
     let eliminator = Term::Elim {
         fam: family,
@@ -226,15 +233,24 @@ fn polymorphic_former_transport_preserves_guest_levels() {
     let elim_ty = infer(&env, &Context::new(), &eliminator).expect("guest eliminator");
     check(&env, &Context::new(), &eliminator, &elim_ty).expect("checked guest eliminator");
     let reduct = iota_reduct(
-        &env, declaration, 1, &[Level::zero()], &[], &motive, &methods,
+        &env,
+        declaration,
+        1,
+        &[Level::zero()],
+        &[],
+        &motive,
+        &methods,
         std::slice::from_ref(&boxed_leaf),
-    ).expect("PolyBox Former iota");
+    )
+    .expect("PolyBox Former iota");
     let (_, args) = peel_app(&reduct);
     let supplied = args.last().expect("supplied Former lift");
     let supplied_type = ken_kernel::subst::subst0(&wrap_domains[1], &boxed_leaf);
-    check(&env, &Context::new(), supplied, &supplied_type)
-        .expect("checked type-level Former lift");
-    if let Term::Elim { fam, level_args, .. } = supplied {
+    check(&env, &Context::new(), supplied, &supplied_type).expect("checked type-level Former lift");
+    if let Term::Elim {
+        fam, level_args, ..
+    } = supplied
+    {
         assert_eq!(*fam, poly_box);
         assert_eq!(level_args, &vec![Level::zero()]);
     } else {
@@ -431,7 +447,7 @@ fn declared_positive_former_lift_builds_dependent_host_evidence() {
     // Durable invariant: the D3a Former skeleton is a semantic consumer, not a
     // test-only ornament. List's original eliminator builds an All-style
     // evidence family without re-instantiating List at a larger universe.
-    // Admission of this outer family remains a later D1b concern.
+    // D1b now opens production admission through this recorded-positive path.
     let mut env = GlobalEnv::new();
     let list = declare_list(&mut env);
     let family = install_test_only_nested_family(&mut env, list);
@@ -456,8 +472,7 @@ fn declared_positive_former_lift_builds_dependent_host_evidence() {
         Box::new(Term::pi(family_type.clone(), ty0())),
     );
     let wrap_method_type =
-        method_type(&env, declaration, 1, &motive, &[], &[])
-            .expect("Former method lift");
+        method_type(&env, declaration, 1, &motive, &[], &[]).expect("Former method lift");
     let (wrap_domains, _) = peel_pi(&wrap_method_type);
     assert_eq!(wrap_domains.len(), 2);
     let methods = vec![
@@ -466,10 +481,7 @@ fn declared_positive_former_lift_builds_dependent_host_evidence() {
             wrap_domains[0].clone(),
             Term::lam(
                 wrap_domains[1].clone(),
-                Term::pair(
-                    Term::Refl(Box::new(Term::var(1))),
-                    constructor(leaf),
-                ),
+                Term::pair(Term::Refl(Box::new(Term::var(1))), constructor(leaf)),
             ),
         ),
     ];
@@ -484,9 +496,18 @@ fn declared_positive_former_lift_builds_dependent_host_evidence() {
     let (domains, _) = peel_pi(&method);
     assert_eq!(domains.len(), 2, "field plus one structured Former lift");
     let instantiated_lift_type = ken_kernel::subst::subst0(&domains[1], &list_value);
+    let all_type = env
+        .all_support(list, 0, AllSupportSort::Type)
+        .expect("List's intrinsic All^Type support");
+    let (lift_head, lift_arguments) = peel_app(&instantiated_lift_type);
     assert!(
-        matches!(instantiated_lift_type, Term::Elim { fam, .. } if fam == list),
-        "FormerLift is a type-level elimination over the original host"
+        matches!(lift_head, Term::IndFormer { id, .. } if id == all_type),
+        "FormerLift is the literal intrinsic All family"
+    );
+    assert_eq!(
+        lift_arguments.last(),
+        Some(&list_value),
+        "the intrinsic family is indexed by the exact source value"
     );
 
     let reduct = iota_reduct(
@@ -536,8 +557,5 @@ fn declared_positive_former_lift_builds_dependent_host_evidence() {
             target_indices: vec![],
         }],
     });
-    assert!(
-        attempted.is_err(),
-        "atomic method/iota semantics must not open D1b admission"
-    );
+    assert!(attempted.is_ok(), "D1b admits the checked Former path");
 }

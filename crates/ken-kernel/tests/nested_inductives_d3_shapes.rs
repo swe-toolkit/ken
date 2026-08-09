@@ -589,7 +589,7 @@ fn checked_positive_former_paths_compose_without_opening_admission() {
     ));
     assert!(shapes[0].shape.as_legacy().is_none());
 
-    let rejected = declare_inductive(&mut env, |rose| InductiveSpec {
+    let admitted = declare_inductive(&mut env, |rose| InductiveSpec {
         level_params: vec![],
         params: vec![],
         indices: vec![],
@@ -603,7 +603,7 @@ fn checked_positive_former_paths_compose_without_opening_admission() {
         }],
     });
     assert!(
-        matches!(rejected, Err(KernelError::PositivityViolation(_))),
-        "preparatory D3 must not open nested admission"
+        admitted.is_ok(),
+        "D1b must admit the path already classified by recursive_shapes"
     );
 }

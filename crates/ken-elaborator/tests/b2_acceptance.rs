@@ -160,7 +160,7 @@ fn ordinary_inductive_admitted_by_k1() {
     // Re-run the real strict-positivity check on the admitted family — the
     // spec's "admitted by K1" grounded against the kernel that exists now.
     assert!(
-        check_positivity(&ind).is_ok(),
+        check_positivity(&env, &ind).is_ok(),
         "real check_positivity admits the first-order Temporal"
     );
 
