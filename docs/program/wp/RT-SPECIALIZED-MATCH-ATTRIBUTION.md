@@ -63,7 +63,7 @@ StructuralNat, ResponseBytes, HostResult, DynamicConstructor, Bytes,
 BorrowedNativeValue, BorrowedOption, String, Constructor, Record, Closure,
 DeclarationClosure, ComputationalRecursorClosure, RecursiveBackedge, Trap`.
 
-### Field 2 — the ordinary `Match`, its cases, and the producing route
+### Field 2 — the eliminated family, the scrutinee occurrence, and the route
 
 | field | value |
 |---|---|
@@ -71,16 +71,46 @@ DeclarationClosure, ComputationalRecursorClosure, RecursiveBackedge, Trap`.
 | case constructors | `ctor:nested_inductive_pkg::global_574::ctor_575`, `…::ctor_576`, `…::ctor_577` |
 | incoming route | `SourceComputationalAnswerRoute::DirectScrutinee` |
 
-Three constructors on one source type, which matches the witness's `Bag`
-(`Empty` / `One` / `Join`). So the refusing `Match` is the **inner** match on
-`b`, not the outer match on `r`.
+#### `global_574` resolved from the checked artifact, not from its arity
 
-**The route is `DirectScrutinee`, and that is a fact about the producer rather
-than the consumer.** The value was not raised by an exact producer and did not
-arrive through a composition or resume path; it was produced by ordinary source
-evaluation and handed straight to the scrutinee position. The pairing is read
-from `RoutedAnswer { value, route }`, which the machine already carries for
-exactly this purpose, rather than reconstructed.
+| probe | result |
+|---|---|
+| `is_terminal_support(GlobalId(574))` | **`true`** |
+| `all_support_origin(GlobalId(574))` | **`Some((host = g570, parameter = 0, sort = Type))`** |
+| name of `g570` | **`Bag`** |
+| source name of `g574` | **`None`** |
+| `Bag` / `LiftRose` ids | `g570` / `g582` |
+| constructor count of `g574` | 3 |
+
+⇒ **`global_574` is the kernel-generated terminal All support for host `Bag` at
+parameter 0. It is not `Bag`.** `Bag` is `g570` and is not the eliminated
+family here. `g574` carries no source name at all, which is why it is rendered
+by the `global_<id>` fallback.
+
+**So the refusing `Match` is a Runtime elimination over the source-indexed All
+inhabitant, not the surface-originating `match b` over `Bag`.**
+
+#### The scrutinee occurrence immediately before `SOI(53)`
+
+| field | value |
+|---|---|
+| occurrence | **`StaticOriginId(52)`** |
+| `RuntimeExpr` kind | **`Var(0)`** |
+| runtime binder index | **0** |
+| binding role / value class | **`Value(Specialized(ComputationalRecursorClosure))`** |
+| environment length | 3 |
+
+The scrutinee is a **variable read**, and binder 0 already holds a
+`ComputationalRecursorClosure`. Nothing at `SOI(52)` produces the value; it
+reads one the environment was already carrying.
+
+#### What `DirectScrutinee` does and does not say
+
+**It is an exclusion, not a producer identity.** It rules out a value *raised by
+an exact producer* and one arriving by composition or resume. It does **not**
+name what produced this value, and reading it as one is an over-claim. The
+producer identity that is actually available is the row above: binder 0's
+binding.
 
 ### Field 3 — the continuation stack at arrival
 
@@ -110,9 +140,11 @@ in this candidate.
 
 ## What this does and does not establish
 
-**Established:** the rejected value is a `ComputationalRecursorClosure` arriving
-by `DirectScrutinee` at the inner three-constructor `Match` at `SOI(53)`, with
-an empty pending continuation.
+**Established:** the rejected value is a `ComputationalRecursorClosure`, read
+from runtime binder 0 at `SOI(52)` (`Var(0)`) and handed to the `Match` at
+`SOI(53)`, which eliminates the **kernel-generated terminal All support for host
+`Bag` at parameter 0** — not `Bag` itself and not the surface `match b`. The
+pending continuation is empty.
 
 **Not established, and deliberately not argued here:** whether the correct
 mechanism is consumer widening at this seat, an upstream composition that should
@@ -127,6 +159,28 @@ cause that is not the cause"*, and that this seat was the only one of three
 missing that arm. The measured variant is consistent with that shape. **It is
 not evidence of it**, and the node says so; the disposition still requires the
 ruling.
+
+## The correction this record carries, and how the first version went wrong
+
+**The first version of Field 2 claimed the case constructors "match the
+witness's `Bag`" and concluded the refusing `Match` was the inner `match b`.
+That was wrong, and it was wrong by resemblance.**
+
+The generated All support for `Bag` has **three constructors mirroring its
+host's**, so the constructor count is identical between the family I named and
+the family actually present. **Counting could not discriminate them, and I used
+a count.** Route only on a measured class, never on resemblance, is the node's
+own instruction for this seat — and I broke it while recording evidence about a
+seat that exists because of an earlier resemblance error.
+
+The discriminator that settles it is the **issued relation**, not the shape:
+`is_terminal_support` and `all_support_origin` are recorded by the kernel at
+generation time and name the host and parameter outright. One call answers it,
+with no arity, name-shape or case-count reasoning anywhere in the chain.
+
+**Corrected in place rather than annotated.** The superseded sentences are gone
+from Field 2, because a later note saying a claim is false leaves the false
+claim sitting where a reader reaches it first.
 
 ## Controls and hazards
 
