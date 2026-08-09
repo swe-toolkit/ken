@@ -1730,9 +1730,14 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             let (unit_bundle, call_edges) = functionized_bundle
                 .as_ref()
                 .expect("the functionized selector arm owns its bundle");
-            // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2 — THE ONE LEDGER'S
+            // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2, extended by
+            // `RT-CONTINUATION-EDGE-DISPOSITION` `D2` — THE ONE ARTIFACT
             // LIFETIME, opened and closed HERE rather than inside any single
             // definition pass.
+            //
+            // **Two sibling ledgers share it since `D2`**: the claim ledger
+            // opened just below, and the candidate ledger opened beside it.
+            // One lifetime, not one ledger and not one equality.
             //
             // ⛔ It used to open and close inside `define_unit_bodies`, which
             // is the FIRST of the passes that declare, claim and emit causal
@@ -1742,13 +1747,20 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // to be discharged. ⇒ The defect was the *lifetime*, not the
             // equality.
             //
-            // ⭐ The position is the whole deliverable. Both endpoints sit in
+            // The position is the whole deliverable. Both endpoints sit in
             // this one block, around every pass that can own a causal token, so
-            // "one global equality" is visible in a single place instead of
-            // being a property a reader must reconstruct from three files.
-            // There is deliberately no per-pass partial close and no second
-            // mirrored ledger — the passes accumulate into this one and it is
-            // checked once.
+            // the global laws are visible in a single place instead of being a
+            // property a reader must reconstruct from three files. Since `D2`
+            // there are two of them over two populations -- `resolved =
+            // declared = planned` over the full planner set, and `discharged =
+            // claimed = call_obligations` over the derived subset -- preceded
+            // by the candidate ledger's totality check.
+            //
+            // There is deliberately no per-pass partial close and no MIRRORED
+            // ledger. The candidate ledger is not a mirror: it holds a
+            // different population, settled by different seats, and it exists
+            // so a candidate can authorize a binding without asserting a call.
+            // The passes accumulate into these two and they are checked once.
             super::units::open_continuation_claim_ledger(&mut compiler, unit_bundle)?;
             let root_result = super::units::define_unit_bodies(
                 &mut module,
