@@ -43,8 +43,17 @@ data D (Δ_p) : (Δ_i) → Type ℓ where
 
 The kernel admits the declaration only if it passes (a) ordinary type-checking
 of all constructor signatures in context `Δ_p`, (b) the **strict-positivity**
-check (§2), and (c) universe-level checks. On admission the kernel adds: the
-type former `D`, the constructors `cₖ`, and the **eliminator** `elim_D` (§3).
+check (§2), and (c) universe-level checks. For every carrier parameter position
+thereby recorded as strictly positive, it must also generate and ordinarily
+check the two internal source-indexed families of §3.2 and their constructors
+before the new former may serve as a positive enclosing path.
+
+This is one atomic admission transaction. Success publishes the type former
+`D`, constructors `cₖ`, **eliminator** `elim_D` (§3), and all required internal
+`All^Type` / `All^Omega` declarations and their ordinary eliminators. Failure
+of either the host checks or any generated-family check publishes none of them
+and leaves the global environment `Σ` unchanged. A partially admitted host with
+missing lift families is never observable.
 
 ### Canonical examples (elaborated forms)
 
@@ -339,26 +348,41 @@ only the recursive-shape record checked at admission. In particular, its type
 is available while the kernel constructs a method type, before any method term
 exists.
 
-For every admitted inductive former `F` and every parameter position `q`
+For every admitted inductive former `F` and every carrier parameter `q`
 recorded as strictly positive, admission also generates a kernel-internal
 indexed family `All^S_{F,q}`. The displayed name is metanotation, not a public
 identifier. Here `S` records whether its leaf predicate is type-valued or
-proposition-valued:
+proposition-valued.
+
+The telescope is closed as follows. Suppose the admitted former has bound level
+parameters `ū`, dependency-ordered parameters `ᾱ`, dependency-ordered indices
+`ī`, and q-th carrier parameter `α_q : Type a_q`:
 
 ```
-All^Type_{F,q}  : (P : A → Type l)  → (v : F ... A ... ī) → Type L
-All^Omega_{F,q} : (P : A → Ω_l)     → (v : F ... A ... ī) → Type L
-L = max(l, level F)
+F {ū} : (α₁ : A₁) ... (αₙ : Aₙ) → (ī : I_F ᾱ) → Type h_F(ū)
+
+All^Type_{F,q} {ū,l} :
+  (α₁ : A₁) ... (αₙ : Aₙ) →
+  (P : α_q → Type l) →
+  (ī : I_F ᾱ) → (v : F {ū} ᾱ ī) → Type (max(l, h_F(ū)))
+
+All^Omega_{F,q} {ū,l} :
+  (α₁ : A₁) ... (αₙ : Aₙ) →
+  (P : α_q → Ω_l) →
+  (ī : I_F ᾱ) → (v : F {ū} ᾱ ī) → Type (max(l, h_F(ū)))
 ```
 
 The two families are distinct because the core has no wildcard `Sort`
 abstraction and `Ω` is non-cumulative; generation does not smuggle either one
 in through a metavariable.
 
-The omitted arguments are `F`'s other parameters and indices, in their
-declared order. `level F` is the instantiated family level of the host former;
-by §1 it bounds every constructor field that a generated `All` constructor
-must bind. Along a composed positive path, `L` is the maximum of `l` and every
+Each `A_j` may refer to `α₁ ... α_{j-1}`, and each entry of `I_F ᾱ` may refer
+to the full parameter telescope and earlier indices. Thus `α_q` is bound before
+`P`, and every operand needed to form `F {ū} ᾱ ī` is bound before `v`.
+Subsequent displays abbreviate this fixed prefix and write only
+`All^S_{F,q} P v`. The instantiated host level `h_F(ū)` bounds every
+constructor field that a generated `All` constructor must bind (§1). Along a
+composed positive path, the result level is the maximum of `l` and every
 host-family level on that path. This is the exact predicative level
 calculation, not a level inferred from the recursive leaf alone.
 
@@ -876,21 +900,26 @@ flips to `-`, so `Nat` appears negatively and is caught.
 **Rejected (nested negative in application argument):**
 `data Bad3 = mk : Pair (Bad3 → Empty) Unit → Bad3`. Argument telescope
 `(f : Pair (Bad3 → Empty) Unit)`, argument type `Pair (Bad3 → Empty) Unit`.
-Under `+`:
+Both parameters of the already-admitted `Pair` are recorded strictly positive.
+Under `+`, `check-pos-application` therefore traverses both arguments at the
+same positive polarisation:
 
 ```
 check-pos-arg(Bad3, +, Pair (Bad3 → Empty) Unit)
-  = check-pos-arg(Bad3, +, Pair)      -- recurse into head (X → not occurs → true)
-    and not occurs(Bad3, (Bad3 → Empty, Unit))
-  = true and false                    -- occurs finds Bad3 in arguments
+  = check-pos-arg(Bad3, +, Bad3 → Empty)
+    and check-pos-arg(Bad3, +, Unit)
+  = (check-pos-arg(Bad3, -, Bad3)
+     and check-pos-arg(Bad3, +, Empty))
+    and true
   = false → FAILS
 ```
 
-The application argument `(Bad3 → Empty)` is inspected by `occurs`; `Bad3`
-appears there (and negatively, since it's under a Π whose domain flips
-polarity), so the check correctly rejects. Without the `occurs` guard on
-application arguments, the algorithm would have recursed into the head `Pair`,
-returned `true` for the unknown type, and admitted the paradox.
+The positive `Pair` boundary does not make its entire argument positive. The
+recursive descent opens `(Bad3 → Empty)`, flips polarity for the Π-domain, and
+rejects the direct `Bad3` occurrence at `-`; `Unit` is `D`-free. The residual
+`not occurs` guard of §8.5 clause 6 remains load-bearing for an unknown,
+unclassified, or discarded parameter position, but it does not decide this
+known-positive case.
 
 **Rejected (D in its own indices):**
 `data Vec (A : Type) : Nat → Type where …` is fine (the index `Nat` is not
