@@ -50,7 +50,8 @@ origin: Architect standalone mechanism ruling evt_172ag7hdbttkc (2026-08-09), se
 > *synthetic* venue (held Kernel `dd3cd050` with Runtime `f0217c67` and its
 > projection snapshot), already built and reproducible. That is what separates
 > it from `AC-5`, which needs the real capability on `main` and is correctly
-> deferred to the first post-Kernel closure candidate.
+> deferred to the first candidate to run once nested-inductive admission is on
+> `main`.
 >
 > `crates/.../static_transition.rs:16928` warns in its own voice that a
 > neighbouring test is **not** this `AC-2`; an earlier revision mislabelled it
@@ -274,7 +275,7 @@ ABI signatures/populations, or closeout equations.
 | `AC-3` | A **body-to-entry collapse mutation** recreates the existing traversal/closeout failure, and **discriminates BOTH classes** — see below |
 | `AC-3b` | The two carried-forward validation mutations red: an **in-range `None`** control node, and a **two-declaration body swap** that preserves the value set |
 | `AC-4` | Root and healthy-sibling topology, function population, join population, ownership, selection, call identity and ABI signature all unchanged |
-| `AC-5` | The synthetic exact-witness control is carried **by this candidate**; the **first post-Kernel closure candidate** owns the committed runnable form once nested-inductive admission is on `main` |
+| `AC-5` | The synthetic exact-witness control is carried **by this candidate**; the **first candidate to run once nested-inductive admission is on `main`** owns the committed runnable form. Keyed on the capability, never on any node's closure — see the `D7` correction below |
 | `AC-6` | Workspace green **in CI** |
 
 > ### `AC-3` — A GLOBAL MUTATION DOES NOT PROVE THE NEW ARM
@@ -427,9 +428,21 @@ pass*; it does not defend against the **release gate itself being wrong**.
 ### `D7` acceptance
 
 - `AC-D7-1` The line labelled **`Release condition:`** states the **capability**,
-  not an event: either "nested-inductive admission is on `main`" or "post-Kernel
-  **closure**". The doc already contains both phrasings in its own words; pick
-  one. **Choosing between them is the owner's call.**
+  not an event: "nested-inductive admission is on `main`".
+
+  > **CORRECTED 2026-08-09, after the node closed. This clause used to offer
+  > "post-Kernel **closure**" as an equally acceptable second phrasing, owner's
+  > call.** That is the exact phrase the `D7` diagnosis table two sections up
+  > classifies as **FALSE** at `16510`, so the acceptance criterion authorized
+  > the defect it was written to remove. The implementer picked the sound
+  > phrasing; the clause would have permitted the other one.
+  >
+  > **The two are not interchangeable, and closure is the unsound one.** A node
+  > closes when its ACs are discharged, which an **accepted partial** can do
+  > with a half ruled out to a successor — [[KERNEL-NESTED-IND]] has already
+  > shipped one such partial at `afb38934` that did not deliver the admission
+  > path. Closure therefore fires while the capability is still absent.
+  > **Capability is the only sound key.**
 - `AC-D7-2` **All five occurrences agree.** A fix that corrects the labelled line
   and leaves `16537`/`16543` keyed on merged-or-on-main reproduces the defect one
   line down — this is the third instance today of a correction reaching one site
