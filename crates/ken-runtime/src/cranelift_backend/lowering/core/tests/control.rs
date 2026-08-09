@@ -27994,6 +27994,55 @@ fn d3_contspec_arm(
     }
 }
 
+/// **Witness C — the binding-dependent composed witness**, selected for row 1.
+///
+/// `d8f`'s composed program, whose baseline success is not my claim to make:
+/// `d8g_the_composed_selected_argument_reaches_its_target_at_the_shared_emitter`
+/// already asserts `d8f_compile(false)` compiles, and has since before this
+/// node. It projects exactly one candidate, installs a `StaticWorker` at that
+/// identity's authorized position, and settles it `ComposedCall`.
+///
+/// It replaces the executing payload witness for row 1, and the reason is the
+/// Architect's block: under suppression that witness **silently succeeded** —
+/// compiled, ran, returned the same answer, settled `InlineNoCall` and closed.
+/// Observing a silent degradation is not clause 5. This witness's suppression
+/// is REFUSED, by a guard that already exists in production.
+fn d3_binding_dependent_arm(
+    mutation: crate::cranelift_backend::lowering::units::D3Mutation,
+) -> D3Arm {
+    use crate::cranelift_backend::lowering::units::{
+        d1_last_dispositions, d3_plan_candidates, d3_trace, reset_d1_dispositions,
+        reset_d3_plan_candidates, reset_d3_trace,
+    };
+    use crate::cranelift_backend::lowering::{
+        d8d_bindings, d8e_consumptions, reset_d8d_bindings,
+    };
+
+    reset_d3_trace();
+    reset_d3_plan_candidates();
+    reset_d1_dispositions();
+    reset_d8d_bindings();
+    let outcome = with_d3_mutation(mutation, || match d8f_compile(false) {
+        None => "Ok".to_string(),
+        Some(error) => format!("{error:?}"),
+    });
+    D3Arm {
+        outcome,
+        dispositions: d1_last_dispositions(),
+        trace: d3_trace(),
+        plan_candidates: d3_plan_candidates(),
+        bindings: d8d_bindings(),
+        consumptions: d8e_consumptions(),
+    }
+}
+
+/// The exact fail-closed refusal a suppressed binding reaches, and it names
+/// the substitution itself rather than a downstream consequence of it.
+///
+/// This is an EXISTING production guard. Nothing was added or reworded to
+/// obtain a discriminator.
+const D3_IH_MARKER_ON_VALUE: &str = "computational IH marker was applied to an ordinary value";
+
 /// The terminal refusal rows 2 and 3 SHARE. Named once, so the fact that it is
 /// shared is visible in the source rather than being something a reader has to
 /// notice by comparing two string literals.
@@ -28001,73 +28050,76 @@ const D3_DOUBLE_SETTLEMENT: &str = "one binding candidate was settled twice";
 
 /// **`D3` `AC-6` row 1 — suppressing the binding installation.**
 ///
-/// **This row is the reason the ruling forbade a count.** The mutation
-/// withholds the `StaticWorker` binding the candidate authorizes, substituting
-/// a plain value binding. **`d8d_bindings` does not move** — it is 1 in both
-/// arms, because a binding IS still installed at that site; only its KIND
-/// changed. A row keyed on the binding count would have been green under this
-/// mutation, asserting nothing.
+/// The mutation withholds the `StaticWorker` capsule a composed candidate
+/// authorizes and substitutes a plain specialized value at the same position.
+/// The candidate itself is untouched, so nothing about the candidate ledger
+/// changes; what changes is what its authorized position can be CALLED as.
 ///
-/// **Nor does the RESULT move**: the program still compiles, still runs, and
-/// still returns `Int(41)`. So this is precisely the "otherwise behaviorally
-/// inert program" the ruling warned about, and it is stated here rather than
-/// hidden, because it is what makes the structural oracle load-bearing instead
-/// of decorative.
+/// **The armed run is REFUSED, by a guard that already exists in production
+/// and whose message names the substitution itself:** a computational
+/// induction-hypothesis marker applied to an ordinary value. Nothing was added
+/// or reworded to obtain that discriminator.
 ///
-/// **What DOES move is structural and downstream**: with no static worker to
-/// call, the composed call is never emitted, so no composed claim is ever
-/// RECORDED, and the candidate that settled `ComposedCall` in the baseline
-/// silently degrades to `InlineNoCall`. A causal edge that was answered by a
-/// call is now answered by nothing, and the artifact still closes — which is
-/// exactly the class of silent degradation this node exists to make
-/// impossible to reach unobserved.
+/// **This row was rebuilt after an Architect block, and the reason is worth
+/// keeping.** It first ran on the executing payload witness, where suppression
+/// **silently succeeded** — the program compiled, ran, returned the identical
+/// answer, settled `InlineNoCall` instead of `ComposedCall`, and closed. The
+/// row asserted that structural difference and called it proof. It is not:
+/// `AC-6` requires the armed run to reach a refusal or a closeout failure, and
+/// *observing* a silent degradation is exactly the bad state mutation 1 exists
+/// to make red rather than an acceptable terminal outcome. The witness moved;
+/// the assertions were not inverted.
 ///
-/// **Promise class: durable invariant.** It asserts a relation between the
-/// binding kind and the disposition its candidate reaches, not a literal.
+/// **The baseline's success is not my claim.**
+/// `d8g_the_composed_selected_argument_reaches_its_target_at_the_shared_emitter`
+/// has asserted `d8f_compile(false)` compiles since before this node.
+///
+/// **Promise class: durable invariant.** It asserts that a candidate's
+/// authorized position cannot lose its capsule and still reach a successful
+/// artifact — a relation between the binding kind at one identity and that
+/// same identity's fate, not a literal.
 #[test]
-fn ced_d3_m1_suppressing_the_binding_installation_degrades_composed_to_inline_silently() {
+fn ced_d3_m1_suppressing_the_binding_installation_is_refused_at_the_ih_marker_guard() {
     use crate::cranelift_backend::lowering::units::{
-        CandidateDisposition, D3BindingKind, D3Mutation,
+        CandidateDisposition, D3BindingKind, D3Mutation, D3Seat,
     };
 
-    let (baseline, baseline_answer) = d3_payload_arm(D3Mutation::None);
-    let (armed, armed_answer) = d3_payload_arm(D3Mutation::SuppressBindingInstallation);
+    let baseline = d3_binding_dependent_arm(D3Mutation::None);
+    let armed = d3_binding_dependent_arm(D3Mutation::SuppressBindingInstallation);
 
-    // Clause 1 — the unmutated witness SUCCEEDS. Without this the row is about
-    // a program that was already refusing, which is the boundary `D3` inherits
-    // from `D2` and the reason `d8j` is not used here.
+    // Clause 1 — the unmutated witness SUCCEEDS, and settles its one candidate
+    // at the downstream boundary. Without both halves the row is about a
+    // program that was already failing, or about one whose candidate never
+    // reached a disposition at all.
     assert_eq!(
         baseline.outcome, "Ok",
         "the unmutated witness must compile: {}",
         baseline.outcome
     );
-    assert_eq!(
-        baseline_answer, "Returned(Int(Small(41)))",
-        "and it must RUN, returning the payload it consumed through the composed call. A witness \
-         that compiles but does not execute cannot show that the suppressed binding was live: \
-         {baseline_answer}"
-    );
-
-    // Clause 1b — the baseline installs AND consumes its static worker. This is
-    // what makes the mutation a suppression of something real.
-    assert!(
-        baseline.bindings > 0 && baseline.consumptions > 0,
-        "the baseline must install and consume a static-worker binding, or there is nothing for \
-         this mutation to withhold: bindings={} consumptions={}",
-        baseline.bindings,
-        baseline.consumptions
+    let identity = baseline.the_candidate();
+    baseline.settlement_of(
+        &identity,
+        CandidateDisposition::ComposedCall,
+        D3Seat::ComposedPromotion,
+        "the baseline must settle THIS identity as ComposedCall at the promotion seat, which is \
+         the downstream boundary the suppression will stop it from reaching",
     );
     assert_eq!(
         baseline.dispositions.get(&CandidateDisposition::ComposedCall).copied(),
         Some(1),
-        "and exactly one candidate must settle ComposedCall, which is the disposition the \
-         suppression is about to move: {:?}",
+        "and the artifact must CLOSE with that disposition recorded: {:?}",
         baseline.dispositions
     );
+    assert!(
+        baseline.bindings > 0 && baseline.consumptions > 0,
+        "and it must install and consume a static-worker binding, or there is nothing for this \
+         mutation to withhold: bindings={} consumptions={}",
+        baseline.bindings,
+        baseline.consumptions
+    );
 
-    // Clause 2 — the SAME derived identity in both arms, selected from the
-    // live plan by type rather than compared as a rendering.
-    let identity = baseline.the_candidate();
+    // Clause 2 — the SAME identity in both arms, selected from the live plan
+    // by type rather than compared as a rendering.
     assert_eq!(
         armed.the_candidate(),
         identity,
@@ -28075,9 +28127,8 @@ fn ced_d3_m1_suppressing_the_binding_installation_degrades_composed_to_inline_si
          different edges and every comparison below means nothing"
     );
 
-    // Clause 2b — THE BINDING SEAT, keyed by that identity. This is what makes
-    // the row a statement about the suppressed edge rather than about the
-    // program's binding population.
+    // Clause 4 — THE BINDING SEAT, keyed by that identity. The mutation is
+    // observed where the choice is made, not inferred from its consequences.
     assert_eq!(
         baseline.binding_kind(&identity),
         Some(D3BindingKind::StaticWorker),
@@ -28087,49 +28138,42 @@ fn ced_d3_m1_suppressing_the_binding_installation_degrades_composed_to_inline_si
     assert_eq!(
         armed.binding_kind(&identity),
         Some(D3BindingKind::Value),
-        "and the armed run must substitute a plain Value at the SAME identity's position. \
-         Recorded at the seat that makes the choice, so the substitution is observed rather than \
-         inferred from its consequences: {:?}",
+        "and the armed run must substitute a plain Value at the SAME identity's position. This \
+         is the one thing that moved: {:?}",
         armed.trace
     );
 
-    // Clause 4 — the mutation-specific causal observation, and it is the whole
-    // row. THE COUNT IS UNCHANGED and the RESULT IS UNCHANGED; only the
-    // structure moves.
-    assert_eq!(
-        armed.bindings, baseline.bindings,
-        "the binding COUNT must not move -- a binding is still installed, only its kind \
-         changed. If this ever differs, a count-keyed oracle would suffice and this row's whole \
-         design premise has changed: baseline={} armed={}",
-        baseline.bindings, armed.bindings
+    // Clause 5 — THE ARMED RUN IS REFUSED, at the guard that names the
+    // substitution. This is the clause the previous witness could not
+    // discharge, and it is why the witness was replaced rather than the
+    // assertions reworded.
+    assert!(
+        armed.outcome.contains(D3_IH_MARKER_ON_VALUE),
+        "the armed run must reach the fail-closed IH-marker guard. A different refusal would mean \
+         the suppression is being caught somewhere else and this row is not attributing it: {}",
+        armed.outcome
     );
-    assert_eq!(
-        armed_answer, baseline_answer,
-        "and the RESULT must not move either. This row is stated on a program the mutation \
-         leaves behaviorally inert, which is why its oracle has to be structural: \
-         baseline={baseline_answer} armed={armed_answer}"
+
+    // Clause 5b — and it must never reach the downstream boundary the baseline
+    // did. Without this the refusal above is consistent with a compile that
+    // failed for an unrelated reason after settling normally.
+    assert!(
+        armed
+            .settlements_of(
+                &identity,
+                CandidateDisposition::ComposedCall,
+                D3Seat::ComposedPromotion
+            )
+            .is_empty(),
+        "the armed run must NOT settle this identity at the promotion seat: {:?}",
+        armed.trace
     );
     assert!(
-        baseline.recorded_composed(&identity),
-        "the baseline must RECORD a composed claim for THIS identity during lowering"
-    );
-    assert!(
-        !armed.recorded_composed(&identity),
-        "and the armed run must record none for it -- with no static worker to call, the composed \
-         call is never emitted. This is the structural observation the count and the result both \
-         miss, and it is bound to the same edge whose binding was substituted above"
-    );
-    assert_eq!(
-        armed.dispositions.get(&CandidateDisposition::InlineNoCall).copied(),
-        Some(1),
-        "⇒ so the candidate degrades to InlineNoCall: a causal edge that was answered by a call \
-         is now answered by nothing, and the artifact still closes: {:?}",
-        armed.dispositions
-    );
-    assert_eq!(
-        armed.dispositions.get(&CandidateDisposition::ComposedCall).copied(),
-        None,
-        "and nothing settles ComposedCall any more: {:?}",
+        armed.dispositions.is_empty(),
+        "and no artifact may close at all, so the candidate reaches no disposition rather than \
+         reaching a different one. A non-empty tally here would mean the suppression was absorbed \
+         into a successful close, which is precisely the silent degradation this row was rebuilt \
+         to reject: {:?}",
         armed.dispositions
     );
 }
