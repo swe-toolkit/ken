@@ -107,35 +107,54 @@
 
 Neither node is closed, so no slot has freed.
 
-> ### WHY RUNTIME IS HELD, AND WHY I DID NOT RE-KICK VERIFY INTO THE GAP
+> ### RUNTIME: `D1b-id` RECUT AS `D1b-role`. I WITHDREW TWO CONTROLS ON A FALSE READING; THEY ARE BACK.
 >
-> **`D1b-id`'s producer premise was false and the recut is mine.** I cut it
-> against the process-starter path: `compiler_driver.rs:3336-3337` resolves the
-> Nat pair, but the implementer instrumented it and measured **0** lines on the
-> `D5` value path with the instrument confirmed present and the refusal
-> confirmed firing. A second measurement at `erase_checked_core_package_for_target`
-> (`erasure.rs:77`) shows the erased program carries **two function declarations
-> and zero `Data` declarations** — the package's `Nat` is not in it at all.
+> **The frame defect was real and mine.** `D1b-id`'s producer,
+> `compiler_driver.rs:3336-3337`, runs only in the process-starter transaction.
+> Runtime instrumented it: **0** producer lines on the `D5` value path, with the
+> instrument confirmed present and the refusal confirmed firing. Stopping there
+> instead of building an inert transport was the right call.
 >
-> ⇒ **Controls #1 and #3 of `D1b-id` are WITHDRAWN as unsatisfiable.** #1 wants a
-> pair equal to the package `Nat` and different from `legacy_prelude()`; no such
-> pair exists on this path from either source, and the prelude ids resolve
-> byte-equal to legacy. #3's swap cannot discriminate. **Had the implementer
-> built what I framed, it would have compiled, transported a value identical to
-> the existing fallback, changed nothing, and greened its own controls
-> vacuously.** Two measurements are what stopped that.
+> ⇒ **But I then withdrew controls #1 and #3 as "unsatisfiable", and that was
+> wrong.** Architect ruling `evt_23eb7gp8sz4an` corrects two conclusions:
 >
-> **The open question is above every build seat:** may erasure carry
-> checked-package type and constructor identity into `RuntimeProgram`? That
-> changes what an erased artifact *is*. Architect picked the fork up 22:48:53.
-> The answer also decides whether `AC-K12` is reachable on this architecture.
+> - *"zero `Data` rows ⇒ the `Nat` identity is absent"* — **false.** Erasure keeps
+>   `declarations` minimal but copies `semantic.symbol`s into
+>   `erased_core.symbols` (`erasure.rs:195-205`) and `data_metadata` into
+>   `erased_core.metadata.checked_core` (`:5918-5952`), which `ir.rs:43-50` calls
+>   authoritative. The probe counted **executable declarations only**. Correct
+>   statement: *"`Nat` is not an executable target declaration."*
+> - *"the prelude ids resolve byte-equal to legacy"* — **false.**
+>   `emit_package_from_env` calls `stable_symbols_for_env` at
+>   `compiler_driver.rs:2960`, which maps constructors under the
+>   package-qualified parent. Through **that** table the ids yield
+>   `ctor:nested_inductive_pkg::Nat::{Zero,Suc}`. Prelude **origin** and current
+>   artifact **spelling** are different axes.
 >
-> **Verify stays held.** Runtime's lane is blocked but not released — the
-> Architect is actively on it and Runtime resumes the moment it rules. Three
-> turning lanes within the hour would breach the operator's cap for a gap
-> measured in minutes. **If the ruling has not landed by the next pass, the
-> fallback is `D9`+`D10` of [[RT-MATCH-RECURSOR-CONSUMERS]]** — both small,
-> both in Runtime's own files, neither dependent on the ruling.
+> **Both controls are restored** and become satisfiable once the producer sits on
+> the generic package-emission path.
+>
+> **What changed in scope:** the repair is no longer a transport. It is *produce*
+> a complete, versioned, hash-covered `CheckedRuntimeSymbolsV1` role record —
+> **the whole `NativeProcessSymbols` population, not a Nat-only pair** — carry it
+> through erasure metadata, and **require** it at package-backed native
+> compilation, with `core.rs:1781-1783`'s implicit `legacy_prelude()` fallback
+> made structurally unreachable. Executable closure stays as-is; no `Data`
+> declarations added. Cut into three accepted partials (a/b/c) in the node.
+>
+> **`AC-K12` IS reachable on the current architecture** — the Architect says so
+> explicitly. This deliverable discharges only the first native refusal;
+> verifier passage and interp/native agreement stay separate gates.
+>
+> **Verify stays held.** Kernel picked up `D6` at 22:52 and Runtime resumes on
+> `D1b-role`, so both lanes are turning and no slot freed. **If Runtime blocks
+> again, the fallback is `D9`+`D10` of [[RT-MATCH-RECURSOR-CONSUMERS]]** — both
+> small, both in Runtime's own files, neither dependent on any ruling.
+>
+> **The method note that generalizes: make probes unconditional.** A `Data`-only
+> probe cannot separate *"no `Data` declarations"* from *"not on this path"* —
+> the same conditional-probe shape that made the first `D1a` walker report the
+> outermost link.
 
 > ### THE SWEEP THAT PAID: FOUR STALE "BLOCKED ON X" CLAIMS, ONE ROOT CAUSE.
 >
