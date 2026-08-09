@@ -48,6 +48,21 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > 3-Decl / 6-ID / 2-edge carrier**; **zero `trusted_base()` delta** with audited
 > generator/transaction/iota TCB; surface lockstep.
 >
+> ### ONE CARRY FROM THE SPEC RETROS — it bears on the frozen-carrier constraint
+>
+> **Generated kernel support needs TWO separately grounded closures before an
+> exact oracle is frozen**, and conflating them is how a carrier oracle gets
+> frozen against the wrong set:
+>
+> 1. **finite provenance / generation** — host versus terminal support, and
+>    private edges;
+> 2. **the actual published carrier** — declarations, embedded constructor
+>    records, IDs, graph edges, derived term forms.
+>
+> ⇒ This is the practical shape of the **frozen 3-Decl / 6-ID / 2-edge carrier**
+> constraint below. **Ground both closures separately**; a single closure that
+> looks like it covers the carrier is the failure mode.
+>
 > ### Forbidden, all six
 >
 > Restoring method-dependent binders; adding equality/transport or a conversion
