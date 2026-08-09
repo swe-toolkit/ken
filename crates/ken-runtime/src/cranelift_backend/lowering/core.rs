@@ -547,6 +547,131 @@ fn mrc_census_selector(index: Option<usize>, authority: BodyEmissionAuthority) {
     });
 }
 
+/// The child-process transport for the census above (frame section 4a.1).
+///
+/// This wraps the child's native-build compilation attempt and, when the parent
+/// has opened a session, writes exactly one envelope after the attempt and
+/// before the CLI converts its result to an exit. It installs the SAME scope and
+/// the same rows as the in-process path; there is no second enumerator, schema,
+/// or sampling rule here.
+///
+/// # Why this item is not feature-gated
+///
+/// The gate is on this crate's feature, and the call site is in `ken-cli`'s
+/// binary. `ken-cli` declares no feature of its own: it receives
+/// `px8-ds-test-support` only through its `[dev-dependencies]` edge onto this
+/// crate, which enables the feature on *this* crate's unit without ever defining
+/// a `cfg` that `ken-cli`'s own sources could test. A gated item would therefore
+/// not exist for the binary in the default build, and the call could not be
+/// written at all.
+///
+/// So the item is always present and the entire behaviour is gated. With the
+/// feature off this is a direct call to `body` and nothing below is compiled in.
+#[doc(hidden)]
+pub fn with_child_match_recursor_census<R>(body: impl FnOnce() -> R) -> R {
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    return body();
+
+    #[cfg(feature = "px8-ds-test-support")]
+    {
+        let Some(session) = ChildCensusSession::from_environment() else {
+            // Feature on, no session: inert. No scope is installed and no
+            // artifact is created, so this child is indistinguishable from one
+            // that was never observed.
+            return body();
+        };
+        let (value, rows) = with_match_recursor_census(body);
+        session.write_envelope(&rows);
+        value
+    }
+}
+
+/// The observation session a parent test opened for one child.
+///
+/// These three values select only *which* observation session is recorded and
+/// *where* its envelope is written. Nothing reachable from here can choose a
+/// residual, an exclusion, an authority, a lane, a source, or any planner/ABI
+/// value -- the rows come from the same production walk as the in-process path.
+#[cfg(feature = "px8-ds-test-support")]
+struct ChildCensusSession {
+    session: String,
+    parent: String,
+    sink: std::path::PathBuf,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+impl ChildCensusSession {
+    const SESSION_VAR: &'static str = "KEN_MRC_CENSUS_SESSION";
+    const PARENT_VAR: &'static str = "KEN_MRC_CENSUS_PARENT";
+    const SINK_VAR: &'static str = "KEN_MRC_CENSUS_SINK";
+
+    /// All three must be present and non-empty. A partial environment is
+    /// treated as no session at all rather than as a half-open one, so the
+    /// inert case has a single definition.
+    fn from_environment() -> Option<Self> {
+        let session = std::env::var(Self::SESSION_VAR).ok()?;
+        let parent = std::env::var(Self::PARENT_VAR).ok()?;
+        let sink = std::env::var(Self::SINK_VAR).ok()?;
+        if session.is_empty() || parent.is_empty() || sink.is_empty() {
+            return None;
+        }
+        Some(Self {
+            session,
+            parent,
+            sink: std::path::PathBuf::from(sink),
+        })
+    }
+
+    /// Write one versioned envelope with no-overwrite semantics.
+    ///
+    /// Every failure here is silent on purpose. Frame 4a.1 puts observation
+    /// failure in the *parent* test: a missing, short, or wrong-session envelope
+    /// must red the parent's control, and must not change this child's exit
+    /// status, stdout, stderr, artifact, or diagnostic. So there is nothing to
+    /// report here and nowhere to report it that would not violate that.
+    ///
+    /// `pid` is written as supplementary evidence only. The merged identity is
+    /// `(session, parent, ordinal)`: PIDs are reused, and the child thread is
+    /// commonly just `main`, so neither can carry an identity axis.
+    ///
+    /// The trailing `end` line is what makes a truncated write detectable as
+    /// *incomplete* rather than as a legitimately smaller census.
+    fn write_envelope(&self, rows: &[MatchRecursorCensusRow]) {
+        use std::fmt::Write as _;
+        use std::io::Write as _;
+
+        let mut text = String::new();
+        let _ = writeln!(text, "mrc-census-envelope\tv1");
+        let _ = writeln!(text, "session\t{}", self.session);
+        let _ = writeln!(text, "parent\t{}", self.parent);
+        let _ = writeln!(text, "pid\t{}", std::process::id());
+        let _ = writeln!(text, "rows\t{}", rows.len());
+        for row in rows {
+            let _ = writeln!(
+                text,
+                "row\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                row.ordinal,
+                row.run,
+                row.thread,
+                row.validator_admitted,
+                row.reached_selector,
+                row.authority.as_deref().unwrap_or("-"),
+                row.residuals.join(","),
+            );
+        }
+        let _ = writeln!(text, "end\t{}", rows.len());
+
+        let Ok(mut file) = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&self.sink)
+        else {
+            return;
+        };
+        let _ = file.write_all(text.as_bytes());
+    }
+}
+
 /// The bounded re-entry depth for continuing a composed suffix behind a carried
 /// ordinary elimination.
 ///
