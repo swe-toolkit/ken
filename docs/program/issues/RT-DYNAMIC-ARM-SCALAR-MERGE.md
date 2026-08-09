@@ -344,6 +344,67 @@ runtime value representation.
    `StructuralNat` remains the native representation of the checked `Nat`
    identified by that authority.
 
+> ### SLICE `a` WIDENED IN PLACE 2026-08-09 — the immutable canonical role roster
+>
+> **Architect ruling `evt_6q4tvtenb1wps`, recorded here by the Steward so the
+> enlarged diff is self-authorizing.** Decision `dec_7v589ezdeq321` rejected
+> `aade3c2f` on one authority defect — **not** on the hash control, which stands.
+>
+> **The defect:** both producers select authority by **mutable source spelling**
+> (`env.globals.get(name)` after package source elaboration). Mapping a
+> name-selected id through `stable_symbols_for_env` does not cure that — the id
+> is already the wrong one. Every Runtime constructor role must originate from an
+> **immutable canonical prelude `GlobalId`** captured at prelude registration,
+> before package source elaboration, and every stored symbol must be
+> `exact_stable_table[canonical_role_global_id]`.
+>
+> ⛔ **Do NOT split this off as a preparatory `a0` WP.** The Architect ruled
+> against it directly: the roster is the **only lawful implementation of item 1**,
+> and `CheckedRuntimeSymbolsV1` embeds `CheckedHostSpineV1`, so produce/store/
+> hash-cover cannot be an independently correct accepted partial while either
+> producer still resolves by name. A split would draw an artificial boundary
+> inside one authority producer and yield no separately usable contract. **One
+> fresh slice-`a` candidate, one fresh QA/Decision lineage.**
+>
+> **Authorized scope widening** (this is what the carve-out above now grants):
+> `prelude.rs`/`PreludeEnv` registration, **both** producer resolvers in
+> `compiler_driver.rs`, the existing slice-`a` record/storage/hash paths, and
+> focused tests. Prefer a **nested immutable roster type** inside `PreludeEnv`
+> over expanding unrelated top-level fields. Use semantic fields or a **closed
+> internal role enum** for collections — ⛔ do not replace the string lookup with
+> a later string-keyed authority map, which reproduces the defect one layer up.
+>
+> **Completeness is every currently name-resolved entry of BOTH producers**, not
+> the six former plan roles: host families, constructors, error/resource/progress
+> roles, Bool/Unit, and the public operation identities. Existing private-operation
+> ids remain valid roster members. Measured starting point, from the implementer's
+> roster survey — this is the part that needed measuring and it is done:
+>
+> | roster state | roles |
+> |---|---|
+> | canonical id **exists** in `PreludeEnv` | `Nil` (`prelude.rs:130`), `Cons` (`:131`), `MkProd` (`:141`); and on the spine side `Some`, `Err`, `Ok`, `MkUnit` |
+> | canonical id **MISSING**, must be captured at registration | `MkProcessInput`, `Success`, `Failure`; and on the spine side `True`/`False` and most resource/progress roles |
+>
+> **The committed discriminator must cover two properties SEPARATELY.**
+> (1) **inventory completeness** — no name-resolved role remains in either
+> producer; (2) **substitution resistance** — package declarations shadow
+> representative constructor, family, and operation spellings while the emitted
+> record still equals the exact canonical-id-to-stable-symbol projection,
+> **including parent identities**. ⛔ **Bare-name containment is not evidence** —
+> that is precisely the blindness that let the rejected candidate pass. If one
+> fixture can lawfully shadow the full public roster, assert all entries;
+> otherwise use a table-driven exact projection plus representative collisions
+> per namespace/path class.
+>
+> **Retained unchanged:** the record-presence/version control and the
+> semantic-hash mutation/removal pair, both already valid. **All partial-`a`
+> negative boundaries still bind** — no decode/consumption, no executable `Data`,
+> no fold/scalar work, no native admission, no `AC-K12` claim.
+>
+> ⚠ **`9d3273a8` is the blocked baseline only** (`aade3c2f` replayed onto
+> `4a903d46`, content identical, object different). **No prior SHA-bound verdict
+> transfers** — not QA's approval, not the Architect's earlier vote.
+
 **Sizing: land this as up to three accepted partials, in this order.** Each is
 independently reviewable and mergeable per the accepted-partial policy, and each
 is roughly a one-hour turn; do not hold the whole chain for one PR.
@@ -427,7 +488,11 @@ surface their own gaps.
   >
   > - `compiler_driver.rs` — `emit_package_from_env`, to build the
   >   `CheckedRuntimeSymbolsV1` record from the exact `stable_symbols_for_env`
-  >   table while the live `ElabEnv` is still in hand;
+  >   table while the live `ElabEnv` is still in hand, **and both producer
+  >   resolvers** (`checked_runtime_symbols_v1` and `checked_host_spine_v1`);
+  > - **`prelude.rs` / `PreludeEnv` registration**, to capture the immutable
+  >   canonical role-`GlobalId` roster — added 2026-08-09 by ruling
+  >   `evt_6q4tvtenb1wps`, see the block below;
   > - the checked package's versioned `semantic.metadata` lane, to carry that
   >   record under `core_semantic_hash`;
   > - `erasure.rs`, to decode and validate it into the typed Runtime field.
