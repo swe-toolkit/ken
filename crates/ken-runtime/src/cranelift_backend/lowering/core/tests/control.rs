@@ -19524,6 +19524,11 @@ fn d8k_the_causal_population_is_a_disjoint_partition_of_direct_and_composed() {
         !identities.is_empty(),
         "the witness must plan at least one causal identity, or every clause here is vacuous"
     );
+    // `D2` — the derived call-obligation subset this control intends. Every
+    // identity here IS an obligation: the clauses below discharge them
+    // directly or compositionally, or deliberately fail to. Built from the
+    // plan's own identities rather than written as a literal.
+    let call_obligations = identities.iter().cloned().collect::<std::collections::BTreeSet<_>>();
     let owner = identities[0].emission_owner();
     let open = || {
         let mut module = new_object_module("d8k-partition").expect("module");
@@ -19540,7 +19545,7 @@ fn d8k_the_causal_population_is_a_disjoint_partition_of_direct_and_composed() {
     ledger
         .record_composed(identities.iter().cloned(), owner)
         .expect("a verified composed discharge claims its own identity");
-    ledger.close().expect(
+    ledger.close(&call_obligations).expect(
         "planned = declared = claimed and planned = direct ⊎ composed with an EMPTY direct half. \
          A refusal here means the partition still requires a direct emission for every planned \
          token, which is exactly the law D8k replaced",
@@ -19580,7 +19585,7 @@ fn d8k_the_causal_population_is_a_disjoint_partition_of_direct_and_composed() {
     let refusal = format!(
         "{:?}",
         ledger
-            .close()
+            .close(&call_obligations)
             .expect_err("an identity in both halves must refuse at the closeout")
     );
     assert!(
@@ -19597,7 +19602,7 @@ fn d8k_the_causal_population_is_a_disjoint_partition_of_direct_and_composed() {
     let refusal = format!(
         "{:?}",
         ledger
-            .close()
+            .close(&call_obligations)
             .expect_err("a planned token in neither half must refuse")
     );
     assert!(
@@ -27416,7 +27421,7 @@ fn sar_d3_the_ordinary_live_cell_is_routed_to_the_resume_and_the_mutation_restor
 /// at which point the assertion inverts deliberately, under review, rather
 /// than drifting.
 #[test]
-fn ced_d1_the_inline_candidate_settles_after_the_bridge_and_the_closeout_still_refuses() {
+fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obligation() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
     use crate::cranelift_backend::lowering::{d8d_bindings, reset_d8d_bindings};
     use crate::cranelift_backend::lowering::units::{
@@ -27485,12 +27490,28 @@ fn ced_d1_the_inline_candidate_settles_after_the_bridge_and_the_closeout_still_r
 
     // Clause 3 -- it reached the existing closeout, and the closeout refused,
     // with the EXACT pre-D2 sentence.
+    // **INVERTED BY `D2`, deliberately and under review.** This assertion read
+    // `outcome.contains(PRE_D2_REFUSAL)` for the whole of `D1`, and the refusal
+    // was the deliverable: the candidate was in the equality by construction
+    // and nothing could take it out. `D2`'s ordered closeout derives the
+    // call-obligation subset from `DirectCall ∪ ComposedCall`, `InlineNoCall`
+    // is not in it, and the same witness now compiles.
+    //
+    // The sentinel is spent. It is kept, inverted, because the pair of
+    // assertions below is what makes the conversion auditable: the refusal
+    // string is still live production text, so asserting its ABSENCE is not
+    // free, and a regression that put the candidate back into the equality
+    // would red here rather than pass quietly.
     assert!(
-        outcome.contains(PRE_D2_REFUSAL),
-        "the witness must reach the existing closeout and be refused by it, verbatim. A green \
-         result here is a D1 DEFECT: it means D2's subset derivation was done early, the exact \
-         equality was weakened, or planner-side edge exclusion returned -- and a check keyed on \
-         'it failed' rather than on this sentence would pass under all three: {outcome}"
+        !outcome.contains(PRE_D2_REFUSAL),
+        "D2 derives the call-obligation subset, so an InlineNoCall candidate is no longer an \
+         obligation and this witness must no longer be refused for being one: {outcome}"
+    );
+    assert_eq!(
+        outcome, "Ok",
+        "and it must compile, not merely stop failing for this one reason. A different refusal \
+         here would mean the subset derivation moved the failure rather than removing it: \
+         {outcome}"
     );
 }
 

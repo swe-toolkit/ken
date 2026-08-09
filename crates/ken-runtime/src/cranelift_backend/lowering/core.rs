@@ -8581,6 +8581,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         };
         #[cfg(test)]
         d5a_trace(format!("  CLAIM bound identity={identity:?}"));
+        // `D1`/`D2` — settlement is NOT here. It sits inside
+        // `claim_and_call_resolved_continuation`, which both direct consumption
+        // seats funnel through. See the note there.
         let claimed = self.claim_and_call_resolved_continuation(
             builder,
             &identity,
@@ -8588,11 +8591,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             recursive_position,
             producer_env,
         )?;
-        // `RT-CONTINUATION-EDGE-DISPOSITION` `D1` — `DirectCall`, settled only
-        // on a SUCCESSFUL claim/emit. Reaching this seat and failing is a
-        // different outcome and must not read as a direct call: the `?` above
-        // is what makes that structural rather than a convention.
-        self.settle_continuation_candidate(&identity, super::units::CandidateDisposition::DirectCall)?;
         Ok(Some(claimed))
     }
 
@@ -8984,7 +8982,53 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             )),
         }
     }
+    /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`/`D2` — `DirectCall` settles
+    /// HERE, at the funnel, and that placement is a measured correction.**
+    ///
+    /// `D1` settled inside `claim_and_call_continuation`, which is only the
+    /// **retained-frame** seat. This function is shared: the **detached-result**
+    /// seat calls it directly from `eliminate_detached_producer_continuation`.
+    /// So a candidate consumed by a direct call at that second seat was left
+    /// unsettled and carried no pending composed discharge — which meant the
+    /// deferred bridge's two negative conditions both held and it would have
+    /// been settled `InlineNoCall`. **A real direct call would have been
+    /// recorded as an inline non-call.**
+    ///
+    /// `D1` never surfaced it because nothing required the population to be
+    /// total. `D2` is that requirement, which is exactly why the Steward asked
+    /// for this audit at this checkpoint rather than at `D3`.
+    ///
+    /// ⇒ **This is the third time on this campaign that an instrument or a
+    /// settlement placed at one consumer was blind to another.** The rule that
+    /// keeps being relearned: put it at the funnel every caller passes through,
+    /// not at the caller you happened to be reading.
+    ///
+    /// Settling on `Ok` only, and covering every return including the
+    /// mutation-driven early one, is what the wrapper buys over a per-return
+    /// call.
     fn claim_and_call_resolved_continuation(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        identity: &ContinuationCallIdentity,
+        // `D9` — the producer constructor's WHOLE lowered field run and the
+        // ruled recursive position, not a pre-assembled ordinary run. ⛔ The
+        // assembly moved here because `unit` is resolved here: both callers
+        // previously built their own run from the nonrecursive fields alone,
+        // and each carried a comment claiming the captures were appended by the
+        // other side. One authority, one assembly, both callers.
+        fields: &[LoweringOperand],
+        recursive_position: usize,
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<RoutedAnswer, CraneliftBackendError> {
+        let answer = self.claim_and_call_resolved_continuation_inner(builder, identity, fields, recursive_position, producer_env)?;
+        self.settle_continuation_candidate(
+            identity,
+            super::units::CandidateDisposition::DirectCall,
+        )?;
+        Ok(answer)
+    }
+
+    fn claim_and_call_resolved_continuation_inner(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         identity: &ContinuationCallIdentity,
