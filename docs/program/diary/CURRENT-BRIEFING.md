@@ -42,7 +42,48 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `b92b3f3f`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `bdccd97a`.** Worktree clean. Nothing of mine is unpublished.
+
+> ### SINCE THE TABLE BELOW WAS WRITTEN — read these four first
+>
+> 1. **`D5`'s accepted partial MERGED** — PR #1743, exact `5903b664`,
+>    `main` `82918b6a`. Six paths, blob-verified. `AC-K12` **not** discharged;
+>    `KERNEL-NESTED-IND` stays `active`. **Kernel's next slice is `D6`.**
+> 2. **`D8` MERGED** — PR #1741, `26f1bc50`.
+> 3. **`DS-9` is now `ready`** (PR #1745). `D5` was the event it waited on, and
+>    `AC-K12` independence is confirmed against `D6`'s own text. ⛔ `ready` is
+>    not released; Foundation stays stood down.
+> 4. **`D1b-cov`/`D1b-rep` WITHDRAWN, recut as `D1b-id`** (PR #1744). See the
+>    `RT-DYNAMIC-ARM-SCALAR-MERGE` section below — my two-branch taxonomy was
+>    not exhaustive and my own Forbidden bullet had banned the repair.
+>
+> ### OPEN AND UNTRIAGED — the first thing to pick up on resume
+>
+> **Adversary finding `evt_37y39vcj7y695` on `82918b6a`**, arrived while I was
+> compacting and **I have not read it in full or dispositioned it.** Reported
+> substance: the carried `AC-5` control's release gate at
+> `static_transition.rs:16514` has **flipped to GO**, and `D5`'s accepted
+> partial is what flipped it. ⚠ **This is the THIRD correction that one gate has
+> needed**, and the Adversary says explicitly that its recommendation is *not* a
+> fourth wording. ⇒ Treat a fourth re-wording as the wrong answer by default;
+> the repeated-defeat pattern says the gate's default branch is wrong.
+>
+> ### TRAP I HIT TWICE THIS SESSION — `cd /workspaces/ken` in a git command
+>
+> `/workspaces/ken` is the **main worktree**, not the Steward's. A command
+> prefixed `cd /workspaces/ken &&` runs git **there**:
+>
+> - twice it staged/edited against the wrong tree (one commit silently did
+>   nothing; one file edit landed on a **stale base** and had to be discarded
+>   and redone, not copied over);
+> - once a `git switch steward/work` **moved the main worktree onto
+>   `steward/work`**, which then blocked the Steward worktree from switching
+>   back with *"already used by worktree at /workspaces/ken"*.
+>
+> ⇒ **Run git from the Steward worktree with no `cd`.** Use `cd /workspaces/ken`
+> only for `scripts/*` and `moot exec`, and never in the same command as a git
+> write. Nothing was lost either time, but only because the edits were checked
+> before being trusted.
 
 ### The two lanes — this is the operator's cap of two
 
