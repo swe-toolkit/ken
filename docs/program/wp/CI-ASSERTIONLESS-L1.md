@@ -32,8 +32,27 @@ Exactly **4** contain no `assert*`, no `panic!`, and no `expect(`:
 |---|---|---|---|
 | `ac2_expected_type_overrides_default` | `surface/numbers/expected-type-overrides-default` | **no** | 3 statements, no assertion |
 | `ac5_explicit_conversion_is_partial_option` | `surface/numbers/explicit-conversion-is-partial-option` | yes | one `unwrap()` |
-| `sec31_int_div_zero_emits_obligation` | `surface/numbers/int-div-by-zero-emits-obligation` | yes | one `unwrap()` |
-| `sec24_char_excludes_surrogates` | `surface/numbers/char-excludes-surrogates` | yes | comment only, zero statements |
+| `sec31_int_div_zero_emits_obligation` | **NONE — no doc comment at all** | yes | one `unwrap()` |
+| `sec24_char_excludes_surrogates` | **NONE — no doc comment at all** | yes | comment only, zero statements |
+
+> ### CORRECTED 2026-08-09 — this column was WRONG for the bottom two rows
+>
+> **Steward ruling `evt_7pc7a3she9sgj`, on Verify's measurement.** Re-measured
+> at both `a22f1a87` and `4f88d383`: **only `ac2` and `ac5` carry a literal
+> claim-id doc comment.** `sec31` and `sec24` carry **no doc comment at all** —
+> they reach their claim through section labels, claim-shaped names, and the
+> coverage map.
+>
+> **All four claims ARE registered** — every id resolves in `conformance/`, with
+> `char-excludes-surrogates` in two files. So the **population is right and the
+> stated linkage was wrong**, which is the worse of the two: a test can be
+> counted as cover *without naming what it covers*, and severing a doc comment
+> that does not exist discharges nothing.
+>
+> ⇒ **§1c and the "sever the claim-id doc comment" reasoning below apply to
+> `ac2` and `ac5` only.** For `sec31` and `sec24` the marking must be positive —
+> an explicit `Not conformance cover; waits on <capability>` — because there is
+> no link to sever.
 
 Re-derive the population by walking Rust items, not by regex — see §5.
 
@@ -111,6 +130,10 @@ deliverable.
 ⇒ **What makes the false cover false is the claim-id doc comment, not the
 missing assertion.** Sever that link and the row stops asserting cover it does
 not have, immediately, with no dependency on unbuilt capability.
+
+> **Holds for `ac2` and `ac5` only** — see the correction above. `sec31` and
+> `sec24` have no doc-comment link to sever, so for them "sever" is a no-op and
+> only the positive marker discharges anything.
 
 Per row, the honest dispositions are exactly these three. Pick one per row and
 record which and why:
