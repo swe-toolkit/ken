@@ -11,6 +11,51 @@ github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## STILL BLOCKED, BUT NOT FOR THE REASON BELOW — corrected 2026-08-09
+>
+> **Steward verification against the code on `origin/main` `c34317f3`.** The
+> banner under this one says `Json` *"is rejected by the kernel as a nested
+> inductive."* ⛔ **That is FALSE on `main` and has been since `afb38934`.**
+>
+> `crates/ken-kernel/tests/nested_inductives_remaining.rs::declared_positive_paths_admit_list_pair_and_fresh_container_nesting`
+> declares a `json` inductive whose constructors include **`List json`** and
+> **`List (Pair _ json)`** — the exact two shapes this node was blocked on — and
+> admits all five. It is landed and green. `check_pos_arg` now traverses
+> recorded `ParameterPolarity::StrictlyPositive` positions instead of rejecting
+> every non-`D` head.
+>
+> ⇒ **The kernel-expressibility blocker is CLEARED.** `KERNEL-NESTED-IND`'s
+> `D1a`, `D1b`, `D2`, `D3a`, `D3b`, and `D4` are all in.
+>
+> **What actually still blocks DS-9 is `KERNEL-NESTED-IND` `D5` alone** —
+> surface consumability: matching, elaboration, and structural-recursion
+> checking accepting the lifted hypotheses. You cannot write `encode`/`decode`
+> by recursion over `JsonArray (List Json)` until surface matching consumes the
+> lifted IH, and that is `D5`, currently in review as an accepted partial.
+>
+> ⚠ **DS-9 does NOT need `AC-K12`, and this is the part that changes
+> sequencing.** `AC-K12` is native lowering, the Cranelift verifier, and
+> interpreter/native agreement, and it is blocked at
+> [[RT-DYNAMIC-ARM-SCALAR-MERGE]] on Runtime. **This frame requires none of it**
+> — verified by grep: `ds-9-json-codec.md` mentions native execution, Cranelift,
+> and the interpreter **nowhere**. Its deliverables are a value type, a
+> `CursorOps` instance, `encode`/`decode`, the round-trip theorem, fuel
+> sufficiency, an acceptance test, and Findings.
+>
+> ⇒ **DS-9 becomes startable when `D5` MERGES, not when `KERNEL-NESTED-IND`
+> CLOSES.** Reading it as "wait for the whole node" strands this node behind a
+> Runtime dependency it does not have. ⛔ Do not infer the node's blockers from
+> its `depends_on` edge alone — the edge is whole-node, the need is `D5`.
+>
+> **Status stays `draft`** because `D5` has not merged. The flip to `ready` is
+> owed the moment it does, and it is the Steward's.
+>
+> **Foundation remains stood down until then** — the stand-down below is still
+> in force, and every re-encoding it forbids by name is still forbidden. What
+> changed is *when* the stand-down lifts and *what event* lifts it.
+>
+> The original block, now partly superseded, follows.
+>
 > ## ⛔⛔ BLOCKED 2026-07-27 — `Json` IS NOT EXPRESSIBLE IN THE CURRENT KERNEL
 >
 > **Released, started, and blocked at `D1` inside half an hour.** Foundation
