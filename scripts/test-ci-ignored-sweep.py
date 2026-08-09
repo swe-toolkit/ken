@@ -162,12 +162,21 @@ class IgnoredSweepTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(SWEEP.SweepError, "counter 1/46"):
                 SWEEP.report(log, 47, 100)
+            for malformed in ("(x/47) row", "(1/x) row", "(1/47 row"):
+                log.write_text(
+                    f"PASS [ 0.001s] {malformed}\n"
+                    "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(SWEEP.SweepError, "malformed"):
+                    SWEEP.report(log, 47, 100)
 
     def test_cli_exit_contract_distinguishes_all_three_outcomes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             nominal_log = root / "nominal.log"
             finding_log = root / "finding.log"
+            malformed_log = root / "malformed.log"
             all_listing = root / "all.json"
             missing_registry = root / "missing.toml"
             nominal_log.write_text(
@@ -177,6 +186,11 @@ class IgnoredSweepTests(unittest.TestCase):
             finding_log.write_text(
                 "nextest output\n"
                 "PASS [ 0.001s] l1_acceptance repaired_row\n"
+                "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
+                encoding="utf-8",
+            )
+            malformed_log.write_text(
+                "PASS [ 0.001s] (x/47) l1_acceptance repaired_row\n"
                 "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
                 encoding="utf-8",
             )
@@ -209,6 +223,19 @@ class IgnoredSweepTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            malformed = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "report",
+                    str(malformed_log),
+                    "47",
+                    "100",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
             nominal = subprocess.run(
                 [sys.executable, str(SCRIPT), "report", str(nominal_log), "47", "100"],
                 check=False,
@@ -217,10 +244,16 @@ class IgnoredSweepTests(unittest.TestCase):
             )
 
         self.assertEqual(
-            (instrument.returncode, finding.returncode, nominal.returncode),
-            (2, 0, 0),
+            (
+                instrument.returncode,
+                malformed.returncode,
+                finding.returncode,
+                nominal.returncode,
+            ),
+            (2, 2, 0, 0),
         )
         self.assertIn("resolves to 0", instrument.stderr)
+        self.assertIn("malformed nextest progress counter", malformed.stderr)
         self.assertIn("::notice title=Ignored row now passes::", finding.stdout)
         self.assertIn("No ignored row passed", nominal.stdout)
 

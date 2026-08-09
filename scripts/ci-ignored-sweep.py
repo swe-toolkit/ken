@@ -23,9 +23,11 @@ POPULATION_PATHS = (
 ALLOWED_CLASSES = {"policy-cost", "placeholder-no-assertions"}
 SUMMARY_RE = re.compile(r"\b(\d+) tests? run:")
 PASS_RE = re.compile(
-    r"^\s*PASS\s+\[[^]]+\]\s+"
-    r"(?:\((?P<index>\d+)/(?P<total>\d+)\)\s+)?(?P<identity>.+?)\s*$",
+    r"^\s*PASS\s+\[[^]]+\]\s+(?P<payload>.+?)\s*$",
     re.MULTILINE,
+)
+COUNTER_RE = re.compile(
+    r"^\((?P<index>\d+)/(?P<total>\d+)\)\s+(?P<identity>.+)$"
 )
 
 
@@ -211,15 +213,21 @@ def report(path: Path, expected: int, exit_status: int) -> None:
 
     passing: list[str] = []
     for match in PASS_RE.finditer(text):
-        if match.group("index") is not None:
-            index = int(match.group("index"))
-            total = int(match.group("total"))
+        payload = match.group("payload")
+        if payload.startswith("("):
+            counter = COUNTER_RE.fullmatch(payload)
+            if counter is None:
+                raise SweepError(f"malformed nextest progress counter: {payload}")
+            index = int(counter.group("index"))
+            total = int(counter.group("total"))
             if total != expected or not 1 <= index <= total:
                 raise SweepError(
                     f"nextest progress counter {index}/{total} is inconsistent "
                     f"with expected population {expected}"
                 )
-        identity = match.group("identity")
+            identity = counter.group("identity")
+        else:
+            identity = payload
         if identity not in passing:
             passing.append(identity)
     print(f"Ignored-row sweep completed: {observed} selected; {len(passing)} passed.")
