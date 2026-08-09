@@ -33,7 +33,7 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-09 ~22:2xZ · BOTH LANES TURNING; FOUR STALE BLOCKERS CLEARED
+## LIVE — 2026-08-09 ~22:5xZ · KERNEL ON D6; RUNTIME HELD ON AN ARCHITECT RULING
 
 > ### POWER LOSS ~20:0xZ WAS RECOVERED WITH NOTHING LOST.
 >
@@ -42,7 +42,7 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `bdccd97a`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `de338ab4`.** Worktree clean. Nothing of mine is unpublished.
 
 > ### SINCE THE TABLE BELOW WAS WRITTEN — read these four first
 >
@@ -57,16 +57,28 @@
 >    `RT-DYNAMIC-ARM-SCALAR-MERGE` section below — my two-branch taxonomy was
 >    not exhaustive and my own Forbidden bullet had banned the repair.
 >
-> ### OPEN AND UNTRIAGED — the first thing to pick up on resume
+> ### DISPOSITIONED — Adversary `evt_37y39vcj7y695`, closed as CONFIRMED
 >
-> **Adversary finding `evt_37y39vcj7y695` on `82918b6a`**, arrived while I was
-> compacting and **I have not read it in full or dispositioned it.** Reported
-> substance: the carried `AC-5` control's release gate at
-> `static_transition.rs:16514` has **flipped to GO**, and `D5`'s accepted
-> partial is what flipped it. ⚠ **This is the THIRD correction that one gate has
-> needed**, and the Adversary says explicitly that its recommendation is *not* a
-> fourth wording. ⇒ Treat a fourth re-wording as the wrong answer by default;
-> the repeated-defeat pattern says the gate's default branch is wrong.
+> Read in full and triaged. **Confirmed at the source**: the release condition
+> in `planning/static_transition.rs:16513-16523` gives the reader one concrete
+> test — four elaborator/interp paths *"each remain at their pre-change
+> state"* — and all four moved in `82918b6a`. The `#[ignore]` string and the
+> `panic!` body are clean; the snapshot lives **only** in the doc comment.
+>
+> **Split across two nodes, no new node created** (`steward.md §4c`):
+>
+> - the **condition** now has a tracked owner — `KERNEL-NESTED-IND` `AC-K12`,
+>   which *is* that capability. Discharging `AC-K12` also obliges running the
+>   carried control; it may not be reported green while still `#[ignore]`d.
+> - the **code edit** is [[RT-MATCH-RECURSOR-CONSUMERS]] `D10`: delete the
+>   snapshot, point at `AC-K12`, keep the control carried and fail-closed.
+>   Prose-only. Sequenced alongside `D9`.
+>
+> **The repair is a deletion, not a fourth wording — that was the whole point
+> of the finding.** A gate re-keyed from a merge event to a capability but
+> operationalized by a path-state snapshot is still event-keyed; `D7` moved the
+> problem one level down instead of removing it. Not soundness: the body
+> panics, so un-ignoring reds rather than passing vacuously.
 >
 > ### TRAP I HIT TWICE THIS SESSION — `cd /workspaces/ken` in a git command
 >
@@ -89,11 +101,60 @@
 
 | team | node | state |
 |---|---|---|
-| **Kernel** | `KERNEL-NESTED-IND` | `D5` accepted partial. Architect **rejected** `ec577ec0` for a real reachability regression; repair landed as candidate `5903b664`, awaiting fresh QA |
-| **Runtime** | `RT-DYNAMIC-ARM-SCALAR-MERGE` | `D8` of `RT-MATCH-RECURSOR-CONSUMERS` **merged** (`26f1bc50`, PR #1741). `D0` closed; **`D1` framed at `b92b3f3f`**; `D1a` is next |
+| **Kernel** | `KERNEL-NESTED-IND` | `D5` accepted partial **merged** (`5903b664`, PR #1743). Both retros in. **`D6` kicked 2026-08-09 ~22:5xZ** — a *binding* task, contract-point-4 subset only. `D7` after it |
+| **Runtime** | `RT-DYNAMIC-ARM-SCALAR-MERGE` | **HELD pending an Architect design ruling** (`evt_7ek8j2wzzc3e6`). Branch FREE, tree byte-identical to `44c0ceab`, no production edit |
 | **Verify** | `CI-ASSERTIONLESS-L1` | **HELD on the lane cap**, WIP preserved, `AC-2` ruling durable. **First node back in when a slot frees.** |
 
 Neither node is closed, so no slot has freed.
+
+> ### RUNTIME: `D1b-id` RECUT AS `D1b-role`. I WITHDREW TWO CONTROLS ON A FALSE READING; THEY ARE BACK.
+>
+> **The frame defect was real and mine.** `D1b-id`'s producer,
+> `compiler_driver.rs:3336-3337`, runs only in the process-starter transaction.
+> Runtime instrumented it: **0** producer lines on the `D5` value path, with the
+> instrument confirmed present and the refusal confirmed firing. Stopping there
+> instead of building an inert transport was the right call.
+>
+> ⇒ **But I then withdrew controls #1 and #3 as "unsatisfiable", and that was
+> wrong.** Architect ruling `evt_23eb7gp8sz4an` corrects two conclusions:
+>
+> - *"zero `Data` rows ⇒ the `Nat` identity is absent"* — **false.** Erasure keeps
+>   `declarations` minimal but copies `semantic.symbol`s into
+>   `erased_core.symbols` (`erasure.rs:195-205`) and `data_metadata` into
+>   `erased_core.metadata.checked_core` (`:5918-5952`), which `ir.rs:43-50` calls
+>   authoritative. The probe counted **executable declarations only**. Correct
+>   statement: *"`Nat` is not an executable target declaration."*
+> - *"the prelude ids resolve byte-equal to legacy"* — **false.**
+>   `emit_package_from_env` calls `stable_symbols_for_env` at
+>   `compiler_driver.rs:2960`, which maps constructors under the
+>   package-qualified parent. Through **that** table the ids yield
+>   `ctor:nested_inductive_pkg::Nat::{Zero,Suc}`. Prelude **origin** and current
+>   artifact **spelling** are different axes.
+>
+> **Both controls are restored** and become satisfiable once the producer sits on
+> the generic package-emission path.
+>
+> **What changed in scope:** the repair is no longer a transport. It is *produce*
+> a complete, versioned, hash-covered `CheckedRuntimeSymbolsV1` role record —
+> **the whole `NativeProcessSymbols` population, not a Nat-only pair** — carry it
+> through erasure metadata, and **require** it at package-backed native
+> compilation, with `core.rs:1781-1783`'s implicit `legacy_prelude()` fallback
+> made structurally unreachable. Executable closure stays as-is; no `Data`
+> declarations added. Cut into three accepted partials (a/b/c) in the node.
+>
+> **`AC-K12` IS reachable on the current architecture** — the Architect says so
+> explicitly. This deliverable discharges only the first native refusal;
+> verifier passage and interp/native agreement stay separate gates.
+>
+> **Verify stays held.** Kernel picked up `D6` at 22:52 and Runtime resumes on
+> `D1b-role`, so both lanes are turning and no slot freed. **If Runtime blocks
+> again, the fallback is `D9`+`D10` of [[RT-MATCH-RECURSOR-CONSUMERS]]** — both
+> small, both in Runtime's own files, neither dependent on any ruling.
+>
+> **The method note that generalizes: make probes unconditional.** A `Data`-only
+> probe cannot separate *"no `Data` declarations"* from *"not on this path"* —
+> the same conditional-probe shape that made the first `D1a` walker report the
+> outermost link.
 
 > ### THE SWEEP THAT PAID: FOUR STALE "BLOCKED ON X" CLAIMS, ONE ROOT CAUSE.
 >

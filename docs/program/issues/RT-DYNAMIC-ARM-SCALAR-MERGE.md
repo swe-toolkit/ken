@@ -11,14 +11,18 @@ github: null
 origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 2026-08-09). Kernel reached the native boundary after interpreter Nat-3 and provenance-gated erasure both passed, and stopped without Runtime edits exactly as the durable D5 ruling at main 46c12adb requires. Steward-filed (agents cannot create tracked work per COORDINATION §2). Steward owns the frame and AC/control placement.
 ---
 
-> # `D0` AND `D1a` ARE DONE. START AT `D1b-id`.
+> # `D0` AND `D1a` ARE DONE. START AT `D1b-role`.
 >
 > ⚠ **`D1a` closed 2026-08-09 (`evt_3g4n00s7ftd9q`) with a verdict my own
 > taxonomy could not express**, and Architect ruling `evt_2wm35zk98p9nr` recut
 > the repair. **`D1b-cov` and `D1b-rep` are both WITHDRAWN; the deliverable is
-> `D1b-id`, an identity-authority transport fix.** Read that section, not the
-> fold-coverage framing that preceded it — and note that `D0`'s
-> inductive-cascade mechanism story is retracted.
+> `D1b-role`.** Read that section, not the fold-coverage framing that preceded
+> it — and note that `D0`'s inductive-cascade mechanism story is retracted.
+>
+> ⚠ **`D1b-id` is ALSO superseded, recut 2026-08-09 as `D1b-role` on Architect
+> ruling `evt_23eb7gp8sz4an`.** It is not a transport: the authority does not
+> exist on the value path and must be produced. Two conclusions from the
+> falsifying measurement are themselves false — see the superseded block.
 >
 > `D0` closed 2026-08-09 (`evt_1ct16entsqn94`) and answered all four questions
 > with `file:line` evidence. **It also measured two of this frame's own fixed
@@ -256,42 +260,116 @@ The `D5` differential helper erases a generic `CompilerDriverOutput` to
 compared against `ctor:prelude::Nat::{Zero,Suc}` and miss. **The producer had
 the right identities; the consumer never received them.**
 
-### `D1b-id` — carry checked symbol authority into package-backed native value compilation
+> ### `D1b-id` IS SUPERSEDED BY `D1b-role`
+>
+> **Recut 2026-08-09 on Architect ruling `evt_23eb7gp8sz4an`.**
+>
+> **The `D1b-id` frame below was defective and the defect was mine:** its
+> producer, `compiler_driver.rs:3336-3337`, runs only in the process-starter
+> transaction, so the generic value package never materializes a role table at
+> all. Runtime measured that (0 instrumented producer lines with the instrument
+> confirmed present and the `D5` refusal confirmed firing) and stopped instead of
+> building an inert transport. That was the right call.
+>
+> **But two conclusions drawn from those measurements are FALSE, including one I
+> propagated when I withdrew controls #1 and #3 as unsatisfiable. They are not
+> unsatisfiable.** Correcting both, because a recut built on either is wrong:
+>
+> | conclusion | status | what is actually true |
+> |---|---|---|
+> | *"zero `Data` rows ⇒ the package `Nat` identity is absent from `RuntimeProgram`"* | **FALSE** | erasure keeps `declarations` minimal but independently copies every `semantic.symbol` into `erased_core.symbols` (`erasure.rs:195-205`) and every `semantic.data_metadata` entry into `erased_core.metadata.checked_core.data_metadata` (`:5918-5952`), which `ir.rs:43-50` calls authoritative after proof erasure. The probe counted **executable declarations only** and inspected neither authoritative metadata lane. The correct statement is *"`Nat` is not an executable target declaration"* |
+> | *"resolving the prelude `GlobalId` yields a legacy-prelude symbol, byte-equal to `legacy_prelude()`"* | **FALSE** | `emit_package_from_env` calls `stable_symbols_for_env(&manifest.package_name, ...)` at `compiler_driver.rs:2960`. That table maps every non-primitive declaration id through `declaration_symbol(package_name, name)` (`:3492-3496`) and constructors under the package-qualified parent (`:3499-3509`). Applied to **that** table, `resolve_id(prelude_env.zero_id/suc_id)` yields `ctor:nested_inductive_pkg::Nat::{Zero,Suc}` |
+>
+> ⇒ **The ids' prelude origin and their current artifact stable spelling are
+> different axes.** Controls #1 and #3 become satisfiable the moment the producer
+> is placed on the real generic package-emission path — which is the recut.
+>
+> **A conditional probe is what made both look settled.** The first `Data`-only
+> probe could not separate *"no `Data` declarations"* from *"not on this path"*;
+> the same conditional-probe mistake, in another guise, made the first `D1a`
+> walker report the outermost link. Make probes unconditional.
 
-**Scope is the compiler-driver producer PLUS the Runtime consumer.** ⭐ The
-Elaborator/compiler-driver ban in this frame's Forbidden list is **lifted for
-this deliverable only**, and only for the producer link named here. ⛔ **The
-scalar merge is NOT the repair site** — no new `merge_scalar_operand` admission.
+### `D1b-role` — materialize a COMPLETE checked-runtime role record, carry it
+### through erasure, and REQUIRE it at package-backed native compilation
 
-1. Both Nat folds stay **exact-identity and inductive**. ⛔ No whole-chain
-   walker, no declaration-shape recognizer, no name/suffix matching.
-2. The **compiler driver** derives the Nat pair from the live prelude
-   `GlobalId`s plus the exact stable-symbol table. ⛔ Callers and Runtime may not
-   reconstruct it from `"Nat"`, `"Zero"`, package names, suffixes, or `Data`
-   metadata.
-3. A package-backed native value compile **carries that exact authority** into
-   Runtime's existing `process_symbols` parameter. Reusing `NativeProcessSymbols`
-   is lawful; a narrower complete typed projection is lawful. ⛔ A hand-built
-   pair in NC14 is not.
-4. `legacy_prelude()` stays a **legitimate explicit** authority for fixtures
-   whose IR is deliberately minted in that namespace. ⛔ It may not remain the
-   **implicit fallback** for a checked-package `RuntimeProgram`. Missing or
-   mismatched authority must **fail closed before semantic lowering**.
-5. `StructuralNat` remains the native representation of the checked `Nat`
-   identified by that authority. No new scalar representation.
+**Not a transport of an existing authority — the authority does not exist on this
+path and must be produced.** ⛔ **The scalar merge is still NOT the repair
+site**: no new `merge_scalar_operand` admission, no `ScalarMergeKind` change.
 
-### Required committed discrimination — all five
+**The executable-erasure boundary is preserved.** ⛔ Do **not** add `Nat`,
+`Bool`, or any prelude type as `RuntimeDeclarationKind::Data` entries to teach
+native lowering their roles. That widens the executable closure to solve a
+**metadata** problem. This deliverable is a checked-artifact metadata extension
+plus Runtime consumption — not a change to proof erasure, and not a change to
+runtime value representation.
+
+1. **Produce.** One versioned, hash-covered checked semantic record,
+   conceptually `CheckedRuntimeSymbolsV1`, built **inside `emit_package_from_env`
+   after the exact `stable_symbols_for_env` call** (`compiler_driver.rs:2960`)
+   and **before the live `ElabEnv` is lost**. Derived from prelude `GlobalId`s
+   through that exact table. ⛔ No source-name, suffix, package-name
+   reconstruction, or structural Peano inference.
+2. **Complete, not Nat-only.** The record must cover **every constructor role to
+   which Runtime assigns special meaning**. The current complete population is
+   the existing `NativeProcessSymbols` field set: Bool, Nat, Unit, Result/Option,
+   process/list/product/exit, file/resource/progress and related constructors.
+   ⛔ **A Nat-only sidecar reproduces this exact defect at the next special
+   constructor** and does not discharge this deliverable.
+3. **Store canonically.** In the checked package's semantic lane — the existing
+   versioned `semantic.metadata` lane is lawful — so it participates in
+   `core_semantic_hash` and survives serialized-package consumption. ⛔ A live
+   `CompilerDriverOutput` sidecar is **not** lawful: the compiler's semantic
+   input is `CheckedCorePackage`, not a retained `ElabEnv`.
+4. **Decode and validate at erasure.** Into a typed Runtime field, preferably
+   `RuntimeCheckedCoreMetadata.runtime_symbols: CheckedRuntimeSymbolsV1`.
+   Validate every role symbol against `semantic.symbols`; constructor roles must
+   also resolve **uniquely** through the existing `data_metadata`
+   family/constructor entries with their recorded arity and recursive positions
+   — for `Nat`, `Zero` nullary and `Suc` unary with the recorded recursive
+   position. ⚠ These checks detect **stale or mismatched metadata**; they do not
+   infer the `Nat` role from shape, and must not be written as if they could.
+5. **Require at consumption.** Package-backed compilation requires the typed
+   field. `compile_program_expr` passes its exact table to the lowerer. Missing,
+   malformed, duplicate, or metadata-inconsistent authority **rejects before**
+   `plan_static_transition_graph_with_symbols`.
+6. **Remove the ambiguity structurally, not by discipline.** The inner package
+   lowerer takes `&CheckedRuntimeSymbolsV1` (or `&NativeProcessSymbols`), **not**
+   `Option<&...>`. `core.rs:1781-1783`'s `unwrap_or_else(legacy_prelude)` must
+   not remain reachable from a `Some(program)` compile. Seed-only `compile_expr`
+   **may** construct and pass `legacy_prelude()` **explicitly**, because its IR is
+   deliberately minted in that namespace.
+7. **Folds unchanged.** Both Nat folds stay **exact-identity and inductive**. ⛔
+   No fold-code change, structural criterion, eager chain walk, whole-chain
+   walker, declaration-shape recognizer, or name/suffix matching.
+   `StructuralNat` remains the native representation of the checked `Nat`
+   identified by that authority.
+
+**Sizing: land this as up to three accepted partials, in this order.** Each is
+independently reviewable and mergeable per the accepted-partial policy, and each
+is roughly a one-hour turn; do not hold the whole chain for one PR.
+
+| slice | scope | closes |
+|---|---|---|
+| `a` | produce + store + hash-cover the record (items 1-3) | control 1 |
+| `b` | erasure decode + validation (item 4) | control 2 |
+| `c` | require + consume + structural de-`Option` (items 5-7) | controls 3-6 |
+
+### Required committed discrimination — all six
 
 | # | control |
 |---|---|
-| 1 | on the exact `D5` package, the producer's Nat pair **equals** `nested_inductive_pkg::Nat::{Zero,Suc}` and **differs** from the legacy pair |
-| 2 | `AC-10` re-run at the real seat: refusal **1 → 0** and the operand arrives as `StructuralNat`. ⛔ A green end-to-end test alone is insufficient |
-| 3 | replace **only** the transported pair with the legacy pair → the `D5` control **reds through the identity/fold lane** |
-| 4 | a package with an unrelated nullary-plus-unary-recursive `Data` **remains `Lowered::Constructor`** and keeps its constructor identity — the counterexample excluding structural widening |
-| 5 | existing legacy seed controls stay green; all **six** admitted merge shapes and the fail-closed catch-all preserved |
+| 1 | on the **real generic `D5` package-emission path**, the produced Nat roles are exactly `nested_inductive_pkg::Nat::{Zero,Suc}` and **differ** from the explicit legacy pair. ⛔ The probe must fire **on that path** — an unconditional probe, for the reason recorded above |
+| 2 | after erasure, the executable declaration set is **still exactly** `liftAdd` and `liftSize`, **while** `erased_core.checked_core.data_metadata` and the typed runtime-symbol record both carry the exact Nat family and pair. This pins metadata preservation **without** closure widening — both halves are required |
+| 3 | **three separate** rejection controls: delete the semantic role record; corrupt its header; mutate **only** Nat `Zero` to the legacy symbol. Each must reject **before native semantic lowering**, through a **named** authority-validation lane. ⚠ Separately, a focused lowerer control with an **explicitly supplied** legacy table must leave the package-qualified chain as `Lowered::Constructor` — that proves the identity operand is **causal**, rather than resting only on preflight |
+| 4 | `AC-10` re-run at the real `D5` seat: refusal **1 → 0** and the operand arrives as `StructuralNat`. ⛔ A green end-to-end result alone is insufficient |
+| 5 | an unrelated **nullary-plus-unary-recursive** `Data` remains `Lowered::Constructor` and retains its constructor identity — the counterexample excluding structural widening |
+| 6 | existing **explicit** legacy seed controls stay green, **and** a structural control proves no package-backed compile can reach an **implicit** legacy fallback. All **six** admitted merge shapes and the fail-closed catch-all preserved |
 
 ⛔ **No Kernel, interpreter, match-semantics, `ScalarMergeKind`, or `AC-K12`
-claim follows from this ruling.**
+claim follows from this ruling.** `AC-K12` **is** reachable on the current
+architecture — the Architect states this — but this deliverable discharges only
+the **first** native-lowering refusal. Verifier passage and interpreter/native
+agreement remain separate gates.
 
 ### Acceptance for `D1`
 
@@ -341,20 +419,30 @@ surface their own gaps.
 - Editing `crates/ken-elaborator`, `crates/ken-kernel`, or `crates/ken-interp`
   to make the arm produce something the existing seat already accepts. That
   moves a Runtime gap into Kernel's landed work.
-  > ⚠ **NARROWED 2026-08-09 for `D1b-id` only.** `compiler_driver.rs` lives in
-  > `crates/ken-elaborator`, and Architect ruling `evt_2wm35zk98p9nr` makes it
-  > the **producer half** of the repair. ⇒ The compiler driver **is in scope for
-  > `D1b-id`**, solely to derive and expose the checked Nat pair from the live
-  > prelude `GlobalId`s and the stable-symbol table.
+  > ⚠ **NARROWED 2026-08-09 for `D1b-role` only, and WIDENED the same day by
+  > ruling `evt_23eb7gp8sz4an`.** Read the whole carve-out; the first version of
+  > it was too narrow to reach the repair.
+  >
+  > ⇒ **In scope for `D1b-role`, inside `crates/ken-elaborator`:**
+  >
+  > - `compiler_driver.rs` — `emit_package_from_env`, to build the
+  >   `CheckedRuntimeSymbolsV1` record from the exact `stable_symbols_for_env`
+  >   table while the live `ElabEnv` is still in hand;
+  > - the checked package's versioned `semantic.metadata` lane, to carry that
+  >   record under `core_semantic_hash`;
+  > - `erasure.rs`, to decode and validate it into the typed Runtime field.
   >
   > ⛔ **Everything else in this bullet still binds**, and the original intent is
-  > untouched: you may not reshape what the arm *produces* to dodge the Runtime
-  > gap. `ken-kernel` and `ken-interp` remain fully out of scope, and so does the
-  > rest of `ken-elaborator`.
+  > untouched: **you may not reshape what the arm *produces* to dodge the Runtime
+  > gap.** The carve-out is for *carrying identity that already exists*, never for
+  > changing the value. `ken-kernel` and `ken-interp` remain fully out of scope,
+  > and so does the rest of `ken-elaborator`. Adding `Data` declarations to the
+  > executable closure is forbidden by `D1b-role` item 2 regardless of crate.
   >
   > **This bullet forbade the only route to the repair for about forty
-  > minutes.** Recorded because a Forbidden list is read on its own, far from
-  > the deliverable that carves it out.
+  > minutes, and its first repair was still too narrow to reach the second.**
+  > Recorded because a Forbidden list is read on its own, far from the
+  > deliverable that carves it out.
 
 ## Sequencing
 

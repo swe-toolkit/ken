@@ -693,6 +693,34 @@ Each names its positive control.
 | `AC-K13` | ⭐ **The polarity producer is TOTAL over every accepted constructor field type** — every such field yields a polarity record or a rejection, ⛔ **never a panic** (`18 §4`). | ⚠ **Enumerate by `Term` form, not by example.** For each form the fallback traverses, exercise a field of that form that mentions the parameter. Two named controls, both from Architect rejections: (a) `Term::Let { ty: Bool, val: false, body: pi(var(1), Bool) }` — an accepted field reducing to `A -> Bool`, which must record `NonPositive`; its `body` binds index 0, so a fallback that traverses children at one depth reads `A` at the wrong index. (b) index selection must be non-panicking for an out-of-range relative index — ⛔ `bool::then_some` evaluates its argument **eagerly**, so `(r < n).then_some(n - 1 - r)` underflows *before* the condition can yield `None`; `then(\|\| …)` is the lazy form |
 | `AC-K12` | A nested-IH constructor **lowers and evaluates**, not just type-checks. | the evaluator and native-lowering paths **re-derive** recursive positions (frame §2d, §2f) and one lowering site computes binder arity as `argument_binders + recursive_positions.len()`. Control: a recursive computation over `JsonArray` evaluates, and the built-artifact suite is green |
 
+### `AC-K12` ACQUIRED A RIDER — it now owns a carried Runtime control
+
+**Added 2026-08-09 from Adversary triage of finding `evt_37y39vcj7y695` on
+`82918b6a`.** Not a new acceptance criterion and not `D6`/`D7` work.
+
+`ken-runtime/src/cranelift_backend/planning/static_transition.rs` carries an
+`#[ignore]`d control, `liftrose_synthetic_witness_closes_owner_two_required_joins`,
+whose release condition is stated in its own doc comment as *"nested-inductive
+admission is on `main`"*. That condition is exactly what `AC-K12` requires, and
+`RT-BODY-OCCURRENCE-PROVENANCE` — the node that authored it — is **closed**, so
+the condition had no tracked owner. It has one now: **`AC-K12`**.
+
+Two consequences, and only the second is anyone's task today:
+
+1. **Discharging `AC-K12` also obliges running that carried control.** Do not
+   report `AC-K12` green while it is still `#[ignore]`d. The obligation rides on
+   the capability, not on this node's closure — if `AC-K12` is later recut, the
+   rider follows whatever criterion inherits the capability.
+2. **The code edit is Runtime's, not Kernel's** — it lives under
+   `crates/ken-runtime`, which `D5` correctly refused to enter. It is folded into
+   [[RT-MATCH-RECURSOR-CONSUMERS]] as `D10`.
+
+**Why this is recorded rather than re-worded in place.** The comment's release
+condition has now been corrected three times, and each correction restated it
+somewhere with no owner to re-read it. A fourth wording would repeat that. The
+condition belongs in a tracked node that a status check can see, which is what
+this block makes it.
+
 ⛔ **`AC-K3` and `AC-K8` are the pair that matters.** `AC-K3` proves the new
 capability is *usable*; `AC-K8` proves the old capability is *undamaged*. A node
 that greens one and quietly weakens the other has widened the TCB for nothing.
