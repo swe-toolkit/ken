@@ -58,40 +58,9 @@ publishes and merges.
    (K3: a `>4 MiB` value underflowed the arena, untested because the max test
    value was 8 KiB; the Architect caught it). Keep the change small.
 
-   ** Declare a promise class for every conformance-derived test you write —
-   if you cannot classify it, it is not ready.** QA applies this as a review
-   gate and will Block on it, so classifying at *authoring* time is strictly
-   cheaper than discovering it at review:
-   - **Durable invariant** — survives every intended extension that preserves
-     the contract. Prefer relations, set equality, disjointness/exhaustiveness,
-     exhaustive matches over literals.
-   - **Normative compatibility vector** — pins exact bytes/values *because those
-     values are the contract* (ABI op identities, field order, canonical
-     hashes, grammar arity). Changing one takes a contract decision.
-   - **Transition sentinel** — *intentionally* goes red when a planned extension
-     lands, to force review. Legal **only if labelled honestly**: named for the
-     boundary rather than the current count, and naming the event that retires
-     it.
+   **Declare a promise class for every conformance-derived test you write** —
+   see the section below the loop.
 
-   **The discriminating question, asked before you commit the assertion:**
-   *which intended extensions keep this test green, and which turn it red?* If
-   both answers are "any change at all," you have written a snapshot, not an
-   invariant — label it a sentinel or re-assert relationally. **Never freeze a
-   derived count**: a count computable from an authoritative set belongs to
-   that set, so assert against the set. (This is not hypothetical — a
-   `ken-verify` test asserting "exactly nine native and thirteen unavailable"
-   went CI-red when a later WP legitimately promoted four ops. The red was
-   maintenance noise, not a regression.)
-
-   **Authoritative reference — read it once, before writing your first
-   conformance test:** `research/qa-conformance-to-rust-test-guidelines.md`
-   §6 holds the ten-step authoring workflow (restate the proposition → find
-   the production seam → choose an independent oracle → design the
-   discriminator *before* the positive case → assert at the narrowest stable
-   boundary → classify every literal → enumerate consumer closure → prove the
-   test can fail for the intended reason → validate maintenance behavior → run
-   the right gates). §7 holds the Rust patterns. Do not restate it here or in
-   your WP notes — cite it, so there is one copy that cannot go stale.
 5. **Commit to `wp/<ID>` before you hand off** — never hand off uncommitted work
    (the next agent and the publisher path only see committed state). Cite the WP ID,
    acceptance criteria met, and your spec sources in the commit/handoff.
@@ -106,6 +75,42 @@ publishes and merges.
    Silence is only safe when your status accurately says what you're doing;
    `update_status` on every pickup/handoff/block so silence + status stay
    consistent.
+
+## Declare a promise class for every conformance-derived test
+
+**If you cannot classify it, it is not ready.** QA applies this as a review
+gate and will Block on it, so classifying at *authoring* time is strictly
+cheaper than discovering it at review:
+- **Durable invariant** — survives every intended extension that preserves
+  the contract. Prefer relations, set equality, disjointness/exhaustiveness,
+  exhaustive matches over literals.
+- **Normative compatibility vector** — pins exact bytes/values *because those
+  values are the contract* (ABI op identities, field order, canonical
+  hashes, grammar arity). Changing one takes a contract decision.
+- **Transition sentinel** — *intentionally* goes red when a planned extension
+  lands, to force review. Legal **only if labelled honestly**: named for the
+  boundary rather than the current count, and naming the event that retires
+  it.
+
+**The discriminating question, asked before you commit the assertion:**
+*which intended extensions keep this test green, and which turn it red?* If
+both answers are "any change at all," you have written a snapshot, not an
+invariant — label it a sentinel or re-assert relationally. **Never freeze a
+derived count**: a count computable from an authoritative set belongs to
+that set, so assert against the set. (This is not hypothetical — a
+`ken-verify` test asserting "exactly nine native and thirteen unavailable"
+went CI-red when a later WP legitimately promoted four ops. The red was
+maintenance noise, not a regression.)
+
+**Authoritative reference — read it once, before writing your first
+conformance test:** `research/qa-conformance-to-rust-test-guidelines.md`
+§6 holds the ten-step authoring workflow (restate the proposition → find
+the production seam → choose an independent oracle → design the
+discriminator *before* the positive case → assert at the narrowest stable
+boundary → classify every literal → enumerate consumer closure → prove the
+test can fail for the intended reason → validate maintenance behavior → run
+the right gates). §7 holds the Rust patterns. Do not restate it here or in
+your WP notes — cite it, so there is one copy that cannot go stale.
 
 ## Keep working until blocked or done — don't yield mid-assignment
 
@@ -232,18 +237,16 @@ file they have never read, instead of on whoever erred.
 
 **This is a rule about the test's SUBJECT, and it is why your promise class
 will not save you.** A corpus-text census reads perfectly as a *normative
-compatibility vector* (*"these values are the contract"*) and passes QA's promise
-gate. `crates/ken-elaborator/tests/kw_theorem_source_oracle.rs` did exactly that
-— 64 `(path, line, count)` rows across 18 files, freezing their line numbers
-repo-wide and blocking an unrelated doc WP. ⇒ **Ask what the test is ABOUT
-before you ask what it promises.**
+compatibility vector* and passes QA's promise gate on its face. ⇒ **Ask what
+the test is ABOUT before you ask what it promises.** The worked case and the
+reasoning are in `qa.md`, cited below; do not restate them here.
 
 **Express the property as behaviour instead:** a policy about identifiers →
 assert the elaborator **rejects** the construct on a fixture you author; a
 generated artifact → assert the **generator round-trips**, never pin its output's
 lines; a document invariant → assert a **relation between artifacts keyed on
-identity**, never on position. Full gate + the permitted boundary case: the
-`Test design` section of `agent/playbooks/build/qa.md`.
+identity**, never on position. Full gate + the permitted boundary case:
+`agent/playbooks/build/qa-test-design.md`.
 
 ## Authoring a mechanical pin — load the `pin-a-property` skill
 
@@ -262,7 +265,7 @@ The two steps most often skipped, both of which have blocked candidates here:
   property can be entirely true and about something else; the implication is
   only checked if it is written down.
 
-## Discipline
+## Discipline: staying in your lane
 
 - **Don't author outside your lane.** Something wrong in another crate → file a
   `bug`-typed note to that team (cap your own dig at ~5 min) and continue.
@@ -276,6 +279,8 @@ The two steps most often skipped, both of which have blocked candidates here:
   passed; the fix made the guard reject any under-declared higher-order effect).
   A conservative reject over a silent accept is the right shape for a soundness
   property with a deferred feature behind it; the gate must fail closed.
+## Discipline: verifying what you inherit
+
 - **A shared-structure field another crate "populates" is a claim to verify —
   grep its init sites before you rely on it (promoted X1).** A field that exists
   and is read elsewhere may be **always-empty** at every construction site. Before
@@ -325,6 +330,8 @@ The two steps most often skipped, both of which have blocked candidates here:
   rejection message line-by-line. Cheap, and it's what turned a vague "seems
   supported" into a precise, falsifiable escalation the Architect could rule on
   fast.
+## Discipline: when to flag and when to block
+
 - **Flag-vs-block calibration: routine completion of an already-assumed
   mechanism is flag-and-continue; a genuine capability/soundness question is
   stop-and-escalate (promoted ES4-classes-build).** Adding `leq_int` (the spec
@@ -362,6 +369,8 @@ The two steps most often skipped, both of which have blocked candidates here:
   gate") is the same conclusion-shape over-claim this arc kept producing — the
   leader's cross-check caught it, but it's yours to catch first: grep the *exact
   obligation each proof hits* and name its gate precisely.
+## Discipline: tooling, git, and the ring
+
 - **Non-blocking bug never stops the ring.** File it, keep going.
 - Re-resolve thread IDs after a context reset before replying.
 - **Build/test only via `scripts/ken-cargo`, scoped to your crate** (`-p`),

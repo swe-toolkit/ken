@@ -64,7 +64,7 @@ Worked examples that cost this project hard-stops:
 | two concrete types are module-private (**not nameable**) | no outside consumer can key on them | **naming ≠ capability**: derived `Ord`, an `impl Trait` return, or a derived ordinal leaks usable structure without leaking the name |
 | the budget balances | the encoding is complete | a balanced total says nothing about which rows exist |
 
-### 2a. A predicted POPULATION must include registration-driven fan-out
+## 2a. A predicted POPULATION must include registration-driven fan-out
 
 **Promoted from `RT-FNSPLIT-B2R` — named independently by the leader, QA, and the
 implementer, which is as strong a signal as this corpus produces.**
@@ -174,7 +174,7 @@ mis-set path, or a fixture that never exercised the mechanism. So:
 - **Positive controls can themselves be spelling-scoped.** Having one is
   necessary, not sufficient.
 
-### AND READ THE TEST COUNT — a run that executed NOTHING reports GREEN
+## 6-prime. Read the test count — a run that executed NOTHING reports GREEN
 
 **Measured 2026-07-26, `RT-SCALE-A` QA.** An incomplete exact-test path
 **silently ran 0 tests** and the invocation came back green. *A green run that
@@ -232,7 +232,7 @@ free.**
   mistake about one of its laws; the identical hazard applied to every arm below
   that comment.
 
-### THE WITNESS NEEDS ITS OWN AXIS DISCIPLINE
+## 6b. The witness needs its own axis discipline
 
 *— or this rule reproduces the very bug it exists to catch.*
 

@@ -81,359 +81,175 @@ load and follow it after this generic archetype.
    terms / dependent telescopes, eliminator methods that **use** the IH (not
    discard it via β). A green suite that only explores single-variable/closed
    instances is **Blocked**, not Approved (COORDINATION §7).
-   - **For an elaborator / translator / codegen, assert the *emitted output*, not
-     just that it succeeds — elaborate-and-check ≠ elaborate-and-correct
-     (promoted V1-fix; a 2-WP-latency bug).** A test that asserts only
-     "elaboration succeeds / the result type-checks" passes even when the output
-     is **wrong but well-typed** — so a producer bug ships green and propagates.
-     V1's de Bruijn shift bug rode through **V1 *and* V2** because the test used
-     **same-type params** (both `Nat`), making the mis-shifted body coincidentally
-     type-correct, and the suite checked *success* not *the term*. Require
-     **both**: **non-degenerate inputs** (distinct types/indices so a wrong output
-     can't be coincidentally valid) **and** a **structural assertion on the
-     emitted term** (the core/AST, resolved de Bruijn indices, the
-     obligation/cert shape) — the same "assert the structural output, at
-     non-degenerate endpoints" rule the trust-root uses, here for any producer
-     whose output a *later* checker accepts. **A round-trip test
-     (`parse(repr(x)) == x`) checks self-*consistency*, not *truth* (promoted
-     T1-build).** A mis-serialized value — a `verdict` written `false` when V3
-     said `unknown` — **round-trips green** (it deserializes back to the same
-     wrong value), so round-trip alone is vacuously self-satisfying. Pair
-     **every** round-trip case with ≥1 **structural assertion on the serialized
-     form** (the exact tag/field on the wire), or it guards nothing.
-   - **For a NEW-surface WP, grep the producer registration BEFORE counting green
-     — a HARD gate (promoted L6-build; the hand-feeds-the-deliverable trap).** A
-     test for a new capability passes **green-vs-green** if it **hand-feeds the
-     binding/value the WP is supposed to *produce*** and then exercises a
-     **pre-existing** downstream consumer — so the suite is green with **zero** of
-     the new wiring. (L6: AC2/AC3 hand-fed `EffectRow::singleton("FS")` to the
-     pre-existing L5 escape gate while the elaborator registration was entirely
-     absent — 15/15 green, the Architect bounced it.) The tell: *"would this pass
-     if I deleted the new registration?"* So for any WP adding a new primitive /
-     type / elaborator-module / effect-row, **`grep register_<feature>
-     <producer-crate>/src/` for the actual registration call-site BEFORE counting
-     tests green**, and derive the test seed **from** that registration (delete it
-     ⇒ the seed empties ⇒ the verdict flips). This is a **hard gate on
-     new-surface WPs, not a soft guideline** — it lived as a soft guideline (from
-     F4) and got missed at L6 precisely because the suite was run, not grepped.
-   - **A claim that a test discriminates *old-vs-new* — "X could not have passed
-     under the old code" — is verified by checking out the prior commit and
-     running the *literal same* assertion there (promoted ES2-remainder; 3rd
-     occurrence in a row).** Reading the diff does **not** surface this: the test
-     body looks identical before and after (only a call-site arity or a comment
-     changed), so a *temporal*-discrimination claim reads true from the diff while
-     being false. Three consecutive WPs shipped a "discriminating" test that
-     wasn't — VAL1-nested-patterns' Const-shape check, ES2-prelude-hygiene's dead
-     `print_line` interception, ES2-remainder's AC2 `sort`-elaborates test (all
-     passed **identically** against the pre-change commit: `elaborate_decl_v1`
-     success + `Ensures`-obligation emission never depended on the predicate being
-     real-vs-postulate, and `discharge_hole` — the real proof step — wasn't
-     invoked either way). So when a handoff claims "this couldn't have
-     type-checked / passed before," **`git checkout <prior-sha> -- <test>` and
-     confirm it FAILS there** (or run the literal assertion on the prior commit).
-     Cheap, mechanical, decisive — the *temporal* complement to
-     scratch-test-and-revert (which nets *spatial/value* discrimination).
-   - **Provenance and proposition are ORTHOGONAL axes — a real postulate of the
-     WRONG type passes every provenance test; check the postulated TYPE against
-     the spec's literal law (promoted ES4-classes-build; the total-law bug).** On
-     a law-carrying / postulate-emitting WP, the tests confirmed each law field
-     was a *genuine* `Decl::Opaque` (real grep-able postulate, no smuggled proof)
-     — the provenance axis was solid. But **nothing checked that the type being
-     postulated actually *said* the law**: `total : IsTrue (leq x y)` is a
-     perfectly well-formed, perfectly-opaque postulate that **isn't totality**
-     (the Bool-equation `IsTrue (or_bool (leq x y) (leq y x))` — a *different,
-     generally-false* proposition). A defective field elaborates exactly as
-     cleanly as a correct one, so "it's a real `Opaque`" and "it's the right
-     proposition" are independent, and every test that only asks *is-this-Opaque*
-     is blind to a wrong axiom. Read the actual `.ken`/producer source and assert
-     the field's **type structurally matches the spec's literal law statement**,
-     not just its postulate-vs-proof provenance. **Corollary — grep the seed's
-     NAMED cases against the acceptance suite: a seed case named for a specific
-     property (here `ord-total-law-is-omega-bool-equation`) but *unexercised* is a
-     coverage hole that greenlights the mismatch.** When a seed names a
-     discriminating case, "did I port this exact case" is a checklist item before
-     the WP is done. (Severity calibration also held: trace `conv.rs` before
-     filing — a `Decl::Primitive`/`Opaque` never δ-unfolds, so a wrong *opaque*
-     axiom is a conformance/honesty defect on the audited-delta claim, **not** an
-     immediately kernel-exploitable Bottom — file it as exactly that, neither
-     over- nor under-claiming.)
-   - **A WP that adds a new elaboration *mechanism* (not just new
-     instances/data) needs a synthetic test built to FAIL if the mechanism is
-     wrong — probe the mechanism directly, not the shipped instances (promoted
-     ES4-lawproofs; the dependent match-compiler).** When the WP ships a new
-     *mechanism* (a motive constructor, a substitution path, a dependent
-     eliminator — anything that could accept an *invalid* proof if its logic is
-     subtly wrong), the shipped instances may pass **trivially regardless of
-     whether the mechanism is correct**: `Ord Bool`'s real proofs are all over
-     `Bool`'s two-element state space, where every branch is uniformly
-     `Refl`-provable, so a **constant/degenerate motive** (one that ignores the
-     scrutinee and accepts anything) would pass every shipped instance. Build an
-     **adversarial synthetic case calibrated to the mechanism itself** — e.g.
-     `\x. match x { True => Refl ; False => Refl }` proving `IsTrue x`, which
-     **must be REJECTED** on the `False` branch iff the per-branch substitution
-     genuinely produces *different* expected types. If it accepts, the motive is
-     degenerate. (This one probe also independently re-surfaced the K5 Top-collapse
-     wall — a calibrated mechanism-probe finds both a positive confirmation and
-     latent capability boundaries.) The tell: a "mechanism" WP whose only tests are
-     repurposed acceptance tests over a tiny/uniform carrier.
-   - **An untrusted layer's *positive verdict* must reach its constructor through
-     exactly ONE grep-able kernel-check call — verify the single path (promoted
-     V3-build; pairs with assert-output).** When a layer is believed only because
-     the kernel re-checks it ("distrust the layer, trust the kernel"), the
-     soundness rides on there being **no path to the positive constructor that
-     bypasses the check**. So `grep` the positive constructor (V3: `Proved { cert`)
-     and confirm **exactly one** site reaches it, **through** the kernel-check call
-     (`check(env, [], cert, goal)` in `attempt_with_cert`); every other path must
-     route to the honest negative (`emit_unknown_hole`). A second `Proved` site, or
-     one reachable without the check, is an unsound-accept hole the kernel can't
-     save you from — because the layer never handed it a cert to reject. This is
-     V1's `trusted_base()` honesty guard generalized to **any** verdict-bearing
-     layer (prover/elaborator/extractor); QA + the Architect verify the single
-     kernel-gated path is the *sole* constructor of the positive verdict.
-   - **Test any term-in-a-context builder at a *non-empty* context — an
-     empty-context suite hides scope/de Bruijn assumptions (promoted V4-build; the
-     defining spine latency, twice).** A tactic/elaboration that builds a term *in
-     a context* `Γ` can be wrong about **shifts/scope** while passing every
-     **closed/empty-`Γ`** test — and the gap is invisible until the first
-     contextual input arrives. It bit the spine **twice with the same shape**: the
-     V1 de Bruijn bug (predicate on a non-final param) survived V1+V2 on
-     last-param-only tests; V3's `close_cert`/D-pre-pass passed V3's **empty-
-     context** IPC suite and broke at V4's first contextual goal (E1 slice). "A
-     suite that holds for a narrow range is indistinguishable from a correct one
-     until a non-accommodating case arrives." So for any context-builder, require
-     **non-empty `Γ`** (a hypothesis in scope, the binder not last) — the context
-     dimension of "open terms, not closed"; and **a fix for the consumption
-     interface ships with the producer, not one WP later** (V3's contextual tests
-     should have shipped with V3).
-   - **A "by-construction" guarantee is only as strong as its weakest *input*
-     boundary — trace it one layer out (promoted ITree-lowering).** When the
-     implementer claims "omission is structurally impossible" / "this can't be
-     skipped by construction," don't stop at the API's own scope: ask **what the
-     caller supplies, and whether *that* input is itself structurally
-     constrained**. ITree-lowering's first `extract_hof_params(&[&str])`
-     guaranteed "if you list all HOF params, each gets a `RowVar`" — but the
-     soundness edge is "*every* HOF param gets one," which depends on the **listing
-     being exhaustive**, which a name-list does **not** enforce (the gap just moved
-     one layer out; the Architect caught it). The fix passed the **complete
-     telescope**, so omission became structurally impossible. Verify the guarantee
-     at the boundary the *unchecked* input crosses, not where the API ends.
-   - **Every TCB guard must be *invoked* at least once — not just varied where
-     already called** (sharpened from K2, where the suite varied cast/`Eq`
-     inputs but **never type-checked a `QuotElim`**, so the `check_respect` guard
-     was never called *at any universe* and silently admitted a closed `Empty`).
-     "Vary the inputs" does not cover "call every guard." Enumerate the checks in
-     the diff; **Block** if any guard, eliminator, or reduction case has zero
-     invoking test.
-   - **A "sound stuck/neutral fallback" claim must be verified at the *reduction*
-     site, not just the check.** If a check is deferred / `TODO` / partial but
-     `whnf` reduces the corresponding redex **unconditionally**, the deferral is
-     an unsound **accept**, not a fallback — Block it. Build the adversarial
-     input that the deferred path would mis-accept and assert it errors / stays
-     stuck (the K2 fixes added exactly these: the `Empty` exploit asserting
-     `Err`, the index-change cast asserting neutral).
-   - **Test the boundaries, not just typical magnitudes** (sharpened from K3,
-     where a `>4 MiB` value underflowed the arena — untested because the max test
-     value was 8 KiB, the same edge-avoidance class as K1/K2). For any
-     capacity/size/limit, require **at-limit, limit±1, empty, and oversized**
-     cases; **Block** a suite that only exercises mid-range magnitudes.
+## Does the suite reach the real subject?
+
+- **For an elaborator / translator / codegen, assert the *emitted output*, not
+  just that it succeeds — elaborate-and-check ≠ elaborate-and-correct
+  (promoted V1-fix; a 2-WP-latency bug).** A test that asserts only
+  "elaboration succeeds / the result type-checks" passes even when the output
+  is **wrong but well-typed** — so a producer bug ships green and propagates.
+  V1's de Bruijn shift bug rode through **V1 *and* V2** because the test used
+  **same-type params** (both `Nat`), making the mis-shifted body coincidentally
+  type-correct, and the suite checked *success* not *the term*. Require
+  **both**: **non-degenerate inputs** (distinct types/indices so a wrong output
+  can't be coincidentally valid) **and** a **structural assertion on the
+  emitted term** (the core/AST, resolved de Bruijn indices, the
+  obligation/cert shape) — the same "assert the structural output, at
+  non-degenerate endpoints" rule the trust-root uses, here for any producer
+  whose output a *later* checker accepts. **A round-trip test
+  (`parse(repr(x)) == x`) checks self-*consistency*, not *truth* (promoted
+  T1-build).** A mis-serialized value — a `verdict` written `false` when V3
+  said `unknown` — **round-trips green** (it deserializes back to the same
+  wrong value), so round-trip alone is vacuously self-satisfying. Pair
+  **every** round-trip case with ≥1 **structural assertion on the serialized
+  form** (the exact tag/field on the wire), or it guards nothing.
+- **For a NEW-surface WP, grep the producer registration BEFORE counting green
+  — a HARD gate (promoted L6-build; the hand-feeds-the-deliverable trap).** A
+  test for a new capability passes **green-vs-green** if it **hand-feeds the
+  binding/value the WP is supposed to *produce*** and then exercises a
+  **pre-existing** downstream consumer — so the suite is green with **zero** of
+  the new wiring. (L6: AC2/AC3 hand-fed `EffectRow::singleton("FS")` to the
+  pre-existing L5 escape gate while the elaborator registration was entirely
+  absent — 15/15 green, the Architect bounced it.) The tell: *"would this pass
+  if I deleted the new registration?"* So for any WP adding a new primitive /
+  type / elaborator-module / effect-row, **`grep register_<feature>
+  <producer-crate>/src/` for the actual registration call-site BEFORE counting
+  tests green**, and derive the test seed **from** that registration (delete it
+  ⇒ the seed empties ⇒ the verdict flips). This is a **hard gate on
+  new-surface WPs, not a soft guideline** — it lived as a soft guideline (from
+  F4) and got missed at L6 precisely because the suite was run, not grepped.
+- **A claim that a test discriminates *old-vs-new* — "X could not have passed
+  under the old code" — is verified by checking out the prior commit and
+  running the *literal same* assertion there (promoted ES2-remainder; 3rd
+  occurrence in a row).** Reading the diff does **not** surface this: the test
+  body looks identical before and after (only a call-site arity or a comment
+  changed), so a *temporal*-discrimination claim reads true from the diff while
+  being false. Three consecutive WPs shipped a "discriminating" test that
+  wasn't — VAL1-nested-patterns' Const-shape check, ES2-prelude-hygiene's dead
+  `print_line` interception, ES2-remainder's AC2 `sort`-elaborates test (all
+  passed **identically** against the pre-change commit: `elaborate_decl_v1`
+  success + `Ensures`-obligation emission never depended on the predicate being
+  real-vs-postulate, and `discharge_hole` — the real proof step — wasn't
+  invoked either way). So when a handoff claims "this couldn't have
+  type-checked / passed before," **`git checkout <prior-sha> -- <test>` and
+  confirm it FAILS there** (or run the literal assertion on the prior commit).
+  Cheap, mechanical, decisive — the *temporal* complement to
+  scratch-test-and-revert (which nets *spatial/value* discrimination).
+## Classification, provenance, and new mechanisms
+
+- **Provenance and proposition are ORTHOGONAL axes — a real postulate of the
+  WRONG type passes every provenance test; check the postulated TYPE against
+  the spec's literal law (promoted ES4-classes-build; the total-law bug).** On
+  a law-carrying / postulate-emitting WP, the tests confirmed each law field
+  was a *genuine* `Decl::Opaque` (real grep-able postulate, no smuggled proof)
+  — the provenance axis was solid. But **nothing checked that the type being
+  postulated actually *said* the law**: `total : IsTrue (leq x y)` is a
+  perfectly well-formed, perfectly-opaque postulate that **isn't totality**
+  (the Bool-equation `IsTrue (or_bool (leq x y) (leq y x))` — a *different,
+  generally-false* proposition). A defective field elaborates exactly as
+  cleanly as a correct one, so "it's a real `Opaque`" and "it's the right
+  proposition" are independent, and every test that only asks *is-this-Opaque*
+  is blind to a wrong axiom. Read the actual `.ken`/producer source and assert
+  the field's **type structurally matches the spec's literal law statement**,
+  not just its postulate-vs-proof provenance. **Corollary — grep the seed's
+  NAMED cases against the acceptance suite: a seed case named for a specific
+  property (here `ord-total-law-is-omega-bool-equation`) but *unexercised* is a
+  coverage hole that greenlights the mismatch.** When a seed names a
+  discriminating case, "did I port this exact case" is a checklist item before
+  the WP is done. (Severity calibration also held: trace `conv.rs` before
+  filing — a `Decl::Primitive`/`Opaque` never δ-unfolds, so a wrong *opaque*
+  axiom is a conformance/honesty defect on the audited-delta claim, **not** an
+  immediately kernel-exploitable Bottom — file it as exactly that, neither
+  over- nor under-claiming.)
+- **A WP that adds a new elaboration *mechanism* (not just new
+  instances/data) needs a synthetic test built to FAIL if the mechanism is
+  wrong — probe the mechanism directly, not the shipped instances (promoted
+  ES4-lawproofs; the dependent match-compiler).** When the WP ships a new
+  *mechanism* (a motive constructor, a substitution path, a dependent
+  eliminator — anything that could accept an *invalid* proof if its logic is
+  subtly wrong), the shipped instances may pass **trivially regardless of
+  whether the mechanism is correct**: `Ord Bool`'s real proofs are all over
+  `Bool`'s two-element state space, where every branch is uniformly
+  `Refl`-provable, so a **constant/degenerate motive** (one that ignores the
+  scrutinee and accepts anything) would pass every shipped instance. Build an
+  **adversarial synthetic case calibrated to the mechanism itself** — e.g.
+  `\x. match x { True => Refl ; False => Refl }` proving `IsTrue x`, which
+  **must be REJECTED** on the `False` branch iff the per-branch substitution
+  genuinely produces *different* expected types. If it accepts, the motive is
+  degenerate. (This one probe also independently re-surfaced the K5 Top-collapse
+  wall — a calibrated mechanism-probe finds both a positive confirmation and
+  latent capability boundaries.) The tell: a "mechanism" WP whose only tests are
+  repurposed acceptance tests over a tiny/uniform carrier.
+## Trust boundaries, guard invocation, and input coverage
+
+- **An untrusted layer's *positive verdict* must reach its constructor through
+  exactly ONE grep-able kernel-check call — verify the single path (promoted
+  V3-build; pairs with assert-output).** When a layer is believed only because
+  the kernel re-checks it ("distrust the layer, trust the kernel"), the
+  soundness rides on there being **no path to the positive constructor that
+  bypasses the check**. So `grep` the positive constructor (V3: `Proved { cert`)
+  and confirm **exactly one** site reaches it, **through** the kernel-check call
+  (`check(env, [], cert, goal)` in `attempt_with_cert`); every other path must
+  route to the honest negative (`emit_unknown_hole`). A second `Proved` site, or
+  one reachable without the check, is an unsound-accept hole the kernel can't
+  save you from — because the layer never handed it a cert to reject. This is
+  V1's `trusted_base()` honesty guard generalized to **any** verdict-bearing
+  layer (prover/elaborator/extractor); QA + the Architect verify the single
+  kernel-gated path is the *sole* constructor of the positive verdict.
+- **Test any term-in-a-context builder at a *non-empty* context — an
+  empty-context suite hides scope/de Bruijn assumptions (promoted V4-build; the
+  defining spine latency, twice).** A tactic/elaboration that builds a term *in
+  a context* `Γ` can be wrong about **shifts/scope** while passing every
+  **closed/empty-`Γ`** test — and the gap is invisible until the first
+  contextual input arrives. It bit the spine **twice with the same shape**: the
+  V1 de Bruijn bug (predicate on a non-final param) survived V1+V2 on
+  last-param-only tests; V3's `close_cert`/D-pre-pass passed V3's **empty-
+  context** IPC suite and broke at V4's first contextual goal (E1 slice). "A
+  suite that holds for a narrow range is indistinguishable from a correct one
+  until a non-accommodating case arrives." So for any context-builder, require
+  **non-empty `Γ`** (a hypothesis in scope, the binder not last) — the context
+  dimension of "open terms, not closed"; and **a fix for the consumption
+  interface ships with the producer, not one WP later** (V3's contextual tests
+  should have shipped with V3).
+- **A "by-construction" guarantee is only as strong as its weakest *input*
+  boundary — trace it one layer out (promoted ITree-lowering).** When the
+  implementer claims "omission is structurally impossible" / "this can't be
+  skipped by construction," don't stop at the API's own scope: ask **what the
+  caller supplies, and whether *that* input is itself structurally
+  constrained**. ITree-lowering's first `extract_hof_params(&[&str])`
+  guaranteed "if you list all HOF params, each gets a `RowVar`" — but the
+  soundness edge is "*every* HOF param gets one," which depends on the **listing
+  being exhaustive**, which a name-list does **not** enforce (the gap just moved
+  one layer out; the Architect caught it). The fix passed the **complete
+  telescope**, so omission became structurally impossible. Verify the guarantee
+  at the boundary the *unchecked* input crosses, not where the API ends.
+- **Every TCB guard must be *invoked* at least once — not just varied where
+  already called** (sharpened from K2, where the suite varied cast/`Eq`
+  inputs but **never type-checked a `QuotElim`**, so the `check_respect` guard
+  was never called *at any universe* and silently admitted a closed `Empty`).
+  "Vary the inputs" does not cover "call every guard." Enumerate the checks in
+  the diff; **Block** if any guard, eliminator, or reduction case has zero
+  invoking test.
+- **A "sound stuck/neutral fallback" claim must be verified at the *reduction*
+  site, not just the check.** If a check is deferred / `TODO` / partial but
+  `whnf` reduces the corresponding redex **unconditionally**, the deferral is
+  an unsound **accept**, not a fallback — Block it. Build the adversarial
+  input that the deferred path would mis-accept and assert it errors / stays
+  stuck (the K2 fixes added exactly these: the `Empty` exploit asserting
+  `Err`, the index-change cast asserting neutral).
+- **Test the boundaries, not just typical magnitudes** (sharpened from K3,
+  where a `>4 MiB` value underflowed the arena — untested because the max test
+  value was 8 KiB, the same edge-avoidance class as K1/K2). For any
+  capacity/size/limit, require **at-limit, limit±1, empty, and oversized**
+  cases; **Block** a suite that only exercises mid-range magnitudes.
 4. **No gate regression:** a passed roadmap gate (G0–G8) still holds.
 
-## Test design: conformance → *durable* tests (anti-fossilization gate)
+## Test design — load `build/qa-test-design.md`
 
-**Authoritative reference:** `research/qa-conformance-to-rust-test-guidelines.md`
-(operator-commissioned, 2026-07-18). Read it once; it holds the full 10-step
-conformance-to-test workflow, the oracle ranking, and the Rust assertion
-patterns (evolving partitions, negative conformance, one-axis discriminators,
-canonical bytes). This section is the **gate you apply every WP**; the reference
-is the how.
-
-The failure that motivated this: a `ken-verify` catalog test asserting *"exactly
-nine native and thirteen unavailable"* went CI-red when a later WP legitimately
-promoted 4 ops to native — a **milestone census frozen as a permanent
-invariant**. The red was maintenance noise, not a real regression; only
-full-workspace CI caught it because the count was mirrored across crates. QA's
-job is to make full-workspace surprises **semantic, not incidental**.
-
-**Every conformance-derived test declares one promise class — if you cannot
-classify it, it is not ready (Block):**
-- **Durable invariant** — survives *all* intended extensions that preserve the
-  contract. Prefer relations, set equality, disjointness/exhaustiveness, typed
-  variants, exhaustive matches. (e.g. "native ∪ unavailable == `HostOpV1::ALL`,
-  disjoint, and native == the authoritative `NATIVE_TESTED_TARGETS_V1`" — *not*
-  "there are 13 unavailable".)
-- **Normative compatibility vector** — pins exact bytes/values *because those
-  values are the contract* (ABI op identities, field order, canonical hashes,
-  known-answer vectors, grammar arity). Changing one requires a contract
-  decision, not a snapshot update.
-- **Transition sentinel** — *intentionally* fails when a planned extension
-  happens, to force review. Legal **only if labelled honestly**: named for the
-  boundary (not the current count), states why extension stops here, names the
-  event that retires it, sits beside the authoritative owner, and enumerates its
-  blast-radius consumers.
-
-### PROHIBITED SUBJECT — never assert facts about repository TEXT
-
-**Operator rule, 2026-07-26:** *"Test oracles that assert facts about source
-code, catalog, or documentation lines are an invitation for failure and delay.
-Tests should focus on behavior."*
-
-**BLOCK any test whose subject is the text of the repository** rather than the
-behaviour of a program: line numbers, line contents, occurrence positions or
-counts in prose, heading inventories, section presence, or a hardcoded census of
-where words appear in `catalog/`, `docs/`, `library/`, `spec/`, or `agent/`.
-This is **not** weighed against usefulness — a corpus-text assertion is
-inadmissible even when it is accurate, even when it once caught something.
-
-**WHY THIS IS A SUBJECT RULE AND NOT A FOURTH PROMISE CLASS — read this
-before you argue an exception.** The three classes above govern *what kind of
-promise* a test makes; **none of them asks what the test is ABOUT.** So a
-corpus-text oracle self-classifies straight into **"normative compatibility
-vector"** — *"pins exact values because those values are the contract"* — and
-passes this gate cleanly. **That is exactly what happened.**
-`crates/ken-elaborator/tests/kw_theorem_source_oracle.rs` pinned 64
-`(path, line, count)` rows across 18 files in six top-level trees, froze their
-line numbers repo-wide, and blocked an unrelated doc WP while reading, on its
-face, as a compliant compatibility vector. And the failure recorded as this
-section's *own* motivating example — *"a milestone census frozen as a permanent
-invariant"* — **is the same shape**. The gate described the disease and still
-admitted the patient.
-
-⇒ **A subject prohibition is orthogonal to the promise classes, which is the
-point: you cannot re-classify your way past it.** Ask *"what is this test
-about?"* before *"what does it promise?"*.
-
-**The tell, in one question:** *"Does an edit that changes nothing about how
-any program behaves make this test fail?"* If yes — inserting a paragraph,
-renaming a heading, reflowing prose — **the test is measuring the repository,
-not the software.** It will red for people who did nothing wrong, in files they
-have never read, and the cost lands on whoever is unlucky rather than whoever
-erred.
-
-** What to do instead — the property is usually still testable, as behaviour:**
-- a *policy* about identifiers → assert the **compiler/elaborator rejects** the
-  construct, on a fixture you author. That is behaviour, it is local, and prose
-  cannot break it.
-- a *generated artifact* must match its source → assert the **generator is
-  deterministic** and its output round-trips; do not pin the output's lines.
-- a *structural* document invariant (a manifest covers every file) → assert the
-  **relation** between two artifacts, keyed on identity, never on position.
-
-**Boundary, stated so it is not over-applied:** a test that parses a
-structured data file (a manifest, a lockfile) and checks a **relation** is
-behaviour-adjacent and permitted — line-by-line *parsing* is an implementation
-detail, not the subject. `crates/ken-cli/tests/library_documentation_gates.rs`
-sits on the permitted side: it validates manifest↔library consistency with real
-detector controls and hardcodes no coordinates. The prohibition is on
-**assertions keyed to textual position or corpus-wide word census**, not on
-reading a file.
-
-**The ten hard gates (apply at review; judgment, not syntax — §9 of the
-reference):**
-1. **Traceability** — every test names its spec/conformance source and promise
-   class.
-2. **Reachability** — ≥1 test reaches the *real* production mechanism ("if the
-   mechanism were deleted, would this exact test still pass?" → if yes, it's a
-   proxy/hand-fed; Block as sole evidence).
-3. **Discrimination** — every boundary has an opposite-observable pair; every
-   load-bearing guard/field exercised *independently* (one big malformed fixture
-   can't show which checks are live).
-4. **Oracle independence** — expected values aren't produced by the same logic
-   under test, *unless* "consumer == authoritative producer" is the property.
-   Round-trips prove self-consistency, not truth — pair with an exact structural
-   or independent vector.
-5. **Assertion stability** — typed structure/relations over literals; **classify
-   every literal** (contract? fixed-fixture? derived? or merely today's repo
-   state?). Contract/fixture literals OK; derived values computed or compared
-   relationally; **repo-state literals belong only in labelled sentinels**.
-6. **Completeness** — sealed enums exhaustive by construction; **cross-crate
-   consumer closure explicitly reviewed** (search consumers of the *element and
-   its obligation* — producer, serializer/parser, interp + native, verify/diff,
-   docs/manifest, conformance + Rust tests — compare complete sets, never mirror
-   counts).
-7. **No phantom coverage** — ignored/empty/zero-count/placeholder/success-only
-   tests do not count as conformance.
-8. **Causality** — before Approve, demonstrate breaking the claimed mechanism at
-   its seam makes the unchanged test fail with the expected opposite (scratch
-   mutation / prior-commit run / test-only selector; don't keep the mutation)
-   — **and when it does NOT fail, suspect a stale input or a broken build before
-   concluding the property holds.**
-   - **Enumerate your probes by the STATE each one builds, then look for the
-     missing cell (promoted ORACLE-VIS-*; four instances, three seats, one day).**
-     The probes that **follow the diff** — the happy path and the error path —
-     get written for free, because the change itself puts that state in front of
-     you. The probe that has to **manufacture a violation** is *orthogonal to the
-     change*, so it is the one nobody writes — **and its absence is invisible,
-     because the suite still reads as complete.** A publisher gate shipped with
-     three probes, two green:
-     `green→PERMIT ✅ · red→PERMIT ⛔ · conflict→CANNOT-EVALUATE ✅`.
-     Two of three passed **and the two that passed were exactly the ones
-     exercising the code that had just changed**; the red probe — the only one
-     that had to *construct* a violation — was the only discriminator. So don't
-     ask *"did I test it?"*; **tabulate the states (satisfied / violated /
-     unevaluable) and name which probe builds each.** An empty cell is the
-     finding. Same shape as a `compile_fail` block that passes for any reason at
-     all, and as a detector arm whose real job is *rejecting* a signal.
-   - **Mutate to the property's NEAREST legal neighbour, not to an obvious
-     break.** A mutation only proves what it varies, so the question is *which
-     variation the check is blind to*. The invariant, which is not about
-     programming-language syntax:
-
-     > **The property is semantic; the check operates on a REPRESENTATION. The
-     > nearest legal neighbour is where two representations denote the SAME
-     > thing but differ in the part the check inspects.**
-
-     That is where a check goes vacuous, and it applies to every substrate we
-     gate — a TOML key that may be quoted or re-nested, a manifest defeated by
-     an equivalent array spelling, a shell command line admitting different
-     quoting, a JSON payload with reordered or aliased fields. Enumerate the
-     spellings the **substrate** admits and mutate to the **worst legal one**.
-     Then prefer **asking the substrate's own parser over running a matcher
-     against its text** — the compiler is the Rust instance of that rule, not
-     the rule itself. A text matcher's blind spots are exactly the forms you did
-     not imagine, which is why they cannot be enumerated from the armchair.
-
-     Worked example (promoted ORACLE-VIS-PACKAGING; **caught by runtime-qa**,
-     who constructed it rather than inheriting it): the obvious widening
-     `pub fn f(` went red correctly, while the **legal line-split** form —
-     `#[cfg(test)]` / `pub` / `fn build_process_starter_executable_artifact(` —
-     compiled clean and **passed green, 13/13** over a genuine widening, because
-     the text pin matched visibility against the *same line's* prefix, which is
-     empty on the `fn` line. Same denotation, different representation, and the
-     difference sat precisely in the part the check read.
-   - **A mutation that breaks the BUILD proves nothing** — the checks then
-     "pass" against rubble. Confirm the crate still compiles under the mutation;
-     use a compile-preserving stand-in (e.g. a `#[cfg(not(test))]` sibling) when
-     the direct edit would collide with a gated declaration.
-   - **When a mutation passes where it should FAIL, suspect a STALE INPUT
-     before you doubt the mutation.** Freshness is a **third axis**, independent
-     of correctness and of the positive control: a control proves the harness
-     *works*, never that it read **current** code. A probe selecting among 15
-     accumulated rlibs by filename hash reported on hours-old source **with every
-     signal healthy, the positive control included**. Check *which artifact the
-     probe actually compiled against* before concluding the property holds.
-   - **Construct your OWN mutation before you run theirs — and if you can only
-     re-run theirs, SAY SO IN THE VERDICT.** **Re-running is not re-deriving.**
-     A QA that re-runs the
-     implementer's mutation inherits the implementer's *vantage* — including the
-     forms they did not imagine, which for a representation-matching mechanism is
-     the **entire failure surface**. That is the one place a mutation proof
-     degrades silently into agreement, and it leaves no trace: the verdict reads
-     identical either way.
-     ⇒ **Agreement counts as corroboration only when neither seat inherited the
-     other's premise.** So derive the violation independently from the *property*,
-     not from their test. (ORACLE-VIS-PACKAGING: QA mutation-proved across three
-     axes with its own construction, and the finding that blocked the WP was a
-     form the implementer's own probes could not have suggested.)
-     The second clause is the load-bearing one — **an inherited mutation is not a
-     defect, but an inherited mutation reported as an independent one is.**
-     Naming the limitation makes the degraded case visible instead of
-     indistinguishable from the real thing.
-9. **Maintenance** — the test states which intended extensions stay green and
-   which incompatible changes go red. If both answers are "any change," it's a
-   snapshot/sentinel, not an invariant — label it.
-10. **Targeted execution** — affected tests/packages via `scripts/ken-cargo`,
-    nonzero test count, inspect the message; **never the workspace locally** —
-    full-workspace consumer surprises stay CI's job.
+Reviewing what a test *promises* and what it is *about* is its own pass, with
+its own gates: the three promise classes and the anti-fossilization rule, the
+prohibited-subject rule (never assert facts about repository text), and the ten
+hard gates you apply before Approve. It is `agent/playbooks/build/qa-test-design.md`.
 
 ## Verifying a mechanical pin — load the `pin-a-property` skill
 

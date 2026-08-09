@@ -168,3 +168,85 @@ from a re-recording.** Record the base SHA, the probe names, and the exact
 worktree + invocation, and **specify the sanctioned invocation verbatim**
 (`scripts/ken-cargo`, targeted) or the recipe will document a procedure the
 fleet is not allowed to run. **Demonstrate the binding; do not testify to it.**
+
+## 12. Running a mutation campaign at the review gate
+
+Promoted from `build/qa-test-design.md`'s Causality gate, which is where this is
+applied: before Approve, demonstrate that breaking the claimed mechanism at
+its seam makes the unchanged test fail with the expected opposite.
+
+- **Enumerate your probes by the STATE each one builds, then look for the
+  missing cell (promoted ORACLE-VIS-*; four instances, three seats, one day).**
+  The probes that **follow the diff** — the happy path and the error path —
+  get written for free, because the change itself puts that state in front of
+  you. The probe that has to **manufacture a violation** is *orthogonal to the
+  change*, so it is the one nobody writes — **and its absence is invisible,
+  because the suite still reads as complete.** A publisher gate shipped with
+  three probes, two green:
+  `green→PERMIT ✅ · red→PERMIT ⛔ · conflict→CANNOT-EVALUATE ✅`.
+  Two of three passed **and the two that passed were exactly the ones
+  exercising the code that had just changed**; the red probe — the only one
+  that had to *construct* a violation — was the only discriminator. So don't
+  ask *"did I test it?"*; **tabulate the states (satisfied / violated /
+  unevaluable) and name which probe builds each.** An empty cell is the
+  finding. Same shape as a `compile_fail` block that passes for any reason at
+  all, and as a detector arm whose real job is *rejecting* a signal.
+## 12a. Mutate to the property's nearest legal neighbour
+
+- **Mutate to the property's NEAREST legal neighbour, not to an obvious
+  break.** A mutation only proves what it varies, so the question is *which
+  variation the check is blind to*. The invariant, which is not about
+  programming-language syntax:
+
+  > **The property is semantic; the check operates on a REPRESENTATION. The
+  > nearest legal neighbour is where two representations denote the SAME
+  > thing but differ in the part the check inspects.**
+
+  That is where a check goes vacuous, and it applies to every substrate we
+  gate — a TOML key that may be quoted or re-nested, a manifest defeated by
+  an equivalent array spelling, a shell command line admitting different
+  quoting, a JSON payload with reordered or aliased fields. Enumerate the
+  spellings the **substrate** admits and mutate to the **worst legal one**.
+  Then prefer **asking the substrate's own parser over running a matcher
+  against its text** — the compiler is the Rust instance of that rule, not
+  the rule itself. A text matcher's blind spots are exactly the forms you did
+  not imagine, which is why they cannot be enumerated from the armchair.
+
+  Worked example (promoted ORACLE-VIS-PACKAGING; **caught by runtime-qa**,
+  who constructed it rather than inheriting it): the obvious widening
+  `pub fn f(` went red correctly, while the **legal line-split** form —
+  `#[cfg(test)]` / `pub` / `fn build_process_starter_executable_artifact(` —
+  compiled clean and **passed green, 13/13** over a genuine widening, because
+  the text pin matched visibility against the *same line's* prefix, which is
+  empty on the `fn` line. Same denotation, different representation, and the
+  difference sat precisely in the part the check read.
+## 12b. Build breaks, stale inputs, and inherited mutations
+
+- **A mutation that breaks the BUILD proves nothing** — the checks then
+  "pass" against rubble. Confirm the crate still compiles under the mutation;
+  use a compile-preserving stand-in (e.g. a `#[cfg(not(test))]` sibling) when
+  the direct edit would collide with a gated declaration.
+- **When a mutation passes where it should FAIL, suspect a STALE INPUT
+  before you doubt the mutation.** Freshness is a **third axis**, independent
+  of correctness and of the positive control: a control proves the harness
+  *works*, never that it read **current** code. A probe selecting among 15
+  accumulated rlibs by filename hash reported on hours-old source **with every
+  signal healthy, the positive control included**. Check *which artifact the
+  probe actually compiled against* before concluding the property holds.
+- **Construct your OWN mutation before you run theirs — and if you can only
+  re-run theirs, SAY SO IN THE VERDICT.** **Re-running is not re-deriving.**
+  A QA that re-runs the
+  implementer's mutation inherits the implementer's *vantage* — including the
+  forms they did not imagine, which for a representation-matching mechanism is
+  the **entire failure surface**. That is the one place a mutation proof
+  degrades silently into agreement, and it leaves no trace: the verdict reads
+  identical either way.
+  ⇒ **Agreement counts as corroboration only when neither seat inherited the
+  other's premise.** So derive the violation independently from the *property*,
+  not from their test. (ORACLE-VIS-PACKAGING: QA mutation-proved across three
+  axes with its own construction, and the finding that blocked the WP was a
+  form the implementer's own probes could not have suggested.)
+  The second clause is the load-bearing one — **an inherited mutation is not a
+  defect, but an inherited mutation reported as an independent one is.**
+  Naming the limitation makes the degraded case visible instead of
+  indistinguishable from the real thing.
