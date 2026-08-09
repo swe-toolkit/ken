@@ -1770,11 +1770,21 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 call_edges,
                 staged_process_input,
             )?;
-            // `D5a` checkpoint 4 step 3 — the reaching mutation for the ONE
-            // ledger's lifetime, and it is the checkpoint-2 defect itself:
-            // close after the FIRST definition pass, before any generated
-            // `Function` exists. ⛔ Nothing about the equality moves; only the
-            // window it is taken over.
+            // `D5a` checkpoint 4 step 3 — the reaching mutation for the
+            // shared artifact lifetime, and it is the checkpoint-2 defect
+            // itself: close after the FIRST definition pass, before any
+            // generated `Function` exists.
+            //
+            // **It moves the COMPOSITE closeout's window.** Since `D2` this
+            // call closes the candidate ledger's totality check and the claim
+            // ledger's two laws together, so the mutation varies when all of
+            // them are taken -- not one ledger and not one equality. Nothing
+            // about any of the laws themselves moves; only the window they are
+            // taken over, which is what keeps the refusal attributable to the
+            // lifetime. Candidates are genuinely unsettled at that point, so
+            // candidate totality is the refusal it reaches, and
+            // `ced_d2_the_composite_early_close_reaches_candidate_totality_on_the_generalized_owner_domain`
+            // is the control that pins it.
             #[cfg(test)]
             if d5a_route_mutation() == D5aRouteMutation::CloseLedgerAfterTheFirstPass {
                 record_d5a_route_application();
@@ -1842,7 +1852,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // root adapter is the tempting spot. It is closed after the adapter
             // instead: the adapter is itself a generated `Function`, and
             // closing before it would make a causal ref declared there
-            // invisible to the equality rather than caught by it. It declares
+            // invisible to the laws rather than caught by them. It declares
             // none today — that is a fact about the adapter, not a reason to
             // narrow the window.
             super::units::close_continuation_claim_ledger(&mut compiler)?;
