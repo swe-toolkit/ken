@@ -5950,6 +5950,20 @@ fn the_owner_classification_has_a_closed_production_naming_inventory() {
             // records the seam without claiming production reachability.
             "pub(in crate::cranelift_backend) enum D2aPopulationMutation {",
             "pub(in crate::cranelift_backend) fn with_d2a_population_mutation<T>(",
+            // `RT-BODY-OCCURRENCE-PROVENANCE` `AC-3` adds a second scoped
+            // mutation seam of exactly the `D2a` shape, and the argument is the
+            // same one: it is a `cfg(test)` SCOPE that restores a prior
+            // population choice for the duration of one control, never a
+            // capability a consumer gains. The enum carries no payload and the
+            // scope restores `Exact` on the way out including on panic, so a
+            // consumer cannot mint, compute or install a body occurrence
+            // through it — it can only ask the planner to re-issue the
+            // pre-correction alias and observe the refusal that follows.
+            // Same `cfg(test)` caveat as `D2a`: the source tripwire cannot
+            // distinguish it, so this records the seam without claiming
+            // production reachability.
+            "pub(in crate::cranelift_backend) enum BodyOccurrenceMutation {",
+            "pub(in crate::cranelift_backend) fn with_body_occurrence_mutation<T>(",
         ],
         "D7: the plane's widened-visibility inventory changed. `StaticOriginId` \
          is widened deliberately so the lowering can carry an occurrence's \
@@ -12909,7 +12923,7 @@ fn d5_planned_callable_declaration_origins(
                 AbiUnitDefinition::CallableDeclaration { .. }
             )
         })
-        .map(|unit| unit.origin())
+        .map(|unit| unit.body_occurrence())
         .collect()
 }
 
@@ -13949,7 +13963,7 @@ fn d5a_the_landed_object_fixture_consumes_its_ih_marker_before_emitting_the_work
             .emittable_units()
             .expect("units")
             .into_iter()
-            .map(|unit| format!("{:?}@{:?}={:?}", unit.function(), unit.origin(), unit.definition()))
+            .map(|unit| format!("{:?}@{:?}={:?}", unit.function(), unit.body_occurrence(), unit.definition()))
             .collect::<Vec<_>>();
         let calls = plan
             .continuation_calls()
@@ -15029,13 +15043,13 @@ fn d5a_the_final_executable_population_is_the_emittable_set_minus_the_superseded
             .emittable_units()
             .expect("emittable units")
             .iter()
-            .map(|unit| (unit.function(), unit.origin()))
+            .map(|unit| (unit.function(), unit.body_occurrence()))
             .collect::<Vec<_>>();
         let executable = plan
             .executable_units()
             .expect("executable units")
             .iter()
-            .map(|unit| (unit.function(), unit.origin()))
+            .map(|unit| (unit.function(), unit.body_occurrence()))
             .collect::<Vec<_>>();
 
         let expected = emittable
@@ -25276,12 +25290,12 @@ fn d6b_the_mixed_pair_is_over_one_body_and_only_a_retarget_makes_the_two_tables_
             plan.emittable_units()
                 .expect("emittable units")
                 .iter()
-                .map(|unit| unit.origin())
+                .map(|unit| unit.body_occurrence())
                 .collect::<BTreeSet<_>>(),
             plan.executable_units()
                 .expect("executable units")
                 .iter()
-                .map(|unit| unit.origin())
+                .map(|unit| unit.body_occurrence())
                 .collect::<BTreeSet<_>>(),
         )
     });

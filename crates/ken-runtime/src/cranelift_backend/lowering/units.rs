@@ -478,7 +478,7 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
                 "worker template frame size disagrees with its slot run".to_string(),
             ));
         }
-        let origin = unit.origin();
+        let origin = unit.body_occurrence();
         if templates
             .insert(
                 origin,
@@ -513,7 +513,7 @@ pub(in crate::cranelift_backend) fn resolve_worker_targets(
                 "worker target frame size disagrees with its slot run".to_string(),
             ));
         }
-        let origin = unit.origin();
+        let origin = unit.body_occurrence();
         let target = ResolvedUnitTarget {
             function,
             origin,
@@ -685,7 +685,7 @@ pub(in crate::cranelift_backend) fn resolve_call_edges(
             .into_iter()
             .find(|unit| unit.function() == edge.callee())
             .ok_or_else(|| backend_module("call edge callee has no abi descriptor".to_string()))?;
-        if unit.origin() != edge.callee_origin() {
+        if unit.entry_origin() != edge.callee_origin() {
             return Err(backend_module(
                 "call edge callee origin disagrees with its abi descriptor".to_string(),
             ));
@@ -1584,7 +1584,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
                         .filter(|slot| slot.kind == AbiSlotKind::Capture)
                         .count(),
                 ),
-                emittable.origin(),
+                emittable.body_occurrence(),
             )
         })
         .collect();
@@ -2868,14 +2868,17 @@ pub(super) fn define_root_adapter<M: Module>(
             source_authorized: false,
         }),
     );
-    let root_origin = root.origin();
+    let root_origin = root.body_occurrence();
     function_local.unit_calls.insert(
         root_origin,
         DeclaredUnitCall {
             function: module.declare_func_in_func(root_id, &mut func),
             origin: root_origin,
-            // The root adapter's own entry: source body and scheduling entry
-            // are the same occurrence.
+            // The body occurrence, NOT the scheduling entry. They coincide
+            // for an ordinary root and deliberately do not when the root body
+            // schedules something before itself; `call_site_origin` is matched
+            // against the `body_origin` the unit actually lowers, so naming the
+            // entry here would disagree exactly on that case.
             call_site_origin: root_origin,
             header: root.header(),
             slots: root.slots().to_vec(),
@@ -4134,7 +4137,7 @@ pub(super) fn define_unit_bodies<M: Module>(
             let (offsets, frame_bytes) = unit.slot_offsets()?;
             Ok(OwnedUnitEmission {
                 function: unit.function(),
-                origin: unit.origin(),
+                body_occurrence: unit.body_occurrence(),
                 definition: unit.definition(),
                 header: unit.header(),
                 slots: unit.slots().to_vec(),
@@ -4188,7 +4191,8 @@ pub(super) fn define_unit_bodies<M: Module>(
 
 struct OwnedUnitEmission {
     function: PredeclaredFunctionId,
-    origin: StaticOriginId,
+    /// The issued body occurrence this unit lowers, carried from the planner.
+    body_occurrence: StaticOriginId,
     /// `RT-SRCBODY-BIND-ORDER` `D1` — carried because the ABI descriptor run
     /// and the source body's semantic environment are now two different orders,
     /// and only the definition arm says which units get the conversion.
@@ -4388,7 +4392,7 @@ fn define_unit_body<M: Module>(
     #[cfg(test)]
     d5a_trace(format!(
         "UNIT-BODY entry function={:?} origin={:?}",
-        unit.function, unit.origin
+        unit.function, unit.body_occurrence
     ));
     compiler.open_aggregate_events(id)?;
     // `D8o` — bound for this body's lifetime and released on exit, so no later
@@ -4671,16 +4675,19 @@ fn define_unit_body<M: Module>(
             compiler.root_terminal_authority =
                 compiler.take_distinguished_root_answer_authority()?;
         }
-        // The explicit root *entry* selects the unit, but a root
-        // `ComputationalMatch` deliberately schedules its scrutinee while its
-        // source record belongs to the distinct root occurrence.  Body
-        // selection therefore uses the recorded occurrence only after the
-        // unmintable entry has selected the descriptor.
-        let body_origin = if is_root {
-            compiler.static_transition_plan.root_static_origin()?
-        } else {
-            unit.origin
-        };
+        // **No root special case.** The planner issues every unit's body
+        // occurrence at the visit that registered its scheduling entry, so the
+        // carried value is already the right one for the root and for every
+        // declaration alike.
+        //
+        // This conditional existed because `unit.origin` was an ALIAS of the
+        // scheduling entry, which is wrong for any body that schedules
+        // something before itself — the root was simply the one case that had
+        // been noticed and patched. Substituting at one arm left every non-root
+        // unit entering its entry and never reaching its body occurrence or the
+        // join subtree beneath it. Reinstating a branch here would restore that
+        // defect for whichever arm it did not cover.
+        let body_origin = unit.body_occurrence;
         #[cfg(test)]
         srcbody_bind_order_record(SrcbodyBindOrderObservation {
             host: SrcbodyBindHost::OrdinaryUnit,
@@ -4778,7 +4785,11 @@ fn define_unit_body<M: Module>(
                 }
                 LoweringOperand::Specialized(value) => Some(
                     compiler
-                        .transfer_unit_result_into_carrier(&mut builder, unit.origin, &value)?
+                        .transfer_unit_result_into_carrier(
+                            &mut builder,
+                            unit.body_occurrence,
+                            &value,
+                        )?
                         .word,
                 ),
             };
@@ -4805,7 +4816,7 @@ fn define_unit_body<M: Module>(
     #[cfg(test)]
     d5a_trace(format!(
         "UNIT-BODY done function={:?} origin={:?} root={:?}",
-        unit.function, unit.origin, root_outcome.as_ref().map(|_| "root")
+        unit.function, unit.body_occurrence, root_outcome.as_ref().map(|_| "root")
     ));
     compiler.validate_materialized_dead_join_cfg(unit.function, &func)?;
     // `4b` -- the emission-seam equality gate, on the FINISHED function and

@@ -474,7 +474,12 @@ pub(super) struct AbiDescriptor {
     pub(super) function: PredeclaredFunctionId,
     /// This unit's entry node — its seed in the owner partition.
     pub(super) planned_node: StaticNodeId,
-    pub(super) origin: StaticOriginId,
+    /// The occurrence ordinary emission lowers as this unit's body.
+    ///
+    /// Carried, never derived from `planned_node`: the two coincide for
+    /// an ordinary body and deliberately differ when the body schedules
+    /// something before itself.
+    pub(super) body_occurrence: StaticOriginId,
     pub(super) definition: AbiUnitDefinition,
     pub(super) header: AbiFrameHeader,
     /// This descriptor's dense run in `AbiPlane::slots`, laid out in kind order:
@@ -720,7 +725,7 @@ pub(super) fn build_abi_plane(
         abi.descriptors.push(AbiDescriptor {
             function: id,
             planned_node: function.planned_node,
-            origin: function.origin,
+            body_occurrence: function.body_occurrence,
             definition,
             header,
             slots,
@@ -1776,7 +1781,7 @@ pub(super) fn validate_emitted_transfers(
         // ⭐ Hole B: the unit's OWN result. `C4` never carrier-checks this, and
         // `LexicalClosure { captures: [], body: ImportedDeclarationRef }` needs
         // no wrapper at all to exploit it.
-        require_representable_producers(plane, sources, descriptor.origin)?;
+        require_representable_producers(plane, sources, descriptor.body_occurrence)?;
 
         // ⭐ Hole A: each capture, traced through binder-free wrappers rather
         // than read off the child's own top-level shape.
@@ -2199,7 +2204,7 @@ impl AbiPlane {
             );
             if descriptor.function != id
                 || descriptor.planned_node != function.planned_node
-                || descriptor.origin != function.origin
+                || descriptor.body_occurrence != function.body_occurrence
             {
                 return Err(planner_error(
                     "abi descriptor is not positional for its function unit",
