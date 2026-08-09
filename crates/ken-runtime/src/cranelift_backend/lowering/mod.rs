@@ -6853,7 +6853,7 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .emittable_units()?
                 .into_iter()
-                .find(|unit| unit.origin() == record.worker_body_origin)
+                .find(|unit| unit.body_occurrence() == record.worker_body_origin)
                 .ok_or_else(|| {
                     backend_module(
                         "a claimed composed discharge names a worker body with no emittable unit"

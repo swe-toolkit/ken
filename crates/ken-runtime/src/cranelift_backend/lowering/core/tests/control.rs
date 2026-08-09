@@ -12909,7 +12909,7 @@ fn d5_planned_callable_declaration_origins(
                 AbiUnitDefinition::CallableDeclaration { .. }
             )
         })
-        .map(|unit| unit.origin())
+        .map(|unit| unit.body_occurrence())
         .collect()
 }
 
@@ -13949,7 +13949,7 @@ fn d5a_the_landed_object_fixture_consumes_its_ih_marker_before_emitting_the_work
             .emittable_units()
             .expect("units")
             .into_iter()
-            .map(|unit| format!("{:?}@{:?}={:?}", unit.function(), unit.origin(), unit.definition()))
+            .map(|unit| format!("{:?}@{:?}={:?}", unit.function(), unit.body_occurrence(), unit.definition()))
             .collect::<Vec<_>>();
         let calls = plan
             .continuation_calls()
@@ -15029,13 +15029,13 @@ fn d5a_the_final_executable_population_is_the_emittable_set_minus_the_superseded
             .emittable_units()
             .expect("emittable units")
             .iter()
-            .map(|unit| (unit.function(), unit.origin()))
+            .map(|unit| (unit.function(), unit.body_occurrence()))
             .collect::<Vec<_>>();
         let executable = plan
             .executable_units()
             .expect("executable units")
             .iter()
-            .map(|unit| (unit.function(), unit.origin()))
+            .map(|unit| (unit.function(), unit.body_occurrence()))
             .collect::<Vec<_>>();
 
         let expected = emittable
@@ -25276,12 +25276,12 @@ fn d6b_the_mixed_pair_is_over_one_body_and_only_a_retarget_makes_the_two_tables_
             plan.emittable_units()
                 .expect("emittable units")
                 .iter()
-                .map(|unit| unit.origin())
+                .map(|unit| unit.body_occurrence())
                 .collect::<BTreeSet<_>>(),
             plan.executable_units()
                 .expect("executable units")
                 .iter()
-                .map(|unit| unit.origin())
+                .map(|unit| unit.body_occurrence())
                 .collect::<BTreeSet<_>>(),
         )
     });

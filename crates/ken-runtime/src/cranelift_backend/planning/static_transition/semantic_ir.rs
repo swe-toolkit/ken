@@ -798,8 +798,16 @@ pub(super) struct CaptureLayout {
 #[repr(C)]
 pub(super) struct PredeclaredFunction {
     pub(super) id: PredeclaredFunctionId,
+    /// The **scheduling-entry** axis — this unit's seed in the owner partition.
     pub(super) planned_node: StaticNodeId,
-    pub(super) origin: StaticOriginId,
+    /// The **body-occurrence** axis — the origin ordinary emission lowers.
+    ///
+    /// ⛔ Named for the axis rather than `origin`, which read as "this unit's
+    /// origin" and was filled with an alias of `planned_node`. The two axes
+    /// coincide for every ordinary body and deliberately do not when the body
+    /// schedules something before itself; a field name that does not say which
+    /// one it holds is what let the alias survive review.
+    pub(super) body_occurrence: StaticOriginId,
     pub(super) program: SemanticProgramId,
 }
 
@@ -888,6 +896,23 @@ struct OwnershipPartition {
     /// Seed entry nodes, dense by `PredeclaredFunctionId` ordinal: `entries`
     /// first, in order, then every `StaticBody` target in edge order.
     seeds: Vec<StaticNodeId>,
+    /// Each seed's body occurrence, dense by the same ordinal as `seeds`.
+    ///
+    /// ⛔ **Two seed classes, two different authorities, and neither is the
+    /// seed's own ordinal.**
+    ///
+    /// - A `SchedulingEntry` seed takes the **exact pair issued** at its
+    ///   registration visit. Its entry and its body coincide for every ordinary
+    ///   form and deliberately differ when the body schedules something before
+    ///   it, so the entry's ordinal is not an answer.
+    /// - A `StaticBodyTarget` seed keeps its already-grounded defining child-0
+    ///   relation: the seed **is** the body node, so its own origin is the
+    ///   correct one by the same rule, not by coincidence.
+    ///
+    /// ⚠ Resolved here, where the class is known from which loop pushed the
+    /// seed, rather than at the consumer — a consumer holding only a node has
+    /// no way to tell the classes apart and would have to infer.
+    seed_body_occurrences: Vec<StaticOriginId>,
     /// One owner per planned node, dense by node index.
     owners: Vec<SemanticOwner>,
 }
@@ -1036,6 +1061,7 @@ fn partition_function_units(
     nodes: &[StaticNode],
     edges: &[StaticEdge],
     entries: &[StaticNodeId],
+    entry_bodies: &dyn Fn(StaticNodeId) -> Option<StaticOriginId>,
     root_entry: Option<StaticNodeId>,
 ) -> Result<OwnershipPartition, CraneliftBackendError> {
     let (terminal, trap_terminal) = shared_exits(nodes)?;
@@ -1058,6 +1084,7 @@ fn partition_function_units(
     }
     let mut seed_class = vec![None; nodes.len()];
     let mut seeds = Vec::with_capacity(entries.len());
+    let mut seed_body_occurrences = Vec::with_capacity(entries.len());
     for entry in entries {
         let index = entry.0 as usize;
         let slot = seed_class
@@ -1077,7 +1104,15 @@ fn partition_function_units(
             SeedClass::SchedulingEntry
         });
         if !is_declaration_owned(*entry) {
+            // Fail closed. A scheduling entry with no issued pair is a planner
+            // bug, and the one substitution available here — the entry's own
+            // origin — is exactly the alias this correction removed, so it must
+            // not be reachable as a fallback.
+            let body = entry_bodies(*entry).ok_or_else(|| {
+                planner_error("scheduling entry has no issued body occurrence")
+            })?;
             seeds.push(*entry);
+            seed_body_occurrences.push(body);
         }
     }
     for edge in edges {
@@ -1101,7 +1136,12 @@ fn partition_function_units(
             }
             None => *slot = Some(SeedClass::StaticBodyTarget),
         }
+        // The already-grounded class: this seed IS the body node, so its
+        // defining child-0 relation is its own origin. Unchanged by this
+        // correction, and stated rather than shared with the entry class so the
+        // two authorities cannot be collapsed into one rule later.
         seeds.push(edge.to);
+        seed_body_occurrences.push(StaticOriginId(edge.to.0));
     }
     // `D2a`: the declaration occurrence traverses WITH its callable unit. ⭐ It
     // remains that unit's ownership, provenance and `D3` signature authority —
@@ -1171,7 +1211,16 @@ fn partition_function_units(
         .into_iter()
         .map(|owner| owner.ok_or_else(|| planner_error("planned node has no function unit owner")))
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(OwnershipPartition { seeds, owners })
+    if seed_body_occurrences.len() != seeds.len() {
+        return Err(planner_error(
+            "function unit seeds and issued body occurrences are not the same population",
+        ));
+    }
+    Ok(OwnershipPartition {
+        seeds,
+        seed_body_occurrences,
+        owners,
+    })
 }
 
 /// The sole semantic-definition constructor. It positions seeds by their
@@ -1187,6 +1236,10 @@ pub(super) fn build_semantic_plane(
     nodes: &[StaticNode],
     edges: &[StaticEdge],
     entries: &[StaticNodeId],
+    // The issued `entry -> body_occurrence` pairing, read as a lookup so this
+    // module never sees the table's representation and cannot acquire a second
+    // way to answer the same question.
+    entry_bodies: &dyn Fn(StaticNodeId) -> Option<StaticOriginId>,
     root_entry: Option<StaticNodeId>,
     sources: &[SemanticSourceSeed],
     arena: &SemanticMaterialArena,
@@ -1219,7 +1272,7 @@ pub(super) fn build_semantic_plane(
         });
     }
 
-    let partition = partition_function_units(nodes, edges, entries, root_entry)?;
+    let partition = partition_function_units(nodes, edges, entries, entry_bodies, root_entry)?;
 
     let mut plane = SemanticPlane::default();
     // Atom content is referenced by absolute span, so the interned bytes move
@@ -1306,12 +1359,17 @@ pub(super) fn build_semantic_plane(
         plane.functions.push(PredeclaredFunction {
             id,
             planned_node: *seed,
-            origin: StaticOriginId(seed.0),
+            // ⛔ Was `StaticOriginId(seed.0)` — an alias of the SCHEDULING
+            // entry. For every unit whose body schedules something before
+            // itself the two are different nodes, so ordinary emission entered
+            // the entry and never reached the body occurrence or its join
+            // subtree. The partition resolved the correct axis per seed class.
+            body_occurrence: partition.seed_body_occurrences[ordinal],
             program: SemanticProgramId(seed.0),
         });
     }
 
-    plane.validate(nodes, edges, entries, root_entry, sources, arena)?;
+    plane.validate(nodes, edges, entries, entry_bodies, root_entry, sources, arena)?;
     Ok(plane)
 }
 
@@ -1823,11 +1881,20 @@ impl SemanticPlane {
             if caller == callee {
                 continue;
             }
-            let callee_origin = self
+            // ⛔ The **scheduling-entry** axis, deliberately. A call names the
+            // unit it enters, which is its entry; the body occurrence is where
+            // that unit's source traversal begins once inside. The old `origin`
+            // field was an alias of `planned_node`, so this read is unchanged in
+            // value — it is spelled from `planned_node` now that the two axes
+            // are separately named, rather than silently following the field
+            // whose meaning moved. Call identity is invariant under this
+            // correction.
+            let callee_entry = self
                 .functions
                 .get(callee.0 as usize)
                 .ok_or_else(|| planner_error("call edge callee has no function descriptor"))?
-                .origin;
+                .planned_node;
+            let callee_origin = StaticOriginId(callee_entry.0);
             call_edges.push((caller, callee, callee_origin));
         }
         Ok(call_edges)
@@ -1867,13 +1934,16 @@ impl SemanticPlane {
                     "declaration call edge does not join two function units",
                 ));
             };
-            let callee_origin = self
+            // The scheduling-entry axis, for the same reason as the typed call
+            // edges above: a call names the unit's entry, not its body.
+            let callee_entry = self
                 .functions
                 .get(callee.0 as usize)
                 .ok_or_else(|| {
                     planner_error("declaration call callee has no function descriptor")
                 })?
-                .origin;
+                .planned_node;
+            let callee_origin = StaticOriginId(callee_entry.0);
             call_edges.push((
                 caller,
                 callee,
@@ -1905,10 +1975,11 @@ impl SemanticPlane {
         nodes: &[StaticNode],
         edges: &[StaticEdge],
         entries: &[StaticNodeId],
+        entry_bodies: &dyn Fn(StaticNodeId) -> Option<StaticOriginId>,
         root_entry: Option<StaticNodeId>,
         node_indexed_sources: &[SemanticSourceSeed],
     ) -> Result<(), CraneliftBackendError> {
-        let partition = partition_function_units(nodes, edges, entries, root_entry)?;
+        let partition = partition_function_units(nodes, edges, entries, entry_bodies, root_entry)?;
         let (declaration_owned_body, pairs) =
             declaration_owned_pairs(nodes.len(), edges, entries, root_entry)?;
 
@@ -1946,11 +2017,42 @@ impl SemanticPlane {
             let seed = partition.seeds[ordinal];
             if function.id != id
                 || function.planned_node != seed
-                || function.origin != StaticOriginId(seed.0)
                 || function.program != SemanticProgramId(seed.0)
             {
                 return Err(planner_error(
                     "function unit is not positional for its seed",
+                ));
+            }
+        }
+
+        // **The body-occurrence axis, checked against operands the plane did
+        // NOT derive it from.**
+        //
+        // ⛔ Deliberately *not* re-derived from the partition and compared.
+        // `build_semantic_plane` fills this field from
+        // `partition.seed_body_occurrences`, so recomputing that here would put
+        // one value on both sides of the comparison and could never disagree —
+        // green in every world, including the ones it is written to exclude.
+        // These two laws use the **descriptor owner map** and the **function
+        // population** instead, which are independent of the pairing table.
+        let mut claimed: BTreeMap<StaticOriginId, PredeclaredFunctionId> = BTreeMap::new();
+        for function in &self.functions {
+            // A body occurrence absent from the source-occurrence table has no
+            // descriptor at all.
+            let descriptor = self
+                .descriptors
+                .get(function.body_occurrence.0 as usize)
+                .ok_or_else(|| {
+                    planner_error("function unit body occurrence is not a planned occurrence")
+                })?;
+            if descriptor.owner != SemanticOwner::Function(function.id) {
+                return Err(planner_error(
+                    "function unit body occurrence is owned by a different function unit",
+                ));
+            }
+            if claimed.insert(function.body_occurrence, function.id).is_some() {
+                return Err(planner_error(
+                    "two function unit seeds claim one body occurrence",
                 ));
             }
         }
@@ -2167,6 +2269,7 @@ impl SemanticPlane {
         nodes: &[StaticNode],
         edges: &[StaticEdge],
         entries: &[StaticNodeId],
+        entry_bodies: &dyn Fn(StaticNodeId) -> Option<StaticOriginId>,
         root_entry: Option<StaticNodeId>,
         semantic_sources: &[SemanticSourceSeed],
         arena: &SemanticMaterialArena,
@@ -2229,7 +2332,14 @@ impl SemanticPlane {
                 "semantic program arena contains a post-origin clone",
             ));
         }
-        self.validate_function_units(nodes, edges, entries, root_entry, &node_indexed_sources)?;
+        self.validate_function_units(
+            nodes,
+            edges,
+            entries,
+            entry_bodies,
+            root_entry,
+            &node_indexed_sources,
+        )?;
 
         let expected_operands =
             node_indexed_sources

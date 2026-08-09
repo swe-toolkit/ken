@@ -16710,7 +16710,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // ── The ABI domain, on that exact target.
         let mut found = None;
         for unit in self.static_transition_plan.emittable_units()? {
-            if unit.origin() != declared.origin {
+            if unit.body_occurrence() != declared.origin {
                 continue;
             }
             if found.is_some() {
