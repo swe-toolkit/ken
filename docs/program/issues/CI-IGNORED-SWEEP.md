@@ -1,7 +1,7 @@
 ---
 id: CI-IGNORED-SWEEP
 title: "nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off"
-status: active
+status: merged
 owner: verify
 size: S
 gate: none
