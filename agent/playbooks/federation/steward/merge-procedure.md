@@ -8,6 +8,9 @@ None is conditional on how routine the merge feels.**
 
 **M1-M3 run before you publish, M4-M5 publish, M6-M9 run after it lands.**
 
+Whether a thing *should* land, and where the cut goes, is `merge-policy.md`.
+This file assumes that decision is made.
+
 ## M1 — Verify the Decision is `resolved`, read fresh from the object
 
 ```sh
