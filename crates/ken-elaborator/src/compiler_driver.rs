@@ -2980,6 +2980,16 @@ fn emit_package_from_env(
             .insert(symbol, LowerabilityStatus::Supported);
     }
 
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a` — produce the complete runtime
+    // role record here, after the exact `stable_symbols_for_env` call above and
+    // while the live `ElabEnv` is still in scope, and store it in the versioned
+    // semantic lane so it participates in `core_semantic_hash`.
+    let runtime_symbols = checked_runtime_symbols_v1(env, &symbols)?;
+    semantic.metadata.insert(
+        checked_runtime_symbols_v1_key(),
+        canonical_checked_runtime_symbols_v1_bytes(&runtime_symbols),
+    );
+
     add_data_metadata(env, &symbols, &mut semantic);
     add_admitted_recursion_metadata(
         &manifest.package_name,
@@ -3345,6 +3355,80 @@ fn checked_host_spine_v1(
         bool_true: resolve("True")?,
         operations,
     })
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a` — build the COMPLETE role record.
+///
+/// The spine half is the existing resolver; the six entry-plan roles are
+/// resolved here **through the same table**, so the record is complete on a
+/// generic package emission that builds no plan. ⛔ The starter-only plan is
+/// neither consulted nor persisted.
+fn checked_runtime_symbols_v1(
+    env: &ElabEnv,
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
+) -> Result<crate::erasure::CheckedRuntimeSymbolsV1, CompilerDriverError> {
+    let spine = checked_host_spine_v1(env, symbols)?;
+    // Same resolution idiom as `checked_host_spine_v1` above: a name is looked
+    // up in the live environment and then mapped through the exact
+    // stable-symbol table. The name never reaches the record.
+    let resolve = |name: &'static str| {
+        let id =
+            env.globals
+                .get(name)
+                .copied()
+                .ok_or(CompilerDriverError::MissingStableSymbol {
+                    id: GlobalId(u32::MAX),
+                })?;
+        symbols
+            .get(&id)
+            .cloned()
+            .ok_or(CompilerDriverError::MissingStableSymbol { id })
+    };
+    Ok(crate::erasure::CheckedRuntimeSymbolsV1 {
+        spine,
+        process_input: resolve("MkProcessInput")?,
+        list_nil: resolve("Nil")?,
+        list_cons: resolve("Cons")?,
+        prod: resolve("MkProd")?,
+        exit_success: resolve("Success")?,
+        exit_failure: resolve("Failure")?,
+    })
+}
+
+/// Canonical, versioned bytes for the record above.
+///
+/// The header carries the version so a decoder can reject an unknown or
+/// corrupted record rather than read it short — the same discipline as the
+/// spine encoding below.
+fn canonical_checked_runtime_symbols_v1_bytes(
+    record: &crate::erasure::CheckedRuntimeSymbolsV1,
+) -> Vec<u8> {
+    let mut out = b"CheckedRuntimeSymbolsV1\0".to_vec();
+    out.extend_from_slice(&canonical_checked_host_spine_v1_bytes(&record.spine));
+    for role in [
+        &record.process_input,
+        &record.list_nil,
+        &record.list_cons,
+        &record.prod,
+        &record.exit_success,
+        &record.exit_failure,
+    ] {
+        let bytes = role.to_string();
+        out.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
+        out.extend_from_slice(bytes.as_bytes());
+    }
+    out
+}
+
+/// The semantic-metadata key the record is stored under.
+pub const CHECKED_RUNTIME_SYMBOLS_V1_KEY: &str = "checked-runtime-symbols-v1";
+
+/// The key as a `StableSymbol`, built once so producer and decoder cannot drift.
+pub fn checked_runtime_symbols_v1_key() -> StableSymbol {
+    StableSymbol::new(
+        SymbolNamespace::Declaration,
+        [CHECKED_RUNTIME_SYMBOLS_V1_KEY.to_string()],
+    )
 }
 
 fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpineV1) -> Vec<u8> {
