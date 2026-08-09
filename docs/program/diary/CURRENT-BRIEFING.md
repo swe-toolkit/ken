@@ -126,11 +126,31 @@ admitted set omitted `Lowered::Int`, `Lowered::Bool`, and
 — an unfolded Peano chain — and it IS scalar-representable.** `StructuralNatV1`
 is one `i64` and the backend already folds Peano chains at two sites.
 
-> ⭐⭐ **But both folds are INDUCTIVE ON THEIR OWN OUTPUT.** `Suc` folds only if
-> its predecessor already folded, so one unfolded link makes every enclosing
-> `Suc` fall through. ⇒ **What bounds the repair is WHERE THE INDUCTION BROKE,
-> not how wide the value is.** My `AC-2` asked scalar-vs-wider and would have
-> been answered "scalar" with the repair still unbounded.
+> ⛔⛔ **THE CASCADE STORY IS RETRACTED — `D1a` MEASURED IT FALSE.** `D0` (and I,
+> repeating it) said `Suc` folds only if its predecessor folded, so one unfolded
+> link cascades. `D1a` measured that **the fold never engages on ANY link**: it
+> compares against `ctor:prelude::Nat::{Zero,Suc}` while the value renders as
+> `ctor:nested_inductive_pkg::Nat::{Zero,Suc}`.
+>
+> ⭐ **And the real defect is a third thing neither of my branches named.**
+> Architect ruling `evt_2wm35zk98p9nr`: it is **identity-authority transport**.
+> The package-qualified name *is* the prelude `Nat`, rendered through the
+> package's stable-symbol table. The `D5` helper erases `CompilerDriverOutput`
+> to `RuntimeProgram` and reaches `compile_expr_into_module` with
+> `process_symbols=None`, so Runtime silently substitutes `legacy_prelude()`.
+> **The producer had the right identities; the consumer never received them.**
+>
+> ⛔ **My `D1b-cov` prohibition forbade the repair.** It banned Elaborator and
+> compiler-driver edits, and the compiler driver is **half the fix**. Recut as
+> **`D1b-id`**, with the Forbidden bullet narrowed *in place* — a Forbidden list
+> is read on its own, far from the deliverable that carves it out.
+>
+> ⇒ **The lesson for my own framing: a two-branch taxonomy is a claim that the
+> space has two branches.** Mine were "coverable" and "genuinely dynamic"; the
+> answer was static, formally coverable, and repairable only outside the scope I
+> had drawn. **Pre-ruling both outcomes is still right — pre-ruling them
+> *exhaustively* is what I got wrong**, and the implementer stopping to say so
+> rather than picking one is what kept it cheap.
 
 `D1` is cut against that with **both outcomes pre-ruled** so Runtime does not
 return twice: `D1a` measures the **innermost** failing link; *coverable* goes
