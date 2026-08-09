@@ -279,3 +279,63 @@ native Nat 3.
 **If the correction cannot be made at the registration seat without touching a
 forbidden surface, STOP AND ROUTE** rather than widening. Eight authorities on
 this chain have each been resolved by routing.
+
+## `D7` — correct this node's own carried release condition
+
+**Adversary finding `evt_3wrysef721kag`, triaged CONFIRMED by the Steward
+2026-08-09.** This is a defect in text this node landed at `1f706520`, surfaced
+by a *different* merge firing it.
+
+`crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs:16504-16546`
+is the carried `AC-5` control: `#[ignore]`d, `panic!` body, gated on
+[[KERNEL-NESTED-IND]]. Its doc carries **three predicates that were coextensive
+when written**, and the `KERNEL-NESTED-IND` accepted partial at `afb38934` has
+pulled them apart:
+
+| line | predicate | status after `afb38934` |
+|---|---|---|
+| `16511` | released when **nested-inductive admission is on `main`** | the real capability — **not** established |
+| `16514` | **`Release condition:`** `KERNEL-NESTED-IND` **merged** | **TRUE** |
+| `16537`, `16542` | needs/requires `KERNEL-NESTED-IND` **on main** | **TRUE** |
+| `16510` | owned by the first **post-Kernel closure** candidate | FALSE — the node is not closed |
+
+**The line explicitly labelled `Release condition:` is the weakest of the three,
+and it is the one a reader looking for the gate finds first.** Three of five
+occurrences key on merged-or-on-main; exactly one keys on closure; the one
+naming the actual capability is not the labelled condition.
+
+**The capability did not arrive, measured on the paths.** From `dd3cd050` to
+`main`: `ken-kernel/src/inductive.rs` landed as a superset, but
+`ken-elaborator/src/{compiler_driver,elab}.rs`,
+`ken-elaborator/tests/nc14_data_match_lowering.rs`, and `ken-interp/src/eval.rs`
+each invert **exactly** — `main` sits at the **pre-`dd3cd050`** state on all
+four. The `LiftRose` witness venue the control points at is still not
+reconstructible from `main`. (Ancestry says "not an ancestor" and is worth
+nothing under squash-merge; the content measurement is what settles it.)
+
+**What goes wrong without this fix.** The named owner reads
+`Release condition: ... merged`, finds it true, and either removes `#[ignore]`
+and takes a red it cannot fix, or budgets a witness against an elaborator path
+still at its pre-change state. The `panic!` body correctly prevents a *vacuous
+pass*; it does not defend against the **release gate itself being wrong**.
+
+### `D7` acceptance
+
+- `AC-D7-1` The line labelled **`Release condition:`** states the **capability**,
+  not an event: either "nested-inductive admission is on `main`" or "post-Kernel
+  **closure**". The doc already contains both phrasings in its own words; pick
+  one. **Choosing between them is the owner's call.**
+- `AC-D7-2` **All five occurrences agree.** A fix that corrects the labelled line
+  and leaves `16537`/`16542` keyed on merged-or-on-main reproduces the defect one
+  line down — this is the third instance today of a correction reaching one site
+  and not the one a reader binds to first.
+- `AC-D7-3` Comment-only. The `#[ignore]`, the `panic!` body, and the control's
+  logic are unchanged. **Do not un-ignore it** — the capability still has not
+  landed.
+
+**The general rule this instances, and it is not incidental to one control:**
+an anticipatory clause of the form *"released when X lands"* silently assumes
+**land implies capability**. The uncovered branch is the **accepted partial**,
+where the named event fires and the capability does not arrive. Four accepted
+partials shipped in this window. **Gate a carried control on the capability it
+needs, never on a merge event.**

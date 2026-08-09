@@ -131,6 +131,28 @@ measurement, not an inference.
 | `AC-5` | Six **independent** reds: missing, duplicated, swapped, wrong-host, wrong-parameter/sort, and **same-cardinality foreign-support** mappings | each mutation applied alone must red. The last is the load-bearing one — the generated `All` support for `Bag` has three constructors mirroring its host's, so **a same-cardinality foreign family is exactly what a count cannot discriminate**, and that is the error `a030d2a1` actually made |
 | `AC-6` | An **unmarked** ordinary `Match`/capsule pair keeps the present refusal, byte-for-byte | the pre-existing fail-closed path, unchanged |
 | `AC-7` | No control keys on `("Match", "scrutinee is not a constructor value")` | the `6164` test hook produces that pair by construction, so a control keyed on it passes for a reason unrelated to the property |
+| `AC-8` | **`all_supports` is asserted injective on its values**, not merely injective by construction | `debug_assert!` at the insert in `register_all_supports` (`env.rs:416-428`), or one injectivity test. See below — this row is cheap and `D1` is what makes it load-bearing |
+
+### Why `AC-8` exists
+
+**Adversary observation `evt_3wrysef721kag`, no witness claimed, recorded as an
+axis rather than an alarm.** `all_support_origin` (`env.rs:400-410`) is a
+**reverse scan**: `all_supports.iter().find_map(|(&(host, parameter, sort),
+&candidate)| (candidate == family).then_some(...))` over a
+`HashMap<(GlobalId, usize, AllSupportSort), GlobalId>`.
+
+**The answer is well-defined only if that map is injective on its values.** If
+one family were ever registered under two keys, `find_map` returns whichever key
+iteration reaches first — and `HashMap` order is unspecified and per-process
+randomized. **The failure mode is a nondeterministic authority answer, not a
+refusal**, which is the worst shape for a relation whose whole job is to be
+authoritative.
+
+Injectivity holds today by construction: `register_all_supports` stores
+freshly-declared families. **`D1` is precisely what turns this into the single
+relation carried into checked erasure and planning.** An invariant that is true
+by construction and unasserted is one refactor from being true by accident, and
+this node is the refactor.
 
 ## Forbidden
 
