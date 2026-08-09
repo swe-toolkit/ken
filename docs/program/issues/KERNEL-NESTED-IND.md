@@ -11,22 +11,34 @@ github: null
 origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved. Demand-pulled by DS-9, which blocked at its first deliverable on `JsonArray (List Json)`; fork raised by the Steward as evt_1ykvpj7yvtg18. The five-point prerequisite contract below is the Architect's, transcribed verbatim in substance. Steward-filed; Steward owns the frame and AC/control placement.
 ---
 
-> ## HELD AGAIN 2026-08-09 — BLOCKED ON [[RT-JOIN-ORIGIN-ATTRIBUTION]]
+> ## UNHELD 2026-08-09 — THE RUNTIME WALL IS DOWN. RESUME FROM `da917653`.
 >
-> **Architect ruling `evt_j8t0ktxbmck`: the native RED is HELD EVIDENCE, not
-> `AC-K12` discharge, and no production correction is authorized yet.**
-> Component attribution is **Runtime**. **Kernel must NOT edit
-> `crates/ken-runtime` for this wall** — the Steward authorized that and was
-> overruled. Runtime owns the planner/lowering invariant and its correction.
+> **The hold of Architect ruling `evt_j8t0ktxbmck` is discharged: all four
+> `depends_on` are merged or closed and this node has zero unmerged
+> dependencies.** [[RT-JOIN-ORIGIN-ATTRIBUTION]] merged at `72e0d7c` (PR
+> #1686); [[RT-SPECIALIZED-MATCH-ATTRIBUTION]] merged;
+> [[RT-BODY-OCCURRENCE-PROVENANCE]] closed with every AC discharged —
+> production at `1f706520`, `D7` at `1105671a` (PR #1727, CI green).
 >
-> The merged contract requires the nested-IH constructor to lower **and
-> evaluate**: the checked-artifact control must reach native execution, pass the
+> **Resume by rebasing the retained work onto `origin/main` and re-running the
+> exact differential**: interpreter Nat 3, native present, verifier passed,
+> native Nat 3. The retained branches are `wp/KERNEL-NESTED-IND` (the relation
+> projection snapshot) and `wp/KERNEL-NESTED-IND-relation-partial` (tip: pin
+> `All` evidence field identity), both preserved with the durable RED.
+>
+> ### Two things the unblock does NOT change
+>
+> **`AC-K12` still requires lowering AND evaluation.** The merged contract
+> requires the nested-IH constructor to reach native execution, pass the
 > Cranelift verifier, and agree with the interpreter at Nat 3. **A production
-> native refusal cannot be the terminal positive control.**
+> native refusal cannot be the terminal positive control** — that was true
+> while held and it is true now.
 >
-> **Held with the erasure projection and the RED preserved.** After Runtime's
-> correction merges independently, rebase the retained work and re-run the exact
-> differential: interpreter Nat 3, native present, verifier passed, native Nat 3.
+> **Component attribution is still Runtime, so a surviving refusal is not
+> yours to fix.** **Kernel must NOT edit `crates/ken-runtime`** — the Steward
+> authorized that once and was overruled. If the rebased differential still
+> refuses, that is a fresh Runtime attribution finding: report the exact first
+> refusal and its owner to the Steward, and do not repair it in place.
 >
 > ## RE-RELEASED 2026-08-09 — AND THE RELATIONAL ZIPPER IS NOT THE ROUTE
 >
