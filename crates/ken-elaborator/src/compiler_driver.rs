@@ -3643,7 +3643,7 @@ fn add_data_metadata(
             .collect();
 
         semantic.data_metadata.insert(
-            family,
+            family.clone(),
             DataMetadata {
                 parameter_count: ind.params.len(),
                 index_count: ind.indices.len(),
@@ -3652,6 +3652,13 @@ fn add_data_metadata(
                 lowerability: LowerabilityStatus::Supported,
             },
         );
+        if let Some((origin, _, _)) = env.env.all_support_origin(ind.id) {
+            if let Some(origin) = symbols.get(&origin) {
+                semantic
+                    .all_support_origins
+                    .insert(family, origin.clone());
+            }
+        }
     }
 }
 

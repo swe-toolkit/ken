@@ -10,13 +10,31 @@ use ken_elaborator::compiler_driver::{
     TargetSelector,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabError, ElabEnv};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 use ken_runtime::{
     evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeExpr, RuntimeGroundValue,
-    RuntimeIrSeedEnvironment, RuntimeObservation,
+    RuntimeIrSeedEnvironment, RuntimeObservation, RuntimeProgram,
 };
+
+const NESTED_LIFT_NAT_THREE_SOURCE: &str = "data Bag (a : Type) : Type where { \
+      Empty : Bag a ; One : a -> Bag a ; Join : a -> a -> Bag a \
+    }\n\
+    data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)\n\
+    fn liftAdd (x : Nat) (y : Nat) : Nat = match x { \
+      Zero |-> y ; Suc x2 |-> Suc (liftAdd x2 y) \
+    }\n\
+    fn liftSize (r : LiftRose) : Nat = match r { \
+      LiftLeaf |-> Suc Zero ; \
+      LiftNode b |-> match b { \
+        Empty |-> Suc Zero ; \
+        One x |-> Suc (liftSize x) ; \
+        Join x y |-> Suc (liftAdd (liftSize x) (liftSize y)) \
+      } \
+    }\n\
+    const liftSizeResult : Nat = liftSize \
+      (LiftNode (Join LiftRose LiftLeaf (LiftNode (Empty LiftRose))))";
 
 fn decl_symbol(package: &str, name: &str) -> StableSymbol {
     StableSymbol::declaration(package, &[], name)
@@ -119,6 +137,56 @@ fn assert_runtime_and_interpreter_bool_agree(package_name: &str, target_name: &s
     assert_runtime_bool(runtime, interpreter);
 }
 
+fn interpreter_nat_for_source(source: &str, target_name: &str) -> usize {
+    fn count(value: EvalVal, zero: GlobalId, suc: GlobalId) -> usize {
+        match value {
+            EvalVal::Ctor { id, args, .. } if id == zero && args.is_empty() => 0,
+            EvalVal::Ctor { id, args, .. } if id == suc && args.len() == 1 => {
+                1 + count(args[0].clone(), zero, suc)
+            }
+            other => panic!("expected interpreter Nat constructor, got {other:?}"),
+        }
+    }
+
+    let mut env = ElabEnv::new().expect("prelude env");
+    env.elaborate_file(source).expect("source elaborates");
+    let target = env.globals[target_name];
+    let body = match env.env.lookup(target) {
+        Some(Decl::Transparent { body, .. }) => body.clone(),
+        other => panic!("expected transparent target, got {:?}", other.map(|_| ())),
+    };
+    let mut store = EvalStore::new();
+    count(
+        eval(&[], &body, &env.env, &mut store),
+        env.globals["Zero"],
+        env.globals["Suc"],
+    )
+}
+
+fn nested_checked_runtime_program_for_source(
+    package_name: &str,
+    target_name: &str,
+    source: &str,
+) -> RuntimeProgram {
+    let target = decl_symbol(package_name, target_name);
+    let out = compile_ken_package_sources(
+        &CompilerManifest::new(package_name, Vec::new()),
+        vec![CompilerSource::new("src/main.ken", source)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![package_name.to_string()],
+            ),
+            symbol: target.clone(),
+            kind: CompilerTargetKind::Executable,
+        },
+    )
+    .expect("recursive source emits checked-core package");
+    let closure = out.closures.first().expect("selected target closure");
+    erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
+        .expect("recursive checked artifact erases")
+}
+
 #[test]
 fn option_match_payload_binding_lowers_and_matches_interpreter() {
     let source = "const target : Bool = \
@@ -142,6 +210,85 @@ fn user_data_two_payload_binders_preserve_de_bruijn_order() {
         match PairBoolMk True False { PairBoolMk x y |-> x }";
 
     assert_runtime_and_interpreter_bool_agree("nc14_pair_pkg", "target", source);
+}
+
+#[test]
+fn nested_recursive_field_elaborates_checks_erases_and_interprets_at_nat_three() {
+    // D5 accepted-partial control: elaboration and kernel checking complete,
+    // the interpreter computes Nat 3, and provenance-gated checked-artifact
+    // erasure succeeds. Native lowering, verifier, interpreter/native
+    // agreement, and AC-K12 discharge remain unmet at
+    // RT-DYNAMIC-ARM-SCALAR-MERGE.
+    assert_eq!(
+        interpreter_nat_for_source(NESTED_LIFT_NAT_THREE_SOURCE, "liftSizeResult"),
+        3
+    );
+    let program = nested_checked_runtime_program_for_source(
+        "nested_inductive_pkg",
+        "liftSize",
+        NESTED_LIFT_NAT_THREE_SOURCE,
+    );
+    let target = decl_symbol("nested_inductive_pkg", "liftSize");
+    assert!(
+        program
+            .declarations
+            .iter()
+            .any(|declaration| declaration.symbol == target.to_string()),
+        "checked runtime program contains the selected liftSize declaration"
+    );
+}
+
+#[test]
+fn duplicate_nested_lift_arm_is_reachability_error() {
+    // Durable invariant: the residual-All path consumes every source arm just
+    // as the ordinary dependent-match path does. Keep the accepted fixture as
+    // the positive side, and change only one duplicate-arm axis here.
+    let source = NESTED_LIFT_NAT_THREE_SOURCE.replacen(
+        "Empty |-> Suc Zero ; ",
+        "Empty |-> Suc Zero ; Empty |-> Suc Zero ; ",
+        1,
+    );
+    assert_ne!(
+        source, NESTED_LIFT_NAT_THREE_SOURCE,
+        "duplicate-arm mutation must change the shared fixture"
+    );
+
+    let mut env = ElabEnv::new().expect("prelude env");
+    match env.elaborate_file(&source) {
+        Err(ElabError::ReachabilityError { .. }) => {}
+        Ok(_) => panic!("duplicate nested lift arm was silently accepted"),
+        Err(other) => panic!("expected ReachabilityError, got {other}"),
+    }
+}
+
+#[test]
+fn nested_dependent_motive_consumes_correlated_child_proofs() {
+    let source = "data ProofBag (a : Type) : Type where { \
+          ProofEmpty : ProofBag a ; ProofOne : a -> ProofBag a ; \
+          ProofJoin : a -> a -> ProofBag a \
+        }\n\
+        data ProofRose = ProofLeaf | ProofNode (ProofBag ProofRose)\n\
+        fn allGoodType (r : ProofRose) : Omega = match r { \
+          ProofLeaf |-> Top ; \
+          ProofNode b |-> match b { \
+            ProofEmpty |-> Top ; \
+            ProofOne x |-> allGoodType x ; \
+            ProofJoin x y |-> And (allGoodType x) (allGoodType y) \
+          } \
+        }\n\
+        theorem allGood (r : ProofRose) : allGoodType r = match r { \
+          ProofLeaf |-> Proved ; \
+          ProofNode b |-> match b { \
+            ProofEmpty |-> Proved ; \
+            ProofOne x |-> allGood x ; \
+            ProofJoin x y |-> and_intro \
+              (allGoodType x) (allGoodType y) (allGood x) (allGood y) \
+          } \
+        }";
+
+    let mut env = ElabEnv::new().expect("prelude env");
+    env.elaborate_file(source)
+        .expect("dependent nested lift proof elaborates");
 }
 
 fn bool_data_symbols(package: &str) -> (StableSymbol, StableSymbol, StableSymbol) {

@@ -2358,7 +2358,12 @@ fn lower_body_term_with_plans(
         }
     }
     if let Some((constructor, arguments)) = constructor_application_spine(term) {
-        reject_level_args(root, &constructor.level_args)?;
+        reject_level_args_for_family(
+            root,
+            &constructor.level_args,
+            semantic,
+            &constructor.family_symbol,
+        )?;
         require_expression_supported(
             root,
             &constructor.family_symbol,
@@ -2371,7 +2376,9 @@ fn lower_body_term_with_plans(
             &constructor.constructor_lowerability,
             "constructor_lowerability_blocked",
         )?;
-        if constructor.family_index_count != 0 || constructor.target_index_count != 0 {
+        if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
+            && !is_generated_all_support(semantic, &constructor.family_symbol)
+        {
             return Err(expression_lowering_error(
                 root,
                 "dependent_constructor_lowering_unsupported",
@@ -2510,8 +2517,10 @@ fn lower_body_term_with_plans(
             })
         }
         CheckedCoreBodyTerm::Match(view) => {
-            reject_level_args(root, &view.level_args)?;
-            if !view.indices.is_empty() {
+            reject_level_args_for_family(root, &view.level_args, semantic, &view.family_symbol)?;
+            if !view.indices.is_empty()
+                && !is_generated_all_support(semantic, &view.family_symbol)
+            {
                 return Err(expression_lowering_error(
                     root,
                     "unsupported_dependent_motive",
@@ -2552,7 +2561,12 @@ fn lower_body_term_with_plans(
             let mut cases = Vec::with_capacity(view.branches.len());
             for (branch_index, branch) in view.branches.iter().enumerate() {
                 let constructor = &branch.constructor;
-                reject_level_args(root, &constructor.level_args)?;
+                reject_level_args_for_family(
+                    root,
+                    &constructor.level_args,
+                    semantic,
+                    &constructor.family_symbol,
+                )?;
                 require_expression_supported(
                     root,
                     &constructor.family_symbol,
@@ -2565,7 +2579,10 @@ fn lower_body_term_with_plans(
                     &constructor.constructor_lowerability,
                     "constructor_lowerability_blocked",
                 )?;
-                if constructor.family_index_count != 0 || constructor.target_index_count != 0 {
+                if (constructor.family_index_count != 0
+                    || constructor.target_index_count != 0)
+                    && !is_generated_all_support(semantic, &constructor.family_symbol)
+                {
                     return Err(expression_lowering_error(
                         root,
                         "dependent_constructor_lowering_unsupported",
@@ -2774,8 +2791,8 @@ fn lower_checked_host_computation(
         });
     }
     if let CheckedCoreBodyTerm::Match(view) = term {
-        reject_level_args(root, &view.level_args)?;
-        if !view.indices.is_empty() {
+        reject_level_args_for_family(root, &view.level_args, semantic, &view.family_symbol)?;
+        if !view.indices.is_empty() && !is_generated_all_support(semantic, &view.family_symbol) {
             return Err(expression_lowering_error(
                 root,
                 "host_match_identity",
@@ -2836,7 +2853,12 @@ fn lower_checked_host_computation(
         let mut cases = Vec::with_capacity(view.branches.len());
         for (branch_index, branch) in view.branches.iter().enumerate() {
             let constructor = &branch.constructor;
-            reject_level_args(root, &constructor.level_args)?;
+            reject_level_args_for_family(
+                root,
+                &constructor.level_args,
+                semantic,
+                &constructor.family_symbol,
+            )?;
             require_expression_supported(
                 root,
                 &constructor.family_symbol,
@@ -2849,7 +2871,9 @@ fn lower_checked_host_computation(
                 &constructor.constructor_lowerability,
                 "constructor_lowerability_blocked",
             )?;
-            if constructor.family_index_count != 0 || constructor.target_index_count != 0 {
+            if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
+                && !is_generated_all_support(semantic, &constructor.family_symbol)
+            {
                 return Err(expression_lowering_error(
                     root,
                     "host_match_identity",
@@ -5271,7 +5295,12 @@ fn lower_constructor_application(
     context_depth: usize,
     branch_remap: Option<&BranchBinderRemap>,
 ) -> Result<RuntimeExpr, ErasureError> {
-    reject_level_args(root_symbol, &constructor.level_args)?;
+    reject_level_args_for_family(
+        root_symbol,
+        &constructor.level_args,
+        semantic,
+        &constructor.family_symbol,
+    )?;
     require_expression_supported(
         root_symbol,
         &constructor.family_symbol,
@@ -5284,7 +5313,9 @@ fn lower_constructor_application(
         &constructor.constructor_lowerability,
         "constructor_lowerability_blocked",
     )?;
-    if constructor.family_index_count != 0 || constructor.target_index_count != 0 {
+    if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
+        && !is_generated_all_support(semantic, &constructor.family_symbol)
+    {
         return Err(expression_lowering_error(
             root_symbol,
             "dependent_constructor_lowering_unsupported",
@@ -5337,8 +5368,13 @@ fn lower_match_view(
     context_depth: usize,
     branch_remap: Option<&BranchBinderRemap>,
 ) -> Result<RuntimeExpr, ErasureError> {
-    reject_level_args(root_symbol, &view.level_args)?;
-    if !view.indices.is_empty() {
+    reject_level_args_for_family(
+        root_symbol,
+        &view.level_args,
+        semantic,
+        &view.family_symbol,
+    )?;
+    if !view.indices.is_empty() && !is_generated_all_support(semantic, &view.family_symbol) {
         return Err(expression_lowering_error(
             root_symbol,
             "unsupported_dependent_motive",
@@ -5358,7 +5394,12 @@ fn lower_match_view(
     let mut cases = Vec::with_capacity(view.branches.len());
     for branch in &view.branches {
         let constructor = &branch.constructor;
-        reject_level_args(root_symbol, &constructor.level_args)?;
+        reject_level_args_for_family(
+            root_symbol,
+            &constructor.level_args,
+            semantic,
+            &constructor.family_symbol,
+        )?;
         require_expression_supported(
             root_symbol,
             &constructor.family_symbol,
@@ -5371,7 +5412,9 @@ fn lower_match_view(
             &constructor.constructor_lowerability,
             "constructor_lowerability_blocked",
         )?;
-        if constructor.family_index_count != 0 || constructor.target_index_count != 0 {
+        if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
+            && !is_generated_all_support(semantic, &constructor.family_symbol)
+        {
             return Err(expression_lowering_error(
                 root_symbol,
                 "dependent_constructor_lowering_unsupported",
@@ -5439,6 +5482,26 @@ fn lower_match_view(
                 .collect(),
             default,
         })
+    }
+}
+
+fn is_generated_all_support(
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+    family: &StableSymbol,
+) -> bool {
+    semantic.all_support_origins.contains_key(family)
+}
+
+fn reject_level_args_for_family(
+    root: &StableSymbol,
+    level_args: &[CheckedCoreLevelView],
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+    family: &StableSymbol,
+) -> Result<(), ErasureError> {
+    if is_generated_all_support(semantic, family) {
+        Ok(())
+    } else {
+        reject_level_args(root, level_args)
     }
 }
 

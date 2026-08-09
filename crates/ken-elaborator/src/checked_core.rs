@@ -172,6 +172,8 @@ pub struct CheckedCoreSemanticInputs {
     pub primitive_refs: BTreeMap<StableSymbol, String>,
     pub primitive_metadata: BTreeMap<StableSymbol, PrimitiveMetadata>,
     pub data_metadata: BTreeMap<StableSymbol, DataMetadata>,
+    /// Kernel-recorded source family for each generated terminal `All` support.
+    pub all_support_origins: BTreeMap<StableSymbol, StableSymbol>,
     pub record_sigma_metadata: BTreeMap<StableSymbol, RecordSigmaMetadata>,
     pub class_instance_metadata: BTreeMap<StableSymbol, ClassInstanceMetadata>,
     pub recursion_metadata: BTreeMap<StableSymbol, RecursionMetadata>,
@@ -1291,6 +1293,11 @@ pub fn canonical_semantic_bytes(inputs: &CheckedCoreSemanticInputs) -> Vec<u8> {
     encode_string_map("primitive_refs", &inputs.primitive_refs, &mut out);
     encode_primitive_metadata_map("primitive_metadata", &inputs.primitive_metadata, &mut out);
     encode_data_metadata_map("data_metadata", &inputs.data_metadata, &mut out);
+    encode_symbol_map(
+        "all_support_origins",
+        &inputs.all_support_origins,
+        &mut out,
+    );
     encode_record_sigma_metadata_map(
         "record_sigma_metadata",
         &inputs.record_sigma_metadata,
@@ -1862,6 +1869,8 @@ fn compiler_relevant_symbols(semantic: &CheckedCoreSemanticInputs) -> BTreeSet<S
             symbols.insert(ctor.symbol.clone());
         }
     }
+    symbols.extend(semantic.all_support_origins.keys().cloned());
+    symbols.extend(semantic.all_support_origins.values().cloned());
     symbols.extend(semantic.record_sigma_metadata.keys().cloned());
     symbols.extend(semantic.class_instance_metadata.keys().cloned());
     symbols.extend(semantic.recursion_metadata.keys().cloned());
@@ -1915,6 +1924,10 @@ fn semantic_symbol_references(
         for ctor in &meta.constructors {
             refs.push(("data_metadata.constructors", ctor.symbol.clone()));
         }
+    }
+    for (support, origin) in &semantic.all_support_origins {
+        refs.push(("all_support_origins", support.clone()));
+        refs.push(("all_support_origins.origin", origin.clone()));
     }
     for (symbol, meta) in &semantic.record_sigma_metadata {
         refs.push(("record_sigma_metadata", symbol.clone()));
@@ -4235,7 +4248,7 @@ fn decode_supported_match_view(
             ),
         });
     }
-    if data.index_count != 0 {
+    if data.index_count != 0 && !semantic.all_support_origins.contains_key(&family_symbol) {
         return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
             symbol: owner.clone(),
             family: family_symbol,
@@ -4329,6 +4342,12 @@ fn validate_supported_match_motive(
     data: &DataMetadata,
     motive: &[u8],
 ) -> Result<bool, CheckedCoreBodyViewError> {
+    // A generated terminal `All` family is the kernel-proven lockstep carrier
+    // for a source recursive field. Its motive necessarily depends on the
+    // source index; no shape-based dependent-motive admission is permitted.
+    if semantic.all_support_origins.contains_key(family) {
+        return Ok(true);
+    }
     if data.index_count != 0 {
         return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
             symbol: owner.clone(),
