@@ -33,17 +33,37 @@ const NESTED_LIFT_NAT_THREE_SOURCE: &str = "data Bag (a : Type) : Type where { \
         One x |-> Suc (liftSize x) ; \
         Join xs ys |-> Suc (liftAdd \
           (match xs { \
-            Empty |-> Zero ; One x |-> liftSize x ; Join x y |-> Zero \
+            Empty |-> Zero ; One x |-> liftSize x ; \
+            Join x y |-> liftAdd \
+              (match x { \
+                Empty |-> Zero ; One z |-> liftSize z ; Join p q |-> Zero \
+              }) \
+              (match y { \
+                Empty |-> Zero ; One z |-> liftSize z ; Join p q |-> Zero \
+              }) \
           }) \
           (match ys { \
-            Empty |-> Zero ; One x |-> liftSize x ; Join x y |-> Zero \
+            Empty |-> Zero ; One x |-> liftSize x ; \
+            Join x y |-> liftAdd \
+              (match x { \
+                Empty |-> Zero ; One z |-> liftSize z ; Join p q |-> Zero \
+              }) \
+              (match y { \
+                Empty |-> Zero ; One z |-> liftSize z ; Join p q |-> Zero \
+              }) \
           })) \
       } \
     }\n\
     const liftSizeResult : Nat = liftSize \
       (LiftNode (Join LiftRose \
         (One LiftRose LiftLeaf) \
-        (One LiftRose (LiftNode (Empty LiftRose)))))";
+        (One LiftRose (LiftNode (Empty LiftRose)))))\n\
+    const liftSizeDeeperResult : Nat = liftSize \
+      (LiftNode (Join LiftRose \
+        (Join LiftRose \
+          (One LiftRose LiftLeaf) \
+          (One LiftRose LiftLeaf)) \
+        (Empty LiftRose)))";
 
 fn decl_symbol(package: &str, name: &str) -> StableSymbol {
     StableSymbol::declaration(package, &[], name)
@@ -244,6 +264,18 @@ fn nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_thre
             .iter()
             .any(|declaration| declaration.symbol == target.to_string()),
         "checked runtime program contains the selected liftSize declaration"
+    );
+}
+
+#[test]
+fn nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three() {
+    // Durable invariant: a residual recursive Join is eliminated through its
+    // aligned generated support evidence. Its two leaves and the outer node
+    // each contribute one; replacing the residual Join arm with Zero makes
+    // this exact counterexample compute one while the shallow witness stays 3.
+    assert_eq!(
+        interpreter_nat_for_source(NESTED_LIFT_NAT_THREE_SOURCE, "liftSizeDeeperResult"),
+        3
     );
 }
 
