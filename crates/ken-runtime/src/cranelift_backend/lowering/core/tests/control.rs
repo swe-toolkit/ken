@@ -27387,3 +27387,166 @@ fn sar_d3_the_ordinary_live_cell_is_routed_to_the_resume_and_the_mutation_restor
          {suppressed}"
     );
 }
+
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` / `AC-7` — the real witness, and
+/// it REFUSES.**
+///
+/// This is the member `D0` could not find: a selected `FunctionizedUnits`
+/// artifact in which a binding is installed, a candidate settles
+/// `InlineNoCall` after the deferred bridge completes, and the compile reaches
+/// the existing closeout.
+///
+/// **Its outcome is a refusal, and that is the deliverable rather than a
+/// shortfall.** `ContinuationClaimLedger::close` takes exact set equality over
+/// a `planned` set seeded from the full `continuation_calls()` population. An
+/// `InlineNoCall` candidate is in that population by construction and is
+/// neither emitted nor composed, so a closeout that checks it must refuse.
+/// `D2`'s ordered closeout -- disjointness first, then the derived
+/// `DirectCall ∪ ComposedCall` subset, then the unchanged equality -- is what
+/// converts this same witness to compiling.
+///
+/// **A GREEN result here is a `D1` defect, not a success**, and the exact
+/// refusal string is what tells the three defects apart from a correct `D1`:
+/// `D2` done early and a weakened equality both make it compile, and a return
+/// of planner-side edge exclusion removes the refusal instead of producing it.
+/// Keying on "it failed" would pass under all three.
+///
+/// **Promise class: transition sentinel.** It is named for the boundary rather
+/// than for the outcome, and it retires when `D2`'s subset derivation lands --
+/// at which point the assertion inverts deliberately, under review, rather
+/// than drifting.
+#[test]
+fn ced_d1_the_inline_candidate_settles_after_the_bridge_and_the_closeout_still_refuses() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    use crate::cranelift_backend::lowering::{d8d_bindings, reset_d8d_bindings};
+    use crate::cranelift_backend::lowering::units::{
+        d1_last_dispositions, reset_d1_dispositions, CandidateDisposition,
+    };
+
+    const PRE_D2_REFUSAL: &str =
+        "the discharged continuation call population is not the planned one";
+
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    let _restore = Restore;
+
+    let witness = RuntimeExpr::Match {
+        scrutinee: Box::new(px8j_deferred_recursive_field_fixture()),
+        cases: ["ctor:prelude::Result::Err", "ctor:prelude::Result::Ok"]
+            .into_iter()
+            .map(|constructor| RuntimeMatchCase {
+                constructor: constructor.to_string(),
+                binders: 1,
+                body: RuntimeExpr::Construct {
+                    constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+                    args: Vec::new(),
+                },
+            })
+            .collect(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "CED D1 AC-7 witness".to_string(),
+        },
+    };
+
+    reset_d1_dispositions();
+    reset_d8d_bindings();
+    set_selector_variant_exclusion(Some(RecursiveDescentResidual::MatchScrutineeRecursor));
+    let (result, _trace) = px8j_capture_source_trace(&witness, false, "ken_ced_d1_ac7_witness");
+    let outcome = match result.map(|_| ()) {
+        Ok(()) => "Ok".to_string(),
+        Err(error) => format!("{error:?}"),
+    };
+    let dispositions = d1_last_dispositions();
+    let bindings = d8d_bindings();
+
+    // Clause 1 -- a binding IS installed. Without this the rest is about a
+    // candidate that never authorized anything, which is the role this node
+    // exists to separate from the call obligation.
+    assert!(
+        bindings > 0,
+        "the witness must install a static-worker binding, or it is not exercising the binding \
+         projection role at all: bindings={bindings}"
+    );
+
+    // Clause 2 -- a candidate settled InlineNoCall. This can only happen after
+    // the deferred bridge returned Ok with the candidate unconsumed; the seat
+    // has no other caller.
+    assert!(
+        dispositions.get(&CandidateDisposition::InlineNoCall).copied().unwrap_or(0) > 0,
+        "a candidate must settle InlineNoCall after the bridge completes. Zero here means either \
+         the bridge did not complete -- in which case this is a BRIDGE_INCOMPLETE program and not \
+         a witness -- or the candidate was consumed and settled some other way: {dispositions:?}"
+    );
+
+    // Clause 3 -- it reached the existing closeout, and the closeout refused,
+    // with the EXACT pre-D2 sentence.
+    assert!(
+        outcome.contains(PRE_D2_REFUSAL),
+        "the witness must reach the existing closeout and be refused by it, verbatim. A green \
+         result here is a D1 DEFECT: it means D2's subset derivation was done early, the exact \
+         equality was weakened, or planner-side edge exclusion returned -- and a check keyed on \
+         'it failed' rather than on this sentence would pass under all three: {outcome}"
+    );
+}
+
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — `d8e`'s discriminator, asserted
+/// by this node rather than inherited from a neighbour's green status.**
+///
+/// `AC-5` says `d8e` keeps **one** binding and still **refuses in value
+/// position**. Both halves are load-bearing and they fail in opposite
+/// directions: losing the binding is how the withdrawn planner-side exclusion
+/// broke this program -- it compiled `Ok` in a shifted environment -- while
+/// losing the refusal alone would mean the fail-closed guard had been
+/// weakened.
+///
+/// **Relying on `d8e` merely staying green does not discharge this.** A
+/// neighbouring row is green for its own reasons, and if `D1` ever moved this
+/// behaviour the failure would land in a file this node does not own, attributed
+/// to whoever touched it next. So the pair is asserted here, on this node's
+/// terms.
+///
+/// **Promise class: durable invariant.** A relation between the installed
+/// binding count and the refusal a value-position read must still produce, on
+/// one program, in both bridge arms.
+#[test]
+fn ced_d1_d8e_keeps_its_one_binding_and_still_refuses_in_value_position() {
+    const VALUE_POSITION_REFUSAL: &str = "a static worker binding has no value representation";
+
+    // The binding half holds on BOTH arms, and it is the half the withdrawn
+    // planner-side exclusion broke: it removed the installed binding and let
+    // the program compile in a shifted environment.
+    for (arm, computational_bridge) in [("ordinary", false), ("computational", true)] {
+        let (_error, (sites, bindings, consumptions), _markers) =
+            d8e_witness_compile("ced_d1_d8e", 2, computational_bridge);
+        assert!(
+            sites > 0,
+            "the {arm} arm must still reach the composed site, or its clause is vacuous"
+        );
+        assert_eq!(
+            (bindings, consumptions),
+            (1, 0),
+            "the {arm} arm must keep exactly ONE installed binding and consume nothing. A zero \
+             binding count is the signature of the withdrawn planner-side exclusion"
+        );
+    }
+
+    // The value-position refusal is the ORDINARY arm's alone, and saying so is
+    // the point rather than a convenience. Off the source-machine path the case
+    // bodies are lowered by `lower_expr`, so the callee reaches the binding in
+    // value position and `D8d`'s fail-closed guard fires. The computational arm
+    // lowers them through the source machine and stops earlier, for a different
+    // reason -- asserting this string of both arms reds on that difference and
+    // would be measuring the wrong property, not a stricter one.
+    let (error, _counts, _markers) = d8e_witness_compile("ced_d1_d8e_value", 2, false);
+    let reason = format!("{:?}", error.expect("the value-position read must still refuse"));
+    assert!(
+        reason.contains(VALUE_POSITION_REFUSAL),
+        "the ordinary arm's refusal must still be D8d's own fail-closed value-position guard, \
+         not an incidental downstream failure: {reason}"
+    );
+}
