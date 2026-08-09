@@ -78,11 +78,60 @@ into `RT-SRCBODY-BIND-ORDER`.
 - **Do not un-ignore the three ignored rows.** Their capabilities really are
   unbuilt; un-ignoring converts a silent non-test into a red. The assertion is
   what is owed, not the attribute.
-- **Ask whether the class is wider than one file.** This was found in
-  `l1_acceptance.rs` because `CI-IGNORED-SWEEP` happened to look there. An
-  assertion-free `#[test]` is cheaply detectable across `crates/`, and the
-  measurement above took one pass. **Scope that sweep before sizing this node**
-  — if the class is large, this is the wrong shape and it should be re-cut.
+- **Ask whether the class is wider than one file.** Partially answered below;
+  the answer is *yes, but do not trust my count.*
+
+## Scoping attempt, 2026-08-09 — the sweep is HARDER than it looks
+
+**Steward attempted the cross-crate scoping sweep this node asks for, and it did
+not survive its own audit. Recorded so nobody repeats it.**
+
+A regex over `crates/` for `#[test]` functions whose bodies contain no
+`assert`/`panic!` reported **115 of 2731**; restricted to genuinely empty bodies
+it reported **54**. **Both numbers are contaminated and must not be used.**
+
+Two independent defects in that detector, each found by reading its output
+rather than its count:
+
+1. **It matched Ken source inside fixture string literals.** Ken test fixtures
+   are embedded Ken programs in Rust raw strings, and they contain `fn`
+   declarations. `surface_named_proof_claims.rs` alone produced seven hits all
+   named `id` — that is `fn id (x : A) = x` inside a fixture, not a Rust test.
+   Names like `local_resp`, `vectorHead`, `J`, `keep`, `main`, `spin` are the
+   same artifact.
+2. **Its brace-matching walked the wrong span on nested items.**
+   `ken-host/src/abi_v1.rs:2245 resolve_effective_user_home` was reported as an
+   empty body. It is a **trait method inside a nested `impl` inside a real
+   test**, and it contains `assert_eq!`.
+
+⇒ **"Assertion-free `#[test]`" is not cheaply detectable by grep in this
+repository**, which is the opposite of what this node's first draft assumed.
+Any frame that specifies a mechanical sweep must say how it excludes fixture
+strings and nested items — a syntactic pass over Rust items, not a regex — and
+must be validated against a known-answer set before its count is believed.
+
+### What the attempt DID establish, by reading
+
+A distinct and milder sub-class exists, and it is **self-declaring**:
+
+| row | shape |
+|---|---|
+| `ken-elaborator/tests/v2_acceptance.rs:516,530,541,555` | four tests named `*_placeholder`, each body a single comment `[placeholder — reifies in V3]`, each doc comment saying the same |
+| `ken-elaborator/tests/v1_acceptance.rs:372` | `disproved_distinct_from_unknown` — comment-only body whose comments say the property "is covered by `unknown_hole_distinct_from_proved`" |
+
+All five are **live, green, and counted as cover**.
+
+**These are a different defect from `sec24`, and probably a much smaller one.**
+They announce themselves in the name, the doc comment, and the body; a reader is
+not misled about what they check. `sec24_char_excludes_surrogates` and
+`sec31_int_div_zero_emits_obligation` **claim a property in the name that the
+body never tests**, which is the shape that becomes a false green.
+
+⇒ **Frame this node on the name/body mismatch, not on "asserts nothing".** The
+second is a style question with legitimate instances (a "must not panic" smoke
+test correctly has no assertion). The first is the defect. Sizing should assume
+the honest placeholders are a cheap second-order cleanup, not the main body of
+work, and that no reliable population count exists yet.
 
 ## Owner
 
