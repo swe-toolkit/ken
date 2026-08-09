@@ -1130,9 +1130,19 @@ fn check_match_with_lift(
             span: arm.span.clone(),
         })?;
         let (raw_domains, _) = peel_pi(&method_ty);
-        if raw_domains.len() != support_ctor.args.len() {
+        let support_shapes =
+            recursive_shapes(cx.env, support_ctor, support, support_decl.params.len()).map_err(
+                |error| ElabError::KernelRejected {
+                    error,
+                    span: arm.span.clone(),
+                },
+            )?;
+        // Recursive support fields contribute generated IH binders after the
+        // constructor fields. They are consumed by the lifted method body, not
+        // exposed as source-pattern binders.
+        if raw_domains.len() != support_ctor.args.len() + support_shapes.len() {
             return Err(ElabError::Internal(
-                "generated support method has an unexpected recursive binder".into(),
+                "generated support method and recursive-shape producer disagree".into(),
             ));
         }
         let base = cx.ctx.len();
