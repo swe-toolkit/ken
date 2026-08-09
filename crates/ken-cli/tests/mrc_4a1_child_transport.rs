@@ -200,16 +200,28 @@ fn read_sole_envelope(dir: &Path, expected_session: &str, expected_parent: &str)
     let text = std::fs::read_to_string(&found[0]).expect("envelope readable");
     let envelope = parse_envelope(&text)
         .unwrap_or_else(|error| panic!("BROKEN INSTRUMENT -- envelope unparseable: {error}"));
+    assert_emitted_identity(&envelope, expected_session, expected_parent);
+    envelope
+}
+
+/// Both identity axes, checked against what the envelope ACTUALLY CARRIES.
+///
+/// Every path that parses an envelope goes through this, so no path can validate
+/// one axis and quietly skip the other. That is not stylistic: the concurrent
+/// path previously did its own inline check of the session alone, and asserting
+/// the parent the test PASSED IN is a different claim from asserting the parent
+/// the child EMITTED. The first tests the environment hand-off; only the second
+/// can catch a transport that substitutes or shares the field on its way out.
+fn assert_emitted_identity(envelope: &Envelope, expected_session: &str, expected_parent: &str) {
     assert_eq!(
         envelope.session, expected_session,
         "wrong-session envelope: the child wrote an observation this parent did not open"
     );
     assert_eq!(
         envelope.parent, expected_parent,
-        "wrong-parent envelope: the child did not carry the invoking test/thread identity, so \
-         the second axis of the merged identity is not established"
+        "wrong-parent envelope: the emitted parent identity is not the invoking test/thread \
+         identity, so the second axis of the merged identity is not established"
     );
-    envelope
 }
 
 /// The three properties every well-formed census must have, wherever it was
@@ -551,7 +563,10 @@ fn mrc_4a1_child_transport_and_its_controls() {
             .unwrap_or_else(|error| panic!("envelope for {session} missing: {error}"));
         let child = parse_envelope(&text)
             .unwrap_or_else(|error| panic!("envelope for {session} unparseable: {error}"));
-        assert_eq!(child.session, session, "each child writes its own session");
+        // Both axes, from the EMITTED envelope. `worker_parent == parent` above
+        // checks only what this test handed the child; this checks what the
+        // child wrote back, which is the axis a transport defect would move.
+        assert_emitted_identity(&child, &session, &worker_parent);
         assert!(
             !child.rows.is_empty(),
             "concurrent child {session} recorded nothing -- loss, not a small census"
