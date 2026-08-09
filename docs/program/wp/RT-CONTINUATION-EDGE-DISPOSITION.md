@@ -143,6 +143,43 @@ pass silently, which is exactly the failure the predecessor's `close` refuses.
 | 4 | omit a final disposition | yes |
 | 5 | present one candidate in **two** dispositions | yes |
 
+> ### `AC-6` IS FIVE CAUSAL PROOFS, NOT FIVE DISTINCT STRINGS — Architect, `evt_6vwnj8a9qty5d`
+>
+> **This sharpens what "independently" means, and it is the difference between
+> a real `D3` and a vacuous one.** Mutations 2 and 3 reach **different causal
+> points** but converge on the **same** existing double-settlement refusal.
+> **That shared refusal may be the terminal corroboration for both; it may not
+> be either control's sole oracle** — a test asserting only that string is green
+> under either mutation and therefore supplies **one** proof, not two.
+>
+> **The minimum lawful proof for each row, all five clauses:**
+>
+> 1. the **unmutated**, production-shaped witness **succeeds** under merged `D2`;
+> 2. the same derived identity reaches the mutation's **exact seat in both runs**;
+> 3. **exactly one** mutation is armed;
+> 4. a **mutation-specific causal observation** proves what moved; and
+> 5. the armed run reaches the expected refusal or closeout failure.
+>
+> ⚠ **The current `d8j` result is REACHABILITY EVIDENCE ONLY, not `AC-6`
+> evidence — its unmutated arm already refuses**, which violates `D3`'s
+> post-`D2`-successful-witness boundary. Clause 1 is the one that catches this,
+> and it is the clause a hurried proof drops.
+>
+> **PREFER SELECTION OVER AUTHORING.** For 4/5, select a compile-OK direct
+> `FunctionizedUnits` member from the **live `D0` census** by re-arming the
+> filter; **author one only if that filter comes back empty.** My authorization
+> below permits authoring — it does not prefer it, and a selected
+> production-shaped member is stronger evidence than a constructed one.
+>
+> **Mutation 1 needs a successful binding-dependent witness:** baseline proves
+> the exact candidate installs **and consumes** its `StaticWorker`; suppression
+> changes a **pinned downstream structural/result oracle**. **A count drop alone
+> on an otherwise behaviorally inert program is not enough.**
+>
+> **Do NOT change production diagnostics merely to manufacture different
+> strings.** Equality of final diagnostics does not collapse rows whose causal
+> discriminators are independently pinned.
+>
 > ### WITNESS CONSTRUCTION IS AUTHORIZED INSIDE `D3` — Steward, 2026-08-09
 >
 > **Ruled on `evt_2g86m27bnv91a`.** The corpus does not supply all five live
