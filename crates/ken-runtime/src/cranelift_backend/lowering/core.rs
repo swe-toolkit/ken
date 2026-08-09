@@ -3401,6 +3401,17 @@ impl<'a> Lowering<'a> {
                             bypassed
                         }
                     };
+                    // `D3` — the ordered causal observation at bridge ENTRY,
+                    // recorded on EVERY run so the unmutated and armed arms are
+                    // comparable at the same seat for the same identity.
+                    #[cfg(test)]
+                    for identity in &bypassed {
+                        super::units::d3_record(super::units::D3Event::BridgeEntry {
+                            identity: identity.clone(),
+                            settled: self.d3_raw_settled(identity),
+                            pending_composed: self.d3_raw_pending_composed(identity),
+                        });
+                    }
                     // `D3` mutation 2 — settle on ENTRY, before the scope is
                     // known to have completed. Nothing else moves.
                     if super::units::d3_mutation()
@@ -3408,6 +3419,13 @@ impl<'a> Lowering<'a> {
                     {
                         for identity in &bypassed {
                             if !self.continuation_candidate_is_consumed(identity) {
+                                #[cfg(test)]
+                                super::units::d3_record(super::units::D3Event::Settle {
+                                    identity: identity.clone(),
+                                    disposition:
+                                        super::units::CandidateDisposition::InlineNoCall,
+                                    seat: super::units::D3Seat::BridgeEntry,
+                                });
                                 self.settle_continuation_candidate(
                                     identity,
                                     super::units::CandidateDisposition::InlineNoCall,
@@ -3436,9 +3454,31 @@ impl<'a> Lowering<'a> {
                         super::units::D3Mutation::MarkInlineBeforeBridgeCompletion => true,
                         _ => outcome.is_ok(),
                     };
+                    // `D3` — the ordered causal observation at bridge EXIT. The
+                    // two feed reads are RAW, deliberately not routed through
+                    // `continuation_candidate_is_consumed`: that is the
+                    // function mutation 3 mutates, and an instrument reading
+                    // through it would agree with the mutation instead of
+                    // exposing it.
+                    #[cfg(test)]
+                    for identity in &bypassed {
+                        super::units::d3_record(super::units::D3Event::BridgeExit {
+                            identity: identity.clone(),
+                            completed,
+                            settled: self.d3_raw_settled(identity),
+                            pending_composed: self.d3_raw_pending_composed(identity),
+                        });
+                    }
                     if completed {
                         for identity in &bypassed {
                             if !self.continuation_candidate_is_consumed(identity) {
+                                #[cfg(test)]
+                                super::units::d3_record(super::units::D3Event::Settle {
+                                    identity: identity.clone(),
+                                    disposition:
+                                        super::units::CandidateDisposition::InlineNoCall,
+                                    seat: super::units::D3Seat::BridgeExit,
+                                });
                                 self.settle_continuation_candidate(
                                     identity,
                                     super::units::CandidateDisposition::InlineNoCall,
@@ -8580,6 +8620,30 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     /// consumption is "already settled, or a composed claim is pending" —
     /// and it reads `pending_composed_discharges` rather than duplicating the
     /// decision about what will be promoted.
+    /// **`D3` instrument — the settled half, read RAW.**
+    ///
+    /// Separate from [`Self::continuation_candidate_is_consumed`] on purpose:
+    /// that function is a mutation target, so the trace must not reach the
+    /// ledger through it.
+    #[cfg(test)]
+    fn d3_raw_settled(&self, identity: &ContinuationCallIdentity) -> bool {
+        self.continuation_candidates
+            .as_ref()
+            .is_some_and(|ledger| ledger.is_settled(identity))
+    }
+
+    /// **`D3` instrument — the pending-composed half, read RAW.** This is the
+    /// half mutation 3 suppresses, so reading it directly is what lets the
+    /// trace show the mutation settled inline *while a composed claim was
+    /// already pending*.
+    #[cfg(test)]
+    fn d3_raw_pending_composed(&self, identity: &ContinuationCallIdentity) -> bool {
+        self.function_local
+            .pending_composed_discharges
+            .iter()
+            .any(|pending| &pending.identity == identity)
+    }
+
     fn continuation_candidate_is_consumed(&self, identity: &ContinuationCallIdentity) -> bool {
         if self
             .continuation_candidates
@@ -9088,6 +9152,15 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let answer = self.claim_and_call_resolved_continuation_inner(builder, identity, fields, recursive_position, producer_env)?;
+        // `D3` — the funnel was REACHED and returned. Recorded before the
+        // settlement branch, so mutation 4's row can prove the direct call and
+        // its return were preserved and only the settlement was withheld.
+        #[cfg(test)]
+        super::units::d3_record(super::units::D3Event::Settle {
+            identity: identity.clone(),
+            disposition: super::units::CandidateDisposition::DirectCall,
+            seat: super::units::D3Seat::DirectFunnel,
+        });
         match super::units::d3_mutation() {
             // `D3` mutation 4 -- withhold the settlement, leaving a real
             // direct call unsettled. The call itself is unchanged.
@@ -9098,6 +9171,12 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     identity,
                     super::units::CandidateDisposition::DirectCall,
                 )?;
+                #[cfg(test)]
+                super::units::d3_record(super::units::D3Event::Settle {
+                    identity: identity.clone(),
+                    disposition: super::units::CandidateDisposition::DirectCall,
+                    seat: super::units::D3Seat::DirectFunnel,
+                });
                 self.settle_continuation_candidate(
                     identity,
                     super::units::CandidateDisposition::DirectCall,
@@ -12465,6 +12544,14 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             return Ok(());
         }
         let inst = emission.inst;
+        // `D3` — the composed claim is RECORDED here, during lowering, and
+        // PROMOTED only after finished-CLIF verification. The gap between those
+        // two is the window mutations 2 and 3 exploit from opposite ends, so
+        // the recording itself is an ordered observation.
+        #[cfg(test)]
+        super::units::d3_record(super::units::D3Event::ComposedRecorded {
+            identity: identity.clone(),
+        });
         self.function_local
             .pending_composed_discharges
             .push(PendingComposedDischarge {
