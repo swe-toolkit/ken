@@ -16279,6 +16279,394 @@ mod tests {
         assert_ne!(origin_of(entry), outer, "the entry is not the occurrence");
     }
 
+    /// Emit one fixture end to end, returning the failure text if it refuses.
+    #[cfg(test)]
+    fn ac3_emit(
+        root: &RuntimeExpr,
+        declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    ) -> Result<(), String> {
+        use crate::cranelift_backend::artifact::new_object_module_for_lowering_tests;
+        use crate::cranelift_backend::lowering::core::{
+            compile_expr_into_object_module, NativeSeedEnvironment,
+        };
+        let seed_env = NativeSeedEnvironment::empty();
+        compile_expr_into_object_module(
+            new_object_module_for_lowering_tests("ac3")
+                .map_err(|error| format!("{error:?}"))?,
+            "ac3_entry",
+            cranelift_module::Linkage::Export,
+            root,
+            &seed_env,
+            declarations.clone(),
+            None,
+            true,
+            None,
+            Some(crate::cranelift_backend::test_support::test_only_distinguished_root_join_plan()),
+            None,
+        )
+        .map(|_| ())
+        .map_err(|error| format!("{error:?}"))
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-3` — collapsing the issued body
+    /// back to the scheduling entry recreates the traversal/closeout failure.**
+    ///
+    /// > **PROPERTY:** the issued body occurrence is what makes the source
+    /// > traversal reach the unit's join subtree.
+    /// > **OPERAND THAT MOVED:** the **population** — the value the planner
+    /// > issues for a `SchedulingEntry` seed, mutated at the seat that resolves
+    /// > it, back to the pre-correction `StaticOriginId(seed.0)` alias. No
+    /// > detector, assertion or validator arm was touched.
+    /// > **OBSERVED BOUNDARY:** `finalize_join_disposition` refuses with
+    /// > *"function left planned source join … neither emitted nor statically
+    /// > unselected"* — a required join reached by neither consumption nor
+    /// > disposition, which is the attribution record's failure exactly.
+    ///
+    /// ⛔ **Population-side is the whole point.** `AC-3` asserts REACH. A
+    /// detector-side mutation would redden this same test name while the
+    /// carried value never moved, and would keep reddening for the entire life
+    /// of a correction that reached nothing.
+    ///
+    /// ⚠ **The `Exact` arm is not a fourth assertion — it is what validates the
+    /// other three.** A refusal control only has to reach its own guard; the
+    /// success arm has to traverse every guard, so it is the only arm that
+    /// establishes the fixture could have lowered at all. Without it, a fixture
+    /// broken upstream would refuse under both settings and read as a discharge.
+    ///
+    /// ⚠ **Honest scope of the two arms.** The root arm exercises the arm that
+    /// previously carried a *workaround* (`define_unit_body`'s `is_root`
+    /// substitution), so it demonstrates the mechanism rather than the shipped
+    /// defect. The **non-root** arm is the population that was actually broken:
+    /// nothing compensated for it, which is why the defect shipped. Both are
+    /// asserted; neither is offered as the other.
+    #[test]
+    fn collapsing_the_body_to_its_scheduling_entry_recreates_the_closeout_failure() {
+        use super::semantic_ir::{with_body_occurrence_mutation, BodyOccurrenceMutation};
+
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+
+        // ── Arm 1: the ROOT unit.
+        let empty = BTreeMap::new();
+        assert_eq!(
+            ac3_emit(&computational, &empty),
+            Ok(()),
+            "AC-3 positive control: the root fixture must lower under the exact \
+             pairing, or the refusals below prove nothing about the pairing"
+        );
+        let collapsed_root = with_body_occurrence_mutation(
+            BodyOccurrenceMutation::CollapseBodyToSchedulingEntry,
+            || ac3_emit(&computational, &empty),
+        );
+        assert_eq!(
+            collapsed_root,
+            Err(
+                "Backend(Module(\"function left planned source join StaticOriginId(5) \
+                 neither emitted nor statically unselected\"))"
+                    .to_string()
+            ),
+            "AC-3: with the body collapsed to the scheduling entry the traversal \
+             enters the entry and never reaches the join subtree, so closeout \
+             finds a required join neither consumed nor dispositioned"
+        );
+
+        // ── Arm 2: a NON-ROOT unit — the population that actually shipped broken.
+        let declaration = b2o_transparent_declaration(computational.clone());
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::b2o", &declaration);
+        let root = RuntimeExpr::Value(RuntimeValue::Bool(true));
+        assert_eq!(
+            ac3_emit(&root, &declarations),
+            Ok(()),
+            "AC-3 positive control: the non-root fixture must lower under the \
+             exact pairing"
+        );
+        let collapsed_declaration = with_body_occurrence_mutation(
+            BodyOccurrenceMutation::CollapseBodyToSchedulingEntry,
+            || ac3_emit(&root, &declarations),
+        );
+        assert!(
+            collapsed_declaration
+                .as_ref()
+                .err()
+                .is_some_and(|message| message.contains("planned source join")),
+            "AC-3: the non-root unit is the population the removed root-only \
+             substitution never covered; collapsing its body must recreate the \
+             same closeout failure. got {collapsed_declaration:?}"
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-5` — the deferred synthetic
+    /// exact-witness control, CARRIED here, RUNNABLE later.**
+    ///
+    /// ⛔ **This control has never executed and this candidate does not claim it
+    /// has.** It is carried in the tree, per `AC-5`, so the obligation is an
+    /// artifact rather than a sentence in a handoff that evaporates when the
+    /// terminal closes. The **committed runnable form is owned by the first
+    /// post-Kernel closure candidate**, released when nested-inductive admission
+    /// is on `main`.
+    ///
+    /// **Release condition:** `KERNEL-NESTED-IND` merged. Until then the
+    /// `LiftRose` witness exists only on the attribution node's disposable
+    /// synthetic venue — an unreferenced composition of this Runtime tree with
+    /// Kernel's held `dd3cd050` and its projection snapshot — which is a
+    /// pre-merge integration gate, not a suite fixture.
+    ///
+    /// **What the runnable form must assert**, so the next seat inherits the
+    /// obligation rather than re-deriving it:
+    ///
+    /// 1. `SOI(26)` is a reachable `ComputationalMatch` owned by
+    ///    `PredeclaredFunctionId(2)`;
+    /// 2. that owner's required join set is exactly `{26, 33, 39, 53}`;
+    /// 3. every member is **entered and closed through the real traversal** —
+    ///    `consumed ∪ dispositioned` equals the required set, rather than the
+    ///    empty sets the attribution measured;
+    /// 4. sibling owners still close normally, so the fixture discriminates this
+    ///    owner rather than reporting a whole-plan change.
+    ///
+    /// ⚠ **Fail-closed by construction.** The body panics rather than returning,
+    /// so removing `#[ignore]` without supplying the witness is a RED. An
+    /// ignored test whose body would pass vacuously is the shape that lets a
+    /// deferred obligation read as a discharged one.
+    #[test]
+    #[ignore = "carried, not runnable: needs KERNEL-NESTED-IND on main for the \
+                LiftRose witness. The first post-Kernel closure candidate owns \
+                the runnable form."]
+    fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
+        panic!(
+            "RT-BODY-OCCURRENCE-PROVENANCE AC-5 is CARRIED, not discharged. \
+             Supply the LiftRose witness (requires KERNEL-NESTED-IND on main) \
+             and assert: SOI(26) is a reachable ComputationalMatch owned by \
+             PredeclaredFunctionId(2); its required join set is exactly \
+             {{26, 33, 39, 53}}; consumed union dispositioned equals that set \
+             through the real traversal; and sibling owners still close \
+             normally. Do not delete this control to make a suite green."
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-4` — call identity is the ENTRY
+    /// axis and did not move with the body axis.**
+    ///
+    /// > **MEASURED:** across every `b2ac` fixture, each call edge's
+    /// > `callee_origin` equals `origin_of(callee_unit.planned_node)`.
+    /// > **CLAIMED:** the correction changed the BODY axis only; call identity
+    /// > is invariant under it.
+    /// > **THE GAP:** at least one fixture must have a unit whose two axes
+    /// > DIFFER, or the equality holds for both readings and the pin cannot
+    /// > tell which axis it measured.
+    ///
+    /// ⛔ **This is the invariant most easily broken by accident, and the one a
+    /// green suite is least likely to catch.** The old `origin` field was an
+    /// alias of `planned_node`, so every consumer read the entry axis whether or
+    /// not it meant to. Renaming that field in bulk would have silently moved
+    /// call identity onto the body axis for exactly the units where the two
+    /// differ — the same units the correction targets — and every fixture whose
+    /// axes coincide would have stayed green.
+    #[test]
+    fn call_identity_stays_on_the_entry_axis_after_the_body_axis_moved() {
+        let mut fixtures_with_split_axes = 0usize;
+        let mut checked_edges = 0usize;
+
+        for (name, expr) in b2ac_topology_fixtures() {
+            let plan = plan_static_transition_graph(&expr, &BTreeMap::new())
+                .unwrap_or_else(|error| panic!("{name} must plan: {error:?}"));
+
+            fixtures_with_split_axes += usize::from(
+                plan.semantic
+                    .functions
+                    .iter()
+                    .any(|function| function.body_occurrence != origin_of(function.planned_node)),
+            );
+
+            for edge in plan.emittable_call_edges().expect("call edges") {
+                let callee = plan
+                    .semantic
+                    .functions
+                    .iter()
+                    .find(|function| function.id == edge.callee())
+                    .expect("a call edge names a planned unit");
+                assert_eq!(
+                    edge.callee_origin(),
+                    origin_of(callee.planned_node),
+                    "AC-4 [{name}]: a call names the unit it ENTERS. The body \
+                     occurrence is where that unit's traversal begins once \
+                     inside, and moving call identity onto it would change which \
+                     unit a call resolves to"
+                );
+                checked_edges += 1;
+            }
+        }
+
+        // ── Non-vacuity, both axes.
+        assert!(
+            fixtures_with_split_axes > 0,
+            "AC-4 precondition: at least one fixture must have a unit whose entry \
+             and body DIFFER, or this test passes under either reading and \
+             measures nothing"
+        );
+        assert!(
+            checked_edges > 0,
+            "AC-4 precondition: the fixture set must actually produce call edges"
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-1` — the issued pair is `n18 ->
+    /// n5`, and `n10` is not registered as that unit's body.**
+    ///
+    /// > **MEASURED:** on the frozen `computational-nested` fixture, the sole
+    /// > row of the pairing authority is `(n18, origin_of(n5))`, and no
+    /// > `PredeclaredFunction` carries `origin_of(n10)` as its body.
+    /// > **CLAIMED:** the registration binds the OUTER scheduling entry to the
+    /// > outer body occurrence its own visit returned, and excludes the nested
+    /// > call's occurrence.
+    /// > **THE GAP:** `n10` must actually EXIST and be the inner match's
+    /// > occurrence. "`n10` is not registered" is vacuously true of a node the
+    /// > fixture never planned, so the exclusion carries no information until
+    /// > the excluded thing is shown to be the real, competing candidate.
+    ///
+    /// ⛔ **The non-vacuity arms are the test.** Both are asserted here rather
+    /// than assumed: `n5 != n10` (two distinct resumes exist under one entry, so
+    /// there is a genuine choice to get wrong) and `origin_of(n18) != n5` (the
+    /// entry is not the body, so a pin that read the entry would differ). On a
+    /// fixture where the axes coincide this test would pass while measuring
+    /// nothing.
+    ///
+    /// ⚠ The exact node identities are a **normative compatibility vector**:
+    /// they are the frozen `B2AC_BASE_TOPOLOGY` row for this fixture, which
+    /// pins `nodes=19`, `n5`/`n10` as the two `SourceReturnResume` nodes and
+    /// `entries=[StaticNodeId(18)]`. A topology change reddens that row first.
+    #[test]
+    fn nested_registration_issues_the_outer_pair_and_excludes_the_inner_resume() {
+        let (_, nested) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational-nested")
+            .expect("the nested computational fixture");
+        let plan = plan_static_transition_graph(&nested, &BTreeMap::new()).expect("plannable");
+
+        let n18 = StaticNodeId(18);
+        let n5 = origin_of(StaticNodeId(5));
+        let n10 = origin_of(StaticNodeId(10));
+
+        // ── Non-vacuity, before anything is concluded from an absence.
+        assert_ne!(
+            n5, n10,
+            "AC-1 precondition: the fixture must supply TWO distinct resumes \
+             under one entry, or there is no wrong answer available to exclude"
+        );
+        assert_ne!(
+            origin_of(n18),
+            n5,
+            "AC-1 precondition: entry and body must differ on this fixture, or \
+             reading the entry would be indistinguishable from reading the body"
+        );
+        let outer = plan.root_static_origin().expect("root occurrence");
+        assert_eq!(outer, n5, "the outer occurrence is the outer resume");
+        assert_eq!(
+            plan.child_static_origin(outer, 1)
+                .expect("the outer match's case body resolves"),
+            n10,
+            "AC-1 precondition: `n10` is the INNER match's occurrence — a real, \
+             competing candidate, not an absent node"
+        );
+
+        // ── The issued pairing itself.
+        assert_eq!(
+            plan.scheduling_entry_bodies,
+            vec![SchedulingEntryBody {
+                entry: n18,
+                body_occurrence: n5,
+            }],
+            "AC-1: the sole issued pair binds the outer scheduling entry to the \
+             outer body occurrence its own visit returned"
+        );
+
+        // ── And no unit claims the nested call's occurrence as its body.
+        assert!(
+            plan.semantic
+                .functions
+                .iter()
+                .all(|function| function.body_occurrence != n10),
+            "AC-1: `n10` is the occurrence the NESTED call returned to its \
+             parent; recovering an `outermost` resume by graph shape is exactly \
+             what would select it"
+        );
+    }
+
+    /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-2` — a NON-ROOT unit whose body
+    /// schedules something before itself has entry != body.**
+    ///
+    /// > **MEASURED:** for a transparent declaration whose body is a
+    /// > computational match, the unit's `body_occurrence` differs from
+    /// > `origin_of(planned_node)`, and equals the declaration occurrence the
+    /// > planner recorded for that symbol.
+    /// > **CLAIMED:** the correction reaches NON-ROOT units — the population the
+    /// > removed root-only substitution never covered.
+    /// > **THE GAP:** the unit must genuinely be non-root. `AC-1`'s fixture has
+    /// > exactly one entry and it IS the root, so it cannot discharge this;
+    /// > passing it off as coverage would leave the entire defect population
+    /// > unmeasured.
+    ///
+    /// ⛔ This is the discriminating pair the old code could not produce: before
+    /// the correction `body_occurrence` was `StaticOriginId(seed.0)`, so the
+    /// first assertion below was an identity and could not fail.
+    #[test]
+    fn a_non_root_computational_declaration_body_differs_from_its_entry() {
+        // Reuse the frozen `computational` fixture shape as the DECLARATION
+        // body, so the only thing varying from `AC-1` is root-ness.
+        let (_, computational) = b2ac_topology_fixtures()
+            .into_iter()
+            .find(|(name, _)| *name == "computational")
+            .expect("the computational fixture");
+        let declaration = b2o_transparent_declaration(computational);
+        let mut declarations = BTreeMap::new();
+        declarations.insert("decl:fixture::b2o", &declaration);
+        let root = RuntimeExpr::Value(RuntimeValue::Bool(true));
+        let plan = plan_static_transition_graph(&root, &declarations).expect("plannable");
+
+        let root_entry = plan.root_entry.expect("a root entry");
+        let declaration_body = plan
+            .declaration_occurrence_origin("decl:fixture::b2o")
+            .expect("the declaration was planned");
+
+        let pair = plan
+            .scheduling_entry_bodies
+            .iter()
+            .find(|pair| pair.entry != root_entry)
+            .expect("AC-2 precondition: a non-root scheduling entry exists");
+
+        assert_ne!(
+            origin_of(pair.entry),
+            pair.body_occurrence,
+            "AC-2: a non-root unit whose body schedules its scrutinee first must \
+             not have its entry aliased as its body — this equality is what the \
+             correction removed"
+        );
+        assert_eq!(
+            pair.body_occurrence, declaration_body,
+            "AC-2: the issued body is the occurrence the declaration's own visit \
+             returned"
+        );
+
+        // The unit built from that seed carries the issued value, not the alias.
+        let unit = plan
+            .semantic
+            .functions
+            .iter()
+            .find(|function| function.planned_node == pair.entry)
+            .expect("the non-root seed built a function unit");
+        assert_eq!(
+            unit.body_occurrence, declaration_body,
+            "AC-2: the carried field is the issued body occurrence"
+        );
+        assert_ne!(
+            unit.body_occurrence,
+            origin_of(unit.planned_node),
+            "AC-2: and it is NOT an alias of the scheduling entry"
+        );
+    }
+
     /// **`RT-FNSPLIT-B2A-S` AC-5 — keying selection by the scheduling ENTRY
     /// resolves to the WRONG body. Demonstrated, not forbidden by a grep.**
     ///

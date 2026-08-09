@@ -5950,6 +5950,20 @@ fn the_owner_classification_has_a_closed_production_naming_inventory() {
             // records the seam without claiming production reachability.
             "pub(in crate::cranelift_backend) enum D2aPopulationMutation {",
             "pub(in crate::cranelift_backend) fn with_d2a_population_mutation<T>(",
+            // ⭐ `RT-BODY-OCCURRENCE-PROVENANCE` `AC-3` adds a second scoped
+            // mutation seam of exactly the `D2a` shape, and the argument is the
+            // same one: it is a `cfg(test)` SCOPE that restores a prior
+            // population choice for the duration of one control, never a
+            // capability a consumer gains. The enum carries no payload and the
+            // scope restores `Exact` on the way out including on panic, so a
+            // consumer cannot mint, compute or install a body occurrence
+            // through it — it can only ask the planner to re-issue the
+            // pre-correction alias and observe the refusal that follows.
+            // ⚠ Same `cfg(test)` caveat as `D2a`: the source tripwire cannot
+            // distinguish it, so this records the seam without claiming
+            // production reachability.
+            "pub(in crate::cranelift_backend) enum BodyOccurrenceMutation {",
+            "pub(in crate::cranelift_backend) fn with_body_occurrence_mutation<T>(",
         ],
         "D7: the plane's widened-visibility inventory changed. `StaticOriginId` \
          is widened deliberately so the lowering can carry an occurrence's \

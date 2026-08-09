@@ -1057,6 +1057,50 @@ fn declaration_owned_pairs(
     Ok((declaration_owned_body, pairs))
 }
 
+/// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-3` — the causal control.**
+///
+/// Restores the pre-correction alias: a `SchedulingEntry` seed takes its own
+/// scheduling entry as its body occurrence instead of the pair its registration
+/// visit issued. This is the defect exactly — `origin: StaticOriginId(seed.0)`
+/// — reinstated at the seat that now resolves it.
+///
+/// ⛔ **Population-side, deliberately.** The property `AC-3` asserts is that the
+/// issued pair REACHES ordinary emission. A detector-side mutation — narrowing
+/// an assertion, neutering a validator arm — would redden a correctly-named
+/// test while the carried value never moved, and would stay green-reddening for
+/// the entire life of a correction that reached nothing. What must move is the
+/// value the planner issues, at the seat that issues it.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum BodyOccurrenceMutation {
+    Exact,
+    CollapseBodyToSchedulingEntry,
+}
+
+#[cfg(test)]
+thread_local! {
+    static BODY_OCCURRENCE_MUTATION: std::cell::Cell<BodyOccurrenceMutation> =
+        const { std::cell::Cell::new(BodyOccurrenceMutation::Exact) };
+}
+
+/// Run `body` with the pre-correction alias restored, restoring `Exact` on the
+/// way out **including on panic**.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_body_occurrence_mutation<T>(
+    mutation: BodyOccurrenceMutation,
+    body: impl FnOnce() -> T,
+) -> T {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            BODY_OCCURRENCE_MUTATION.with(|cell| cell.set(BodyOccurrenceMutation::Exact));
+        }
+    }
+    BODY_OCCURRENCE_MUTATION.with(|cell| cell.set(mutation));
+    let _restore = Restore;
+    body()
+}
+
 fn partition_function_units(
     nodes: &[StaticNode],
     edges: &[StaticEdge],
@@ -1111,6 +1155,13 @@ fn partition_function_units(
             let body = entry_bodies(*entry).ok_or_else(|| {
                 planner_error("scheduling entry has no issued body occurrence")
             })?;
+            #[cfg(test)]
+            let body = match BODY_OCCURRENCE_MUTATION.with(std::cell::Cell::get) {
+                BodyOccurrenceMutation::Exact => body,
+                BodyOccurrenceMutation::CollapseBodyToSchedulingEntry => {
+                    StaticOriginId(entry.0)
+                }
+            };
             seeds.push(*entry);
             seed_body_occurrences.push(body);
         }
