@@ -20,6 +20,68 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > [[RT-BODY-OCCURRENCE-PROVENANCE]] closed with every AC discharged —
 > production at `1f706520`, `D7` at `1105671a` (PR #1727, CI green).
 >
+> ### `D5`'s LANE SURFACE IS DEFINED BY `AC-K12`'s STAGES, NOT BY A CRATE LIST
+>
+> **Steward ruling 2026-08-09, on `kernel-leader`'s spillover question
+> `evt_5881mybzdzs0m`.** Fresh `T1` grounding repaired two elaborator defects
+> and reached exact dependent-`Omega` acceptance; the valid Nat-3 control then
+> elaborates, passes both kernel re-checks, and fails independently at two
+> consumers outside `elab.rs`. **Both are authorized spillover in this `D5`
+> landing. The acceptance boundary is NOT amended, because `AC-K12` already
+> spans them.**
+>
+> | consumer | disposition | why |
+> |---|---|---|
+> | `ken-interp::eval::elim_reduce` — legacy direct/Pi-only `recursive_arg_arity` supplies no structured `All` IH for `LiftNode : Bag LiftRose -> LiftRose` | **IN** | `AC-K12`'s own row says *"the evaluator and native-lowering paths **re-derive** recursive positions"* and requires a recursive computation to **evaluate**. Interpreter Nat-3 is a named `AC-K12` stage |
+> | `erase_checked_core_package_for_target` — rejects the generated support-family dependent motive as `unsupported_dependent_motive` | **IN** | it is in `crates/ken-elaborator/src`, which this block already rules is *"the work, not an out-of-lane escalation"*. `AC-K12` requires a built artifact, which cannot exist while erasure refuses |
+> | `crates/ken-runtime` planner/lowering | **OUT, unchanged** | off-limits to Kernel. The Steward authorized an edit there once and was overruled. If the failure moves there after these two, it is a Runtime attribution and Kernel **stops** |
+>
+> **This is the same defect class the Architect already ruled, one crate over:
+> a legacy direct/Pi-only producer against the kernel's `recursive_shapes`.**
+> `recursive_arg_arity` is to `ken-interp` what `recursive_args` was to
+> `elab.rs`, so mechanism point 1 — *take the telescope from kernel
+> `method_type`/`recursive_shapes`; never reconstruct a nested lift or add a
+> second topology rule* — **binds verbatim at both new sites.**
+>
+> **The one part that is soundness-adjacent, and it is not a scope question.**
+> Relaxing `unsupported_dependent_motive` must key on **kernel provenance**
+> (`all_support_origin`), never on the motive's shape. A shape-keyed relaxation
+> widens erasure for arbitrary dependent motives, which is a TCB-adjacent
+> widening this node does not authorize. Ground the discriminator in `spec/`
+> first; if `spec/` does not settle it, that single question routes to the
+> Architect — not the scope call, which is ruled here.
+>
+> **Validation:** a change to `ken-interp` evaluation requires the **full
+> `-p ken-interp` suite**, not the one focused test. Reifier and `elim_reduce`
+> changes have reached distant cases in that crate before.
+>
+> **One branch, one candidate.** Elaborator, interpreter, and erasure ride the
+> same `wp/KERNEL-NESTED-IND-D5` and one Decision. Do not publish the
+> elaborator piece alone while the consumers wait — that is the exact assembly
+> failure `COORDINATION §14(4)` exists to prevent.
+>
+> **Contention, re-measured rather than asserted.** No seat holds uncommitted
+> edits in `ken-interp/src` or `ken-elaborator/src/erasure.rs`.
+> `verify-implementer` holds `crates/ken-interp/tests/l1_acceptance.rs`, but
+> Verify is held on the lane cap and that is a **test** file against Kernel's
+> `src` — the file intersection is empty. Flagged forward: Verify re-bases onto
+> a moved `ken-interp` when `CI-ASSERTIONLESS-L1` resumes.
+>
+> ### THE LANE SURFACE IS NOT A CRATE LIST. I HAVE MISREAD IT THREE TIMES.
+>
+> **Three times on this node I have under-described `D5`'s surface** — first
+> excluding `crates/ken-elaborator/src`, then attributing the refusal to
+> Runtime, now excluding the evaluator. Each time the omitted path was
+> **required by `AC-K12`'s own stages**, and each time a ring stopped to ask.
+>
+> ⇒ **`D5`'s surface is not a crate list. It is: every path an `AC-K12` stage
+> traverses, minus `crates/ken-runtime`.** `AC-K12` names lowering, native
+> execution, the Cranelift verifier, and interpreter agreement at Nat 3. **Any
+> path on the way to those stages is in scope by construction**, and a crate
+> list written from the current failure site will always be one consumer short
+> of the next one. Do not ask whether a consumer is "in the lane" — ask which
+> `AC-K12` stage it blocks.
+>
 > ### THE NEXT SLICE IS `D5`. THE POSITION IS FOUR DELIVERABLES FURTHER ON.
 >
 > **Architect ruling `evt_3cnnt1megm88h`, 2026-08-09, and it is the authority
