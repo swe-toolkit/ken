@@ -1,7 +1,7 @@
 ---
 id: RT-SPECIALIZED-ACTIVE-RESUME
 title: "A live specialized value with an Active frame is refused by a constructor-only destructure — Active resume does not require constructor shape"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,39 @@ blocks: [RT-MATCH-RECURSOR-CONSUMERS]
 github: null
 origin: Architect fifth-wall sibling-authority ruling evt_1pw1ng8448mef (2026-08-08) on the RT-CARRIED-ORDINARY-COMPOSITION D2 hard stop evt_5vs6jav0b9zws, discharged against the evidence-only trace aa78c973. Handle suggested by the Architect in the same ruling. Campaign docs/program/16-recursive-descent-retirement.md node #6g. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # CLOSED 2026-08-09. ALL FOUR DELIVERABLES ON `main`; ALL NINE ACs MET.
+>
+> **The node was left `active` after its `D2`/`D3` were accepted as a partial,
+> and the tracker was never flipped once the remainder landed.** Verified
+> against **its own ACs**, not on the code having landed:
+>
+> - **`D2`/`D3` are on `main`**, republished under a different SHA than the
+>   accepted `d9175d05`. **Ancestry is the wrong test and reports the wrong
+>   answer here** — `d9175d05` is *not* an ancestor of `main`. The mechanism is
+>   present by name: `sar_d2_routes`, `sar_d2_cell_arrivals`,
+>   `sar_d2_suppress_route`, and `sar_d3_the_ordinary_live_cell_is_routed_to_
+>   the_resume_and_the_mutation_restores_the_refusal`.
+> - **The owed doc-only scope child landed.** It was the one thing blocking
+>   closure: the handback quoted `+417/-16` against the merge base when that is
+>   the **checkpoint-relative** figure. `RT-SPECIALIZED-ACTIVE-RESUME-D0-D1.md`
+>   on `main` now states **both** anchored ranges — `dcd6d84c` to `d9175d05` is
+>   `+664/-6`, `f3be6476` to `d9175d05` is `+417/-16`.
+> - **`AC-8`** — `control.rs` carries **zero** `#[ignore]` at `dcd6d84c` and
+>   **zero** on current `main`. Nothing added.
+> - **`AC-4`/`AC-5`/`AC-7`** — the controls and the four landed repairs are
+>   present, and the targeted `-p ken-runtime --lib` suite over `main`'s code
+>   ran **834 passed, 0 failed, 5 ignored**. The full-equality suppression
+>   control reds by design on a message change, so its continued pass is its
+>   continued discrimination.
+> - **`AC-9`** — `main` green in CI, zero failures.
+>
+> **Its rows not closing was never this node's AC.** `AC-1` to `AC-9` are about
+> measurement quality, partition, controls, and non-regression. The A rows stop
+> at the sixth authority, which was routed to
+> [[RT-CONTINUATION-CALL-DISCHARGE]] and from there to
+> [[RT-CONTINUATION-EDGE-DISPOSITION]] — that is
+> [[RT-MATCH-RECURSOR-CONSUMERS]]'s `AC-1`, not this node's.
 
 > # THIS IS THE FIFTH WALL, AND THE FIRST ONE THAT IS NOT A CARRIER PROBLEM.
 

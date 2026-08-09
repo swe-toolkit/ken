@@ -1,7 +1,7 @@
 ---
 id: RT-CONTINUATION-CALL-DISCHARGE
 title: "A planned continuation call is neither directly emitted nor compositionally consumed once the Active resume path goes live — attribution, not repair"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,29 @@ blocks: [RT-CONTINUATION-EDGE-DISPOSITION]
 github: null
 origin: Architect ruling evt_vxqa83y4z3nt (2026-08-08) on the RT-SPECIALIZED-ACTIVE-RESUME D2/D3 sixth wall at exact d9175d05, with the Steward cut and release ruling evt_27jwdbz9h2t4c. Campaign docs/program/16-recursive-descent-retirement.md node #6h. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # CLOSED 2026-08-09. THE ATTRIBUTION IS DELIVERED AND `D2`/`D3` CLOSED AT THEIR NEW HOME.
+>
+> **The node was left `active` after `D2`/`D3` were withdrawn from it, and the
+> tracker was never flipped once the remainder landed.** Verified against **its
+> own ACs**:
+>
+> - **`AC-1`/`AC-2`** — the `D0`/`D1` attribution record is on `main`. It
+>   establishes that every measured member has `pending_len=0`, so the activated
+>   path reaches an empty `Active` resume **with no call** while the planner has
+>   already minted one, and it refutes the other two classifications rather than
+>   asserting one.
+> - **`AC-3` to `AC-7` were RE-HOMED, not met here.** They describe *the
+>   repair*, which Architect hard stop `evt_dakdkqk4wbg6` withdrew to
+>   [[RT-CONTINUATION-EDGE-DISPOSITION]] (#6i) — **merged and closed
+>   2026-08-09**, discharging them there. This is recorded in the frame's AC
+>   table too, because the table alone reads as five unmet ACs on a closed node.
+> - **`AC-8`/`AC-9`** — no `#[ignore]` added; `main` green in CI, zero failures.
+>
+> **`65639a13` and `a15a3e934766a1d075386ba561a9469e51a448b7` remain HELD
+> EVIDENCE and must never be published.** The string `a15a3e93bd76...` that
+> circulated is **NOT AN OBJECT** — it shares its first eight characters with
+> the real one. `git cat-file -t` every SHA.
 
 > # THIS IS THE SIXTH WALL, AND IT IS THE FIRST PLANNER-POPULATION AUTHORITY.
 

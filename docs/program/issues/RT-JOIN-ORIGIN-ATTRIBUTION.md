@@ -1,7 +1,7 @@
 ---
 id: RT-JOIN-ORIGIN-ATTRIBUTION
 title: "A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,27 @@ blocks: [KERNEL-NESTED-IND]
 github: null
 origin: Architect ruling evt_j8t0ktxbmck (2026-08-09) on the KERNEL-NESTED-IND scope hard stop. Component attribution is Runtime; Kernel must not edit crates/ken-runtime for this wall. Steward-filed and sequenced after #6i's D3 because it contends on all four D3 paths (COORDINATION §2).
 ---
+
+> # CLOSED 2026-08-09. ALL FOUR ACs MET, RECORD-ONLY, ON `main`.
+>
+> Verified against **its own ACs**, not on the code having landed:
+>
+> - **`AC-1`/`AC-2`** — the record merged at exact `72e0d7c`, PR #1686, and
+>   names the first missing general authority as **the ordinary body-emission
+>   traversal** (the Architect's option 1), argued from SOI(26)'s source-table
+>   resolution, owner, token and continuing-predecessor data, `required
+>   {26,33,39,53}` with **empty** `consumed` and `dispositioned`, absent
+>   traversal *and* selection for that owner, and **healthy sibling owner
+>   closeouts**. The siblings are what make it an attribution rather than an
+>   observation.
+> - **`AC-3`** — `crates/` byte-identical to base `f0217c67`; one path,
+>   `+407/-0`. No production change.
+> - **`AC-4`** — returned at the boundary, and the Architect ruled
+>   `evt_172ag7hdbttkc` on it rather than the ring proceeding to a repair.
+>
+> **The successor it produced is [[RT-BODY-OCCURRENCE-PROVENANCE]]**, which is
+> where the repair lives. This node never authorized production work and did
+> not do any.
 
 > # THIS IS AN ATTRIBUTION NODE. IT DOES NOT BEGIN WITH A REPAIR.
 

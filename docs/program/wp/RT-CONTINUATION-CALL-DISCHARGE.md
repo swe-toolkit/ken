@@ -169,6 +169,24 @@ has **no downstream effect**. Assert `> 0` for the mutated denominator and
 
 ## 3. Acceptance criteria
 
+> ### `AC-3` THROUGH `AC-7` WERE RE-HOMED WITH `D2`/`D3`. THEY ARE NOT THIS NODE'S TO MEET.
+>
+> **Recorded 2026-08-09 at closure.** Architect hard stop `evt_dakdkqk4wbg6`
+> withdrew `D2`/`D3` from this node and re-homed them to
+> [[RT-CONTINUATION-EDGE-DISPOSITION]] (#6i). **Five of the nine ACs below
+> describe *the repair*, so they went with it** — every one names a repair that
+> this node no longer carries: `AC-3` "the repair sits at the authority `D1`
+> named", `AC-4` the post-repair ledger-law check, `AC-5`/`AC-6` the lane pair
+> around a repair, `AC-7` `D3`'s non-vacuity.
+>
+> **#6i merged and closed 2026-08-09**, discharging them at their new home.
+>
+> **This is written down rather than left to inference because the table below
+> reads as five unmet ACs on a closed node.** A reader arriving at the AC table
+> and not the Disposition section would conclude the node closed with its
+> acceptance unsatisfied. **`AC-1`, `AC-2`, `AC-8` and `AC-9` are this node's,
+> and they are met** — the `D0`/`D1` attribution record is on `main`.
+
 | AC | criterion | control |
 |---|---|---|
 | `AC-1` | The missing identity is traced in both lanes, all seven fields recorded | `D0` record, with denominators and excluded committed controls named |
