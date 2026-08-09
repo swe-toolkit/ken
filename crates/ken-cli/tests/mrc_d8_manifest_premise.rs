@@ -40,10 +40,28 @@ use std::path::{Path, PathBuf};
 //
 // Deliberately small: enough for three facts and no more. What is modelled is
 // table headers, `key = value` entries, values that continue across lines while
-// `[]`/`{}` are unbalanced, inline-table keys, and string arrays. What is NOT
-// modelled — dotted keys, arrays of tables, multi-line basic strings, literal
-// strings containing brackets — is absent from all three manifests, and the
-// evasion controls below are what keep that from being an assumption.
+// `[]`/`{}` are unbalanced, inline-table keys, and string arrays.
+//
+// # What is NOT modelled, and which way each one fails
+//
+// A hand-written reader is clean about exactly the shapes its author
+// remembered, so the residual is stated by DIRECTION rather than by adjective.
+// The direction that matters is a fact reported HELD when it is not; a fact
+// reported LOST when it holds is a loud, attributable red.
+//
+// | unmodelled shape | present in the three manifests | direction if it appeared |
+// |---|---|---|
+// | dotted keys (`workspace.resolver = "2"`) | no | **safe** — no table context, so fact 1 reads NOT DECLARED and reds. Controlled below |
+// | arrays of tables (`[[bin]]`) | yes, in `ken-cli` | **safe** — treated as an unrelated table, so it cannot supply a key to a wanted one. Controlled below |
+// | multi-line basic strings (`"""…"""`) | no | **UNCONTROLLED.** A `[table]`-shaped or `key = value`-shaped line inside one would be read as structure |
+// | literal strings (`'…'`) containing brackets | no | **UNCONTROLLED.** Bracket depth is counted for double-quoted strings only, so one could unbalance a continuation |
+//
+// The last two are a real residual, not a covered case: if a manifest ever uses
+// them, this reader needs a fresh look rather than a patch. They are called out
+// here because the earlier revision of this comment claimed the controls kept
+// every unmodelled shape "from being an assumption", which was false — the
+// controls cover comments, neighbouring tables, multi-line arrays, and the two
+// shapes marked controlled above, and nothing else.
 
 /// Strip a `#` comment, respecting double-quoted strings so a `#` inside a
 /// value is not treated as a comment introducer.
@@ -561,5 +579,182 @@ bundle = [
     assert!(
         !feature_is_not_default(multiline_features, FEATURE),
         "the reader missed a transitive default written across lines"
+    );
+}
+
+// ---- controls that mutate the REAL manifests -----------------------------
+//
+// The synthetic controls above prove the predicates discriminate. They cannot
+// prove the predicates discriminate on *the shipped files*, because a fixture
+// can drift from the manifest it stands for and nothing would say so. These
+// close that: each reads the real manifest, asserts it green, applies the exact
+// mutation frame section 4a.2 names, and asserts it reds.
+//
+// Each is a non-degenerate pair on a SHARED input, and that input is the actual
+// file. Each also asserts the mutation CHANGED the text: a mutation that
+// silently no-ops because the manifest was respelled would otherwise leave the
+// unmutated text in place, and the control would be measuring nothing while
+// reading as a result.
+//
+// Three mutations, three reds, in three separate tests, so a single red names
+// which fact lost its control rather than collapsing them into one verdict.
+
+fn real(path: &str) -> String {
+    read_manifest(&workspace_root().join(path))
+}
+
+/// Apply a mutation and refuse to proceed if it did not bite the real text.
+fn mutated(original: &str, applied: String, what: &str) -> String {
+    assert_ne!(
+        applied, original,
+        "the {what} mutation did not change the shipped manifest -- the manifest has been \
+         respelled, so this control is measuring nothing. Re-derive the mutation against the \
+         current text rather than deleting this assertion"
+    );
+    applied
+}
+
+#[test]
+fn mrc_d8_real_control_fact_one_reds_on_the_shipped_workspace_manifest() {
+    let text = real("Cargo.toml");
+    assert!(
+        workspace_declares_resolver_two(&text),
+        "the shipped workspace manifest must be green, or the reds below are free"
+    );
+
+    let removed = mutated(
+        &text,
+        text.lines()
+            .filter(|line| line.trim() != "resolver = \"2\"")
+            .collect::<Vec<_>>()
+            .join("\n"),
+        "resolver-removal",
+    );
+    assert!(
+        !workspace_declares_resolver_two(&removed),
+        "FACT 1 CONTROL LOST: removing `resolver = \"2\"` from the shipped workspace manifest did \
+         not red the pin"
+    );
+
+    let downgraded = mutated(
+        &text,
+        text.replace("resolver = \"2\"", "resolver = \"1\""),
+        "resolver-downgrade",
+    );
+    assert!(
+        !workspace_declares_resolver_two(&downgraded),
+        "FACT 1 CONTROL LOST: `resolver = \"1\"` in the shipped workspace manifest was accepted as \
+         if it were 2"
+    );
+}
+
+#[test]
+fn mrc_d8_real_control_fact_two_reds_on_the_shipped_runtime_manifest() {
+    let text = real("crates/ken-runtime/Cargo.toml");
+    assert!(
+        feature_is_not_default(&text, FEATURE),
+        "the shipped ken-runtime manifest must be green, or the reds below are free"
+    );
+
+    let direct = mutated(
+        &text,
+        text.replace(
+            "[features]\n",
+            "[features]\ndefault = [\"px8-ds-test-support\"]\n",
+        ),
+        "default-feature",
+    );
+    assert!(
+        !feature_is_not_default(&direct, FEATURE),
+        "FACT 2 CONTROL LOST: defaulting `{FEATURE}` in the shipped ken-runtime manifest did not \
+         red the pin"
+    );
+
+    let transitive = mutated(
+        &text,
+        text.replace(
+            "[features]\n",
+            "[features]\ndefault = [\"bundle\"]\nbundle = [\"px8-ds-test-support\"]\n",
+        ),
+        "transitive-default-feature",
+    );
+    assert!(
+        !feature_is_not_default(&transitive, FEATURE),
+        "FACT 2 CONTROL LOST: reaching `{FEATURE}` from `default` through another feature did not \
+         red the pin on the shipped manifest"
+    );
+}
+
+#[test]
+fn mrc_d8_real_control_fact_three_reds_on_the_shipped_cli_manifest() {
+    let text = real("crates/ken-cli/Cargo.toml");
+    assert!(
+        dependency_is_featured_only_for_dev(&text, DEPENDENCY, FEATURE),
+        "the shipped ken-cli manifest must be green, or the reds below are free"
+    );
+
+    let moved = mutated(
+        &text,
+        text.replace(
+            "ken-runtime = { path = \"../ken-runtime\" }",
+            "ken-runtime = { path = \"../ken-runtime\", features = [\"px8-ds-test-support\"] }",
+        ),
+        "featured-production-edge",
+    );
+    assert!(
+        !dependency_is_featured_only_for_dev(&moved, DEPENDENCY, FEATURE),
+        "FACT 3 CONTROL LOST: a featured `{DEPENDENCY}` edge in the shipped `[dependencies]` did \
+         not red the pin"
+    );
+
+    let no_dev = mutated(
+        &text,
+        text.replace(
+            "ken-runtime = { path = \"../ken-runtime\", features = [\"px8-ds-test-support\"] }\n",
+            "",
+        ),
+        "dev-edge-removal",
+    );
+    assert!(
+        !dependency_is_featured_only_for_dev(&no_dev, DEPENDENCY, FEATURE),
+        "FACT 3 CONTROL LOST: removing the shipped dev-dependency edge did not red the pin"
+    );
+}
+
+// ---- the two unmodelled shapes that ARE controlled -----------------------
+
+#[test]
+fn mrc_d8_control_dotted_keys_and_arrays_of_tables_fail_closed() {
+    // A dotted key carries no table context for this reader, so fact 1 must
+    // report NOT DECLARED rather than reading it as `[workspace]`'s resolver.
+    // Over-strict is the safe direction: a loud red, not a silent hold.
+    let dotted = "workspace.resolver = \"2\"\n";
+    assert!(
+        !workspace_declares_resolver_two(dotted),
+        "the reader accepted a DOTTED resolver key, which it does not model -- that is the unsafe \
+         direction"
+    );
+
+    // An array-of-tables header must not be read as the table of the same name.
+    // `ken-cli`'s real manifest contains `[[bin]]`, so this shape is live.
+    let array_of_tables = r#"
+[[dependencies]]
+ken-runtime = { path = "../ken-runtime", features = ["px8-ds-test-support"] }
+
+[dev-dependencies]
+ken-runtime = { path = "../ken-runtime", features = ["px8-ds-test-support"] }
+"#;
+    assert!(
+        !dependency_is_featured_only_for_dev(array_of_tables, DEPENDENCY, FEATURE),
+        "the reader read `[[dependencies]]` as `[dependencies]`"
+    );
+
+    // And the real `ken-cli` manifest's own `[[bin]]` must not disturb the
+    // tables the facts are read from -- that is measured by the pin passing, so
+    // this asserts the shape is actually PRESENT, or the reassurance is vacuous.
+    assert!(
+        real("crates/ken-cli/Cargo.toml").contains("[[bin]]"),
+        "this control assumes the shipped ken-cli manifest still contains an array-of-tables \
+         header; it no longer does, so the shape is no longer exercised"
     );
 }
