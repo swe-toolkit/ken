@@ -33,7 +33,7 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-09 ~21:4xZ · TWO LANES TURNING; D5 REACHED THE RUNTIME WALL
+## LIVE — 2026-08-09 ~22:2xZ · BOTH LANES TURNING; FOUR STALE BLOCKERS CLEARED
 
 > ### POWER LOSS ~20:0xZ WAS RECOVERED WITH NOTHING LOST.
 >
@@ -42,17 +42,124 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `7dcda4a1`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `b92b3f3f`.** Worktree clean. Nothing of mine is unpublished.
 
 ### The two lanes — this is the operator's cap of two
 
 | team | node | state |
 |---|---|---|
-| **Kernel** | `KERNEL-NESTED-IND` | `D5`. Interpreter Nat-3 and erasure PASS; native lowering blocked in Runtime. Routing WIP `51c482a5` as an **accepted partial** |
-| **Runtime** | `RT-MATCH-RECURSOR-CONSUMERS` | `AC-1` merged (`09c3ec8b`, PR #1737). Retros in. `D8` pin is the next slice |
+| **Kernel** | `KERNEL-NESTED-IND` | `D5` accepted partial. Architect **rejected** `ec577ec0` for a real reachability regression; repair landed as candidate `5903b664`, awaiting fresh QA |
+| **Runtime** | `RT-DYNAMIC-ARM-SCALAR-MERGE` | `D8` of `RT-MATCH-RECURSOR-CONSUMERS` **merged** (`26f1bc50`, PR #1741). `D0` closed; **`D1` framed at `b92b3f3f`**; `D1a` is next |
 | **Verify** | `CI-ASSERTIONLESS-L1` | **HELD on the lane cap**, WIP preserved, `AC-2` ruling durable. **First node back in when a slot frees.** |
 
 Neither node is closed, so no slot has freed.
+
+> ### THE SWEEP THAT PAID: FOUR STALE "BLOCKED ON X" CLAIMS, ONE ROOT CAUSE.
+>
+> All four were written when true and never re-read after `X` landed. **None
+> was visible to any tracker check, because in every case the node's `status:`
+> stayed correct throughout.** All are corrected on `main` at `b92b3f3f`.
+>
+> | claim | was | actually |
+> |---|---|---|
+> | `KERNEL-NESTED-IND` remaining work | *"`D1b`, `D2`, `D5`, `D6`, `D7` remain"*; *"a nested inductive is still rejected on `origin/main`"* | `D1b` and `D2` are **in**; nested inductives are **admitted**. Six of eight |
+> | `KERNEL-NESTED-IND` `D5` refusal block | a `TypeMismatch` at `nc14_data_match_lowering.rs:136` | fixed; the test was renamed; the live boundary is Runtime's |
+> | frame §3 `D1b`/`D2` polarity gate | *"the producer on `main` is FAIL-OPEN"* | **fail-closed and discharged**, by a four-position control I had not measured |
+> | `DS-9` | *"`Json` IS NOT EXPRESSIBLE IN THE CURRENT KERNEL"* | **expressible**; a landed test admits the exact `List Json` + `List (Pair _ Json)` shapes |
+>
+> ⭐ **The detection rule.** `KERNEL-NESTED-IND` held the *true* claim and the
+> *false* claim **three hundred lines apart in one file**, so a grep for either
+> finds a true sentence and stops. ⇒ **Verify a remaining-work claim against
+> the code, never against a sibling paragraph** — and treat *"blocked on X"* as
+> perishable the moment any part of `X` lands.
+>
+> **Why the class exists:** an accepted partial lands a *deliverable*, not a
+> *node*, so `status:` never moves and nothing schedules a re-read. The commit
+> subject compounds it — `afb38934` reads *"issue the terminal-All source
+> relation (accepted partial)"* and never says `D1b`.
+
+### `DS-9` HAS SEQUENCING CONSEQUENCES — read before the next lane frees
+
+**Foundation is idle and has been stood down since 2026-07-27 on a premise that
+is now false.** DS-9's true blocker is **`KERNEL-NESTED-IND` `D5` alone**, and
+DS-9 does **not** need `AC-K12` — its frame mentions native execution,
+Cranelift, and the interpreter **nowhere**; it is a value type, `CursorOps`,
+`encode`/`decode`, the round-trip theorem, fuel sufficiency, an acceptance test,
+and Findings.
+
+⇒ **DS-9 becomes startable when `D5` MERGES, not when `KERNEL-NESTED-IND`
+CLOSES.** ⛔ Do not infer a node's blockers from its `depends_on` edge — the
+edge is whole-node, the need is one deliverable. Status stays `draft` and the
+flip to `ready` is mine, owed the moment `D5` lands.
+
+**This makes the next free lane a real contest:** Verify's `CI-ASSERTIONLESS-L1`
+(currently promised first) versus Foundation's DS-9. ⚠ **That is a priority call
+between ready WPs, which `steward.md §3` routes to the operator, not to me.**
+
+### OPERATOR DECISION OWED — an idle enclave under the two-lane cap
+
+**Eleven `draft` nodes have every dependency already merged.** Six are Runtime
+(a queue, fine), one is `SPEC-ALIGN-B1`, and **three belong to the spec enclave,
+which is entirely idle** — `spec-leader` reports *"awaiting Steward kickoff"*,
+with `spec-author` and `conformance-validator` behind it.
+
+The cap is an operator instruction from this session, not corpus law, and
+`CLAUDE.md` names the **doc** track as *the one* standing concurrency exception
+— on contention-free-ness, since it touches `library/`/`agent/` not `crates/`.
+`spec/` and `conformance/` are equally disjoint from `crates/`, **but the text
+says one exception, so I did not extend it myself.**
+
+⇒ **Question for the operator:** does the two-lane cap bind the spec enclave, or
+is it a build-lane cap? If the latter, three unblocked nodes and three idle
+seats are available now at zero `crates/` contention. ⛔ I have not kicked them.
+
+### `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1` FRAMED — `AC-2` asked the wrong question
+
+`D0` (`evt_1ct16entsqn94`) answered all four questions at the seat **and
+measured two of my own fixed inputs false**, reporting them instead of building
+around them — which is what the perishable-anchor instruction asks for. The
+admitted set omitted `Lowered::Int`, `Lowered::Bool`, and
+`Lowered::RecursiveBackedge`; and question 3's premise that no arm produces
+`RecursiveBackedge` was wrong — two produce it, a third refuses it.
+
+**The value is `Lowered::Constructor`, `Nat::Suc` arity 1 over a `Constructor`
+— an unfolded Peano chain — and it IS scalar-representable.** `StructuralNatV1`
+is one `i64` and the backend already folds Peano chains at two sites.
+
+> ⭐⭐ **But both folds are INDUCTIVE ON THEIR OWN OUTPUT.** `Suc` folds only if
+> its predecessor already folded, so one unfolded link makes every enclosing
+> `Suc` fall through. ⇒ **What bounds the repair is WHERE THE INDUCTION BROKE,
+> not how wide the value is.** My `AC-2` asked scalar-vs-wider and would have
+> been answered "scalar" with the repair still unbounded.
+
+`D1` is cut against that with **both outcomes pre-ruled** so Runtime does not
+return twice: `D1a` measures the **innermost** failing link; *coverable* goes
+straight to `D1b-cov` keeping the fold inductive; *genuinely dynamic* **stops**
+and routes to the Architect as a representation question, and I re-cut the size.
+
+⚠ **`AC-10` is the row that matters** — the positive control is `D0`'s seat
+instrument re-run, requiring the `D5` refusal count to go 1 → 0 **and** the
+arrival to be `StructuralNat`. A green `D5` test alone could pass via a
+different arm admitting the `Constructor`.
+
+⭐ **The best thing in the `D0` report is a control that FAILED.** Widening
+`:15839` with `StructuralNat` printed zero — because `StructuralNat` never
+reaches that match at all, so the zero would have looked exactly like the wanted
+answer. Reporting that is what makes the replacement `ProcessExitStatus` witness
+(50 firings, chosen from measured arrivals) trustworthy.
+
+### The Architect caught what QA did not, on `D5`
+
+QA approved `ec577ec0`; the Architect **rejected** it and was right.
+`check_match_with_lift` selected arms with `.find(...)`, never recorded which,
+and skipped the ordinary path's unused-arm rejection — so **a second arm for the
+same constructor was silently accepted and dropped.** They built the
+discriminator, ran it, and measured `Ok([...])` where `ReachabilityError` was
+required. QA's approval was fresh but had not exercised duplicate arms.
+
+⇒ **An accepted partial still widens acceptance, and that is reviewable.** The
+partial boundary was correct; the regression was in production lockstep code the
+boundary said nothing about.
 
 ### CHECK THE MODEL FOOTER ON EVERY PANE READ. A T1 SEAT WAS SILENTLY AT T3.
 
@@ -99,27 +206,26 @@ then refuses at `merge_scalar_operand`,
 `ken-runtime/src/cranelift_backend/lowering/mod.rs:15898`. Kernel stopped
 without Runtime edits, correctly.
 
-**Filed `RT-DYNAMIC-ARM-SCALAR-MERGE`** (`ready`, runtime, `size: TBD`). `D0`
-is measurement only and `D1` is deliberately unframed — nothing measured bounds
-the repair. Sequenced **after** Runtime's current slice. **No reverse edge**:
-`AC-K12`'s native stage is Kernel's acceptance condition, not an implementation
-dependency, so neither node waits on the other.
+**`RT-DYNAMIC-ARM-SCALAR-MERGE`** is filed, `D0` is closed and `D1` is framed —
+see the `D1` section above. **No reverse edge**: `AC-K12`'s native stage is
+Kernel's acceptance condition, not an implementation dependency, so neither node
+waits on the other.
 
-### Two carried residuals — neither is discharged
+### Carried residuals — BOTH now discharged
 
-1. **`docs/program/wp/kernel-nested-inductives.md` §3's `D1b`/`D2` gate is
-   stale.** It reads present-tense that `derive_parameter_polarities` *"scans
-   only `constructor.args`"*; at `main`,
-   `derive_parameter_polarities_inner` visits all four positions. **NOT thereby
-   discharged** — the AC demands one discriminating control *per position*,
-   recorded per-position, and I have not measured them. Whoever closes `D2`
-   owns it.
-2. **`RT-TERMINAL-ALL-ELIM-AUTHORITY`'s release gate was keyed on a name the
-   implementation did not choose.** It grepped for `terminal_support`; `D5`
-   names the relation `all_support_origins`. Re-keyed on capability at
-   `7dcda4a1`. Its answer — not released — was right, but **for the wrong
-   reason**: only fact 2 of five has arrived, and a string test cannot
-   distinguish that from a rename.
+1. **The `D1b`/`D2` polarity gate is DISCHARGED**, and this reverses what I
+   wrote last checkpoint. I said the four-position controls were unmeasured and
+   that whoever closed `D2` owned them. They were already measured and landed:
+   `polarity_producer_covers_all_four_positions_with_independent_mutations`
+   exercises all four as **non-degenerate pairs on a shared fixture**, and three
+   of the four record `NonPositive` unmutated — the fail-closed direction. The
+   caution was right; what it missed is that **a gate phrased as "establish
+   coverage and record the result" has no owner once the deliverable it gates
+   merges**, so nobody re-reads it and the frame keeps asserting the defect.
+2. **`RT-TERMINAL-ALL-ELIM-AUTHORITY`'s gate re-keyed on capability** at
+   `7dcda4a1`. Its answer — not released — was right but **for the wrong
+   reason**: a string test could not distinguish "capability absent" from
+   "relation renamed to `all_support_origins`".
 
 ### CORRECTION — the framing debt I reported last checkpoint does not exist
 
@@ -130,6 +236,15 @@ measurably not fired, so `ready`-and-held is correct. **All four successors of
 the two live nodes are framed; there is no framing debt on the frontier.**
 `status: ready` means framed-and-shovel-ready (§4e), which is a *different act*
 from released — do not "fix" a held node's status.
+
+> ⚠ **AMENDED 2026-08-09 ~22:2xZ — that claim was right about the FRONTIER and
+> wrong as a general statement.** "All four successors of the two live nodes are
+> framed" still holds. But **eleven `draft` nodes have every dependency
+> merged**, including three spec-enclave nodes with three idle seats behind
+> them — see the operator-decision section above. ⇒ **A frontier sweep is not a
+> backlog sweep.** Checking only the successors of what is in flight cannot see
+> a node whose dependencies merged three weeks ago and whose team has been idle
+> since.
 
 ### Settled this session, do not redo
 
