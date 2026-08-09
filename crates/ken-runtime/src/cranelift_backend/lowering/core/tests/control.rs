@@ -27707,7 +27707,7 @@ fn ced_d2_an_unclaimed_planned_token_is_missing_from_the_exact_equality_in_isola
     );
 }
 
-// ─── `RT-CONTINUATION-EDGE-DISPOSITION` `D3` / `AC-6` — the five mutation rows ─
+// `RT-CONTINUATION-EDGE-DISPOSITION` `D3` / `AC-6` — the five mutation rows.
 //
 // **Five mutation-SPECIFIC CAUSAL proofs, not five distinct terminal strings**
 // (Architect ruling, held checkpoint `c17b9939`). Rows 2 and 3 deliberately
@@ -28652,7 +28652,7 @@ fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
         CandidateDisposition, D3BindingKind, D3Event, D3Mutation, D3Seat,
     };
 
-    // ── Row 1 against all four others, on its own witness ────────────────────
+    // Row 1 against all four others, on its own witness.
     //
     // QA's block, and it was the same defect one layer up: the previous commit
     // RAN this and reported it, in a message whose own subject line says a
@@ -28733,7 +28733,7 @@ fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
         );
     }
 
-    // ── The pair that shares a terminal refusal ──────────────────────────────
+    // The pair that shares a terminal refusal.
 
     // Row 2's discriminator is a settlement at the ENTRY seat. Mutation 3
     // reaches the SAME terminal refusal and must NOT make one.
@@ -28806,7 +28806,7 @@ fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
          unsettled with a claim pending -- and that difference is what the two rows key on"
     );
 
-    // ── The pair on the direct funnel ────────────────────────────────────────
+    // The pair on the direct funnel.
 
     // Row 4's discriminator is a returned funnel with NO settlement attempt.
     // Mutation 5 returns from the same funnel and must attempt two.
