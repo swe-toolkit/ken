@@ -27587,3 +27587,95 @@ fn ced_d1_d8e_keeps_its_one_binding_and_still_refuses_in_value_position() {
          not an incidental downstream failure: {reason}"
     );
 }
+
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D2` — `D5a`'s original
+/// single-authority promise, isolated so it survives the composite close.**
+///
+/// **Why this row has to exist separately.** `D5a`'s whole-wrapper early-close
+/// mutation used to move exactly one authority: the claim ledger's window. Once
+/// the wrapper acquired the sibling candidate ledger, that mutation began
+/// moving **both** closeouts, and candidate totality became the first refusal
+/// it reaches. Re-pointing that row to the totality string — which `D2` did,
+/// correctly — would have left `D5a`'s actual promise untested while its name
+/// and prose still claimed it.
+///
+/// So the promise is re-asserted here, at the level where it is still a
+/// single-authority statement: **a planned continuation call token that no unit
+/// claimed is missing from the exact claim/discharge equality**, observed on a
+/// ledger whose call-obligation domain is **supplied complete** rather than
+/// derived from a candidate population.
+///
+/// **The isolation is the point and it is what keeps this test-only.** Nothing
+/// here bypasses candidate totality in production, and no production special
+/// case is added: the domain is handed in directly, exactly as
+/// `ContinuationClaimLedger` receives it after `D2`'s derivation, so the
+/// equality is exercised on its own without a second authority in front of it.
+///
+/// **Promise class: durable invariant.** A set relation over a population the
+/// fixture does not fix — the identities come from the plan's own pairing, and
+/// `ContinuationCallIdentity` has no constructor outside planning, so this row
+/// cannot fabricate its population even by accident.
+#[test]
+fn ced_d2_an_unclaimed_planned_token_is_missing_from_the_exact_equality_in_isolation() {
+    use crate::cranelift_backend::lowering::units::{declare_unit_bundle, ContinuationClaimLedger};
+
+    let entry = d8j_root_witness_entry();
+    let plan = plan_static_transition_graph_with_symbols(
+        &entry,
+        &BTreeMap::new(),
+        &crate::NativeProcessSymbols::legacy_prelude(),
+        AbiRootIngress::Value,
+        true,
+    )
+    .expect("the witness plans");
+    let identities = plan
+        .composed_call_targets()
+        .expect("targets")
+        .iter()
+        .map(|target| target.call_identity().clone())
+        .collect::<Vec<_>>();
+    assert!(
+        !identities.is_empty(),
+        "the witness must plan at least one causal identity, or this row is vacuous"
+    );
+    // The call-obligation domain, SUPPLIED complete. This is the isolation:
+    // after `D2` the claim ledger receives this set from the candidate
+    // ledger's derivation, and handing it in directly exercises the equality
+    // without candidate totality standing in front of it.
+    let call_obligations = identities
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    let mut module = new_object_module("ced-d2-isolated-equality").expect("module");
+    let bundle = declare_unit_bundle(&mut module, &plan).expect("the bundle declares");
+    let mut ledger = ContinuationClaimLedger::open(&plan, &bundle).expect("the ledger opens");
+    ledger
+        .record_declared(identities.iter().cloned())
+        .expect("declaration covers the planned set");
+
+    // Nothing is claimed and nothing is discharged, which is exactly the state
+    // the early window left behind: the specialization-owned token is planned
+    // and cannot yet have been answered.
+    let refusal = format!(
+        "{:?}",
+        ledger
+            .close(&call_obligations)
+            .expect_err("an unclaimed, undischarged call obligation must refuse")
+    );
+    // Keyed on the DISCHARGE equality's own sentence. The first draft of this
+    // row reused `D5a`'s old keys -- "does not equal the planned one" plus
+    // "absent" -- which belong to the declared/resolved clause, not this one.
+    // It failed loudly rather than passing on a neighbouring refusal, which is
+    // the behaviour a substring oracle has to have.
+    assert!(
+        refusal.contains("the discharged continuation call population is not the planned one")
+            && refusal
+                .contains("neither directly emitted nor compositionally consumed"),
+        "the refusal must come from the EQUALITY finding the obligation undischarged, which is \
+         the single authority D5a promised and the composite-close row can no longer observe. A \
+         candidate-totality message here would mean this row had drifted back onto the other \
+         authority; a declared/resolved message would mean it is measuring an earlier clause: \
+         {refusal}"
+    );
+}
