@@ -117,7 +117,7 @@ class IgnoredSweepTests(unittest.TestCase):
     def test_completed_report_names_passing_rows(self) -> None:
         log_text = """
         Starting 47 tests across 4 binaries
-        PASS [  0.001s] l1_acceptance sec24_char_excludes_surrogates
+        PASS [  0.001s] (1/47) l1_acceptance sec24_char_excludes_surrogates
         Final status:
         PASS [  0.001s] l1_acceptance sec24_char_excludes_surrogates
         Summary [  1.000s] 47 tests run: 1 passed, 46 failed
@@ -155,6 +155,13 @@ class IgnoredSweepTests(unittest.TestCase):
             )
             with self.assertRaises(SWEEP.SweepError):
                 SWEEP.report(log, 47, 4)
+            log.write_text(
+                "PASS [ 0.001s] (1/46) l1_acceptance repaired_row\n"
+                "Summary [ 1.000s] 47 tests run: 1 passed, 46 failed\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(SWEEP.SweepError, "counter 1/46"):
+                SWEEP.report(log, 47, 100)
 
     def test_cli_exit_contract_distinguishes_all_three_outcomes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
