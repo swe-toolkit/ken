@@ -27409,33 +27409,34 @@ fn sar_d3_the_ordinary_live_cell_is_routed_to_the_resume_and_the_mutation_restor
     );
 }
 
-/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` / `AC-7` — the real witness, and
-/// it REFUSES.**
+/// **`RT-CONTINUATION-EDGE-DISPOSITION` `D2` / `AC-7` — the real witness, and
+/// it COMPILES.**
 ///
 /// This is the member `D0` could not find: a selected `FunctionizedUnits`
 /// artifact in which a binding is installed, a candidate settles
 /// `InlineNoCall` after the deferred bridge completes, and the compile reaches
 /// the existing closeout.
 ///
-/// **Its outcome is a refusal, and that is the deliverable rather than a
-/// shortfall.** `ContinuationClaimLedger::close` takes exact set equality over
-/// a `planned` set seeded from the full `continuation_calls()` population. An
-/// `InlineNoCall` candidate is in that population by construction and is
-/// neither emitted nor composed, so a closeout that checks it must refuse.
-/// `D2`'s ordered closeout -- disjointness first, then the derived
-/// `DirectCall ∪ ComposedCall` subset, then the unchanged equality -- is what
-/// converts this same witness to compiling.
+/// **The sentinel has fired, and this heading is the record of it.** Through
+/// `D1` the outcome was a refusal and that was the deliverable: the candidate
+/// sat in a `planned` set seeded from the full `continuation_calls()`
+/// population and was neither emitted nor composed, so any closeout that
+/// checked it had to refuse. `D2`'s ordered closeout -- candidate totality
+/// first, then the derived `DirectCall ∪ ComposedCall` subset, then the
+/// unchanged exact equality and claim equality over it -- removed the
+/// obligation without adding an arm to the partition, and the same program now
+/// compiles.
 ///
-/// **A GREEN result here is a `D1` defect, not a success**, and the exact
-/// refusal string is what tells the three defects apart from a correct `D1`:
-/// `D2` done early and a weakened equality both make it compile, and a return
-/// of planner-side edge exclusion removes the refusal instead of producing it.
-/// Keying on "it failed" would pass under all three.
+/// **The inversion is still a discriminator, not a relaxation.** The refusal
+/// string is live production text, so asserting its absence is not free, and
+/// the row additionally requires `Ok` rather than merely "not that refusal" --
+/// a derivation that moved the failure instead of removing it reds here. That
+/// is how the second `close` clause keyed on `planned` was found.
 ///
-/// **Promise class: transition sentinel.** It is named for the boundary rather
-/// than for the outcome, and it retires when `D2`'s subset derivation lands --
-/// at which point the assertion inverts deliberately, under review, rather
-/// than drifting.
+/// **Promise class: spent transition sentinel, retained as an invariant.** It
+/// was named for the boundary rather than the outcome, so the crossing is
+/// recorded here in operative text instead of leaving a heading that says the
+/// opposite of what the assertions check.
 #[test]
 fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obligation() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
