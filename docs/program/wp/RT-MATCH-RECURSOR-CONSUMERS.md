@@ -320,6 +320,72 @@ in-process path does.
 Runtime may continue the mechanical in-process wiring and the comment-only QA
 correction on that lineage; review and merge remain separate events.
 
+### 4a.2 `D8` — pin the premise that keeps the transport out of production
+
+**Added 2026-08-09 after `0d3f413c` merged, from an Adversary sweep of
+`e8feb236` that found no defect. Folded into this node rather than filed as a
+new one: the premise is this section's own, not a neighbouring concern.**
+
+The entire safety argument for `with_child_match_recursor_census` being an
+unconditional `pub` item called from production `ken-cli/src/main.rs` is that
+**the feature never reaches the shipped binary**. Verified by the Steward at
+`e8feb236`, that argument rests on exactly three facts:
+
+1. the workspace root `Cargo.toml` declares `resolver = "2"`;
+2. `px8-ds-test-support` is not a default feature of `ken-runtime`;
+3. `ken-cli` depends on `ken-runtime` **without features** in
+   `[dependencies]`, taking the feature only on its `[dev-dependencies]` edge.
+
+**Fact 1 is one line, it is load-bearing, and nothing in the repository checks
+it.** A `grep` for `resolver` across `crates/` and `scripts/` at `e8feb236`
+returns only unrelated semantic uses of the word.
+
+**Why it matters more than a normal missing pin.** A virtual workspace
+manifest with no `resolver` key **defaults to resolver 1 even when every
+member is edition 2021** — the workspace does not inherit it from members.
+Under resolver 1, dev-dependency features unify into normal builds, so
+`cargo build --release --bin ken` would compile the transport into the
+**shipped** binary. There, three environment variables any caller can set
+(`KEN_MRC_CENSUS_{SESSION,PARENT,SINK}`) turn a production `ken` into a file
+writer against a caller-chosen sink. **The gap between "safe" and "a shipped
+binary writes attacker-named files" is one absent line in a manifest, and it
+is invisible at the call site.**
+
+**`D8`.** A committed pin that fails if the premise stops holding. Assert all
+three facts, not only the first — fact 1 alone is the subtlest, but facts 2
+and 3 are equally load-bearing and equally editable. The natural home is a
+test in `ken-cli` that reads the manifests, since that is the crate whose
+production binary is at risk.
+
+- **Control:** removing `resolver = "2"` from the workspace manifest must
+  redden the pin; so must adding `px8-ds-test-support` to a `default` list,
+  and so must moving the featured `ken-runtime` edge from
+  `[dev-dependencies]` to `[dependencies]`. Three mutations, three reds,
+  proved separately — one pin that only catches the first is a third of a pin.
+- **Not** a rule about how to spell the manifest. If a future change makes the
+  transport unreachable from production by construction, `D8` is discharged by
+  deleting it and saying so.
+
+**Recorded as a known residual and deliberately NOT a deliverable.** The new
+`pub use` sits outside the reach of the `surface.rs` set-equality oracle,
+legitimately — the item comes from `lowering::core`, so it is not a missed
+oracle update. But the backend's public surface now carries an unconditional
+item that **no set-equality oracle governs**, and that oracle's own comment
+concedes the compiler is not a net here because most of those names have no
+in-repo consumer. A second ungated item would arrive the same way and be
+caught by nobody. Extending the derived enumeration to non-`surface.rs`
+bare-`pub` items in this module is the cheap fix **if anyone wants it**; the
+Architect's ruling that the ungated shape is acceptable and forced is about
+**this** item and is not reopened here.
+
+**Reading note for whoever next greps this diff.** `git diff | grep '^-'` on
+`lowering/core.rs` shows `-    validate_oriented_subcontinuation_transport(`.
+That is a **re-wrap, not a removal**: the `?` was deferred three lines so the
+census can observe the outcome. The validator call is unconditional, only the
+two census calls are `cfg`-gated, and the error still propagates before
+anything downstream runs. Behaviourally identical on both paths. The `-2` in
+the numstat actively invites the false alarm.
+
 ## 5. Banned scope
 
 - **No `#[ignore]`.** Quarantine was ruled out for this population and the
