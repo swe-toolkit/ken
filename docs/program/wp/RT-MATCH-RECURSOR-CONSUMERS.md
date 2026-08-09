@@ -133,6 +133,13 @@ Unaffected same-family controls stay green.
   *Control:* the handback enumerates each fixture in the production-predicate
   population with its complete residual set, and states which selectors were
   used as candidates. A grep list alone does not discharge this.
+  **`AC-1` is unqualified and stays unqualified** — it ranges over *every*
+  compilation entry that can supply the predicate, not one crate's unit tests.
+  A closed subset does not discharge it, and a domain parenthetical on a
+  discharge claim is an amendment to this AC rather than a hedge. The
+  `ken-runtime --lib` census merged at `28edeb00` is a **partial** and claims no
+  `AC-1`. The remaining domain is the cross-crate `px8-ds-test-support` census
+  authorized in section 4a.
 - **AC-2 — every repaired root has a committed discriminating control.**
   *Control:* the control reds under a mutation at that root and greens without
   it, **from the committed tree**, with evidence the detector was reached. A
@@ -158,6 +165,62 @@ Unaffected same-family controls stay green.
 - **AC-8 — CI green** on the merge. Not a local `--workspace` run, which is
   banned (`COORDINATION §12`).
 
+## 4a. The cross-crate census: observation extends, activation does NOT
+
+**Architect ruling `evt_2gp8nk2sn7xn2`, 2026-08-09.** This section exists
+because the frame previously required an unqualified `AC-1` while banning the
+only instrument that could reach the residual domain. That was a defect in this
+frame, not in any handback.
+
+**The decisive split is a real property of the code, not a convention.**
+`enumerate_recursive_descent_residuals` is **ordinary production code** and
+already walks the exact `RuntimeExpr` and declarations exhaustively; only
+today's *recorder* is `#[cfg(test)]`. By contrast
+`set_selector_variant_exclusion` **and the selector branch it controls** are
+both `#[cfg(test)]`, so making either reachable cross-crate would build the
+behavior-changing generalized activation seam section 5 bans.
+
+⇒ **The observation extends. The activation does not.** An earlier phrase of the
+Architect's, "extend the same instrumentation through the feature", is narrowed
+by that ruling to exactly this.
+
+**Authorized instrument:**
+
+1. Under `#[cfg(any(test, feature = "px8-ds-test-support"))]`, a hidden scoped
+   census recorder around the existing common compilation entry: inactive by
+   default, restores prior state on unwind, exposes only recorded evidence to
+   the calling harness.
+2. At `compile_expr_into_module_with_root_projection` entry, **before**
+   `validate_oriented_subcontinuation_transport`, record the complete residual
+   set from the exact `expr` and declarations being compiled. Correlate that
+   same invocation with validator outcome, selector arrival, and the
+   **unmodified production** authority selected if it reaches the selector.
+3. **Key rows by test-binary/run identity, plus test/thread identity, plus a
+   per-run compilation ordinal. A test name alone is not an identity.** Preserve
+   the exact equation `entry = selector-arrival ⊎ pre-selector-return`, and the
+   full residual set for **every** entry, not only firing rows.
+4. The recorder **may not** remove a residual, set an exclusion, choose an
+   authority, alter a planner/ABI value, or affect any result. Feature-off is
+   byte- and behavior-equivalent; feature-on with no recorder installed is
+   inert. Required controls: a known cross-crate compile captured **exactly
+   once**, a known non-member still a non-member, and feature-on/off result
+   parity.
+5. Run the targeted `ken-cli`, `ken-verify`, and elaborator-driven compilation
+   suites with the dependency feature enabled. Forwarding the default-off
+   test-support feature through test/dev surfaces is permitted; **a
+   production-default or user-facing activation control is not.**
+
+**Outcome routing.** No additional `MatchScrutineeRecursor` row closes `AC-1`'s
+population coverage. A row found preserves the exact compiled input and returns
+through this node's existing `D1`/hard-stop path. **Activation stays crate-local
+through the existing `#[cfg(test)]` one-variant hook** — if the exact
+cross-crate input cannot be reproduced in that authorized harness without
+semantic reshaping, **stop and return rather than widening the hook.**
+
+**[[RT-RECURSOR-TRANSPORT]] `D3` does not subsume this**, ruled explicitly: its
+evidence does not range over these compilation entries. **No successor node and
+no residual transfer** — this remains `AC-1` of this node.
+
 ## 5. Banned scope
 
 - **No `#[ignore]`.** Quarantine was ruled out for this population and the
@@ -165,7 +228,12 @@ Unaffected same-family controls stay green.
 - **No reshaping of a fixture, and no absorption of a refusal**, to make a row
   pass.
 - **No simultaneous exclusion of both variants, and no generalized hook** — that
-  fabricates a lane no program has.
+  fabricates a lane no program has. **This ban is unchanged and is not relaxed
+  by section 4a.** What 4a authorizes is an *observation-only* recorder that
+  cannot change a result; any cross-crate **activation** seam, feature-gated or
+  otherwise, is still banned. If a change makes the selector behave differently
+  when the feature is on, it is activation and it is out of scope regardless of
+  how it is spelled.
 - **No reinterpreting a retained `RecursiveDescent` run as activation.**
 - **No touching rows 1-5** or the `LexicalCallArgumentRecursor` population.
 - **No resume or cherry-pick of `10369776252861e8b15e613576256a3682c70066`** —
