@@ -12,20 +12,37 @@ before this record was written and `crates/` is byte-identical to the base,
 tree `4c2bc579c52046040db81c81fea3fb5d545523d2` on both sides. Coordinates are
 cited by grep-able phrase.
 
-> ## THE HEADLINE, AND IT IS ABOUT `D2` RATHER THAN `D1`
+> ## CORRECTED BY RULING `evt_40rf074xsj3y1` — THE COUNTS STAND, THE READING DOES NOT
 >
-> **The closeout sees 210 of 637 candidates. It never sees the other 427.**
+> **Every measured count in this record is retained, and 637 remains the
+> observational superpopulation.** What is withdrawn is the inference this
+> headline originally drew from `CLOSE_CHECKED`.
 >
-> `D2` as framed requires *"an exact, disjoint disposition for every
-> candidate"* **first**, and then derives the call-obligation subset. Measured,
-> the population that reaches a closeout is **a third of the candidate
-> population**, because a ledger only closes over candidates whose owner
-> function actually reaches closeout. Requiring a disposition for *every*
-> candidate is therefore not a check added at the existing seat — it is a change
-> to **which population that seat ranges over**.
+> **There is no per-owner closeout in production.** `open_continuation_claim_ledger`
+> creates **one artifact-wide ledger** in the selected
+> `BodyEmissionAuthority::FunctionizedUnits` arm, before `define_unit_bodies`.
+> That single ledger spans continuation bodies, generated contexts, and the root
+> adapter; `ContinuationClaimLedger::open` seeds `planned` from the plan's full
+> `continuation_calls()`; and `close_continuation_claim_ledger` runs only after
+> all of those passes succeed, checking that one whole-artifact set.
 >
-> That is adjacent to §4's named hard stop rather than clearly inside it, so I
-> am reporting it rather than ruling it.
+> ⇒ **`CLOSE_CHECKED = false` means the compilation never reached a successful
+> functionized-artifact closure, or did not select that authority at all.** It
+> does **not** show that a healthy candidate lay outside an otherwise successful
+> closeout's authority. The 52 `DIRECT` and 11 `COMPOSED` rows remain useful
+> census observations; they are **not** evidence of omitted healthy members.
+>
+> **`D2`'s production quantifier is narrower and exact:** every **activated
+> binding candidate in one selected `FunctionizedUnits` artifact** must be
+> settled once before that artifact closes. Plan-only rows, compilations already
+> returning `Err`, and plans compiled under the non-selected `RecursiveDescent`
+> authority **are not obligations** a successful functionized-artifact close must
+> visit.
+>
+> **This is therefore not a second hard stop, and it does not widen any law.**
+> The candidate layer is a sibling in front of the unchanged call ledger and
+> shares its artifact lifetime; it does not widen `ContinuationClaimLedger`, add
+> a per-owner close, or traverse failed or non-selected compilations.
 >
 > **And `AC-7` does not clear on this corpus.** Details in §4: the only
 > `InlineNoCall` members a closeout actually checks are **three of this
@@ -89,18 +106,29 @@ completes successfully, and conflating the two would manufacture members.
 **`BOTH` is empty**, which is the disjointness the existing law already
 enforces, measured rather than assumed.
 
-## 3. Closeout visibility, which is the finding
+## 3. Closeout visibility — the counts stand, the interpretation is corrected
 
-**210 of 637 candidates are checked by a closeout. 427 are not.**
+**210 of 637 candidates are checked by a closeout. 427 are not.** Both numbers
+are retained, and so is the per-class split: **52 `DIRECT` and 11 `COMPOSED`**
+candidates carry `CLOSE_CHECKED = false`.
 
-A candidate is checked only when its owner's ledger reaches `close`. So
-`CLOSE_CHECKED` splits every class, including the healthy ones — **52 `DIRECT`
-and 11 `COMPOSED` candidates are discharged at seats no closeout ever ranges
-over.**
+**What `CLOSE_CHECKED = false` means** (Architect ruling `evt_40rf074xsj3y1`):
+that compilation **never reached a successful functionized-artifact closure**,
+or **did not select `FunctionizedUnits` at all**. There is one artifact-wide
+ledger, not a per-owner one — see the corrected headline block above.
 
-That is not a defect in the law. It is what makes `D2`'s ordering a bigger
-change than it reads: *"require an exact disposition for every candidate"*
-cannot be satisfied at a seat that structurally sees a third of them.
+**The original reading of this section was wrong**, and it is worth naming
+because the number is unchanged while its meaning is not. It read
+`CLOSE_CHECKED = false` as *"a healthy candidate that a successful closeout
+structurally cannot see"*, and concluded the law inspects only a third of its
+own population. Measured against production, the same rows are instead
+**compiles that never got to a successful close** — a lifecycle fact about those
+compilations, not a scope gap in the law.
+
+⇒ **`D2`'s ordering is not thereby a bigger change than it reads.** Its
+quantifier is one selected successful `FunctionizedUnits` artifact, and
+plan-only rows, `Err` compiles, and `RecursiveDescent`-authority plans are
+outside it by construction rather than by omission.
 
 ## 4. `AC-7` — `InlineNoCall` does not have a clean independent member
 
@@ -176,8 +204,10 @@ at the emission seat rather than through `b2f_last_unit_emission`.
 because a fork is open — it is because two of the three inputs a size would rest
 on are the ones §3 and §4 just moved:
 
-- `D2`'s "disposition for every candidate" is a **427-candidate visibility gap**,
-  not a check at an existing seat;
+- ~~`D2`'s "disposition for every candidate" is a **427-candidate visibility
+  gap**, not a check at an existing seat~~ — **withdrawn** by
+  `evt_40rf074xsj3y1`; `D2`'s quantifier is one selected successful
+  `FunctionizedUnits` artifact, and this is not a sizing input;
 - `D3`'s five mutations need an `InlineNoCall` witness that **does not exist**
   and must be authored under `D1`;
 - and §6's hard-stop measurement is open.

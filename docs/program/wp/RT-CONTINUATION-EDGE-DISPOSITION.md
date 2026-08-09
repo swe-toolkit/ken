@@ -130,7 +130,7 @@ must still refuse in value position.**
 | `AC-4` | The law is unchanged: exact set equality, both-sets refusal intact, `composed` still fed only from `function_local.composed_discharges` | verbatim check at the three sites |
 | `AC-5` | `d8e` keeps binding count **1** and still **refuses** in value position | the four-cell table, both variants |
 | `AC-6` | Each of the five mutations reds **independently** | five proofs, from the committed tree |
-| `AC-7` | `InlineNoCall` has a real named member — **`D0` measured this class EMPTY, so the member must be AUTHORED under `D1`** | `D1`, not `D0`; **vacuous otherwise** |
+| `AC-7` | `InlineNoCall` has a real named member. **The CLASS is not empty — `D0` measured 21 members.** What is empty is the **non-vacuous witness cell**, `binding-installed ∩ closeout-checked ∩ compile-OK`, so the witness must be **AUTHORED under `D1`** | `D1`, not `D0`; **vacuous otherwise** |
 | `AC-8` | No `#[ignore]` added; `issues/` untouched; the five landed repairs and the predecessor's `D0`/`D1` intact | mechanical |
 | `AC-9` | Workspace green **in CI** | CI, never a local `--workspace` run |
 
@@ -177,15 +177,31 @@ refusing has not implemented the distinction — it has erased it.
   interned-but-uncalled specialization already exists inside a successful
   compile.** That **argues against the strong form** of this hard stop and does
   **not** settle it.
-- **A SECOND candidate hard stop, adjacent to this one.** The closeout ranges
-  over **210 of 637** candidates. `D2`'s "exact disposition for every candidate"
-  therefore **changes the population the seat ranges over** rather than adding a
-  check to it. **Do not absorb this into `D2`.** It is with the Architect.
+- **The 210-of-637 result is NOT a second hard stop** — ruled
+  `evt_40rf074xsj3y1`. Production has **one artifact-wide ledger**, opened in
+  the selected `FunctionizedUnits` arm before `define_unit_bodies`, seeded from
+  the full `continuation_calls()`, and closed only after every definition pass
+  and the root adapter succeed. So `CLOSE_CHECKED = false` means **that compile
+  never reached a successful functionized-artifact closure, or selected another
+  authority** — not that a healthy candidate fell outside a successful
+  closeout's authority.
 
-**The population DID partition — 637, one disposition each, zero orphans.** So
-the failure predicted here did not take the predicted shape: it is not a
-population that refuses to partition, it is **a lawful partition most of which
-the law never inspects.**
+**`D2`'s production quantifier, stated exactly.** Every **activated binding
+candidate in one selected `FunctionizedUnits` artifact** must be settled once
+before that artifact closes. **Plan-only rows, `Err` compilations, and plans
+compiled under the non-selected `RecursiveDescent` authority are not
+obligations.** The candidate layer is a sibling in front of the unchanged call
+ledger and **shares its artifact lifetime**: it does not widen
+`ContinuationClaimLedger`, add a per-owner close, or traverse failed or
+non-selected compilations.
+
+**The population DID partition — 637, one disposition each, zero orphans**, and
+637 is retained as the **observational superpopulation**. **The stop above is
+OPEN BUT UNFIRED.** It fires only if the exact prospective `InlineNoCall` target
+cannot be declared, defined, and ABI-reachable through the already selected
+`UnitBundle` without a post-lowering call-graph rebuild or a planner
+traversal-contract change — and that is exactly what the outstanding `px8j`
+measurement decides.
 
 ## 5. Untouched
 
