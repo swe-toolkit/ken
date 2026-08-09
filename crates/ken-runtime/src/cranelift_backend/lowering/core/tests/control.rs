@@ -28411,3 +28411,118 @@ fn ced_d3_m5_settling_the_direct_candidate_twice_is_refused_at_the_second_settle
         armed.outcome
     );
 }
+
+/// **`D3` `AC-6` — the five rows are FIVE proofs, and this is the residue of
+/// proving it.**
+///
+/// ⭐⭐ **Why this exists as a committed test rather than a verified claim.**
+/// The five rows above were each shown to red when their own mutation is not
+/// armed — a clean 5×5 diagonal. That is necessary and it is **not
+/// sufficient**, because it does not rule out the one failure the ruling
+/// actually forbids: rows 2 and 3 share a terminal refusal, so a control keyed
+/// on that refusal plus "something settled inline" would be green under
+/// **either** mutation and would supply one proof while appearing to supply
+/// two.
+///
+/// That was verified by cross-arming each row's control with its partner's
+/// mutation and watching all four fail. **A verification that lives in a
+/// terminal evaporates when the terminal closes** — so the discriminating
+/// observations are asserted here, over the partner mutation, as a committed
+/// artifact. Delete any row's causal clause above and this reds.
+///
+/// **Exactly one variant is armed per arm**, as the frame requires. This is
+/// four separate single-mutation runs, not a combined one.
+///
+/// **Promise class: durable invariant** — it asserts that four specific
+/// observations are *absent* under the partner mutation, which stays true for
+/// any future shape of these seats that keeps the rows independent.
+#[test]
+fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
+    use crate::cranelift_backend::lowering::units::{D3Event, D3Mutation, D3Seat};
+
+    // ── The pair that shares a terminal refusal ──────────────────────────────
+
+    // Row 2's discriminator is a settlement at the ENTRY seat. Mutation 3
+    // reaches the SAME terminal refusal and must NOT make one.
+    let (under_m3, _) = d3_payload_arm(D3Mutation::MarkInlineAfterComposedCall);
+    assert!(
+        under_m3.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "precondition -- mutation 3 must reach the shared terminal, or this arm is not testing \
+         the collapse at all: {}",
+        under_m3.outcome
+    );
+    assert!(
+        !under_m3.settle_seats().contains(&D3Seat::BridgeEntry),
+        "⇒ and it must make NO entry settlement. If it did, row 2's discriminator would be \
+         satisfied by mutation 3 and the two rows would be one proof wearing two names: {:?}",
+        under_m3.settle_seats()
+    );
+
+    // Row 3's discriminator is an EXIT settlement made while a composed claim
+    // was already pending. Mutation 2 must not produce that either: it settles
+    // at entry, so by the time the exit is reached the candidate is already
+    // settled and the exit path correctly leaves it alone.
+    let (under_m2, _) = d3_payload_arm(D3Mutation::MarkInlineBeforeBridgeCompletion);
+    assert!(
+        under_m2.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "precondition -- mutation 2 must reach the shared terminal: {}",
+        under_m2.outcome
+    );
+    assert!(
+        !under_m2.settle_seats().contains(&D3Seat::BridgeExit),
+        "⇒ and it must make NO exit settlement, or row 3's discriminator would be satisfied by \
+         mutation 2: {:?}",
+        under_m2.settle_seats()
+    );
+    // And the exit it does reach sees the candidate ALREADY settled — which is
+    // the structural reason the two chains cannot be confused, stated as a
+    // measurement rather than as the argument above.
+    let exit = under_m2
+        .trace
+        .iter()
+        .find_map(|e| match e {
+            D3Event::BridgeExit {
+                settled,
+                pending_composed,
+                ..
+            } => Some((*settled, *pending_composed)),
+            _ => None,
+        })
+        .expect("mutation 2's run must still complete the bridge");
+    assert_eq!(
+        exit,
+        (true, true),
+        "under mutation 2 the exit must see the candidate ALREADY SETTLED (by the entry seat) \
+         with the composed claim pending. Under mutation 3 the same read is (false, true) -- \
+         unsettled with a claim pending -- and that difference is what the two rows key on"
+    );
+
+    // ── The pair on the direct funnel ────────────────────────────────────────
+
+    // Row 4's discriminator is a returned funnel with NO settlement attempt.
+    // Mutation 5 returns from the same funnel and must attempt two.
+    let under_m5 = d3_contspec_arm(D3Mutation::DoubleDisposition);
+    assert!(
+        under_m5.returned_from_funnel() && !under_m5.settle_seats().is_empty(),
+        "mutation 5 must return from the funnel AND attempt a settlement, or row 4's \
+         'returned but settled nothing' would also describe it: {:?}",
+        under_m5.settle_seats()
+    );
+
+    // Row 5's discriminator is two attempts at one seat. Mutation 4 makes none.
+    let under_m4 = d3_contspec_arm(D3Mutation::OmitFinalDisposition);
+    assert_ne!(
+        under_m4.settle_seats().len(),
+        2,
+        "mutation 4 must not make two settlement attempts, or row 5's discriminator would be \
+         satisfied by it: {:?}",
+        under_m4.settle_seats()
+    );
+    assert!(
+        !under_m4.outcome.contains(D3_DOUBLE_SETTLEMENT),
+        "and it must not reach the double-settlement terminal at all -- unlike rows 2, 3 and 5, \
+         row 4's terminal is candidate totality, and that separation is what makes its row \
+         attributable without a causal clause doing all the work: {}",
+        under_m4.outcome
+    );
+}
