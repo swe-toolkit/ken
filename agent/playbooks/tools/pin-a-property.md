@@ -1,6 +1,6 @@
 ---
 name: pin-a-property
-description: How to write a mechanical pin (test/scan/structural assertion) that actually guards the property it claims. Load before authoring or reviewing an acceptance criterion, a control, a tripwire, or a multi-arm validator. Covers property-vs-form, MEASURED/CLAIMED/GAP, per-pin compile-preserving evasion, fail-closed defaults, allowed-inventory over forbidden-list, advertised-vs-enforced law counts and arm reachability, mutation provenance, and honest residuals.
+description: How to write a mechanical pin (test/scan/structural assertion) that actually guards the property it claims. Load before authoring or reviewing an acceptance criterion, a control, a tripwire, or a multi-arm validator. Covers property-vs-form, MEASURED/CLAIMED/GAP, per-pin compile-preserving evasion, fail-closed defaults, allowed-inventory over forbidden-list, advertised-vs-enforced law counts and arm reachability, and honest residuals. Proving a pin bites is the companion skill mutation-prove-a-pin.
 scope: tools
 ---
 
@@ -336,157 +336,15 @@ because the name is the part future readers quote. **Rename the pin to what it
 actually establishes**, and never leave a corrected body under an uncorrected
 name.
 
-## 10. Mutation hygiene
 
-**A verdict from a mutation that did not apply is not evidence — and it looks
-exactly like evidence.** The run compiles, the test executes, the output is
-well-formed. **"The mutation ran" and "the mutation changed the subject, and only
-the subject" are different claims, and only the second licenses a verdict.**
+## Proving the pin bites: load `mutation-prove-a-pin`
 
-**One campaign of eight produced four distinct invalid kinds (2026-07-25) —
-report each, never discard it:**
+Everything above is authoring. To demonstrate that a pin you wrote actually
+reddens when the property it guards is broken, load
+**`mutation-prove-a-pin`** (`agent/playbooks/tools/mutation-prove-a-pin.md`):
+mutation provenance in both directions, detector-side versus population-side
+mutation, reset ordering, and reproduction recipes. A pin whose bite has never
+been demonstrated is §6's negative check with no positive control.
 
-| kind | why its outcome is not evidence |
-|---|---|
-| **never applied** (bad anchor) | the test ran against pristine source |
-| **broke the build** | nothing was measured |
-| **inserted a comment** | the pin had nothing to catch, so GREEN is vacuous |
-| **edited the DETECTOR along with its subject** | the oracle was rewritten to match its rewritten subject and reported success **on a sound pin** |
-
-That last one is the dangerous shape: it **would have filed a spurious finding
-against a correct detector.** The mutation respaced *every* occurrence of its
-needle — including the copy inside the test's own string literal. Re-run against
-declaration lines only, it reddened.
-
-⇒ **Every mutation needs a provenance check before its outcome is recorded:**
-assert the occurrence count **before** mutating; and where the result is **green**,
-prove the change reached the compiled artifact (symbol present, binary mtime after
-the edit). **Reporting the invalid rows is what makes the valid ones
-trustworthy** — a campaign that silently drops them is indistinguishable from one
-that had no failures.
-
-### And the provenance check itself fails in BOTH directions
-
-**Measured 2026-07-25, on the very next candidate after the rows above.** A
-provenance check reported `applied=False` for two mutations that **had** landed:
-it re-counted the anchor **after** the replacement, and **the replacement string
-contained the anchor.** The campaign would have discarded **two sound results as
-unproven.**
-
-**An instrument that certifies evidence can fail toward throwing good evidence
-away, and that is exactly as corrupting as passing bad evidence through** — it is
-merely quieter, because a discarded row leaves no trace to audit. The rule above,
-read only in the false-positive direction (*"did it change the subject, and only
-the subject"*), does not catch this.
-
-⇒ **Count the anchor BEFORE the edit and compare against a PREDICTED
-post-count** — do not re-match a needle the replacement may still contain. A
-provenance check is itself a pin, so §6's positive control and §6a's
-which-arm-fired question apply to it: **feed it a mutation you know landed and a
-mutation you know did not, and confirm it distinguishes them.**
-
-### DETECTOR-SIDE AND POPULATION-SIDE MUTATIONS ARE NOT INTERCHANGEABLE
-
-**This is NOT the "edited the DETECTOR along with its subject" row above.**
-That row is about mutating **both**. This is about mutating **the detector
-instead of the population** — and it passes every check on this page, including
-the provenance check, because the mutation genuinely applied and the intended
-named test genuinely reddened.
-
-Every control has **two** operands: the **detector**, and the **population the
-detector is claimed to reach**. They answer different questions:
-
-| you mutated | a redden proves | a redden does NOT prove |
-|---|---|---|
-| the **detector** (narrow its predicate, neuter an arm) | the detector is wired to **something** | that it reaches the population the AC names |
-| the **population** (add a real instance to a real input) | the detector **reaches that population** | which arm of the detector fired (§6a) |
-
-**An AC whose property is REACH can only be discharged population-side.** A
-detector-side mutation on such an AC can redden for the entire life of a
-detector that reaches nothing — which is precisely the defect the AC exists to
-prevent, so the control has been made blind to its own subject.
-
-**Measured 2026-07-26, `KW-ORACLE-CLOSURE`, and the report was TRUE.** The AC
-row read *"widen one corpus file's occurrence set beyond a declaration head
-(e.g. add `lemmas` in prose) — must redden."* The build ran a **detector-side**
-mutation (*"head-only occurrence scan"*), it reddened, and the handoff correctly
-said *"each control reddened its intended named test."* QA then ran the
-**population-side** mutation the row actually specified — one line of prose added
-to a real corpus file — and the suite came back **exit 0, 1 passed, 0 failed**.
-**The occurrence predicate was still not reaching the corpus**, the exact
-defect the WP existed to fix, with a green control sitting on top of it.
-
-⇒ **Three obligations, all mechanical:**
-
-1. **When you author the row, name the operand.** "Must redden" is
-   under-specified; *"adding an instance to `<real input file>` must redden"* is
-   not. **Necessary, and measured NOT sufficient — see the next block.**
-2. **When you discharge it, quote the row and diff it against what you ran.**
-   Do not repair a population-side failure by hunting for a detector-side
-   mutation that reddens — the post-condition is the row's mutation, verbatim.
-   And pair it with §6's **positive control**: without an arm showing a real
-   instance being *found*, "found nothing" and "never looked" read identically,
-   which is exactly what a reach failure looks like from the outside.
-3. **Report WHICH OPERAND MOVED as its own field of the handoff** — not as
-   something a reader can infer from the mutation you describe. See below for
-   why this is the load-bearing one.
-
-#### NAMING THE OPERAND IN THE ROW IS NOT ENOUGH — THE CODE SEAM NAMES ONE TOO, AND IT WINS
-
-**The three `KW-ORACLE-CLOSURE` retros (2026-07-26) refuted the natural reading
-of obligation 1.** I wrote that row, so I asked the ring the one question I could
-not answer myself: **was the row ambiguous about which operand moves, or clear
-and skipped?** — because those need **opposite** repairs, and a softened answer
-would have had me fix the wrong one.
-
-**QA answered: clear and skipped.** The row *did* name the corpus-side operand.
-So "author it more precisely" is **not** the repair, and reaching for it would
-have hardened prose that was already correct.
-
-**The implementer supplied the mechanism, and it is the reusable part:** the
-implementation seam in front of them was a `declaration_lines` helper. Mutating
-*that* was **cheap, isolated, compile-preserving, and it reddened the correctly
-named test** — four properties that each independently read as *"good control."*
-In their words, they *varied the operand named by the code seam rather than the
-operand named by the reach claim.* Note what is **not** in that sentence:
-carelessness, haste, or a misread row. The seam you are standing in front of
-**supplies a default operand**, that default is **not** the AC's, and it is
-selected by locally sound reasoning.
-
-⇒ **A property named at authoring time competes with an operand named by the
-code, at the point of work — and the code is closer.** Sibling of *"a rule far
-from the point of work does not fire"*: the row was correct **and** it was not
-where the choice got made.
-
-**And the leader seat cannot close this gap by reviewing harder.** Asked what was
-visible at their seat that could have distinguished the first candidate from a
-correct discharge, the leader answered **"nothing"** — they bound branch, tree,
-scope and diff hygiene, and confirmed a named test reddened, *and none of those
-facts say which operand the AC requires to move.* Do not install a
-leader-review step here; it provably cannot work. That plain "nothing" is worth
-more than a hedge would have been — it is what rules the wrong repair out.
-
-⇒ **Which is why obligation 3 is a REPORTED FIELD.** Every AC→control handoff
-carries **(the property · the operand that moved · the observed boundary)**
-together, stated, not inferable. That makes the distinction visible at a seat
-that otherwise has no instrument for it — and it is the only one of the three
-obligations that changes what a reviewer can *see*.
-
-- Apply each mutation at its **natural production site**, not at a convenient
-  one; a mutation the real code path never reaches proves nothing.
-- **Restore byte-identically** and verify with `git diff --quiet`.
-  `git diff --stat` **always exits 0** and is not an emptiness test.
-- **Commit the real fix before any mutation-proof reset.**
-- When a resource cliff (stack, RSS, timeout) fires, **measure the base's
-  MARGIN**, not just pass/fail — attribution needs the margin. And **fixing a
-  cliff by raising a limit spends a detector**: name which one, and where its
-  replacement belongs.
-
-## 11. Reproduction recipes
-
-If a pin rests on captured constants, a re-capture after the change would
-produce byte-identical values — **so nothing distinguishes a genuine baseline
-from a re-recording.** Record the base SHA, the probe names, and the exact
-worktree + invocation, and **specify the sanctioned invocation verbatim**
-(`scripts/ken-cargo`, targeted) or the recipe will document a procedure the
-fleet is not allowed to run. **Demonstrate the binding; do not testify to it.**
+**`§10` and `§11` live in that file**, under those numbers. An older citation
+reading `pin-a-property §10` is pointing at its mutation-hygiene content.

@@ -231,7 +231,7 @@ proves it is wired to *something*; only mutating the **population** proves
 in place of the frame's population-side one, it reddened, and the report *"each
 control reddened its intended named test"* was **literally true** while the
 defect the WP existed to fix sat under a green control. Per AC below, **record
-which side you moved.** See `agent/playbooks/tools/pin-a-property.md §10`.
+which side you moved.** See `agent/playbooks/tools/mutation-prove-a-pin.md §10`.
 
 ### `AC-V1` — deep ACYCLIC encoding succeeds, with a POSITIVE byte oracle
 
