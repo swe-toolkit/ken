@@ -324,7 +324,44 @@ Node text is authoritative; this is the slicing view.
 | `D6` | the four conformance rows of contract point 4 | |
 | `D7` | `trusted_base()` delta as a **number**, with what grew and why | ⛔ not a zero — this node grows the TCB |
 
-### ⛔⛔ `D1b`/`D2` GATE — THE POLARITY PRODUCER ON `main` IS FAIL-OPEN
+### `D1b`/`D2` GATE — DISCHARGED 2026-08-09. The producer is fail-CLOSED.
+
+> **This gate is satisfied and `D1b`/`D2` have landed.** Steward verification,
+> 2026-08-09, against the code rather than against a handback claim. The
+> heading previously read *"THE POLARITY PRODUCER ON `main` IS FAIL-OPEN"* and
+> the diagnosis below it is retained as history — ⛔ **it no longer describes
+> `main`.**
+>
+> **The discharging control is
+> `crates/ken-kernel/tests/nested_inductives_remaining.rs::polarity_producer_covers_all_four_positions_with_independent_mutations`.**
+> It is what the gate asked for and not the shape the gate warned against:
+>
+> | position | unmutated record | mutation | mutated record |
+> |---|---|---|---|
+> | constructor **arguments** | `StrictlyPositive` | arg becomes `pi(var(0), ty0())` | `NonPositive` |
+> | constructor **target indices** | `NonPositive` | clear `target_indices` | `StrictlyPositive` |
+> | inductive **indices** | `NonPositive` | index becomes `ty0()` | `StrictlyPositive` |
+> | **dependent parameter** types | `[NonPositive, StrictlyPositive]` | `params[1]` becomes `ty0()` | `[StrictlyPositive, StrictlyPositive]` |
+>
+> **Each position is a non-degenerate pair on a shared fixture** — both
+> directions measured, so no row passes by rejecting a malformed fixture for
+> free. **Three of the four record `NonPositive` unmutated**, which is the
+> fail-closed direction the gate demanded: a negative occurrence in a
+> target index, an inductive index, or a dependent parameter type is no longer
+> silently recorded positive.
+>
+> ⇒ **The specific defect the adversary demonstrated is closed**:
+> target-index placement no longer flips the permissive gate from reject to
+> accept — it now records `NonPositive`.
+>
+> ⚠ **This was carried as an undischarged residual for one checkpoint**, on the
+> correct ground that no one had *measured* the per-position controls. The
+> lesson is not that the caution was wrong — it is that a gate stated as
+> "establish coverage and record the per-position result" has no owner once
+> the deliverable it gates has merged, so **nothing re-reads it and the frame
+> keeps asserting a fail-open producer.** The test's own comment — *"These four
+> mutations are the controls, not four spellings of one"* — shows the
+> implementer read `§2h` and honoured it; the frame simply never learned.
 
 **Recorded here 2026-07-28 on `kernel-leader`'s routed ask.** The node has
 carried this since the `D3b`+`D4` merge; the frame did not, and **the frame is
@@ -339,7 +376,8 @@ the artifact a `D1b` implementer slices from.**
 > constructor **target indices**, **inductive indices**, and **dependent
 > parameter types**.
 
-**What is wrong on `main`:** `derive_parameter_polarities` scans only
+**What WAS wrong on `main` (historical — fixed, see the discharge above):**
+`derive_parameter_polarities` scanned only
 `constructor.args`, while `derive_recursive_shape` admits a nested recursive
 `Former` **only** on a recorded `StrictlyPositive`. ⇒ A negative occurrence in
 any of the other three positions is **recorded positive**, and the adversary
