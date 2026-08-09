@@ -231,6 +231,45 @@ fails. The control must distinguish "the literal took the expected type" from
 elaboration fails does not discharge this, because the pre-existing `unwrap()`
 already did that much. State the mutation and the observed failure message.
 
+> ### STEWARD RULING 2026-08-09 — the mutation SITE is the owner's call, and
+> ### the producer mutation is retired as uninformative
+>
+> Verify measured at `D1` that the real producer mutation
+> (`elab_num_lit_checked` skips the checked arm for infer+unify) reds, **but
+> that the retained legacy body fails first at its existing `unwrap()`
+> (`KernelRejected TypeMismatch`), before the new literal-level witness is ever
+> reached.** The finding is correct and it is the reason this clause is being
+> written, not a reason to amend the property.
+>
+> **1. AC-2 never prescribed a site, so no amendment is needed.** It prescribes
+> what the control must *distinguish* and asks you to state the mutation you
+> used. **An observation-seam mutation is permitted.**
+>
+> **2. The producer mutation is retired for this AC.** In an A/B mutation proof
+> the informative side is the one that **greens** — the arm where the legacy
+> body still passes and only the new witness reds. Here neither arm isolates
+> the new witness, so the mutation cannot support the claim regardless of how
+> red it goes. Record it as measured-and-uninformative; do not report it as a
+> discharge and do not weaken the legacy body to make it green.
+>
+> **3. The binding constraint on the substitute.** An observation-seam mutation
+> must substitute what the witness **observes at a seam the production path
+> actually feeds**. If the test hands the substituted `Term::IntLit` to its own
+> assertion, it asserts on a needle it supplied and is vacuous — that is
+> `DOC-GATE-NEEDLE`'s defect class, already merged in this repo. State which
+> seam you substituted at and what still reaches it from production.
+>
+> **4. State both cells, not one.** The mutated arm reds **and** the unmutated
+> pair greens. A red alone is consistent with a control that reds at
+> everything.
+>
+> **5. The committed pair is already the discriminator AC-2 asks for.**
+> `const defaulted = 1` observed as `Term::IntLit` against
+> `const expected : Int64 = 1` observed as `Term::Const` at kernel type
+> `Int64` is a non-degenerate pair on a shared input, so a flipped boundary
+> inverts both. The pair proves the witness *discriminates*; the mutation
+> proves the pin *bites*. They are separate obligations and `AC-2` wants both.
+
 **AC-3 — no row is un-ignored, and no capability work is done here.** Positive
 control: the count of `#[ignore]` in this file is unchanged unless a test was
 deleted under D2.3, in which case state the new count and which row went.
