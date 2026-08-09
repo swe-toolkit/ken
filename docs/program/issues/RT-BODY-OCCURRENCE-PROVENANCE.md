@@ -12,6 +12,14 @@ origin: Architect standalone mechanism ruling evt_172ag7hdbttkc (2026-08-09), se
 ---
 
 > # THE TRAVERSAL CALL IS NOT MISSING. THE IDENTITY PASSED TO IT IS WRONG.
+>
+> ### THE PAIRING AUTHORITY IS ONE, AND IT COVERS EVERY SEED CLASS
+>
+> **Ruling `evt_5ncj9jd6fjt8f` withdrew the original `StaticBodyTarget`
+> carve-out.** The first attempt implemented the bounded contract correctly and
+> then **measured that it was insufficient** — `9e5b8d7f` is **held evidence,
+> not a completed candidate, and must not be published.** Read that block in
+> the construction section before implementing anything.
 
 **[[KERNEL-NESTED-IND]] IS BLOCKED ON THIS AND ON NOTHING ELSE.**
 
@@ -70,8 +78,14 @@ membership projection and is **never** a pairing authority.
 ### At function-unit construction
 
 - every `SchedulingEntry` seed consumes its **exact recorded** body occurrence;
-- the already-grounded `StaticBodyTarget` seed classes continue to consume their
-  defining child-0 occurrence relation;
+- ~~the already-grounded `StaticBodyTarget` seed classes continue to consume
+  their defining child-0 occurrence relation~~ — **WITHDRAWN by ruling
+  `evt_5ncj9jd6fjt8f`. THE CARVE-OUT WAS WRONG.** `StaticBodyTarget` seeds
+  consume the **same issued `entry -> body_occurrence` pairing**; **there is no
+  distinct child-0 authority.** Child-0 coincides with the body for ordinary
+  expressions and **diverges for `ComputationalMatch`** — the identical two-axis
+  split, in a second seat class. Measured on held evidence `9e5b8d7f`: owner 2,
+  seed `n58` `Evaluate`, issued body **SOI(58)**, actual body **SOI(26)**;
 - `PredeclaredFunction.planned_node` remains the **scheduling-entry** axis;
 - its currently aliased `origin` becomes the **issued body-occurrence** axis,
   preferably renamed `body_occurrence`;
