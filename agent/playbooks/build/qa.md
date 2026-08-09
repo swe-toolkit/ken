@@ -412,16 +412,8 @@ reference):**
      signal healthy, the positive control included**. Check *which artifact the
      probe actually compiled against* before concluding the property holds.
    - **Construct your OWN mutation before you run theirs — and if you can only
-     re-run theirs, SAY SO IN THE VERDICT.** *Correction (2026-07-22): this
-     block first cited `:18` as instructing QA to "re-run" rather than re-derive.
-     **That citation was wrong** — `:18` is the targeted-testing rule, and its
-     "re-runs the affected tests" fixes the **scope** of a run (targeted, never
-     `--workspace`), not its provenance. **The real defect was an ABSENCE:**
-     nothing in this file required QA to derive the violation itself, so a QA
-     doing the weaker thing was not contradicting any line — it was following
-     every line there was. An absence is the harder gap to see, because there is
-     no sentence to disagree with.* **Re-running is not re-deriving.** A QA that
-     re-runs the
+     re-run theirs, SAY SO IN THE VERDICT.** **Re-running is not re-deriving.**
+     A QA that re-runs the
      implementer's mutation inherits the implementer's *vantage* — including the
      forms they did not imagine, which for a representation-matching mechanism is
      the **entire failure surface**. That is the one place a mutation proof

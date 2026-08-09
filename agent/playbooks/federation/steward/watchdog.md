@@ -9,11 +9,9 @@ the backstop fell over.
 
 ## What to catch
 
-Federation-level stall patterns: a whole team gone idle; a stalled team leader
-(its own watchdog died); a dropped cross-team query; a blocked dependency chain
-(team B waiting on a merge from A that never came); no movement toward the
-active roadmap gate. Diagnose before restarting, use graduated recovery (nudge,
-re-nudge, act), and escalate what you cannot restart.
+The federation-level stall patterns, the diagnose-before-restart rule and the
+graduated-recovery sequence are enumerated in `COORDINATION §13`. Everything
+below is the Steward-specific application of them; nothing below restates them.
 
 **You are the backstop, not the primary rouser — rouse the leader, not its
 workers** (operator, 2026-07-11). Per-member rousing is the team leader's

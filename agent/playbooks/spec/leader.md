@@ -171,9 +171,8 @@ permissive references and first principles; **you work only from their output**
 Detecting copied *expression* requires comparing the output against the source,
 and `:29-35` forbids you the source — so a leader-run "check" here could only
 read Ken-language prose and find it Ken-language: **a guard that cannot fail.**
-This section formerly asserted exactly that, which is worse than no guard,
-because the enclave read it as covered. (Found by the corpus verb-audit,
-2026-07-22; division below proposed by the spec-leader seat itself.)
+A guard that cannot fail is worse than no guard, because the enclave reads it
+as covered.
 
 **The division is evidence-based, and each half names an artifact:**
 
