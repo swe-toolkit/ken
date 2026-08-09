@@ -22,7 +22,11 @@ POPULATION_PATHS = (
 )
 ALLOWED_CLASSES = {"policy-cost", "placeholder-no-assertions"}
 SUMMARY_RE = re.compile(r"\b(\d+) tests? run:")
-PASS_RE = re.compile(r"^\s*PASS\s+\[[^]]+\]\s+(.+?)\s*$", re.MULTILINE)
+PASS_RE = re.compile(
+    r"^\s*PASS\s+\[[^]]+\]\s+"
+    r"(?:\((?P<index>\d+)/(?P<total>\d+)\)\s+)?(?P<identity>.+?)\s*$",
+    re.MULTILINE,
+)
 
 
 class SweepError(RuntimeError):
@@ -205,9 +209,19 @@ def report(path: Path, expected: int, exit_status: int) -> None:
             f"nextest exit {exit_status} is neither complete success nor test failure"
         )
 
-    passing = list(
-        dict.fromkeys(match.group(1) for match in PASS_RE.finditer(text))
-    )
+    passing: list[str] = []
+    for match in PASS_RE.finditer(text):
+        if match.group("index") is not None:
+            index = int(match.group("index"))
+            total = int(match.group("total"))
+            if total != expected or not 1 <= index <= total:
+                raise SweepError(
+                    f"nextest progress counter {index}/{total} is inconsistent "
+                    f"with expected population {expected}"
+                )
+        identity = match.group("identity")
+        if identity not in passing:
+            passing.append(identity)
     print(f"Ignored-row sweep completed: {observed} selected; {len(passing)} passed.")
     if passing:
         print("Passing ignored rows need owner routing:")
