@@ -211,20 +211,32 @@ impl ElabEnv {
         // Lc typeclass env: pre-declare RecordNil + record_nil_val (`33 §5`).
         elab.class_env = elab::init_class_env(&mut elab.env, &mut elab.globals)?;
         // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — capture the immutable
-        // pre-source trusted base HERE, at the prelude floor.
+        // pre-source trusted base.
         //
-        // This is the last instant at which every entry in `Σ`'s trusted base
-        // is compiler-owned: the three stages above (`register_prelude`,
-        // `register_safe_bytes_ops`, `init_class_env`) are all prelude, and no
-        // package source has been elaborated. Anything a package's own source
-        // later postulates enters strictly after this line and is therefore
-        // absent from the roster -- whatever identity that source gives it.
+        // ⛔ **The authority boundary is the end of `ElabEnv::empty()`**, not
+        // any single call inside it. What makes the capture sound is the
+        // constructor's contract: every compiler declaration stage
+        // (`register_prelude`, `register_safe_bytes_ops`, `init_class_env`)
+        // has run, and the constructor has not yet returned an environment
+        // that any package source could elaborate into. So the roster is
+        // exactly "trusted before the package could speak".
         //
-        // ⚠ Capturing at the end of `register_prelude` instead is WRONG and was
-        // measured: it misses the 9 targets the two later prelude stages
+        // The neighbouring `install_prelude_floor()` is NOT that boundary and
+        // must not be cited as one: it installs the unshadowable *name* floor
+        // only, and says nothing about `Σ`'s trusted base. The adjacency is
+        // where the line sits, not why it is correct.
+        //
+        // ⚠ Capturing at the end of `register_prelude` instead is WRONG, and
+        // was measured: it misses the targets the two later prelude stages
         // declare (`bytes_at`, `bytes_decode`, `bytes_list_roundtrip`,
-        // `RecordNil`, ...), so a clean package's 107 tuples would face a
-        // 98-entry roster and every real package would be refused.
+        // `RecordNil`, ...), leaving a roster strictly smaller than a clean
+        // package's own tuple targets -- so every real package would be
+        // refused for entries no user wrote.
+        //
+        // Adding a compiler initializer that declares trusted entries AFTER
+        // this line silently shrinks the roster the same way. The control in
+        // `prelude.rs` derives roster/tuple equality as a SET relation on a
+        // freshly built environment, so such an addition reddens there.
         elab.prelude_env.native_trusted_base = elab.env.trusted_base().into_iter().collect();
         elab.module_state.install_prelude_floor();
         Ok(elab)
