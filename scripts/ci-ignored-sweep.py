@@ -33,8 +33,6 @@ PASS_PREFIX_RE = re.compile(r"^\s*PASS(?:\s|$)")
 COUNTER_RE = re.compile(
     r"^\((?P<index>\d+)/(?P<total>\d+)\)\s+(?P<identity>.+)$"
 )
-ROW_CLAIM_RE = re.compile(r"^\s*//(?:/)?\s+(?P<row>surface/\S+)")
-ROW_HEADING_RE = re.compile(r"^###\s+(?P<row>surface/\S+)(?:\s.*)?$")
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*#\[test\]\s*$")
 ATTRIBUTE_OR_COMMENT_RE = re.compile(r"^\s*(?:#\[|//)")
 TEST_FN_RE = re.compile(r"^\s*fn\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(")
@@ -44,7 +42,23 @@ class SweepError(RuntimeError):
     """The sweep instrument could not establish its claimed measurement."""
 
 
-def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
+def conformance_row_patterns(
+    root: Path,
+) -> tuple[re.Pattern[str], re.Pattern[str]]:
+    namespaces = sorted(path.name for path in root.iterdir() if path.is_dir())
+    if not namespaces:
+        raise SweepError(f"{root} contains no conformance namespace directories")
+    namespace = "|".join(re.escape(name) for name in namespaces)
+    row = rf"(?P<row>(?:{namespace})/\S+)"
+    return (
+        re.compile(rf"^\s*//(?:/)?\s+{row}"),
+        re.compile(rf"^###\s+{row}(?:\s.*)?$"),
+    )
+
+
+def rust_test_row_claims(
+    root: Path, row_claim_re: re.Pattern[str]
+) -> list[tuple[str, int, str, str]]:
     claims: list[tuple[str, int, str, str]] = []
     for path in sorted(root.rglob("*.rs")):
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -60,7 +74,7 @@ def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
             if not any(TEST_ATTRIBUTE_RE.match(candidate) for _, candidate in prefix):
                 continue
             for claim_index, candidate in reversed(prefix):
-                claim = ROW_CLAIM_RE.match(candidate)
+                claim = row_claim_re.match(candidate)
                 if claim is not None:
                     claims.append(
                         (
@@ -73,13 +87,15 @@ def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
     return claims
 
 
-def conformance_row_headings(root: Path) -> dict[str, list[tuple[str, int]]]:
+def conformance_row_headings(
+    root: Path, row_heading_re: re.Pattern[str]
+) -> dict[str, list[tuple[str, int]]]:
     headings: dict[str, list[tuple[str, int]]] = {}
     for path in sorted(root.rglob("*.md")):
         for line_number, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), start=1
         ):
-            heading = ROW_HEADING_RE.match(line)
+            heading = row_heading_re.match(line)
             if heading is not None:
                 headings.setdefault(heading.group("row"), []).append(
                     (str(path.relative_to(ROOT)), line_number)
@@ -88,10 +104,11 @@ def conformance_row_headings(root: Path) -> dict[str, list[tuple[str, int]]]:
 
 
 def verify_row_claims(rust_root: Path, conformance_root: Path) -> int:
-    claims = rust_test_row_claims(rust_root)
+    row_claim_re, row_heading_re = conformance_row_patterns(conformance_root)
+    claims = rust_test_row_claims(rust_root, row_claim_re)
     if not claims:
         raise SweepError("Rust test row-claim census resolved zero claims")
-    headings = conformance_row_headings(conformance_root)
+    headings = conformance_row_headings(conformance_root, row_heading_re)
     errors: list[str] = []
     for path, line, test, row in claims:
         matches = headings.get(row, [])
