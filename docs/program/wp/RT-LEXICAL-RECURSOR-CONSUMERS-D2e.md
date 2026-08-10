@@ -16,12 +16,34 @@ at the seam I named. **That is the outcome I asked for.** Two short turns is
 evidence the cut is right, and this is the cut: the identity plane here, the
 emission plane in [[RT-LEXICAL-RECURSOR-CONSUMERS-D2f]].
 
-**Take `D2d`'s grounding record as a fixed input.** Every key member except the
-checked frame/invocation-template identity is already a measured coordinate on
-the `R3` before-hole witness — the unique `0 -> 2` producer edge, the two-entry
-ordinary `ValueWord` projection, the consuming `Call` at `StaticOriginId(12)`.
-Read it at `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2d-GROUNDING.md`.
-**Do not re-derive those coordinates; derive the mechanism that produces them.**
+**Take `D2d`'s grounding record as a fixed input** for the members it actually
+measured — the unique `0 -> 2` producer edge, the two-entry ordinary
+`ValueWord` projection, the consuming `Call` at `StaticOriginId(12)`. Read it
+at `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2d-GROUNDING.md`. **Do not
+re-derive those coordinates; derive the mechanism that produces them.**
+
+> ### FIXED-INPUT RECONCILIATION, 2026-08-10. The `R3` tuple cannot complete a key.
+>
+> **This section previously said every key member *except* the checked identity
+> was already measured on the `R3` before-hole witness. That framing is
+> withdrawn, and the correction is not cosmetic.** It invited the next turn to
+> read the `R3` tuple as a source from which the full fusion key could be
+> completed. It cannot be.
+>
+> Measured by the implementer at `215bd156` and ruled by the Architect at
+> `evt_2t67rtf6kaw5e`: the `R3` before-hole witness carries **zero** checked
+> transport markers, as does the two-sibling `AC-9` fixture, while 22 other
+> fixtures in the same file construct `CheckedSubcontinuationFrame`. These are
+> hand-built IR fixtures and the markers are elaborator-emitted, so the absence
+> is a property of the fixture, not of the mechanism.
+>
+> ⇒ **The `R3` tuple is partial grounding plus an absence control. It is not a
+> full-key positive and no positive identity control may be built on it.**
+>
+> **The implementer stopped before writing any key rather than picking among
+> required / optional / re-author. That was the right call** — the member gates
+> the key's *shape*, so discovering it afterwards would have meant rewriting the
+> discovery, the interning and the validator around it.
 
 ## The defect this deliverable removes, and it is measured
 
@@ -64,12 +86,60 @@ IH-consuming `Call`; the checked frame/invocation-template identity; and the
 complete ordered ABI input projection. **Distinct in any member means a distinct
 fusion.**
 
-**3. The exact re-derivation validator.** Re-deriving the key from planner facts
+**The checked transport member is REQUIRED and is never an `Option`**
+(`evt_2t67rtf6kaw5e`). Absence does not denote a smaller-but-valid identity.
+It is one coordinate resolved from three wrapper authorities:
+
+| wrapper authority | resolved against |
+|---|---|
+| `CheckedSubcontinuationFrame.frame_id` | its exact `OrientedSubcontinuationFramePlanV1` |
+| the selected `CheckedComputationalIHSlots` entry, with slot-template id and checked occurrence path | its exact `CheckedComputationalIHSlotTemplateV1` |
+| `CheckedComputationalIHInvocation`, with call-template id and checked occurrence path | its exact `CheckedComputationalIHCallTemplateV1` |
+
+**Record the exact resolved identity. Do not infer it from the Runtime shape,
+do not select "the only" marker, and do not accept raw wrapper numbers without
+the matching oriented plan and exact marker-location validation.** "The only
+marker" is the same existential shape as "the only continuation", and it is
+rejected for the same reason.
+
+**3. The checked `R3`-shaped twin, and it is a deliverable rather than test
+scaffolding.** The positive identity controls need a fixture that carries
+checked transport. **Do not rewrite the existing unmarked `R3` witness in
+place** — it keeps its `D2d` coordinates and becomes the absence control, with
+an exact meaning: no checked transport means **not a fusion candidate**, so no
+key, id or descriptor is created and the ordinary refusal stands. The
+two-sibling `AC-9` fixture likewise stays an order discriminator and is not
+promoted.
+
+The twin must be produced by the checked erasure/wrapper path, **or** carry a
+complete matching `OrientedSubcontinuationPlanV1` and pass the existing exact
+transport validator. **Hand-wrapping the old `RuntimeExpr` with chosen ids is
+forbidden.** Wrappers change the semantic occurrence tree, so **derive and
+report the twin's coordinates fresh — do not reuse `StaticOriginId(5/12/18/23)`
+or the old owner and edge numbers by assertion.**
+
+**4. The construction order, and it is fail-closed by sequence.**
+
+1. Validate the oriented plan against all three Runtime marker populations and
+   their exact structural locations.
+2. Resolve the checked frame, the selected IH slot, and the exact IH
+   invocation template.
+3. Derive every other whole-key member, including the landed exact consuming
+   `Call`.
+4. Exact-re-derive and compare the complete key.
+5. **Only then** intern and mint key↔ID↔descriptor.
+
+**Any absence, multiplicity, marker/plan disagreement, wrong selected slot, or
+transplanted frame/slot/call template yields no candidate before interning.
+There is no optional-key equivalence class and no fallback identity.**
+
+**5. The exact re-derivation validator.** Re-deriving the key from planner facts
 yields the same members. This is what converts the grounding tuple into a
 mechanism: each member comes from a planner-issued identity, never from a
 spelling, a type, a row number, a runtime tag, or *"the only continuation."*
 
-**4. The suppressed-leg denominator repair — a rider, two lines.** Confirmed
+**6. The suppressed-leg denominator repair — a rider, two lines. LANDED** in the
+first partial (`f37ecd13`); kept here for the record. Confirmed
 Adversary finding `evt_4b1yq03sw9zr6`, measured on `ca753171`. `D2d`'s `AC-6`
 made `established_s_arrivals` a `NonZeroUsize`, but on the **suppressed** leg the
 value is read **only inside the format string** — the comparison is against the
@@ -114,6 +184,19 @@ differing in exactly one member intern to two distinct fusions. Exercise one
 member per identity class rather than one representative — a bijection test on a
 single member says nothing about the others.
 
+**The Architect specified the control set (`evt_2t67rtf6kaw5e`), and the
+checked coordinate counts as three classes, not one:**
+
+- the same complete valid key interns to the same id and round-trips;
+- two complete valid keys differing in the **checked frame** member intern
+  distinctly;
+- likewise for the **selected slot-template** identity and path;
+- likewise for the **invocation-template** identity and path;
+- the ordinary one-member controls cover every other key identity class;
+- **malformed transplants are validator refusals, not "distinct valid key"
+  evidence.** Counting a refusal as a distinguished key would make the
+  bijection look total while proving nothing.
+
 **AC-5 — fail-closed, and this is the soundness-bearing control.** A producer
 **lacking** the exact consuming suffix yields **no fusion and the ordinary
 existing refusal** — never a fallback to the unspecialized result-returning unit.
@@ -124,6 +207,21 @@ must reject, and reject before any definition is created.**
 continuation."** An identity that happens to be unique in the measured
 population is not an identity — it is the same existential shape that got
 `d94ef37e` rejected on `D2b`. The transplant controls are what separate the two.
+
+**Added by the ruling, and every one of these fires BEFORE any id, descriptor
+or definition is created:**
+
+- **strip the checked transport from the positive twin** — no fusion, and the
+  ordinary refusal;
+- **independently** remove or transplant the **frame**, the **selected slot**,
+  and the **invocation** marker/plan relation — each rejects on its own;
+- the already-required **missing exact consuming suffix**, **call-identity
+  transplant**, and **segment-owner transplant** controls are retained.
+
+**Marker absence does not substitute for those soundness controls.** The
+unmarked `R3` witness now refuses for a *transport* reason, which would mask a
+missing suffix-identity control that never ran — passing for the wrong reason
+is the failure mode here, and it is why the retained controls need the twin.
 
 **AC-6 — `D2b`'s controls are retained** and still prove `Closure` and
 `DeclarationClosure` unconditionally non-transferable at every depth, and
@@ -202,8 +300,38 @@ representation; any weakening of the whole-graph admissibility walk; any case
 where the checked binder layout cannot distinguish an IH slot from an ordinary
 binder.
 
+**Added by the ruling and it is the live one:** if **no plan-backed checked twin
+can reach the same producer to IH-consumer relation**, stop again and hand back
+the seam. **Do not manufacture markers and do not make the member optional.**
+The first stop on this fork was called correctly; a second one on the twin would
+be too.
+
 **Not a stop condition:** the emitter/ABI obligation being undischarged. It is
 excluded here by construction and lands in `D2f`.
+
+**Not a stop condition, as of 2026-08-10:** the checked-transport member's
+required-versus-optional status. That fork is ruled — **required** — and this
+frame carries the ruling. Do not re-escalate it.
+
+## AC ledger, carried from the implementer's handback at `215bd156`
+
+| AC | state |
+|---|---|
+| `AC-1` binder role | landed, first partial `f37ecd13` |
+| `AC-7` denominator operand | landed, first partial |
+| `AC-2` / `AC-3` indirection, no `Var` search | landed, threading partial `fe28ac7d` |
+| `AC-9` control observes production | landed, threading partial |
+| `AC-10` single-owner claim corrected | landed, threading partial |
+| `AC-6` `D2b` controls retained | holds, untouched by both partials |
+| `AC-8` population stated in the claim | retained and satisfied |
+| `AC-4` bijection | **not delivered** |
+| `AC-5` fail-closed and transplants | **not delivered** |
+
+**The consuming-`Call` side needs no new mechanism** and this is measured, not
+assumed: the consumer's selected case body is the exact suffix iff its callee
+`Var` resolves, through the landed IH authority, to `CheckedIhBinding {
+frame_origin: continuation_origin, recursive_position }`. That is `AC-5`'s
+discrimination, and it is why only the checked coordinate gated the key's shape.
 
 ## Contention
 
@@ -216,8 +344,17 @@ Decision.
 ## Sizing and validation
 
 One turn to a releasable increment or a genuine hard stop; both are good
-outcomes. **The implementer reported context budget as the binding constraint on
-the last turn — this deliverable starts on a fresh one.**
+outcomes.
+
+**This deliverable grew on 2026-08-10 and I am saying so rather than leaving the
+sizing implicit.** The checked-transport ruling added a fixture twin built
+through the checked path, a five-step fail-closed construction order, three
+extra `AC-4` identity classes and four extra `AC-5` refusals. **The twin alone
+may be a turn.** That is authorized scope — the Architect placed the paired
+fixture and control work inside `D2e` — but **a partial that lands the twin and
+its absence control, with the key still unbuilt, is a good outcome and I will
+merge it.** Do not compress the fail-closed order to fit one turn; the order is
+the soundness property.
 
 Targeted only — `-p ken-runtime`, or `--test <name>` for one suite, **never
 `--workspace`**. A new id and key add enum variants, so the floor is a full
