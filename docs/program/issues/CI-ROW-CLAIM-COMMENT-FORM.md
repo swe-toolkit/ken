@@ -1,7 +1,7 @@
 ---
 id: CI-ROW-CLAIM-COMMENT-FORM
 title: "verify-row-claims extracts only from /// doc comments, so a row claim written with // is invisible to it -- two false soundness certificates survive on main in exactly that form"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none
