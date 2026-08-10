@@ -96,6 +96,60 @@
 > it within minutes. Gate steps 2/5/7 already passed; **all three enclave seats
 > are compacted and holding** — the kick is the second half of that act.
 >
+> #### MERGED THIS WINDOW — `main` = `458b1413` (re-verify)
+>
+> All blob-verified from declared bases with path counts checked against the
+> ring's declared scope:
+>
+> | WP | exact | PR | paths |
+> |---|---|---|---|
+> | `CI-ROW-CLAIM-COMMENT-FORM` | `c51f408e` | #1781 | 3 |
+> | DS-9 `D3a` Capability.Parsing | `857edddd` | #1784 | 2 |
+> | doc checkpoints | `491f7b2d`, `f4c2e38a` | #1782, #1783 | — |
+>
+> **Ledger consequences, and the two are OPPOSITE — do not conflate them.**
+> `crates/ken-interp/src/eval.rs` was **already** stale at `82918b6a`, so
+> `CI-ROW-CLAIM` found a pre-existing defect (routed `evt_326nqdbdc76qk`). Both
+> `Capability/Parsing/{Cursor,Decoder}.ken.md` rows were **green before `D3a`
+> and are red because of it** — real blast radius, checked before merging rather
+> than after (routed `evt_1aw0vz1b7d5ks`).
+>
+> #### LANES as of ~09:0xZ
+>
+> - **Runtime** — implementer building the `c1` **L** recut. Authorized twice
+>   (`evt_28pvpc4rpyvyx`, then `evt_4yr8cvmnb4z2q` after the Architect widened it
+>   to a pre-source trusted-base roster). **I re-ran the TCB question on the
+>   second, rather than inheriting my own first answer** — it holds, because the
+>   roster is a *refuser*: its negative control rejects the user-postulate case
+>   the weaker designs would have admitted.
+> - **spec-enclave** — `CONF-EVAL` active. **`AC-1` was MY error and is
+>   replaced** (`evt_30m4e0a35czk6`): `ROW_CLAIM_RE`/`ROW_HEADING_RE` hardcode
+>   `surface/`, so the checker structurally cannot see `runtime/evaluation/`.
+>   Substantive bar unchanged (ids resolve 1:1, by direct inspection); only the
+>   *instrument* changed. Build all-clear issued, bounded to targeted
+>   `-p ken-interp`.
+> - **Verify** — `CI-DOCTEST-UNEXECUTED` active. Census green: 8 crates,
+>   `ken-runtime` **14/14 passing**, other seven collect zero, `values::Value`
+>   collected and passing ⇒ `D4`'s step lands green. **I amended scope** to fold
+>   four stale "CI has no doctest lane" comments in, **but decided per comment
+>   against the collector** — a comment about ` ```text ` fences stays true after
+>   the step lands, so a blanket rewrite would introduce falsehoods the other way.
+> - **Foundation** — **STOOD DOWN** (`evt_6zws8nt7qa8zp`). Everything left is
+>   behind something it does not own; that is my debt, not theirs.
+> - **Kernel / Language / Ergo / doc** — idle for reasons the operator owns.
+>
+> #### The DS-9 fuel stop is CLASSIFIED and gets NO node
+>
+> Architect `evt_fb8zzbsk46ag`: **not** the `KERNEL-RECURSIVE-RESULT-SURFACE`
+> obstruction — that needs elimination into a `support: Some(All_List)`
+> constructor and this theorem never does one. It is an **unclassified
+> theorem-conversion gap**; opaque reduction of primitives such as `eq_int` is a
+> lead the raw terms do not prove. **A node requires attribution work first**
+> (preserve the rejected source, isolation-replace components until the
+> `TypeMismatch` flips). Filing one now would put an ungrounded premise on the
+> critical path. **The decode-only shell stays deferred** — the lemma did not
+> land, so the shell would imply a guarantee nothing establishes.
+>
 > #### OPERATOR QUEUE for 11:30Z — do not decide these
 >
 > **0. The Architect seat strands on inbound mentions and needs a fix.** Six
