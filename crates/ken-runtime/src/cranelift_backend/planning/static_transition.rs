@@ -1782,39 +1782,37 @@ impl<'plan> ContinuationUnitView<'plan> {
         // ⭐⭐ `RT-CONTSRC-PRODUCER-LOCAL` `D8l2` — THE NONRECURSIVE POPULATION
         // IS SOURCE POSITIONS, NOT ENVELOPE INDICES.
         //
-        // ⛔ `D8l2`'s own model, retained because its defect and its controls
-        // are about field ORDER, not about how many positions are recursive.
-        // `D2b` supersedes its arithmetic: the producer has
-        // `N + |recursive_positions|` fields, and EVERY recursive position is
-        // skipped rather than only the selected one. Read the `D2b` note on
-        // this method's contract before reasoning from the paragraph below.
-        //
-        // The producer `Construct` has `N + 1` fields: `N` nonrecursive ones
-        // and the selected recursive one. The roles are those `N` fields at
-        // their OWN source positions, in source order, with the selected
-        // position skipped.
+        // The producer `Construct` has `N + |recursive_positions|` fields: `N`
+        // nonrecursive ones and the whole recursive run. The roles are those
+        // `N` fields at their OWN source positions, in source order, with
+        // **every** recursive position skipped.
         //
         // ⛔ What stood here emitted `0..N` — the envelope index — and called it
         // `source_position`. The two coincide only while every nonrecursive
-        // field precedes the selected recursive position, because omitting a
-        // later position does not renumber the earlier ones but omitting an
-        // earlier one renumbers every later one. `px8tr` selects its last field,
-        // so the defect was unreachable on every landed fixture and the method's
-        // own doc comment — "in producer source order with the selected
-        // recursive position omitted" — described the rule the loop did not
-        // implement. `D8l1` measured it with two witnesses differing only in
-        // field order.
+        // field precedes every recursive position, because omitting a later
+        // position does not renumber the earlier ones but omitting an earlier
+        // one renumbers every later one. `px8tr` selects its last field, so the
+        // defect was unreachable on every landed fixture and the method's own
+        // doc comment — "in producer source order with the recursive positions
+        // omitted" — described the rule the loop did not implement. `D8l1`
+        // measured it with two witnesses differing only in field order.
         //
         // ⛔ This is neither a reverse source walk nor a new identity: the
-        // producer's field count is `N + 1` by construction from the checked
-        // capture subtraction above, and the selected position is the key's own
-        // `recursive_position`. Nothing is inferred from a body, a shape, or an
+        // producer's field count is `N + |recursive_positions|` by construction
+        // from the checked capture subtraction above plus the closed
+        // projection's own size, and the positions omitted are that
+        // projection's members. Nothing is inferred from a body, a shape, or an
         // ABI slot.
-        // ⭐⭐ `D2b` — the field count is the nonrecursive run plus the WHOLE
-        // recursive run, not plus one. `+ 1` encoded the assumption that a
-        // producer has exactly one recursive position; with a sibling it
-        // undercounts the constructor by one field and the envelope then fails
-        // to cover its own Parameter slot run.
+        //
+        // ⛔ `D2b` — THE COUNT AND THE SKIP ARE BOTH PLURAL, and they were both
+        // singular. This paragraph read `N + 1` and "the selected recursive
+        // one", and the loop matched it. That model is correct exactly when a
+        // producer has one recursive position, which every landed fixture had —
+        // so a sibling recursive field was counted nonrecursive, became an
+        // ordinary ABI parameter, and carried a `Specialized(Closure)` the
+        // boundary walk then correctly refused. `D8l2`'s SOURCE-ORDER lesson is
+        // untouched by that correction and is the reason this paragraph is
+        // rewritten rather than deleted.
         //
         // ⛔ Self-membership is required, not defensive: `nonrecursive_field_count`
         // is derived from an arity that excluded every projected position, so if
