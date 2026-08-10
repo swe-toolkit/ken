@@ -539,16 +539,18 @@ keyword** — it named the definition/refinement construct before
 `SURF-def-refinement` (`33 §1`) renamed it to `def`; `type` stays rejected as a
 free identifier to preserve future optionality. Contextual keywords
 (`infixl`, `derive`, …) are not globally reserved. The decided post-freeze
-surface tokens are also lexed here (all spellings OQ-syntax):
+surface tokens are also lexed here (spellings OQ-syntax except the two selector
+phrases fixed below):
 
-- the contextual primary-expression phrase `structural result of x` (`32 §3`,
-  `34 §3.1.1`). `structural`, `result`, and `of` remain ordinary identifier
-  tokens outside that exact production. In particular, this does not change
-  the existing `result` binder in an `ensures` clause. At a primary-expression
-  boundary, the exact four-token sequence commits to the structural-result
-  production; parentheses may disambiguate an ordinary application using the
-  same identifier spellings. The formatter treats the whole phrase as one
-  primary expression and preserves the spaces between its words;
+- the contextual primary-expression phrases `recursive result for x` and
+  `induction hypothesis for x` (`32 §3`, `34 §3.1.1`). `recursive`, `result`,
+  `induction`, `hypothesis`, and `for` remain ordinary identifier tokens outside
+  those exact productions. In particular, this does not change the existing
+  `result` binder in an `ensures` clause. At a primary-expression boundary,
+  either exact four-token sequence commits to its selector production;
+  parentheses may disambiguate an ordinary application using the same
+  identifier spellings. The formatter treats each whole phrase as one primary
+  expression and preserves the spaces between its words;
 - the wrapping-arithmetic operator `+%` (and `wrapping_add`, …) in the operator
   set (`35 §3`, OQ-1a);
 - the type-level identifiers `Lazy` (OQ-eval-order) and `Wrapping` (OQ-1a,
