@@ -28953,3 +28953,143 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
         );
     });
 }
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` — the backedge marker is forwarded
+/// at `ComputationalMatchScrutinee`, and `R1` is gone from all five compiles.**
+///
+/// > **MEASURED:** under B-only exclusion the five `R1` compiles (rows 1 and 4)
+/// > deliver a backedge marker to this continuation, every arrival is forwarded,
+/// > and none of the five renders *"source scrutinee is not a constructor
+/// > value"*. Suppressing only the forward brings that refusal back on all five.
+/// > **CLAIMED:** the marker is consumed at its owner rather than reaching a
+/// > value-position guard. **THE GAP:** the rows do not turn green — they
+/// > advance to a further wall this node does not own (see the handback).
+///
+/// ⛔ **This does NOT key on the absence of the refusal alone.** A repair that
+/// deleted the sentence from production would make `!contains(...)` true for
+/// free, and this campaign has already shipped one control with that defect.
+/// The load-bearing assertions are the **non-zero arrival denominator** — the
+/// marker really reached this exact continuation — and the **suppression A/B**,
+/// which makes the pre-repair refusal producible again from the committed tree.
+///
+/// **`AC-3` guard 3, as far as this deliverable can establish it.** The
+/// suppressed leg proves the constructor guard is **still present, still
+/// reached, and still refusing** on all five compiles — so `D2a` did not delete
+/// or bypass it; it routed a marker that was never a scrutinee value past it.
+///
+/// ⛔ What that does NOT establish, stated because the difference matters: a
+/// **genuine** non-constructor value refused at this exact seat. No existing
+/// fixture delivers one to `ComputationalMatchScrutinee` — the operands that
+/// reach it are constructors, `Carried` words, and now this marker — and
+/// authoring one is new fixture work outside `D2a`'s one-authority mandate.
+/// That witness is owed to `D3` and is recorded as owed rather than implied.
+///
+/// PROMISE CLASS: durable invariant. Arrivals and forwards are asserted as a
+/// relation (`forwards == arrivals`, `arrivals > 0`), never as a fixed count, so
+/// a fixture that grows a compile keeps it green.
+#[test]
+fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compiles() {
+    use crate::cranelift_backend::lowering::core::{
+        lrc_d2a_backedge_arrivals, lrc_d2a_backedge_forwards, reset_lrc_d2a_counts,
+        set_lrc_d2a_suppress_forward, set_selector_variant_exclusion,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+            set_lrc_d2a_suppress_forward(false);
+        }
+    }
+    const R1: &str = "source scrutinee is not a constructor value";
+
+    // The five `R1` compiles: row 1's exact and deleted-scope pair, and row 4's
+    // three depths. Named by shape, not transcribed from a census.
+    let cases: Vec<(&str, RuntimeExpr, bool)> = vec![
+        (
+            "row1 owned-scope exact",
+            host_result_closure_match(px8j_layered_recursive_result(1, 1)),
+            false,
+        ),
+        (
+            "row1 owned-scope deleted",
+            host_result_closure_match(px8j_layered_recursive_result(1, 1)),
+            true,
+        ),
+        (
+            "row4 depth 1",
+            host_result_closure_match(px8j_scope_chain_observation_result(1, 0)),
+            false,
+        ),
+        (
+            "row4 depth 2",
+            host_result_closure_match(px8j_scope_chain_observation_result(2, 0)),
+            false,
+        ),
+        (
+            "row4 depth 3",
+            host_result_closure_match(px8j_scope_chain_observation_result(3, 0)),
+            false,
+        ),
+    ];
+
+    let run = |suppress: bool| -> (usize, usize, Vec<(&'static str, String)>) {
+        let _restore = Restore;
+        let mut rendered = Vec::new();
+        reset_lrc_d2a_counts();
+        for (label, expression, delete_scope) in &cases {
+            set_lrc_d2a_suppress_forward(suppress);
+            set_selector_variant_exclusion(Some(
+                RecursiveDescentResidual::LexicalCallArgumentRecursor,
+            ));
+            let (result, _trace) =
+                px8j_capture_source_trace(expression, *delete_scope, "ken_lrc_d2a");
+            set_selector_variant_exclusion(None);
+            set_lrc_d2a_suppress_forward(false);
+            rendered.push((*label, format!("{result:?}")));
+        }
+        (
+            lrc_d2a_backedge_arrivals(),
+            lrc_d2a_backedge_forwards(),
+            rendered,
+        )
+    };
+
+    // ── REPAIRED ────────────────────────────────────────────────────────────
+    let (arrivals, forwards, repaired) = run(false);
+
+    // THE DENOMINATOR. Without this, every `!contains` below would hold just as
+    // well if the marker never reached this continuation at all.
+    assert!(
+        arrivals > 0,
+        "no backedge marker arrived at ComputationalMatchScrutinee, so the forward was never \
+         exercised and the absences below say nothing"
+    );
+    assert_eq!(
+        forwards, arrivals,
+        "an arriving marker was not forwarded: arrivals={arrivals} forwards={forwards}"
+    );
+    for (label, rendered) in &repaired {
+        assert!(
+            !rendered.contains(R1),
+            "R1 survives the repair on {label}: {rendered}"
+        );
+    }
+
+    // ── SUPPRESSED — the pre-repair state, producible from this tree ────────
+    let (s_arrivals, s_forwards, suppressed) = run(true);
+    assert!(
+        s_arrivals > 0,
+        "the suppressed run saw no arrivals, so its reds are not attributable to the suppression"
+    );
+    assert_eq!(
+        s_forwards, 0,
+        "the suppression did not actually suppress the forward: {s_forwards} still forwarded"
+    );
+    for (label, rendered) in &suppressed {
+        assert!(
+            rendered.contains(R1),
+            "suppressing the forward did NOT recreate R1 on {label}, so the repair is not what \
+             removed it: {rendered}"
+        );
+    }
+}
