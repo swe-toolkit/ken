@@ -29103,13 +29103,32 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
     // == 0` passes MORE easily at zero arrivals, not less, so its denominator is
     // load-bearing in the same way -- and this leg had been left with a separable
     // `assert!(s_arrivals > 0)` that a trim pass could delete without breaking
-    // anything. Binding the denominator here makes its removal a COMPILE ERROR at
-    // the assertion below, which reads the count to say what fraction forwarded.
+    // anything.
+    //
+    // ⛔ A DENOMINATOR READ ONLY BY THE MESSAGE IS TWO EDITS FROM GONE, NOT ONE.
+    // A previous revision bound this `NonZeroUsize` and then compared against the
+    // literal `0`, reading the value only inside the format string. Deleting the
+    // binding was a compile error -- but *shortening the message* first, which
+    // reads as an innocuous tidy of a verbose string, left the binding merely
+    // `unused`. There is no `deny` in this crate and no `-D warnings` in the
+    // workflows, so nothing made that bite, and the second edit then removed the
+    // denominator in silence.
+    //
+    // So the denominator is an OPERAND of the assertion, not an argument to its
+    // message. The claim is stated as the relation it actually is -- every
+    // arrival went unforwarded -- which reads the established count on both
+    // sides. `checked_sub` keeps a counter disagreement reporting itself rather
+    // than surfacing as a subtract-with-overflow panic.
     let established_s_arrivals = std::num::NonZeroUsize::new(s_arrivals).expect(
         "the suppressed run saw no arrivals, so its reds are not attributable to the suppression",
     );
+    let unforwarded = established_s_arrivals
+        .get()
+        .checked_sub(s_forwards)
+        .expect("the suppressed run forwarded more markers than arrived, so the counters disagree");
     assert_eq!(
-        s_forwards, 0,
+        unforwarded,
+        established_s_arrivals.get(),
         "the suppression did not actually suppress the forward: {s_forwards} of \
          {established_s_arrivals} arrivals still forwarded"
     );
