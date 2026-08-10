@@ -1,7 +1,7 @@
 ---
 id: CI-L1-EXECUTING-COVER
 title: "Three executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 never issues the conversion query its soundness row turns on, sec61 names a row id that does not exist, and ac5_no_implicit_cross_type_coercion is satisfied by an elaboration limitation rather than by the coercion refusal it claims"
-status: ready
+status: merged
 owner: verify
 size: M
 gate: none

@@ -1,7 +1,7 @@
 ---
 id: CONF-EVAL-COMPUTED-BOOL-ELIM
 title: "The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together"
-status: draft
+status: ready
 owner: spec-enclave
 size: S
 gate: none
@@ -11,21 +11,26 @@ github: null
 origin: "Surfaced by CI-L1-EXECUTING-COVER's D5 row-claim checker on its first real-tree run (verify-implementer hard stop evt_1rg7vw502amr0, 2026-08-10): four tests in elim_bool_dispatch_acceptance.rs claimed surface/numbers/elim-reduce-computed-bool-* ids that resolve to zero conformance headings. Steward ruled the false certificates retired and forbade Verify from authoring conformance artifacts. Conformance Validator judgment evt_2ah01fn9v4ev3 ruled the family belongs in the matrix but under conformance/runtime/evaluation/, not surface/numbers/. Mechanism independently measured by the Steward at origin/main bebe1a79 in crates/ken-interp/src/eval.rs elim_reduce. Steward-filed (agents cannot create tracked work per COORDINATION §2)."
 ---
 
-> ## Frame is shovel-ready: `docs/program/wp/CONF-EVAL-COMPUTED-BOOL-ELIM.md`
+> ## READY as of 2026-08-10 — the dependency is MET. Frame is shovel-ready.
 >
-> **`status: draft` is correct and is about the dependency, not the frame.**
-> `depends_on` names `CI-L1-EXECUTING-COVER`, which is in the publisher queue
-> as of 2026-08-10 07:3xZ. Two reasons the edge is real, not ceremonial:
+> **`CI-L1-EXECUTING-COVER` merged** at exact `bfac3f6f` (PR #1776, `main`
+> `53c09f9b`), all six paths blob-verified. The edge this node waited on was
+> real, not ceremonial, on two counts and **both are now discharged**:
 >
-> 1. **`AC-1` is discharged by a checker that node delivers.**
->    `scripts/ci-ignored-sweep.py verify-row-claims` does not exist on `main`
->    until it lands.
+> 1. **`AC-1` is discharged by a checker that node delivered.**
+>    `scripts/ci-ignored-sweep.py verify-row-claims` now exists on `main` and
+>    reports **29 resolved claims** on the delivered tree. That number is
+>    `AC-1`'s baseline: the count must rise by exactly the number of claims
+>    this node adds.
 > 2. **Both nodes write
->    `crates/ken-interp/tests/elim_bool_dispatch_acceptance.rs`.** Starting
->    early collides on the exact comment lines.
+>    `crates/ken-interp/tests/elim_bool_dispatch_acceptance.rs`.** That file is
+>    now settled on `main` with the four false certificate lines retired to
+>    prose and every assertion untouched, so `D2`'s comment edits no longer
+>    collide.
 >
-> **Flip to `ready` the moment `CI-L1-EXECUTING-COVER` merges.** Nothing else is
-> owed and no further framing pass is needed.
+> **Frame:** `docs/program/wp/CONF-EVAL-COMPUTED-BOOL-ELIM.md`. Nothing further
+> is owed and no additional framing pass is needed — this is releasable to the
+> spec enclave on the next sequencing pass.
 
 ## Why this is not "the tests already cover it"
 
