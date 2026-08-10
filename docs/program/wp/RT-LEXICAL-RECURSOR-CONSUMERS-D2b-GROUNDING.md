@@ -250,3 +250,74 @@ and has a precedent — no new lowering population, ABI lane or guard is implied
 for row 3, or whether the caller-side omission must also account for something
 the subtree walk does not reach. That is measurable only by building it, and it
 is the first thing the next turn should measure rather than assume.
+
+## 9. The ruled lowering plane, corrected — for whichever turn implements it
+
+⛔ **§8 located the seams; this section records the RULED SHAPE, including one
+correction to what I proposed.** No implementation is in this candidate.
+
+### 9.1 The telescope — the sibling gets an IH, it is NOT skipped
+
+I proposed skipping the nonselected recursive position in segment 1. **That is
+wrong and is superseded.** The ruled telescope is:
+
+```text
+[ IH for EVERY recursive position, in reverse position order ]
+    ++ [ argument for EVERY constructor field, in source order ]
+    ++ [ continuation inputs ]
+```
+
+with the **sealed cardinality unchanged**. So segment 1 keeps one
+`InductionHypothesis` per recursive position — the sibling included — and
+segment 2 has an argument member for **every** recursive source field, not only
+the selected one.
+
+⛔ **The callee resolves both roles only through the planner's closed-member
+projection — never by cloning the selected worker.** Cloning would make the
+sibling's binding a copy of a different unit's facts, which is exactly the
+substitution the projection exists to prevent.
+
+⛔ The blocker `segment 1` currently presents — *"a recursive position that the
+continuation specialization projects no worker for"* — is therefore **not**
+removed by skipping. It is removed because the projection can now resolve that
+position to its own interned worker.
+
+### 9.2 The lookup I owe, and its validation contract
+
+Keyed by `(emission_owner, producer_result_origin, producer_construct_origin,
+producer_alternative, consumer_owner, continuation_origin)` **plus position**.
+It accepts the selected exact view and **validates the whole group before
+returning**:
+
+- group keys **set-equal** to the checked positions;
+- **exactly one** unit per position;
+- every member agrees on the group coordinate **and** the checked set;
+- exposes specialization, closure/body occurrences, declared arity, capture
+  count and provenance, IH route/context.
+
+⛔ **Zero, duplicate, conflict, short or extra is a planner invariant failure** —
+never `None`, never first-match, never a fallback, never a lowering-side filter.
+
+**This is the clause I under-delivered.** The landed projection is
+`recursive_positions: BTreeSet<u32>` — set-equality and uniqueness only. It
+closed the envelope question completely, which is why the planner plane passed;
+it carries no worker facts, and the lowering plane is the only consumer that
+needs them.
+
+### 9.3 The bounded member for row 3
+
+Exact worker facts, **empty captures**, `RawWorker`, `DirectSpecializationCall`;
+IH only on the exact planner-issued raw/capture-free route. Installed as a
+compiler-only `StaticWorker` with **zero ABI slots** and never a
+`LoweringOperand`.
+
+**Stop conditions:** the group is not uniquely complete, or the sibling is
+captured or carries a generated context.
+
+### 9.4 Unchanged from the earlier rulings
+
+The caller-side reconciliation and the live-`Call` consumption of origin 12 are
+as previously ruled — the caller omits the runtime ABI field only and consumes
+no join; origin 12 is consumed by ordinary `lower_expr(Call)` →
+`enter_source_occurrence_plan` → `call_static_worker` once the binder exists.
+`finalize_join_disposition` stays byte-for-behaviour unchanged.
