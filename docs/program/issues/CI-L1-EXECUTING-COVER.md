@@ -1,9 +1,9 @@
 ---
 id: CI-L1-EXECUTING-COVER
-title: "Two executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 stands for a soundness row whose discriminator it never queries, and sec61 covers half of a row while its doc comment asserts the half the row denies"
+title: "Three executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 never issues the conversion query its soundness row turns on, sec61 names a row id that does not exist, and ac5_no_implicit_cross_type_coercion is satisfied by an elaboration limitation rather than by the coercion refusal it claims"
 status: ready
 owner: verify
-size: S
+size: M
 gate: none
 depends_on: [CI-ASSERTIONLESS-L1]
 blocks: []
@@ -11,16 +11,45 @@ github: null
 origin: Architect rejection of CI-ASSERTIONLESS-L1 respin dec_7yn4qg6q05t8n (rejected 2026-08-10T04:21:58Z), which found that the candidate's replacement header "overclaims conformance cover for neighboring executing rows whose expectations remain unbound" and directed that the header be narrowed rather than widened. Independently re-measured by the Steward at origin/main 69b1504b against conformance/surface/numbers/seed-numbers.md. Filed as its own node because CI-ASSERTIONLESS-L1 has been rejected three times and widening a thrice-rejected candidate is how it never lands. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> ## WIDENED 2026-08-10 — a third row and a machine check folded in
+>
+> **`ac5_no_implicit_cross_type_coercion` is a third row on this node**, from
+> Adversary finding `evt_34q2zm16a48pz` on `65a61416`, corroborated by the
+> Steward at `98c3e0fc`. It is the worst of the three: `sec62` reaches its
+> mechanism and fails only under a specific bug, while `ac5` never reaches its
+> mechanism at all -- its `is_err()` is satisfied by `elaborate_decl_v1`'s
+> inability to elaborate an un-annotated `fn`, which the matching-type positive
+> control fails identically. **Ken's behaviour is correct; the defect is
+> entirely in the instrument.**
+>
+> **Verifying that finding surfaced a fourth defect the frame had wrong.**
+> `sec61` claims `surface/numbers/literal-reduces-in-kernel` -- **a row id that
+> exists in no markdown file in the repo.** Meanwhile the real seed row it
+> should serve, `primitive-op-runtime-value-k3-conversion-deferred`, has zero
+> claims anywhere in the code tree. The frame's original §3d supplied that
+> mapping itself and called it "covers half a row"; the artifact makes no such
+> mapping. §3d now states the measurement instead.
+>
+> **`D5` adds the check that would have caught all of this**: every `///
+> surface/...` row id on a test must resolve to a `### <id>` heading in a
+> `conformance/` seed. Resolution only -- cover adequacy stays human judgment.
+> The certification form is a **bare row id**, which is why the Adversary's
+> first keyword sweep for "cover"/"conformance"/"certify" came back clean and
+> was wrong.
+>
+> **Re-sized S to M.** Three rows, five deliverables.
+>
 > ## FRAMED 2026-08-10 — [`docs/program/wp/CI-L1-EXECUTING-COVER.md`][f]
 >
 > `ready` per `steward.md §4e`: a successor must be shovel-ready **while** its
 > predecessor is in flight, so the frontier advances on the merge with no
-> Steward pass in between. **`ready` is NOT released** -- Verify is on
-> `CI-ASSERTIONLESS-L1`'s fourth SHA and this node has not been kicked.
+> Steward pass in between. **`ready` is NOT released** -- both lanes are
+> occupied under the two-lane cap (Runtime `RT-DYNAMIC-ARM-SCALAR-MERGE`,
+> Foundation `DS-9`) and this node has not been kicked.
 >
-> **`depends_on: [CI-ASSERTIONLESS-L1]` is file contention, not logic.** Both
-> nodes edit `crates/ken-interp/tests/l1_acceptance.rs`. This node must not
-> start until that one merges, and then cuts from the `origin/main` carrying it.
+> **`depends_on: [CI-ASSERTIONLESS-L1]` was file contention, not logic, and it
+> is DISCHARGED.** That node merged at `3d6622c9`; the edge is satisfied. Cut
+> from current `origin/main`.
 >
 > **The frame's §3c is the load-bearing audit and it forecloses the easy exit.**
 > `ken_kernel::convert` is public and re-exported at the crate root, the
@@ -37,11 +66,17 @@ origin: Architect rejection of CI-ASSERTIONLESS-L1 respin dec_7yn4qg6q05t8n (rej
 `CI-ASSERTIONLESS-L1` was cut for four rows: three honest `#[ignore]`d
 placeholders and one live assertion-free row. Its repair rewrote the file
 header to distinguish executing cover from non-cover, and in doing so
-certified two **executing, green** rows that do not earn the certificate.
+certified **executing, green** rows that do not earn the certificate.
 
-**These two are a worse instance than the four that node covers.** An empty
+**These are a worse instance than the four that node covers.** An empty
 `#[ignore]`d placeholder advertises that it checks nothing. A green assertion
 is read as evidence the property holds.
+
+**The certification form is a bare row id** in a doc comment (`///
+surface/numbers/<row>`), eleven of them on executing tests. That population is
+what the file-header repair does not reach, and nothing measures it -- neither
+that a claimed id resolves, nor that the assertion beneath it discriminates.
+Three of the eleven fail, for three different reasons.
 
 ## The measurement
 
@@ -84,13 +119,24 @@ API... For now: verify that..."*. **The admission is present and the cover
 claim was made anyway** -- the same shape `CI-ASSERTIONLESS-L1` exists to
 eliminate.
 
-### `sec61_literal_reduces_in_kernel` -- half a row, denied by its own comment
+### `sec61_literal_reduces_in_kernel` -- claims a row id that does not exist
 
-`crates/ken-interp/tests/l1_acceptance.rs:297`, standing for §6.1, whose seed
-row is `surface/numbers/primitive-op-runtime-value-k3-conversion-deferred`
-(`seed-numbers.md:225`).
+Search for `fn sec61_literal_reduces_in_kernel`. Its doc comment claims
+`surface/numbers/literal-reduces-in-kernel`. **Measured at `98c3e0fc`: that
+string appears in no markdown file anywhere in the repo.** The seed defines
+fourteen rows and that is not one of them.
 
-That row has two halves:
+Symmetrically, `surface/numbers/primitive-op-runtime-value-k3-conversion-`
+`deferred` -- the row the seed's own Cases list routes §6.1 to -- has **zero**
+claims in the code tree (no `.rs`, `.toml`, or `.py` reference). **A real seed
+row is uncovered and a phantom id is covered.**
+
+The paragraph below was the original statement here, and it assumed the
+mapping the artifact does not make. It is retained because it is why a rename
+alone is not the fix: the k3 row's second half is unchecked, so repointing the
+id would move a false claim rather than retire it.
+
+That row (`seed-numbers.md:225`) has two halves:
 
 | seed half | test |
 |---|---|
@@ -108,6 +154,45 @@ seed says kernel conversion specifically does **not** reduce `add_int`, because
 and the doc comment are about the kernel, and they are wrong in the direction
 that would hide a K3 boundary change.**
 
+### `ac5_no_implicit_cross_type_coercion` -- never reaches its mechanism
+
+Adversary finding on `65a61416` (`evt_34q2zm16a48pz`), corroborated by the
+Steward at `98c3e0fc`. Search for `fn ac5_no_implicit_cross_type_coercion`.
+It claims `surface/numbers/no-implicit-cross-type-coercion`
+(`seed-numbers.md:168`), a **reject** row: *"a type error; the operands
+disagree and there is no widening coercion to make them agree."*
+
+Its entire assertion is `result.is_err()` on
+`fn f (x : Int) (y : Int64) = x + y`. The error it actually gets:
+
+```
+TypeMismatch { span: 29..34, reason: "cannot infer type of lambda without annotation" }
+```
+
+Span `29..34` is the body. **The positive control settles it:** the same
+declaration with **matching** types, `fn f (x : Int) (y : Int) = x + y`, which
+must be legal, fails with the identical error. `elaborate_decl_v1` cannot
+elaborate an un-annotated `fn`, so the type relationship is never reached.
+
+Steward corroboration from the artifact rather than a run: of the ten `fn`
+probes in the file, **every un-annotated one is either `#[ignore]`d or asserted
+to fail -- not one executes and succeeds.** Exactly the distribution the
+control predicts.
+
+⇒ **The row would stay green if Ken grew a silent implicit `Int`-to-`Int64`
+coercion tomorrow.** Adding the return-type annotation makes the declaration
+elaborate and the real kernel refusal fire (`TypeMismatch { expected: g6,
+found: g10 }`), so the repair is one token plus a genuine accept/reject pair.
+
+**Ken's behaviour is correct. This is not a coercion hole -- it is a row with
+no evidence, and the defect is entirely in the instrument.**
+
+Nothing caught it because the negative check has no positive control *by
+construction*: its accepting counterpart
+`ac5_explicit_conversion_is_partial_option` is `#[ignore]`d and
+registry-exempt, so the accept arm is structurally absent from CI. And because
+this test executes green, `CI-IGNORED-SWEEP` cannot see it.
+
 ## What this node is NOT
 
 - **Not a repair of the four `CI-ASSERTIONLESS-L1` rows.** Those are that
@@ -119,8 +204,19 @@ that would hide a K3 boundary change.**
   `CI-ASSERTIONLESS-L1` is that the file header stops certifying per-row
   conformance cover entirely. This node must not reintroduce a hand-maintained
   cover enumeration -- three rewrites got three different subsets wrong.
+  `D5` is the opposite move: a machine check, not a prose inventory, and
+  deliberately scoped to the decidable half.
+- **Not an audit of the other eight executing row-id claims.** The Adversary
+  swept them and found them sound. That is a fixed input; `D5` covers their ids
+  mechanically.
+- **Not a soundness finding.** All three rows measure a correct Ken. Every
+  defect here is in the instrument.
 
-## Deliverables -- provisional, to be fixed by the frame
+## Deliverables -- the frame is authoritative, this is the summary
+
+**The frame carries five deliverables and seven ACs.** The list below is the
+original three; `D4` (the `ac5` repair) and `D5` (the row-id resolution check)
+are stated in the frame's §4 and are not restated here.
 
 - **`D1` -- `sec62` issues the conversion query the row names**, or is severed
   and marked with the capability it waits on. Severing is a legitimate
@@ -145,6 +241,12 @@ repeats the defect.
 | `AC-2` | No test or comment in `l1_acceptance.rs` asserts kernel-definitional reduction of a `PrimReduction::Op`. |
 | `AC-3` | Every row that remains uncovered after this node is named in the registry with its reason, and the sweep resolves it. |
 | `AC-4` | The file header still makes no per-row conformance-cover enumeration. Inherited guardrail, and it is the one this node is most likely to break. |
+
+**The frame carries three more**: `AC-5` (only the three named tests changed
+behaviour), `AC-6` (the `ac5` repair flips under a mutation that grants the
+widening its row denies, *and* a positive control showing the pre-repair form
+still passes), and `AC-7` (the row-id checker reds on a fabricated id and
+reports how many ids it resolved -- a checker that resolves zero also passes).
 
 ## Validation -- targeted only
 
