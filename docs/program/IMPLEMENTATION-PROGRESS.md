@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-10 04:04:32Z — from 194 issue file(s) in `docs/program/issues/`.
+2026-08-10 04:27:45Z — from 195 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -60,6 +60,7 @@ the committed file matches the generator's output.
 | `CB-HYGIENE` | cranelift_backend facade: strip WP-token narration, separate test material from implementation | merged | runtime | S | none | — |
 | `CI-ASSERTIONLESS-L1` | Four registered conformance claims whose only cover does not check them — l1_acceptance.rs, three ignored and one live, green, and counted as cover | ready | verify | S | none | — |
 | `CI-IGNORED-SWEEP` | nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off | merged | verify | S | none | — |
+| `CI-L1-EXECUTING-COVER` | Two executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 stands for a soundness row whose discriminator it never queries, and sec61 covers half of a row while its doc comment asserts the half the row denies | draft | verify | S | none | — |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
 | `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | draft | spec-enclave | S | none | — |
@@ -268,6 +269,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
+- `CI-L1-EXECUTING-COVER` blocked by `CI-ASSERTIONLESS-L1` (status: ready)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-RECURSIVE-RESULT-SURFACE` blocked by `KERNEL-NESTED-IND` (status: active)
