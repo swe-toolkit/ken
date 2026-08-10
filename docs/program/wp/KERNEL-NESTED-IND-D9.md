@@ -1,7 +1,26 @@
 # KERNEL-NESTED-IND D9 — ungate `nested-size-uses-lift`, on the repaired fixture
 
 Owner: kernel. Size: S. Node: [[KERNEL-NESTED-IND]] (`active`).
-**RELEASED 2026-08-10. The hold is discharged** —
+
+**HELD 2026-08-10, on a hard stop Kernel called correctly — see
+[[KERNEL-NESTED-IND-D10]].** The repaired fixture elaborates, kernel-checks and
+erases, and then the interpreter panics at `ken-kernel/src/subst.rs:245` before
+producing `Nat 3`. **The row's named witnesses cannot execute, so this
+deliverable is not currently achievable** — that is the condition the "no new
+capability" clause below exists to surface, and it worked.
+
+**Two things move to `D10` and must NOT land here.** The repro commit
+`2c165823` carrying the `Join` migration is `D10`'s to land, together with the
+repair, so CI is green on the result. Do not carry it in a `D9` candidate and
+do not re-derive it.
+
+**What remains `D9` when `D10` lands:** the row binding, the gate-marker and
+`blocked on` removal at both summary sites, `AC-4`'s discriminating fold
+mutation, and the sort-boundary reporting below. **A `conformance/` path still
+pulls a Spec vote on this merge Decision** — `D10` carries none and does not.
+
+**Originally released 2026-08-10; the Language hold below is discharged and
+stays discharged** —
 [[LANG-SELECTOR-SORT-SPLIT-ELAB]] merged as `main` `c0757335`, the crates now
 parse `recursive result for`, and the old spelling is at **zero** under
 `crates/`. Re-derive your merge-base; do not reuse a SHA from this frame.
