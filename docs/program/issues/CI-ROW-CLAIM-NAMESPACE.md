@@ -52,12 +52,22 @@ checker, with the gap stated as its residual. This node is what closes it.
 ## The trap that makes the obvious fix wrong
 
 **Do not replace `surface/` with a permissive pattern.** A generic
-`(?P<row>\w+/\S+)` re-admits exactly the population `CI-ROW-CLAIM-COMMENT-FORM`
-measured and excluded: **file-path citations in doc comments**
-(`spec/30-surface/35-numbers.md`, `conformance/surface/numbers/seed-numbers.md`)
-look identical to row ids under any pattern loose enough to span namespaces.
-That census found 29 such citations. Re-admitting them would manufacture false
-unresolved claims and red the gate for the wrong reason.
+`(?P<row>\w+/\S+)` re-admits **file-path citations in doc comments**
+(`spec/30-surface/35-numbers.md`, `conformance/surface/numbers/seed-numbers.md`),
+which look identical to row ids under any pattern loose enough to span
+namespaces. Re-admitting them would manufacture false unresolved claims and red
+the gate for the wrong reason.
+
+**Deriving the namespace set from the filesystem excludes them structurally**,
+which is stronger than excluding them by count: `conformance` and `spec` are not
+directories under `conformance/`, so a citation carrying its leading directory
+cannot match. For a citation written namespace-relative, the separator is the
+suffix — **zero of the 825 row headings end in `.md`, and every citation does.**
+
+> **This node previously asserted a census of 29 such citations. That
+> attribution was wrong** (Steward error, corrected 2026-08-10): at `376d495d`
+> the 29 counts attached `/// surface/...` row claims, and the `//!` claim-form
+> count is 0. **Carry no count from this node.**
 
 **Derive the namespace set from the filesystem** — the directories under
 `conformance/` — rather than hardcoding a list of nine. A hardcoded list is the

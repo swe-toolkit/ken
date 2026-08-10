@@ -30,12 +30,29 @@ both report exactly **30**, expected **34**. The attachment form was correct;
 the namespace was excluded. **That A/B is why the cause is grounded rather than
 inferred** — a single reading of 30 is also consistent with mis-attachment.
 
-**2d. The population that must stay excluded.**
-`CI-ROW-CLAIM-COMMENT-FORM`'s census found **29** `//!` file-path citations
-(`spec/30-surface/35-numbers.md`,
-`conformance/surface/numbers/seed-numbers.md`) that are **not** row ids. They
-are indistinguishable from ids under any pattern loose enough to span
-namespaces.
+**2d. The population that must stay excluded.** File-path citations in doc
+comments (`spec/30-surface/35-numbers.md`,
+`conformance/surface/numbers/seed-numbers.md`) are **not** row ids, and under a
+pattern loose enough to span namespaces they can be mistaken for them.
+
+> **Corrected 2026-08-10, Steward error.** This section previously asserted that
+> `CI-ROW-CLAIM-COMMENT-FORM`'s census found **29** such `//!` citations. **That
+> attribution was wrong** — at `376d495d` the 29 describes attached
+> `/// surface/...` row claims, and the `//!` claim-form count there is **0**.
+> Verify measured 83 `//!` lines / 86 path tokens / 27 body-begins-with-path on
+> the rebased tree, none of which is 29. **Carry no count from this frame**; see
+> the replacement `AC-3`.
+
+**Two measured facts that separate the populations** (Steward, on `379bc0f4`):
+
+- **Structural.** A filesystem-derived namespace set holds the directories under
+  `conformance/` — `behavioral`, `challenge`, `fs`, `kernel`, `runtime`,
+  `security`, `stdlib`, `surface`, `verify`. It does **not** hold `conformance`
+  or `spec`, so any citation written with its leading directory fails to match
+  **by construction**.
+- **Suffix.** For a citation written namespace-relative (a bare
+  `surface/numbers/seed-numbers.md`), **zero of the 825 `### ` row headings
+  under `conformance/` end in `.md`, and every file-path citation does.**
 
 **2e. Baseline resolved count: 30**, on `main` at `376d495d`. **Do not carry
 this number** — see `AC-4`.
@@ -70,10 +87,18 @@ checker that rejects every non-`surface/` claim. If
 `CONF-EVAL-COMPUTED-BOOL-ELIM`'s `runtime/evaluation/` rows have landed, they
 are the live positive control; if not, construct one and restore it.
 
-**AC-3 — The excluded population stays excluded.** After the widening, the 29
-file-path citations of §2d must **still not** be counted as claims. State the
-measured citation count before and after. **This is the criterion most likely to
-fail silently**, because admitting them raises the total and looks like success.
+**AC-3 — No file-path citation is ever counted as a row claim.** On the
+delivered tree, enumerate the set of tokens the checker's claim pattern matches,
+and assert that **every member is a row id and none is a file path**. Discharge
+it against both facts in §2d: show that `conformance` and `spec` are not members
+of the derived namespace set, and that **no matched claim token ends in `.md`**.
+Report the set size before and after — **those numbers are outputs, not
+targets, and no count is carried into this criterion.**
+
+**This is the criterion most likely to fail silently**, because admitting
+citations raises the total and looks like success. If a `### ` heading ending in
+`.md` exists, the suffix discriminator is unsound — **report that rather than
+working around it.**
 
 **AC-4 — No count carried.** The only number here is 30, at `376d495d`.
 Re-measure and report what you get.
