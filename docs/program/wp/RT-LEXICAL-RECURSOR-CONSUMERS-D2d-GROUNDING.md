@@ -166,7 +166,7 @@ identity is now a measured coordinate on this witness:
 | **exact consuming `Call` occurrence** | **`StaticOriginId(12)`** — `Call { callee: Var(0), args: [Construct Unit::MkUnit] }` |
 | ordered ABI input projection | the two-entry run in §4.2 |
 
-⛔ **This tuple is grounding, not an identity.** It is what a key must *resolve
+**This tuple is grounding, not an identity.** It is what a key must *resolve
 to* on this witness — the class must derive each member from planner facts, and
 a fixture-shaped tuple is exactly the "identity that happens to be unique in the
 measured population" the ruling forbids. It is recorded so the next slice can be
