@@ -1,3 +1,33 @@
+//! Nested-inductive contract-point-4 conformance.
+//!
+//! Binds exactly these cases from
+//! `conformance/kernel/inductive/seed-nested.md`:
+//! - `nested-ds9-shapes-admitted` and `nested-fresh-carrier-admitted`;
+//! - `nested-negative-under-positive` and
+//!   `nested-negative-existing-pair-control` (AC-K5);
+//! - `nested-unknown-head-rejected` and `nested-nonpositive-rejected`
+//!   (AC-K6–AC-K7);
+//! - `nested-direct-and-wstyle-controls-unchanged` (AC-K8).
+//!
+//! `nested-size-uses-lift` remains `[KERNEL-NESTED-IND]`-gated on
+//! `KERNEL-RECURSIVE-RESULT-SURFACE`; no finite topology control discharges it.
+//!
+//! Exact executing bindings:
+//! - `nested-ds9-shapes-admitted` ->
+//!   `declared_positive_paths_admit_list_pair_and_fresh_container_nesting`;
+//! - `nested-fresh-carrier-admitted` ->
+//!   `seed_fresh_bag_rose_and_deep_paths_admit_structurally`;
+//! - `nested-negative-under-positive` ->
+//!   `seed_negative_under_fresh_positive_bag_rejects_only_inner_arrow`;
+//! - `nested-negative-existing-pair-control` ->
+//!   `acceptance::ac5_nested_negative_in_application_rejected`;
+//! - `nested-unknown-head-rejected` ->
+//!   `seed_bound_head_is_unknown_and_rejected`;
+//! - `nested-nonpositive-rejected` ->
+//!   `nested_negative_unknown_and_non_positive_paths_reject_separately`;
+//! - `nested-direct-and-wstyle-controls-unchanged` -> the unchanged
+//!   `acceptance.rs` direct controls and `k1p5_wstyle.rs` suite.
+
 use ken_kernel::env::PrimReduction;
 use ken_kernel::inductive::{derive_parameter_polarities, iota_reduct, method_type, peel_pi};
 use ken_kernel::subst::weaken;
@@ -90,6 +120,47 @@ fn declare_box(env: &mut GlobalEnv) -> GlobalId {
     .expect("Box")
 }
 
+fn declare_bag(env: &mut GlobalEnv) -> GlobalId {
+    declare_inductive(env, |bag| InductiveSpec {
+        level_params: vec![],
+        params: vec![ty0()],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::var(0)],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![
+                    Term::app(former(bag), Term::var(0)),
+                    Term::app(former(bag), Term::var(1)),
+                ],
+                target_indices: vec![],
+            },
+        ],
+    })
+    .expect("Bag")
+}
+
+fn declare_wrap(env: &mut GlobalEnv) -> GlobalId {
+    declare_inductive(env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![ty0()],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![Term::var(0)],
+            target_indices: vec![],
+        }],
+    })
+    .expect("Wrap")
+}
+
 fn positivity_error(result: Result<GlobalId, KernelError>) -> String {
     match result {
         Err(KernelError::PositivityViolation(message)) => message,
@@ -158,6 +229,115 @@ fn declared_positive_paths_admit_list_pair_and_fresh_container_nesting() {
 
     let declaration = env.inductive(nested).expect("nested declaration");
     assert_eq!(declaration.constructors.len(), 5);
+}
+
+#[test]
+fn seed_fresh_bag_rose_and_deep_paths_admit_structurally() {
+    // Durable invariant (AC-K2): fresh names work because their recorded
+    // parameter polarity composes. Bag/Rose covers the named seed carrier;
+    // Deep prevents a one-former traversal cap from hiding behind that case.
+    let mut env = GlobalEnv::new();
+    let bag = declare_bag(&mut env);
+    assert_eq!(
+        env.inductive(bag).unwrap().parameter_polarities,
+        vec![ParameterPolarity::StrictlyPositive]
+    );
+
+    let rose = declare_inductive(&mut env, |rose| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::app(former(bag), former(rose))],
+                target_indices: vec![],
+            },
+        ],
+    })
+    .expect("fresh Bag Rose path admits");
+    assert_eq!(env.inductive(rose).unwrap().constructors.len(), 2);
+
+    let wrap = declare_wrap(&mut env);
+    let deep = declare_inductive(&mut env, |deep| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![Term::app(
+                former(bag),
+                Term::app(former(wrap), former(deep)),
+            )],
+            target_indices: vec![],
+        }],
+    })
+    .expect("two fresh positive carrier positions compose");
+    assert_eq!(env.inductive(deep).unwrap().constructors.len(), 1);
+}
+
+#[test]
+fn seed_bound_head_is_unknown_and_rejected() {
+    // Durable invariant (AC-K6): a bound F has no declaration-backed polarity.
+    let mut env = GlobalEnv::new();
+    let unknown = declare_inductive(&mut env, |family| InductiveSpec {
+        level_params: vec![],
+        params: vec![Term::pi(ty0(), ty0())],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![Term::app(
+                Term::var(0),
+                Term::app(former(family), Term::var(0)),
+            )],
+            target_indices: vec![],
+        }],
+    });
+    assert!(positivity_error(unknown).contains("non-strictly-positive"));
+}
+
+#[test]
+fn seed_negative_under_fresh_positive_bag_rejects_only_inner_arrow() {
+    // Durable discriminating pair (AC-K5): the same fresh Bag path accepts a
+    // direct recursive payload and rejects only when that payload is negative.
+    let mut env = GlobalEnv::new();
+    let empty = declare_inductive(&mut env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![],
+    })
+    .expect("Empty");
+    let bag = declare_bag(&mut env);
+
+    declare_inductive(&mut env, |good| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![Term::app(former(bag), former(good))],
+            target_indices: vec![],
+        }],
+    })
+    .expect("Bag Good positive control");
+
+    let bad = declare_inductive(&mut env, |bad| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![Term::app(former(bag), Term::pi(former(bad), former(empty)))],
+            target_indices: vec![],
+        }],
+    });
+    assert!(positivity_error(bad).contains("non-strictly-positive"));
 }
 
 #[test]

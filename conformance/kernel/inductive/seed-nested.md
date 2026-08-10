@@ -14,11 +14,14 @@ required population). The stable declaration entry is `18 §4.3`. Frame:
 Ken-owned objects and first principles; no reference implementation or
 `local/refs/` source was consulted.
 
-Cases marked `[KERNEL-NESTED-IND]` are design-locked but implementation-gated.
-Before that node lands, the kernel's conservative blanket rejection remains the
-live safe boundary. The existing direct and W-style controls at the end remain
-live throughout, so staging the new completeness class does not suspend the
-positivity posture.
+Cases marked `[KERNEL-NESTED-IND]` remain design-locked and
+implementation-gated. Seven D6 cases now execute un-gated: DS-9 and fresh-carrier
+admission; negative-under-positive and Pair-negative rejection; unknown-head and
+nonpositive rejection; and unchanged direct/W-style behavior. Of those D6 cases,
+only `nested-size-uses-lift` remains gated for the missing recursive-result
+capability. Independently gated non-D6 residual cases remain marked below. The
+existing direct and W-style controls remain live throughout, so staging the
+residual completeness class does not suspend the positivity posture.
 
 The custom positive carrier used below is deliberately not a standard-library
 name:
@@ -50,7 +53,7 @@ telescopes. No later rule may recognize `Bag`, `Box`, or `Slot` by name.
 
 Spec: `14 §8.5` clauses 1–3.
 
-### kernel/inductive/nested-ds9-shapes-admitted [KERNEL-NESTED-IND]
+### kernel/inductive/nested-ds9-shapes-admitted
 
 - spec: `14 §8.5`; `18 §4.3`
 - given: previously admitted positive `List` and `Pair`, followed by an ordinary
@@ -65,7 +68,7 @@ Spec: `14 §8.5` clauses 1–3.
   custom-carrier case below prevents a `List`/`Pair` allow-list from satisfying
   the corpus.
 
-### kernel/inductive/nested-fresh-carrier-admitted [KERNEL-NESTED-IND]
+### kernel/inductive/nested-fresh-carrier-admitted
 
 - spec: `14 §8.5` clauses 1–3; `18 §4.3`
 - given: admit the `Bag A` declaration above, then submit the `Rose` declaration
@@ -132,6 +135,10 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
   reduction without over-specifying an internal runtime representation.
 
 ### kernel/inductive/nested-size-uses-lift [KERNEL-NESTED-IND]
+
+Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE`. The current surface cannot
+denote the kernel-supplied recursive result; finite-depth topology controls do
+not discharge this all-leaf fold, and this row remains gated.
 
 - spec: `14 §3.2`, `§7.8`, `§9.5`; `39 §2.2`; `43 §1`
 - given: define `size : Rose -> Nat` by the generated eliminator. The `leaf`
@@ -328,7 +335,7 @@ Spec: `14 §3.2`, `§7.8`, `§9.5` item 7; `18 §5`.
 
 Spec: `14 §8.5` clauses 1, 2, 4, and 6.
 
-### kernel/inductive/nested-unknown-head-rejected [KERNEL-NESTED-IND] (soundness)
+### kernel/inductive/nested-unknown-head-rejected (soundness)
 
 - spec: `14 §8.5` clauses 1 and 6; `18 §4.3`
 - given: declare
@@ -344,7 +351,7 @@ Spec: `14 §8.5` clauses 1, 2, 4, and 6.
   accept proves the corpus is not merely demanding blanket rejection of every
   nested application.
 
-### kernel/inductive/nested-nonpositive-rejected [KERNEL-NESTED-IND] (soundness)
+### kernel/inductive/nested-nonpositive-rejected (soundness)
 
 - spec: `14 §8.5` clauses 2 and 4; `18 §4.3`
 - given: first admit
@@ -364,7 +371,7 @@ Spec: `14 §8.5` clauses 1, 2, 4, and 6.
 
 Spec: `14 §8.3`, `§8.5` clause 5.
 
-### kernel/inductive/nested-negative-under-positive [KERNEL-NESTED-IND] (soundness)
+### kernel/inductive/nested-negative-under-positive (soundness)
 
 - spec: `14 §8.3`; `§8.5` clauses 3 and 5
 - given: with positive `Bag` already admitted, declare
@@ -449,10 +456,13 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
   `Inductive` declarations and six `GlobalId`s, with no eliminator declaration
   or `GlobalId`. Its two support families are terminal and no `All`-of-`All`
   exists; failure to generate either rolls the whole admission back.
-- The negative cases are not coincidental blanket rejects: after
-  `KERNEL-NESTED-IND`, their paired positive controls admit while the exact
-  negative/unknown mutation flips the verdict.
-- Until that node lands, the positive/lift cases and the reason-specific
-  negative cases remain gated together. The direct/W-style corpus stays live,
-  and the current blanket nested rejection remains a safe implementation
-  boundary.
+- The seven D6 bindings execute un-gated: DS-9 and fresh-carrier admission;
+  negative-under-positive and Pair-negative rejection; unknown-head and
+  nonpositive rejection; and unchanged direct/W-style behavior. Their paired
+  positive controls admit while each exact negative/unknown mutation flips the
+  verdict.
+- `nested-size-uses-lift` remains gated on
+  `KERNEL-RECURSIVE-RESULT-SURFACE`: the current surface cannot denote the
+  kernel-supplied recursive result, and finite-depth topology controls cannot
+  discharge its all-leaf fold. Independently gated non-D6 residual rows remain
+  marked; blanket nested rejection is no longer the live boundary.
