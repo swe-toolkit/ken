@@ -1,15 +1,44 @@
-//! `RT-MATCH-RECURSOR-CONSUMERS` `D8`, frame section 4a.2 — the pin on the
-//! premise that keeps the census transport out of the shipped `ken` binary.
+//! `RT-MATCH-RECURSOR-CONSUMERS` `D8` + `D9`, frame section 4a.2 — the pin on
+//! the premise that confines the census transport.
 //!
 //! `with_child_match_recursor_census` is an unconditional `pub` item called from
-//! production `ken-cli/src/main.rs`. The entire safety argument for that is that
-//! **the feature never reaches the shipped binary**, and that argument rests on
-//! exactly three facts about three manifests:
+//! production `ken-cli/src/main.rs`. The safety argument for that rests on
+//! **four** facts, read from the workspace root manifest and **every manifest
+//! the root declares as a member**:
 //!
 //! 1. the workspace root declares `resolver = "2"`;
 //! 2. `ken-runtime` does not make `px8-ds-test-support` a default feature;
 //! 3. `ken-cli` takes `ken-runtime` **unfeatured** in `[dependencies]`, with the
-//!    featured edge only in `[dev-dependencies]`.
+//!    featured edge only in `[dev-dependencies]`;
+//! 4. **no declared member** enables `px8-ds-test-support` on a normal
+//!    `[dependencies]` edge to `ken-runtime`.
+//!
+//! # The four facts do not all defend the same thing, and conflating them is
+//! # what `D9` corrects
+//!
+//! **Facts 1-3 are about the shipped `ken` binary.** They are keyed on
+//! `ken-cli`'s own graph, which is what `--bin ken` selects.
+//!
+//! **Fact 4 is not.** ⛔ It is **instrument coverage for `cargo build
+//! --workspace`**, the invocation CI runs (`.github/workflows/ci.yml`). Resolver
+//! 2 withholds feature unification across **dev** edges — that is exactly what
+//! fact 3 buys — but **not** across **normal** edges of sibling members in one
+//! workspace invocation. So a sibling enabling the feature on its own normal
+//! edge turns it on for `ken-runtime`'s normal build while facts 1-3 stay green.
+//!
+//! ⛔ **Fact 4 is NOT a claim about the shipped binary, and must not be reported
+//! as one.** Nobody has measured which invocation cuts a release artifact. If
+//! releases are cut `-p ken-cli` or `--bin ken`, cross-member unification
+//! structurally cannot appear there and fact 4 is CI coverage alone. The repair
+//! was cheap under either answer, which is why it did not wait on that
+//! measurement — but the answer is still unmeasured and the honest scope is the
+//! narrow one.
+//!
+//! **Severity of fact 4 today: not a present defect.** No member enables it; the
+//! clean baseline is asserted by the pin itself. It closes a blind spot in the
+//! instrument whose whole purpose is catching the future manifest edit — and the
+//! natural future edit is precisely a sibling wanting test support and writing
+//! it into `[dependencies]`.
 //!
 //! **Fact 1 is one line and nothing else in the repository checks it.** A
 //! virtual workspace manifest with no `resolver` key defaults to **resolver 1**
@@ -27,18 +56,24 @@
 //! If a future change makes the transport unreachable from production by
 //! construction, `D8` is discharged by deleting this file and saying so.
 //!
-//! # It reads three exact paths, so no prose can fire it
+//! # It reads manifests, so no prose can fire it
 //!
-//! Every check below is a read of a named `Cargo.toml`. Nothing here greps the
+//! Every check below is a read of a `Cargo.toml`. Nothing here greps the
 //! repository, so Markdown that merely *discusses* `resolver` or
 //! `px8-ds-test-support` — including the frame section that specifies this pin,
 //! and this comment — cannot satisfy or trip any assertion.
+//!
+//! Facts 1-3 name three exact paths. **Fact 4 names none:** it iterates
+//! `[workspace] members` and reads whatever that list declares, so the member
+//! population is the artifact's own rather than this file's. A transcription
+//! would be correct today and silently wrong at the next `cargo new`, which is
+//! the blind spot `D9` exists to remove.
 
 use std::path::{Path, PathBuf};
 
 // ---- the modelled subset of TOML ----------------------------------------
 //
-// Deliberately small: enough for three facts and no more. What is modelled is
+// Deliberately small: enough for four facts and no more. What is modelled is
 // table headers, `key = value` entries, values that continue across lines while
 // `[]`/`{}` are unbalanced, inline-table keys, and string arrays.
 //
@@ -49,12 +84,21 @@ use std::path::{Path, PathBuf};
 // The direction that matters is a fact reported HELD when it is not; a fact
 // reported LOST when it holds is a loud, attributable red.
 //
-// | unmodelled shape | present in the three manifests | direction if it appeared |
+// ⛔ **The "present" column is an AUDITED CURRENT POPULATION, not a standing
+// census.** `D9` made the read population the workspace's own declared member
+// list, so this column is a measurement over the root manifest plus **every**
+// declared member at the time of writing — nine manifests, eight members — and
+// it goes stale the moment a member is added. It is recorded so a reader knows
+// what was checked, NOT as a claim about what the population will contain.
+// Re-audit it when `[workspace] members` changes; do not carry it forward.
+//
+// | unmodelled shape | audited population at this candidate | direction if it appeared |
 // |---|---|---|
-// | dotted keys (`workspace.resolver = "2"`) | no | **safe** — no table context, so fact 1 reads NOT DECLARED and reds. Controlled below |
-// | arrays of tables (`[[bin]]`) | yes, in `ken-cli` | **safe** — treated as an unrelated table, so it cannot supply a key to a wanted one. Controlled below |
-// | multi-line basic strings (`"""…"""`) | no | **UNCONTROLLED.** A `[table]`-shaped or `key = value`-shaped line inside one would be read as structure |
-// | literal strings (`'…'`) containing brackets | no | **UNCONTROLLED.** Bracket depth is counted for double-quoted strings only, so one could unbalance a continuation |
+// | dotted keys naming a table this reader reads (`workspace.resolver = "2"`) | **none** | **safe** — no table context, so fact 1 reads NOT DECLARED and reds. Controlled below |
+// | dotted keys elsewhere (`version.workspace = true`) | **every member** | **safe, and the reason is not "rare"** — the key retains its dot, and this reader only ever asks for undotted keys, so such an entry cannot be mistaken for one |
+// | arrays of tables (`[[bin]]`, `[[bench]]`) | `ken-cli`, `ken-foundation` | **safe** — treated as an unrelated table, so it cannot supply a key to a wanted one. Controlled below |
+// | multi-line basic strings (`"""…"""`) | none | **UNCONTROLLED.** A `[table]`-shaped or `key = value`-shaped line inside one would be read as structure |
+// | literal strings (`'…'`) containing brackets | none | **UNCONTROLLED.** Bracket depth is counted for double-quoted strings only, so one could unbalance a continuation |
 //
 // The last two are a real residual, not a covered case: if a manifest ever uses
 // them, this reader needs a fresh look rather than a patch. They are called out
@@ -201,7 +245,7 @@ fn list_items(value: &str) -> Vec<String> {
         .collect()
 }
 
-// ---- the three facts, as predicates over manifest TEXT -------------------
+// ---- the four facts, as predicates over manifest TEXT --------------------
 //
 // Each takes text rather than a path, so the pin below can apply it to the real
 // manifest and the controls can apply the SAME code to synthetic text. A
@@ -367,9 +411,16 @@ fn read_manifest(path: &Path) -> String {
 const FEATURE: &str = "px8-ds-test-support";
 const DEPENDENCY: &str = "ken-runtime";
 
-/// **The pin.** All three facts, against the real manifests on disk.
+/// **The pin.** All four facts, against the real manifests on disk.
+///
+/// ⛔ The name deliberately does NOT say "cannot reach the shipped binary".
+/// That was accurate for facts 1-3 and became an over-claim once fact 4 joined
+/// them: fact 4 is instrument coverage for `cargo build --workspace`, and which
+/// invocation cuts a release artifact is unmeasured. A combined pin named for
+/// the strongest of its parts would report the weakest one as if it carried the
+/// same weight.
 #[test]
-fn mrc_d8_the_transport_cannot_reach_the_shipped_binary() {
+fn mrc_d8_d9_the_census_transport_premise_holds_on_every_declared_manifest() {
     let root = workspace_root();
 
     let workspace = read_manifest(&root.join("Cargo.toml"));
@@ -457,9 +508,14 @@ fn mrc_d8_the_transport_cannot_reach_the_shipped_binary() {
 
 // ---- the controls --------------------------------------------------------
 //
-// Three mutations, three reds, PROVED SEPARATELY — a pin that only catches the
-// first is a third of a pin, so each fact gets its own test rather than sharing
-// one that could pass on any single red.
+// Facts 1-3 are `D8`'s, and their three synthetic controls below are retained
+// unchanged — they are still the controls for those facts, and rewriting them
+// to mention four would be churn that proves nothing. Fact 4's controls are
+// `D9`'s and live in their own section at the end of the file.
+//
+// One mutation per fact, PROVED SEPARATELY — a pin that only catches the first
+// is a fraction of a pin, so each fact gets its own test rather than sharing one
+// that could pass on any single red.
 //
 // Each control is a NON-DEGENERATE PAIR on a shared input: the same synthetic
 // manifest with and without the mutation. The unmutated side must be ACCEPTED.
@@ -602,7 +658,7 @@ fn mrc_d8_control_moving_the_featured_edge_reds_fact_three() {
 
 // ---- controls on the READER, not on the facts ----------------------------
 //
-// The three facts above are only as good as the hand-written reader underneath
+// The four facts above are only as good as the hand-written reader underneath
 // them, and a hand-written reader is clean about exactly the shapes its author
 // remembered. These are the shapes that would make it report a fact as HELD
 // when it is not — the direction that matters.
@@ -692,8 +748,10 @@ bundle = [
 // unmutated text in place, and the control would be measuring nothing while
 // reading as a result.
 //
-// Three mutations, three reds, in three separate tests, so a single red names
-// which fact lost its control rather than collapsing them into one verdict.
+// One mutation per fact, in separate tests, so a single red names which fact
+// lost its control rather than collapsing them into one verdict. Facts 1-3 are
+// covered here against the shipped manifests; fact 4's real-manifest control is
+// `mrc_d9_control_a_...`, which mutates the shipped `ken-verify` manifest.
 
 fn real(path: &str) -> String {
     read_manifest(&workspace_root().join(path))
