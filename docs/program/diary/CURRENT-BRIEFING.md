@@ -237,6 +237,46 @@
 > resolve without widening") that a five-minute census would have falsified
 > before anyone built anything.
 >
+> #### `moot compact <role>` STRANDS ON CODEX SEATS — "Sent" is not "ran"
+>
+> Measured 2026-08-10 ~08:0xZ on the Verify ring. `moot compact verify-leader`
+> reported `Sent /compact to moot-verify-leader` for all three seats, and all
+> three panes then showed **`/compact` sitting unsubmitted in the composer**,
+> undimmed. **Same bare-Enter bug as a convo mention.** One `tmux send-keys
+> Enter` per pane consumed it and the seats went to `Working`.
+>
+> ⇒ **Every "compaction" reported as sent to a Codex seat may never have run.**
+> The handoff gate's step 4 — *"a 'sent' report is not proof"* — is exactly
+> this, and it is now measured for `moot compact`, not just for mentions.
+> **Always dim-test the composer after sending, and send Enter if it is
+> undimmed.** Claude Code seats are unaffected; my own `moot compact steward`
+> ran normally.
+>
+> #### M6's BLOB CHECK IS A POST-MERGE INSTRUMENT. It false-alarms later.
+>
+> Chased `dec_1d2a275b6pjs2` (KERNEL-NESTED-IND `D6`, APPROVE resolved
+> **00:32Z**) because CV and spec-leader both still showed *"awaiting
+> kernel-leader resolve and publisher routing"* and I read that as a possible
+> approved-but-unrouted candidate aging on the vine.
+>
+> **It had merged.** `276d5ae4` on `main`. Two instruments disagreed and both
+> were technically right:
+>
+> - `d9b1d5b1` **is not an ancestor of `main`** — the publisher squashes, so
+>   that is expected and proves nothing.
+> - The blob check said `MATCH` on the test file and **`DIFFER` on
+>   `seed-nested.md`** — because a **later** commit, `dba42b0a`, added 25 lines
+>   to it.
+>
+> ⇒ **Blob identity proves "landed unchanged at merge time". A `DIFFER` read
+> hours later is not evidence of "never landed"** — it is the expected result of
+> any subsequent edit. Retrospectively, the instrument is `git log <path>`.
+> Do not re-run M6 against an old SHA and read its `DIFFER` as a missed merge.
+>
+> **Corollary: CV's and spec-leader's `awaiting` statuses are STALE by ~7.5h.**
+> Treat a seat's self-reported "awaiting X" as evidence about when it last
+> looked, never about whether X is still outstanding.
+>
 > #### Still owed to me
 >
 > Runtime `c2` returns **before** assignment stating its `AC-K12` relationship
