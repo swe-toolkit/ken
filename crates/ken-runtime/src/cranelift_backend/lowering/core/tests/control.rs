@@ -28968,9 +28968,14 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 /// ⛔ **This does NOT key on the absence of the refusal alone.** A repair that
 /// deleted the sentence from production would make `!contains(...)` true for
 /// free, and this campaign has already shipped one control with that defect.
-/// The load-bearing assertions are the **non-zero arrival denominator** — the
-/// marker really reached this exact continuation — and the **suppression A/B**,
-/// which makes the pre-repair refusal producible again from the committed tree.
+/// ⛔ **The three assertions below are NOT co-equal, and billing them as a flat
+/// list was wrong.** `arrivals > 0` is the **denominator**, and it is
+/// irreplaceable: every other clause is conditional on it.
+/// `forwards == arrivals` is satisfied by `0 == 0`, so on its own it is a
+/// **prospective** guard — it catches a *future* arrival that fails to forward
+/// and is evidence about nothing today. The **suppression A/B** is likewise
+/// only meaningful once something arrived. So the denominator is asserted
+/// **first and alone**, before either dependent clause is allowed to run.
 ///
 /// **`AC-3` guard 3, as far as this deliverable can establish it.** The
 /// suppressed leg proves the constructor guard is **still present, still
@@ -28984,9 +28989,8 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 /// authoring one is new fixture work outside `D2a`'s one-authority mandate.
 /// That witness is owed to `D3` and is recorded as owed rather than implied.
 ///
-/// PROMISE CLASS: durable invariant. Arrivals and forwards are asserted as a
-/// relation (`forwards == arrivals`, `arrivals > 0`), never as a fixed count, so
-/// a fixture that grows a compile keeps it green.
+/// PROMISE CLASS: durable invariant. Both are relations — never a pinned count —
+/// so a fixture that grows a compile keeps this green.
 #[test]
 fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compiles() {
     use crate::cranelift_backend::lowering::core::{
@@ -29057,16 +29061,26 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
     // ── REPAIRED ────────────────────────────────────────────────────────────
     let (arrivals, forwards, repaired) = run(false);
 
-    // THE DENOMINATOR. Without this, every `!contains` below would hold just as
-    // well if the marker never reached this continuation at all.
+    // ⭐⭐ THE DENOMINATOR, ESTABLISHED FIRST AND ALONE.
+    //
+    // ⛔ It is not one of three peers. `forwards == arrivals` holds at `0 == 0`
+    // and the suppression legs compare refusals that never occurred, so BOTH
+    // are conditional on this line. Reading them as co-equal supports is how a
+    // control can look triply-defended while resting on one clause.
     assert!(
         arrivals > 0,
         "no backedge marker arrived at ComputationalMatchScrutinee, so the forward was never \
-         exercised and the absences below say nothing"
+         exercised and every clause below is vacuous"
     );
+    // Bound to the denominator rather than stated beside it: the equality is
+    // read off a value that only exists because arrivals was proven non-zero,
+    // so it cannot be quoted as evidence in the all-zero case.
+    let established_arrivals = arrivals;
     assert_eq!(
-        forwards, arrivals,
-        "an arriving marker was not forwarded: arrivals={arrivals} forwards={forwards}"
+        forwards, established_arrivals,
+        "an arriving marker was not forwarded: arrivals={established_arrivals} \
+         forwards={forwards}. NOTE: this clause is PROSPECTIVE -- it holds at 0 == 0 and is \
+         meaningful only because the denominator above is non-zero"
     );
     for (label, rendered) in &repaired {
         assert!(
@@ -29092,4 +29106,684 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
              removed it: {rendered}"
         );
     }
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` (planner plane) — the runtime
+/// envelope excludes EVERY recursive constructor position.**
+///
+/// > **MEASURED:** on row 3's plan, whose producer has **two** recursive
+/// > positions, every interned continuation unit's closed projection is
+/// > set-equal to the checked `recursive_positions`, and its ordinary envelope
+/// > names **no** recursive position. **CLAIMED:** no recursive field reaches
+/// > the declared-unit ABI, so a sibling `Specialized(Closure)` can no longer be
+/// > cloned into the ordinary run. **THE GAP:** this is the planner plane only —
+/// > row 3 does not compile (see the handback); the compiler-only binder and the
+/// > caller-side reconciliation are not in this candidate.
+///
+/// ⛔ **The qualifying population is established FIRST, and the exclusions range
+/// over it — they are not merely accompanied by a count.** A producer with a
+/// single recursive position satisfies every exclusion under **both** the old
+/// and the new derivation, because the two coincide there; that is exactly why
+/// the defect survived every landed fixture. So `projected.len() > 1` selects
+/// the population before any dependent assertion runs, which makes those
+/// assertions **unreachable** on a non-sibling fixture rather than vacuously
+/// true on one. An independent clause asserts the qualifying population is
+/// nonempty, so "nothing qualified" cannot pass as "everything passed".
+///
+/// This is the same ordering discipline as the `D2a` denominator rider, applied
+/// here — and an earlier revision of this very row got it wrong in the way the
+/// rider describes: it asserted over every unit and checked the count
+/// afterwards.
+#[test]
+fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
+    let expression =
+        host_result_closure_match(px8j_recursive_sibling_result(1, 2, px8j_aggregate_result()));
+    let plan = plan_static_transition_graph(&expression, &BTreeMap::new())
+        .expect("row 3's fixture plans");
+
+    let units = plan.continuation_units().expect("continuation units");
+    assert!(
+        !units.is_empty(),
+        "the fixture interned no continuation unit, so every assertion below is vacuous"
+    );
+
+    // ⭐⭐ THE QUALIFYING POPULATION IS ESTABLISHED FIRST, AND EVERYTHING ELSE
+    // RANGES OVER IT.
+    //
+    // ⛔ An earlier revision asserted the exclusions over EVERY unit and checked
+    // `sibling_units > 0` afterwards. That ordering is the defect this control
+    // exists to catch, one level up: a single-position fixture satisfies every
+    // exclusion under BOTH the old and the new derivation, so the assertions
+    // would all have passed and the count would have been the only thing
+    // standing between a green row and a vacuous one. Qualifying first makes
+    // the dependent assertions unreachable on a non-sibling fixture rather than
+    // merely accompanied by a caveat.
+    let qualified = units
+        .iter()
+        .filter(|unit| unit.recursive_positions().len() > 1)
+        .collect::<Vec<_>>();
+    assert!(
+        !qualified.is_empty(),
+        "no interned unit has more than one recursive position, so this fixture is not the \
+         sibling shape and every exclusion below would hold under the single-position \
+         derivation too"
+    );
+
+    for unit in qualified {
+        let projected = unit.recursive_positions();
+        debug_assert!(projected.len() > 1, "the qualified filter admitted a single-position unit");
+
+        // The unit's own position is a member, which is what lets the envelope
+        // derive its field count from the projection at all.
+        assert!(
+            projected.contains(&unit.recursive_position()),
+            "a unit's own recursive position is absent from its closed projection: {projected:?}"
+        );
+
+        // THE EXCLUSION, on a producer that genuinely has siblings.
+        let envelope = unit.ordinary_envelope().expect("the envelope builds");
+        for role in &envelope {
+            if let ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
+                source_position,
+            } = role
+            {
+                assert!(
+                    !projected.contains(source_position),
+                    "the runtime envelope names recursive source position {source_position}, so a \
+                     recursive field is still an ordinary ABI parameter: projected={projected:?}"
+                );
+            }
+        }
+    }
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — an abandoned `Let` body's joins are
+/// DISPOSITIONED, and the missing-join refusal is gone.**
+///
+/// > **MEASURED:** under B-only exclusion row 3 no longer renders *"function
+/// > left planned source join … neither emitted nor statically unselected"*.
+/// > Suppressing **only** the new arm's disposition brings that exact refusal
+/// > back. **CLAIMED:** the abandoned body's joins are accounted at the arm that
+/// > abandons it. **THE GAP:** row 3 still does not compile — it advances to the
+/// > singular-specialization hard stop, which this deliverable keeps.
+///
+/// ⛔ **The A/B is the whole control, because the repaired side is an ABSENCE.**
+/// Asserting only that the sentence is gone would pass for free if the sentence
+/// were deleted from production, or if the row failed earlier for an unrelated
+/// reason. The suppressed leg is what makes the absence attributable: it
+/// reproduces the exact refusal from the committed tree, with nothing else
+/// changed.
+///
+/// ⛔ **And the advance is asserted positively**, not merely as "some other
+/// error": the row must reach the hard stop, which is strictly later than the
+/// join closeout. A row that started failing *earlier* would also stop
+/// rendering the join refusal, and that would be a regression wearing the
+/// shape of a fix.
+#[test]
+fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_it() {
+    use crate::cranelift_backend::lowering::core::{
+        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+    };
+    use crate::cranelift_backend::lowering::{
+        lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+            set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        }
+    }
+    const MISSING_JOIN: &str = "neither emitted nor statically unselected";
+    const HARD_STOP: &str = "projects no worker for";
+
+    let run = |mode: LrcD2bLetDisposition| -> D2bObservation {
+        let _restore = Restore;
+        let expression = host_result_closure_match(px8j_recursive_sibling_result(
+            1,
+            2,
+            px8j_aggregate_result(),
+        ));
+        lrc_d2b_reset_observation();
+        set_lrc_d2b_let_disposition(mode);
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let (result, _trace) = px8j_capture_source_trace(&expression, false, "ken_d2b_let");
+        set_selector_variant_exclusion(None);
+        set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        D2bObservation {
+            rendered: format!("{result:?}"),
+            closeout: lrc_d2b_join_observation(),
+            entered: lrc_d2b_entered(),
+            worker_calls: lrc_d2b_worker_calls(),
+        }
+    };
+
+    // ── REPAIRED ────────────────────────────────────────────────────────────
+    let repaired = run(LrcD2bLetDisposition::Exact);
+    assert!(
+        !repaired.rendered.contains(MISSING_JOIN),
+        "the abandoned body's join is still unaccounted: {}",
+        repaired.rendered
+    );
+    assert!(
+        repaired.rendered.contains(HARD_STOP),
+        "the row did not reach the singular-specialization hard stop, so it is failing EARLIER \
+         than the join closeout and the absence above is a regression rather than the repair: {}",
+        repaired.rendered
+    );
+
+    // ⭐⭐ THE ACCOUNTING ITSELF, not inferred from the absence of a sentence.
+    //
+    // ⛔ `None` here would mean the closeout guard never ran, which the absence
+    // assertion above cannot distinguish from "it ran and closed". That is the
+    // reading this unwrap refuses.
+    assert!(
+        !repaired.closeout.is_empty(),
+        "no join closeout ran at all, so the accounting below would be vacuous"
+    );
+    // ⛔ The guard runs once per function; select the close that actually
+    // dispositioned something, and require it to be UNIQUE. Taking the last
+    // close would record a different function's accounting.
+    let dispositioning: Vec<_> = repaired
+        .closeout
+        .iter()
+        .filter(|(_, _, dispositioned)| !dispositioned.is_empty())
+        .collect();
+    assert_eq!(
+        dispositioning.len(),
+        1,
+        "expected exactly one function to disposition anything; got {} -- the arm is firing in \
+         more places than the abandoned body",
+        dispositioning.len()
+    );
+    let (required, consumed, dispositioned) = dispositioning[0].clone();
+    let abandoned = *dispositioned
+        .iter()
+        .next()
+        .expect("the abandoned body's join is dispositioned");
+
+    assert_eq!(
+        dispositioned.len(),
+        1,
+        "exactly the abandoned body's join is dispositioned; a wider subtree would swallow joins \
+         that legitimately executed: {dispositioned:?}"
+    );
+    assert!(
+        required.contains(&abandoned),
+        "the dispositioned join is not in the required set, so it belongs to another function"
+    );
+    assert!(
+        !consumed.contains(&abandoned),
+        "the abandoned join is BOTH consumed and dispositioned; the two sets must stay disjoint"
+    );
+    assert!(
+        consumed.is_disjoint(&dispositioned),
+        "consumed and dispositioned overlap: {consumed:?} vs {dispositioned:?}"
+    );
+    let mut covered = consumed.clone();
+    covered.extend(dispositioned.iter().copied());
+    assert_eq!(
+        covered, required,
+        "the disjoint union of consumed and dispositioned does not close the required set"
+    );
+    assert!(
+        !consumed.is_empty(),
+        "nothing was consumed, so the closure above holds for the degenerate reason that \
+         everything was dispositioned"
+    );
+
+    // THE BODY DID NOT EXECUTE, and that is asserted rather than assumed.
+    assert!(
+        !repaired.entered.contains(&abandoned),
+        "the abandoned body's occurrence was ENTERED, so it did execute and dispositioning it is \
+         the wrong accounting"
+    );
+    assert!(
+        !repaired.worker_calls.contains(&abandoned),
+        "a static-worker call was emitted for the abandoned body's origin, so it did execute"
+    );
+    assert!(
+        !repaired.entered.is_empty(),
+        "no occurrence was entered at all, so the two absences above are vacuous"
+    );
+
+    // ── SUPPRESSED — the pre-repair state, from the committed tree ──────────
+    let suppressed = run(LrcD2bLetDisposition::Suppress);
+    assert!(
+        suppressed.rendered.contains(MISSING_JOIN),
+        "suppressing ONLY the new arm's disposition did not recreate the missing-join refusal, \
+         so that arm is not what accounts the join: {}",
+        suppressed.rendered
+    );
+    assert!(
+        suppressed
+            .closeout
+            .iter()
+            .all(|(_, _, dispositioned)| !dispositioned.contains(&abandoned)),
+        "the suppressed run still dispositioned the abandoned join, so the suppression did not \
+         reach the arm and the A/B compares one state with itself"
+    );
+}
+
+/// The observation one run yields. Grouped so the two legs are compared on the
+/// same axes rather than on whichever field each happened to read.
+#[cfg(test)]
+struct D2bObservation {
+    rendered: String,
+    closeout: Vec<(
+        BTreeSet<StaticOriginId>,
+        BTreeSet<StaticOriginId>,
+        BTreeSet<StaticOriginId>,
+    )>,
+    entered: BTreeSet<StaticOriginId>,
+    worker_calls: BTreeSet<StaticOriginId>,
+}
+
+/// Row 3's exact shape with **only** the `Let` value changed to an ordinary
+/// constructor.
+///
+/// ⛔ Derived from `px8j_recursive_sibling_result` by rewriting one node, not
+/// re-typed beside it. "Differs only in the `Let` value" is then true **by
+/// construction**: a copy would drift from row 3 the first time either is
+/// edited, and this control's whole meaning is that it is the same shape.
+///
+/// The producer, its two recursive positions, the `Let` and the `Call Var(2)`
+/// body are row 3's own.
+fn px8j_sibling_result_with_ordinary_let_value() -> RuntimeExpr {
+    let mut expression =
+        px8j_recursive_sibling_result(1, 2, px8j_aggregate_result());
+    let RuntimeExpr::ComputationalMatch { cases, .. } = &mut expression else {
+        panic!("row 3's fixture is a computational match");
+    };
+    let node_case = cases
+        .iter_mut()
+        .find(|case| !case.recursive_positions.is_empty())
+        .expect("row 3's producer has a recursive case");
+    let RuntimeExpr::Let { value, .. } = &mut node_case.body else {
+        panic!("row 3's recursive case body is a Let");
+    };
+    // The recursive `Call Var(0)` is what lowers to a backedge; an ordinary
+    // constructor is what this row exists to contrast with.
+    assert!(
+        matches!(value.as_ref(), RuntimeExpr::Call { .. }),
+        "row 3's Let value is the recursive call this fixture replaces"
+    );
+    *value = Box::new(RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    });
+    expression
+}
+
+/// **`D2b` ROW A — CAPABILITY GATE ONLY. This row does NOT show a body running.**
+///
+/// ⛔ Its whole subject is that on row 3's **two-position** shape the retained
+/// segment-1 refusal fires **before the case body**, so the body and its
+/// static-worker edge are **unreachable in both disposition modes**. It is
+/// named for that and must not be read as a live-body row: it does not show the
+/// body entering, its join consumed, or any global body-entry property. Row B
+/// below is the live one.
+///
+/// > **MEASURED:** on row 3's two-position producer with only the `Let` value
+/// > changed to an ordinary constructor, **no static-worker edge is reached in
+/// > either mode**, `dispositioned` is empty in every close, the disjoint union
+/// > closes `required`, and both modes agree exactly. **CLAIMED:** the retained
+/// > singular refusal precedes the case body on this shape, and the new arm
+/// > dispositions nothing on a non-backedge value. **THE GAP:** this says
+/// > nothing about a body that *does* run — that is Row B's axis, not this
+/// > one's.
+///
+/// ⛔ **An earlier revision of this row claimed to be the live half.** It was
+/// not: on this shape the body never lowers, so it could not testify to a body
+/// running. Splitting the two axes is what makes each row's claim true.
+///
+/// ⛔ **The mode toggle must change NOTHING here**, and that is asserted rather
+/// than assumed. If `Suppress` altered this row, the mutation would not be
+/// confined to the backedge branch — and the backedge control's A/B would then
+/// be measuring two changes instead of one.
+#[test]
+fn d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body() {
+    use crate::cranelift_backend::lowering::core::{
+        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+    };
+    use crate::cranelift_backend::lowering::{
+        lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+            set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        }
+    }
+
+    let run = |mode: LrcD2bLetDisposition| -> D2bObservation {
+        let _restore = Restore;
+        let expression = host_result_closure_match(px8j_sibling_result_with_ordinary_let_value());
+        lrc_d2b_reset_observation();
+        set_lrc_d2b_let_disposition(mode);
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let (result, _trace) =
+            px8j_capture_source_trace(&expression, false, "ken_d2b_live_let");
+        set_selector_variant_exclusion(None);
+        set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        D2bObservation {
+            rendered: format!("{result:?}"),
+            closeout: lrc_d2b_join_observation(),
+            entered: lrc_d2b_entered(),
+            worker_calls: lrc_d2b_worker_calls(),
+        }
+    };
+
+    for mode in [LrcD2bLetDisposition::Exact, LrcD2bLetDisposition::Suppress] {
+        let observed = run(mode);
+
+        // ⛔ SOME source occurrence was entered -- NOT the body's, and this
+        // comment says so because an earlier revision of it said "THE BODY
+        // RAN", which is false on this shape and contradicted the very next
+        // block.
+        //
+        // This is a NON-VACUITY clause and nothing more: without it, every
+        // "nothing was dispositioned" below would hold because the compile did
+        // nothing at all. It establishes that lowering happened, not that the
+        // case body was reached -- Row B is the row that reaches a body, and it
+        // asserts entry of the ARM-REPORTED origin rather than a non-empty set.
+        assert!(
+            !observed.entered.is_empty(),
+            "{mode:?}: no source occurrence was entered, so this row measures nothing"
+        );
+        // ⛔ THE BODY'S `Call` IS NOT REACHED ON THIS FIXTURE, and that is a
+        // measured property of the shape rather than a gap in this row.
+        //
+        // The re-cut asked this control to prove the body's `Call` reaches a
+        // static-worker edge and its join is consumed. It cannot, and the
+        // reason is structural: the producer keeps row 3's TWO recursive
+        // positions, so `continuation_case_binder_run`'s segment-1 hard stop --
+        // which this deliverable RETAINS -- fires during unit definition,
+        // before the case body lowers. Changing only the `Let` value cannot get
+        // past a refusal triggered by the producer's shape.
+        //
+        // ⇒ A fixture that DID reach the body would need a single-recursive-
+        // position producer, which is no longer row 3's shape and would stop
+        // being the comparison this row exists to make. The two requirements
+        // are in tension on one fixture; the handback reports it.
+        assert!(
+            observed.worker_calls.is_empty(),
+            "{mode:?}: a static-worker edge WAS reached, so the singular hard stop no longer \
+             precedes the body and the live half of this row is now constructible -- write it \
+             rather than keeping this assertion"
+        );
+
+        assert!(
+            !observed.closeout.is_empty(),
+            "{mode:?}: no join closeout ran, so the accounting below is vacuous"
+        );
+
+        // NOTHING IS DISPOSITIONED — the discriminator against the backedge row.
+        for (required, consumed, dispositioned) in &observed.closeout {
+            assert!(
+                dispositioned.is_empty(),
+                "{mode:?}: a live Let body's subtree was dispositioned {dispositioned:?}; the new \
+                 arm is firing outside the backedge branch"
+            );
+            assert!(
+                consumed.is_disjoint(dispositioned),
+                "{mode:?}: consumed and dispositioned overlap"
+            );
+            let mut covered = consumed.clone();
+            covered.extend(dispositioned.iter().copied());
+            assert_eq!(
+                covered, *required,
+                "{mode:?}: the disjoint union does not close the required set"
+            );
+        }
+        assert!(
+            observed
+                .closeout
+                .iter()
+                .any(|(_, consumed, _)| !consumed.is_empty()),
+            "{mode:?}: nothing was consumed anywhere, so the closures above are degenerate"
+        );
+    }
+
+    // THE MODE TOGGLE CHANGES NOTHING on this shape.
+    let exact = run(LrcD2bLetDisposition::Exact);
+    let suppressed = run(LrcD2bLetDisposition::Suppress);
+    assert_eq!(
+        exact.rendered, suppressed.rendered,
+        "the disposition mode changed a NON-backedge row's outcome, so the mutation is not \
+         confined to the backedge branch and the other control's A/B measures two changes"
+    );
+    assert_eq!(
+        exact.closeout, suppressed.closeout,
+        "the disposition mode changed a non-backedge row's join accounting"
+    );
+    assert_eq!(
+        exact.entered, suppressed.entered,
+        "the disposition mode changed which occurrences a non-backedge row entered"
+    );
+}
+
+/// Row 3's **single**-position shape with its recursive `Call` wrapped in a
+/// `Let` whose value is ordinary.
+///
+/// ⛔ Derived by rewriting one node, like Row A's fixture, so the only
+/// difference from `px8j_recursive_sibling_result(1, 1, …)` is the wrapping.
+///
+/// ⛔ **The de Bruijn shift is the load-bearing part.** Introducing the `Let`
+/// binder pushes every outer binding down one, so the original `Var(0)` callee
+/// becomes `Var(1)` in the body. Leaving it at `Var(0)` would silently call the
+/// `Let`'s own value — an ordinary `Unit` — and the row would fail for a reason
+/// having nothing to do with the arm under test.
+fn px8j_single_position_let_wrapped_recursive_call() -> RuntimeExpr {
+    let mut expression = px8j_recursive_sibling_result(1, 1, px8j_aggregate_result());
+    let RuntimeExpr::ComputationalMatch { cases, .. } = &mut expression else {
+        panic!("the fixture is a computational match");
+    };
+    let node_case = cases
+        .iter_mut()
+        .find(|case| !case.recursive_positions.is_empty())
+        .expect("the producer has a recursive case");
+    assert_eq!(
+        node_case.recursive_positions.len(),
+        1,
+        "Row B's axis is the SINGLE-position shape; two positions is Row A's"
+    );
+    let RuntimeExpr::Call { callee, args } = node_case.body.clone() else {
+        panic!("the single-position case body is the recursive Call this row wraps");
+    };
+    assert!(
+        matches!(callee.as_ref(), RuntimeExpr::Var(0)),
+        "the recursive callee is Var(0) before the Let binder is introduced"
+    );
+    node_case.body = RuntimeExpr::Let {
+        value: Box::new(RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            args: Vec::new(),
+        }),
+        // The de Bruijn shift: Var(0) -> Var(1) under the new binder.
+        body: Box::new(RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::Var(1)),
+            args,
+        }),
+    };
+    expression
+}
+
+/// **`D2b` ROW B — the REACHING non-backedge branch: the body runs, its join is
+/// consumed, and nothing is dispositioned.**
+///
+/// > **MEASURED, and every clause is about THE ARM'S OWN body origin:** the arm
+/// > is reached with a **non-backedge** value; that body occurrence is
+/// > **entered**; a static-worker edge is reached **for that origin**; the
+/// > closeout whose `required` contains it is **unique**, and in that owning
+/// > closeout the origin is **consumed** and **not dispositioned**; every close
+/// > has empty `dispositioned` and a union that closes; and Exact and Suppress
+/// > agree on **all** of outcome, arrival, entry, calls and accounting. **CLAIMED:** the new arm's ordinary branch is untouched — a
+/// > live `Let` body runs and its joins are consumed, not dispositioned.
+/// > **THE GAP:** one source shape, and the single-position producer, which is
+/// > what makes the body reachable at all.
+///
+/// ⛔ **The body occurrence is the ARM'S OWN `body.static_origin`**, reported by
+/// the arm-local observation, never a numeric origin. So each clause is a
+/// relation between what the arm saw and what the compile did, rather than a
+/// coincidence of two independently written constants.
+///
+/// ⛔ **An earlier revision proved the arm's body was entered and then only that
+/// SOME worker call and SOME consumed join existed.** Those are existentials
+/// over unrelated occurrences — they hold even if the arm's body is entered and
+/// never lowered, while a different occurrence supplies the call and the
+/// consumption. Selecting the **owning** closeout by `required` membership, and
+/// requiring uniqueness, is what ties the accounting to *this* body instead of
+/// to whichever function happened to close last.
+///
+/// ⛔ **Row A cannot make this claim** — on its two-position shape the retained
+/// refusal precedes the body entirely. That is why the pair is split.
+#[test]
+fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
+    use crate::cranelift_backend::lowering::core::{
+        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+    };
+    use crate::cranelift_backend::lowering::{
+        lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_let_arrivals, lrc_d2b_reset_observation,
+        lrc_d2b_worker_calls,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+            set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        }
+    }
+
+    let run = |mode: LrcD2bLetDisposition| {
+        let _restore = Restore;
+        let expression =
+            host_result_closure_match(px8j_single_position_let_wrapped_recursive_call());
+        lrc_d2b_reset_observation();
+        set_lrc_d2b_let_disposition(mode);
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let (result, _trace) = px8j_capture_source_trace(&expression, false, "ken_d2b_row_b");
+        set_selector_variant_exclusion(None);
+        set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        (
+            format!("{result:?}"),
+            lrc_d2b_let_arrivals(),
+            lrc_d2b_entered(),
+            lrc_d2b_worker_calls(),
+            lrc_d2b_join_observation(),
+        )
+    };
+
+    for mode in [LrcD2bLetDisposition::Exact, LrcD2bLetDisposition::Suppress] {
+        let (_rendered, arrivals, entered, worker_calls, closeout) = run(mode);
+
+        // 1. The arm was reached, with a NON-backedge value.
+        let nonbackedge: Vec<_> = arrivals
+            .iter()
+            .filter(|(_, backedge)| !backedge)
+            .map(|(origin, _)| *origin)
+            .collect();
+        assert!(
+            !nonbackedge.is_empty(),
+            "{mode:?}: the LetBody arm was never reached with a non-backedge value, so this row \
+             measures nothing"
+        );
+        assert!(
+            arrivals.iter().all(|(_, backedge)| !backedge),
+            "{mode:?}: a backedge arrival occurred, so this is not purely the ordinary branch"
+        );
+
+        // 2/3. ⭐⭐ EVERY ASSERTION IS ABOUT THE ARM'S OWN BODY ORIGIN.
+        //
+        // ⛔ An earlier revision asserted `entered.contains(body)` and then only
+        // that SOME worker call and SOME consumed join existed anywhere in the
+        // compile. Those are existentials over unrelated occurrences: they hold
+        // just as well if the arm's body is entered and then never lowered,
+        // while some other occurrence supplies the call and the consumption.
+        // The relation below is per-body and closes that gap.
+        assert!(!closeout.is_empty(), "{mode:?}: no join closeout ran");
+        for body in &nonbackedge {
+            assert!(
+                entered.contains(body),
+                "{mode:?}: the arm's own body occurrence {body:?} was never entered, so the live \
+                 body did not run"
+            );
+            // THIS body reached a static-worker edge -- not merely some body.
+            assert!(
+                worker_calls.contains(body),
+                "{mode:?}: no static-worker edge was reached for the arm's own body {body:?}; \
+                 calls were emitted for {worker_calls:?}, which is a different occurrence"
+            );
+            // THIS body is consumed in ITS OWNING closeout. Selecting the close
+            // by `required` membership is what ties the accounting to this
+            // occurrence rather than to whichever function closed last.
+            let owning: Vec<_> = closeout
+                .iter()
+                .filter(|(required, _, _)| required.contains(body))
+                .collect();
+            assert_eq!(
+                owning.len(),
+                1,
+                "{mode:?}: the arm's body {body:?} is required by {} closeouts; its owning \
+                 function must be unique or the assertions below name no particular accounting",
+                owning.len()
+            );
+            let (required, consumed, dispositioned) = owning[0];
+            assert!(
+                consumed.contains(body),
+                "{mode:?}: the arm's own body {body:?} is not CONSUMED in its owning closeout, so \
+                 it did not execute there"
+            );
+            assert!(
+                !dispositioned.contains(body),
+                "{mode:?}: the arm's own body {body:?} was DISPOSITIONED in its owning closeout, \
+                 which is the abandoned-body accounting applied to a live body"
+            );
+            assert!(
+                consumed.is_disjoint(dispositioned),
+                "{mode:?}: consumed and dispositioned overlap in the owning closeout"
+            );
+            let mut covered = consumed.clone();
+            covered.extend(dispositioned.iter().copied());
+            assert_eq!(
+                covered, *required,
+                "{mode:?}: the owning closeout's disjoint union does not close its required set"
+            );
+        }
+
+        // The whole-compile invariants, retained: no close dispositions
+        // anything on this shape, and every close's union closes.
+        for (required, consumed, dispositioned) in &closeout {
+            assert!(
+                dispositioned.is_empty(),
+                "{mode:?}: a LIVE Let body's subtree was dispositioned {dispositioned:?}"
+            );
+            let mut covered = consumed.clone();
+            covered.extend(dispositioned.iter().copied());
+            assert_eq!(
+                covered, *required,
+                "{mode:?}: the disjoint union does not close the required set"
+            );
+        }
+        assert!(
+            closeout.iter().any(|(_, consumed, _)| !consumed.is_empty()),
+            "{mode:?}: nothing was consumed, so the closures above are degenerate"
+        );
+    }
+
+    // 4. THE MODE TOGGLE CHANGES NOTHING on the ordinary branch — every axis.
+    let exact = run(LrcD2bLetDisposition::Exact);
+    let suppressed = run(LrcD2bLetDisposition::Suppress);
+    assert_eq!(exact.0, suppressed.0, "the mode changed a live row's outcome");
+    assert_eq!(exact.1, suppressed.1, "the mode changed a live row's LetBody arrivals");
+    assert_eq!(exact.2, suppressed.2, "the mode changed a live row's entered occurrences");
+    assert_eq!(exact.3, suppressed.3, "the mode changed a live row's static-worker calls");
+    assert_eq!(exact.4, suppressed.4, "the mode changed a live row's join accounting");
 }

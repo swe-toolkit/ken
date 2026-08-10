@@ -75,10 +75,16 @@ outside a one-authority mandate. **Recorded as owed, not implied.**
 
 **Does not key on the refusal's absence.** A repair that deleted the sentence
 from production would make `!contains(…)` true for free, and this campaign has
-already shipped one control with that defect. The load-bearing assertions are a
-**non-zero arrival denominator**, **`forwards == arrivals`** as equality, and a
-**suppression A/B** that makes the pre-repair refusal producible again from the
-committed tree on all five compiles. Relations throughout; no count pinned.
+already shipped one control with that defect.
+
+⛔ **The assertions are not co-equal, and an earlier revision of this sentence
+listed them as if they were.** `arrivals > 0` is the **denominator** and is
+irreplaceable; `forwards == arrivals` is satisfied by `0 == 0`, so alone it is a
+**prospective** guard about a future failure rather than evidence today; the
+**suppression A/B** likewise compares refusals that only exist once something
+arrived. The control now establishes the denominator **first and alone**, and
+reads the equality off a value that exists only because of it. Relations
+throughout; no count pinned.
 
 ## 6. Guards
 

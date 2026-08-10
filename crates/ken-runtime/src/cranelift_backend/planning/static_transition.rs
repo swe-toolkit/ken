@@ -1601,6 +1601,19 @@ struct ContinuationSpecializationKey {
     consumer_owner: PredeclaredFunctionId,
     continuation_origin: StaticOriginId,
     recursive_position: u32,
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — THE CLOSED PROJECTION.**
+    ///
+    /// Every recursive source position of this producer construct, not just the
+    /// one this unit specializes. ⛔ `recursive_position` above is **singular**
+    /// and always will be — one interned unit per position — so it cannot
+    /// answer *"is field `k` recursive?"*, only *"is field `k` MINE?"*. The
+    /// envelope needs the former, and asking the singular field for it calls
+    /// every sibling recursive position nonrecursive by construction.
+    ///
+    /// ⛔ Set-equal to the case's checked `recursive_positions` by construction:
+    /// it is copied from that set, not derived from a body, a lowered shape, an
+    /// arity or a constructor symbol. Uniqueness is structural — it is a set.
+    recursive_positions: BTreeSet<u32>,
     worker: ContinuationWorkerProvenance,
     ordinary_parameters: u32,
     continuation_inputs: Vec<ContinuationInputProjection>,
@@ -1697,6 +1710,14 @@ impl<'plan> ContinuationUnitView<'plan> {
     pub(in crate::cranelift_backend) fn recursive_position(&self) -> u32 {
         self.key.recursive_position
     }
+
+    /// **`D2b` — the closed projection.** Every recursive source position of
+    /// this producer construct. ⛔ Read-only: lowering may consult it and must
+    /// never reconstruct membership from a lowered shape, arity, body or
+    /// constructor symbol.
+    pub(in crate::cranelift_backend) fn recursive_positions(&self) -> &BTreeSet<u32> {
+        &self.key.recursive_positions
+    }
     pub(in crate::cranelift_backend) fn ordinary_parameters(&self) -> u32 {
         self.key.ordinary_parameters
     }
@@ -1716,9 +1737,16 @@ impl<'plan> ContinuationUnitView<'plan> {
     /// `nonrecursive_field_count = ordinary_parameters - worker_capture_count`,
     /// computed with checked arithmetic. Positions
     /// `0..nonrecursive_field_count` are nonrecursive producer-`Construct`
-    /// fields in producer source order with the selected recursive position
+    /// fields in producer source order with **every** recursive position
     /// omitted; worker capture `ordinal` occupies
     /// `nonrecursive_field_count + ordinal`.
+    ///
+    /// ⛔ **Every projected recursive position, not just the selected one** —
+    /// `D2b`. This contract previously said "with the selected recursive
+    /// position omitted", which is the singular model that let a SIBLING
+    /// recursive field through as an ordinary ABI parameter. The field count is
+    /// `nonrecursive_field_count + |recursive_positions|` for the same reason:
+    /// `+ 1` was the same assumption written a second time.
     ///
     /// Each role is recompared against the validated slot run before it is
     /// returned: the count of `Parameter` slots must equal
@@ -1754,34 +1782,72 @@ impl<'plan> ContinuationUnitView<'plan> {
         // ⭐⭐ `RT-CONTSRC-PRODUCER-LOCAL` `D8l2` — THE NONRECURSIVE POPULATION
         // IS SOURCE POSITIONS, NOT ENVELOPE INDICES.
         //
-        // The producer `Construct` has `N + 1` fields: `N` nonrecursive ones
-        // and the selected recursive one. The roles are those `N` fields at
-        // their OWN source positions, in source order, with the selected
-        // position skipped.
+        // The producer `Construct` has `N + |recursive_positions|` fields: `N`
+        // nonrecursive ones and the whole recursive run. The roles are those
+        // `N` fields at their OWN source positions, in source order, with
+        // **every** recursive position skipped.
         //
         // ⛔ What stood here emitted `0..N` — the envelope index — and called it
         // `source_position`. The two coincide only while every nonrecursive
-        // field precedes the selected recursive position, because omitting a
-        // later position does not renumber the earlier ones but omitting an
-        // earlier one renumbers every later one. `px8tr` selects its last field,
-        // so the defect was unreachable on every landed fixture and the method's
-        // own doc comment — "in producer source order with the selected
-        // recursive position omitted" — described the rule the loop did not
-        // implement. `D8l1` measured it with two witnesses differing only in
-        // field order.
+        // field precedes every recursive position, because omitting a later
+        // position does not renumber the earlier ones but omitting an earlier
+        // one renumbers every later one. `px8tr` selects its last field, so the
+        // defect was unreachable on every landed fixture and the method's own
+        // doc comment — "in producer source order with the recursive positions
+        // omitted" — described the rule the loop did not implement. `D8l1`
+        // measured it with two witnesses differing only in field order.
         //
         // ⛔ This is neither a reverse source walk nor a new identity: the
-        // producer's field count is `N + 1` by construction from the checked
-        // capture subtraction above, and the selected position is the key's own
-        // `recursive_position`. Nothing is inferred from a body, a shape, or an
+        // producer's field count is `N + |recursive_positions|` by construction
+        // from the checked capture subtraction above plus the closed
+        // projection's own size, and the positions omitted are that
+        // projection's members. Nothing is inferred from a body, a shape, or an
         // ABI slot.
-        let field_count = nonrecursive_field_count.checked_add(1).ok_or_else(|| {
-            planner_error("the producer constructor's field count overflows the envelope")
-        })?;
-        // ⛔ The range refusal is REQUIRED, not defensive: a selected position
-        // at or past the field count would leave the loop below emitting `N + 1`
-        // roles for `N` slots, and the slot reconciliation would then report a
-        // length disagreement that says nothing about the real fault.
+        //
+        // ⛔ `D2b` — THE COUNT AND THE SKIP ARE BOTH PLURAL, and they were both
+        // singular. This paragraph read `N + 1` and "the selected recursive
+        // one", and the loop matched it. That model is correct exactly when a
+        // producer has one recursive position, which every landed fixture had —
+        // so a sibling recursive field was counted nonrecursive, became an
+        // ordinary ABI parameter, and carried a `Specialized(Closure)` the
+        // boundary walk then correctly refused. `D8l2`'s SOURCE-ORDER lesson is
+        // untouched by that correction and is the reason this paragraph is
+        // rewritten rather than deleted.
+        //
+        // ⛔ Self-membership is required, not defensive: `nonrecursive_field_count`
+        // is derived from an arity that excluded every projected position, so if
+        // this unit's own position were absent from the projection the two
+        // derivations would disagree and the count below would be silently short.
+        if !self
+            .key
+            .recursive_positions
+            .contains(&self.key.recursive_position)
+        {
+            return Err(planner_error(
+                "a continuation's own recursive position is absent from its closed projection,                  so the envelope's field count cannot be derived from it",
+            ));
+        }
+        let recursive_run = u32::try_from(self.key.recursive_positions.len())
+            .map_err(|_| planner_error("the recursive position run exceeds addressable range"))?;
+        let field_count = nonrecursive_field_count
+            .checked_add(recursive_run)
+            .ok_or_else(|| {
+                planner_error("the producer constructor's field count overflows the envelope")
+            })?;
+        // ⛔ The range refusal is REQUIRED, not defensive, and its reason is an
+        // IMPOSSIBLE KEY STATE rather than any arity consequence: a selected
+        // position at or past the field count names a field the producer
+        // construct does not have, so this unit's identity does not identify
+        // anything in the run it claims to specialize.
+        //
+        // ⛔ It does NOT cause a surplus role or a slot-length mismatch, and
+        // saying so would be false under the repaired model. The loop below
+        // filters on the CLOSED PROJECTION, which removes every real recursive
+        // position whatever `selected` is; an out-of-range `selected` simply
+        // matches nothing, and the emitted roles remain the normal nonrecursive
+        // run. That consequence belonged to the singular model, where `selected`
+        // was the only thing omitted -- it does not survive the plural one, and
+        // it is not this guard's rationale.
         if self.key.recursive_position >= field_count {
             return Err(planner_error(
                 "a continuation selects a recursive position outside its producer constructor's \
@@ -1801,10 +1867,20 @@ impl<'plan> ContinuationUnitView<'plan> {
         };
         #[cfg(not(test))]
         let selected = self.key.recursive_position;
-        // ⛔ The range refusal is REQUIRED, not defensive: a selected position
-        // at or past the field count would leave the loop below emitting `N + 1`
-        // roles for `N` slots, and the slot reconciliation would then report a
-        // length disagreement that says nothing about the real fault.
+        // ⛔ The range refusal is REQUIRED, not defensive, and its reason is an
+        // IMPOSSIBLE KEY STATE rather than any arity consequence: a selected
+        // position at or past the field count names a field the producer
+        // construct does not have, so this unit's identity does not identify
+        // anything in the run it claims to specialize.
+        //
+        // ⛔ It does NOT cause a surplus role or a slot-length mismatch, and
+        // saying so would be false under the repaired model. The loop below
+        // filters on the CLOSED PROJECTION, which removes every real recursive
+        // position whatever `selected` is; an out-of-range `selected` simply
+        // matches nothing, and the emitted roles remain the normal nonrecursive
+        // run. That consequence belonged to the singular model, where `selected`
+        // was the only thing omitted -- it does not survive the plural one, and
+        // it is not this guard's rationale.
         if selected >= field_count {
             return Err(planner_error(
                 "a continuation selects a recursive position outside its producer constructor's \
@@ -1813,8 +1889,20 @@ impl<'plan> ContinuationUnitView<'plan> {
             ));
         }
         let mut envelope = Vec::with_capacity(parameter_slots);
+        // ⭐⭐ `D2b` — omit EVERY recursive position, from the closed
+        // projection, not only `selected`. `selected` is this unit's own
+        // position; a sibling recursive field is equally not a runtime value,
+        // and calling it nonrecursive is what put a `Specialized(Closure)` into
+        // the ordinary run. The two agree whenever a producer has exactly one
+        // recursive position, which is why this was green on every landed
+        // fixture until a sibling shape appeared.
         let mut nonrecursive = (0..field_count)
-            .filter(|position| *position != selected)
+            .filter(|position| {
+                *position != selected
+                    && !u32::try_from(*position)
+                        .ok()
+                        .is_some_and(|encoded| self.key.recursive_positions.contains(&encoded))
+            })
             .collect::<Vec<_>>();
         // ⛔ `D8l2` — the four population defects, applied to the built
         // population. Each is a shape a wrong derivation would actually
@@ -1951,7 +2039,11 @@ impl<'plan> ContinuationUnitView<'plan> {
 /// The Architect's ruling: the Parameter prefix is
 /// `[nonrecursive producer-Construct fields in source order]
 ///  ++ [selected worker captures in capture-ordinal order]`,
-/// with the selected recursive field omitted.
+/// with **every** recursive field omitted.
+///
+/// ⛔ `D2b`: this read "with the selected recursive field omitted". A producer
+/// with one recursive position makes the two readings identical, which is why
+/// the singular wording survived every landed fixture.
 ///
 /// This is a **role projection**, not a worker-body environment map. The
 /// continuation descriptor's contract and the worker's `arity + captures`
@@ -1960,7 +2052,12 @@ impl<'plan> ContinuationUnitView<'plan> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ContinuationOrdinaryEnvelopeRole {
     /// A nonrecursive field of the producer `Construct`, at its **source**
-    /// position. The selected recursive field is not in this population.
+    /// position.
+    ///
+    /// ⛔ **NO recursive field is in this population** — `D2b`. This doc
+    /// previously said "the selected recursive field is not in this
+    /// population", which was the singular reading that let a sibling recursive
+    /// field in as an ordinary ABI parameter.
     NonrecursiveConstructorField { source_position: u32 },
     /// One selected worker capture, at its capture ordinal.
     WorkerCapture {
@@ -7527,6 +7624,7 @@ fn exact_continuation_ordinary_parameters(
     producer_construct_origin: StaticOriginId,
     arguments: &[RuntimeExpr],
     recursive_position: usize,
+    recursive_positions: &BTreeSet<u32>,
     worker: &ContinuationWorkerProvenance,
 ) -> Result<u32, CraneliftBackendError> {
     if worker.producer_origin != producer_construct_origin
@@ -7539,9 +7637,21 @@ fn exact_continuation_ordinary_parameters(
     }
     let mut ordinary_fields = 0usize;
     for (position, _) in arguments.iter().enumerate() {
-        if position == recursive_position {
+        // ⭐⭐ `D2b` — EVERY recursive position is excluded, not just this
+        // unit's own. `recursive_position` answers "is this field MINE?"; the
+        // runtime envelope needs "is this field RECURSIVE?", and a sibling
+        // recursive field counted here becomes an ordinary ABI parameter
+        // carrying a `Specialized(Closure)` the boundary correctly refuses.
+        if u32::try_from(position)
+            .ok()
+            .is_some_and(|encoded| recursive_positions.contains(&encoded))
+        {
             continue;
         }
+        debug_assert!(
+            position != recursive_position,
+            "this unit's own recursive position must be a member of the closed projection"
+        );
         let field_origin = plan
             .semantic
             .child_origin(producer_construct_origin, position)?;
@@ -7893,6 +8003,30 @@ fn build_continuation_specialization_plan(
                 {
                     continue;
                 }
+                // `D2b` — the closed projection, built ONCE from the checked
+                // set and validated before any unit is interned. Every member
+                // must name a real constructor field; a position outside the
+                // argument run would leave the envelope omitting a field that
+                // does not exist and the slot reconciliation reporting a length
+                // disagreement that says nothing about the real fault.
+                let mut checked_recursive_positions = BTreeSet::new();
+                for position in case.recursive_positions.iter().copied() {
+                    if position >= args.len() {
+                        // The computational-match validator owns the malformed
+                        // -position diagnostic; dormant planning must not
+                        // preempt it, so this position is not projected.
+                        continue;
+                    }
+                    let encoded = u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("continuation recursive position exhausted")
+                    })?;
+                    if !checked_recursive_positions.insert(encoded) {
+                        return Err(planner_error(
+                            "a checked case names one recursive source position twice, so the \
+                             closed projection is not unique by source position",
+                        ));
+                    }
+                }
                 for position in case.recursive_positions.iter().copied() {
                     let Some(candidate) = args.get(position) else {
                         // This is not a specialization candidate. The existing
@@ -7922,6 +8056,7 @@ fn build_continuation_specialization_plan(
                         producer_construct_origin,
                         args,
                         position,
+                        &checked_recursive_positions,
                         &worker,
                     )?;
                     let Some(producer_environment) = exact_continuation_source_environment(
@@ -8033,6 +8168,7 @@ fn build_continuation_specialization_plan(
                         recursive_position: u32::try_from(position).map_err(|_| {
                             planner_capacity_error("continuation recursive position exhausted")
                         })?,
+                        recursive_positions: checked_recursive_positions.clone(),
                         worker: worker.clone(),
                         ordinary_parameters,
                         continuation_inputs: exact_continuation_projection(
