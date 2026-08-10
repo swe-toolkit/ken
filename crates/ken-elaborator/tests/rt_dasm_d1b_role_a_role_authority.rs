@@ -19,6 +19,31 @@
 //! control stayed green under exactly the substitution it was meant to exclude.
 //! Every assertion below names a **fully qualified** symbol — the parent chain
 //! is the identity, and the parent is what a substitution changes.
+//!
+//! **MEASURED.** With all sixty shadowable role spellings and all five family
+//! spellings declared by a package, no shadow's framed symbol occurs anywhere in
+//! the emitted record, the canonical prelude parents are still carried, and the
+//! roster's spelling table and the fixture's inventory agree in both directions.
+//! Seven mutations discriminate it: one per producer path class (record
+//! constructor, spine constructor, family, operation), each restored to
+//! `env.globals.get(name)` and each reddening while naming exactly the redirected
+//! role; and three on the inventory relation (fixture shrinks, roster grows,
+//! fixture goes stale).
+//!
+//! **CLAIMED.** Neither producer selects any role by source spelling after
+//! package elaboration, so no package declaration can capture a Runtime role.
+//!
+//! **THE GAP.** The claim is closed over *today's* roster. A future edit that
+//! adds `env.globals.get("SomethingNew")` directly to a producer — bypassing the
+//! roster rather than extending it — is seen by neither control: the relation
+//! compares the fixture against the roster, not against the producers, and the
+//! fixture cannot shadow a spelling nobody has written yet. What forces such an
+//! edit into view is that the roster is the producers' only other source of
+//! ids, so adding a role *through* it reds this file until the fixture follows.
+//! Roles whose ids were already canonical before this repair (`Zero`/`Suc`, the
+//! private operations, the resource ids) are outside the fixture by
+//! construction — they never passed through name lookup, so there is nothing to
+//! substitute.
 
 use ken_elaborator::checked_core::{CheckedCorePackage, StableSymbol, SymbolNamespace};
 use ken_elaborator::prelude::CanonicalRuntimeRoles;
