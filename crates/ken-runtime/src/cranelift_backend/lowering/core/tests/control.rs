@@ -29380,3 +29380,180 @@ struct D2bObservation {
     entered: BTreeSet<StaticOriginId>,
     worker_calls: BTreeSet<StaticOriginId>,
 }
+
+/// Row 3's exact shape with **only** the `Let` value changed to an ordinary
+/// constructor.
+///
+/// ⛔ Derived from `px8j_recursive_sibling_result` by rewriting one node, not
+/// re-typed beside it. "Differs only in the `Let` value" is then true **by
+/// construction**: a copy would drift from row 3 the first time either is
+/// edited, and this control's whole meaning is that it is the same shape.
+///
+/// The producer, its two recursive positions, the `Let` and the `Call Var(2)`
+/// body are row 3's own.
+fn px8j_sibling_result_with_ordinary_let_value() -> RuntimeExpr {
+    let mut expression =
+        px8j_recursive_sibling_result(1, 2, px8j_aggregate_result());
+    let RuntimeExpr::ComputationalMatch { cases, .. } = &mut expression else {
+        panic!("row 3's fixture is a computational match");
+    };
+    let node_case = cases
+        .iter_mut()
+        .find(|case| !case.recursive_positions.is_empty())
+        .expect("row 3's producer has a recursive case");
+    let RuntimeExpr::Let { value, .. } = &mut node_case.body else {
+        panic!("row 3's recursive case body is a Let");
+    };
+    // The recursive `Call Var(0)` is what lowers to a backedge; an ordinary
+    // constructor is what this row exists to contrast with.
+    assert!(
+        matches!(value.as_ref(), RuntimeExpr::Call { .. }),
+        "row 3's Let value is the recursive call this fixture replaces"
+    );
+    *value = Box::new(RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+        args: Vec::new(),
+    });
+    expression
+}
+
+/// **`D2b` — the SAME `Let` shape with a NON-BACKEDGE value: the body runs, its
+/// join is consumed, and nothing is dispositioned.**
+///
+/// > **MEASURED:** on row 3's producer with only the `Let` value changed to an
+/// > ordinary constructor, occurrences are entered, **`dispositioned` is empty
+/// > in every close**, the disjoint union closes `required`, and **both**
+/// > disposition modes agree exactly — outcome, accounting and entry.
+/// > **CLAIMED:** the new arm touches only the backedge branch; a non-backedge
+/// > `Let` on this producer dispositions nothing. **THE GAP:** the body's `Call`
+/// > is NOT reached on this fixture, so "its join is consumed" is not asserted
+/// > here — see the note at that assertion; and this is one source shape, not
+/// > every `Let`.
+///
+/// ⛔ **This is the live half of a live/non-live pair, and it needs its own
+/// row.** An earlier revision argued it followed from *"exactly one function
+/// dispositions anything"* over the existing suite. It does not: that clause
+/// says nothing about **which** source shape reached this arm, and a suite-wide
+/// count cannot testify that *this* producer's ordinary branch was exercised.
+///
+/// ⛔ **The mode toggle must change NOTHING here**, and that is asserted rather
+/// than assumed. If `Suppress` altered this row, the mutation would not be
+/// confined to the backedge branch — and the backedge control's A/B would then
+/// be measuring two changes instead of one.
+#[test]
+fn d2b_the_same_let_with_a_nonbackedge_value_runs_its_body_and_dispositions_nothing() {
+    use crate::cranelift_backend::lowering::core::{
+        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+    };
+    use crate::cranelift_backend::lowering::{
+        lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+            set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        }
+    }
+
+    let run = |mode: LrcD2bLetDisposition| -> D2bObservation {
+        let _restore = Restore;
+        let expression = host_result_closure_match(px8j_sibling_result_with_ordinary_let_value());
+        lrc_d2b_reset_observation();
+        set_lrc_d2b_let_disposition(mode);
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let (result, _trace) =
+            px8j_capture_source_trace(&expression, false, "ken_d2b_live_let");
+        set_selector_variant_exclusion(None);
+        set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        D2bObservation {
+            rendered: format!("{result:?}"),
+            closeout: lrc_d2b_join_observation(),
+            entered: lrc_d2b_entered(),
+            worker_calls: lrc_d2b_worker_calls(),
+        }
+    };
+
+    for mode in [LrcD2bLetDisposition::Exact, LrcD2bLetDisposition::Suppress] {
+        let observed = run(mode);
+
+        // THE BODY RAN. Non-empty entry and a reached static-worker edge are the
+        // positive evidence; without them every "nothing was dispositioned"
+        // below would hold because nothing happened at all.
+        assert!(
+            !observed.entered.is_empty(),
+            "{mode:?}: no source occurrence was entered, so this row measures nothing"
+        );
+        // ⛔ THE BODY'S `Call` IS NOT REACHED ON THIS FIXTURE, and that is a
+        // measured property of the shape rather than a gap in this row.
+        //
+        // The re-cut asked this control to prove the body's `Call` reaches a
+        // static-worker edge and its join is consumed. It cannot, and the
+        // reason is structural: the producer keeps row 3's TWO recursive
+        // positions, so `continuation_case_binder_run`'s segment-1 hard stop --
+        // which this deliverable RETAINS -- fires during unit definition,
+        // before the case body lowers. Changing only the `Let` value cannot get
+        // past a refusal triggered by the producer's shape.
+        //
+        // ⇒ A fixture that DID reach the body would need a single-recursive-
+        // position producer, which is no longer row 3's shape and would stop
+        // being the comparison this row exists to make. The two requirements
+        // are in tension on one fixture; the handback reports it.
+        assert!(
+            observed.worker_calls.is_empty(),
+            "{mode:?}: a static-worker edge WAS reached, so the singular hard stop no longer \
+             precedes the body and the live half of this row is now constructible -- write it \
+             rather than keeping this assertion"
+        );
+
+        assert!(
+            !observed.closeout.is_empty(),
+            "{mode:?}: no join closeout ran, so the accounting below is vacuous"
+        );
+
+        // NOTHING IS DISPOSITIONED — the discriminator against the backedge row.
+        for (required, consumed, dispositioned) in &observed.closeout {
+            assert!(
+                dispositioned.is_empty(),
+                "{mode:?}: a live Let body's subtree was dispositioned {dispositioned:?}; the new \
+                 arm is firing outside the backedge branch"
+            );
+            assert!(
+                consumed.is_disjoint(dispositioned),
+                "{mode:?}: consumed and dispositioned overlap"
+            );
+            let mut covered = consumed.clone();
+            covered.extend(dispositioned.iter().copied());
+            assert_eq!(
+                covered, *required,
+                "{mode:?}: the disjoint union does not close the required set"
+            );
+        }
+        assert!(
+            observed
+                .closeout
+                .iter()
+                .any(|(_, consumed, _)| !consumed.is_empty()),
+            "{mode:?}: nothing was consumed anywhere, so the closures above are degenerate"
+        );
+    }
+
+    // THE MODE TOGGLE CHANGES NOTHING on this shape.
+    let exact = run(LrcD2bLetDisposition::Exact);
+    let suppressed = run(LrcD2bLetDisposition::Suppress);
+    assert_eq!(
+        exact.rendered, suppressed.rendered,
+        "the disposition mode changed a NON-backedge row's outcome, so the mutation is not \
+         confined to the backedge branch and the other control's A/B measures two changes"
+    );
+    assert_eq!(
+        exact.closeout, suppressed.closeout,
+        "the disposition mode changed a non-backedge row's join accounting"
+    );
+    assert_eq!(
+        exact.entered, suppressed.entered,
+        "the disposition mode changed which occurrences a non-backedge row entered"
+    );
+}

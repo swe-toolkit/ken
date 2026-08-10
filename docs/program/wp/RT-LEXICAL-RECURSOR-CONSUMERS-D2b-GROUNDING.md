@@ -347,13 +347,33 @@ existed only in prose; what is committed now, in
 | the abandoned origin is **never entered** and gets **no static-worker call**, with a non-empty entered set so both absences are non-vacuous | yes |
 | the suppressed leg dispositions it in **no** close | yes |
 
-⛔ **Two things named in the re-cut are covered by implication rather than by
-their own row, and that is stated rather than glossed.** The *non-backedge live
-body* is covered by the uniqueness clause — exactly one close dispositions
-anything, so every other `LetBody` traversal in the suite disposes nothing — and
-by `consumed` being non-empty. *Zero withdrawn-plan invocations* is a **git**
-fact, not a test: `units.rs` is untouched across the candidate range, so the
-lookup, binder and telescope do not exist to be invoked.
+**The non-backedge shape now has its OWN row**, not an implication:
+`d2b_the_same_let_with_a_nonbackedge_value_runs_its_body_and_dispositions_nothing`.
+It is derived from row 3's fixture by rewriting one node, so "differs only in
+the `Let` value" holds by construction. It asserts nothing is dispositioned in
+any close, the union closes, and **both disposition modes agree exactly** —
+outcome, accounting and entry — which is what confines the mutation to the
+backedge branch.
+
+⛔ **One half of that row's specification is not satisfiable and this is
+measured, not conceded.** The re-cut also asked it to prove the body's `Call`
+reaches a static-worker edge and its join is consumed. It cannot: the producer
+keeps row 3's **two** recursive positions, so the segment-1 hard stop this
+deliverable **retains** fires during unit definition, before the case body
+lowers. Changing only the `Let` value cannot get past a refusal triggered by the
+producer's *shape*. A fixture that reached the body would need a
+single-recursive-position producer — no longer row 3's shape, and no longer the
+comparison the row exists to make. The assertion is inverted and armed instead:
+if a static-worker edge is ever reached there, the row **reds** and says to
+write the live half, so the limitation cannot silently outlive its cause.
+
+**Zero withdrawn-plan invocations** is recorded as a **candidate-scope /
+full-diff invariant**, not a behavioural control: `units.rs` is untouched across
+the range, so the member lookup and nonselected binder do not exist to be
+invoked. The **telescope route** is separately pinned behaviourally by the
+positive advance to `projects no worker for` — that refusal can only fire while
+the plural telescope is absent, and it demonstrably disappeared when the plural
+telescope was built.
 
 Between them, an arm that dispositioned the wrong subtree could not stay green —
 the union would not close, the singleton clause would fail, or the advance

@@ -11067,8 +11067,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         static_origin: StaticOriginId,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
-        #[cfg(test)]
-        crate::cranelift_backend::lowering::lrc_d2b_record_worker_call(static_origin);
         // Explicit arguments in source order: argument `i` is child `1 + i` of
         // the `Call` occurrence, the callee being child `0`.
         //
@@ -11105,6 +11103,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         mut inputs: Vec<LoweringOperand>,
         static_origin: StaticOriginId,
     ) -> Result<(LoweringOperand, StaticWorkerEmission), CraneliftBackendError> {
+        // `D2b` OBSERVATION ONLY, at the seam BOTH consumers share -- the direct
+        // descent and the source-machine consumer. Recording at one caller
+        // would miss whichever path a fixture happens to take, which is exactly
+        // how a "no worker call" reading can be an instrument gap rather than a
+        // fact about the program.
+        #[cfg(test)]
+        crate::cranelift_backend::lowering::lrc_d2b_record_worker_call(static_origin);
         // ⛔ Arity is checked HERE, not in either caller. The explicit-argument
         // run is exactly `inputs` at entry -- captures are appended below -- so
         // this is the one place both consumers can be held to the declared
