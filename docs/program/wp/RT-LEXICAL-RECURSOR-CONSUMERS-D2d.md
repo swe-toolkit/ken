@@ -1,8 +1,9 @@
 # RT-LEXICAL-RECURSOR-CONSUMERS D2d — no-carrier static continuation fusion
 
 Owner: runtime. Size: M. Node: [[RT-LEXICAL-RECURSOR-CONSUMERS]] (`#6d`).
-Architect ruling `evt_2wwh9yamyhs7p`, 2026-08-10. Fixed inputs measured at
-`main` `5756ff74` and at candidate `66688fa4`.
+Architect ruling `evt_2wwh9yamyhs7p`, 2026-08-10. Fixed inputs were measured at
+`main` `5756ff74`; `D2c` has since landed and `main` is `35231088`. **Re-derive
+your merge-base — do not reuse a SHA from this frame.**
 
 **Seat tier: T1.** The suspension of Runtime's T1 exception covers campaign node
 `#8` only; `#6d` is a campaign node and stays T1. Do not downgrade this seat.
@@ -12,9 +13,10 @@ Architect ruling `evt_2wwh9yamyhs7p`, 2026-08-10. Fixed inputs measured at
 `D2c` withdrew the retained-lane reuse premise by measurement: on the identical
 expression `RecursiveDescent` performs **zero** carrier transfers while
 functionized B-only performs six and refuses on the sixth. **The retained lane
-never carries the closure**, so there was no lawful counterpart to copy. That
-evidence rides candidate `66688fa4`, which **remains independently mergeable and
-is not blocked by this frame**.
+never carries the closure**, so there was no lawful counterpart to copy. **That
+evidence has landed** — it merged as `e810a227` into `main` `8c72ed62`, not as
+the earlier `66688fa4` this frame was drafted against. Take the withdrawal as
+settled and do not re-measure it.
 
 ## The ruling: both obvious repairs are rejected
 
@@ -88,6 +90,38 @@ singular.
 **AC-5.** `D2b`'s controls are retained and still prove `Closure` and
 `DeclarationClosure` unconditionally non-transferable, and
 `call_declared_unit_target` free of any closure lane.
+
+**AC-6 — finish the `D2a` repair on the leg it missed.** Confirmed Adversary
+finding `evt_6enwsf0jrdezx`, measured on `8c72ed62`. `D2c` hardened one leg of
+the A/B and left the **suppressed** leg byte-untouched, in the same function
+thirty lines below:
+
+```rust
+let (s_arrivals, s_forwards, suppressed) = run(true);
+assert!(s_arrivals > 0, "the suppressed run saw no arrivals, ...");
+assert_eq!(s_forwards, 0, "the suppression did not actually suppress ...");
+```
+
+**Delete the denominator and `assert_eq!(s_forwards, 0)` passes more easily, not
+less** — because nothing arrived. `s_forwards == 0` is the clause establishing
+that the suppression actually suppressed; vacuous, the negative leg no longer
+separates *"suppression restored R1"* from *"R1 returned for an unrelated reason
+while zero forwards happened because zero arrived."*
+
+Apply the same idiom verbatim: build `s_arrivals` as a `NonZeroUsize` and read
+`.get()` where the count is needed. **Two lines. No predicate change, no count
+pinned, no new control.** The `.contains(R1)` assertions below are positive and
+do not go vacuous — this is specifically `s_forwards == 0`.
+
+**Why this is in scope rather than tidy-up:** the trim motive is a pass that
+strips `#[cfg(test)]` machinery out of production, both counters feed both legs,
+and that pass reaches the unhardened leg exactly as easily as it would have
+reached the hardened one. **The hazard was never leg-specific; the repair was.**
+
+**And it is a standing caution on your own AC-2**, which is an A/B of exactly
+this shape. When you author it, make the clause that establishes the suppression
+worked inseparable from its denominator by construction — do not restate the
+guarantee in a comment.
 
 ## Excluded scope
 
