@@ -42,9 +42,39 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `95322b0e`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `d1c91369`**, moving again when Runtime PR #1760 lands.
 
-> ### RESUME HERE — state at 2026-08-10 ~01:0xZ
+> ### RESUME HERE — state at 2026-08-10 ~04:0xZ
+>
+> ### BOTH LANES MERGED OR MERGING; VERIFY IS IN. Kernel's ring is COMPLETE.
+>
+> | lane | state |
+> |---|---|
+> | Kernel `KERNEL-NESTED-IND` `D7` | **MERGED** `4b412ec4`, PR #1759, CI green, `main` `d1c91369`. Both blobs verified. Adversary notified (`evt_2zwgebwwt8cwr`), Librarian notified for the attested-path hit (`evt_4z7rsp8ev7zs1`). |
+> | Runtime `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a` | **PUBLISHING** `3f768659`, PR #1760, in its CI wait. Decision `dec_7hn6smgz1fp19` read from the object: Architect APPROVE. |
+> | Verify `CI-ASSERTIONLESS-L1` | **RELEASED** on Kernel's freed lane, anchor `evt_2g9jr9kcpt04g`. |
+>
+> ⛔ **`KERNEL-NESTED-IND` STAYS `active`, and no Kernel work is implied.** Its
+> only open criterion is `AC-K12`, which is **Runtime-owned** — native lowering,
+> the Cranelift verifier, interpreter/native agreement — plus its carried
+> `#[ignore]`d `AC-5` control in `static_transition.rs`, which may not be
+> reported green while still ignored. Kernel's deliverable ring is complete
+> (kernel-leader, `evt_69c8tf68fwqab`).
+>
+> **Unpublished and owed: `3ad5228e`** — the Architect motive-row ruling. Publish
+> it once PR #1760 clears; one publisher at a time.
+>
+> ### `D7` RETROS RECORDED — no action, retros do not gate (`steward.md §1`)
+>
+> Implementer `evt_x1g3m86b1s73`, QA `evt_5bye381ye3ert`, leader
+> `evt_1v5k4wjz07a1x`.
+>
+> ⚠ **The leader retro id was mistyped and corrected in a follow-up, for the
+> SECOND consecutive ring** (`D6` did the same at `evt_5f18ba3jgwr1e`). Record
+> only the corrected trio; a retro id copied from the first handoff is wrong
+> both times.
+>
+> ### RESUME HERE — earlier state at 2026-08-10 ~01:0xZ
 >
 > ### OPERATOR AWAY 2026-08-10 ~02:57Z UNTIL 11:30Z. THE FLEET KEEPS RUNNING.
 >

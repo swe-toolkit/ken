@@ -894,10 +894,63 @@ Set identity is the result; equal cardinality would miss an assumption swap.
   shapes and constructs the matching lifted terms at lines 2233–2259 before
   applying the selected method.
 
-Thus the kernel checker grew by these three load-bearing mechanisms while the
+- **`crates/ken-kernel/src/env.rs` — the support-authority registry.** ⚠ **Added
+  2026-08-10 from Adversary finding `evt_3ycbbm7yydhva`; the enumeration as
+  merged omitted this file entirely.** It holds the state and the relations that
+  decide support identity and terminality:
+
+  | line | symbol |
+  |---|---|
+  | `:254` | `all_supports: HashMap<(GlobalId, usize, AllSupportSort), GlobalId>` |
+  | `:258` | `terminal_supports: HashSet<GlobalId>` |
+  | `:400` | `all_support_origin(...)` |
+  | `:412` | `is_terminal_support(family)` |
+  | `:416` | `register_all_supports(...)` |
+
+  This is **authority, not construction**, which is why it belongs in an audit
+  enumeration at least as much as the constructors do. `all_support_origin` is
+  the provenance gate on which checked-artifact erasure admits a generated
+  support `Elim`; `is_terminal_support` is the predicate behind the seed's
+  `nested-generated-all-support-is-terminal (soundness)` row. ⚠ **A wrong answer
+  from either is silent, where a wrong constructor is loud.** There is also an
+  open, unclosed soundness concern against this exact registry —
+  [[RT-TERMINAL-ALL-ELIM-AUTHORITY]] `AC-8`, that a reverse scan over a
+  randomized `HashMap` fails as a nondeterministic authority answer rather than
+  a refusal.
+
+**Scope of this enumeration, stated because the omission proved it was not
+obvious:** it covers **every kernel surface a reader must newly trust** for
+nested-inductive admission — the constructors, the admission transaction, iota,
+and the support-authority registry. ⛔ It is **not** narrowed to "the checker"
+with registries and accessors excluded.
+
+Thus the kernel checker grew by these four load-bearing mechanisms while the
 unchecked-assumption ledger grew by **`+0 GlobalId`**. No LOC, function, or file
 count is claimed because the repository has no instrumented baseline for one.
 This report does not advance `AC-K12`, which remains Runtime-blocked.
+
+> ### Why neither half of `D7` could catch the other's gap
+>
+> `all_supports` and `terminal_supports` are **`GlobalEnv` struct fields, not
+> `Decl`s**, and `trusted_base()` iterates `self.decls` filtering `Decl::Opaque`
+> and non-literal `Decl::Primitive`. ⇒ **The `AC-K10` control structurally
+> cannot observe the support-authority state.** No outcome of that test says
+> anything about it.
+>
+> So `D7` shipped as a mechanical control that provably cannot see this surface,
+> plus a prose enumeration that omitted it. **The defect was in the conjunction,
+> and reviewing either half alone reads complete.** ⇒ Reusable: when a
+> deliverable is *"a control plus a prose claim"*, **the control's blind spot is
+> exactly where the prose needs auditing hardest** — and that is the one place
+> neither reviewer is looking, because each is checking the half that is fine.
+>
+> **What proved this was an omission and not a scoping choice:** `git log -S`
+> over `crates/ken-kernel/src/` shows `build_all_support_decl` — the anchor that
+> *was* named — together with `all_support_origin`, `is_terminal_support`, and
+> `register_all_supports` **all introduced by the same commit, `afb38934`.** The
+> enumeration took one symbol from that change and left three, in a file it
+> never mentioned. Re-verified by the Steward at `d1c91369`; all five line
+> citations above resolve there.
 
 **Validation.** After the operator all-clear, the exact set-identity control
 passed 1/1 and the complete affected `nc14_data_match_lowering` suite passed
