@@ -115,6 +115,159 @@ pub struct RuntimeCheckedCoreMetadata {
     pub recursion_metadata: BTreeMap<RuntimeSymbol, RuntimeRecursionAuditMetadata>,
     pub effects_foreign_metadata: BTreeMap<RuntimeSymbol, RuntimeEffectsForeignAuditMetadata>,
     pub metadata: BTreeMap<RuntimeSymbol, Vec<u8>>,
+    /// The checked role authority, decoded and validated at erasure.
+    ///
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-b`. The raw bytes also survive in
+    /// `metadata` above; this is the typed, validated projection of them, so a
+    /// consumer never has to re-parse the lane or trust it unchecked.
+    ///
+    /// ⚠ `Option` is deliberate **and temporary**. Not every erasure path is
+    /// package-backed — the seed-only lane mints its IR in the legacy namespace
+    /// and carries no record — so absence is a real state at this slice.
+    /// `D1b-role` item 5 makes package-backed compilation *require* the field
+    /// and item 6 removes the `Option` at the lowerer boundary; neither is in
+    /// scope here. ⛔ Do not read absence as "no roles needed".
+    pub runtime_symbols: Option<RuntimeCheckedRoleSymbolsV1>,
+}
+
+/// Declares the host-spine half of the role record and the order its symbols
+/// are encoded in, from a single list.
+///
+/// The wire format is positional, so the decoder and the field set must agree.
+/// Declaring both from one list makes them unable to disagree: adding a field
+/// here moves the decoder's expected count and its destructuring together.
+macro_rules! runtime_host_spine_v1 {
+    ($( $field:ident ),* $(,)?) => {
+        /// The decoded, validated host spine (`CheckedHostSpineV1`'s projection).
+        #[derive(Clone, Debug, PartialEq, Eq)]
+        pub struct RuntimeCheckedHostSpineV1 {
+            $( pub $field: RuntimeSymbol, )*
+            /// The twelve IO errors, in the order the record carries them.
+            pub io_errors: Vec<RuntimeSymbol>,
+            /// Public host operations as `(symbol, HostOpV1 tag)`.
+            pub operations: Vec<(RuntimeSymbol, u16)>,
+        }
+
+        impl RuntimeCheckedHostSpineV1 {
+            /// The positional field names, in wire order.
+            pub const ORDERED_FIELDS: &'static [&'static str] =
+                &[ $( stringify!($field) ),* ];
+
+            /// Rebuild from the positional run the decoder read.
+            ///
+            /// Returns `None` on a length mismatch rather than silently binding
+            /// fields to the wrong symbols — a short run would otherwise shift
+            /// every role by one and still produce a well-formed record.
+            pub fn from_ordered(
+                ordered: Vec<RuntimeSymbol>,
+                io_errors: Vec<RuntimeSymbol>,
+                operations: Vec<(RuntimeSymbol, u16)>,
+            ) -> Option<Self> {
+                if ordered.len() != Self::ORDERED_FIELDS.len() {
+                    return None;
+                }
+                let mut next = ordered.into_iter();
+                Some(Self {
+                    $( $field: next.next()?, )*
+                    io_errors,
+                    operations,
+                })
+            }
+
+            /// Every spine role paired with its field name, for validation.
+            pub fn roles(&self) -> Vec<(&'static str, &RuntimeSymbol)> {
+                let mut out: Vec<(&'static str, &RuntimeSymbol)> =
+                    vec![ $( (stringify!($field), &self.$field), )* ];
+                for symbol in &self.io_errors {
+                    out.push(("io_error", symbol));
+                }
+                for (symbol, _) in &self.operations {
+                    out.push(("operation", symbol));
+                }
+                out
+            }
+        }
+    };
+}
+
+runtime_host_spine_v1! {
+    ret,
+    vis,
+    in_l,
+    in_r,
+    fs_family,
+    console_family,
+    clock_family,
+    entropy_family,
+    capability,
+    result_err,
+    result_ok,
+    option_some,
+    file_error,
+    file_operation_read,
+    file_operation_write,
+    file_operation_change_mode,
+    resource_host_io,
+    resource_closed,
+    resource_malformed,
+    resource_right_not_held,
+    resource_release_failed,
+    resource_kind_mismatch,
+    resource_buffer_limit,
+    resource_allocation_failed,
+    resource_invalid_offset,
+    resource_invalid_bounds,
+    resource_no_progress,
+    resource_kind_fs_handle,
+    resource_kind_buffer,
+    resource_trace_identity,
+    nat_zero,
+    nat_suc,
+    private_buffer_span,
+    private_transfer_count,
+    read_some,
+    read_eof,
+    wrote,
+    unit,
+    bool_false,
+    bool_true,
+}
+
+/// The decoded, validated checked-runtime role record.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-b`, item 4. Every symbol here has
+/// been checked to exist in the package's `semantic.symbols` and, where it is a
+/// constructor, to resolve **uniquely** through the recorded `data_metadata`
+/// family with its recorded arity and recursive positions.
+///
+/// ⛔ Those checks detect **stale or mismatched metadata**. They do not infer a
+/// role from a declaration's shape and must not be read as if they could: the
+/// authority is the producer's canonical prelude roster, not this validation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeCheckedRoleSymbolsV1 {
+    pub spine: RuntimeCheckedHostSpineV1,
+    pub process_input: RuntimeSymbol,
+    pub list_nil: RuntimeSymbol,
+    pub list_cons: RuntimeSymbol,
+    pub prod: RuntimeSymbol,
+    pub exit_success: RuntimeSymbol,
+    pub exit_failure: RuntimeSymbol,
+}
+
+impl RuntimeCheckedRoleSymbolsV1 {
+    /// Every role in the record, spine included, paired with its field name.
+    pub fn roles(&self) -> Vec<(&'static str, &RuntimeSymbol)> {
+        let mut out = self.spine.roles();
+        out.extend([
+            ("process_input", &self.process_input),
+            ("list_nil", &self.list_nil),
+            ("list_cons", &self.list_cons),
+            ("prod", &self.prod),
+            ("exit_success", &self.exit_success),
+            ("exit_failure", &self.exit_failure),
+        ]);
+        out
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
