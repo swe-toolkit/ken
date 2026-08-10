@@ -2,17 +2,22 @@
 
 Owner: kernel. Size: S. Node: [[KERNEL-NESTED-IND]] (`active`).
 
-**HELD 2026-08-10, on a hard stop Kernel called correctly — see
-[[KERNEL-NESTED-IND-D10]].** The repaired fixture elaborates, kernel-checks and
-erases, and then the interpreter panics at `ken-kernel/src/subst.rs:245` before
-producing `Nat 3`. **The row's named witnesses cannot execute, so this
-deliverable is not currently achievable** — that is the condition the "no new
-capability" clause below exists to surface, and it worked.
+**RE-RELEASED 2026-08-10. The `D10` hold is discharged** —
+[[KERNEL-NESTED-IND-D10]] merged as `main` `b2662be4` (candidate `cfc86a83`,
+PR #1838, both paths blob-verified). **The row's named witnesses now execute.**
 
-**Two things move to `D10` and must NOT land here.** The repro commit
-`2c165823` carrying the `Join` migration is `D10`'s to land, together with the
-repair, so CI is green on the result. Do not carry it in a `D9` candidate and
-do not re-derive it.
+`D10` discharged **both** required properties, and the second is the one that
+matters here: not merely that the interpreter stopped panicking, but that the
+`Former` arm's coordinate-origin repair makes the full-pipeline NC14 witness
+compute **`Nat 3`** rather than falling back to `Neutral`. A selection-removal
+control reds it to `Neutral`, and a guard-removal control restores the panic.
+**Take that as a fixed input and do not re-derive it.**
+
+**The fixture is already landed and is NOT yours to carry.** `D10` brought in
+the `Join` migration (`Join : Bag a -> Bag a -> Bag a`, `One` unchanged, every
+reaching operand migrated) together with the repair. **Do not re-apply it, do
+not re-derive it, and do not edit it** — a `D9` candidate that touches
+`nc14_data_match_lowering.rs` for the migration is re-landing work.
 
 **What remains `D9` when `D10` lands:** the row binding, the gate-marker and
 `blocked on` removal at both summary sites, `AC-4`'s discriminating fold
@@ -103,10 +108,45 @@ cannot type-check the definition at all. **A witness that only asserts `3` does
 not discriminate.** Show the `1` outcome is reachable under a mutation of the
 fold and that the witness reds on it. One mutation, reported with its result.
 
-**AC-5.** The gate marker and the `blocked on` status are removed from **this
-row only**, and the file's summary paragraph no longer claims it is gated.
-**The line-21 summary and the line-541 residual list are separate sites and both
-say so.**
+**AC-5 — the un-gating is EIGHT sites, not one, and I under-counted it.**
+Corrected 2026-08-10 by measuring the file rather than trusting the frame.
+
+**My earlier wording named "the gate marker" plus a `line-541` residual list.
+Both were wrong.** There is no single marker, and the residual list is at
+**557**, not 541 — a stale line citation repoints silently at real content
+rather than failing.
+
+**Enumerate by content, not by line number**, because these numbers move the
+moment anyone edits the file. In `conformance/kernel/inductive/seed-nested.md`,
+for `nested-size-uses-lift` **only**:
+
+| site | what it is |
+|---|---|
+| the row's `Status:` paragraph | `blocked on KERNEL-RECURSIVE-RESULT-SURFACE`, ending `the marker remains gated` |
+| `- given (future binding, gated)` | one of four qualifiers on the row's clauses |
+| `- expect (future binding, gated)` | |
+| `- fail-closed boundary (future binding, gated)` | |
+| `- sort boundary (future binding, gated)` | |
+| the file's opening summary | near line 21, naming both rows as gated |
+| the residual list | near line 557, naming both rows as gated |
+
+The two summary sites name **both** rows in one sentence, so each needs an edit
+that drops `nested-size-uses-lift` and **leaves
+`nested-dependent-motive-uses-lift` gated**.
+
+> ### THE SIBLING ROW IS A NEAR-IDENTICAL DECOY. A phrase-keyed edit hits both.
+>
+> `nested-dependent-motive-uses-lift` carries its **own** `Status: blocked on
+> KERNEL-RECURSIVE-RESULT-SURFACE` paragraph ending `the marker remains
+> gated`, and its **own** four `(future binding, gated)` qualifiers on
+> `given`, `expect`, `fail-closed boundary` and `sort boundary`. **Its
+> paragraph even says it is the *same* blocker for the *same* reason.**
+>
+> ⇒ **A `sed` or global replace on `remains gated`, on `(future binding,
+> gated)`, or on the blocker name silently un-gates a row that Kernel measured
+> as unestablished.** Scope every edit to the target row's span and **report
+> the sibling's site count as unchanged** — that count is the control, and a
+> claim that the target row is clean says nothing about the decoy.
 
 **AC-6 — new, and it is why D8 cost two rings a turn.** Any fixture edit that
 changes a constructor's type **migrates every reaching term in the same
