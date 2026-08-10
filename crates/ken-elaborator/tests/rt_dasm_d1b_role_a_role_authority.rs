@@ -162,6 +162,22 @@ fn shadow_family_symbol(family: &str) -> String {
     format!("decl:{PACKAGE}::{family}")
 }
 
+/// Does the record carry this symbol as one of its encoded entries?
+///
+/// ⚠ **This deliberately is not a substring search.** Every symbol in the record
+/// is framed as a little-endian `u64` length followed by its bytes, and matching
+/// the frame is what makes an occurrence exact. A plain `contains` reports role
+/// `X` whenever role `XY` is present, because `X`'s spelling is a prefix of
+/// `XY`'s: the operation-role mutation below redirected only `ReadFile`, and a
+/// substring reader also accused `Read`. That direction is safe — it over-reports
+/// rather than under-reports — but it misattributes the defect, and a control
+/// that names the wrong role sends its reader to the wrong line.
+fn record_carries_symbol(record: &[u8], symbol: &str) -> bool {
+    let mut needle = (symbol.len() as u64).to_le_bytes().to_vec();
+    needle.extend_from_slice(symbol.as_bytes());
+    record.windows(needle.len()).any(|window| window == needle)
+}
+
 #[test]
 fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
     let package = emit_shadowing_package();
@@ -218,13 +234,13 @@ fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
     let mut redirected = Vec::new();
     for (family, constructor) in SHADOWED_ROLES {
         let symbol = shadow_symbol(family, constructor);
-        if text.contains(&symbol) {
+        if record_carries_symbol(record, &symbol) {
             redirected.push(symbol);
         }
     }
     for family in SHADOWED_FAMILIES {
         let symbol = shadow_family_symbol(family);
-        if text.contains(&symbol) {
+        if record_carries_symbol(record, &symbol) {
             redirected.push(symbol);
         }
     }
@@ -238,6 +254,12 @@ fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
     // The canonical prelude parents are still present, so the roles were carried
     // rather than merely dropped. An empty or truncated record would satisfy the
     // absence check above for the wrong reason.
+    //
+    // These are deliberately PREFIX probes on the parent chain, not framed exact
+    // matches: the role's own final component is not what is being asked about,
+    // and under shadowing it degrades (the prelude's `Nil` loses its name to the
+    // package's, so its symbol becomes `...::List::ctor_<id>`). The parent is
+    // what survives shadowing, and the parent is the identity.
     for parent in [
         "ctor:d1b_role_a_shadow_pkg::List::",
         "ctor:d1b_role_a_shadow_pkg::Prod::",
