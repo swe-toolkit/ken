@@ -352,6 +352,10 @@ impl Scope {
         self.bindings.push((vec![name.to_string()], span));
     }
 
+    fn push_anonymous(&mut self, span: Span) {
+        self.bindings.push((Vec::new(), span));
+    }
+
     fn push_alias(&mut self, alias: &str, name: &str) {
         if let Some((names, _)) = self
             .bindings
@@ -1732,7 +1736,11 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
                 let (rpat, bound_names) = resolve_pattern(&arm.pat)?;
                 let depth_before = scope.depth();
                 for (name, binding_span) in &bound_names {
-                    scope.push_spanned(name, binding_span.clone());
+                    if name == "_" {
+                        scope.push_anonymous(binding_span.clone());
+                    } else {
+                        scope.push_spanned(name, binding_span.clone());
+                    }
                 }
                 if let Some(equation) = equation {
                     scope.push(equation);

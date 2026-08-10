@@ -191,6 +191,66 @@ fn validated_nested_results_elaborate_and_kernel_check() {
 }
 
 #[test]
+fn wildcard_slot_is_not_a_surface_addressable_structural_result_operand() {
+    // Promise class: durable invariant. `_` remains a discard under extensions
+    // that preserve the pattern-binding contract.
+    // MEASURED: a wildcard still occupying the first Join field's pattern slot
+    // cannot be resolved by the selector as the source name `_`.
+    // CLAIMED: wildcard pattern slots preserve method alignment without
+    // becoming surface bindings. THE GAP: this rejection alone could come from
+    // dropping the slot; the named-field control below pins retained alignment.
+    let source = STRUCTURAL_SIZE_SOURCE.replace(
+        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
+        "Join _ ys |-> add (structural result of _) (structural result of ys)",
+    );
+    assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
+    let mut env = ElabEnv::new().unwrap();
+    assert!(matches!(
+        env.elaborate_file(&source),
+        Err(ElabError::UnboundName { ref name, .. }) if name == "_"
+    ));
+}
+
+#[test]
+fn wildcard_slot_preserves_named_field_structural_result_alignment() {
+    // Promise class: durable invariant. Anonymous slots remain part of method
+    // alignment while named siblings retain their source identity.
+    // MEASURED: with the first Join field discarded, the second named field
+    // still selects its correlated trailing result and kernel-checks.
+    // CLAIMED: the repair changes surface addressability only, not pattern or
+    // method arity. THE GAP: the all-wildcard control below rules out a later
+    // wildcard becoming selectable through shadowing.
+    let source = STRUCTURAL_SIZE_SOURCE.replace(
+        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
+        "Join _ ys |-> structural result of ys",
+    );
+    assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_file(&source).unwrap();
+    assert!(env.globals.contains_key("result"));
+}
+
+#[test]
+fn multiple_wildcard_slots_never_publish_a_latest_surface_binding() {
+    // Promise class: durable invariant. Adding discarded fields cannot make
+    // the wildcard token denote a surface binding.
+    // MEASURED: two anonymous slots do not create a latest `_` binding.
+    // CLAIMED: wildcard invisibility holds independently of shadowing order.
+    // THE GAP: named pattern variables remain visible through the positive
+    // controls above; this pin is deliberately limited to wildcard slots.
+    let source = STRUCTURAL_SIZE_SOURCE.replace(
+        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
+        "Join _ _ |-> structural result of _",
+    );
+    assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
+    let mut env = ElabEnv::new().unwrap();
+    assert!(matches!(
+        env.elaborate_file(&source),
+        Err(ElabError::UnboundName { ref name, .. }) if name == "_"
+    ));
+}
+
+#[test]
 fn d2_wstyle_without_a_trailing_result_binder_is_exactly_out_of_scope() {
     let mut env = ElabEnv::new().unwrap();
     assert!(matches!(
