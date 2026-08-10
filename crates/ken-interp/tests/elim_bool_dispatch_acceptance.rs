@@ -53,6 +53,7 @@ fn eval_view(src: &str) -> EvalVal {
 /// `match (eq_int a a) { True => 1 ; False => 2 }` on a COMPUTED `Bool`
 /// (genuinely `eq_int 5 5`, never a bare literal) must pick the `True`
 /// branch, matching `data Bool = True | False`'s declared index 0.
+/// runtime/evaluation/computed-bool-true-selects-true-method
 #[test]
 fn computed_bool_true_dispatches_to_first_method() {
     let result = eval_view(
@@ -66,6 +67,7 @@ fn computed_bool_true_dispatches_to_first_method() {
 /// OTHER branch (methods[1]), not the same one as the True case (which
 /// would net a flipped/collapsed mapping,
 /// [[taint-axis-orientation-needs-distinguishing-pair]]).
+/// runtime/evaluation/computed-bool-false-selects-false-method
 #[test]
 fn computed_bool_false_dispatches_to_second_method() {
     let result = eval_view(
@@ -80,6 +82,7 @@ fn computed_bool_false_dispatches_to_second_method() {
 /// that the fix's new `EvalVal::Bool` arm agrees with the pre-existing,
 /// already-correct `EvalVal::Ctor{true_id/false_id}` literal path, not just
 /// that it happens to produce SOME value.
+/// runtime/evaluation/computed-bool-agrees-with-constructor
 #[test]
 fn computed_bool_agrees_with_literal_bool_dispatch() {
     let computed_true = eval_view("const t = match (eq_int 5 5) { True |-> 1 ; False |-> 2 }");
@@ -95,6 +98,7 @@ fn computed_bool_agrees_with_literal_bool_dispatch() {
 /// exact shape `decimalAdd`'s alignment needs: `leq_int`-computed `Bool` as
 /// a match scrutinee (not `eq_int`), confirming the fix isn't narrowly
 /// specific to one prim symbol's `EvalVal::Bool` output.
+/// runtime/evaluation/computed-bool-elimination-producer-independent
 #[test]
 fn computed_bool_via_leq_int_dispatches_correctly() {
     let le = eval_view("const t = match (leq_int 3 5) { True |-> 1 ; False |-> 2 }");
