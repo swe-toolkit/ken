@@ -1,7 +1,7 @@
 ---
 id: SPEC-SELECTOR-SORT-SPLIT
 title: "split the recursive-result selector by motive sort -- `recursive result for x` when Type-classified, `induction hypothesis for x` when Omega-classified -- and remove `structural result of x`"
-status: ready
+status: merged
 owner: spec
 size: M
 gate: none
