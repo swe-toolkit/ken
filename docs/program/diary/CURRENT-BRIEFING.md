@@ -38,15 +38,38 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~11:0xZ. `main` = `cf3b77b7`.
+> ### RESUME HERE — state at 2026-08-10 ~11:2xZ. `main` = `3d2e7ffb`.
 >
-> **One merge landed, one publishing, one waiting only on you.**
+> **Two merges landed. One thing waits only on you. Nothing else is blocked.**
 >
 > | what | exact | state |
 > |---|---|---|
 > | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | `fad92a1b` | **MERGED**, PR #1792, tree `279a0de7`. M6-M9 done |
-> | `CI-ROW-CLAIM-NAMESPACE` | `76121c51` | **PUBLISHING**, PR #1793, task `bt18g4zxb` |
+> | `CI-ROW-CLAIM-NAMESPACE` | `76121c51` | **MERGED**, PR #1793, tree `f553ece9`. M6-M9 done |
 > | `RT-DYNAMIC-ARM-SCALAR-MERGE` c1 | `7bfc8ae5` | **APPROVED AND WAITING ONLY ON THE OPERATOR** |
+>
+> **`main` is green on the widened checker, measured rather than assumed.** On a
+> throwaway detached worktree at `3d2e7ffb`, `verify-row-claims` reports **73
+> claims resolved to exactly one heading, 66 distinct row tokens, exit 0**. That
+> was the entire risk the ordering existed to avoid — the checker exits nonzero
+> on any unresolved claim and the sweep step runs under `bash -e`, so landing the
+> widening before the enclave node would have reddened `main` for every ring's
+> publisher.
+>
+> **A first attempt to measure that reported exit 2 with all four phantom claims
+> unresolved. It was a stale anchor, not a red `main`:** `steward/work` sits at
+> `b654d33a` plus local commits and never picked up the enclave merge, so
+> checking out `main`'s two scripts over a pre-enclave `crates/` and
+> `conformance/` measured a tree that never existed. **Both instincts it invites
+> are wrong** — believing it, and waving it away.
+>
+> **M8 was deliberately skipped on `CI-ROW-CLAIM-NAMESPACE`.** The procedure's
+> discriminator is `--doc-only`, which I did not pass, so it says notify. But
+> `COORDINATION §10⁻a` bars the Adversary from reporting on `scripts/` at all,
+> and this merge touched nothing else. **The flag is two-valued over a
+> three-valued space** — library docs, `scripts/` tooling, product code — so the
+> mechanical discriminator and the scope rule disagree here, and the scope rule
+> is the operator's. Worth repairing in `merge-procedure.md` M8.
 >
 > #### THE ONE DECISION THAT IS YOURS, and it now holds two rings
 >
