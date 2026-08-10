@@ -6,11 +6,11 @@
 //! conditions live in `.github/ignored-test-exemptions.toml`. This header makes
 //! no claim about any other row's conformance-cover status.
 
-use ken_elaborator::{ElabEnv, NumericLitVal, ObligationKind};
+use ken_elaborator::{ElabEnv, ElabError, NumericLitVal, ObligationKind};
 use ken_elaborator::extract::{v2_extract, ProvKind};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::env::Context;
-use ken_kernel::{convert, Decl, GlobalId, Term};
+use ken_kernel::{convert, Decl, GlobalId, KernelError, Term};
 
 // ── test infrastructure ──────────────────────────────────────────────────────
 
@@ -265,13 +265,21 @@ fn ac4_explicit_wrapping_is_modular() {
 #[test]
 fn ac5_no_implicit_cross_type_coercion() {
     let mut env = ElabEnv::new().unwrap();
-    let result = env.elaborate_decl_v1(
-        "fn f (x : Int) (y : Int64) = x + y"
-    );
-    assert!(
-        result.is_err(),
-        "implicit Int + Int64 must be a type error (no widening coercion)"
-    );
+    env.elaborate_decl_v1("fn same (x : Int) (y : Int) : Int = x + y")
+        .expect("matching Int operands must accept");
+
+    let error = env
+        .elaborate_decl_v1("fn mixed (x : Int) (y : Int64) : Int = x + y")
+        .expect_err("mixed Int and Int64 operands must reject without an explicit conversion");
+    let ElabError::KernelRejected {
+        error: KernelError::TypeMismatch { expected, found },
+        ..
+    } = error
+    else {
+        panic!("mixed operands must reach a kernel operand type mismatch, got {error:?}")
+    };
+    assert_eq!(*expected, Term::const_(env.numeric_env.int_id, vec![]));
+    assert_eq!(*found, Term::const_(env.numeric_env.int64_id, vec![]));
 }
 
 /// Not conformance cover; waits on L-classes to expose `Int.toInt64`.
@@ -327,19 +335,39 @@ fn sec31_int_div_zero_emits_obligation() {
     ).unwrap();
 }
 
-// ── §6.1: literal reduces in kernel ──────────────────────────────────────────
+// ── §6.1: primitive op runtime value and neutral conversion ──────────────────
 
-/// surface/numbers/literal-reduces-in-kernel
-/// `2 + 3 : Int` reduces to `5` definitionally in the kernel evaluator.
+/// surface/numbers/primitive-op-runtime-value-k3-conversion-deferred
+/// The interpreter evaluates `2 + 3 : Int` to `5`, while kernel conversion
+/// keeps the primitive operation application distinct from the literal `5`.
 #[test]
 fn sec61_literal_reduces_in_kernel() {
     let mut env = ElabEnv::new().unwrap();
-    let result = env.elaborate_decl_v1(
+    let sum = env.elaborate_decl_v1(
         "const five = (2 : Int) + (3 : Int)"
     ).unwrap();
+    let literal = env.elaborate_decl_v1(
+        "const literal_five = (5 : Int)"
+    ).unwrap();
     let mut store = make_store(&env);
-    let val = eval_def(&env, &mut store, result.def_id);
-    assert_eq!(val, EvalVal::Int(5), "2 + 3 : Int must reduce to 5 in the kernel evaluator");
+    let val = eval_def(&env, &mut store, sum.def_id);
+    assert_eq!(val, EvalVal::Int(5), "the interpreter must evaluate 2 + 3 : Int to 5");
+
+    let sum_body = env
+        .env
+        .transparent_body(sum.def_id)
+        .expect("five must be a transparent definition")
+        .1;
+    let literal_body = env
+        .env
+        .transparent_body(literal.def_id)
+        .expect("literal_five must be a transparent definition")
+        .1;
+    let int_ty = Term::const_(env.numeric_env.int_id, vec![]);
+    assert!(
+        !convert(&env.env, &Context::new(), &int_ty, &sum_body, &literal_body),
+        "kernel conversion must keep primitive addition neutral against literal 5"
+    );
 }
 
 // ── §6.2: algebraic law is a proposition, not a kernel rule ─────────────────
@@ -347,8 +375,8 @@ fn sec61_literal_reduces_in_kernel() {
 /// surface/numbers/algebraic-law-is-proposition-not-reduction (soundness)
 /// On abstract operands, `a + b` and `b + a` are NOT definitionally equal
 /// (commutativity holds only propositionally).
-/// Testing kernel conversion directly requires the kernel API; simplified here
-/// to structural evaluation observation.
+/// This test queries kernel conversion directly over the production-elaborated
+/// abstract operation bodies.
 #[test]
 fn sec62_abstract_add_is_neutral() {
     let mut env = ElabEnv::new().unwrap();
