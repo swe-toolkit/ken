@@ -1,8 +1,33 @@
 # RT-LEXICAL-RECURSOR-CONSUMERS — `D0`/`D1` checkpoint
 
-Base: exact `origin/main` `8fae87de01e7b9622d964669aa0289c9e99388f6`.
 Node: `docs/program/issues/RT-LEXICAL-RECURSOR-CONSUMERS.md` (rows 1-5 only).
 Frame: `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS.md`.
+
+## 0. Identity — the candidate base and the measurement base are the SAME
+
+| coordinate | exact |
+|---|---|
+| candidate merge-base | `9adeb30f` |
+| **base every number below was measured at** | **`9adeb30f`** |
+
+⛔ **Read this before any denominator.** An earlier revision of this record
+opened `Base: exact origin/main 8fae87de…` and then called its figures *"at this
+base"* — while the candidate had been re-anchored to `9adeb30f`. That is a false
+candidate identity: it presents measurements taken at one tree as evidence about
+another, and it does so in the one field a reader uses to decide what the
+numbers are about. `8fae87de` was the **original** measurement base and is
+recorded here as history, not as this candidate's base.
+
+**The resolution is a re-measurement, not an argument.** Every figure in §1 and
+§2 was re-taken on `9adeb30f` and reproduces the earlier run exactly —
+denominators, distribution, activation counts, the five failing tests, and the
+per-test abort pattern. The measured surface also did not move: `core.rs` is
+byte-identical across the two bases (sha256 `d75c2f09…a4f3` at both), which is
+why the reproduction is expected rather than lucky.
+
+**If a later re-anchor moves this candidate again, this section is what goes
+stale first.** Re-run the census rather than carrying these numbers forward: the
+instrument is described in §1.2 and takes one suite run per leg.
 
 > # THE PARTITION IS RETURNED. `D2` IS NOT STARTED.
 >
@@ -42,10 +67,10 @@ measured that `writeln!` issues a syscall per fragment and lets concurrent test
 threads interleave mid-record. **Malformed rows in the run below: 0.**
 
 The instrument was temporary and is **not** in this candidate; the tree is
-byte-identical to base (`core.rs` sha256 `d75c2f09…a4f3`). The measurement is the
-durable artifact.
+byte-identical to `9adeb30f` (`core.rs` sha256 `d75c2f09…a4f3`). The measurement
+is the durable artifact.
 
-### 1.3 Denominators, `ken-runtime --lib` at this base
+### 1.3 Denominators, `ken-runtime --lib`, measured at `9adeb30f`
 
 | quantity | value |
 |---|---|
@@ -102,7 +127,7 @@ green under B-only exclusion** (§2.3), so they widen the *population* without
 widening the *repair*.
 
 **16 is not materially above 16.** The sibling's census at `bcf3218b` put B at
-16 across 10 tests; this base measures the same figure. The re-size trigger does
+16 across 10 tests; `9adeb30f` measures the same figure. The re-size trigger does
 **not** fire. (`MatchScrutineeRecursor` moved 8 → 15 over the same interval, but
 that is the sibling's population, not this node's.)
 
@@ -138,7 +163,7 @@ compiles that enumerate B**. The branch carries
 does not fire"* — so a blanket set would panic on the other 652 compiles rather
 than measure them. Every B compile that reached the selector under exclusion
 selected **`FunctionizedUnits`**; production, unexcluded, keeps
-`RecursiveDescent`. The seam is confirmed at this base.
+`RecursiveDescent`. The seam is confirmed at `9adeb30f`.
 
 ### 2.2 Activation denominators — the guard against a credited-but-unreached refusal
 
@@ -228,7 +253,7 @@ different phase from the other three.
 ## 3. What this checkpoint does not cover
 
 - **No repair, no control, no fixture change.** `crates/` is byte-identical to
-  base; this candidate is this document.
+  `9adeb30f`; this candidate is this document.
 - **Row 6 and the `MatchScrutineeRecursor` population** — not touched.
 - **Rows 1 and 4 beyond their first activated compile** — 3 compiles unmeasured
   under activation, stated in §2.2 rather than assumed harmless.
