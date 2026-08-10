@@ -16542,15 +16542,20 @@ mod tests {
     /// **Release condition: nested-inductive admission is on `main`.**
     ///
     /// Stated as the capability rather than as `KERNEL-NESTED-IND` merged,
-    /// because those two came apart. The accepted partial `afb38934` merged that
-    /// node and did **not** bring the admission path: it landed
-    /// `ken-kernel/src/inductive.rs` as a superset while
-    /// `ken-elaborator/src/{compiler_driver,elab}.rs`,
-    /// `ken-elaborator/tests/nc14_data_match_lowering.rs` and
-    /// `ken-interp/src/eval.rs` each remain at their pre-change state. A merge
-    /// event is not the capability it was expected to deliver, and gating on one
-    /// invites the next reader to un-ignore this control and take a red they
-    /// cannot fix.
+    /// because those two came apart once already: a merge event is not the
+    /// capability it was expected to deliver, and gating on one invites the next
+    /// reader to un-ignore this control and take a red they cannot fix.
+    ///
+    /// **The release condition is tracked at `KERNEL-NESTED-IND` `AC-K12`.**
+    /// Consult it there.
+    ///
+    /// ⛔ **This comment deliberately gives you NO way to decide the condition
+    /// locally.** An earlier wording did, and that is the defect this replaces:
+    /// a decision procedure written into a comment is correct at the instant it
+    /// is written and silently wrong afterwards, at which point it tells the
+    /// reader the capability has arrived. Any snapshot, path list or commit put
+    /// here would decay the same way — so if you find yourself adding one,
+    /// that is the bug, not the omission.
     ///
     /// Until that capability lands the
     /// `LiftRose` witness exists only on the attribution node's disposable

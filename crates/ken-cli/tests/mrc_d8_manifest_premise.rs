@@ -275,6 +275,76 @@ fn dependency_is_featured_only_for_dev(manifest: &str, dependency: &str, feature
         .any(|item| item == feature)
 }
 
+/// **`D9` FACT 4** — this member's manifest enables `feature` on a **normal**
+/// `[dependencies]` edge to `dependency`.
+///
+/// ⛔ Reads `[dependencies]` **only**. `[dev-dependencies]` is deliberately out
+/// of scope and that is the whole point of fact 3: resolver 2 withholds
+/// unification across dev edges, so `ken-cli`'s featured dev edge is *lawful*
+/// and must stay accepted. A predicate that rejected every featured edge
+/// anywhere would red it, which is why `AC-9c` exists.
+fn normal_edge_enables_feature(manifest: &str, dependency: &str, feature: &str) -> bool {
+    let normal = table_entries(manifest, "dependencies").unwrap_or_default();
+    let Some(edge) = entry(&normal, dependency) else {
+        return false;
+    };
+    let Some(rest) = edge.split_once("features").map(|(_, rest)| rest) else {
+        return false;
+    };
+    let Some(open) = rest.find('[') else {
+        return false;
+    };
+    let Some(close) = rest[open..].find(']') else {
+        return false;
+    };
+    list_items(&rest[open..=open + close])
+        .iter()
+        .any(|item| item == feature)
+}
+
+/// Every declared member whose normal edge to `dependency` enables `feature`.
+///
+/// ⛔ **The member list is READ from `[workspace] members`, never transcribed.**
+/// The declared list is the artifact's own population, so iterating it closes
+/// the class **by construction** and stays correct when a ninth member arrives.
+/// An enumeration is correct today and silently wrong at the next `cargo new` —
+/// which is exactly the blind spot `D9` exists to remove, so reintroducing one
+/// here would rebuild it.
+///
+/// `read` maps a member's directory to its manifest text, so the pin can supply
+/// the filesystem and a control can supply a synthetic workspace. That is what
+/// makes "read, not transcribed" a *testable* claim rather than a promise: the
+/// control adds a ninth member and this function finds it **without the test
+/// naming any path**.
+fn members_with_featured_normal_edge(
+    workspace: &str,
+    dependency: &str,
+    feature: &str,
+    read: impl Fn(&str) -> String,
+) -> Vec<String> {
+    let members = table_entries(workspace, "workspace")
+        .as_deref()
+        .and_then(|entries| entry(entries, "members"))
+        .map(list_items)
+        .unwrap_or_else(|| {
+            // Fail closed: an unreadable member list is not an empty one. A
+            // silent `[]` would make the sweep below vacuously green, which is
+            // the failure mode this whole deliverable is about.
+            panic!(
+                "the workspace manifest declares no readable `[workspace] members`, so the \
+                 member sweep would pass over an empty population"
+            )
+        });
+    assert!(
+        !members.is_empty(),
+        "`[workspace] members` parsed as empty, so the sweep would be vacuous"
+    );
+    members
+        .into_iter()
+        .filter(|member| normal_edge_enables_feature(&read(member), dependency, feature))
+        .collect()
+}
+
 // ---- the pin -------------------------------------------------------------
 
 fn workspace_root() -> PathBuf {
@@ -356,6 +426,32 @@ fn mrc_d8_the_transport_cannot_reach_the_shipped_binary() {
         dependency_is_featured_only_for_dev(&cli, DEPENDENCY, FEATURE),
         "FACT 3 LOST: `ken-cli` no longer takes `{DEPENDENCY}` unfeatured in `[dependencies]` \
          with the featured edge confined to `[dev-dependencies]`"
+    );
+
+    // FACT 4 (`D9`) — the premise rests on FOUR facts, not three.
+    //
+    // Facts 1-3 are all keyed on `ken-cli`'s graph. Resolver 2 withholds
+    // unification for DEV edges, which is what fact 3 buys — but NOT across
+    // NORMAL edges of sibling members in one invocation, and
+    // `cargo build --workspace --locked` is that invocation. So a sibling
+    // enabling the feature on its own normal edge turns it on for
+    // `ken-runtime`'s normal build while facts 1-3 stay green.
+    //
+    // ⚠ SCOPE, stated in the honest direction: the hazard is established for
+    // `cargo build --workspace`, the invocation CI runs. NOBODY HAS MEASURED
+    // which invocation cuts a release artifact. If releases are cut
+    // `-p ken-cli` or `--bin ken`, this is instrument coverage only. This fact
+    // must not be read as closing a shipped-binary exposure.
+    let offenders =
+        members_with_featured_normal_edge(&workspace, DEPENDENCY, FEATURE, |member| {
+            read_manifest(&root.join(member).join("Cargo.toml"))
+        });
+    assert!(
+        offenders.is_empty(),
+        "FACT 4 LOST: workspace {offenders:?} enable `{FEATURE}` on a NORMAL `[dependencies]` \
+         edge to `{DEPENDENCY}`. Under `cargo build --workspace` resolver 2 unifies that across \
+         sibling normal edges, so the census transport is compiled into `{DEPENDENCY}`'s normal \
+         build regardless of facts 1-3"
     );
 }
 
@@ -756,5 +852,183 @@ ken-runtime = { path = "../ken-runtime", features = ["px8-ds-test-support"] }
         real("crates/ken-cli/Cargo.toml").contains("[[bin]]"),
         "this control assumes the shipped ken-cli manifest still contains an array-of-tables \
          header; it no longer does, so the shape is no longer exercised"
+    );
+}
+
+// ---- `D9` controls -------------------------------------------------------
+//
+// `AC-9a`, `AC-9b`, `AC-9c` get one test each, so a single red names which row
+// lost its control rather than collapsing three claims into one verdict.
+
+/// **`AC-9a`** — the sweep reads every declared member, and the `ken-verify`
+/// normal edge is the mutation that proves it.
+///
+/// ⛔ MEASURED: mutating the SHIPPED `ken-verify` manifest's existing normal
+/// edge to carry `features = ["px8-ds-test-support"]` makes fact 4 name
+/// `crates/ken-verify`; the unmutated sweep finds nobody. CLAIMED: the pin now
+/// covers members it never opened. THE GAP: this mutates one member's text in
+/// memory, not the resolver — the resolver behaviour it stands for is the
+/// node's measured `cargo tree` leg, not this test's.
+///
+/// ⚠ **This is a genuine new discrimination, not a restatement.** The same
+/// mutation leaves facts 1-3 GREEN, and the control asserts that too — if the
+/// old pin caught it, `D9` would be adding nothing.
+#[test]
+fn mrc_d9_control_a_featured_normal_edge_on_any_member_reds_fact_four() {
+    let root = workspace_root();
+    let workspace = real("Cargo.toml");
+    let verify_path = "crates/ken-verify/Cargo.toml";
+    let verify = real(verify_path);
+
+    // POSITIVE CONTROL: the shipped population is clean, or the red is free.
+    let baseline = members_with_featured_normal_edge(&workspace, DEPENDENCY, FEATURE, |member| {
+        read_manifest(&root.join(member).join("Cargo.toml"))
+    });
+    assert!(
+        baseline.is_empty(),
+        "the shipped workspace already has a featured normal edge {baseline:?}, so the mutation \
+         below cannot be credited with the red"
+    );
+
+    // The mutation, applied to the member's REAL text so a respelling of that
+    // manifest cannot leave this control silently measuring nothing.
+    let mutated_verify = mutated(
+        &verify,
+        verify.replace(
+            "ken-runtime = { path = \"../ken-runtime\"",
+            "ken-runtime = { path = \"../ken-runtime\", features = [\"px8-ds-test-support\"]",
+        ),
+        "ken-verify featured-normal-edge",
+    );
+    assert!(
+        normal_edge_enables_feature(&mutated_verify, DEPENDENCY, FEATURE),
+        "the mutation did not produce a featured normal edge, so the sweep below would be \
+         measuring the mutation's failure rather than the sweep"
+    );
+
+    let offenders = members_with_featured_normal_edge(&workspace, DEPENDENCY, FEATURE, |member| {
+        if member == "crates/ken-verify" {
+            mutated_verify.clone()
+        } else {
+            read_manifest(&root.join(member).join("Cargo.toml"))
+        }
+    });
+    assert_eq!(
+        offenders,
+        vec!["crates/ken-verify".to_string()],
+        "FACT 4 CONTROL LOST: a featured normal edge on `ken-verify` did not red the sweep"
+    );
+
+    // THE DISCRIMINATION: facts 1-3 are untouched by this mutation. If they
+    // caught it, `D9` would be a restatement of `D8` rather than new coverage.
+    assert!(
+        workspace_declares_resolver_two(&workspace),
+        "fact 1 must stay green under the fact-4 mutation"
+    );
+    assert!(
+        feature_is_not_default(&real("crates/ken-runtime/Cargo.toml"), FEATURE),
+        "fact 2 must stay green under the fact-4 mutation"
+    );
+    assert!(
+        dependency_is_featured_only_for_dev(&real("crates/ken-cli/Cargo.toml"), DEPENDENCY, FEATURE),
+        "fact 3 must stay green under the fact-4 mutation -- if it reds, the fact-4 mutation is \
+         not independent and this control is not a new discrimination"
+    );
+}
+
+/// **`AC-9b`** — the member list is READ, so a ninth member is found without
+/// editing this test.
+///
+/// ⛔ This is the row an enumeration fails. The synthetic workspace below
+/// declares a member **this file never names**, and the sweep finds it purely
+/// because it iterated `[workspace] members`. A pin that transcribed eight paths
+/// would report the ninth as clean.
+#[test]
+fn mrc_d9_control_b_a_synthetic_ninth_member_is_found_without_editing_the_test() {
+    let ninth_workspace = r#"
+[workspace]
+resolver = "2"
+members = [
+    "crates/ken-cli",
+    "crates/ken-newcomer",
+]
+"#;
+    let clean_member = r#"
+[package]
+name = "member"
+
+[dependencies]
+ken-runtime = { path = "../ken-runtime" }
+"#;
+    let offending_member = r#"
+[package]
+name = "member"
+
+[dependencies]
+ken-runtime = { path = "../ken-runtime", features = ["px8-ds-test-support"] }
+"#;
+
+    // POSITIVE CONTROL: with every member clean the sweep accepts, so the red
+    // below is caused by the offending edge and not by the fixture's shape.
+    let clean = members_with_featured_normal_edge(ninth_workspace, DEPENDENCY, FEATURE, |_| {
+        clean_member.to_string()
+    });
+    assert!(
+        clean.is_empty(),
+        "the all-clean synthetic workspace was rejected, so the red below is free: {clean:?}"
+    );
+
+    let offenders = members_with_featured_normal_edge(ninth_workspace, DEPENDENCY, FEATURE, |member| {
+        if member == "crates/ken-newcomer" {
+            offending_member.to_string()
+        } else {
+            clean_member.to_string()
+        }
+    });
+    assert_eq!(
+        offenders,
+        vec!["crates/ken-newcomer".to_string()],
+        "AC-9b LOST: a member the test never enumerates was not swept. The member list is being \
+         transcribed somewhere rather than read from `[workspace] members`"
+    );
+}
+
+/// **`AC-9c`** — `ken-cli`'s featured DEV edge stays accepted.
+///
+/// ⛔ The non-degenerate pair, and without it `D9` could pass by rejecting every
+/// featured edge anywhere. Resolver 2 withholds unification across dev edges, so
+/// that edge is lawful; a fact 4 that redded it would be wrong and would also
+/// contradict fact 3, which requires the dev edge to be featured.
+#[test]
+fn mrc_d9_control_c_the_featured_dev_edge_is_not_an_offender() {
+    let cli = real("crates/ken-cli/Cargo.toml");
+
+    // The premise of this row: that edge really is featured, on the dev side.
+    assert!(
+        dependency_is_featured_only_for_dev(&cli, DEPENDENCY, FEATURE),
+        "`ken-cli` no longer carries the featured dev edge, so this row has no subject"
+    );
+
+    assert!(
+        !normal_edge_enables_feature(&cli, DEPENDENCY, FEATURE),
+        "AC-9c LOST: `ken-cli`'s featured `[dev-dependencies]` edge was counted as a NORMAL \
+         featured edge. Fact 4 now rejects a lawful edge, and it would reject the very shape \
+         fact 3 requires"
+    );
+
+    // And the same text WITH a featured normal edge must be caught, so the
+    // acceptance above is a discrimination rather than a blanket pass.
+    let both = mutated(
+        &cli,
+        cli.replace(
+            "ken-runtime = { path = \"../ken-runtime\" }",
+            "ken-runtime = { path = \"../ken-runtime\", features = [\"px8-ds-test-support\"] }",
+        ),
+        "ken-cli normal-edge",
+    );
+    assert!(
+        normal_edge_enables_feature(&both, DEPENDENCY, FEATURE),
+        "AC-9c LOST in the other direction: the predicate accepts a featured NORMAL edge on the \
+         same manifest, so its acceptance above says nothing"
     );
 }
