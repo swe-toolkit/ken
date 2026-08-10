@@ -169,6 +169,14 @@ is a releasable increment.
 - **D3.** The exemption registry is left consistent with whatever D2 did — see
   §4, which is a hard gate, not a cleanup.
 
+### D2 disposition record
+
+| ignored row | disposition | precise waiting capability and reason |
+|---|---|---|
+| `ac5_explicit_conversion_is_partial_option` | sever and mark | L-classes must expose `Int.toInt64`; only then can the test assert acceptance with result type `Option Int64`. |
+| `sec31_int_div_zero_emits_obligation` | sever and mark | Integer division op registration must land; only then can V2 emit and the test assert the non-zero-divisor obligation. |
+| `sec24_char_excludes_surrogates` | sever and mark | Char literal syntax must land; only then can the test assert that a valid scalar accepts while a surrogate rejects. |
+
 ## 4. Contention and sequencing — read this before starting
 
 ### 4a. `CI-IGNORED-SWEEP` owns the registry, and it is in flight

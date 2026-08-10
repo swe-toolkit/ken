@@ -1,11 +1,14 @@
 //! L1 numeric tower acceptance tests (`conformance/surface/numbers/seed-numbers.md`).
 //!
-//! Covers the 14 conformance cases defined in the L1-build WP:
-//! AC1 (Int exactness), AC2 (distinct literal types), AC3 (overflow obligation),
-//! AC4 (no silent wrap), AC5 (no implicit coercion), AC6 (Decimal exact / Float honest),
-//! §3.1 (div-by-zero obligation), §6.1/§6.2 (primitive vs prelude law), §2.4 (Char).
+//! Currently executing conformance cover checks integer exactness; literal-type
+//! distinction and expected-type override; overflow obligations; explicit wrap
+//! versus no silent wrap; no implicit cross-type coercion; Decimal versus Float
+//! behavior; literal reduction; and proposition-versus-reduction behavior.
 //!
-//! Cases that depend on future WPs (V3+, L-classes, char literals) are marked `#[ignore]`.
+//! Three retained ignored placeholders are explicitly not conformance cover:
+//! partial explicit conversion awaits L-classes, division-by-zero obligations
+//! await integer division op registration, and Char exclusion awaits Char
+//! literal syntax.
 
 use ken_elaborator::{ElabEnv, NumericLitVal, ObligationKind};
 use ken_elaborator::extract::{v2_extract, ProvKind};
