@@ -93,7 +93,9 @@ pub enum ElabError {
         actual_classifier: RecursiveResultSort,
         required_spelling: &'static str,
     },
-    /// The selected result's type cannot yet be classified as Type or Omega.
+    /// Reserved for `LANG-SORT-META-CAPABILITY`: unreachable while elaborator
+    /// metas are level-only, because they cannot hide the `Type`/`Omega` term
+    /// constructor. There is deliberately no production raise site today.
     RecursiveResultSortAmbiguous {
         selector_span: Span,
         binding_span: Span,

@@ -17,8 +17,8 @@ use ken_kernel::{
     infer as kernel_infer,
     sct::sct_check,
     subst::{subst0, subst_levels, subst_outer, subst_tel, weaken},
-    whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
-    Term,
+    whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, KernelError, Level,
+    LevelVar, Term,
 };
 
 use crate::ast::{BinOp, DefKeyword, NumLit, RecursiveResultSelector};
@@ -2789,44 +2789,6 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
         .unwrap_or_else(|| format!("<ctor_{:?}>", id))
 }
 
-fn level_variables(term: &Term) -> Vec<LevelVar> {
-    fn collect_level(level: &Level, found: &mut Vec<LevelVar>) {
-        match level {
-            Level::Zero => {}
-            Level::Suc(inner) => collect_level(inner, found),
-            Level::Max(left, right) => {
-                collect_level(left, found);
-                collect_level(right, found);
-            }
-            Level::Var(var) if !found.contains(var) => found.push(*var),
-            Level::Var(_) => {}
-        }
-    }
-
-    fn collect_term(term: &Term, found: &mut Vec<LevelVar>) {
-        match term {
-            Term::Type(level) | Term::Omega(level) => collect_level(level, found),
-            Term::Const { level_args, .. }
-            | Term::IndFormer { level_args, .. }
-            | Term::Constructor { level_args, .. }
-            | Term::Elim { level_args, .. } => {
-                level_args
-                    .iter()
-                    .for_each(|level| collect_level(level, found));
-            }
-            _ => {}
-        }
-        term.children()
-            .into_iter()
-            .for_each(|child| collect_term(child, found));
-    }
-
-    let mut found = Vec::new();
-    collect_term(term, &mut found);
-    found.sort();
-    found
-}
-
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RRecursiveResult {
@@ -2843,30 +2805,27 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
                 binding_span: binding_span.clone(),
             })?;
             let classifier = kernel_infer(cx.env, &cx.ctx, &result_type)
-                .map(|ty| whnf(cx.env, &cx.ctx, &ty));
+                .map_err(|error| ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                })?;
+            let classifier = whnf(cx.env, &cx.ctx, &classifier);
             let (actual, required) = match classifier {
-                Ok(Term::Type(level)) => (
+                Term::Type(level) => (
                     RecursiveResultSort::Type(level),
                     RecursiveResultSelector::RecursiveResult,
                 ),
-                Ok(Term::Omega(level)) => (
+                Term::Omega(level) => (
                     RecursiveResultSort::Omega(level),
                     RecursiveResultSelector::InductionHypothesis,
                 ),
-                unresolved => {
-                    let implicated_metavariables = level_variables(&result_type);
-                    if implicated_metavariables.is_empty() {
-                        return Err(ElabError::Internal(format!(
-                            "checked recursive-result type has no sort classifier: {unresolved:?}"
-                        )));
-                    }
-                    return Err(ElabError::RecursiveResultSortAmbiguous {
-                        selector_span: span.clone(),
-                        binding_span: binding_span.clone(),
-                        implicated_metavariables,
-                        unresolved_result_type: result_type,
-                    });
-                }
+                other => return Err(ElabError::KernelRejected {
+                    error: KernelError::TypeMismatch {
+                        expected: Box::new(Term::Type(Level::Var(LevelVar(0)))),
+                        found: Box::new(other),
+                    },
+                    span: span.clone(),
+                }),
             };
             if *selector != required {
                 return Err(ElabError::RecursiveResultSortMismatch {
@@ -7879,7 +7838,7 @@ mod nested_lift_association_tests {
         resolve::{resolve_expr_standalone, RExpr},
         ElabEnv,
     };
-    use ken_kernel::{Level, LevelVar, Term};
+    use ken_kernel::{KernelError, Level, LevelVar, Term};
 
     use super::{
         infer, lift_association_error, validate_lift_associations, ElabCtx, ElabError, GlobalId,
@@ -8179,38 +8138,43 @@ mod nested_lift_association_tests {
     }
 
     #[test]
-    fn ambiguous_result_sort_rejects_until_same_selector_is_resolved() {
-        // Promise class: durable invariant. Unresolved classification refuses
-        // without a default, while the identical selector accepts once solved.
-        let selector = resolved_selector("let u : Type = Type in recursive result for u");
+    fn unclassifiable_result_rejects_both_selectors_without_defaulting() {
+        // Promise class: durable invariant. Both spellings preserve the same
+        // underlying classification failure, so neither can become a default.
+        let recursive = resolved_selector("let u : Type = Type in recursive result for u");
+        let induction =
+            resolved_selector("let u : Type = Type in induction hypothesis for u");
         let mut env = ElabEnv::new().unwrap();
+        let int_type = env.env.int_lit_type().expect("prelude registers Int literals");
         let mut selected = ElabCtx::new(
             &mut env.env,
             &env.globals,
             &mut env.num_values,
             &env.numeric_env,
-            "ambiguous-result-selector",
+            "unclassifiable-result-selector",
         );
         selected.ctx.push(Term::Type(Level::Zero));
         selected.ctx.push(Term::Type(Level::Zero));
-        selected.ctx.push(Term::app(
-            Term::Type(Level::Var(LevelVar(7))),
-            Term::var(0),
-        ));
+        // A checked-telescope invariant violation: this is a well-typed Int
+        // value where a result TYPE is required. Classification must preserve
+        // the kernel TypeMismatch instead of inventing a selector diagnostic.
+        selected
+            .ctx
+            .push(Term::IntLit(num_bigint::BigInt::from(0)));
         selected.hidden_positions.extend([1, 2]);
         selected
             .lift_bindings
             .insert(0, binding(1, Some(2), None));
 
-        assert!(matches!(
-            infer(&mut selected, &selector),
-            Err(ElabError::RecursiveResultSortAmbiguous {
-                implicated_metavariables,
-                ..
-            }) if implicated_metavariables == vec![LevelVar(7)]
-        ));
-
-        selected.ctx.types[2] = Term::Type(Level::Zero);
-        assert!(infer(&mut selected, &selector).is_ok());
+        for selector in [&recursive, &induction] {
+            assert!(matches!(
+                infer(&mut selected, selector),
+                Err(ElabError::KernelRejected {
+                    error: KernelError::TypeMismatch { expected, found },
+                    ..
+                }) if *expected == Term::Type(Level::Var(LevelVar(0)))
+                    && *found == Term::const_(int_type, Vec::new())
+            ));
+        }
     }
 }
