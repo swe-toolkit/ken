@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-MODULE-SPLIT]
+depends_on: [RT-NATIVE-FNSPLIT, RT-JOIN-DISPOSITION, RT-DECL-CLOSURE-PORT, RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]
 blocks: [PX8-F-CAP-41]
 github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -47,6 +47,32 @@ origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer h
 > file moves too, which is the one item this sequencing makes *cheaper* rather
 > than dearer. Doing the split first means this node rebases onto the new module
 > layout once, instead of landing against the old layout and being moved by #8.
+
+> # NARROWED 2026-08-10 — THE EDGE NOW NAMES ONE #8 CHILD, NOT THE PHASE
+>
+> **`depends_on` was `RT-BACKEND-MODULE-SPLIT`; it is now
+> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]]**, cut item 2 of 18.
+>
+> **This honours the 2026-08-08 instruction, it does not override it.** That
+> instruction's own rationale is the paragraph directly above: rebase onto the
+> new module layout **once**. The primitive slice is the module move that
+> re-homes exactly the code this node edits, so depending on it delivers the
+> stated benefit in full — while the other sixteen slices, which touch nothing
+> this node touches, stop holding it.
+>
+> **Architect ruling `evt_54zvaqbrm752x` §5** established the release point on a
+> bounded ownership proof: this node's remaining `ken-runtime` work is the
+> `int_to_uint64_raw` arm inside `lower_primitive_call`, and that dispatcher
+> plus its twelve exclusively-primitive helpers move as one family. The
+> Architect assigned this bookkeeping to the Operator and Steward.
+>
+> ⇒ **What it buys:** this node heads 19 transitive dependents — the whole
+> remaining Linux ABI completion program. They now wait on **two** #8 children
+> instead of all eighteen.
+>
+> ⛔ **The arm still lands here, not there.** The primitive slice is a
+> byte-for-behaviour move and is explicitly forbidden to add
+> `int_to_uint64_raw`. This node adds it once, in the durable home.
 
 > # HELD 2026-07-29 — 11/12 GREEN, STOPPED ON [[RT-DECL-CLOSURE-PORT]]'s `AC-1` ROW
 >

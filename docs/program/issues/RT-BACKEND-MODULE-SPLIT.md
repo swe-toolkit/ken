@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 depends_on: [RT-DESCENT-RETIRE]
-blocks: [NATIVE-HANDLE-CARRIER]
+blocks: []
 github: null
 origin: Operator directive 2026-07-31 — the ken-runtime backend files are oversized again; a previous interlude of this shape produced the cranelift_backend/ directory. Operator asked whether to repeat it now or after the campaign, and confirmed AFTER on the Steward's recommendation. Campaign docs/program/16-recursive-descent-retirement.md §4 node #8. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
@@ -41,6 +41,127 @@ origin: Operator directive 2026-07-31 — the ken-runtime backend files are over
 > `lowering/core.rs`, so it is the one piece that can proceed while Runtime
 > holds `#6d`. The operator anticipated this — *"there will be ample time for
 > framing the post refactor WPs to keep the fleet running."*
+
+> # THE PASS IS ANSWERED. THIS NODE IS NOW A PHASE RECORD, NOT A MERGE NODE.
+>
+> **Architect ruling `evt_54zvaqbrm752x`, 2026-08-10.** Recorded here because a
+> ruling that lives only in a thread strands.
+>
+> ⇒ **`blocks` is now empty on purpose.** The phase's real edges live on its
+> children. This node will never merge; when the full cut is filed it becomes
+> `closed` — resolved-without-landing — not `merged`.
+
+## The ruling — the eighteen-slice cut
+
+**The structural arc is several accepted phase partials.** Each child is
+complete for its named transfer, independently reviewable and mergeable, and
+**does not claim #8 closure**. There is no atomic all-files candidate.
+
+| # | slice | filed |
+|---:|---|---|
+| 1 | [[RT-BACKEND-SPLIT-CENSUS]] — Stage A, no code move | yes |
+| 2 | [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] — early critical-path slice | yes |
+| 3 | `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | |
+| 4 | `RT-PLANNER-UNITS-ABI-SPLIT` — first planner domain | |
+| 5 | `RT-PLANNER-OCCURRENCES-SPLIT` | |
+| 6 | `RT-PLANNER-CONTINUATIONS-SPLIT` | |
+| 7 | `RT-PLANNER-AGGREGATES-SPLIT` | |
+| 8 | `RT-PLANNER-EFFECTS-SPLIT` | |
+| 9 | `RT-PLANNER-JOINS-TRAPS-SPLIT` | |
+| 10 | `RT-LOWERING-FUNCTION-STATE-SPLIT` | |
+| 11 | `RT-LOWERING-VALUES-BOUNDARY-SPLIT` | |
+| 12 | `RT-SOURCE-MACHINE-TYPES-SPLIT` — existing types/control only | |
+| 13 | `RT-EMITTER-CALLS-RETURNS-SPLIT` | |
+| 14 | `RT-EMITTER-CONTROL-JOINS-SPLIT` | |
+| 15 | `RT-EMITTER-AGGREGATES-SPLIT` | |
+| 16 | `RT-EMITTER-EFFECTS-SPLIT` | |
+| 17 | `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | |
+| 18 | `RT-BACKEND-SPLIT-CLOSURE` — delete adapters, narrow facades, remeasure | |
+
+**Only the first two are filed, and that is deliberate.** They are the two with
+structural consequence today: item 1 gates the phase, and item 2 releases
+[[NATIVE-HANDLE-CARRIER]]. The census supplies the binding paths, counts and
+sizes for the rest, and **it may prove two adjacent small families are one
+lifecycle** — filing all sixteen now would create work ahead of the evidence
+that sizes it.
+
+⛔ **A census merge permits one frame with independently reviewable commits. It
+does not permit a planner or lowering mega-diff, and it does not permit grouping
+to reduce node count.** An exposed behavioural dependency **stops the move and
+returns for a semantic ruling**; it is not repaired inside a "pure move."
+
+## Gates binding every structural frame in the phase
+
+- Exact old/new symbol and test-property ledgers.
+- **No** representation, diagnostic, hash, serialization, behaviour or trust
+  change.
+- No widened production API, no facade recreation of the monolith.
+- Affected library **and** targeted test configurations both compile.
+- Each moved mutation reds the same reached property, with the same **nonzero**
+  denominator and restoration.
+- Plans and commands **never** count as emitted evidence.
+- Source text is a census aid, not the only semantic oracle.
+- Scoped local checks plus CI's workspace gate — **never** a local workspace
+  run.
+
+## Ownership map — accepted with amendments
+
+Modules own **semantic lifecycles**, not line counts or campaign names. The
+durable direction is `plan construction -> validated read-only views -> lowering
+state/source machine -> concrete backend mutation -> independent evidence ->
+closure -> publication`.
+
+Thirteen owners: planning facade; planner graph foundation; occurrences; units
+and ABI; continuations; aggregates; effects; joins and traps; lowering facade;
+function-local state; values and boundary; source machine; backend event
+families. Plus evidence/laws and tests.
+
+Three amendments the frames must carry:
+
+- **The graph foundation is not an `ids.rs` drawer.** `PredeclaredFunctionId`
+  stays unit-owned; `StaticOriginId` and source/child correspondence stay
+  occurrence-owned.
+- **`boundary_value_clif.rs` is not absorbed merely for size** — Stage A must
+  prove its lifecycle and consumers first.
+- **The source machine is relocation only in #8**, not a transition IR.
+- Generated traps receive **no fabricated source origin**.
+
+## First planner domain
+
+**Units and ABI move first**, after the graph foundation. `abi.rs`, predeclared
+ids, descriptors, slots, call-edge views, pre-emission validation and the
+read-only `EmittableUnit` boundary form the strongest closed seam; it is less
+coupled to live source-machine work than continuations, and it gives the later
+emitters a stable unit/call vocabulary. **Occurrences next. Continuations move
+only after the live `#6d`/#7 churn is gone.**
+
+The primitive slice is the first production slice overall but is **not** a
+planner domain.
+
+## The IR recommendation — triaged, which was this pass's other job
+
+**Adopted as a target, outside #8:** the hybrid checked transducer, distinct
+planned/generated term identities, closed source-machine state, typed rule
+results, immediate typed-command interpretation within one function,
+independent post-emission evidence before obligation commitment, and typed
+domain-specific closure laws.
+
+**Deferred to their own semantic nodes after #8 closes:** canonical terms,
+transition results, commands, command/evidence separation, law extraction —
+each has its own mutation and publication boundary. **The first command family
+is declared calls, not primitives**, because its existing post-CLIF callee check
+is the strongest discriminator.
+
+**Declined now:** a persistent whole-function symbolic backend, a universal
+ledger or key, fabricated source origins, and symbolic commands as proof.
+Reassess a persistent IR **only** after the hybrid boundary exists and a
+concrete multi-backend, optimization or replay need is **measured**.
+
+Stable traces begin diagnostic and test-only over stable semantic ids. They are
+**not** persisted artifacts, hash inputs, or compatibility surfaces in this arc.
+
+⇒ **#8 stays behaviour-preserving**, and the IR recommendation stops being
+unrouted without being smuggled into a structural slice.
 
 ## What it is
 
@@ -138,18 +259,24 @@ whose producer and evidence boundaries are already closed." Whether that family
 extracts early and cleanly is the Architect's call against the post-#7 tree, and
 a "yes" makes it the first WP of the phase.
 
-> **A second reading, surfaced and not acted on.** This `depends_on` edge is not
-> semantic. `NATIVE-HANDLE-CARRIER` states its own rationale: the split first
-> means it "rebases onto the new module layout once, instead of landing against
-> the old layout and being moved by #8." That is **rebase-cost avoidance**, and
-> the delta being rebased measures as one match arm plus a fixture and a matrix
-> run. The `core.rs` **+3899/−1022** figure in that node's frame belongs to
-> `RT-DECL-CLOSURE-PORT`, not to it.
+> **ANSWERED: yes, and the edge is kept rather than dropped.** Architect
+> `evt_54zvaqbrm752x` §5 ruled that a clean early subset exists, on the
+> ownership proof above. [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] — cut item 2,
+> immediately after the census — **is the architectural release point**, and
+> `NATIVE-HANDLE-CARRIER` now depends on **that child**, not on every #8 child.
 >
-> ⇒ The edge may be costing 19 nodes a full phase of latency to save a small
-> rebase. **The edge was set by operator instruction on 2026-08-08, so it stands
-> and the Steward does not drop it** — it is back with the operator. If the
-> early-subset answer is yes, the point is moot.
+> ⇒ **The operator's 2026-08-08 instruction is honoured exactly, not
+> overridden.** Its stated rationale was that the node should rebase onto the
+> new module layout **once** instead of landing against the old layout and being
+> moved by #8. Depending on the primitive child delivers precisely that, and
+> stops 19 nodes waiting on the other sixteen slices. The Architect assigned the
+> bookkeeping to the Operator and Steward and did not mutate the graph itself.
+>
+> The earlier reading — that the edge was rebase-cost avoidance costing 19 nodes
+> a full phase — is **superseded by this refinement**, not by a deletion. The
+> `core.rs` **+3899/−1022** figure cited for that edge does belong to
+> `RT-DECL-CLOSURE-PORT` and not to `NATIVE-HANDLE-CARRIER`; that correction
+> stands.
 
 > ## BINDING ON WHOEVER FRAMES THIS — operator, 2026-08-08
 >
