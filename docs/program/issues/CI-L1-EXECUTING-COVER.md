@@ -1,7 +1,7 @@
 ---
 id: CI-L1-EXECUTING-COVER
 title: "Two executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 stands for a soundness row whose discriminator it never queries, and sec61 covers half of a row while its doc comment asserts the half the row denies"
-status: draft
+status: ready
 owner: verify
 size: S
 gate: none
@@ -11,16 +11,26 @@ github: null
 origin: Architect rejection of CI-ASSERTIONLESS-L1 respin dec_7yn4qg6q05t8n (rejected 2026-08-10T04:21:58Z), which found that the candidate's replacement header "overclaims conformance cover for neighboring executing rows whose expectations remain unbound" and directed that the header be narrowed rather than widened. Independently re-measured by the Steward at origin/main 69b1504b against conformance/surface/numbers/seed-numbers.md. Filed as its own node because CI-ASSERTIONLESS-L1 has been rejected three times and widening a thrice-rejected candidate is how it never lands. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> ## STATUS IS `draft` -- it needs a frame, not a decision
+> ## FRAMED 2026-08-10 — [`docs/program/wp/CI-L1-EXECUTING-COVER.md`][f]
 >
-> The measurement below is complete and was taken against the seed, not
-> inferred from the tests. What is owed before release is a frame under
-> `docs/program/wp/`: deliverable cut, AC controls, and the guardrail that
-> keeps this from repeating `CI-ASSERTIONLESS-L1`'s three-rejection loop.
+> `ready` per `steward.md §4e`: a successor must be shovel-ready **while** its
+> predecessor is in flight, so the frontier advances on the merge with no
+> Steward pass in between. **`ready` is NOT released** -- Verify is on
+> `CI-ASSERTIONLESS-L1`'s fourth SHA and this node has not been kicked.
 >
 > **`depends_on: [CI-ASSERTIONLESS-L1]` is file contention, not logic.** Both
 > nodes edit `crates/ken-interp/tests/l1_acceptance.rs`. This node must not
-> start until that one merges.
+> start until that one merges, and then cuts from the `origin/main` carrying it.
+>
+> **The frame's §3c is the load-bearing audit and it forecloses the easy exit.**
+> `ken_kernel::convert` is public and re-exported at the crate root, the
+> `Context::new()` + `push` idiom is landed in `k2c_conversion.rs`, and
+> `ken-interp` already depends on `ken-kernel`. So `sec62` is writable against
+> landed public API, and **"sever and mark" is not an available disposition** --
+> unlike the three severed rows in the sibling node, this one waits on no
+> unbuilt capability.
+>
+> [f]: ../wp/CI-L1-EXECUTING-COVER.md
 
 ## Why this exists
 
