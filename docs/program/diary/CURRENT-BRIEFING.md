@@ -46,6 +46,37 @@
 
 > ### RESUME HERE — state at 2026-08-10 ~01:0xZ
 >
+> ### OPERATOR AWAY 2026-08-10 ~02:57Z UNTIL 11:30Z. THE FLEET KEEPS RUNNING.
+>
+> About eight and a half hours unattended, with two lanes live. Watchdog stays
+> at **900s**. ⛔ **An operator-shaped question does not stop the DAG** — queue
+> it here and keep the unblocked work moving (`steward.md §4f`).
+>
+> **What I decide in this window (sequencing, mine under `steward.md §3`):**
+>
+> - **The freed lane goes to Verify.** When `KERNEL-NESTED-IND` `D7` or
+>   `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a` merges, release
+>   [[CI-ASSERTIONLESS-L1]]. ⚠ It is held **purely on the two-lane cap**, its
+>   branch and WIP are preserved, and it is the most advanced candidate — so
+>   resuming held work is **sequencing, not a priority call between ready WPs**.
+>   That distinction is the whole reason this one is mine.
+> - **Merges.** M1-M9 as verdicts land, including CI. Publishing needs nobody.
+>
+> **What I do NOT decide, queued for 11:30Z:**
+>
+> - **Releasing [[KERNEL-RECURSIVE-RESULT-SURFACE]]** — it is `draft` by design
+>   and its release is a genuine priority call against `DS-9` and the Verify
+>   lane. ⛔ Do not release it to fill an idle seat.
+> - Whether the **two-lane cap binds the spec enclave**.
+> - Any **scope fork the roadmap does not settle**, and anything that **grows the
+>   TCB** beyond what `AC-K10` already ruled.
+> - Any further **CPU/resource trade** — the freeze was the operator's to impose
+>   and lift, and so is the next one.
+>
+> ⚠ **The Architect's owed answer is NOT operator-blocked.** The motive-row
+> expressibility question (`evt_1vtbwcmdgn2h9`) is an Architect call and may land
+> in this window; disposition is one line on that seed row.
+>
 > ### BUILD FREEZE: IMPOSED ~00:52Z, LIFTED ~02:0xZ. BUILDS ARE ALLOWED.
 >
 > The operator needed the CPU and has released it. All-clear broadcast
