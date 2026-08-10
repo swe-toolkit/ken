@@ -29,6 +29,10 @@ const STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
         (One LiftRose LiftLeaf) \
         (Join LiftRose (One LiftRose LiftLeaf) (Empty LiftRose))))";
 
+const WSTYLE_OUT_OF_SCOPE_SOURCE: &str = "data WBag (a : Type) : Type where { WEmpty : WBag a ; WBranch : (Bool -> a) -> WBag a }\n\
+data WRose = WLeaf | WNode (WBag WRose)\n\
+fn wsize (r : WRose) : Nat = match r { WLeaf |-> Suc Zero ; WNode b |-> match b { WEmpty |-> Zero ; WBranch k |-> (structural result of k) True } }";
+
 #[test]
 fn selector_is_contextual_and_resolves_the_surface_binding_identity() {
     // MEASURED: the complete four-word primary parses as one selector and its
@@ -100,4 +104,13 @@ fn validated_nested_results_elaborate_and_kernel_check() {
     let mut env = ElabEnv::new().unwrap();
     env.elaborate_file(STRUCTURAL_SIZE_SOURCE).unwrap();
     assert!(env.globals.contains_key("result"));
+}
+
+#[test]
+fn d2_wstyle_without_a_trailing_result_binder_is_exactly_out_of_scope() {
+    let mut env = ElabEnv::new().unwrap();
+    assert!(matches!(
+        env.elaborate_file(WSTYLE_OUT_OF_SCOPE_SOURCE),
+        Err(ElabError::StructuralResultOutOfScope { .. })
+    ));
 }
