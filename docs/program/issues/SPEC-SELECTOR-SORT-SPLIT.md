@@ -6,7 +6,7 @@ owner: spec
 size: M
 gate: none
 depends_on: []
-blocks: []
+blocks: [LANG-SELECTOR-SORT-SPLIT-ELAB]
 github: null
 origin: Operator directive 2026-08-10, relayed through the research seat at evt_25q3mb2pe0tay and confirmed by the operator directly to the Steward. Prompted by the research terminology pass at evt_5b30njk18nmph on landed 2c0f4c03. Steward-filed (agents cannot create tracked work per COORDINATION section 2).
 ---
@@ -71,8 +71,10 @@ no-guessing rule. Do not default to either spelling.
 authority for the spelling and must state the classification rule, the mismatch
 diagnostic, and the ambiguity rejection. The conformance rows follow.
 
-**Then Language** implements: the parser's contextual-keyword forms, the AST
-variant or variants, the classification, and the diagnostics.
+**Then Language** implements, as [[LANG-SELECTOR-SORT-SPLIT-ELAB]]: the parser's
+contextual-keyword forms, the AST variant or variants, the classification, the
+diagnostics, the crate-wide removal of the old spelling, and the control repair
+below. **No crate path is this node's work.**
 
 **The two gated conformance rows are respelled, not ungated.**
 `nested-size-uses-lift` and `nested-dependent-motive-uses-lift` keep their
@@ -80,10 +82,16 @@ gates; they are blocked on [[LANG-NESTED-MATCH-LIFT-ALIGNMENT]] and on their own
 separate unmeasured blocker respectively. **This node changes their spelling and
 nothing about their status.**
 
-## A control defect to repair in the same pass
+## A control defect, routed to the successor
+
+**This is no longer this node's work.** spec-leader ruled at the D0 scope
+checkpoint that the Rust control repair is Language successor work rather than a
+spec-enclave implementation action, and it is now a deliverable of
+[[LANG-SELECTOR-SORT-SPLIT-ELAB]]. It is restated here only because this node is
+where the Adversary's finding was first recorded.
 
 The identity control landed at `e551e735` tests the right property **at the
-wrong resolution**, and the respell touches its file anyway.
+wrong resolution**.
 
 ```rust
 assert!(matches!(

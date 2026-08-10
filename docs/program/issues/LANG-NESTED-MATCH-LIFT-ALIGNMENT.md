@@ -1,15 +1,46 @@
 ---
 id: LANG-NESTED-MATCH-LIFT-ALIGNMENT
 title: "the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check"
-status: ready
+status: closed
 owner: language
 size: M
 gate: none
 depends_on: []
-blocks: [KERNEL-NESTED-IND]
+blocks: []
 github: null
 origin: Measured by the Kernel ring on KERNEL-NESTED-IND D8, 2026-08-10, at base 5756ff74. D8 was framed with two outcomes and reached outcome (b) -- an attribution rather than a repair. Kernel stopped at its lane boundary and returned this to the Steward, per the frame. Steward-filed (agents cannot create tracked work per COORDINATION section 2).
 ---
+
+> # WITHDRAWN — THE ATTRIBUTION BELOW IS FALSE. DO NOT IMPLEMENT AGAINST IT.
+>
+> **There is no aligned-check propagation defect.** Measured by Language against
+> exact `02070073` on the recovered D8 source: the outer-`Suc` selector form
+> **elaborates and completes final kernel checking**. `scripts/ken-cargo test -p
+> ken-elaborator --test nc14_data_match_lowering
+> nested_inductive_elaboration_preserves_trusted_base_set -- --exact` is 1/0 and
+> the trusted-base comparator holds (`evt_4zdhnrdpf0dw`).
+>
+> **The refusal was a fixture-migration artifact.** D8 changed `Join : a -> a ->
+> Bag a` to `Join : Bag a -> Bag a -> Bag a` and did not migrate the reaching
+> constant, which went on supplying bare `LiftRose` operands where `Bag LiftRose`
+> was then required. That is the whole of `TypeMismatch { expected: (Dg570
+> Dg582), found: Dg582 }` — `Dg570` is `Bag` and `Dg582` is `LiftRose`. Migrating
+> the operands to `LiftNode (Join LiftRose (One LiftRose LiftLeaf) (One LiftRose
+> LiftLeaf))` clears it. `One : a -> Bag a` is unchanged and that asymmetry is
+> load-bearing.
+>
+> **Two signals said so before the measurement did**, and both are worth keeping:
+> the Architect read the landed control flow and found it contradicted the bypass
+> this node asserts (`evt_3xyc3cbkk39k9`), and the explicitly-typed `let`
+> variant failed *identically* — which a defect in expected-type propagation
+> cannot explain, because the broken constant is downstream of how the node
+> method is spelled.
+>
+> The D8 probe was restored without ever being committed, so the failing source
+> existed only in the Kernel seat's scrollback. **An attribution built on a
+> source nobody can re-read is an attribution nobody can check.**
+>
+> Everything below is the original filing, kept for the record.
 
 ## What it is
 
