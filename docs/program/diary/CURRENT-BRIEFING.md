@@ -38,7 +38,49 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~09:3xZ. `main` = `9801c5fb`, moving.
+> ### RESUME HERE — state at 2026-08-10 ~09:5xZ. `main` = `5790c761`.
+>
+> #### WHAT CHANGED SINCE THE ~09:3xZ BLOCK BELOW — read this first
+>
+> - **`CI-DOCTEST-UNEXECUTED` MERGED** at `2dfda20d`. `main` `9801c5fb` →
+>   **`5790c761`**. M6 clean (5/5 blobs from declared base `2a38ccea`, path
+>   count matches). M7 done, M8 Adversary notified, node `merged`.
+> - **M3's two attested paths were ALREADY RED before the merge** — attested
+>   `ci.yml` `b0d1b683` vs pre-merge `cc6d6971`; `cranelift_backend.rs`
+>   `d317ad9c` vs pre-merge `4be81a08`. **Pre-existing ledger defect, not my
+>   blast radius.** Routed to the Librarian at `evt_2b3g2bp631bj1`; if it says
+>   the staleness runs deep, I file the node.
+> - **`CONF-EVAL` is PUBLISHING** — PR #1789, background task `bpvk7us0a`.
+> - **`CI-ROW-CLAIM-NAMESPACE` RELEASED to Verify**, anchor `evt_5e713ff7e464c`,
+>   node `active`. Full handoff gate run; all three seats `Context compacted`
+>   (all three needed a separate `Enter` — Codex strand, 3 for 3).
+> - **RUNTIME IS BLOCKED ON AN ARCHITECT RULING**, routed at
+>   `evt_7zv37htdb4rys`; Architect is `Working` on it. Tip is now **`2cf3dd2a`**
+>   (not `19dfd6a2`), re-anchored onto `5790c761`, all nine range-diff `=`, so
+>   the `ir.rs`/`cranelift_backend.rs` contention is **resolved**. Branch HELD
+>   with 5 known reds — correctly not released.
+>   **The stop:** a real carrier is ADMITTED by the new provenance mechanism and
+>   then REFUSED by the older `reject_program_blockers`. Constraint set is
+>   closed — `assumptions` empty ∧ `targets == roster` ⇒ roster empty ⇒ no real
+>   carrier. **The kickoff's own control AC cannot be discharged as framed; that
+>   AC is MINE to re-cut once the Architect rules.** If the ruling widens the
+>   trusted surface it becomes an operator TCB item.
+>   Also on record: the landed report propagation is **end-to-end vacuous today**
+>   for the same reason; the ring committed a control that MEASURES the vacuity,
+>   as a transition sentinel that reds when the subset widens.
+> - **FIVE COMMITS QUEUED on `steward/work`** for a doc-only publish once #1789
+>   clears: `20a8e9e9` fleet memory lesson, `6943afa1` briefing, `4e115344` M7
+>   flip, `f8dbaeda` release flip, `d33e4127` Adversary residual recorded on the
+>   `CI-DOCTEST` node.
+> - **Adversary triaged** (`evt_6nnxsec6kpnkm`): all seven `compile_fail`
+>   annotations measured correct per-site. Residual — rustdoc does not enforce
+>   the code on stable, so executing a `compile_fail` proves only that it fails,
+>   **never that it fails for the claimed reason**. Accepted trade-off, recorded
+>   on the node so it is not re-filed. The open piece — do the negatives have
+>   discriminating positive partners — folds into the next Verify node touching
+>   those doctests, **not** a new node.
+>
+> #### EARLIER BLOCK, ~09:3xZ — still accurate except the SHAs above
 >
 > **OPERATOR AWAY until 11:30Z 2026-08-10.** Builds targeted only, never
 > `--workspace`. **First action every tick: the Architect strand check** — it
