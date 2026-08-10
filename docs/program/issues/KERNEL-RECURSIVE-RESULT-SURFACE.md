@@ -3,10 +3,10 @@ id: KERNEL-RECURSIVE-RESULT-SURFACE
 title: "A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible"
 status: draft
 owner: spec-enclave
-size: TBD
+size: M
 gate: none
 depends_on: [KERNEL-NESTED-IND]
-blocks: []
+blocks: [DS-9]
 github: null
 origin: Architect ruling evt_2s6gmzqvaj5mr (2026-08-10), issued after the conformance-validator rejected three KERNEL-NESTED-IND D6 candidates (dec_7d46tfm6pp3mq, dec_1r4sxfr3j2gs7, dec_8pyjkfs3qv7m) and kernel-implementer grounded the exact source-level obstruction at evt_7bx469t75cd2y. The ruling directs that D6 be recut to seven cases with nested-size-uses-lift gated, and that this capability become a separate node. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
@@ -28,6 +28,43 @@ origin: Architect ruling evt_2s6gmzqvaj5mr (2026-08-10), issued after the confor
 > capability is tracked rather than living in a thread, and so
 > `nested-size-uses-lift` has a named blocker. Releasing it is a priority call
 > against the current lanes and is the operator's.
+>
+> ## 2026-08-10 — THE PRIORITY CASE CHANGED. It now blocks a THIRD thing.
+>
+> **Architect `evt_6ysrp62e4zayg` ruled that this obstruction extends to
+> `List`-carried recursion**, so **DS-9's `D3`+ unbounded Json fold over arrays
+> and objects is blocked on this node.** That is Foundation's next work, and
+> DS-9 `D1`/`D2` have both merged, so this is no longer a conformance-only
+> blocker sitting behind an idle row. What it blocks now:
+>
+> 1. `nested-size-uses-lift` (`seed-nested.md`)
+> 2. `nested-dependent-motive-uses-lift` (`seed-nested.md`)
+> 3. **DS-9 `D3`+**, at slice granularity — `JsonArray : List Json` and
+>    `JsonObject : List (Pair String Json)`. `D2`'s standalone `List Char`
+>    recursion does **not** share the blocker and is not reopened.
+>
+> **`blocks:` now names DS-9, and that edge is documentation.** DS-9's
+> frontmatter deliberately does **not** carry the reciprocal `depends_on`,
+> because the Architect scoped the dependency to the first `D3`+ slice
+> promising an unbounded fold, not to the node. `gen-progress.sh` reads
+> `depends_on`, so this pairing will not render as a graph edge — that is
+> intended, not an omission.
+>
+> **Size set to `M`** (was `TBD`). It covers `D0` and `D1` only; implementation
+> remains an uncreated successor owned by Language/elaborator.
+>
+> ## `D0` does not depend on what is holding this node's parent
+>
+> `depends_on: [KERNEL-NESTED-IND]` is whole-node, and `KERNEL-NESTED-IND` is
+> `active` **solely on `AC-K12`, which is Runtime-blocked**. `D0` is a Spec
+> contract about surface spelling, scoping, diagnostics, and interaction with
+> direct/W-style matches. **None of that is a function of `AC-K12`.**
+>
+> ⇒ **The operator's call is not gated on Kernel finishing.** If the answer at
+> 11:30Z is yes, `D0` can start immediately, and it consumes a spec-enclave
+> seat rather than one of the build lanes the cap applies to. Recorded so the
+> priority call is a priority call and not an inherited sequencing assumption —
+> a constraint can be practically binding for a reason that is false.
 
 ## Why this exists
 

@@ -38,7 +38,125 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~06:2xZ. `main` = `8e2883b0`.
+> ### RESUME HERE — state at 2026-08-10 ~07:4xZ. `main` = `bebe1a79`.
+>
+> **BOTH open Architect questions are ANSWERED. Nothing is waiting on the
+> Architect. The two things they gated are now mine and are DONE below.**
+>
+> #### The 95-minute stall was a STRANDED COMPOSER, and it is the finding
+>
+> The Architect posted nothing between 05:42 and 07:22 while **four items**
+> queued behind it — two merge Decisions and two design questions — blocking
+> three of four lanes. It was not dead, not compacted, not busy.
+> **`tmux capture-pane` showed twelve `[Pasted Content N chars]` blocks sitting
+> unsubmitted in its composer.** Every mention since 05:42, including my own two
+> from minutes earlier, had been pasted and never entered. **One bare `Enter`
+> cleared it and all four items were answered within 15 minutes.**
+>
+> **The discriminator is the DIM attribute, and it earned its keep in both
+> directions.** `capture-pane -p -e` and look at the composer's escape codes:
+> `ESC[2m` is a dim placeholder (idle, leave alone); anything else is real
+> stranded input. The Architect's was `ESC[38;5;6m` — cyan, real.
+> **A full-fleet sweep then flagged `moot-adversary` and
+> `moot-runtime-implementer` as apparent strands and BOTH were false** — their
+> composers were `ESC[2m` dim, showing the *last submitted prompt*. Without the
+> attribute test I would have re-submitted a `/compact` and a stale
+> instruction into two healthy seats.
+>
+> **A seat's convo status line is not liveness.** The Architect's still read
+> `ready — DS-9 D1 ... publisher routed` throughout, which was true, 95 minutes
+> stale, and indistinguishable from working. `get_activity` is the instrument
+> that saw it: last event 05:42 against a queue that kept growing.
+>
+> #### Architect ruling 1 — c1: NO (`evt_15b9acbfs9tty`). RECUT ISSUED.
+>
+> Absence of `checked_core.runtime_symbols` is **not** a sound discriminator: a
+> package-backed package whose metadata omits the role record erases to the same
+> `None` as a synthetic program, so treating `None` as synthetic re-admits the
+> exact case `c1` must refuse. Provenance goes in the **construction API**, not
+> in the IR.
+>
+> **Recut posted at `evt_ydks95x7mmtp`. The cut: reset to `24995e5e`, discard
+> `9b55a421`.** That commit is exactly 4 files, `+101/-82`, and is entirely the
+> inert threading — **so the ruling's "remove the 77 inert builder parameters"
+> is discharged by the reset, not by a 77-site edit.** Kept: `cdb800a8` (the
+> production fail-closed gate, which introduced `native_authority_for_program`)
+> and `24995e5e`. Stack base `8e2883b0` is on `main`.
+>
+> **I verified the prescription is buildable at the layer named, which is the
+> check I failed twice on this slice.** `legacy_prelude()` is `pub(crate)` in
+> `ken-runtime` with **no cross-crate callers** — the two `ken-elaborator`
+> integration-test hits are doc-comment prose. All 63 real call sites are
+> in-crate and already `#[cfg(test)]` territory. Had one been cross-crate,
+> deliverable 2's `#[cfg(test)]` entrypoint would have been unbuildable as
+> written, exactly as the previous two relays were.
+>
+> **Sized as ONE turn, not sliced:** the 38 reds clear only when the synthetic
+> entrypoint lands, so a production-only first slice would be an unmergeable red
+> increment.
+>
+> #### Architect ruling 2 — List recursion: YES (`evt_6ysrp62e4zayg`)
+>
+> The obstruction extends to `List`-carried recursion. **DS-9 `D3`+ unbounded
+> Json folds over arrays and objects are BLOCKED**; `D2`'s standalone
+> `List Char` recursion is **not** and is not reopened.
+>
+> **The dependency is SLICE-level and is deliberately NOT in DS-9's
+> `depends_on`** — putting it there would mark the whole node blocked, which is
+> false. Recorded in DS-9's body instead. `KERNEL-RECURSIVE-RESULT-SURFACE` now
+> carries `blocks: [DS-9]` as documentation; `gen-progress.sh` reads
+> `depends_on`, so it will not render as a graph edge, and that is intended.
+>
+> #### KERNEL-RECURSIVE-RESULT-SURFACE is now a THREE-way blocker
+>
+> Sized `M` (was `TBD`) and made shovel-ready so the operator's 11:30Z call is a
+> **pure priority call**. It blocks `nested-size-uses-lift`,
+> `nested-dependent-motive-uses-lift`, **and now DS-9 `D3`+** — Foundation's
+> next work. **Its `D0` does not depend on what holds its parent:**
+> `KERNEL-NESTED-IND` is active solely on Runtime-blocked `AC-K12`, and a Spec
+> contract about surface spelling is not a function of `AC-K12`. `D0` also
+> consumes a spec-enclave seat, not one of the capped build lanes.
+>
+> #### Publisher state
+>
+> **DS-9 `D2` exact `ee6773b0` is IN THE PUBLISHER as PR #1775** (Decision
+> `dec_7qw0k1q4rv6bc` resolved 07:22:20Z). M1-M3 done: two paths matching the
+> declared scope, no cited sources, intersection empty. **NOT yet merged — do
+> not record it as landed until M6 blob-verifies it.**
+>
+> **`CI-L1-EXECUTING-COVER` exact `bfac3f6f` is APPROVED and QUEUED behind it**
+> (`dec_29bgfg9pep70y`, Architect APPROVE at `evt_6jwkyynk3rqer`). Six paths,
+> intersection empty, verified.
+>
+> #### New node framed this window
+>
+> **`CONF-EVAL-COMPUTED-BOOL-ELIM`** — frame at
+> `docs/program/wp/CONF-EVAL-COMPUTED-BOOL-ELIM.md`, owner **spec-enclave**,
+> size **S**, `depends_on: [CI-L1-EXECUTING-COVER]`, `status: draft` **only**
+> because of that dependency. **Flip to `ready` the moment CI-L1 merges.**
+>
+> This is where `D5`'s five phantom ids landed. CV judgment `evt_2ah01fn9v4ev3`:
+> the family belongs in the matrix but under **`conformance/runtime/evaluation/`**,
+> not `surface/numbers/`, because `eq_int`/`leq_int` are replaceable witnesses.
+> `legacy-add-sub-mul-retired` is **closed as decorative**.
+>
+> **I measured the fact that makes the family load-bearing, and neither report
+> contained it.** In `eval.rs`'s `elim_reduce` the two scrutinee arms derive the
+> method index by **independent routes**: the `Ctor` arm looks the constructor
+> up via `globals.constructor(ctor_id)`; the `Bool` arm hardcodes
+> `let k = if b { 0 } else { 1 }`, correct **only** because `data Bool = True |
+> False` declares in that order. Change the declared order and one arm follows,
+> the other does not. **The computed-versus-literal agreement observation is the
+> only thing that could catch it**, and a flipped repair is strictly worse than
+> the original bug — it returns the wrong branch where the original left a
+> visible stuck term, so `can-no-stuck-closed-ground` would miss it too.
+>
+> #### Still owed to me
+>
+> Runtime `c2` returns **before** assignment stating its `AC-K12` relationship
+> (two Kernel seats idle behind that criterion).
+
+> ### RESUME HERE — earlier state at 2026-08-10 ~06:2xZ. `main` = `8e2883b0`.
 >
 > Publisher queue EMPTY. **Two code merges landed this window, both CI green.**
 >
@@ -209,14 +327,43 @@
 >
 > ### STILL QUEUED FOR 11:30Z
 >
-> 1. The DS-9 priority call above -- reverse it or confirm it.
+> **Item 1 is RESOLVED BY EVENTS, not a live ask** -- the DS-9-over-CI-L1
+> priority call is moot in one direction because both ran to completion.
+>
+> **NEW, and it is the one that matters: VERIFY HAS NO NEXT NODE, and its
+> blocker is a product decision only you can make.** Once
+> `CI-L1-EXECUTING-COVER` merges, Verify's only remaining node is
+> `SEC1-IFC-R3`, which is correctly `draft` and genuinely unbuildable:
+> `AC-R3b`/`AC-R3c` need a refutation of a `product(c, ζ)` faithfulness
+> obligation, and the sole production route to `Verdict::Disproved` is gated on
+> a literal `Term::IntLit` disequality (`prover.rs:298-300`). Everything else
+> falls through to `emit_unknown_hole`. **`z3` is not a dependency of this
+> workspace at all** -- zero hits across every manifest -- and the DAG's `V3`
+> row names "classifier + Z3 + Kripke embedding". **Adding an SMT backend is a
+> build/CI/licensing/throughput call, not one this node or I can make, and it
+> gates the entire by-proof half of `Sec1`.** The Z3-free widening is
+> separately recorded as **vacuous** -- `declare_deceq_certificate` has exactly
+> one caller registering `Int`, so generalizing the prover off `IntLit` has no
+> second registered type to generalize to and would produce a green WP over
+> nothing. **Do not let anyone frame that as available work.**
+>
+> 1. The DS-9 priority call above -- resolved by events; confirm or reverse.
 > 2. **Close PR #365 unmerged.** The integrator was parked on it awaiting
 >    routing. Head `befc2dc4` is dated **2026-07-08**, is **not an ancestor of
 >    `main`**, and its content (`scripts/scripted-pr-automerge.sh`) landed by
 >    another route. Merging it now would revert a month. Closing needs GitHub
 >    write, which no agent has and the publisher path does not do. Integrator
 >    told to drop it (`evt_3gtny7w70wxny`).
-> 3. Releasing draft `KERNEL-RECURSIVE-RESULT-SURFACE`.
+> 3. **Releasing draft `KERNEL-RECURSIVE-RESULT-SURFACE`. Its case got
+>    materially stronger on 2026-08-10** -- the Architect's `List` ruling makes
+>    it block **DS-9 `D3`+**, which is Foundation's next work, on top of the two
+>    `seed-nested.md` rows it already blocked. It is now sized `M` and
+>    shovel-ready, so this is a pure priority call with no framing pass behind
+>    it. **It is NOT gated on Kernel finishing:** its `depends_on` edge is
+>    whole-node and `KERNEL-NESTED-IND` is active solely on Runtime-blocked
+>    `AC-K12`, but `D0` is a Spec contract about surface spelling, which is not
+>    a function of `AC-K12`. `D0` also consumes a spec-enclave seat rather than
+>    one of the capped build lanes.
 > 4. **Promoting WS-L into the tracked frontier.** Language has 7 tracked nodes:
 >    5 merged, 1 closed, 1 draft, **zero `ready`**, while three Language seats
 >    sit idle. The three severed `CI-ASSERTIONLESS-L1` capability links
