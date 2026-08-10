@@ -42,9 +42,98 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `d1c91369`**, moving again when Runtime PR #1760 lands.
+**`main` = `69b1504b`.** Worktree clean, publisher queue EMPTY, nothing
+unpublished. Builds allowed, targeted only.
 
-> ### RESUME HERE — state at 2026-08-10 ~04:2xZ. `main` = `dba42b0a`.
+> ### RESUME HERE — state at 2026-08-10 ~04:3xZ. `main` = `69b1504b`.
+>
+> **CI-ASSERTIONLESS-L1 WAS REJECTED A THIRD TIME.** `dec_7yn4qg6q05t8n`
+> rejected 04:21:58Z, read from the object. Nothing is in the publisher queue
+> and nothing is publishable.
+>
+> **The three rejections are all the same defect: the file header's cover
+> claim.** Reject 2 was the header claiming cover for the three ignored rows;
+> reject 3 is the replacement header certifying two EXECUTING rows,
+> `sec61`/`sec62`. Each rewrite enumerates per-row cover and gets a different
+> subset wrong. This node exists to eliminate artifacts that assert cover they
+> do not have, and the header is one.
+>
+> **The cut I made and posted as binding** (`evt_3fh43dtt9n1ff`): the header
+> stops certifying per-row conformance cover ENTIRELY -- it points at
+> `.github/ignored-test-exemptions.toml` and claims nothing the registry does
+> not. Preserve the AC-2 mechanics, the three ignored-row dispositions, the
+> registry coupling, and the D2 record, all accepted three times running.
+> `sec61`/`sec62` are OUT of this node -- do not widen a thrice-rejected
+> candidate. Fourth SHA, fresh QA, fresh Decision.
+>
+> **FILED: `CI-L1-EXECUTING-COVER`** (`docs/program/issues/`), owner verify,
+> `draft`, `depends_on: [CI-ASSERTIONLESS-L1]` -- that edge is file contention
+> on `l1_acceptance.rs`, not logic. It needs a frame before release.
+> Measured against the seed, not inferred: `sec62` stands for
+> `algebraic-law-is-proposition-not-reduction (soundness)`, whose `given` is the
+> conversion query `a + b ≟ b + a`; the test asserts
+> `assert_ne!(def_id_ab, def_id_ba)`, true of any two declarations, and issues
+> no conversion query. The seed names its own bug model -- registering an
+> algebraic law as a kernel reduction -- and under that exact bug `sec62` stays
+> green. `sec61` checks the interpreter half of a two-half row while its doc
+> comment asserts the half the seed denies.
+>
+> ### THE ARCHITECT WAS THE BOTTLENECK, TWICE, AND BOTH ARE INSTRUMENT FAILURES
+>
+> 1. **Stranded twice** -- the review request, then my reply, sat undelivered in
+>    its composer with the turn ended. Cyan `38;5;6`, no `Working` line. Bare
+>    `Enter` cleared each; verified by re-capture.
+> 2. **`list_decisions(status="proposed")` returned `[]`** while
+>    `dec_7yn4qg6q05t8n` existed, so it concluded "stale notification, no
+>    further action is due" and stood down. My identical call minutes later
+>    returned it. An empty `list_*` is not evidence the store is empty. When
+>    asking a reviewer to vote, put the `dec_` id in the body so they read the
+>    OBJECT, not a list.
+>
+> ### LANES
+>
+> Runtime holds one (`D1b-role-b`, active, cut confirmed `evt_62s77xsdwh4k3`;
+> slice `c` NOT confirmed). Verify's is open -- its candidate is back with the
+> ring on a fourth SHA.
+>
+> **DS-9 IS THE SUCCESSOR FOR THE NEXT FREE LANE, and the priority call that
+> was queued for the operator has DISSOLVED.** The node records its contention
+> as "DS-9 and Verify's CI-ASSERTIONLESS-L1 both want the lane, and that is a
+> priority call between two `ready` WPs." Verify's only other node,
+> `SEC1-IFC-R3`, is `draft` and gated on adding an SMT backend -- an escalated
+> operator/architecture call, and the node forbids the Z3-free widening by name
+> as vacuous. So once CI-ASSERTIONLESS-L1 lands there is one eligible `ready`
+> non-Runtime node and one free lane: that is sequencing, which is mine.
+> DS-9 is fully unblocked -- `D5` merged at `82918b6a`, and its `AC-K12`
+> independence is confirmed from `D6`'s own text.
+>
+> Releasing draft `KERNEL-RECURSIVE-RESULT-SURFACE` remains the operator's.
+>
+> ### OWED ITEM 1 IS DISCHARGED -- the three capabilities are NOT tracked nodes
+>
+> `Int.toInt64` on L-classes, integer-division op registration, Char literal
+> syntax. All three are WS-L surface work. They are named in the WP catalog as
+> `L1` (`docs/program/03-program-of-work.md:215`) and covered by three Steward
+> frames (`wp/L1-numbers.md`, `wp/conversions-intn-floor.md`,
+> `wp/F1-bignum-int.md`), and they are durably recorded in the CI-enumerated
+> exemption registry with the waiting capability named. **None is a tracked
+> issue node**, and the finding is bigger than three rows: WS-L has 7 tracked
+> nodes, 5 merged, 1 closed, 1 draft -- **zero `ready`**, so the whole Language
+> surface stream is invisible to the frontier while three Language seats sit
+> idle. I did not file L1-L8 unilaterally: promoting a catalog stream into the
+> tracked frontier changes what the build says it is doing next, which is
+> direction. FOR THE OPERATOR AT 11:30Z.
+>
+> ### OWED ITEM 2, unchanged
+>
+> `RT-TERMINAL-ALL-ELIM-AUTHORITY` `AC-8` -- open soundness concern against
+> `register_all_supports`, cross-referenced from `D7`'s audit enumeration.
+> Still `ready` and base-blocked; no action yet.
+
+> ### SUPERSEDED — 2026-08-10 ~04:2xZ. Kept for the E0423 correction only.
+
+> Stale as of 04:3xZ: the respin below was REJECTED. `main` has moved to
+> `69b1504b`. Do not act on this block.
 >
 > **THREE MERGES LANDED TONIGHT, publisher queue drained, all blob-verified.**
 > Kernel `D7` `4b412ec4` (PR #1759); Runtime `D1b-role-a` `3f768659` (PR #1760,
