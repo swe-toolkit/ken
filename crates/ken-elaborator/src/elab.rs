@@ -7798,7 +7798,8 @@ pub fn elaborate_rexpr(
 #[cfg(test)]
 mod nested_lift_association_tests {
     use super::{
-        validate_lift_associations, GlobalId, HashMap, LiftAssociationFailure, LiftBinding,
+        lift_association_error, validate_lift_associations, ElabError, GlobalId, HashMap,
+        LiftAssociationFailure, LiftBinding, Span,
     };
 
     fn binding(
@@ -7884,5 +7885,61 @@ mod nested_lift_association_tests {
             validate_lift_associations(&HashMap::new(), &[(1, association)]),
             Err(LiftAssociationFailure::Missing { source: 1 })
         );
+    }
+
+    #[test]
+    fn validator_failures_map_to_named_structural_diagnostics_with_field_spans() {
+        let match_span = Span::new(100, 200);
+        let first = Span::new(10, 11);
+        let second = Span::new(20, 21);
+        let fields = vec![(3, first.clone()), (4, second.clone())];
+
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Missing { source: 3 },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationMissing { match_span: got_match, field_span }
+                if got_match == match_span && field_span == first
+        ));
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Duplicate { sources: vec![3, 4] },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationDuplicate { match_span: got_match, field_spans }
+                if got_match == match_span && field_spans == vec![first.clone(), second.clone()]
+        ));
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Swapped { first: 3, second: 4 },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationSwapped {
+                match_span: got_match,
+                first_field_span,
+                second_field_span,
+            } if got_match == match_span && first_field_span == first && second_field_span == second
+        ));
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Foreign {
+                    source: 4,
+                    expected: Some(GlobalId(42)),
+                    actual: Some(GlobalId(99)),
+                },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationForeign {
+                match_span: got_match,
+                field_span,
+                expected_support: Some(GlobalId(42)),
+                actual_support: Some(GlobalId(99)),
+            } if got_match == match_span && field_span == second
+        ));
     }
 }

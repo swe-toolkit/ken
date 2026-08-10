@@ -7,7 +7,7 @@ use ken_elaborator::{
     resolve::{resolve_expr_standalone, RExpr},
     ElabEnv, Expr,
 };
-use ken_kernel::Term;
+use ken_kernel::{AllSupportSort, Term};
 
 const STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
       Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a \
@@ -247,4 +247,26 @@ fn d2_deep_nested_associations_elaborate_and_kernel_check() {
     let mut env = ElabEnv::new().unwrap();
     env.elaborate_file(DEEP_STRUCTURAL_SIZE_SOURCE).unwrap();
     assert!(env.globals.contains_key("deep_result"));
+}
+
+#[test]
+fn d2_generated_support_name_stays_unresolvable_beside_visible_source_name() {
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_decl("data Bag (a : Type) : Type where { Empty : Bag a }")
+        .unwrap();
+    let support = env
+        .env
+        .all_support(env.globals["Bag"], 0, AllSupportSort::Type)
+        .expect("Bag's real generated Type support exists");
+    let generated_name = format!("{support:?}");
+
+    // The token is the actual generated support identity, not a guessed
+    // spelling. It is deliberately absent from the source resolver's globals.
+    assert!(matches!(
+        env.elaborate_decl(&format!("const hidden_support : Type = {generated_name}")),
+        Err(ElabError::UnresolvedCon { name, .. }) if name == generated_name
+    ));
+    // Same type-expression position, but a real source family, remains usable.
+    env.elaborate_decl("const visible_source : Type = Bag Nat")
+        .expect("source-visible Bag resolves at the identical type position");
 }
