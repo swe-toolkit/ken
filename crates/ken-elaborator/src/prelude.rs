@@ -32,12 +32,164 @@ use ken_kernel::{
 use crate::error::ElabError;
 use crate::ElabEnv;
 
+/// Declares [`CanonicalRuntimeRoles`] and its registration-time capture from a
+/// single list, so the field set and the captured set cannot drift apart.
+///
+/// Each entry pairs the **role** (the field, which is the identity Runtime
+/// reasons about) with the **prelude source spelling** that declares it. The
+/// spelling is consumed exactly once, here, during `register_prelude` — before
+/// any package source has been elaborated and therefore before any package
+/// declaration could shadow it. What survives is a `GlobalId`, which no later
+/// declaration can redirect.
+macro_rules! canonical_runtime_roles {
+    ($( $(#[$meta:meta])* $field:ident => $spelling:literal ),* $(,)?) => {
+        /// The immutable canonical `GlobalId` for every constructor, family and
+        /// operation role to which Runtime assigns special meaning.
+        ///
+        /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. This is the authority the
+        /// checked-runtime record is built from. It exists because the two
+        /// producers in `compiler_driver.rs` previously selected these roles with
+        /// `env.globals.get(name)` **after** package source elaboration, which is
+        /// mutable source spelling: a package declaring its own `Nil`/`Cons`
+        /// would have redirected Runtime's list roles onto user constructors.
+        ///
+        /// Captured once at prelude registration; read thereafter by field.
+        /// ⛔ Neither producer may consult `ElabEnv::globals` by role spelling.
+        #[derive(Debug, Clone)]
+        pub struct CanonicalRuntimeRoles {
+            $( $(#[$meta])* pub $field: GlobalId, )*
+        }
+
+        impl CanonicalRuntimeRoles {
+            /// The placeholder used before `register_prelude` runs; never read.
+            fn zeroed() -> Self {
+                Self { $( $field: GlobalId(0), )* }
+            }
+
+            /// Resolve every role against the prelude's own global scope.
+            ///
+            /// Called at the end of `register_prelude`, so `globals` holds the
+            /// prelude's declarations and nothing else.
+            fn capture(
+                globals: &std::collections::HashMap<String, GlobalId>,
+            ) -> Result<Self, ElabError> {
+                Ok(Self {
+                    $( $field: globals.get($spelling).copied().ok_or_else(|| {
+                        ElabError::Internal(format!(
+                            "prelude: canonical runtime role '{}' ({}) not registered",
+                            stringify!($field),
+                            $spelling,
+                        ))
+                    })?, )*
+                })
+            }
+
+            /// Every role paired with its **field** name, for exhaustive checks.
+            ///
+            /// The strings are role identities for diagnostics and tests — they
+            /// are never a lookup key, which would reintroduce the very
+            /// string-keyed authority this type replaces.
+            pub fn all(&self) -> Vec<(&'static str, GlobalId)> {
+                vec![ $( (stringify!($field), self.$field), )* ]
+            }
+
+            /// The prelude source spelling each role was declared under.
+            ///
+            /// Test-facing only: a substitution-resistance fixture needs to know
+            /// which spellings to shadow. Production never resolves by these.
+            pub fn spellings() -> &'static [(&'static str, &'static str)] {
+                &[ $( (stringify!($field), $spelling), )* ]
+            }
+        }
+    };
+}
+
+canonical_runtime_roles! {
+    // ITree spine and the effect-op coproduct.
+    ret => "Ret",
+    vis => "Vis",
+    in_l => "InL",
+    in_r => "InR",
+    // Effect families and the authority capability.
+    fs_family => "FSOp",
+    console_family => "ConsoleOp",
+    clock_family => "ClockOp",
+    entropy_family => "EntropyOp",
+    capability => "Cap",
+    // Result / Option.
+    result_err => "Err",
+    result_ok => "Ok",
+    option_some => "Some",
+    // File errors and the file-operation discriminants.
+    file_error => "MkFileError",
+    file_operation_read => "OpReadFile",
+    file_operation_write => "OpWriteFile",
+    file_operation_change_mode => "OpChangeMode",
+    // The twelve IO errors, in the exact order the spine's vector carries them.
+    // That order is the contract; the record's bytes depend on it.
+    io_error_not_found => "NotFound",
+    io_error_permission_denied => "PermissionDenied",
+    io_error_capability_denied => "CapabilityDenied",
+    io_error_broken_pipe => "BrokenPipe",
+    io_error_interrupted => "Interrupted",
+    io_error_already_exists => "AlreadyExists",
+    io_error_invalid_input => "InvalidInput",
+    io_error_is_directory => "IsDirectory",
+    io_error_not_directory => "NotDirectory",
+    io_error_not_empty => "NotEmpty",
+    io_error_unsupported => "Unsupported",
+    io_error_other => "Other",
+    // Resource errors and resource kinds.
+    resource_kind_mismatch => "ResourceKindMismatch",
+    resource_buffer_limit => "BufferLimit",
+    resource_allocation_failed => "AllocationFailed",
+    resource_invalid_offset => "InvalidOffset",
+    resource_invalid_bounds => "InvalidBounds",
+    resource_no_progress => "NoProgress",
+    resource_kind_buffer => "Buffer",
+    // Progress constructors.
+    read_some => "ReadSome",
+    read_eof => "ReadEof",
+    wrote => "Wrote",
+    // Unit and Bool.
+    unit => "MkUnit",
+    bool_false => "False",
+    bool_true => "True",
+    // The public host operations.
+    op_console_read => "Read",
+    op_console_write => "Write",
+    op_console_flush => "Flush",
+    op_console_is_terminal => "IsTerminal",
+    op_clock_wall_now => "WallNow",
+    op_clock_monotonic_now => "MonotonicNow",
+    op_clock_sleep_until => "SleepUntil",
+    op_entropy_random_bytes => "RandomBytes",
+    op_fs_read_file => "ReadFile",
+    op_fs_write_file => "WriteFile",
+    op_fs_append_file => "AppendFile",
+    op_fs_metadata => "Metadata",
+    op_fs_read_directory => "ReadDirectory",
+    op_fs_create_directory => "CreateDirectory",
+    op_fs_remove_file => "RemoveFile",
+    op_fs_remove_directory => "RemoveDirectory",
+    op_fs_rename => "Rename",
+    op_fs_change_mode => "ChangeMode",
+    // The process/list/product/exit roles the checked-runtime record adds.
+    process_input => "MkProcessInput",
+    list_nil => "Nil",
+    list_cons => "Cons",
+    prod => "MkProd",
+    exit_success => "Success",
+    exit_failure => "Failure",
+}
+
 /// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction; overwritten by
 /// `register_prelude` before the env is returned. The `GlobalId(0)` values are
 /// never observed (no real declaration has id 0).
 pub fn empty_prelude_env() -> PreludeEnv {
     let z = GlobalId(0);
     PreludeEnv {
+        runtime_roles: CanonicalRuntimeRoles::zeroed(),
         nat_id: z,
         zero_id: z,
         suc_id: z,
@@ -121,6 +273,10 @@ pub fn empty_prelude_env() -> PreludeEnv {
 /// GlobalIds for the L3 prelude types + Ω constants.
 #[derive(Debug, Clone)]
 pub struct PreludeEnv {
+    /// The immutable canonical roster every Runtime constructor role is derived
+    /// from (`RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`). Captured at
+    /// registration, before package source elaboration can shadow a spelling.
+    pub runtime_roles: CanonicalRuntimeRoles,
     // `Nat` (Peano) — the `unfoldUpTo` fuel.
     pub nat_id: GlobalId,
     pub zero_id: GlobalId,
@@ -2331,7 +2487,15 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude writeFile failed: {e}")))?;
 
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Capture the canonical role
+    // roster HERE — every prelude declaration is registered and no package
+    // source has been elaborated, so each spelling still denotes the prelude's
+    // own declaration. After this point the roster is closed: the ids it holds
+    // survive any later shadowing declaration, which is the whole point.
+    let runtime_roles = CanonicalRuntimeRoles::capture(&elab.globals)?;
+
     Ok(PreludeEnv {
+        runtime_roles,
         nat_id,
         zero_id,
         suc_id,
