@@ -254,9 +254,10 @@ pub enum RExpr {
         proof_name: String,
         span: Span,
     },
-    /// Resolved `structural result of x`. The index identifies one surface
+    /// A resolved nested-result selector. The index identifies one surface
     /// binding; elaboration consults that binding's branch-local association.
-    RStructuralResult {
+    RRecursiveResult {
+        selector: crate::ast::RecursiveResultSelector,
         index: usize,
         name: String,
         binding_span: Span,
@@ -283,7 +284,7 @@ impl RExpr {
             | RExpr::RPi(_, _, _, s)
             | RExpr::RArrow(_, _, s)
             | RExpr::RAttachedProofRef { span: s, .. }
-            | RExpr::RStructuralResult { span: s, .. }
+            | RExpr::RRecursiveResult { span: s, .. }
             | RExpr::RBinOp(_, _, _, s) => s,
             RExpr::RMatch { span, .. } => span,
         }
@@ -566,7 +567,7 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EMatch { .. }
         | Expr::EProj(..)
         | Expr::EAttachedProofRef { .. }
-        | Expr::EStructuralResult { .. } => Err(unsupported_constructor_type_expr(expr)),
+        | Expr::ERecursiveResult { .. } => Err(unsupported_constructor_type_expr(expr)),
     }
 }
 
@@ -1704,7 +1705,8 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             span: span.clone(),
         }),
 
-        Expr::EStructuralResult {
+        Expr::ERecursiveResult {
+            selector,
             operand,
             operand_span,
             span,
@@ -1716,7 +1718,8 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
                         name: operand.clone(),
                         span: operand_span.clone(),
                     })?;
-            Ok(RExpr::RStructuralResult {
+            Ok(RExpr::RRecursiveResult {
+                selector: *selector,
                 index,
                 name: operand.clone(),
                 binding_span,

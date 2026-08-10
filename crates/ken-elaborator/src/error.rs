@@ -2,7 +2,14 @@
 
 use std::fmt;
 
-use ken_kernel::{GlobalId, KernelError, Level};
+use ken_kernel::{GlobalId, KernelError, Level, LevelVar, Term};
+
+/// The determined classifier of a selected hidden recursive result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RecursiveResultSort {
+    Type(Level),
+    Omega(Level),
+}
 
 /// A source span (byte offsets, 0-based).
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
@@ -78,6 +85,20 @@ pub enum ElabError {
         field_span: Span,
         expected_support: Option<GlobalId>,
         actual_support: Option<GlobalId>,
+    },
+    /// A nested-result selector used the spelling for the other sort.
+    RecursiveResultSortMismatch {
+        selector_span: Span,
+        binding_span: Span,
+        actual_classifier: RecursiveResultSort,
+        required_spelling: &'static str,
+    },
+    /// The selected result's type cannot yet be classified as Type or Omega.
+    RecursiveResultSortAmbiguous {
+        selector_span: Span,
+        binding_span: Span,
+        unresolved_result_type: Term,
+        implicated_metavariables: Vec<LevelVar>,
     },
     /// `old` reached elaboration in a space-operation `ensures`, but the
     /// reachable surface has no pre-state binding yet (`36 §4.3`).
@@ -289,6 +310,38 @@ impl fmt::Display for ElabError {
                 field_span.end,
                 expected_support,
                 actual_support,
+            ),
+            ElabError::RecursiveResultSortMismatch {
+                selector_span,
+                binding_span,
+                actual_classifier,
+                required_spelling,
+            } => write!(
+                f,
+                "RecursiveResultSortMismatch at {}-{} for binding at {}-{}: \
+                 found {:?}; required `{}`",
+                selector_span.start,
+                selector_span.end,
+                binding_span.start,
+                binding_span.end,
+                actual_classifier,
+                required_spelling,
+            ),
+            ElabError::RecursiveResultSortAmbiguous {
+                selector_span,
+                binding_span,
+                unresolved_result_type,
+                implicated_metavariables,
+            } => write!(
+                f,
+                "RecursiveResultSortAmbiguous at {}-{} for binding at {}-{}: \
+                 unresolved result type {:?}, metavariables {:?}",
+                selector_span.start,
+                selector_span.end,
+                binding_span.start,
+                binding_span.end,
+                unresolved_result_type,
+                implicated_metavariables,
             ),
             ElabError::OldPreStateUnsupported { span } => write!(
                 f,

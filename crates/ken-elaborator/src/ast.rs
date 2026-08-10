@@ -629,9 +629,10 @@ pub enum Expr {
         proof_name: String,
         span: Span,
     },
-    /// `structural result of x` — select the validated hidden recursive
-    /// method result associated with the surface binding `x`.
-    EStructuralResult {
+    /// A sort-selected recursive method result associated with a surface
+    /// binding (`34 §3.1.1`).
+    ERecursiveResult {
+        selector: RecursiveResultSelector,
         operand: String,
         operand_span: Span,
         span: Span,
@@ -655,10 +656,26 @@ impl Expr {
             | Expr::EPi(_, _, _, s)
             | Expr::EArrow(_, _, s)
             | Expr::EAttachedProofRef { span: s, .. }
-            | Expr::EStructuralResult { span: s, .. }
+            | Expr::ERecursiveResult { span: s, .. }
             | Expr::EBinOp(_, _, _, s)
             | Expr::EProj(_, _, s) => s,
             Expr::EMatch { span, .. } => span,
+        }
+    }
+}
+
+/// The two contextual nested-result selector spellings (`32 §3`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecursiveResultSelector {
+    RecursiveResult,
+    InductionHypothesis,
+}
+
+impl RecursiveResultSelector {
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::RecursiveResult => "recursive result for",
+            Self::InductionHypothesis => "induction hypothesis for",
         }
     }
 }

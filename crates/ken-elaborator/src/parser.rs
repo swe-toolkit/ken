@@ -2241,11 +2241,34 @@ impl Parser {
                     && matches!(self.lookahead(2), Token::Ident(word) if word == "of")
                     && matches!(self.lookahead(3), Token::Ident(_))
                 {
+                    return Err(ElabError::ParseError {
+                        msg: "retired nested-result selector; use the sort-selected spelling"
+                            .to_string(),
+                        span: Span::new(span.start, self.tokens[self.pos + 3].1.end),
+                    });
+                }
+                let selector = if s == "recursive"
+                    && matches!(self.lookahead(1), Token::Ident(word) if word == "result")
+                    && matches!(self.lookahead(2), Token::Ident(word) if word == "for")
+                    && matches!(self.lookahead(3), Token::Ident(_))
+                {
+                    Some(("result", crate::ast::RecursiveResultSelector::RecursiveResult))
+                } else if s == "induction"
+                    && matches!(self.lookahead(1), Token::Ident(word) if word == "hypothesis")
+                    && matches!(self.lookahead(2), Token::Ident(word) if word == "for")
+                    && matches!(self.lookahead(3), Token::Ident(_))
+                {
+                    Some(("hypothesis", crate::ast::RecursiveResultSelector::InductionHypothesis))
+                } else {
+                    None
+                };
+                if let Some((second_word, selector)) = selector {
                     self.advance();
-                    self.expect_contextual_ident("result")?;
-                    self.expect_contextual_ident("of")?;
+                    self.expect_contextual_ident(second_word)?;
+                    self.expect_contextual_ident("for")?;
                     let (operand, operand_span) = self.expect_ident()?;
-                    return Ok(Expr::EStructuralResult {
+                    return Ok(Expr::ERecursiveResult {
+                        selector,
                         operand,
                         span: Span::new(span.start, operand_span.end),
                         operand_span,
@@ -2367,11 +2390,13 @@ impl Parser {
                             proof_name,
                             span,
                         },
-                        Expr::EStructuralResult {
+                        Expr::ERecursiveResult {
+                            selector,
                             operand,
                             operand_span,
                             ..
-                        } => Expr::EStructuralResult {
+                        } => Expr::ERecursiveResult {
+                            selector,
                             operand,
                             operand_span,
                             span,
