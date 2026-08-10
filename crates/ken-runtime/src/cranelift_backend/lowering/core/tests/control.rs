@@ -29105,7 +29105,7 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
     // `assert!(s_arrivals > 0)` that a trim pass could delete without breaking
     // anything.
     //
-    // ⛔ A DENOMINATOR READ ONLY BY THE MESSAGE IS TWO EDITS FROM GONE, NOT ONE.
+    // A DENOMINATOR READ ONLY BY THE MESSAGE IS TWO EDITS FROM GONE, NOT ONE.
     // A previous revision bound this `NonZeroUsize` and then compared against the
     // literal `0`, reading the value only inside the format string. Deleting the
     // binding was a compile error -- but *shortening the message* first, which
@@ -29819,4 +29819,76 @@ fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
     assert_eq!(exact.2, suppressed.2, "the mode changed a live row's entered occurrences");
     assert_eq!(exact.3, suppressed.3, "the mode changed a live row's static-worker calls");
     assert_eq!(exact.4, suppressed.4, "the mode changed a live row's join accounting");
+}
+
+/// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` `AC-9` — the layout control observes
+/// PRODUCTION's assembled prefix, not its own recomputation of the rule.
+///
+/// `CheckedCaseBinderLayout::for_case` reads `recursive_positions` and
+/// `argument_binders` -- the same inputs production reads -- and recomputes the
+/// reversal from them. Every assertion made only against `for_case` therefore
+/// compares the authority with itself: deleting the `.rev()` in
+/// `lowering/core.rs` leaves the authority reversing and every such assertion
+/// green. Prose in a doc comment does not redden.
+///
+/// This control has an independent side. It compiles a real fixture, reads back
+/// the hypothesis prefix production ACTUALLY seated, and requires the layout to
+/// agree with it index by index. Flip or delete a production `.rev()` and the
+/// two sides disagree.
+///
+/// The fixture declares TWO recursive positions deliberately. At length one the
+/// forward and reversed spellings coincide, so a single-position fixture agrees
+/// with both and could not detect the mutation at all.
+#[test]
+fn d2e_ac9_layout_agrees_with_the_prefix_production_assembled() {
+    use crate::cranelift_backend::lowering::d2e_take_binder_assemblies;
+    use crate::cranelift_backend::planning::{CheckedCaseBinderLayout, CheckedCaseBinderRole};
+
+    let _ = d2e_take_binder_assemblies();
+    let expression =
+        host_result_closure_match(px8j_recursive_sibling_result(1, 2, px8j_aggregate_result()));
+    let (result, _trace) =
+        px8j_capture_source_trace(&expression, false, "ken_d2e_ac9_layout_vs_production");
+    result.expect("the two-sibling fixture lowers");
+    let assemblies = d2e_take_binder_assemblies();
+
+    // The discriminating population is established FIRST, so "nothing qualified"
+    // cannot pass as "everything agreed".
+    let multi: Vec<_> = assemblies
+        .iter()
+        .filter(|assembly| assembly.recursive_positions.len() > 1)
+        .collect();
+    assert!(
+        !multi.is_empty(),
+        "no case with more than one recursive position reached the assembly site, so this \
+         control cannot see the reversal at all: {assemblies:#?}"
+    );
+
+    for assembly in multi {
+        let case = crate::RuntimeComputationalMatchCase {
+            // Reconstructed from what production RECORDED, so the layout is
+            // asked about the same declaration production assembled from.
+            constructor: "ctor:fixture::D2eAc9::Reconstructed".to_string(),
+            argument_binders: assembly.argument_binders,
+            recursive_positions: assembly.recursive_positions.clone(),
+            body: RuntimeExpr::Var(0),
+        };
+        let layout = CheckedCaseBinderLayout::for_case(&case).expect("the layout derives");
+        assert_eq!(
+            assembly.assembled_prefix.len(),
+            assembly.recursive_positions.len(),
+            "production seated a hypothesis for every declared recursive position"
+        );
+        for (index, seated) in assembly.assembled_prefix.iter().copied().enumerate() {
+            assert_eq!(
+                layout.role_at(index),
+                CheckedCaseBinderRole::InductionHypothesis {
+                    recursive_position: u32::try_from(seated).expect("position fits"),
+                },
+                "at de Bruijn index {index} production seated the hypothesis for sibling \
+                 position {seated}, and the layout authority disagrees. The authority and \
+                 the emitted environment must not drift: {assembly:#?}"
+            );
+        }
+    }
 }

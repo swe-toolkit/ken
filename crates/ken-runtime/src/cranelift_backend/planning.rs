@@ -57,6 +57,11 @@ pub(super) use static_transition::{
     ContinuationSourceSlotAuthority,
     ContinuationFrameRequirement,
     ContinuationSpecializationId,
+    // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout reaches
+    // lowering's test targets so its control can compare the authority against
+    // the prefix production actually assembled, rather than against its own
+    // recomputation of the same rule. Namespace re-export only.
+    CheckedCaseBinderLayout, CheckedCaseBinderRole,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D3b` — the emission consumer's fail-closed
     // check that it is indexing where the coordinate actually sits.
     verify_current_lexical_availability,

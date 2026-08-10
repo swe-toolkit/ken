@@ -602,6 +602,63 @@ pub(crate) enum PlannedTrapSeat {
     /// into a boundary trap token.
     RootTrapToken,
 }
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` `AC-9` — production's ASSEMBLED
+/// hypothesis prefix.**
+///
+/// The layout authority in the planner reads `recursive_positions` and
+/// `argument_binders` and recomputes the reversal from the same inputs
+/// production uses. A control over it therefore compares the authority against
+/// itself: delete the `.rev()` in this file and the authority still reverses,
+/// and every assertion stays green.
+///
+/// This records what production actually seated, so the control has an
+/// independent side. The recorded prefix is a **fact about the emitted
+/// environment**, not a restatement of the rule.
+#[cfg(test)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct D2eBinderAssembly {
+    /// The case's own checked declaration, as production received it.
+    pub(in crate::cranelift_backend) recursive_positions: Vec<usize>,
+    pub(in crate::cranelift_backend) argument_binders: usize,
+    /// The sibling position production seated at each de Bruijn index of the
+    /// hypothesis prefix, in index order.
+    pub(in crate::cranelift_backend) assembled_prefix: Vec<usize>,
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d2e_take_binder_assemblies() -> Vec<D2eBinderAssembly> {
+    D2E_BINDER_ASSEMBLY.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
+/// Record one assembled hypothesis prefix.
+///
+/// Total and lossless over the prefix: a binding that is not a recursor closure
+/// contributes nothing, which is the same "nothing to record" answer any other
+/// non-recursor value gets, and it would show up as a short prefix rather than
+/// as a silently reordered one.
+#[cfg(test)]
+fn d2e_record_binder_assembly(
+    case: &crate::RuntimeComputationalMatchCase,
+    hypotheses: &[LoweringEnvironmentBinding],
+) {
+    let mut assembled_prefix = Vec::with_capacity(hypotheses.len());
+    for binding in hypotheses {
+        if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
+            Lowered::ComputationalRecursorClosure { invocation, .. },
+        )) = binding
+        {
+            assembled_prefix.push(invocation.sibling_position);
+        }
+    }
+    D2E_BINDER_ASSEMBLY.with(|cell| {
+        cell.borrow_mut().push(D2eBinderAssembly {
+            recursive_positions: case.recursive_positions.clone(),
+            argument_binders: case.argument_binders,
+            assembled_prefix,
+        })
+    });
+}
+
 #[cfg(test)]
 fn px8j_record_source_event(event: Px8jSourceTraceEvent) {
     PX8J_SOURCE_TRACE.with(|trace| trace.borrow_mut().push(event));
@@ -19584,6 +19641,8 @@ fn borrowed_constructor_identity(
 #[cfg(test)]
 thread_local! {
     static PX8J_SOURCE_TRACE: std::cell::RefCell<Vec<Px8jSourceTraceEvent>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static D2E_BINDER_ASSEMBLY: std::cell::RefCell<Vec<D2eBinderAssembly>> =
         const { std::cell::RefCell::new(Vec::new()) };
     static PX8J_DELETE_OWNED_SELECTED_SCOPE: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
