@@ -1,7 +1,7 @@
 ---
 id: RT-CALL-EDGE-EXECUTABILITY-AXIS
 title: "executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none

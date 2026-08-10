@@ -1,7 +1,7 @@
 ---
 id: KERNEL-RECURSIVE-RESULT-SURFACE
 title: "A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible"
-status: draft
+status: ready
 owner: spec-enclave
 size: M
 gate: none

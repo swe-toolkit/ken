@@ -85,9 +85,17 @@ origin: Architect re-rule evt_3r4j14fv1jtj2 (2026-08-08) on the nine-expression 
 > shipped-binary exposure unless someone measures that separately. The repair is
 > cheap under either answer, which is why `D9` does not wait on it.
 >
-> **Sequencing:** after `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1`. Not urgent — the
-> premise holds today — but it is small and it is the guard against the exact
-> edit it is designed to catch.
+> **Sequencing: FIRST in Runtime's queue. The "after
+> `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1`" note is WITHDRAWN** (operator, 2026-08-10:
+> *"retiring RecursiveDescent is the priority"*).
+>
+> That note was a Steward sequencing preference, never a mechanism dependency —
+> `D9` extends a manifest pin and touches none of the lowering surface `D1`
+> touches. Its effect was to park this campaign's next actionable deliverable
+> behind the ABI lane, which is how Runtime spent 08-09 22:12 onward on
+> non-campaign nodes while the retirement directive stood. The premise still
+> holds today, so `D9` is not urgent by severity — it is first because it is the
+> cheapest thing standing between here and `#6d`.
 
 > # `D10` — ADDED 2026-08-09. STRIP THE RELEASE GATE OUT OF A CODE COMMENT.
 >
