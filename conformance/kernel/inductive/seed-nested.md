@@ -133,6 +133,10 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
 
 ### kernel/inductive/nested-size-uses-lift [KERNEL-NESTED-IND]
 
+Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE`. The current surface cannot
+denote the kernel-supplied recursive result; finite-depth topology controls do
+not discharge this row.
+
 - spec: `14 §3.2`, `§7.8`, `§9.5`; `39 §2.2`; `43 §1`
 - given: define `size : Rose -> Nat` by the generated eliminator. The `leaf`
   method returns `1`; the `node` method eliminates the supplied
