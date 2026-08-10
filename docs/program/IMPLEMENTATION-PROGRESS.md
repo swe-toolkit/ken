@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-10 21:58:18Z — from 210 issue file(s) in `docs/program/issues/`.
+2026-08-10 22:01:30Z — from 211 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -117,6 +117,7 @@ the committed file matches the generator's output.
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
 | `KW-THEOREM` | rename the surface keyword `lemma` to `theorem` | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
+| `LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC` | The selector's non-universe classifier arm reports the elaborator's own refusal as KernelRejected and fabricates a Type(?0) expectation that Omega would equally satisfy | ready | language | S | none | — |
 | `LANG-SELECTOR-SORT-SPLIT-ELAB` | Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates | merged | language | L | none | — |
 | `LANG-SORT-META-CAPABILITY` | Rule whether a term/sort metavariable representation is authorized -- the elaborator cannot today leave a selected result undecided between Type and Omega, so the spec's conditional ambiguity clause has an unreachable antecedent | draft | spec-enclave | S | none | — |
 | `LANG-STRUCTURAL-RESULT-ELAB` | Implement the structural-result selector in the elaborator -- derive the field/evidence/result association from the kernel method telescope and elaborate `structural result of x` to the hidden recursive method result | merged | language | L | none | — |
@@ -254,6 +255,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC` — The selector's non-universe classifier arm reports the elaborator's own refusal as KernelRejected and fabricates a Type(?0) expectation that Omega would equally satisfy
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
