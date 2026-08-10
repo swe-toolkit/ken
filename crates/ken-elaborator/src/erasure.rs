@@ -35,6 +35,13 @@ pub enum ErasureError {
         symbol: StableSymbol,
         section: &'static str,
     },
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-b` — the checked role record is
+    /// present but malformed, or a role disagrees with the package's own
+    /// symbols / data metadata. ⛔ Absence of the record is NOT this error.
+    InvalidRuntimeRoleAuthority {
+        role: &'static str,
+        reason: String,
+    },
 }
 
 impl fmt::Display for ErasureError {
@@ -56,6 +63,10 @@ impl fmt::Display for ErasureError {
             ErasureError::MissingRuntimeMetadata { symbol, section } => {
                 write!(f, "{symbol} is missing runtime metadata section {section}")
             }
+            ErasureError::InvalidRuntimeRoleAuthority { role, reason } => write!(
+                f,
+                "checked runtime role authority is invalid for {role}: {reason}"
+            ),
         }
     }
 }
@@ -173,7 +184,7 @@ fn erase_checked_package_with_host_root(
         lowerability: lowerability_map(&semantic.lowerability),
         unsupported: symbol_bytes_map(&semantic.unsupported),
         runtime_declaration_targets: targets.iter().map(ToString::to_string).collect(),
-        checked_core: checked_core_metadata(semantic),
+        checked_core: checked_core_metadata_with_roles(semantic)?,
         runtime_checks: runtime_checks_for_targets(package, &targets),
         capabilities: capabilities_for_targets(package, &targets),
         effects: effects_for_targets(package, &targets),
@@ -5985,7 +5996,281 @@ fn checked_core_metadata(
             .map(|(symbol, meta)| (symbol.to_string(), runtime_effects_foreign_metadata(meta)))
             .collect(),
         metadata: symbol_bytes_map(&semantic.metadata),
+        // `D1b-role-b` fills this in `checked_core_metadata_with_roles`, which
+        // is the only caller that can report a validation failure. Building it
+        // here would have to swallow one.
+        runtime_symbols: None,
     }
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-b`, item 4 — decode the versioned
+/// role record out of the semantic metadata lane and validate every role.
+///
+/// Returns the audit metadata with `runtime_symbols` populated when the package
+/// carries a record. A package that carries none is left `None`: the seed-only
+/// lane mints its IR in the legacy namespace and never had one, and *requiring*
+/// the field is `D1b-role` item 5, not this slice.
+///
+/// ⛔ A record that is present but malformed, or whose roles disagree with the
+/// package's own `semantic.symbols` / `data_metadata`, is an **error** — never a
+/// silent `None`. Absence and corruption are different states and collapsing
+/// them would make the item-5 requirement unimplementable on top of this.
+fn checked_core_metadata_with_roles(
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+) -> Result<RuntimeCheckedCoreMetadata, ErasureError> {
+    let mut audit = checked_core_metadata(semantic);
+    let key = crate::compiler_driver::checked_runtime_symbols_v1_key();
+    let Some(bytes) = semantic.metadata.get(&key) else {
+        return Ok(audit);
+    };
+    let record = decode_checked_runtime_symbols_v1(bytes)?;
+    validate_runtime_role_symbols(&record, semantic)?;
+    audit.runtime_symbols = Some(record);
+    Ok(audit)
+}
+
+/// Read one length-prefixed symbol from `bytes` at `offset`.
+fn read_role_symbol(bytes: &[u8], offset: &mut usize) -> Result<String, ErasureError> {
+    let header_end = offset
+        .checked_add(8)
+        .ok_or_else(|| role_record_error("length prefix overflows the record"))?;
+    if header_end > bytes.len() {
+        return Err(role_record_error("record ends inside a symbol length prefix"));
+    }
+    let mut length_bytes = [0u8; 8];
+    length_bytes.copy_from_slice(&bytes[*offset..header_end]);
+    let length = usize::try_from(u64::from_le_bytes(length_bytes))
+        .map_err(|_| role_record_error("symbol length does not fit this platform"))?;
+    let end = header_end
+        .checked_add(length)
+        .ok_or_else(|| role_record_error("symbol length overflows the record"))?;
+    if end > bytes.len() {
+        return Err(role_record_error("record ends inside a symbol"));
+    }
+    let symbol = std::str::from_utf8(&bytes[header_end..end])
+        .map_err(|_| role_record_error("symbol is not valid UTF-8"))?
+        .to_string();
+    *offset = end;
+    Ok(symbol)
+}
+
+/// Read a little-endian `u64` count.
+fn read_role_count(bytes: &[u8], offset: &mut usize) -> Result<usize, ErasureError> {
+    let end = offset
+        .checked_add(8)
+        .ok_or_else(|| role_record_error("count overflows the record"))?;
+    if end > bytes.len() {
+        return Err(role_record_error("record ends inside a count"));
+    }
+    let mut count_bytes = [0u8; 8];
+    count_bytes.copy_from_slice(&bytes[*offset..end]);
+    *offset = end;
+    usize::try_from(u64::from_le_bytes(count_bytes))
+        .map_err(|_| role_record_error("count does not fit this platform"))
+}
+
+fn role_record_error(reason: &str) -> ErasureError {
+    ErasureError::InvalidRuntimeRoleAuthority {
+        role: "record",
+        reason: reason.to_string(),
+    }
+}
+
+/// Decode the canonical bytes written by `canonical_checked_runtime_symbols_v1_bytes`.
+///
+/// Both version headers are checked before anything is read positionally. The
+/// format is positional, so an unrecognized header must stop the decode rather
+/// than let it bind symbols to the wrong roles from a differently shaped record.
+fn decode_checked_runtime_symbols_v1(
+    bytes: &[u8],
+) -> Result<RuntimeCheckedRoleSymbolsV1, ErasureError> {
+    const RECORD_HEADER: &[u8] = b"CheckedRuntimeSymbolsV1\0";
+    const SPINE_HEADER: &[u8] = b"HostEffectSpineV1\0";
+
+    let mut offset = 0usize;
+    for (header, what) in [(RECORD_HEADER, "record"), (SPINE_HEADER, "host spine")] {
+        let end = offset + header.len();
+        if bytes.len() < end || &bytes[offset..end] != header {
+            return Err(role_record_error(&format!(
+                "{what} version header is missing or unrecognized"
+            )));
+        }
+        offset = end;
+    }
+
+    let mut ordered = Vec::with_capacity(RuntimeCheckedHostSpineV1::ORDERED_FIELDS.len());
+    for _ in 0..RuntimeCheckedHostSpineV1::ORDERED_FIELDS.len() {
+        ordered.push(read_role_symbol(bytes, &mut offset)?);
+    }
+
+    let io_error_count = read_role_count(bytes, &mut offset)?;
+    let mut io_errors = Vec::with_capacity(io_error_count.min(64));
+    for _ in 0..io_error_count {
+        io_errors.push(read_role_symbol(bytes, &mut offset)?);
+    }
+
+    let operation_count = read_role_count(bytes, &mut offset)?;
+    let mut operations = Vec::with_capacity(operation_count.min(64));
+    for _ in 0..operation_count {
+        let symbol = read_role_symbol(bytes, &mut offset)?;
+        let end = offset
+            .checked_add(2)
+            .ok_or_else(|| role_record_error("operation tag overflows the record"))?;
+        if end > bytes.len() {
+            return Err(role_record_error("record ends inside an operation tag"));
+        }
+        let tag = u16::from_le_bytes([bytes[offset], bytes[offset + 1]]);
+        offset = end;
+        operations.push((symbol, tag));
+    }
+
+    let spine = RuntimeCheckedHostSpineV1::from_ordered(ordered, io_errors, operations)
+        .ok_or_else(|| role_record_error("host spine field count does not match this decoder"))?;
+
+    let record = RuntimeCheckedRoleSymbolsV1 {
+        spine,
+        process_input: read_role_symbol(bytes, &mut offset)?,
+        list_nil: read_role_symbol(bytes, &mut offset)?,
+        list_cons: read_role_symbol(bytes, &mut offset)?,
+        prod: read_role_symbol(bytes, &mut offset)?,
+        exit_success: read_role_symbol(bytes, &mut offset)?,
+        exit_failure: read_role_symbol(bytes, &mut offset)?,
+    };
+
+    // Trailing bytes mean the writer and this decoder disagree about the shape,
+    // even though every field read succeeded. Accepting them would let a record
+    // with extra roles decode as if it had none of them.
+    if offset != bytes.len() {
+        return Err(role_record_error(&format!(
+            "record has {} trailing byte(s) after the last role",
+            bytes.len() - offset
+        )));
+    }
+    Ok(record)
+}
+
+/// Validate every decoded role against the package's own checked facts.
+///
+/// `D1b-role` item 4. Two obligations, applied to every role:
+///
+/// 1. **existence** — the symbol is in `semantic.symbols`;
+/// 2. **unique constructor identity** — a role spelled in the constructor
+///    namespace resolves through `data_metadata` to **exactly one** family, and
+///    that family records it with its arity and recursive positions.
+///
+/// ⛔ **This detects stale or mismatched metadata. It does not identify roles.**
+/// The role a symbol plays comes from the producer's canonical prelude roster;
+/// nothing below infers "this is `Nat`" from a declaration's shape, and the Nat
+/// checks are consistency assertions about a pair the record already named.
+fn validate_runtime_role_symbols(
+    record: &RuntimeCheckedRoleSymbolsV1,
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+) -> Result<(), ErasureError> {
+    let known: BTreeSet<String> = semantic
+        .symbols
+        .iter()
+        .map(|symbol| symbol.to_string())
+        .collect();
+
+    for (role, symbol) in record.roles() {
+        if !known.contains(symbol.as_str()) {
+            return Err(ErasureError::InvalidRuntimeRoleAuthority {
+                role,
+                reason: format!(
+                    "{symbol} is not in the package's semantic symbols, so the record is stale \
+                     or was built against a different package"
+                ),
+            });
+        }
+        // Only constructor-namespace roles are carried by `data_metadata`;
+        // families and operations resolve as declarations and are covered by
+        // the existence check above.
+        if symbol.starts_with("ctor:") {
+            constructor_identity(role, symbol, semantic)?;
+        }
+    }
+
+    // The Nat pair specifically: same family, `Zero` nullary, `Suc` unary with a
+    // recorded recursive position. This is what the native Peano fold depends
+    // on, and a record that named two constructors of different families would
+    // satisfy every check above.
+    let zero = &record.spine.nat_zero;
+    let suc = &record.spine.nat_suc;
+    let (zero_family, zero_meta) = constructor_identity("nat_zero", zero, semantic)?;
+    let (suc_family, suc_meta) = constructor_identity("nat_suc", suc, semantic)?;
+    if zero_family != suc_family {
+        return Err(ErasureError::InvalidRuntimeRoleAuthority {
+            role: "nat_zero/nat_suc",
+            reason: format!(
+                "{zero} belongs to {zero_family} but {suc} belongs to {suc_family}; the Nat pair \
+                 must name two constructors of one family"
+            ),
+        });
+    }
+    if zero_meta.argument_count != 0 {
+        return Err(ErasureError::InvalidRuntimeRoleAuthority {
+            role: "nat_zero",
+            reason: format!(
+                "{zero} is recorded with {} argument(s); the Nat zero role must be nullary",
+                zero_meta.argument_count
+            ),
+        });
+    }
+    if suc_meta.argument_count != 1 {
+        return Err(ErasureError::InvalidRuntimeRoleAuthority {
+            role: "nat_suc",
+            reason: format!(
+                "{suc} is recorded with {} argument(s); the Nat successor role must be unary",
+                suc_meta.argument_count
+            ),
+        });
+    }
+    if suc_meta.recursive_positions != vec![0usize] {
+        return Err(ErasureError::InvalidRuntimeRoleAuthority {
+            role: "nat_suc",
+            reason: format!(
+                "{suc} records recursive positions {:?}; the Nat successor role must recurse in \
+                 its only argument",
+                suc_meta.recursive_positions
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// Resolve a constructor role to its family, requiring the resolution be unique.
+///
+/// Uniqueness is the load-bearing half: a symbol recorded under two families
+/// would make "the family of this role" ambiguous, and every downstream use
+/// would silently take whichever the iteration order produced first.
+fn constructor_identity<'a>(
+    role: &'static str,
+    symbol: &str,
+    semantic: &'a checked_core::CheckedCoreSemanticInputs,
+) -> Result<(&'a StableSymbol, &'a checked_core::ConstructorMetadata), ErasureError> {
+    let mut found: Option<(&StableSymbol, &checked_core::ConstructorMetadata)> = None;
+    for (family, data) in &semantic.data_metadata {
+        for constructor in &data.constructors {
+            if constructor.symbol.to_string() == symbol {
+                if let Some((first, _)) = found {
+                    return Err(ErasureError::InvalidRuntimeRoleAuthority {
+                        role,
+                        reason: format!(
+                            "{symbol} resolves to more than one family ({first} and {family}), so \
+                             its constructor identity is ambiguous"
+                        ),
+                    });
+                }
+                found = Some((family, constructor));
+            }
+        }
+    }
+    found.ok_or_else(|| ErasureError::InvalidRuntimeRoleAuthority {
+        role,
+        reason: format!(
+            "{symbol} is spelled as a constructor but no recorded data family declares it"
+        ),
+    })
 }
 
 fn runtime_obligation_metadata(
