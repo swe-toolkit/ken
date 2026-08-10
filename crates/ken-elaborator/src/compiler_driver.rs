@@ -629,7 +629,7 @@ pub fn compile_checked_target_denotation(
         .get(&target_id)
         .cloned()
         .ok_or(CompilerDriverError::MissingStableSymbol { id: target_id })?;
-    let host_spine = checked_host_spine_v1(&env, &symbols)?;
+    let host_spine = checked_host_spine_v1(&env.prelude_env, &symbols)?;
 
     admitted.extend(env.env.decls().map(Decl::id));
     admitted.sort();
@@ -2092,7 +2092,7 @@ pub fn compile_native_program_sources(
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
     let plan_transport_hash = fingerprint(&plan_bytes);
     let host_spine =
-        checked_host_spine_v1(&env, &symbols).map_err(NativeProgramBuildError::Driver)?;
+        checked_host_spine_v1(&env.prelude_env, &symbols).map_err(NativeProgramBuildError::Driver)?;
     let host_spine_bytes = canonical_checked_host_spine_v1_bytes(&host_spine);
     // The production package owns the exact live-environment closure, including
     // prelude definitions referenced by `main`; source-only generic packages
@@ -2980,6 +2980,16 @@ fn emit_package_from_env(
             .insert(symbol, LowerabilityStatus::Supported);
     }
 
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a` — produce the complete runtime
+    // role record here, after the exact `stable_symbols_for_env` call above and
+    // while the live `ElabEnv` is still in scope, and store it in the versioned
+    // semantic lane so it participates in `core_semantic_hash`.
+    let runtime_symbols = checked_runtime_symbols_v1(&env.prelude_env, &symbols)?;
+    semantic.metadata.insert(
+        checked_runtime_symbols_v1_key(),
+        canonical_checked_runtime_symbols_v1_bytes(&runtime_symbols),
+    );
+
     add_data_metadata(env, &symbols, &mut semantic);
     add_admitted_recursion_metadata(
         &manifest.package_name,
@@ -3208,22 +3218,23 @@ fn native_entrypoint_plan(
 }
 
 fn checked_host_spine_v1(
-    env: &ElabEnv,
+    prelude: &crate::prelude::PreludeEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
 ) -> Result<crate::erasure::CheckedHostSpineV1, CompilerDriverError> {
-    let resolve = |name: &'static str| {
-        let id =
-            env.globals
-                .get(name)
-                .copied()
-                .ok_or(CompilerDriverError::MissingStableSymbol {
-                    id: GlobalId(u32::MAX),
-                })?;
-        symbols
-            .get(&id)
-            .cloned()
-            .ok_or(CompilerDriverError::MissingStableSymbol { id })
-    };
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Every role below is selected
+    // by the immutable canonical `GlobalId` captured at prelude registration and
+    // then mapped through this exact stable-symbol table.
+    //
+    // ⛔ **This takes `&PreludeEnv`, not `&ElabEnv`, and that is the guarantee.**
+    // Package source has been elaborated by the time either producer runs, so a
+    // role spelling can denote a package declaration rather than the prelude's.
+    // Narrowing the parameter makes `env.globals` unnameable here: source-name
+    // authority cannot be reintroduced by an ordinary edit, only by widening
+    // this signature, which a reviewer sees and the compiler forces through
+    // every call site. An earlier revision took the whole `ElabEnv` and leaned
+    // on a test enumerating today's roles — that proved the roles *reviewed*
+    // were sound, not that no other role could be added.
+    let roles = &prelude.runtime_roles;
     let resolve_id = |id: GlobalId| {
         symbols
             .get(&id)
@@ -3231,120 +3242,211 @@ fn checked_host_spine_v1(
             .ok_or(CompilerDriverError::MissingStableSymbol { id })
     };
     let mut operations = BTreeMap::new();
-    for (name, operation) in [
-        ("Read", ken_host::HostOpV1::ConsoleRead),
-        ("Write", ken_host::HostOpV1::ConsoleWrite),
-        ("Flush", ken_host::HostOpV1::ConsoleFlush),
-        ("IsTerminal", ken_host::HostOpV1::ConsoleIsTerminal),
-        ("WallNow", ken_host::HostOpV1::ClockWallNow),
-        ("MonotonicNow", ken_host::HostOpV1::ClockMonotonicNow),
-        ("SleepUntil", ken_host::HostOpV1::ClockSleepUntil),
-        ("RandomBytes", ken_host::HostOpV1::EntropyRandomBytes),
-        ("ReadFile", ken_host::HostOpV1::FsReadFile),
-        ("WriteFile", ken_host::HostOpV1::FsWriteFile),
-        ("AppendFile", ken_host::HostOpV1::FsAppendFile),
-        ("Metadata", ken_host::HostOpV1::FsMetadata),
-        ("ReadDirectory", ken_host::HostOpV1::FsReadDirectory),
-        ("CreateDirectory", ken_host::HostOpV1::FsCreateDirectory),
-        ("RemoveFile", ken_host::HostOpV1::FsRemoveFile),
-        ("RemoveDirectory", ken_host::HostOpV1::FsRemoveDirectory),
-        ("Rename", ken_host::HostOpV1::FsRename),
-        ("ChangeMode", ken_host::HostOpV1::FsChangeMode),
+    for (id, operation) in [
+        (roles.op_console_read, ken_host::HostOpV1::ConsoleRead),
+        (roles.op_console_write, ken_host::HostOpV1::ConsoleWrite),
+        (roles.op_console_flush, ken_host::HostOpV1::ConsoleFlush),
+        (
+            roles.op_console_is_terminal,
+            ken_host::HostOpV1::ConsoleIsTerminal,
+        ),
+        (roles.op_clock_wall_now, ken_host::HostOpV1::ClockWallNow),
+        (
+            roles.op_clock_monotonic_now,
+            ken_host::HostOpV1::ClockMonotonicNow,
+        ),
+        (
+            roles.op_clock_sleep_until,
+            ken_host::HostOpV1::ClockSleepUntil,
+        ),
+        (
+            roles.op_entropy_random_bytes,
+            ken_host::HostOpV1::EntropyRandomBytes,
+        ),
+        (roles.op_fs_read_file, ken_host::HostOpV1::FsReadFile),
+        (roles.op_fs_write_file, ken_host::HostOpV1::FsWriteFile),
+        (roles.op_fs_append_file, ken_host::HostOpV1::FsAppendFile),
+        (roles.op_fs_metadata, ken_host::HostOpV1::FsMetadata),
+        (
+            roles.op_fs_read_directory,
+            ken_host::HostOpV1::FsReadDirectory,
+        ),
+        (
+            roles.op_fs_create_directory,
+            ken_host::HostOpV1::FsCreateDirectory,
+        ),
+        (roles.op_fs_remove_file, ken_host::HostOpV1::FsRemoveFile),
+        (
+            roles.op_fs_remove_directory,
+            ken_host::HostOpV1::FsRemoveDirectory,
+        ),
+        (roles.op_fs_rename, ken_host::HostOpV1::FsRename),
+        (roles.op_fs_change_mode, ken_host::HostOpV1::FsChangeMode),
     ] {
-        operations.insert(resolve(name)?, operation);
+        operations.insert(resolve_id(id)?, operation);
     }
     for (id, operation) in [
         (
-            env.prelude_env.private_fs_open_id,
+            prelude.private_fs_open_id,
             ken_host::HostOpV1::FsOpen,
         ),
         (
-            env.prelude_env.private_fs_handle_metadata_id,
+            prelude.private_fs_handle_metadata_id,
             ken_host::HostOpV1::FsHandleMetadata,
         ),
         (
-            env.prelude_env.private_buffer_allocate_id,
+            prelude.private_buffer_allocate_id,
             ken_host::HostOpV1::BufferAllocate,
         ),
         (
-            env.prelude_env.private_fs_read_at_id,
+            prelude.private_fs_read_at_id,
             ken_host::HostOpV1::FsReadAt,
         ),
         (
-            env.prelude_env.private_fs_write_at_id,
+            prelude.private_fs_write_at_id,
             ken_host::HostOpV1::FsWriteAt,
         ),
         (
-            env.prelude_env.private_buffer_freeze_id,
+            prelude.private_buffer_freeze_id,
             ken_host::HostOpV1::BufferFreeze,
         ),
         (
-            env.prelude_env.private_resource_release_id,
+            prelude.private_resource_release_id,
             ken_host::HostOpV1::ResourceRelease,
         ),
     ] {
         operations.insert(resolve_id(id)?, operation);
     }
     Ok(crate::erasure::CheckedHostSpineV1 {
-        ret: resolve("Ret")?,
-        vis: resolve("Vis")?,
-        in_l: resolve("InL")?,
-        in_r: resolve("InR")?,
-        fs_family: resolve("FSOp")?,
-        console_family: resolve("ConsoleOp")?,
-        clock_family: resolve("ClockOp")?,
-        entropy_family: resolve("EntropyOp")?,
-        capability: resolve("Cap")?,
-        result_err: resolve("Err")?,
-        result_ok: resolve("Ok")?,
-        option_some: resolve("Some")?,
-        file_error: resolve("MkFileError")?,
-        file_operation_read: resolve("OpReadFile")?,
-        file_operation_write: resolve("OpWriteFile")?,
-        file_operation_change_mode: resolve("OpChangeMode")?,
+        ret: resolve_id(roles.ret)?,
+        vis: resolve_id(roles.vis)?,
+        in_l: resolve_id(roles.in_l)?,
+        in_r: resolve_id(roles.in_r)?,
+        fs_family: resolve_id(roles.fs_family)?,
+        console_family: resolve_id(roles.console_family)?,
+        clock_family: resolve_id(roles.clock_family)?,
+        entropy_family: resolve_id(roles.entropy_family)?,
+        capability: resolve_id(roles.capability)?,
+        result_err: resolve_id(roles.result_err)?,
+        result_ok: resolve_id(roles.result_ok)?,
+        option_some: resolve_id(roles.option_some)?,
+        file_error: resolve_id(roles.file_error)?,
+        file_operation_read: resolve_id(roles.file_operation_read)?,
+        file_operation_write: resolve_id(roles.file_operation_write)?,
+        file_operation_change_mode: resolve_id(roles.file_operation_change_mode)?,
+        // Order is the contract — the roster documents it at the capture site.
         io_errors: [
-            "NotFound",
-            "PermissionDenied",
-            "CapabilityDenied",
-            "BrokenPipe",
-            "Interrupted",
-            "AlreadyExists",
-            "InvalidInput",
-            "IsDirectory",
-            "NotDirectory",
-            "NotEmpty",
-            "Unsupported",
-            "Other",
+            roles.io_error_not_found,
+            roles.io_error_permission_denied,
+            roles.io_error_capability_denied,
+            roles.io_error_broken_pipe,
+            roles.io_error_interrupted,
+            roles.io_error_already_exists,
+            roles.io_error_invalid_input,
+            roles.io_error_is_directory,
+            roles.io_error_not_directory,
+            roles.io_error_not_empty,
+            roles.io_error_unsupported,
+            roles.io_error_other,
         ]
         .into_iter()
-        .map(resolve)
+        .map(resolve_id)
         .collect::<Result<Vec<_>, _>>()?,
-        resource_host_io: resolve_id(env.prelude_env.resource_host_io_id)?,
-        resource_closed: resolve_id(env.prelude_env.closed_id)?,
-        resource_malformed: resolve_id(env.prelude_env.malformed_resource_id)?,
-        resource_right_not_held: resolve_id(env.prelude_env.right_not_held_id)?,
-        resource_release_failed: resolve_id(env.prelude_env.release_failed_id)?,
-        resource_kind_mismatch: resolve("ResourceKindMismatch")?,
-        resource_buffer_limit: resolve("BufferLimit")?,
-        resource_allocation_failed: resolve("AllocationFailed")?,
-        resource_invalid_offset: resolve("InvalidOffset")?,
-        resource_invalid_bounds: resolve("InvalidBounds")?,
-        resource_no_progress: resolve("NoProgress")?,
-        resource_kind_fs_handle: resolve_id(env.prelude_env.fs_handle_id)?,
-        resource_kind_buffer: resolve("Buffer")?,
-        resource_trace_identity: resolve_id(env.prelude_env.private_resource_trace_identity_id)?,
-        nat_zero: resolve_id(env.prelude_env.zero_id)?,
-        nat_suc: resolve_id(env.prelude_env.suc_id)?,
-        private_buffer_span: resolve_id(env.prelude_env.private_buffer_span_id)?,
-        private_transfer_count: resolve_id(env.prelude_env.private_transfer_count_id)?,
-        read_some: resolve("ReadSome")?,
-        read_eof: resolve("ReadEof")?,
-        wrote: resolve("Wrote")?,
-        unit: resolve("MkUnit")?,
-        bool_false: resolve("False")?,
-        bool_true: resolve("True")?,
+        resource_host_io: resolve_id(prelude.resource_host_io_id)?,
+        resource_closed: resolve_id(prelude.closed_id)?,
+        resource_malformed: resolve_id(prelude.malformed_resource_id)?,
+        resource_right_not_held: resolve_id(prelude.right_not_held_id)?,
+        resource_release_failed: resolve_id(prelude.release_failed_id)?,
+        resource_kind_mismatch: resolve_id(roles.resource_kind_mismatch)?,
+        resource_buffer_limit: resolve_id(roles.resource_buffer_limit)?,
+        resource_allocation_failed: resolve_id(roles.resource_allocation_failed)?,
+        resource_invalid_offset: resolve_id(roles.resource_invalid_offset)?,
+        resource_invalid_bounds: resolve_id(roles.resource_invalid_bounds)?,
+        resource_no_progress: resolve_id(roles.resource_no_progress)?,
+        resource_kind_fs_handle: resolve_id(prelude.fs_handle_id)?,
+        resource_kind_buffer: resolve_id(roles.resource_kind_buffer)?,
+        resource_trace_identity: resolve_id(prelude.private_resource_trace_identity_id)?,
+        nat_zero: resolve_id(prelude.zero_id)?,
+        nat_suc: resolve_id(prelude.suc_id)?,
+        private_buffer_span: resolve_id(prelude.private_buffer_span_id)?,
+        private_transfer_count: resolve_id(prelude.private_transfer_count_id)?,
+        read_some: resolve_id(roles.read_some)?,
+        read_eof: resolve_id(roles.read_eof)?,
+        wrote: resolve_id(roles.wrote)?,
+        unit: resolve_id(roles.unit)?,
+        bool_false: resolve_id(roles.bool_false)?,
+        bool_true: resolve_id(roles.bool_true)?,
         operations,
     })
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a` — build the COMPLETE role record.
+///
+/// The spine half is the existing resolver; the six entry-plan roles are
+/// resolved here **through the same table**, so the record is complete on a
+/// generic package emission that builds no plan. ⛔ The starter-only plan is
+/// neither consulted nor persisted.
+fn checked_runtime_symbols_v1(
+    prelude: &crate::prelude::PreludeEnv,
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
+) -> Result<crate::erasure::CheckedRuntimeSymbolsV1, CompilerDriverError> {
+    let spine = checked_host_spine_v1(prelude, symbols)?;
+    // Same authority and the same narrowed boundary as the spine: a package that
+    // declares its own `Nil`/`Cons` must not be able to redirect Runtime's list
+    // roles onto its constructors, and with only `&PreludeEnv` in hand there is
+    // no package namespace here to redirect them through.
+    let roles = &prelude.runtime_roles;
+    let resolve_id = |id: GlobalId| {
+        symbols
+            .get(&id)
+            .cloned()
+            .ok_or(CompilerDriverError::MissingStableSymbol { id })
+    };
+    Ok(crate::erasure::CheckedRuntimeSymbolsV1 {
+        spine,
+        process_input: resolve_id(roles.process_input)?,
+        list_nil: resolve_id(roles.list_nil)?,
+        list_cons: resolve_id(roles.list_cons)?,
+        prod: resolve_id(roles.prod)?,
+        exit_success: resolve_id(roles.exit_success)?,
+        exit_failure: resolve_id(roles.exit_failure)?,
+    })
+}
+
+/// Canonical, versioned bytes for the record above.
+///
+/// The header carries the version so a decoder can reject an unknown or
+/// corrupted record rather than read it short — the same discipline as the
+/// spine encoding below.
+fn canonical_checked_runtime_symbols_v1_bytes(
+    record: &crate::erasure::CheckedRuntimeSymbolsV1,
+) -> Vec<u8> {
+    let mut out = b"CheckedRuntimeSymbolsV1\0".to_vec();
+    out.extend_from_slice(&canonical_checked_host_spine_v1_bytes(&record.spine));
+    for role in [
+        &record.process_input,
+        &record.list_nil,
+        &record.list_cons,
+        &record.prod,
+        &record.exit_success,
+        &record.exit_failure,
+    ] {
+        let bytes = role.to_string();
+        out.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
+        out.extend_from_slice(bytes.as_bytes());
+    }
+    out
+}
+
+/// The semantic-metadata key the record is stored under.
+pub const CHECKED_RUNTIME_SYMBOLS_V1_KEY: &str = "checked-runtime-symbols-v1";
+
+/// The key as a `StableSymbol`, built once so producer and decoder cannot drift.
+pub fn checked_runtime_symbols_v1_key() -> StableSymbol {
+    StableSymbol::new(
+        SymbolNamespace::Declaration,
+        [CHECKED_RUNTIME_SYMBOLS_V1_KEY.to_string()],
+    )
 }
 
 fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpineV1) -> Vec<u8> {

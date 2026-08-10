@@ -518,6 +518,41 @@ pub(crate) struct CheckedHostSpineV1 {
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role` — the COMPLETE checked-runtime role
+/// record for one package, versioned and hash-covered.
+///
+/// **Why this exists.** Runtime assigns special meaning to a fixed set of
+/// constructor identities (`NativeProcessSymbols`). On the process-starter path
+/// that population is assembled from two sources — the host spine and the
+/// native entrypoint plan — so a generic package emission, which builds no
+/// plan, materialized no role table at all and Runtime silently fell back to
+/// `legacy_prelude()`. That fallback spells `ctor:prelude::Nat::{Zero,Suc}`,
+/// which does not match a package-qualified `Nat`, so its Peano fold never
+/// engaged.
+///
+/// ⛔ **Both halves are required.** A spine-only record reproduces the same
+/// defect at the first entry-plan role, which is why the six plan-sourced roles
+/// are resolved here through the same stable-symbol table rather than read from
+/// the starter-only plan. The plan is neither consulted nor persisted.
+///
+/// Every value is resolved from the live environment through the exact
+/// `stable_symbols_for_env` table. No source spelling, suffix, package-name
+/// reconstruction, or structural inference is accepted at this boundary.
+#[derive(Clone, Debug)]
+pub(crate) struct CheckedRuntimeSymbolsV1 {
+    /// The host-spine half: Bool, Nat, Unit, Result/Option, file and resource
+    /// roles.
+    pub spine: CheckedHostSpineV1,
+    /// The six roles the starter path takes from the entrypoint plan, resolved
+    /// here through the stable-symbol table so a generic package carries them.
+    pub process_input: StableSymbol,
+    pub list_nil: StableSymbol,
+    pub list_cons: StableSymbol,
+    pub prod: StableSymbol,
+    pub exit_success: StableSymbol,
+    pub exit_failure: StableSymbol,
+}
+
 #[derive(Clone)]
 pub(crate) struct CheckedJoinAnswerSymbols {
     pub int: StableSymbol,
