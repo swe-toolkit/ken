@@ -63,6 +63,47 @@
 > writable and DS-9 owes a `depends_on` on a node that is `draft`, unframed,
 > size TBD.** `D2` is unaffected; Foundation told to keep going.
 >
+> ### RUNTIME `c1` — HELD RED at WIP `24995e5e`, executing three Steward rulings
+>
+> All in `thr_1wn4ydb4kjqxt`. **Do not re-litigate them; do check they were
+> followed.**
+>
+> **1. Sibling substitution (`evt_2q5h3mwnd7x7h`).** ~18 roster roles sit in
+> families with same-family nullary siblings (`IOError` has 11); both
+> roster-wide loops check provenance and family-uniqueness, exactly what a
+> sibling substitution preserves. **Ruled:** decode-side fingerprint check
+> (package semantic fingerprint equals `core_semantic_hash`) **plus** a
+> test-side roster-wide `assert_eq!` against `CanonicalRuntimeRoles::all()`.
+> **Rejected** widening the artifact to carry canonical role identity — that
+> buys down forgery on an in-process path, which is the safety-of-`main` trap.
+> They must state which control covers which failure: the fingerprint catches
+> stale and tampered records and **misses a consistently mis-produced one**;
+> the test catches exactly that.
+> **The stop was my relay error** — the Adversary proposed a *test* loop, I
+> wrote it as decode-side validation, and Runtime correctly measured it
+> unbuildable there (erasure sees only `CheckedCorePackage`, symbols are a
+> set, no canonical `GlobalId`s).
+>
+> **2. The 38 red tests (`evt_6kkvrazak8adk`).** `ken-runtime --lib` went
+> 800/38 because 38 synthetic `RuntimeProgram`s inherited the implicit fallback
+> `c1` deleted. **Ruled:** explicit test-only legacy authority. **Rejected**
+> narrowing the gate — no provenance marker exists, so it would reopen
+> authority by convention and roll back `c1`'s own contract. Four conditions:
+> **(a) TRIAGE the 38 before editing** — "mostly `object_linker_packaging`"
+> hides a remainder, and any *checked* package among them is a production
+> finding, not a test fixup; **(b)** the constructor is unreachable from
+> production, **proved** — `cfg(test)` alone is not evidence and a zero from
+> `cargo check` is not proof; **(c)** explicit at **each** site, no blanket
+> default or silent helper, which would rebuild the fallback under a new name;
+> **(d)** report the 38 as an **enumeration with classification**, not a count.
+> **The 38 is the blast-radius measurement and is `c1`'s most valuable
+> output** — it only exists because the gate is fail-closed.
+>
+> **3. The cut (`evt_6z7wf6dw94cym`).** Slice `c` split: `c1` a fail-closed
+> contract that merges independently, `c2` semantic admission. **`c2` returns
+> to me before assignment and must state its `AC-K12` relationship** — that
+> criterion is Runtime-owned and two Kernel seats are idle behind it.
+>
 > **M6 WAS UNDER-VERIFYING and is fixed.** It said `git diff --name-only
 > <SHA>^ <SHA>` — the last commit only. DS-9 `D1` was two commits, so it
 > enumerated one of two declared paths and printed a confident `MATCH` while
