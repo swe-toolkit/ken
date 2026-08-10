@@ -86,7 +86,7 @@ fn ac3_all_bare_fixed_width_arms_degrade_on_overflow() {
 
 // ── F3 — legacy `add`/`sub`/`mul` retired: unregistered AND unreduced ──────
 
-/// surface/numbers/legacy-add-sub-mul-retired (hard-AC): after deletion,
+/// Legacy `add`/`sub`/`mul` retirement guard: after deletion,
 /// `prim_reduce` no longer recognizes the legacy wrapping-i64 symbols —
 /// they fall through to the generic stuck arm.
 #[test]

@@ -86,6 +86,61 @@ def registry_identities(rows: list[dict[str, str]]) -> set[tuple[str, str, str]]
 
 
 class IgnoredSweepTests(unittest.TestCase):
+    def test_row_claims_resolve_exactly_once_and_only_on_tests(self) -> None:
+        with tempfile.TemporaryDirectory(dir=SWEEP.ROOT) as directory:
+            root = Path(directory)
+            rust_root = root / "crates"
+            conformance_root = root / "conformance"
+            rust_root.mkdir()
+            conformance_root.mkdir()
+            (rust_root / "rows.rs").write_text(
+                "/// surface/example/ignored-documentation\n"
+                "fn helper() {}\n\n"
+                "/// surface/example/covered\n"
+                "/// explanatory continuation\n"
+                "#[test]\n"
+                "#[ignore]\n"
+                "fn covered_test() {}\n",
+                encoding="utf-8",
+            )
+            (conformance_root / "seed.md").write_text(
+                "### surface/example/covered\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                SWEEP.verify_row_claims(rust_root, conformance_root), 1
+            )
+
+    def test_row_claim_resolution_names_missing_and_duplicate_claims(self) -> None:
+        with tempfile.TemporaryDirectory(dir=SWEEP.ROOT) as directory:
+            root = Path(directory)
+            rust_root = root / "crates"
+            conformance_root = root / "conformance"
+            rust_root.mkdir()
+            conformance_root.mkdir()
+            rust = rust_root / "rows.rs"
+            rust.write_text(
+                "/// surface/example/fabricated-row\n"
+                "#[test]\n"
+                "fn fabricated_test() {}\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(SWEEP.SweepError) as missing:
+                SWEEP.verify_row_claims(rust_root, conformance_root)
+            self.assertIn("fabricated_test", str(missing.exception))
+            self.assertIn("surface/example/fabricated-row", str(missing.exception))
+            self.assertIn("resolves to 0", str(missing.exception))
+
+            first = conformance_root / "first.md"
+            second = conformance_root / "second.md"
+            heading = "### surface/example/fabricated-row\n"
+            first.write_text(heading, encoding="utf-8")
+            second.write_text(heading, encoding="utf-8")
+            with self.assertRaisesRegex(SWEEP.SweepError, "resolves to 2"):
+                SWEEP.verify_row_claims(rust_root, conformance_root)
+
     def test_checked_in_registry_has_one_cost_and_three_placeholders(self) -> None:
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
         classes = [row["class"] for row in rows]

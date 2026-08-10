@@ -144,6 +144,7 @@ jobs:
       - name: Select and run ignored rows
         shell: bash
         run: |
+          python3 scripts/ci-ignored-sweep.py verify-row-claims
           cargo nextest list --workspace --locked --run-ignored=only \
             --message-format json > ignored-row-all.json
           filter=$(python3 scripts/ci-ignored-sweep.py filter \

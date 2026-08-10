@@ -49,7 +49,7 @@ fn eval_view(src: &str) -> EvalVal {
     }
 }
 
-/// surface/numbers/elim-reduce-computed-bool-true-branch (soundness) —
+/// Computed-Bool true-branch dispatch soundness:
 /// `match (eq_int a a) { True => 1 ; False => 2 }` on a COMPUTED `Bool`
 /// (genuinely `eq_int 5 5`, never a bare literal) must pick the `True`
 /// branch, matching `data Bool = True | False`'s declared index 0.
@@ -61,7 +61,7 @@ fn computed_bool_true_dispatches_to_first_method() {
     assert_eq!(result, EvalVal::Int(1), "eq_int 5 5 is True — must select methods[0]");
 }
 
-/// surface/numbers/elim-reduce-computed-bool-false-branch (soundness) —
+/// Computed-Bool false-branch dispatch soundness:
 /// the discriminating PAIR: a genuinely FALSE computed `Bool` must pick the
 /// OTHER branch (methods[1]), not the same one as the True case (which
 /// would net a flipped/collapsed mapping,
@@ -74,7 +74,7 @@ fn computed_bool_false_dispatches_to_second_method() {
     assert_eq!(result, EvalVal::Int(2), "eq_int 5 6 is False — must select methods[1]");
 }
 
-/// surface/numbers/elim-reduce-computed-vs-literal-bool-agree (soundness) —
+/// Computed-Bool and literal-Bool dispatch agreement:
 /// a computed `Bool` and a bare `True`/`False` literal scrutinee must
 /// dispatch to the IDENTICAL branch for the "same" logical value — pins
 /// that the fix's new `EvalVal::Bool` arm agrees with the pre-existing,
@@ -91,7 +91,7 @@ fn computed_bool_agrees_with_literal_bool_dispatch() {
     assert_eq!(computed_false, literal_false, "computed False and literal False must agree");
 }
 
-/// surface/numbers/elim-reduce-computed-bool-via-leq-int (soundness) — the
+/// Computed-Bool dispatch through `leq_int`: the
 /// exact shape `decimalAdd`'s alignment needs: `leq_int`-computed `Bool` as
 /// a match scrutinee (not `eq_int`), confirming the fix isn't narrowly
 /// specific to one prim symbol's `EvalVal::Bool` output.
