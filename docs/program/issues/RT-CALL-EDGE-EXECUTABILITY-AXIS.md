@@ -1,7 +1,7 @@
 ---
 id: RT-CALL-EDGE-EXECUTABILITY-AXIS
 title: "executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error"
-status: merged
+status: ready
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,77 @@ blocks: []
 github: null
 origin: Adversary report evt_1gtad2keqngcq (2026-08-09) on merged 1f706520, the RT-BODY-OCCURRENCE-PROVENANCE accepted partial at exact 876450ab. Steward-triaged as a confirmed latent defect and filed per COORDINATION §2. NOT folded into RT-CANDIDATE-LEDGER-RESIDUALS: that node's leading claim is "neither is a defect", and this one is.
 ---
+
+> # `D1` — OWED AND FRAMED, **NOT** SEQUENCED IN FRONT OF THE CAMPAIGN
+>
+> **`D0` merged at `35265ca5` (PR #1797). This node returns to `ready` because
+> `D1` is owed, not because anything about `D0` is in doubt.**
+>
+> **Confirmed Adversary finding `evt_51ekvw0fzthy6` on the merged `D0`,
+> measured at `b7bba72d`, triaged by the Steward.** Two defects, both **detector
+> fidelity between the sentinel and the filter it stands in for**, both
+> over-claim in direction. **Neither touches production logic and neither is an
+> `AC-2` claim.** I re-derived both against `origin/main` before accepting them.
+>
+> **The non-vacuity clause was independently checked and HOLDS.** Both counters
+> are computed in the same loop iteration over the same `edge`, so a nonzero
+> `superseded_callees` guarantees an edge with `template_only.contains(&body)`
+> whose `divergent` is empty **only** because `template_only.contains(&entry)`.
+> It is a genuine discriminator, not a reachability proxy. Do not touch it.
+>
+> ### `D1a` — the red message claims a symmetry the predicate does not have
+>
+> The predicate is `template_only.contains(body) && !template_only.contains(entry)`
+> — **one of the two ways the filters can disagree**. The other polarity
+> (`entry ∈ template_only && body ∉`) is a same-callee disagreement and is not
+> detected.
+>
+> ⛔ **The one-sidedness is CORRECT and must not change.** Executability is a
+> function of the body alone (`static_transition.rs:11355`), so retaining there
+> is the right outcome and the benign polarity is deliberately out of scope.
+>
+> The defect is that the doc carries **both** the qualified sentence (*"that
+> conjunction is the defect's own failure direction"*) and an unqualified one,
+> and **the unqualified one is what fires**: *"The two filters disagree on this
+> callee."* A future engineer reading that red goes looking for a symmetric
+> population. Two words fix it — *disagree in the defect's direction*.
+>
+> ### `D1b` — the sentinel re-derives production's join with a different discipline
+>
+> Verified against `static_transition.rs:11361-11375`:
+>
+> | | production | sentinel |
+> |---|---|---|
+> | descriptor-less callee | `None => true` — **RETAIN**, handed downstream | `continue` — **dropped from the scan** |
+> | duplicate `PredeclaredFunctionId` | `.collect()` into `BTreeMap` — **last wins** | `.find(...)` — **first wins** |
+>
+> **(a) is the one that matters.** The set production deliberately treats
+> specially — and whose comment this very cut corrected — is the one set the
+> detector **cannot see**. `joined > 0` does not bound it: that proves the scan
+> was non-empty, never that it covered the edges. One line closes it: assert
+> `joined == edges.len()`, or report the skipped count so an exclusion is
+> visible rather than silent.
+>
+> **(b) is a fidelity defect, not a live one, and the bound is part of the
+> claim.** `emittable_units()` maps 1:1 over `self.abi.descriptors` and
+> **nothing establishes `descriptor.function` is unique**; no duplicate was
+> constructed and there is no evidence the state is reachable. ⇒ **Build the
+> sentinel's lookup with the same `BTreeMap` expression production uses**, which
+> makes the question moot instead of answering it.
+>
+> ### Sequencing, and it is the whole point
+>
+> ⛔ **This does NOT go in front of the RecursiveDescent campaign.** Runtime is
+> kicked onto `RT-MATCH-RECURSOR-CONSUMERS` `D9`/`D10` under the operator's
+> 2026-08-10 priority ruling and must not pick this up. `ready` here means
+> framed and shovel-ready for a later lane, not frontier.
+>
+> **Why it is recorded rather than deferred silently:** the Adversary noted this
+> is the **same over-claim shape** as `evt_2xryrnxz7g0mb`, appearing inside a
+> recut authored specifically to replace an over-claiming proxy, by a ring that
+> had just been told about it. That is not carelessness — the precise sentence
+> and the loose summary get written in different passes, and **only the precise
+> one gets proofread as a claim.** The loose summary is what fires.
 
 > # LATENT, FAIL-CLOSED, AND CHEAP. DO NOT WIDEN IT.
 >
