@@ -29067,20 +29067,27 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
     // and the suppression legs compare refusals that never occurred, so BOTH
     // are conditional on this line. Reading them as co-equal supports is how a
     // control can look triply-defended while resting on one clause.
-    assert!(
-        arrivals > 0,
+    // NOT AN ASSERT PLUS A RENAME. An earlier revision wrote
+    // `assert!(arrivals > 0)` and then `let established = arrivals`, which only
+    // NAMED the intent: deleting the assertion left the equality compiling and
+    // passing at `0 == 0`, so the denominator was removable without breaking
+    // anything.
+    //
+    // The non-zero check is now the CONSTRUCTOR of the value the equality
+    // reads. Remove it and `established_arrivals` does not exist, so the
+    // equality below is a COMPILE ERROR rather than a vacuous pass. The
+    // structural form is what makes "the equality is conditional on the
+    // denominator" enforceable instead of merely written down.
+    let established_arrivals = std::num::NonZeroUsize::new(arrivals).expect(
         "no backedge marker arrived at ComputationalMatchScrutinee, so the forward was never \
-         exercised and every clause below is vacuous"
+         exercised and every clause below is vacuous",
     );
-    // Bound to the denominator rather than stated beside it: the equality is
-    // read off a value that only exists because arrivals was proven non-zero,
-    // so it cannot be quoted as evidence in the all-zero case.
-    let established_arrivals = arrivals;
     assert_eq!(
-        forwards, established_arrivals,
+        forwards,
+        established_arrivals.get(),
         "an arriving marker was not forwarded: arrivals={established_arrivals} \
-         forwards={forwards}. NOTE: this clause is PROSPECTIVE -- it holds at 0 == 0 and is \
-         meaningful only because the denominator above is non-zero"
+         forwards={forwards}. NOTE: this clause is PROSPECTIVE on its own -- it holds at 0 == 0 \
+         -- and is meaningful only because it reads a value that could not be built at zero"
     );
     for (label, rendered) in &repaired {
         assert!(
