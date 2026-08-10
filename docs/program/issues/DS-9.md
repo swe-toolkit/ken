@@ -42,6 +42,27 @@ origin: Phase 3 of the catalog data-structures enrichment program (docs/program/
 > candidate that unrolls to some depth has not satisfied this and must not be
 > proposed as though it had.
 
+> ## D2 MERGED 2026-08-10 as an accepted partial — the node stays `active`
+>
+> Exact `ee6773b0`, PR #1775, CI green, `main` `0daf7170`. Both paths
+> blob-verified from the declared merge-base `258336bf`, path count checked
+> against the declared scope: `catalog/packages/Data/Serialization/Json.ken.md`
+> and `crates/ken-elaborator/tests/ds9_json_codec_acceptance.rs`, `+337/-28`.
+> Authorized by resolved Decision `dec_7qw0k1q4rv6bc` (Architect APPROVE,
+> 07:22:20Z). Adversary notified at `evt_2cx4zkhqmfe9p`.
+>
+> A transparent structural `CursorOps (List Char) Char Nat` instance and
+> transparent `CursorLaws`, with the generic selectors exercised on both
+> non-empty and empty cursors and exact `trusted_base()` set identity asserted.
+>
+> **What remains buildable is an OPEN QUESTION put to foundation-leader at
+> `evt_27cwr5ecnx209`, not something I have established.** The ruling above
+> blocks any `D3`+ slice promising an unbounded fold over arrays or objects.
+> Whether any of `D3`-`D7` — the round-trip law's statement as distinct from
+> its proof, fuel-sufficiency scaffolding, Findings — avoids that fold is the
+> ring's knowledge, and "nothing survives" is an acceptable answer that makes
+> Foundation's idleness the Steward's backlog rather than the ring's.
+
 > ## D1 MERGED 2026-08-10 as an accepted partial — the node stays `active`
 >
 > Exact `6675ff54`, PR #1770, CI green, `main` `258336bf`. Both paths
