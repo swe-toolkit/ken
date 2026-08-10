@@ -1,7 +1,7 @@
 ---
 id: CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS
 title: "Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE"
-status: active
+status: merged
 owner: spec-enclave
 size: S
 gate: none
