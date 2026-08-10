@@ -131,11 +131,23 @@ Paths are `crates/ken-runtime/src/cranelift_backend/**` — the emission side �
 and its test targets. Language owns `crates/ken-elaborator`. No `spec/` or
 `conformance/` path, so no Spec vote on the merge Decision.
 
-**The sequencing constraint.** This deliverable consumes `D2e`'s id, key, and
-validator as fixed inputs. Starting it first would mean building an emitter
-against an identity that does not exist yet, and the identity is the
-soundness-bearing half. **Do not start until `D2e` has merged** — I will release
-this then, and if you receive it earlier the kickoff is my error.
+**The sequencing constraint, and its gate is CORRECTED.** This deliverable
+consumes `D2e`'s id, key, and validator as fixed inputs. Starting it first would
+mean building an emitter against an identity that does not exist yet, and the
+identity is the soundness-bearing half.
+
+**The gate is the identity plane landing, NOT `D2e` merging.** This frame
+originally read *"do not start until `D2e` has merged."* **That wording fires
+early and did.** `D2e`'s first candidate merged as a bounded partial at `main`
+`f37ecd13` carrying only the checked binder layout and `AC-7`, while
+`StaticContinuationFusionId`, the key, interning, the occurrence-walk threading
+and the exact re-derivation validator were all still unbuilt. Under the operator's
+accepted-partial policy a WP branch merges **repeatedly** by construction, so a
+release condition keyed on a merge *event* is early by default, not by accident.
+
+⇒ **Do not start until `AC-1`..`AC-6` and `AC-8`..`AC-10` of `D2e` are
+discharged and its identity plane is landed.** I will release this then; if you
+receive it earlier the kickoff is my error.
 
 ## Sizing and validation
 
