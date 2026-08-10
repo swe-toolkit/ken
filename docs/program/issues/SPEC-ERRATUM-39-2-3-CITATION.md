@@ -1,7 +1,7 @@
 ---
 id: SPEC-ERRATUM-39-2-3-CITATION
 title: "Erratum: 34-data-match.md:625 still cites `39 §2.3` for higher-order pattern abstraction, a coordinate the structural-result merge reassigned to Structural-result association"
-status: ready
+status: merged
 owner: spec-enclave
 size: S
 gate: none
