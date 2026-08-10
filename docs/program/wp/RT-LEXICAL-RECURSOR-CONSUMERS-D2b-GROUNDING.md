@@ -250,4 +250,3 @@ and has a precedent — no new lowering population, ABI lane or guard is implied
 for row 3, or whether the caller-side omission must also account for something
 the subtree walk does not reach. That is measurable only by building it, and it
 is the first thing the next turn should measure rather than assume.
-
