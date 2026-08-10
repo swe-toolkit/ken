@@ -868,6 +868,17 @@ fn rewrite_rexpr(
             RExpr::RCon(n, span)
         }
         RExpr::RVar(i, n, s) => RExpr::RVar(i, n, s),
+        RExpr::RStructuralResult {
+            index,
+            name,
+            binding_span,
+            span,
+        } => RExpr::RStructuralResult {
+            index,
+            name,
+            binding_span,
+            span,
+        },
         RExpr::RUniv(l, s) => RExpr::RUniv(l, s),
         RExpr::RApp(f, a, s) => RExpr::RApp(
             Box::new(rewrite_rexpr(scope, exports, *f)?),
