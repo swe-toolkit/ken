@@ -7867,4 +7867,22 @@ mod nested_lift_association_tests {
             })
         );
     }
+
+    #[test]
+    fn anonymous_association_requires_a_distinct_result_and_rejects_when_deleted() {
+        // No carrier/name/constructor special case: `None` support is the
+        // anonymous association class.  The exact source/evidence/result
+        // triple is admissible, while deleting it is the named fail-closed
+        // Missing arm.
+        let association = binding(3, Some(5), None);
+        let installed = HashMap::from([(1, association)]);
+        assert_eq!(
+            validate_lift_associations(&installed, &[(1, association)]),
+            Ok(())
+        );
+        assert_eq!(
+            validate_lift_associations(&HashMap::new(), &[(1, association)]),
+            Err(LiftAssociationFailure::Missing { source: 1 })
+        );
+    }
 }
