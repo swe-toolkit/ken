@@ -11,6 +11,41 @@ github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## `D3a` MERGED 2026-08-10 — and DO NOT DELETE THE DECODER PARAGRAPH IT ADDED
+>
+> Exact `857edddd`, PR #1784, `main` `458b1413`. Two catalog paths, prose only:
+> the Architect's ruled `cursor_locate` disclosure into `Capability.Parsing`'s
+> `Cursor` contract and beside `DecoderError`. No Ken code changed.
+>
+> **The `DecoderError` paragraph is currently REDUNDANT WITH THE TYPE SYSTEM,
+> and that is a trap for a future reader.** Adversary `evt_1b359n9ww3d3`
+> enumerated all 18 `cursor_locate` occurrences in `catalog/` and confirmed the
+> prose is accurate — no law imposes a relation on `locate`, and `decoder_alt`,
+> the one combinator that would normally order branches by "got furthest",
+> matches on the error **constructor** and **discards** the bound location.
+>
+> But the reason two locations cannot be compared today is that `loc` is a type
+> parameter and the three instances instantiate it at three **different** types:
+>
+> | instance | location type |
+> |---|---|
+> | `arg_cursor_locate` | `ArgLocation` |
+> | `byte_cursor_locate` | `Span` |
+> | `char_cursor_locate` | `Nat` |
+>
+> ⇒ **A fourth instance reusing an existing location type — most plausibly
+> `Nat` — produces two type-compatible location values that mean different
+> things, and at that moment the prose is the only protection.** The paragraph
+> is not describing a property the types already guarantee; it is describing one
+> the types guarantee *by accident of the current instance set*.
+>
+> **Anyone who notices it is "obviously true today" and proposes deleting it is
+> reading the accident, not the contract.** Record kept here because that
+> observation is correct and the conclusion from it is wrong.
+>
+> Bound: the Adversary checked `catalog/` only. A Rust-side comparison of two
+> location values in `crates/` was not audited.
+>
 > ## RULED 2026-08-10 — `D3`+ is BLOCKED for unbounded Json folds. `D2` is NOT.
 >
 > Architect `evt_6ysrp62e4zayg`, answering the Steward's question
