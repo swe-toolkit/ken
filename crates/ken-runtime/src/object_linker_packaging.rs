@@ -18,8 +18,7 @@ use crate::cranelift_backend::{
 };
 use crate::platform_runtime_support::validate_entrypoint_metadata_payload;
 use crate::{
-    fnv1a_64, platform_runtime_support_report_hash,
-    runtime_executable_entrypoint_package_hash,
+    fnv1a_64, platform_runtime_support_report_hash, runtime_executable_entrypoint_package_hash,
     CraneliftObjectArtifact, NativeDifferentialStage, NativeRuntimeIrComparisonVerdict,
     NativeSeedEnvironment, PlatformRuntimeEvidenceFact, PlatformRuntimeEvidenceLane,
     PlatformRuntimeSupportReport, RuntimeArtifactIdentity, RuntimeExecutableEntrypointPackage,
@@ -441,7 +440,8 @@ pub struct ObjectLinkerPackagingOptions {
     /// `validate_options`, ⭐ **before any object is emitted or anything is
     /// linked** — which is `AC-7`'s whole point, and is a different observation
     /// from a starter that links, runs, and then declines to execute.
-    pub boundary_resource_profile: Option<crate::boundary_resource_profile::BoundaryResourceProfileV1>,
+    pub boundary_resource_profile:
+        Option<crate::boundary_resource_profile::BoundaryResourceProfileV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2506,7 +2506,7 @@ mod tests {
             &output_dir,
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("object/linker package materializes");
 
@@ -2577,7 +2577,7 @@ mod tests {
             &output_dir,
             "PX8-I generic object Big discriminator",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("generic object executes the shared exact-Int graph");
         assert_eq!(package.smoke.stdout, "7\n");
@@ -2616,7 +2616,7 @@ mod tests {
             &output_dir,
             "PX8-I generic terminal Big discriminator",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("generic object decodes terminal Big while its arena is live");
         assert_eq!(package.smoke.stdout, "-0x10000000000000007\n");
@@ -2642,7 +2642,7 @@ mod tests {
             &output_dir,
             "PX8-I shared-helper mutation",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         );
         crate::cranelift_backend::NATIVE_INT_LOWERING_MUTATION.with(|mutation| {
             mutation.set(crate::cranelift_backend::NativeIntLoweringMutation::Exact)
@@ -2863,8 +2863,14 @@ mod tests {
         };
         let executable = build_process_starter_executable_artifact(&entry, &output_dir)
             .expect("process starter links");
-        assert!(!process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile()).contains("fnv"));
-        assert!(!process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile()).contains("discriminator"));
+        assert!(
+            !process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile())
+                .contains("fnv")
+        );
+        assert!(
+            !process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile())
+                .contains("discriminator")
+        );
 
         let argument_one = OsString::from_vec(vec![0xff, b'a', b'1']);
         let key_one = OsString::from_vec(vec![b'K', 0xfd]);
@@ -3039,10 +3045,7 @@ mod tests {
             },
         );
         assert_eq!(retained_root_trap.status.code(), Some(1));
-        assert!(
-            String::from_utf8_lossy(&retained_root_trap.stderr)
-                .contains("explicit entry trap")
-        );
+        assert!(String::from_utf8_lossy(&retained_root_trap.stderr).contains("explicit entry trap"));
     }
 
     #[cfg(target_os = "linux")]
@@ -3178,7 +3181,9 @@ mod tests {
                 } if trap != &expected => Some(*planned_identity),
                 _ => None,
             })
-            .expect("the fixture also plans a distinct sibling default, so identity can discriminate");
+            .expect(
+                "the fixture also plans a distinct sibling default, so identity can discriminate",
+            );
         assert_ne!(
             planted.0, sibling,
             "two different planned traps sharing one identity would make this row vacuous"
@@ -3641,7 +3646,7 @@ mod tests {
             temp_output_dir("nc23-stale-support"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("stale support report rejects");
 
@@ -3667,7 +3672,7 @@ mod tests {
             temp_output_dir("nc23-stale-payload"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("stale mutated entrypoint payload rejects");
 
@@ -3700,7 +3705,7 @@ mod tests {
             temp_output_dir("nc23-forged-support"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged support around non-executable payload rejects");
 
@@ -3731,7 +3736,7 @@ mod tests {
             temp_output_dir("nc23-forged-entrypoint-header"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC20 package header rejects");
 
@@ -3761,7 +3766,7 @@ mod tests {
             temp_output_dir("nc23-forged-entrypoint-version"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC20 package version rejects");
 
@@ -3790,7 +3795,7 @@ mod tests {
             temp_output_dir("nc23-forged-support-header"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC21 support header rejects");
 
@@ -3821,7 +3826,7 @@ mod tests {
             temp_output_dir("nc23-forged-support-version"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC21 support version rejects");
 
@@ -3863,7 +3868,7 @@ mod tests {
             temp_output_dir("nc23-platform"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("non-host starter platform rejects");
 
@@ -3915,7 +3920,7 @@ mod tests {
             temp_output_dir("c3-d5-identity"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("package materializes");
 
@@ -4010,7 +4015,7 @@ mod tests {
             &output_dir,
             "object linker unit test",
             &options,
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("packaging without a profile must be refused");
         assert_eq!(err.stage, ObjectLinkerPackagingStage::ResourceProfile);
@@ -4038,7 +4043,7 @@ mod tests {
             &ObjectLinkerPackagingOptions::starter_host_with_profile(
                 crate::boundary_resource_profile::starter_smoke_profile(),
             ),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("packaging with a named profile succeeds");
         assert!(package.smoke.passed);
@@ -4077,7 +4082,7 @@ mod tests {
             temp_output_dir("nc23-missing-linker"),
             "object linker unit test",
             &options,
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("missing linker fails in the toolchain lane");
 
@@ -4119,7 +4124,7 @@ mod tests {
             temp_output_dir("nc23-aggregate"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("aggregate smoke is not packaged as an external ABI");
 
@@ -4155,7 +4160,7 @@ mod tests {
             temp_output_dir("nc23-trap"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("trap smoke is not reported as linker success");
 

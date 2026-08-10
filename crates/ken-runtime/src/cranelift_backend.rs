@@ -62,16 +62,16 @@ pub(crate) use artifact::api::{
 // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the synthetic compilation
 // entrypoints. ⛔ `#[cfg(test)]`, so these names do not exist in a production
 // build and no production path can reach lowering through them.
-#[cfg(test)]
-pub(crate) use artifact::api::{
-    emit_synthetic_runtime_ir_object_with_cranelift, run_synthetic_runtime_ir_report_with_cranelift,
-};
 pub use artifact::api::{
     emit_runtime_ir_object_with_cranelift, reject_program_blockers,
     run_example_with_interpreter_observation, run_example_with_seed_observation,
     run_ken_checked_proof_erasure_example_with_interpreter_observation, run_nc6_seed_examples,
     run_nc8_validated_seed_examples, run_runtime_ir_report_with_cranelift,
     run_validated_example_with_interpreter_observation,
+};
+#[cfg(test)]
+pub(crate) use artifact::api::{
+    emit_synthetic_runtime_ir_object_with_cranelift, run_synthetic_runtime_ir_report_with_cranelift,
 };
 
 // `with_px8ds_retired_flat_order` is bare `pub` and reached cross-CRATE as

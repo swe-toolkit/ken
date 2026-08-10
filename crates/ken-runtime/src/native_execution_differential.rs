@@ -3282,7 +3282,7 @@ mod tests {
             output_dir,
             "native differential unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
-                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("object/linker package materializes")
     }

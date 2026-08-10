@@ -64,10 +64,7 @@ pub(super) fn program_authority(
     program: &RuntimeProgram,
 ) -> Result<crate::NativeProcessSymbols, CraneliftBackendError> {
     crate::native_authority_for_program(program).map_err(|err| {
-        crate::cranelift_backend::surface::unsupported(
-            "checked-role-authority",
-            err.to_string(),
-        )
+        crate::cranelift_backend::surface::unsupported("checked-role-authority", err.to_string())
     })
 }
 

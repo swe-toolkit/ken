@@ -110,7 +110,6 @@ pub(in crate::cranelift_backend) fn producer_match_unit_ports() -> usize {
     PRODUCER_MATCH_UNIT_PORTS.with(std::cell::Cell::get)
 }
 
-
 /// The mutation `D1a` proves its exact-set control against.
 ///
 /// `ShortCircuitLikeTheSelector` is not a synthetic perturbation: it makes the
@@ -166,7 +165,6 @@ pub(in crate::cranelift_backend) fn set_selector_variant_exclusion(
 ) {
     SELECTOR_VARIANT_EXCLUSION.with(|cell| cell.set(excluded));
 }
-
 
 /// **`RT-RECURSOR-TRANSPORT` `D2` trace helpers.** Test-only.
 ///
@@ -469,9 +467,7 @@ thread_local! {
 /// every hook below returns immediately. Prior state is restored on unwind.
 #[cfg(feature = "px8-ds-test-support")]
 #[doc(hidden)]
-pub fn with_match_recursor_census<R>(
-    body: impl FnOnce() -> R,
-) -> (R, Vec<MatchRecursorCensusRow>) {
+pub fn with_match_recursor_census<R>(body: impl FnOnce() -> R) -> (R, Vec<MatchRecursorCensusRow>) {
     struct Restore(Option<Vec<MatchRecursorCensusRow>>);
     impl Drop for Restore {
         fn drop(&mut self) {
@@ -530,7 +526,11 @@ fn mrc_census_begin(
 fn mrc_census_validator(index: Option<usize>, admitted: bool) {
     let Some(index) = index else { return };
     MRC_CENSUS.with(|cell| {
-        if let Some(row) = cell.borrow_mut().as_mut().and_then(|rows| rows.get_mut(index)) {
+        if let Some(row) = cell
+            .borrow_mut()
+            .as_mut()
+            .and_then(|rows| rows.get_mut(index))
+        {
             row.validator_admitted = admitted;
         }
     });
@@ -540,7 +540,11 @@ fn mrc_census_validator(index: Option<usize>, admitted: bool) {
 fn mrc_census_selector(index: Option<usize>, authority: BodyEmissionAuthority) {
     let Some(index) = index else { return };
     MRC_CENSUS.with(|cell| {
-        if let Some(row) = cell.borrow_mut().as_mut().and_then(|rows| rows.get_mut(index)) {
+        if let Some(row) = cell
+            .borrow_mut()
+            .as_mut()
+            .and_then(|rows| rows.get_mut(index))
+        {
             row.reached_selector = true;
             row.authority = Some(format!("{authority:?}"));
         }
@@ -857,6 +861,29 @@ fn masked_reply_response_bytes(
 fn c2_unit_emission_epoch() -> Option<u64> {
     C2_UNIT_EMISSION_EPOCH.with(std::cell::Cell::get)
 }
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — arm a sentinel that entering
+/// the inner lowering clears.
+///
+/// `compile_expr_into_module_with_root_projection` resets this epoch to
+/// `Some(0)` on entry, and that reset is the **only** writer of a non-sentinel
+/// value before any planning happens. So a sentinel that survives a call proves
+/// the inner lowerer was never entered — which is what "refuses before
+/// planning" has to mean to be checkable, rather than a claim about the label
+/// on an error.
+#[cfg(test)]
+pub(crate) fn arm_lowering_entry_sentinel() {
+    C2_UNIT_EMISSION_EPOCH.with(|epoch| epoch.set(Some(LOWERING_ENTRY_SENTINEL)));
+}
+
+/// Whether the inner lowering was entered since the sentinel was armed.
+#[cfg(test)]
+pub(crate) fn lowering_was_entered() -> bool {
+    C2_UNIT_EMISSION_EPOCH.with(std::cell::Cell::get) != Some(LOWERING_ENTRY_SENTINEL)
+}
+
+#[cfg(test)]
+const LOWERING_ENTRY_SENTINEL: u64 = u64::MAX;
 
 #[cfg(test)]
 fn recursive_position_unit_calls() -> usize {
@@ -2052,8 +2079,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         }),
         BodyEmissionAuthority::FunctionizedUnits => None,
     };
-    let root_function_local =
-        helpers.declare_in_func(&mut module, &mut ctx.func, root_trap_exit);
+    let root_function_local = helpers.declare_in_func(&mut module, &mut ctx.func, root_trap_exit);
     let mut func_ctx = FunctionBuilderContext::new();
     let mut compiler = Lowering {
         continuation_claims: None,
@@ -2238,20 +2264,20 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // none today — that is a fact about the adapter, not a reason to
             // narrow the window.
             super::units::close_continuation_claim_ledger(&mut compiler)?;
-                // `D7` — the relation's enforced laws close here: every event
-                // maps to exactly one record, every committed pair is unique,
-                // every related record is in `P`, no body is built twice, and
-                // no event set is left open.
-                //
-                // ⚠ `image(R) ⊆ P`, deliberately not equality. `P` is a closed
-                // AUTHORIZATION population: it plans a record for every
-                // allocation-reachable node of every seat's tree under every
-                // emission owner the seat may be lowered by, while one
-                // compilation emits only the bodies it has. An unused record is
-                // lawful, and requiring equality refused ordinary programs by
-                // 1 to 132 records when measured.
-                let _aggregate_relation =
-                    super::units::close_aggregate_allocation_ledger(&mut compiler)?;
+            // `D7` — the relation's enforced laws close here: every event
+            // maps to exactly one record, every committed pair is unique,
+            // every related record is in `P`, no body is built twice, and
+            // no event set is left open.
+            //
+            // ⚠ `image(R) ⊆ P`, deliberately not equality. `P` is a closed
+            // AUTHORIZATION population: it plans a record for every
+            // allocation-reachable node of every seat's tree under every
+            // emission owner the seat may be lowered by, while one
+            // compilation emits only the bodies it has. An unused record is
+            // lawful, and requiring equality refused ordinary programs by
+            // 1 to 132 records when measured.
+            let _aggregate_relation =
+                super::units::close_aggregate_allocation_ledger(&mut compiler)?;
             // `D7` — planned seats against consumed seats, exactly.
             let _effect_seats = super::units::close_host_effect_seat_ledger(&mut compiler)?;
             root_result
@@ -2314,7 +2340,9 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                         }),
                     ));
                     initial_env.push(LoweringEnvironmentBinding::Value(
-                        LoweringOperand::Specialized(Lowered::CapabilityToken { value: capability }),
+                        LoweringOperand::Specialized(Lowered::CapabilityToken {
+                            value: capability,
+                        }),
                     ));
                 } else {
                     compiler.function_local.host_dispatch_context =
@@ -2397,9 +2425,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         }
     };
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
-    let carrier_identity_catalog = compiler
-        .static_transition_plan
-        .carrier_identity_catalog()?;
+    let carrier_identity_catalog = compiler.static_transition_plan.carrier_identity_catalog()?;
     let compiled = CompiledModule::from_parts(
         module,
         func_id,
@@ -2465,8 +2491,7 @@ struct SourceCarriedControlMutationGuard;
 #[cfg(test)]
 impl Drop for SourceCarriedControlMutationGuard {
     fn drop(&mut self) {
-        SOURCE_CARRIED_CONTROL_MUTATION
-            .with(|cell| cell.set(SourceCarriedControlMutation::Exact));
+        SOURCE_CARRIED_CONTROL_MUTATION.with(|cell| cell.set(SourceCarriedControlMutation::Exact));
     }
 }
 
@@ -2600,7 +2625,11 @@ impl<'a> Lowering<'a> {
             source_selected_cursor: active.source_selected_cursor,
             selected_scope: active.selected_scope,
         });
-        self.lower_computational_match_value_composed(builder, RoutedAnswer::direct(value), &[*head, successor])
+        self.lower_computational_match_value_composed(
+            builder,
+            RoutedAnswer::direct(value),
+            &[*head, successor],
+        )
     }
 
     /// ⛔⛔ **`AC-C4` clause 3 — a carried residual is a transferred VALUE, never
@@ -3023,8 +3052,7 @@ impl<'a> Lowering<'a> {
                         body,
                     }) => {
                         // `RT-DECL-CLOSURE-PORT` `D4`, consumer 2 of 3.
-                        if self.body_emission_authority
-                            == BodyEmissionAuthority::FunctionizedUnits
+                        if self.body_emission_authority == BodyEmissionAuthority::FunctionizedUnits
                         {
                             let args = args
                                 .iter()
@@ -3176,8 +3204,7 @@ impl<'a> Lowering<'a> {
                         // existing pre-move field read. Both are facts of the
                         // invocation, so both are taken while it is still in hand
                         // rather than reconstructed afterwards.
-                        let carried_coordinates =
-                            CarriedInvocationCoordinates::of(&invocation)?;
+                        let carried_coordinates = CarriedInvocationCoordinates::of(&invocation)?;
                         let current = active_recursor_frame(eliminators).ok_or_else(|| {
                             unsupported(
                                 "ComputationalRecursor",
@@ -3211,7 +3238,7 @@ impl<'a> Lowering<'a> {
                         // `BoundedNat` arm below uses. ⛔ Not `specialized_at`,
                         // ⛔ not a reconstructed `Lowered`, ⛔ not the producer.
                         if let LoweringOperand::Carried(word) = base {
-                    if let Some(body) = recursive_unit_body.filter(|_| {
+                            if let Some(body) = recursive_unit_body.filter(|_| {
                                 matches!(
                                     self.body_emission_authority,
                                     BodyEmissionAuthority::FunctionizedUnits
@@ -3240,7 +3267,9 @@ impl<'a> Lowering<'a> {
                                     )
                                     .and_then(|value| {
                                         self.lower_computational_match_value_composed(
-                                            builder, RoutedAnswer::direct(value), &composed,
+                                            builder,
+                                            RoutedAnswer::direct(value),
+                                            &composed,
                                         )
                                     });
                                 self.leave_oriented_semantic_region(installed.checked);
@@ -3356,7 +3385,9 @@ impl<'a> Lowering<'a> {
                                     None,
                                 )?;
                                 self.lower_computational_match_value_composed(
-                                    builder, RoutedAnswer::direct(returned), &composed,
+                                    builder,
+                                    RoutedAnswer::direct(returned),
+                                    &composed,
                                 )
                             }
                         };
@@ -3804,8 +3835,7 @@ impl<'a> Lowering<'a> {
                                 #[cfg(test)]
                                 super::units::d3_record(super::units::D3Event::Settle {
                                     identity: identity.clone(),
-                                    disposition:
-                                        super::units::CandidateDisposition::InlineNoCall,
+                                    disposition: super::units::CandidateDisposition::InlineNoCall,
                                     seat: super::units::D3Seat::BridgeEntry,
                                 });
                                 self.settle_continuation_candidate(
@@ -3857,8 +3887,7 @@ impl<'a> Lowering<'a> {
                                 #[cfg(test)]
                                 super::units::d3_record(super::units::D3Event::Settle {
                                     identity: identity.clone(),
-                                    disposition:
-                                        super::units::CandidateDisposition::InlineNoCall,
+                                    disposition: super::units::CandidateDisposition::InlineNoCall,
                                     seat: super::units::D3Seat::BridgeExit,
                                 });
                                 self.settle_continuation_candidate(
@@ -3956,7 +3985,8 @@ impl<'a> Lowering<'a> {
                 // the exact producer RAISES it. ⛔ Not a default written at the
                 // consumer: a site that hard-codes `DirectScrutinee` on a path an
                 // exact call result reaches would erase the fact being transported.
-                let produced = continuation_result.unwrap_or_else(|| RoutedAnswer::direct(produced));
+                let produced =
+                    continuation_result.unwrap_or_else(|| RoutedAnswer::direct(produced));
                 self.lower_computational_match_value_composed(builder, produced, eliminators)
             }
             RuntimeExpr::Match {
@@ -4341,7 +4371,11 @@ impl<'a> Lowering<'a> {
                 // included — the producer-side twin of the source machine's
                 // fallback arm.
                 let value = self.lower_expr(builder, occurrence, producer_env)?;
-                self.lower_computational_match_value_composed(builder, RoutedAnswer::direct(value), eliminators)
+                self.lower_computational_match_value_composed(
+                    builder,
+                    RoutedAnswer::direct(value),
+                    eliminators,
+                )
             }
         }
     }
@@ -4390,9 +4424,11 @@ impl<'a> Lowering<'a> {
                     // recursor-layer producer's authority; this is the call-result
                     // producer's, and the two join.
                     let frame_field = frame.answer_route;
-                    frame.answer_route =
-                        RoutedAnswer { value: LoweringOperand::Carried(word), route: incoming_route }
-                            .raise(frame.answer_route);
+                    frame.answer_route = RoutedAnswer {
+                        value: LoweringOperand::Carried(word),
+                        route: incoming_route,
+                    }
+                    .raise(frame.answer_route);
                     #[cfg(test)]
                     if d6a_route_mutation() == D6aRouteMutation::OverwriteIncomingWithFrameField {
                         record_d6a_route_application();
@@ -4519,7 +4555,10 @@ impl<'a> Lowering<'a> {
                         COC_D2_SUFFIX_CONTINUATIONS.with(|count| count.set(count.get() + 1));
                         self.lower_computational_match_value_composed(
                             builder,
-                            RoutedAnswer { value, route: incoming_route },
+                            RoutedAnswer {
+                                value,
+                                route: incoming_route,
+                            },
                             suffix,
                         )
                     });
@@ -4571,11 +4610,7 @@ impl<'a> Lowering<'a> {
                     }
                     #[cfg(test)]
                     CCR_D2_ACTIVE_ROUTES.with(|count| count.set(count.get() + 1));
-                    self.resume_active_continuation(
-                        builder,
-                        LoweringOperand::Carried(word),
-                        active,
-                    )
+                    self.resume_active_continuation(builder, LoweringOperand::Carried(word), active)
                 }
                 // `PendingLet` keeps the original refusal verbatim. `D1` measured
                 // its population EMPTY at this base -- zero arrivals in either
@@ -4660,7 +4695,10 @@ impl<'a> Lowering<'a> {
         #[cfg(test)]
         if matches!(
             (&scrutinee, eliminator),
-            (Lowered::ProcessExitStatus { .. }, EliminatorFrame::Active(_))
+            (
+                Lowered::ProcessExitStatus { .. },
+                EliminatorFrame::Active(_)
+            )
         ) {
             SAR_D2_CELL_ARRIVALS.with(|count| count.set(count.get() + 1));
         }
@@ -4873,7 +4911,8 @@ impl<'a> Lowering<'a> {
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
-                    induction_hypotheses.push(LoweringEnvironmentBinding::Value(induction_hypothesis));
+                    induction_hypotheses
+                        .push(LoweringEnvironmentBinding::Value(induction_hypothesis));
                 }
                 let mut case_env = induction_hypotheses;
                 extend_specialized(&mut case_env, args);
@@ -5412,7 +5451,8 @@ impl<'a> Lowering<'a> {
                         Px8jProducerPath::DeferredConstructor,
                         &induction_hypothesis,
                     );
-                    induction_hypotheses.push(LoweringEnvironmentBinding::Value(induction_hypothesis));
+                    induction_hypotheses
+                        .push(LoweringEnvironmentBinding::Value(induction_hypothesis));
                 }
                 // ⭐ `D8d` — THE ONE ENVIRONMENT AUTHORITY at the selected
                 // recursive source-order position.
@@ -5452,12 +5492,10 @@ impl<'a> Lowering<'a> {
                             // is not what mutation 1 is about.
                             #[cfg(test)]
                             if let Ok(identity) = worker.composed_continuation_authority() {
-                                super::units::d3_record(
-                                    super::units::D3Event::BindingInstalled {
-                                        identity: identity.clone(),
-                                        kind: super::units::D3BindingKind::StaticWorker,
-                                    },
-                                );
+                                super::units::d3_record(super::units::D3Event::BindingInstalled {
+                                    identity: identity.clone(),
+                                    kind: super::units::D3BindingKind::StaticWorker,
+                                });
                             }
                             LoweringEnvironmentBinding::StaticWorker(worker)
                         }
@@ -5468,21 +5506,17 @@ impl<'a> Lowering<'a> {
                             // merely resemble each other.
                             #[cfg(test)]
                             if let Ok(identity) = worker.composed_continuation_authority() {
-                                super::units::d3_record(
-                                    super::units::D3Event::BindingInstalled {
-                                        identity: identity.clone(),
-                                        kind: super::units::D3BindingKind::Value,
-                                    },
-                                );
+                                super::units::d3_record(super::units::D3Event::BindingInstalled {
+                                    identity: identity.clone(),
+                                    kind: super::units::D3BindingKind::Value,
+                                });
                             }
                             let _ = &worker;
-                            LoweringEnvironmentBinding::Value(
-                                LoweringOperand::Specialized(lowered),
-                            )
+                            LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(lowered))
                         }
-                        None => LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-                            lowered,
-                        )),
+                        None => {
+                            LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(lowered))
+                        }
                     };
                     induction_hypotheses.push(binding);
                 }
@@ -5510,8 +5544,10 @@ impl<'a> Lowering<'a> {
                     "a deferred constructor's trailing field",
                 )?);
                 Ok(Ok(bound_values(
-                    constructor_args.into_iter().map(LoweringOperand::Specialized),
-        )))
+                    constructor_args
+                        .into_iter()
+                        .map(LoweringOperand::Specialized),
+                )))
             }
             EliminatorFrame::PendingLet(_) => {
                 unreachable!("pending Let continuations cannot be deferred constructor frames")
@@ -5675,23 +5711,26 @@ impl<'a> Lowering<'a> {
                         }
                     }
                     RuntimeExpr::Value(value) => SourceMachineState::Value {
-                        value: RoutedAnswer::direct(LoweringOperand::Specialized(self.lower_value(builder, &value)?)),
+                        value: RoutedAnswer::direct(LoweringOperand::Specialized(
+                            self.lower_value(builder, &value)?,
+                        )),
                         control,
                     },
                     // Same value-producing rule as the direct descent's `Var`:
                     // only `Value` yields a machine value, and a static worker
                     // binding fails closed here rather than entering one.
                     RuntimeExpr::Var(index) => SourceMachineState::Value {
-                        value: RoutedAnswer::direct(env
-                            .get(index as usize)
-                            .ok_or_else(|| {
-                                unsupported(
-                                    "Var",
-                                    format!("no runtime binding for index {index}"),
-                                )
-                            })?
-                            .value_at("a source-machine Var in value position")?
-                            .clone()),
+                        value: RoutedAnswer::direct(
+                            env.get(index as usize)
+                                .ok_or_else(|| {
+                                    unsupported(
+                                        "Var",
+                                        format!("no runtime binding for index {index}"),
+                                    )
+                                })?
+                                .value_at("a source-machine Var in value position")?
+                                .clone(),
+                        ),
                         control,
                     },
                     RuntimeExpr::Let { value, body } => {
@@ -6004,7 +6043,10 @@ impl<'a> Lowering<'a> {
                     // is the erasure this checkpoint exists to prevent, and it
                     // is SILENT -- the compile stays green and the checked
                     // answer quietly takes the closed default.
-                    let RoutedAnswer { value, route: incoming_route } = value;
+                    let RoutedAnswer {
+                        value,
+                        route: incoming_route,
+                    } = value;
                     if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
                         control.continuation = Self::discard_source_prefix(control.continuation);
                     }
@@ -7543,13 +7585,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 let arm_env = env_with([payload], env);
                 let body =
                     self.owned_case_body_occurrence(static_origin, index, case.body.clone())?;
-                self.lower_forked_branch(
-                    builder,
-                    &mut frame_scope,
-                    body,
-                    arm_env,
-                    branch_control,
-                )?
+                self.lower_forked_branch(builder, &mut frame_scope, body, arm_env, branch_control)?
             } else {
                 // ⚠ THE ONE SYNTHESIZED TERM in the whole lowering: no source
                 // occurrence exists for "this alternative has no case", so the
@@ -7905,9 +7941,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         // `brif`, a `jump` or a `return_`, so no block is left live when leaf
         // lowering begins.
         let class = self.emit_carrier_class(builder, scrutinee)?;
-        let mut class_test = builder
-            .current_block()
-            .expect("carried source match block");
+        let mut class_test = builder.current_block().expect("carried source match block");
 
         {
             // Emitted unconditionally: whether the word IS a `HostResult` is a
@@ -8160,8 +8194,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         // origin here.
         builder.switch_to_block(default_block);
         let edge = self.mint_source_predecessor(target.clone());
-        let continuation =
-            Self::instantiate_source_prefix_template(&source_prefix_template, edge)?;
+        let continuation = Self::instantiate_source_prefix_template(&source_prefix_template, edge)?;
         let default_control = SourceControl {
             continuation,
             selected: arm_selected.clone(),
@@ -8551,13 +8584,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 }
                 let body = self.machine_body_occurrence(body)?;
                 self.lower_source_declaration_call(
-                    builder,
-                    symbol,
-                    captures,
-                    body,
-                    args,
-                    env,
-                    control,
+                    builder, symbol, captures, body, args, env, control,
                 )
             }
             mut recursor @ Lowered::ComputationalRecursorClosure { .. } => {
@@ -8609,13 +8636,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 let (activation, invocation) =
                     boundary.expect("recursor closure carries an invocation segment");
                 let recursive_unit_body = invocation.recursive_unit_body;
-                        // `D5a` checkpoint 4 step 1 — read the retained source
-                        // coordinates BEFORE the segment is installed, beside the
-                        // existing pre-move field read. Both are facts of the
-                        // invocation, so both are taken while it is still in hand
-                        // rather than reconstructed afterwards.
-                        let carried_coordinates =
-                            CarriedInvocationCoordinates::of(&invocation)?;
+                // `D5a` checkpoint 4 step 1 — read the retained source
+                // coordinates BEFORE the segment is installed, beside the
+                // existing pre-move field read. Both are facts of the
+                // invocation, so both are taken while it is still in hand
+                // rather than reconstructed afterwards.
+                let carried_coordinates = CarriedInvocationCoordinates::of(&invocation)?;
                 if source_active_cursor(
                     &control.selected,
                     &control.selected_lineage,
@@ -8724,7 +8750,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         checked_ih_invocation,
                     )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                        value: RoutedAnswer::direct(LoweringOperand::Specialized(Lowered::BoundedNat(predecessor))),
+                        value: RoutedAnswer::direct(LoweringOperand::Specialized(
+                            Lowered::BoundedNat(predecessor),
+                        )),
                         control: suspended,
                     }));
                 } else {
@@ -9240,16 +9268,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 #[cfg(test)]
                 let nearest_alias_index = {
                     use crate::cranelift_backend::lowering::{
-                        d3b_consumer_mutation, record_d3b_consumer_application,
-                        D3bConsumerMutation,
+                        d3b_consumer_mutation, record_d3b_consumer_application, D3bConsumerMutation,
                     };
                     match d3b_consumer_mutation() {
                         D3bConsumerMutation::Exact => nearest_alias_index,
                         D3bConsumerMutation::ConsumeLocatorIndex => {
                             match coordinate {
-                                ContinuationSourceCoordinate::ProducerLocal {
-                                    locator, ..
-                                } => {
+                                ContinuationSourceCoordinate::ProducerLocal { locator, .. } => {
                                     record_d3b_consumer_application();
                                     locator.environment_index
                                 }
@@ -9564,7 +9589,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         recursive_position: usize,
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
-        let answer = self.claim_and_call_resolved_continuation_inner(builder, identity, fields, recursive_position, producer_env)?;
+        let answer = self.claim_and_call_resolved_continuation_inner(
+            builder,
+            identity,
+            fields,
+            recursive_position,
+            producer_env,
+        )?;
         // `D3` — the funnel was REACHED and RETURNED. A distinct event from a
         // settlement attempt, because mutation 4's row must say "the call was
         // preserved AND nothing was settled", and one event standing for both
@@ -10137,7 +10168,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             // current-lexical claim": taking the context-capture view here would
             // measure an operand run this seat does not hold.
             let Some(ContinuationEnvironmentClaim::CurrentLexical {
-                nearest_alias_index, ..
+                nearest_alias_index,
+                ..
             }) = input.availability.direct_emission
             else {
                 continue;
@@ -10218,7 +10250,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 .count();
             for input in &vector {
                 let D3cCoordinate::EntryAbi {
-                    source_abi_position, ..
+                    source_abi_position,
+                    ..
                 } = input.coordinate
                 else {
                     continue;
@@ -10295,7 +10328,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             #[cfg(test)]
             let source_abi_position = match input.coordinate {
                 ContinuationSourceCoordinate::EntryAbi {
-                    source_abi_position, ..
+                    source_abi_position,
+                    ..
                 } => source_abi_position,
                 ContinuationSourceCoordinate::ProducerLocal { .. } => u32::MAX,
             };
@@ -10424,27 +10458,21 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 }
             }
             resolved_slots.push((input.coordinate, immediate_slot));
-            let binding = producer_env
-                .get(immediate_slot as usize)
-                .ok_or_else(|| {
-                    unsupported(
-                        "ContinuationSpecialization",
-                        format!(
-                            "a continuation input names immediate slot {} outside the emitting \
+            let binding = producer_env.get(immediate_slot as usize).ok_or_else(|| {
+                unsupported(
+                    "ContinuationSpecialization",
+                    format!(
+                        "a continuation input names immediate slot {} outside the emitting \
                              context's environment of {} bindings; note this is the IMMEDIATE \
                              slot, whose meaning is fixed by the availability domain {:?} and \
                              not by any root position beside it",
-                            immediate_slot,
-                            producer_env.len(),
-                            input.availability,
-                        ),
-                    )
-                })?;
-            inputs.push(
-                binding
-                    .value_at("a continuation capture input")?
-                    .clone(),
-            );
+                        immediate_slot,
+                        producer_env.len(),
+                        input.availability,
+                    ),
+                )
+            })?;
+            inputs.push(binding.value_at("a continuation capture input")?.clone());
         }
 
         let (returned, call) = self.call_declared_unit_target(
@@ -10765,13 +10793,12 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // the only thing that moves is the declared ordinary run this count is
         // compared against.
         #[cfg(test)]
-        let ordinary_declared = if d5a_route_mutation()
-            == D5aRouteMutation::PerturbOrdinaryParameterCount
-        {
-            unit.ordinary_parameters() as usize + 1
-        } else {
-            unit.ordinary_parameters() as usize
-        };
+        let ordinary_declared =
+            if d5a_route_mutation() == D5aRouteMutation::PerturbOrdinaryParameterCount {
+                unit.ordinary_parameters() as usize + 1
+            } else {
+                unit.ordinary_parameters() as usize
+            };
         #[cfg(not(test))]
         let ordinary_declared = unit.ordinary_parameters() as usize;
         // The field run, against the PLANNER'S OWN stated relation:
@@ -10832,11 +10859,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             .collect::<Vec<_>>();
         Ok(self
             .claim_and_call_resolved_continuation(
-                builder,
-                &identity,
-                &field_run,
-                position,
-                unit_env,
+                builder, &identity, &field_run, position, unit_env,
             )?
             .value)
     }
@@ -10904,9 +10927,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // run is exactly `inputs` at entry -- captures are appended below -- so
         // this is the one place both consumers can be held to the declared
         // arity without either restating it.
-        let supplied = u32::try_from(inputs.len()).map_err(|_| {
-            unsupported("Call", "call argument count exceeds addressable range")
-        })?;
+        let supplied = u32::try_from(inputs.len())
+            .map_err(|_| unsupported("Call", "call argument count exceeds addressable range"))?;
         if supplied != worker.declared_arity {
             return Err(unsupported(
                 "Call",
@@ -11044,23 +11066,20 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 (&self.function_local.raw_worker_calls, "raw_worker_calls")
             }
         };
-        let exact = table
-            .get(&worker.body_origin)
-            .cloned()
-            .ok_or_else(|| {
-                unsupported(
-                    "Call",
-                    format!(
-                        "no {table_name} target for body origin {:?} was declared into this \
+        let exact = table.get(&worker.body_origin).cloned().ok_or_else(|| {
+            unsupported(
+                "Call",
+                format!(
+                    "no {table_name} target for body origin {:?} was declared into this \
                          function, so the {:?} route has no callee. ⛔ This never falls back to \
                          the other route's table: a raw call answered by a generated context \
                          would underflow that context's capture run, and a context call answered \
                          by the raw body would drop the continuation inputs the context exists \
                          to carry",
-                        worker.body_origin, worker.route
-                    ),
-                )
-            })?;
+                    worker.body_origin, worker.route
+                ),
+            )
+        })?;
         // `D8g` — the emitted callee identity, captured where the table
         // answered. The FuncRef, not the origin: the two routes share a worker
         // body origin by design, so only this separates them.
@@ -12911,7 +12930,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             .len()
             .checked_add(paired.worker().declared_arity() as usize)
             .ok_or_else(|| {
-                unsupported("ContinuationDischarge", "declared operand run exceeds range")
+                unsupported(
+                    "ContinuationDischarge",
+                    "declared operand run exceeds range",
+                )
             })?;
         if paired.worker().body_origin() != worker.body_origin
             || paired.worker().declared_arity() != worker.declared_arity
@@ -13516,7 +13538,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
-                    induction_hypotheses.push(LoweringEnvironmentBinding::Value(induction_hypothesis));
+                    induction_hypotheses
+                        .push(LoweringEnvironmentBinding::Value(induction_hypothesis));
                 }
                 active_scope = Some((activation, cursor, producer_origin, splice_caller));
             }
@@ -13696,11 +13719,15 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             // projected field of it: the checked answer is the value the return
             // case binds, and projecting would ask the carrier for structure
             // this route never claimed it has.
-            let mut case_env =
-                vec![LoweringEnvironmentBinding::Value(LoweringOperand::Carried(scrutinee))];
+            let mut case_env = vec![LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                scrutinee,
+            ))];
             case_env.extend(eliminator.env.to_vec());
-            let body =
-                self.case_body_occurrence(eliminator.static_origin, return_index, &return_case.body)?;
+            let body = self.case_body_occurrence(
+                eliminator.static_origin,
+                return_index,
+                &return_case.body,
+            )?;
             let body_origin = body.static_origin;
             // ⭐ Lowered through the ORDINARY continuation of this eliminator,
             // exactly as a non-recursive case body beside it is. The eliminated
@@ -15175,9 +15202,17 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         }
         for (ordinal, operand) in lowered.iter().enumerate() {
             let ordinal = u32::try_from(ordinal).map_err(|_| {
-                unsupported("Effect", "host effect argument ordinal exceeds the seat space")
+                unsupported(
+                    "Effect",
+                    "host effect argument ordinal exceeds the seat space",
+                )
             })?;
-            claim(self, &mut claimed, EffectSeatSlot::Argument(ordinal), operand)?;
+            claim(
+                self,
+                &mut claimed,
+                EffectSeatSlot::Argument(ordinal),
+                operand,
+            )?;
         }
         #[cfg(test)]
         if effect_seat_visit_mutation() == EffectSeatVisitMutation::DuplicateWithinVisit {
@@ -15248,9 +15283,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         let io_error_other_detail =
             |builder: &mut FunctionBuilder<'_>, code: cranelift_codegen::ir::Value| {
                 let payload = builder.ins().ishl_imm(code, 32);
-                builder
-                    .ins()
-                    .bor_imm(payload, IO_ERROR_OTHER_DISCRIMINATOR)
+                builder.ins().bor_imm(payload, IO_ERROR_OTHER_DISCRIMINATOR)
             };
         // `(invalid, reply tag, detail)`. The TAG is carried rather than assumed
         // because a synthesized pre-dispatch failure must land on the surface
@@ -15273,19 +15306,20 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // constant, because a byte-span refusal chooses its `ResourceErrorV1`
         // code at run time from the observer's outcome. Every pre-existing
         // caller still passes a constant and is unchanged in meaning.
-        let mut record_narrow_failure = |builder: &mut FunctionBuilder<'_>,
-                                         invalid,
-                                         tag: cranelift_codegen::ir::Value,
-                                         detail: cranelift_codegen::ir::Value| {
-            narrow_failure = Some(match narrow_failure.take() {
-                Some((prior_invalid, prior_tag, prior_detail)) => (
-                    builder.ins().bor(prior_invalid, invalid),
-                    builder.ins().select(prior_invalid, prior_tag, tag),
-                    builder.ins().select(prior_invalid, prior_detail, detail),
-                ),
-                None => (invalid, tag, detail),
-            });
-        };
+        let mut record_narrow_failure =
+            |builder: &mut FunctionBuilder<'_>,
+             invalid,
+             tag: cranelift_codegen::ir::Value,
+             detail: cranelift_codegen::ir::Value| {
+                narrow_failure = Some(match narrow_failure.take() {
+                    Some((prior_invalid, prior_tag, prior_detail)) => (
+                        builder.ins().bor(prior_invalid, invalid),
+                        builder.ins().select(prior_invalid, prior_tag, tag),
+                        builder.ins().select(prior_invalid, prior_detail, detail),
+                    ),
+                    None => (invalid, tag, detail),
+                });
+            };
         match operation {
             ken_host::HostOpV1::ConsoleWrite
             | ken_host::HostOpV1::ConsoleFlush
@@ -15296,10 +15330,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         "ambient Console carried a capability",
                     ));
                 }
-                let stream = console_stream_tag(seats.specialized(SEAT_0)?)
-                    .ok_or_else(|| {
-                        unsupported("Effect", "Console operation has a malformed Stream operand")
-                    })?;
+                let stream = console_stream_tag(seats.specialized(SEAT_0)?).ok_or_else(|| {
+                    unsupported("Effect", "Console operation has a malformed Stream operand")
+                })?;
                 let stream = builder.ins().iconst(types::I64, stream);
                 builder
                     .ins()
@@ -15362,9 +15395,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     .ins()
                     .stack_store(path.len, request, request_offset(2));
                 if operation == ken_host::HostOpV1::FsWriteFile {
-                    let policy = create_policy_tag(seats.specialized(SEAT_1)?).ok_or_else(|| {
-                        unsupported("Effect", "FS.WriteFile has a malformed CreatePolicy")
-                    })?;
+                    let policy =
+                        create_policy_tag(seats.specialized(SEAT_1)?).ok_or_else(|| {
+                            unsupported("Effect", "FS.WriteFile has a malformed CreatePolicy")
+                        })?;
                     let contents = self.wire_bytes_seat(builder, &seats, SEAT_2)?;
                     if let Some((invalid, resource_code)) = contents.refusal {
                         let detail = io_error_other_detail(builder, resource_code);
@@ -15394,8 +15428,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     let mode = builder.ins().select(in_range, narrowed, invalid);
                     builder.ins().stack_store(mode, request, request_offset(3));
                 } else if operation == ken_host::HostOpV1::FsOpen {
-                    let mode = resource_open_mode_tag(seats.specialized(SEAT_1)?)
-                        .ok_or_else(|| {
+                    let mode =
+                        resource_open_mode_tag(seats.specialized(SEAT_1)?).ok_or_else(|| {
                             unsupported("Effect", "FS.Open has a malformed ResourceOpenMode")
                         })?;
                     let mode = builder.ins().iconst(types::I64, mode);
@@ -15471,7 +15505,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     valid,
                     0,
                 );
-                let detail = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
                 record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
                 builder
                     .ins()
@@ -15496,7 +15532,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     valid,
                     0,
                 );
-                let detail = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
                 record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
                 // PX8-SPAN-PROV: trailing `span_origin` acquisition token.
                 let span_origin = self.lower_buffer_freeze_resource_seat(
@@ -15518,8 +15556,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     ));
                 }
                 let resource = |index: usize, name: &str| {
-                    let Some(Lowered::ResourceToken { value }) =
-                        seats.specialized(EffectSeatSlot::Argument(index as u32)).ok()
+                    let Some(Lowered::ResourceToken { value }) = seats
+                        .specialized(EffectSeatSlot::Argument(index as u32))
+                        .ok()
                     else {
                         return Err(unsupported(
                             "Effect",
@@ -15529,8 +15568,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     Ok(*value)
                 };
                 let integer = |index: usize, name: &str| {
-                    let Some(value @ Lowered::Int { .. }) =
-                        seats.specialized(EffectSeatSlot::Argument(index as u32)).ok()
+                    let Some(value @ Lowered::Int { .. }) = seats
+                        .specialized(EffectSeatSlot::Argument(index as u32))
+                        .ok()
                     else {
                         return Err(unsupported(
                             "Effect",
@@ -15553,15 +15593,24 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     file_offset_valid,
                     0,
                 );
-                let detail = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_OFFSET);
-                record_narrow_failure(builder, file_offset_invalid, resource_error_reply_tag, detail);
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_OFFSET);
+                record_narrow_failure(
+                    builder,
+                    file_offset_invalid,
+                    resource_error_reply_tag,
+                    detail,
+                );
                 let bounds_valid = builder.ins().band(buffer_start_valid, length_valid);
                 let bounds_invalid = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
                     bounds_valid,
                     0,
                 );
-                let detail = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                let detail = builder
+                    .ins()
+                    .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
                 record_narrow_failure(builder, bounds_invalid, resource_error_reply_tag, detail);
                 if operation == ken_host::HostOpV1::FsWriteAt {
                     // PX8-SPAN-PROV: `FsWriteAt` carries the trailing
@@ -15923,8 +15972,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     vec![self.site_operand_argument(static_origin, 0, &seats)?],
                     &seats,
                 )?;
-                let io_error =
-                    generic_io_error(self, builder, payload_int, &error_root.field(2))?;
+                let io_error = generic_io_error(self, builder, payload_int, &error_root.field(2))?;
                 self.synthesized_constructor(
                     static_origin,
                     &error_root,
@@ -15966,21 +16014,22 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 // paths; cloning one template into both would carry one
                 // occurrence to two allocations, which is exactly the aliasing
                 // the path key exists to prevent.
-                let surface_io_error = |this: &Self,
-                                        builder: &mut FunctionBuilder<'_>,
-                                        node: &SynthesizedAggregatePath| {
-                    Ok::<_, CraneliftBackendError>(Lowered::DynamicConstructor(
-                        DynamicConstructorV1 {
-                            discriminator: builder.ins().band_imm(surface_io, 0xff),
-                            alternatives: this.synthesized_io_error_alternatives(
-                                static_origin,
-                                node,
-                                surface_io_payload_int.clone(),
-                                &seats,
-                            )?,
-                        },
-                    ))
-                };
+                let surface_io_error =
+                    |this: &Self,
+                     builder: &mut FunctionBuilder<'_>,
+                     node: &SynthesizedAggregatePath| {
+                        Ok::<_, CraneliftBackendError>(Lowered::DynamicConstructor(
+                            DynamicConstructorV1 {
+                                discriminator: builder.ins().band_imm(surface_io, 0xff),
+                                alternatives: this.synthesized_io_error_alternatives(
+                                    static_origin,
+                                    node,
+                                    surface_io_payload_int.clone(),
+                                    &seats,
+                                )?,
+                            },
+                        ))
+                    };
                 let identity_low = builder.ins().band_imm(resource_identity, 0xffff_ffff);
                 let identity_high = builder.ins().ushr_imm(resource_identity, 32);
                 let identity_low_int = self.lower_dynamic_small_int(builder, identity_low);
@@ -15990,37 +16039,36 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 // than closing over one. Passing a path in is what makes the
                 // three uses three occurrences; a closure that knew its own
                 // path could only ever describe one of them.
-                let resource_kind_value = |this: &Self,
-                                           discriminator,
-                                           node: &SynthesizedAggregatePath| {
-                    Ok::<_, CraneliftBackendError>(Lowered::DynamicConstructor(
-                        DynamicConstructorV1 {
-                            discriminator,
-                            alternatives: vec![
-                                this.synthesized_dynamic_alternative(
-                                    static_origin,
-                                    node,
-                                    0,
-                                    wire.resource_kind_fs_handle as i64,
-                                    SynthesizedFixedConstructorRole::ResourceKindFsHandle,
-                                    this.process_symbols.resource_kind_fs_handle.clone(),
-                                    Vec::new(),
-                                    &seats,
-                                )?,
-                                this.synthesized_dynamic_alternative(
-                                    static_origin,
-                                    node,
-                                    1,
-                                    wire.resource_kind_buffer as i64,
-                                    SynthesizedFixedConstructorRole::ResourceKindBuffer,
-                                    this.process_symbols.resource_kind_buffer.clone(),
-                                    Vec::new(),
-                                    &seats,
-                                )?,
-                            ],
-                        },
-                    ))
-                };
+                let resource_kind_value =
+                    |this: &Self, discriminator, node: &SynthesizedAggregatePath| {
+                        Ok::<_, CraneliftBackendError>(Lowered::DynamicConstructor(
+                            DynamicConstructorV1 {
+                                discriminator,
+                                alternatives: vec![
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin,
+                                        node,
+                                        0,
+                                        wire.resource_kind_fs_handle as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindFsHandle,
+                                        this.process_symbols.resource_kind_fs_handle.clone(),
+                                        Vec::new(),
+                                        &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin,
+                                        node,
+                                        1,
+                                        wire.resource_kind_buffer as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindBuffer,
+                                        this.process_symbols.resource_kind_buffer.clone(),
+                                        Vec::new(),
+                                        &seats,
+                                    )?,
+                                ],
+                            },
+                        ))
+                    };
                 // `ResourceReleaseFailed` field 1, alternative 4 of the
                 // resource surface -- measured, not assumed.
                 let checked_resource_tag = |wire_tag: u64| {
@@ -16559,7 +16607,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // (`same_recursive_argument_shapes`) and lowered into block params. A
         // carried boundary word has no such shape, so this is a
         // specialized-only surface with the ruled fail-closed arm.
-        let lowered_args = specialized_operands_at(&lowered_args, "a recursive declaration argument")?;
+        let lowered_args =
+            specialized_operands_at(&lowered_args, "a recursive declaration argument")?;
         if params.len() != lowered_args.len() {
             return Err(unsupported(
                 "DeclarationRef",
@@ -16980,7 +17029,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 ),
             ));
         }
-        self.validate_declaration_unit_call(reference, symbol, checked, params.len(), captures.len())?;
+        self.validate_declaration_unit_call(
+            reference,
+            symbol,
+            checked,
+            params.len(),
+            captures.len(),
+        )?;
         // ⭐ The consumed template id is carried from the validation that
         // accepted it to the emission that realizes it — one value, one path.
         // ⛔ Re-deriving it at the emission site would be a second authority on
@@ -17265,11 +17320,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 "checked recursion group disagrees about its admission",
             ));
         }
-        if plan
-            .recursive_calls
-            .iter()
-            .any(|other| other.scc_index == call.scc_index && other.recursion_group != call.recursion_group)
-        {
+        if plan.recursive_calls.iter().any(|other| {
+            other.scc_index == call.scc_index && other.recursion_group != call.recursion_group
+        }) {
             return Err(unsupported(
                 "OrientedSubcontinuationPlanV1",
                 "two checked recursion groups claim one scc index",
@@ -17587,13 +17640,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         .jump(merge, &[value.tag.into(), value.payload.into()]);
                 }
                 JoinResultRepresentation::CarrierWord => {
-                    let word = self.carried_join_arm(
-                        builder,
-                        body.static_origin,
-                        lowered,
-                        None,
-                        "Match",
-                    )?;
+                    let word =
+                        self.carried_join_arm(builder, body.static_origin, lowered, None, "Match")?;
                     builder.ins().jump(merge, &[word.word.into()]);
                 }
             }
@@ -17869,18 +17917,16 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 self.assumptions.insert(format!(
                     "checked partial obligation {obligation} not discharged"
                 ));
-                let trap =
-                    crate::cranelift_backend::planning::planned_partiality_trap(primitive)
-                        .expect("CheckedTrap has one planner-derived trap");
+                let trap = crate::cranelift_backend::planning::planned_partiality_trap(primitive)
+                    .expect("CheckedTrap has one planner-derived trap");
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
             }
             RuntimePartiality::TrustedTrap { assumption } => {
                 self.assumptions.insert(format!(
                     "trusted partial assumption {assumption} remains visible"
                 ));
-                let trap =
-                    crate::cranelift_backend::planning::planned_partiality_trap(primitive)
-                        .expect("TrustedTrap has one planner-derived trap");
+                let trap = crate::cranelift_backend::planning::planned_partiality_trap(primitive)
+                    .expect("TrustedTrap has one planner-derived trap");
                 return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
             }
         }
@@ -18079,7 +18125,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     }
 }
 
-
 /// Which environment a `D3b` resolution's index is an index INTO, and what root
 /// provenance it carries. ⛔ Two fields, not one: the index alone cannot say
 /// which environment it belongs to, and that is the conflation the closed
@@ -18126,7 +18171,8 @@ struct ContinuationDirectEmissionSeat {
 fn d3b_claim_index(claim: ContinuationEnvironmentClaim) -> u32 {
     match claim {
         ContinuationEnvironmentClaim::CurrentLexical {
-            nearest_alias_index, ..
+            nearest_alias_index,
+            ..
         } => nearest_alias_index,
         ContinuationEnvironmentClaim::EntryFrame { declared_slot, .. } => declared_slot,
     }

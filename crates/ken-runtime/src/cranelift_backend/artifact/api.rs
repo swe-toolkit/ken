@@ -810,9 +810,7 @@ fn run_example_native(
     ken_checked_proof_erasure_boundary: Option<KenCheckedProofErasureBoundaryReport>,
 ) -> Result<CraneliftRunReport, CraneliftBackendError> {
     let compiled = match program {
-        Some((program, authority)) => {
-            compile_program_expr(program, &example.ir, env, authority)?
-        }
+        Some((program, authority)) => compile_program_expr(program, &example.ir, env, authority)?,
         None => compile_expr(&example.ir, env)?,
     };
     let verifier_passed = compiled.verifier_passed;
