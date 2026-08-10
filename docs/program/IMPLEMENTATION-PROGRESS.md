@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-10 19:51:31Z — from 209 issue file(s) in `docs/program/issues/`.
+2026-08-10 20:12:37Z — from 209 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -235,7 +235,7 @@ the committed file matches the generator's output.
 | `SPEC-IDENT-BLESSED` | Settle the identifier character set: 31-lexical promises a bounded blessed-Unicode-letter table that does not exist, cites a security chapter that carries no such claim, and states a confusable gate the landed lexer does not implement | merged | spec-enclave | M | none | https://github.com/swe-toolkit/ken/pull/1147 |
 | `SPEC-MISSION-GROUNDING` | Ground the spec as a whole against the mission — audit every retained constraint for which mission property fails without it, and relax the ones where nothing does | draft | spec | L | none | — |
 | `SPEC-NESTED-IND` | un-defer nested strictly-positive inductives in 14 §8.5 — state structural positivity through declared strictly-positive type-parameter positions, the lifted induction hypotheses, and the iota rules, WITHOUT mutual families | merged | spec-enclave | M | none | — |
-| `SPEC-SELECTOR-SORT-SPLIT` | split the recursive-result selector by motive sort -- `recursive result for x` when Type-classified, `induction hypothesis for x` when Omega-classified -- and remove `structural result of x` | ready | spec | M | none | — |
+| `SPEC-SELECTOR-SORT-SPLIT` | split the recursive-result selector by motive sort -- `recursive result for x` when Type-classified, `induction hypothesis for x` when Omega-classified -- and remove `structural result of x` | merged | spec | M | none | — |
 | `SPEC-STATUS-RECONCILE` | the spec's two status vocabularies do not correspond — define the correspondence (or replace the ladder), then apply it | merged | spec-enclave | M | none | — |
 | `SPEC-STORE-SPLIT` | Split durable canonical bytes from in-process maximal sharing: demote the store mechanism to private, retarget the conformance rows that assert it, and re-cut the runtime program against the relaxed contract | merged | spec-enclave | L | none | — |
 | `SRC-ATTEST` | squash-stable whole-source attestation + fresh merge-result authorization | merged | doc | M | none | — |
@@ -253,6 +253,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `LANG-SELECTOR-SORT-SPLIT-ELAB` — Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
@@ -264,7 +265,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-LEXICAL-RECURSOR-CONSUMERS` — Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SPEC-ERRATUM-39-2-3-CITATION` — Erratum: 34-data-match.md:625 still cites `39 §2.3` for higher-order pattern abstraction, a coordinate the structural-result merge reassigned to Structural-result association
-- `SPEC-SELECTOR-SORT-SPLIT` — split the recursive-result selector by motive sort -- `recursive result for x` when Type-classified, `induction hypothesis for x` when Omega-classified -- and remove `structural result of x`
 
 ## Blockers
 
@@ -286,7 +286,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
-- `LANG-SELECTOR-SORT-SPLIT-ELAB` blocked by `SPEC-SELECTOR-SORT-SPLIT` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)

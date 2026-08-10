@@ -1,6 +1,7 @@
 # KERNEL-NESTED-IND D9 — ungate `nested-size-uses-lift`, on the repaired fixture
 
 Owner: kernel. Size: S. Node: [[KERNEL-NESTED-IND]] (`active`).
+**Held pending [[LANG-SELECTOR-SORT-SPLIT-ELAB]] — see Contention.**
 Fixed inputs measured at `main` `c380ab32`. `D2c` lands between framing and
 release and touches only `crates/ken-runtime` and `docs/`, so every input this
 frame names is unchanged by it.
@@ -114,11 +115,20 @@ Paths are `conformance/kernel/inductive/seed-nested.md` and the
 targets and the conformance row, so the intersection is empty, but check before
 you write.** A `conformance/` path pulls a Spec vote on the merge Decision.
 
-**One coordination hazard worth naming:** `SPEC-SELECTOR-SORT-SPLIT` respells
-this row's selector to `recursive result for`. CV is respelling the gated rows
-now, and this frame quotes the **current** spelling. If the respell has landed
-by the time you read the row, **use what is in the file** — the spelling is not
-this deliverable's business and a merge conflict on it is not a hard stop.
+**A sequencing constraint, and it is why this frame is not released yet.**
+`SPEC-SELECTOR-SORT-SPLIT` respells this row: `nested-size-uses-lift` now
+requires **`recursive result for xs`**. The crates still parse only `structural
+result of`, and the elaborator respell is
+[[LANG-SELECTOR-SORT-SPLIT-ELAB]].
+
+⇒ **Until that lands, no executing witness can spell the selector the way the
+row it binds specifies.** Writing the witness in the old spelling would bind the
+row to a source that contradicts it, which is worse than leaving it gated.
+
+**Do not start this deliverable until `LANG-SELECTOR-SORT-SPLIT-ELAB` has
+merged.** I will release it then; if you receive this frame before that, the
+kickoff is the error and it comes back to me. When you do start, take the
+spelling from the row in the file rather than from this frame.
 
 ## Validation
 
