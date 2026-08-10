@@ -37,14 +37,23 @@ still kernel-checking.
   (appears), a checked certificate adds **nothing** (absent) — **not** a V-layer
   flag, so the untrusted layer cannot forge `proved` (`21 §5.4`).
 
-**Deferred-tag note (`21 §5.5`, tagged at elaboration time).** V1 delivers the
+**Deferred-tag convention.** A case may describe a settled model whose concrete
+spelling or elaboration capability has not landed. Tag only that portion
+`[deferred — <named capability or section>]`, state the landed behavior
+separately, and never present the deferred portion as currently accepted. The
+tag names implementation availability, not whether the governing design
+decision is open.
+
+The first instance is disposition-tag spelling (`21 §5.5`): V1 delivers the
 status **model** and concrete grammar for
-`requires`/`ensures`/`{x:A|φ}`/`prove`/
-`law` only; the **disposition-tag clause spelling** (`tested`/`assume`/`test`/
-`delegated`) stays **reserved** (`OQ-syntax`, downstream of
-`../70-behavioral/`).
-Cases that would exercise that spelling are tagged **`[deferred — §5.5]`** and
-assert the model, never un-landed grammar.
+`requires`/`ensures`/`{x:A|φ}`/`prove`/`law` only; the **disposition-tag clause
+spelling** (`tested`/`assume`/`test`/`delegated`) stays **reserved**
+(`OQ-syntax`, downstream of `../70-behavioral/`). Cases that would exercise that
+spelling are tagged **`[deferred — §5.5, OQ-syntax]`** and assert the model,
+never un-landed grammar. The second instance is the **deferred-model
+expectation** in each `old` scope row, tagged
+**`[deferred — old/pre-state elaboration; OQ-Space model decided]`**; each
+row's landed expectation remains live and untagged.
 
 Cases tagged **(soundness)** encode the honesty/scope commitments the whole
 model
@@ -57,16 +66,18 @@ rests on (`21 §5.4`) and must never regress.
 ### verify/spec-syntax/requires-elaborates-to-pi-proof-arg
 - spec: `21 §6.3` (elabView), `§6.1`/§6.2 (grammar/AST); `16 §1.1` (`sort_pi`)
 - given: `view divide (n : Int) (d : Int) : Int requires d ≠ 0 = n / d`
-- expect: **accepts**; the emitted core **type** is
+- expect: **accepts**; **(a — emitted type)** the emitted core type is
   `(n:Int) → (d:Int) → (_ : d ≠ 0) → Int` — the precondition is a **Π
-  proof-argument** and the function type stays at **`Type`** (not Ω); the core
-  **body** is `λ n. λ d. λ p. (n / d)` — the bare carrier, no proof paired in.
+  proof-argument** and the function type stays at **`Type`** (not Ω);
+  **(b — emitted body)** the core body is `λ n. λ d. λ p. (n / d)` — the bare
+  carrier, no proof paired in.
 - why: §6.3 lowers `requires φ` to a Π proof-arg, `check`ed at Ω then assumed in
   the body. `sort_pi(Ω, Type) = Type` (`16 §1.1`, codomain-keyed) — an Ω
   **domain** does not collapse the function to a proposition. Structural
   (emitted core), not just accept: a bug dropping the proof-arg, or mis-keying
   `sort_pi` on the **domain** (→ Ω), changes the emitted type — green-vs-red on
-  the core shape.
+  the core shape. The two conformance attachments divide these labelled halves
+  and jointly cover the expectation; neither attachment alone establishes both.
 
 ### verify/spec-syntax/requires-on-first-param-of-two
 - spec: `21 §6.3` (preconditions become proof parameters), `39 §5.3`
@@ -161,31 +172,45 @@ rests on (`21 §5.4`) and must never regress.
 ### verify/spec-syntax/old-resolves-in-space-op-ensures
 - spec: `21 §6.4` (elabSpaceEnsures), `36 §4.3`; `16 §2` (`refl`)
 - given: a `space` op `inc` over a cell `n : Int` with `ensures n == old(n) + 1`
-- expect: **accepts**; `old(n)` resolves to the **pre-state** `s_pre.n`
-  (`§6.4`), the bare `n` to the post-state `s_post.n`; the obligation
-  `(s_pre with .n := s_pre.n + 1).n == s_pre.n + 1` computes by record-β
-  (`13 §3`) to `s_pre.n + 1 == s_pre.n + 1`, discharged by `refl`.
-- why: §6.4 binds `s_pre, result, s_post` in a `space`-op `ensures`; `old(e)`
-  denotes `⟦e⟧` at `s_pre`. Structural: `old(n)` resolves to the `s_pre`
-  projection (not `s_post`). Worked example from `36 §4.3`. Pairs with the
-  reject below — the flip is the §6.4 scope guard.
+- expect (landed): **rejected at elaboration as unsupported**; the
+  space-operation scope recognizes `old(n)`, but no obligation using it is
+  emitted because pre-state elaboration is unavailable.
+- expect (model, deferred):
+  **`[deferred — old/pre-state elaboration; OQ-Space model decided]`** once
+  pre-state elaboration is available, `old(n)` resolves to the pre-state
+  projection and bare `n` to the post-state projection. For the
+  stated increment, substitution and record reduction leave a reflexive
+  equality.
+- why: `OQ-Space` settles the semantic model and `21 §6.4` specifies it, but the
+  positive elaboration capability has not landed. The landed behavior proves
+  that the enclosing-declaration scope recognizes `old` in a space-operation
+  postcondition; the tagged clause records the later positive resolution
+  contract without claiming current acceptance.
 
 ### verify/spec-syntax/old-out-of-scope-rejects (soundness)
 - spec: `21 §6.4` (scope guard), `§4`, `36 §7.3`
 - given: a **pure**
   `view k (x : Int) : Int ensures result == old(x) + 1 = x + 1`
-- expect: **rejected** — `old(x)` in a pure `view`'s `ensures` is a **scope
-  error** at elaboration (no `State` effect ⇒ no distinct pre-state `s_pre` to
-  bind), before the kernel.
-- why: §6.4 admits `old` **only** when the enclosing declaration is a `space`
-  operation — the guard is the **kind of the enclosing declaration**, asserted
-  explicitly. **Verdict-flips** with the case above: identical `old(…)` syntax,
-  **space-op resolves / pure-view rejects**. **Absence-assertion gate** — guard
-  named: enclosing-decl-kind = `space` op (the one place `s_pre ≢ s_post`).
-  **Disconfirming check:** would `old(x)` in a pure view reject under the bug
-  this targets (dropping the scope guard)? **No** — that bug would bind `old(x)`
-  to `s_post ≡ s_pre` and **accept** it (silently meaningless) — so the reject
-  is guard-gated, not coincidental.
+- expect (landed): **rejected** as `UnboundName("old")` at scope resolution.
+  With the same `old(…)` syntax in a space-operation postcondition, scope
+  resolution recognizes `old` and elaboration proceeds to the later
+  unsupported-pre-state rejection. The landed relation is therefore
+  **reject/reject at distinct gates**, not a verdict flip.
+- expect (model, deferred):
+  **`[deferred — old/pre-state elaboration; OQ-Space model decided]`** once
+  pre-state elaboration lands, the space-operation case resolves `old` to the
+  pre-state and accepts, while the pure-view case
+  continues to reject `old` as unbound; only then is the intended accept/reject
+  verdict flip live.
+- why: the live scope guard is the enclosing declaration kind. It is observable
+  now through gate identity: outside a space-operation postcondition, `old` is
+  unbound; inside one, the expression passes that guard and reaches the separate
+  missing-capability fence. If the scope guard were dropped today, the pure-view
+  case would no longer produce `UnboundName("old")`; it would progress to the
+  later unsupported-pre-state rejection. Thus the exact landed diagnostic
+  distinguishes the guard even while both cases reject. The tagged future
+  clause states the stronger verdict discriminator that becomes available when
+  pre-state elaboration lands.
 
 ---
 
@@ -369,8 +394,11 @@ rests on (`21 §5.4`) and must never regress.
   `proved-status-cert-checks-not-in-trusted-base`, `bogus-cert-not-proved`,
   `unknown-hole-distinct-from-proved`, `disproved-distinct-from-unknown`,
   `epistemic-projection-distinct`.
-- **#3 `old` semantics** — `old-resolves-in-space-op-ensures` /
-  `old-out-of-scope-rejects` (the flip pair).
+- **#3 `old` semantics** — live distinct-gate scope guard:
+  `old-out-of-scope-rejects` produces `UnboundName("old")`, while
+  `old-resolves-in-space-op-ensures` passes scope resolution and reaches the
+  unsupported-pre-state fence. The positive accept/reject flip is
+  **`[deferred — old/pre-state elaboration; OQ-Space model decided]`**.
 - **#4 V2-ready** — `obligation-hole-set-exposed-to-v2`.
 - **#5 no regression** — `v0-unchanged-for-non-spec-programs`.
 - **goals** — `prove-goal-obligation-and-postulate-binding`,
