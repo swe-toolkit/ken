@@ -44,7 +44,54 @@
 
 **`main` = `d1c91369`**, moving again when Runtime PR #1760 lands.
 
-> ### RESUME HERE — state at 2026-08-10 ~04:0xZ
+> ### RESUME HERE — state at 2026-08-10 ~04:2xZ. `main` = `dba42b0a`.
+>
+> **THREE MERGES LANDED TONIGHT, publisher queue drained, all blob-verified.**
+> Kernel `D7` `4b412ec4` (PR #1759); Runtime `D1b-role-a` `3f768659` (PR #1760,
+> +999/-96); doc sweep PR #1761.
+>
+> **IN FLIGHT — the only open item.** Verify `CI-ASSERTIONLESS-L1` respin exact
+> `651e8dccbd71a6d0fadcfd1b61fee8adf8b31d37`, base `dba42b0a`, fresh QA
+> approved. ⛔ Decision `dec_7yn4qg6q05t8n` is **`proposed`** — do not publish
+> until it is `resolved`, read from the object. ⚠ Check the superseded
+> `dec_x96wn9h9xxse` got closed out. Scope:
+> `.github/ignored-test-exemptions.toml`, `crates/ken-interp/tests/l1_acceptance.rs`,
+> `docs/program/wp/CI-ASSERTIONLESS-L1.md`. Publisher queue is otherwise empty.
+>
+> **Runtime `D1b-role-b` cut CONFIRMED** (`evt_62s77xsdwh4k3`) — erasure decode
+> + validation, item 4 / control 2. Measured first: every fact control 2 asserts
+> is already carried, so unlike slice `a` it is satisfiable inside the slice.
+> ⛔ Slice `c` is **not** confirmed; they come back for it.
+>
+> ### OWED BY ME, both small and both real
+>
+> 1. **Three severed claim links name waiting capabilities that may be
+>    untracked** — `Int.toInt64` on L-classes, integer-division op registration,
+>    Char literal syntax (Verify's `D2` disposition record in the frame). ⚠ A
+>    severed link with no tracked successor is how a gap becomes permanent.
+>    **Check after the merge; filing is mine, not Verify's.**
+> 2. **`RT-TERMINAL-ALL-ELIM-AUTHORITY` `AC-8`** is an open soundness concern
+>    against `register_all_supports`, now cross-referenced from `D7`'s audit
+>    enumeration. Still `ready` and base-blocked; no action yet.
+>
+> ### CORRECTION ON THE RECORD: I named a control that does not exist
+>
+> My merge notification `evt_48b71e73718cx` described an *"`E0423`
+> compile-failure control"* for `D1b-role-a`. **There is none** — `git grep
+> E0423` is empty repo-wide, no `compile_fail`/`trybuild` in `ken-elaborator`.
+> It came from the implementer's handback reporting a **hand-run** mutation; I
+> wrote a one-off experiment up as a committed instrument. Corrected at
+> `evt_4m21dcrtwt79g`; **propagation verified nil** — not in PR #1760, the node,
+> any frame, playbook, or briefing.
+>
+> ⇒ **Direction matters: the substance is STRONGER than I described.** The
+> boundary is closed by the **signature**, compiler-enforced on every build
+> through every call site; a `compile_fail` control is the weaker instrument.
+> ⛔ Nobody should build the control I named. Rule adopted: `git grep` the thing
+> before naming a control in any outbound message, and reserve *control*, *pin*,
+> *fixture* for things with a path in the tree.
+>
+> ### RESUME HERE — earlier state at 2026-08-10 ~04:0xZ
 >
 > ### BOTH LANES MERGED OR MERGING; VERIFY IS IN. Kernel's ring is COMPLETE.
 >
