@@ -33,7 +33,7 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-09 ~22:5xZ · KERNEL ON D6; RUNTIME HELD ON AN ARCHITECT RULING
+## LIVE — 2026-08-10 ~00:1xZ · D6 RECUT TO SEVEN; RUNTIME ON THE WIDENED ROSTER
 
 > ### POWER LOSS ~20:0xZ WAS RECOVERED WITH NOTHING LOST.
 >
@@ -42,7 +42,60 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `de338ab4`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `7b7225f0`.** Worktree clean. Nothing of mine is unpublished.
+
+> ### RESUME HERE — state at 2026-08-10 ~00:1xZ
+>
+> **Kernel — `KERNEL-NESTED-IND` `D6`, recut to SEVEN cases and released back
+> (PR #1750).** The eighth row, `nested-size-uses-lift`, is **gated**: the
+> current surface cannot express its unbounded residual-`All` fold. Three
+> candidates were built and rejected cleanly, each moving the counterexample one
+> level deeper, and `kernel-implementer` then grounded the exact obstruction —
+> `method_type` supplies one recursive method result per recursive support field,
+> but `check_match_with_lift` hides those binders and no source term denotes one.
+> **Seed marker census 14 → 15; a candidate reporting 14 has not done the recut.**
+> `dec_8pyjkfs3qv7m` and every earlier `D6` vote are spent.
+>
+> ⇒ **My "`D6` is a binding task" framing was FALSIFIED.** I wrote it from a
+> measurement that the behaviour was covered and only provenance was missing.
+> Successive repairs defeated the same way by one checker means the default
+> branch is wrong — the default was mine, not the checker's fussiness.
+>
+> **New node: [[KERNEL-RECURSIVE-RESULT-SURFACE]]** — `draft`,
+> `owner: spec-enclave`, **not released**. Carries the Architect's approved
+> semantic shape (`evt_2s6gmzqvaj5mr`). ⛔ `recursive-result` is **metanotation,
+> not a keyword** — the spelling is `D0`, a Spec contract. The implementation
+> successor is deliberately **not** created yet. Releasing it is an operator
+> priority call.
+>
+> **Runtime — `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`, widened in place**
+> (PR #1749). `dec_7v589ezdeq321` rejected `aade3c2f` on one authority defect:
+> both producers select roles by mutable source spelling
+> (`env.globals.get(name)` **after** package source elaboration), and mapping a
+> name-selected id through `stable_symbols_for_env` does not cure it — the id is
+> already wrong. Roles must come from **immutable canonical prelude `GlobalId`s**
+> captured at registration. ⛔ The Architect ruled **against** splitting a
+> preparatory `a0` WP. Implementer compacted at 23:45 and is working from blocked
+> baseline `9d3273a8`.
+>
+> ⇒ **Second framing error of the night, same shape: I cut slice `a` assuming
+> the authority existed and only needed storing.** It does not exist; producing
+> it *is* the deliverable. The tell was that slice `a`'s own item 1 could not be
+> satisfied inside slice `a`. **Do not size `b` and `c` against `a`.**
+>
+> **Verify still held on the two-lane cap.** Both build lanes are genuinely
+> turning, so no slot has freed. `DS-9` is `ready` and contends with
+> `CI-ASSERTIONLESS-L1` for the next one — **operator's call, not mine.**
+>
+> ### THE ONE RECURRING COMMS DEFECT, now seen in BOTH lanes
+>
+> **A merge Decision opened mentioning nobody, while the Architect is
+> non-polling.** `runtime-leader` did it (nine minutes idle, caught only on a
+> sweep) and `kernel-leader` did it with the expressibility ruling request. Both
+> were routed by me and both leaders told to mention the Architect directly.
+> ⛔ **Do not turn this into a standing Steward relay** — the edge already
+> exists and adding a hop is exactly the topology thickening `§8` forbids. Keep
+> catching it on the sweep and handing the habit back.
 
 > ### SINCE THE TABLE BELOW WAS WRITTEN — read these four first
 >
