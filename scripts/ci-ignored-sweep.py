@@ -33,10 +33,10 @@ PASS_PREFIX_RE = re.compile(r"^\s*PASS(?:\s|$)")
 COUNTER_RE = re.compile(
     r"^\((?P<index>\d+)/(?P<total>\d+)\)\s+(?P<identity>.+)$"
 )
-ROW_CLAIM_RE = re.compile(r"^\s*///\s+(?P<row>surface/\S+)")
+ROW_CLAIM_RE = re.compile(r"^\s*//(?:/)?\s+(?P<row>surface/\S+)")
 ROW_HEADING_RE = re.compile(r"^###\s+(?P<row>surface/\S+)(?:\s.*)?$")
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*#\[test\]\s*$")
-ATTRIBUTE_OR_DOC_RE = re.compile(r"^\s*(?:#\[|///)")
+ATTRIBUTE_OR_COMMENT_RE = re.compile(r"^\s*(?:#\[|//)")
 TEST_FN_RE = re.compile(r"^\s*fn\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
 
@@ -54,7 +54,7 @@ def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
                 continue
             prefix: list[tuple[int, str]] = []
             cursor = index - 1
-            while cursor >= 0 and ATTRIBUTE_OR_DOC_RE.match(lines[cursor]):
+            while cursor >= 0 and ATTRIBUTE_OR_COMMENT_RE.match(lines[cursor]):
                 prefix.append((cursor, lines[cursor]))
                 cursor -= 1
             if not any(TEST_ATTRIBUTE_RE.match(candidate) for _, candidate in prefix):

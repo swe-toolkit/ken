@@ -94,22 +94,27 @@ class IgnoredSweepTests(unittest.TestCase):
             rust_root.mkdir()
             conformance_root.mkdir()
             (rust_root / "rows.rs").write_text(
-                "/// surface/example/ignored-documentation\n"
+                "// surface/example/ignored-documentation\n"
                 "fn helper() {}\n\n"
-                "/// surface/example/covered\n"
+                "/// surface/example/doc-covered\n"
                 "/// explanatory continuation\n"
                 "#[test]\n"
                 "#[ignore]\n"
-                "fn covered_test() {}\n",
+                "fn doc_covered_test() {}\n\n"
+                "// surface/example/comment-covered\n"
+                "// explanatory continuation\n"
+                "#[test]\n"
+                "fn comment_covered_test() {}\n",
                 encoding="utf-8",
             )
             (conformance_root / "seed.md").write_text(
-                "### surface/example/covered\n",
+                "### surface/example/doc-covered (soundness)\n"
+                "### surface/example/comment-covered [NODE]\n",
                 encoding="utf-8",
             )
 
             self.assertEqual(
-                SWEEP.verify_row_claims(rust_root, conformance_root), 1
+                SWEEP.verify_row_claims(rust_root, conformance_root), 2
             )
 
     def test_row_claim_resolution_names_missing_and_duplicate_claims(self) -> None:
@@ -121,7 +126,7 @@ class IgnoredSweepTests(unittest.TestCase):
             conformance_root.mkdir()
             rust = rust_root / "rows.rs"
             rust.write_text(
-                "/// surface/example/fabricated-row\n"
+                "// surface/example/fabricated-row\n"
                 "#[test]\n"
                 "fn fabricated_test() {}\n",
                 encoding="utf-8",
