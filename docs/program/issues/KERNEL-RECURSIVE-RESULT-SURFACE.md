@@ -138,10 +138,29 @@ the exact failure that produced three rejections.
 ## What this unblocks
 
 `KERNEL-NESTED-IND` `D6`'s `nested-size-uses-lift` row, which is gated pending
-this node and whose seed marker is restored (census 14 → 15). ⛔ Landing this
-node does **not** by itself close that row — the binding is restored by a
-`D6` successor with fresh QA, Architect, and frontier-class conformance-validator
-review. No verdict from the three spent `D6` candidates transfers to anything.
+this node. ⛔ Landing this node does **not** by itself close that row — the
+binding is restored by a `D6` successor with fresh QA, Architect, and
+frontier-class conformance-validator review. No verdict from the four spent `D6`
+candidates transfers to anything.
+
+**Census effect when that successor lands: `14 → 13`.** `nested-size-uses-lift`
+keeps the `[KERNEL-NESTED-IND]` marker it has always had, so un-gating the row
+**removes** it. ⚠ **Population: `^### ` heading markers in
+`conformance/kernel/inductive/seed-nested.md`.** Corpus-wide the same delta reads
+`15 → 14`, because `conformance/kernel/judgments/seed-judgments.md` carries one
+unchanged marker — both are right for their own population, so any criterion
+citing a count must name which.
+
+> ⚠ **An earlier version of this paragraph said the marker is *restored*, census
+> `14 → 15`.** That was the withdrawn arithmetic from the `D6` recut, inherited
+> here and **wrong in direction as well as magnitude** — nothing is restored, and
+> the count goes down when this node's successor lands, not up. Found by the
+> Adversary at `evt_2zzy9q33cetm1` after the source was corrected at PR #1752.
+> **This node is the one that owns unblocking the row, so it is exactly where a
+> wrong prediction would have been used.** Recorded rather than silently fixed
+> because the same bad number has now had to be corrected twice, one artifact
+> apart: correcting a number at its source does not sweep the artifacts that
+> already copied it.
 
 ## Sequencing and contention
 
