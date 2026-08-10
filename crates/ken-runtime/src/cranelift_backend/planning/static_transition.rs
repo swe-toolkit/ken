@@ -11344,14 +11344,37 @@ impl<'src> StaticTransitionPlan<'src> {
     /// retargeted; resolving it would demand a `FuncId` for a unit that has no
     /// emitted `Function`, and fabricating one is the failure
     /// `UnitBundle::function`'s `Option` exists to expose.
+    /// ⛔ **The probe names the BODY axis, because the set does.**
+    /// `template_only` is a set of worker body origins — its candidates come
+    /// from `context.worker_body_origin()` — and the sibling `executable_units`
+    /// probes it with `unit.body_occurrence()` for that reason.
+    /// `edge.callee_origin()` is the **scheduling entry**, a different axis:
+    /// `resolve_call_edges` enforces `unit.entry_origin() == edge.callee_origin()`,
+    /// so reading it here would ask an executability question with a call-identity
+    /// key. The two coincide for every unit whose body does not schedule
+    /// something before itself, which is why probing the wrong one stays green
+    /// on most fixtures; the invariant this file states at the composed-selector
+    /// refusal is that *executability is a function of the body alone*.
     pub(in crate::cranelift_backend) fn executable_call_edges(
         &self,
     ) -> Result<Vec<EmittableCallEdge>, CraneliftBackendError> {
         let template_only = self.template_only_worker_bodies()?;
+        let body_axis: BTreeMap<PredeclaredFunctionId, StaticOriginId> = self
+            .emittable_units()?
+            .into_iter()
+            .map(|unit| (unit.function(), unit.body_occurrence()))
+            .collect();
         Ok(self
             .emittable_call_edges()?
             .into_iter()
-            .filter(|edge| !template_only.contains(&edge.callee_origin()))
+            .filter(|edge| match body_axis.get(&edge.callee()) {
+                Some(body) => !template_only.contains(body),
+                // A callee with no descriptor is a planner contradiction this
+                // filter does not own, and must not silently suppress:
+                // `resolve_call_edges` diagnoses it exactly, as
+                // "call edge callee has no abi descriptor".
+                None => true,
+            })
             .collect())
     }
 

@@ -28850,3 +28850,73 @@ fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
         under_m4.outcome
     );
 }
+
+/// **`RT-CALL-EDGE-EXECUTABILITY-AXIS` — the population sentinel.**
+///
+/// ⛔ **THIS DOES NOT DISCHARGE `AC-2`, and must not be reported as doing so.**
+/// `AC-2` asks for a control exercising a template-only callee **whose two axes
+/// differ**. That population does not exist today, and this row is what will
+/// say so when it starts to.
+///
+/// MEASURED, across the only two populations that carry either conjunct:
+///
+/// | population | template-only bodies | split-axis units |
+/// |---|---|---|
+/// | the `D5a` witness (`px8tr_nested_post_effect_planning_inputs`) | 1 | **0** |
+/// | `b2ac` `computational`, `computational-nested` | **0** | 1 |
+/// | every other `b2ac` fixture | 0 | 0 |
+///
+/// The conjuncts are **disjoint**: every fixture with a superseded worker body
+/// has no split-axis unit, and every fixture with a split-axis unit generates no
+/// contexts, so its template-only set is empty. A control written on either one
+/// alone would pass under both the body-axis and the entry-axis reading — the
+/// precise shape `AC-3`'s sibling `AC-4` calls out as measuring nothing.
+///
+/// So this asserts the **precondition** rather than the property: in the `D5a`
+/// witness the two axes coincide for every unit. That is why the repaired filter
+/// and the old one agree here, and it is the reason a passing suite is not
+/// evidence about the axis.
+///
+/// PROMISE CLASS: transition sentinel, labelled for the boundary rather than the
+/// count. It goes red **deliberately** the moment a witness gains a unit whose
+/// entry and body differ — which is exactly when `AC-2`'s population becomes
+/// constructible and the real control must be written. Retire it then.
+#[test]
+fn call_edge_executability_axis_population_for_ac2_does_not_exist_yet() {
+    with_d5a_witness_plan(|plan| {
+        let template_only = plan
+            .template_only_worker_bodies()
+            .expect("the superseded set");
+        assert!(
+            !template_only.is_empty(),
+            "the witness no longer supersedes any worker body, so it is not the D5a population \
+             this sentinel is about"
+        );
+
+        let units = plan.emittable_units().expect("emittable units");
+        let split: Vec<_> = units
+            .iter()
+            .filter(|unit| unit.body_occurrence() != unit.entry_origin())
+            .map(|unit| (unit.function(), unit.body_occurrence(), unit.entry_origin()))
+            .collect();
+        assert!(
+            split.is_empty(),
+            "AC-2's population now EXISTS: this witness has a unit whose entry and body differ \
+             {split:?}. Write the real control -- a template-only callee whose axes differ -- and \
+             retire this sentinel"
+        );
+
+        // And therefore the two readings are indistinguishable here. Stated so
+        // no one mistakes this suite's green for evidence about the axis.
+        for edge in plan.emittable_call_edges().expect("call edges") {
+            let Some(callee) = units.iter().find(|unit| unit.function() == edge.callee()) else {
+                continue;
+            };
+            assert_eq!(
+                callee.body_occurrence(),
+                edge.callee_origin(),
+                "the axes diverged for a call edge callee, so the sentinel's premise is stale"
+            );
+        }
+    });
+}
