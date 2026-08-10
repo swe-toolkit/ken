@@ -179,7 +179,9 @@ fn nc22_cranelift_agrees_with_runtime_ir_report_for_broad_starter_shapes() {
     .expect("runtime-IR evaluator runs the compiler-produced artifact");
 
     let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+        run_synthetic_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty(),
+                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+        );
 
     assert_eq!(
         report.verdict,
@@ -235,7 +237,9 @@ fn nc22_imported_dependency_lowers_as_stable_unsupported_native_lane() {
         .expect("runtime-IR evaluator can use an exact imported seed binding");
 
     let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+        run_synthetic_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty(),
+                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+        );
 
     assert!(matches!(
         report.verdict,
@@ -262,7 +266,9 @@ fn nc22_runtime_ir_report_identity_mismatch_rejects_before_native_lowering() {
     run_report.evidence.runtime_artifact_hash = 0xdead_beef;
 
     let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+        run_synthetic_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty(),
+                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+        );
 
     assert!(matches!(
         report.verdict,
@@ -297,7 +303,9 @@ fn nc22_ambiguous_runtime_ir_report_target_rejects_before_native_lowering() {
     run_report.evidence.runtime_artifact_hash = program.artifact_hash;
 
     let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+        run_synthetic_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty(),
+                    &crate::native_process_authority::synthetic_test_legacy_authority(),
+        );
 
     assert!(matches!(
         report.verdict,
@@ -324,12 +332,13 @@ fn nc8_valid_certificate_records_f2_validation_separate_from_f1() {
         evidence_source: "test oracle over matching RuntimeProgram identity".to_string(),
     };
 
-    let report = run_validated_example_with_interpreter_observation(
+    let report = run_synthetic_validated_example_with_interpreter_observation(
         &program,
         &example,
         &NativeSeedEnvironment::empty(),
         oracle,
         &certificate,
+        &crate::native_process_authority::synthetic_test_legacy_authority(),
     )
     .expect("certificate validates");
 

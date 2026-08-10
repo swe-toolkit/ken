@@ -55,7 +55,12 @@ fn compile_expr(
 /// fallback branch here: a package that cannot produce an authority does not
 /// compile, rather than compiling against legacy prelude spellings its own
 /// checked package never recorded.
-fn program_authority(
+///
+/// This is the **only** production producer of a package-backed authority, and
+/// every production entrypoint calls it before it can reach the functions
+/// below. They take the resolved value and have no `None` to fill, so the
+/// refusal cannot be routed around by an intermediate layer.
+pub(super) fn program_authority(
     program: &RuntimeProgram,
 ) -> Result<crate::NativeProcessSymbols, CraneliftBackendError> {
     crate::native_authority_for_program(program).map_err(|err| {
@@ -66,14 +71,18 @@ fn program_authority(
     })
 }
 
+/// Package-backed JIT compilation against an authority the caller resolved.
+///
+/// ⛔ The authority is a **required** parameter, not an `Option`. Production
+/// callers obtain it from `program_authority`, which fails closed; the only
+/// other producer is the `#[cfg(test)]` synthetic entrypoint, which does not
+/// exist in a production build. There is no third way to reach lowering.
 fn compile_program_expr(
     program: &RuntimeProgram,
     expr: &RuntimeExpr,
     seed_env: &NativeSeedEnvironment,
+    authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledExpr, CraneliftBackendError> {
-    // The authority is resolved BEFORE lowering, so a refusal happens before
-    // `plan_static_transition_graph_with_symbols` ever runs.
-    let authority = program_authority(program)?;
     compile_program_expr_into_module(
         new_jit_module()?,
         "ken_nc6_seed",
@@ -87,7 +96,7 @@ fn compile_program_expr(
             .collect(),
         None,
         false,
-        &authority,
+        authority,
         None,
         None,
     )
@@ -122,13 +131,14 @@ fn compile_expr_with_declarations_and_process_input<'a>(
     )
 }
 
+/// Package-backed object compilation against a resolved authority. See above.
 fn compile_program_expr_object(
     program: &RuntimeProgram,
     expr: &RuntimeExpr,
     seed_env: &NativeSeedEnvironment,
     entry_symbol: &str,
+    authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledModule<ObjectModule>, CraneliftBackendError> {
-    let authority = program_authority(program)?;
     compile_program_expr_into_object_module(
         new_object_module("ken-runtime-cranelift-object")?,
         entry_symbol,
@@ -142,7 +152,7 @@ fn compile_program_expr_object(
             .collect(),
         None,
         false,
-        &authority,
+        authority,
         native_join_plan_for_program(program)?,
         oriented_subcontinuation_plan_for_program(program)?,
     )

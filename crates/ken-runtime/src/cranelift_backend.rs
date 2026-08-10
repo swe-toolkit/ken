@@ -56,7 +56,15 @@ mod test_support;
 // Re-exporting an already-exported name at its established visibility does not
 // widen it.
 pub(crate) use artifact::api::{
-    emit_bound_process_program_object_with_cranelift, run_process_expr_with_cranelift,
+    emit_bound_process_program_object_with_cranelift, emit_runtime_ir_object_with_authority,
+    run_process_expr_with_cranelift, run_runtime_ir_report_with_authority,
+};
+// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the synthetic compilation
+// entrypoints. ⛔ `#[cfg(test)]`, so these names do not exist in a production
+// build and no production path can reach lowering through them.
+#[cfg(test)]
+pub(crate) use artifact::api::{
+    emit_synthetic_runtime_ir_object_with_cranelift, run_synthetic_runtime_ir_report_with_cranelift,
 };
 pub use artifact::api::{
     emit_runtime_ir_object_with_cranelift, reject_program_blockers,

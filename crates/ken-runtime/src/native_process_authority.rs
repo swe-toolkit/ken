@@ -219,3 +219,22 @@ fn native_process_symbols_from_record(
         bool_true: spine.bool_true.clone(),
     }
 }
+
+/// The legacy prelude authority, for **synthetic** hand-built test programs.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. The tests that reach native
+/// lowering build a `RuntimeProgram` struct literal by hand, with a fabricated
+/// package identity and hash; none comes from a `CheckedCorePackage` or from
+/// erasure. They are entitled to legacy authority for the same reason the seed
+/// lane is — their IR is minted in the `prelude::` namespace — but they must
+/// **say so**, which is why every synthetic compilation call passes this
+/// explicitly rather than inheriting a default.
+///
+/// ⛔ **`#[cfg(test)]` is the boundary.** In a production build this item does
+/// not exist, so no production path can name it. That is proved by a
+/// compilation-boundary positive control — referencing it from a production
+/// path fails to compile — not by a grep or a zero-result check.
+#[cfg(test)]
+pub(crate) fn synthetic_test_legacy_authority() -> NativeProcessSymbols {
+    NativeProcessSymbols::legacy_prelude()
+}

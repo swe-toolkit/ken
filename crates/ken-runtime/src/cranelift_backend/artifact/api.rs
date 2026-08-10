@@ -45,7 +45,7 @@ use crate::cranelift_backend::surface::{
 // rest of this file is untouched (§10.5).
 use super::{
     compile_expr, compile_expr_with_declarations_and_process_input, compile_program_expr,
-    compile_program_expr_object, native_platform_target_name, new_object_module,
+    compile_program_expr_object, native_platform_target_name, new_object_module, program_authority,
 };
 
 pub fn run_nc6_seed_examples(
@@ -65,13 +65,15 @@ pub fn run_nc8_validated_seed_examples(
 ) -> Result<Vec<CraneliftRunReport>, ValidatedNativeRunError> {
     let validation = validate_supported_runtime_artifact_certificate(program, certificate)?;
     reject_program_blockers(program)?;
+    // Fail closed on the authority before any example is lowered.
+    let authority = program_authority(program)?;
     let env = NativeSeedEnvironment::nc5_seed();
     program
         .examples
         .iter()
         .map(|example| {
             let mut report = run_example_native(
-                Some(program),
+                Some((program, &authority)),
                 example,
                 &env,
                 NativeFidelity::F0NativeExample,
@@ -108,6 +110,31 @@ pub fn run_validated_example_with_interpreter_observation(
         env,
         oracle,
         Some(validation),
+    ))
+}
+
+/// Run a **synthetic** hand-built program through the validated differential
+/// lane against an explicitly supplied authority.
+///
+/// ⛔ `#[cfg(test)]`; see `run_synthetic_runtime_ir_report_with_cranelift`.
+#[cfg(test)]
+pub(crate) fn run_synthetic_validated_example_with_interpreter_observation(
+    program: &RuntimeProgram,
+    example: &RuntimeExample,
+    env: &NativeSeedEnvironment,
+    oracle: InterpreterOracleObservation,
+    certificate: &RuntimeArtifactCertificate,
+    authority: &crate::NativeProcessSymbols,
+) -> Result<NativeDifferentialReport, RuntimeArtifactValidationError> {
+    let validation = validate_supported_runtime_artifact_certificate(program, certificate)?;
+    Ok(run_example_with_interpreter_observation_with_authority(
+        program,
+        example,
+        env,
+        oracle,
+        Some(validation),
+        None,
+        authority,
     ))
 }
 pub fn run_ken_checked_proof_erasure_example_with_interpreter_observation(
@@ -148,10 +175,59 @@ pub fn run_ken_checked_proof_erasure_example_with_interpreter_observation(
         Some(proof_erasure_boundary),
     ))
 }
+/// Package-backed differential run. ⛔ Fails closed on the checked authority
+/// **before** the example is lowered and before planning.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`: the refusal is reported at
+/// `BoundaryPreflight` rather than `NativeLoweringOrExecution`, because the
+/// authority is now resolved ahead of lowering rather than inside it. That is a
+/// deliberate stage change, stated here because a reader of the report sees it.
 pub fn run_runtime_ir_report_with_cranelift(
     program: &RuntimeProgram,
     run_report: RuntimeIrRunReport,
     env: &NativeSeedEnvironment,
+) -> NativeRuntimeIrComparisonReport {
+    let authority = match program_authority(program) {
+        Ok(authority) => authority,
+        Err(err) => {
+            return runtime_ir_comparison_error_report(
+                NativeArtifactIdentity::from_program(program),
+                run_report,
+                err,
+                NativeDifferentialStage::BoundaryPreflight,
+            );
+        }
+    };
+    run_runtime_ir_report_with_authority(program, run_report, env, &authority)
+}
+
+/// Compile a **synthetic** hand-built program against an explicitly supplied
+/// authority.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. ⛔ `#[cfg(test)]` is the
+/// boundary: this item does not exist in a production build, so no production
+/// path can name it, and the `authority` argument is required so a caller
+/// cannot omit it and inherit a default. Synthetic programs are entitled to
+/// legacy spellings because their IR is minted in the `prelude::` namespace —
+/// but they must **say so**, which is the whole point of this entrypoint.
+#[cfg(test)]
+pub(crate) fn run_synthetic_runtime_ir_report_with_cranelift(
+    program: &RuntimeProgram,
+    run_report: RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    authority: &crate::NativeProcessSymbols,
+) -> NativeRuntimeIrComparisonReport {
+    run_runtime_ir_report_with_authority(program, run_report, env, authority)
+}
+
+/// The shared body. ⛔ Reachable only with an **already resolved** authority.
+/// The only production producer of one is `program_authority`, which fails
+/// closed; the only other is the `#[cfg(test)]` synthetic constructor.
+pub(crate) fn run_runtime_ir_report_with_authority(
+    program: &RuntimeProgram,
+    run_report: RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    authority: &crate::NativeProcessSymbols,
 ) -> NativeRuntimeIrComparisonReport {
     let artifact = NativeArtifactIdentity::from_program(program);
     let example = match runtime_ir_report_example(program, &run_report) {
@@ -176,7 +252,7 @@ pub fn run_runtime_ir_report_with_cranelift(
     }
 
     match run_example_native(
-        Some(program),
+        Some((program, authority)),
         example,
         env,
         NativeFidelity::F0NativeExample,
@@ -218,17 +294,46 @@ pub fn run_runtime_ir_report_with_cranelift(
         ),
     }
 }
+/// Package-backed object emission. ⛔ Fails closed on the checked authority
+/// before lowering. See `run_runtime_ir_report_with_cranelift`.
 pub fn emit_runtime_ir_object_with_cranelift(
     program: &RuntimeProgram,
     run_report: &RuntimeIrRunReport,
     env: &NativeSeedEnvironment,
     entry_symbol: impl Into<String>,
 ) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
+    let authority = program_authority(program)?;
+    emit_runtime_ir_object_with_authority(program, run_report, env, entry_symbol, &authority)
+}
+
+/// Emit an object for a **synthetic** hand-built program against an explicitly
+/// supplied authority. ⛔ `#[cfg(test)]`; see
+/// `run_synthetic_runtime_ir_report_with_cranelift`.
+#[cfg(test)]
+pub(crate) fn emit_synthetic_runtime_ir_object_with_cranelift(
+    program: &RuntimeProgram,
+    run_report: &RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    entry_symbol: impl Into<String>,
+    authority: &crate::NativeProcessSymbols,
+) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
+    emit_runtime_ir_object_with_authority(program, run_report, env, entry_symbol, authority)
+}
+
+/// The shared body. ⛔ See `run_runtime_ir_report_with_authority`.
+pub(crate) fn emit_runtime_ir_object_with_authority(
+    program: &RuntimeProgram,
+    run_report: &RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    entry_symbol: impl Into<String>,
+    authority: &crate::NativeProcessSymbols,
+) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
     let entry_symbol = entry_symbol.into();
     let example = runtime_ir_report_example(program, run_report)?;
     reject_program_blockers(program)?;
 
-    let compiled = compile_program_expr_object(program, &example.ir, env, &entry_symbol)?;
+    let compiled =
+        compile_program_expr_object(program, &example.ir, env, &entry_symbol, authority)?;
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();
@@ -369,8 +474,81 @@ fn run_example_with_interpreter_observation_and_reports(
         return differential_error_report(example, artifact, oracle, err, true);
     }
 
+    // `D1b-role-c1`: the authority is resolved here — AFTER the oracle-identity
+    // and blocker guards, so a program refused by either is still refused for
+    // that reason — and before lowering, so a package that cannot produce one
+    // never reaches planning.
+    let authority = match program_authority(program) {
+        Ok(authority) => authority,
+        Err(err) => return differential_error_report(example, artifact, oracle, err, true),
+    };
+
+    run_example_differential_with_authority(
+        program,
+        example,
+        env,
+        oracle,
+        artifact,
+        artifact_validation,
+        ken_checked_proof_erasure_boundary,
+        &authority,
+    )
+}
+
+/// The **synthetic** counterpart: same guards, then the same shared tail
+/// against an explicitly supplied authority.
+///
+/// ⛔ `#[cfg(test)]`. The two guards are repeated rather than hoisted because
+/// hoisting them would mean passing the authority as an `Option` and branching
+/// on its absence, which is the implicit fallback this node deletes. Repeating
+/// six lines under a test-only cfg is the smaller cost; the lowering tail
+/// itself is shared, not duplicated.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn run_example_with_interpreter_observation_with_authority(
+    program: &RuntimeProgram,
+    example: &RuntimeExample,
+    env: &NativeSeedEnvironment,
+    oracle: InterpreterOracleObservation,
+    artifact_validation: Option<RuntimeArtifactValidationReport>,
+    ken_checked_proof_erasure_boundary: Option<KenCheckedProofErasureBoundaryReport>,
+    authority: &crate::NativeProcessSymbols,
+) -> NativeDifferentialReport {
+    let artifact = NativeArtifactIdentity::from_program(program);
+
+    if oracle.artifact != artifact {
+        return oracle_identity_mismatch_report(example, artifact, oracle);
+    }
+
+    if let Err(err) = reject_program_blockers(program) {
+        return differential_error_report(example, artifact, oracle, err, true);
+    }
+
+    run_example_differential_with_authority(
+        program,
+        example,
+        env,
+        oracle,
+        artifact,
+        artifact_validation,
+        ken_checked_proof_erasure_boundary,
+        authority,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_example_differential_with_authority(
+    program: &RuntimeProgram,
+    example: &RuntimeExample,
+    env: &NativeSeedEnvironment,
+    oracle: InterpreterOracleObservation,
+    artifact: NativeArtifactIdentity,
+    artifact_validation: Option<RuntimeArtifactValidationReport>,
+    ken_checked_proof_erasure_boundary: Option<KenCheckedProofErasureBoundaryReport>,
+    authority: &crate::NativeProcessSymbols,
+) -> NativeDifferentialReport {
     match run_example_native(
-        Some(program),
+        Some((program, authority)),
         example,
         env,
         NativeFidelity::F0NativeExample,
@@ -618,8 +796,12 @@ pub(crate) fn run_process_expr_with_cranelift(
         },
     })
 }
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the program and its authority
+/// travel as one value, so a package-backed compile cannot be expressed without
+/// one. `None` is the seed lane, which has no program and is entitled to legacy
+/// spellings because seed IR is minted in the `prelude::` namespace.
 fn run_example_native(
-    program: Option<&RuntimeProgram>,
+    program: Option<(&RuntimeProgram, &crate::NativeProcessSymbols)>,
     example: &RuntimeExample,
     env: &NativeSeedEnvironment,
     fidelity: NativeFidelity,
@@ -628,7 +810,9 @@ fn run_example_native(
     ken_checked_proof_erasure_boundary: Option<KenCheckedProofErasureBoundaryReport>,
 ) -> Result<CraneliftRunReport, CraneliftBackendError> {
     let compiled = match program {
-        Some(program) => compile_program_expr(program, &example.ir, env)?,
+        Some((program, authority)) => {
+            compile_program_expr(program, &example.ir, env, authority)?
+        }
         None => compile_expr(&example.ir, env)?,
     };
     let verifier_passed = compiled.verifier_passed;
