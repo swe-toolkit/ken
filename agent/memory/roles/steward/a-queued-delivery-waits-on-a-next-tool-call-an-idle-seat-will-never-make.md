@@ -81,6 +81,26 @@ check only when something looks wrong** — sweep for it every watchdog tick,
 alongside the `[Pasted Content]` check, and note that the two need **opposite**
 keys (`Enter` versus `Escape`).
 
+## A `Working` footer does NOT mean the queue will flush
+
+**Refined on the third occurrence, `spec-leader` again ~10:3xZ.** I saw the
+banner beside `Working (6m 04s)`, judged it benign — a running turn will make a
+tool call, so the queue drains — and deliberately left it alone rather than
+interrupt live work. **The turn then ended without making another tool call, and
+the message stranded anyway.**
+
+⇒ **The gate is a *subsequent* tool call, not merely being busy.** A turn that
+finishes its tool use and then writes its reply satisfies nothing. So:
+
+| pane | verdict |
+|---|---|
+| banner + idle prompt | stranded now — `Escape` |
+| banner + `Working` | **stranded the moment that turn ends without another tool call** — recheck; do not clear it as benign |
+
+**`Working` buys a recheck, not a dismissal.** The safety rule still holds —
+never `Escape` a live turn — but the conclusion drawn from it was wrong: waiting
+is only correct if you come back. Re-read the pane after the turn ends.
+
 ## Why it is worth a standing check
 
 **Only the Steward sweeps panes.** Team leaders watchdog their rings through
