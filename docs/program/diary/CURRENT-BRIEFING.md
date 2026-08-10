@@ -222,6 +222,21 @@
 > coordinate at the generic-decoder boundary** rather than describe it as a
 > universal offset.
 >
+> #### FRAMING NOTE for the next corpus-gate node — one line, not a project
+>
+> Verify's `CI-L1-EXECUTING-COVER` retros converged on a carry worth applying
+> when I next frame a node that **builds a gate over an existing corpus**:
+> **run the prospective whole-corpus census BEFORE building the gate.** If it
+> finds pre-existing violations, **hold the population, classify the hits, and
+> get an explicit disposition — never weaken the gate to fit them.**
+>
+> That is exactly the shape `D5` hit: the checker was correct on first run and
+> the tempting repair was to shrink its population. **Put the census in the
+> frame as a deliverable rather than letting it surface as a hard stop** — the
+> stop cost a turn, and the frame had asserted a premise ("every claim can
+> resolve without widening") that a five-minute census would have falsified
+> before anyone built anything.
+>
 > #### Still owed to me
 >
 > Runtime `c2` returns **before** assignment stating its `AC-K12` relationship
