@@ -157,6 +157,31 @@ not discharge this all-leaf fold, and this row remains gated.
 
 ### kernel/inductive/nested-dependent-motive-uses-lift [KERNEL-NESTED-IND]
 
+Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE` — the **same** blocker as
+`nested-size-uses-lift`, and for the same reason. Architect ruling
+`evt_5dg9ypms4d4ed` (2026-08-10), from an Adversary finding that nothing in this
+seed distinguished the two rows.
+
+The existing NC14 control `nested_dependent_motive_consumes_correlated_child_proofs`
+is a **direct-leaf association discriminator, not an executing binding for this
+row.** Its fixture is flat — `ProofJoin : a -> a -> ProofBag a` — so every child
+binding is `support: None` and an owner self-call consumes the exact motive
+instance. This row's carrier is `join : Bag A -> Bag A -> Bag A`, where `xs` and
+`ys` carry `support: Some(All^Omega_Bag)`; the kernel telescope supplies their
+recursive results, `check_match_with_lift` hides every trailing binder, and no
+source term denotes either one. Implicit lockstep preserves the correlation but
+does **not** synthesize the branch's recursive result — another source `match`
+only finite-unrolls the residual `Bag`, exactly as in the Nat-size case.
+
+The obstruction is **sort-independent**: `All^Type` versus `All^Omega` changes
+the leaf motive, not the need to consume the support eliminator's recursive
+result at `Bag.join`. ⛔ The erasure boundary does not refute this — provenance-
+gated erasure admitting the generated support `Elim` while rejecting arbitrary
+dependent motives is a downstream artifact concern and says nothing about what
+source can name.
+
+⇒ **One capability un-gates both rows.** No second surface form is needed.
+
 - spec: `14 §3.2`, `§9.5`; `34 §3.1`; `39 §2.2`
 - given: a dependent motive `AllGood : Rose -> Omega_0` whose `node` proof
   matches the `Bag Rose` field and its

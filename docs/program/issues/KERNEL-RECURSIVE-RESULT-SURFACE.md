@@ -137,19 +137,32 @@ the exact failure that produced three rejections.
 
 ## What this unblocks
 
-`KERNEL-NESTED-IND` `D6`'s `nested-size-uses-lift` row, which is gated pending
-this node. ⛔ Landing this node does **not** by itself close that row — the
-binding is restored by a `D6` successor with fresh QA, Architect, and
-frontier-class conformance-validator review. No verdict from the four spent `D6`
-candidates transfers to anything.
+**TWO** `KERNEL-NESTED-IND` seed rows, both gated pending this node and both
+blocked by the same obstruction (Architect `evt_5dg9ypms4d4ed`, ruling section
+below):
 
-**Census effect when that successor lands: `14 → 13`.** `nested-size-uses-lift`
-keeps the `[KERNEL-NESTED-IND]` marker it has always had, so un-gating the row
-**removes** it. ⚠ **Population: `^### ` heading markers in
-`conformance/kernel/inductive/seed-nested.md`.** Corpus-wide the same delta reads
-`15 → 14`, because `conformance/kernel/judgments/seed-judgments.md` carries one
-unchanged marker — both are right for their own population, so any criterion
-citing a count must name which.
+- `nested-size-uses-lift` (`seed-nested.md:137`)
+- `nested-dependent-motive-uses-lift` (`seed-nested.md:158`)
+
+⛔ Landing this node does **not** by itself close either — the bindings come from
+a `D6` successor with fresh QA, Architect, and frontier-class
+conformance-validator review. No verdict from the four spent `D6` candidates
+transfers to anything.
+
+**Census effect when that successor binds both: `14 → 12`.** ⚠ **Population:
+`^### ` heading markers in `conformance/kernel/inductive/seed-nested.md`**, and
+**`14` is measured on `main`, not carried forward.** Both rows carry the
+`[KERNEL-NESTED-IND]` marker today, and binding a row **removes** its marker —
+that is exactly how `D6` went `19 → 14` by binding five. Corpus-wide the same
+delta reads `15 → 13`, because `conformance/kernel/judgments/seed-judgments.md`
+carries one unchanged marker. Both are right for their own population, so any
+criterion citing a count must name which.
+
+> ⚠ **This paragraph said `14 → 13` until the Architect ruling landed**, on the
+> assumption that only the size row was gated. That was one row short, not
+> wrong in direction. ⇒ **A census prediction is a function of how many rows are
+> gated, so it moves whenever the gating does** — re-measure it at the point of
+> use rather than treating it as a fixed property of this node.
 
 > ⚠ **An earlier version of this paragraph said the marker is *restored*, census
 > `14 → 15`.** That was the withdrawn arithmetic from the `D6` recut, inherited
@@ -162,31 +175,42 @@ citing a count must name which.
 > apart: correcting a number at its source does not sweep the artifacts that
 > already copied it.
 
-## OPEN QUESTION, routed to the Architect: does a SECOND row share this blocker?
+## RULED: a SECOND seed row shares this blocker. This node un-gates BOTH.
 
-**Adversary `evt_2zzy9q33cetm1`, item 4. Routed 2026-08-10; not ruled here.**
+**Architect `evt_5dg9ypms4d4ed`, 2026-08-10**, answering the question raised by
+Adversary `evt_2zzy9q33cetm1` item 4. **`nested-dependent-motive-uses-lift`
+(`seed-nested.md:158`) shares `nested-size-uses-lift`'s exact obstruction.**
 
-`nested-dependent-motive-uses-lift` (`seed-nested.md:158`) may share
-`nested-size-uses-lift`'s exact obstruction, and nothing in the seed
-distinguishes them. Both consume the kernel-supplied inhabitant — size folds
-`All^Type_{Bag,0}`'s leaves; the motive row consumes the motive instance
-attached to each exposed child from `All^Omega_{Bag,0}`. There are exactly two
-`blocked on KERNEL-RECURSIVE-RESULT-SURFACE` mentions in the seed (`:139`,
-`:465`) and **both are about size**, so the motive row carries only the generic
-node marker.
+The proposed distinction — that lockstep matching might be supplied by
+`check_match_with_lift` implicitly and so need no source name — **holds only at
+a direct guest leaf, not through the seed's recursive carrier.**
 
-**The refutation the Adversary could not close, and it is the whole question:**
-size needs a **source term to denote** the supplied result, whereas lockstep
-matching may be supplied by `check_match_with_lift` **implicitly, needing no
-name** — in which case the rows genuinely differ and the motive row's marker is
-right as it stands.
+| | flat NC14 control | the seed row |
+|---|---|---|
+| carrier | `ProofJoin : a -> a -> ProofBag a` | `join : Bag A -> Bag A -> Bag A` |
+| child binding | `support: None` | `support: Some(All^Omega_Bag)` |
+| consumption | owner self-call takes the exact motive instance | telescope supplies a recursive result **no source term can denote** |
 
-⇒ **Expressibility is the Architect's call.** The disposition either way is one
-line on that row: name its real blocker, or say why it differs from size.
-Nothing is red today; the cost lands when [[KERNEL-NESTED-IND]] closes and
-someone un-gates the row. Corroborating tension, not proof: `D5`'s notification
-records that erasure admits the generated support `Elim` *"with arbitrary
-dependent motives still rejecting"*, and this row expects an accept.
+⇒ `nested_dependent_motive_consumes_correlated_child_proofs` is a **direct-leaf
+association discriminator, not an executing binding** for this row. Implicit
+lockstep preserves the correlation; it does not synthesize the branch's
+recursive result. Another source `match` only finite-unrolls the residual
+`Bag` — the Nat-size case again.
+
+**The obstruction is sort-independent.** `All^Type` versus `All^Omega` changes
+the leaf motive, not the need to consume the support eliminator's recursive
+result at `Bag.join`; the topology-carrying `All^Omega` application is itself in
+`Type`, as the row says. ⛔ The `D5` erasure note does **not** refute this:
+provenance-gated erasure admitting the generated support `Elim` while rejecting
+arbitrary dependent motives is a downstream artifact boundary, silent on what
+source can name.
+
+⇒ **One capability, two rows. No second surface form is needed** — the same
+explicit structural-result form consumes the `Omega`-motive recursive result.
+
+⚠ **Nothing that merged is over-claimed.** The row carries no binding and never
+did, so `D6` did not assert an executing binding for it. The disposition is
+recorded on the row itself (`seed-nested.md:158`).
 
 ## Sequencing and contention
 
