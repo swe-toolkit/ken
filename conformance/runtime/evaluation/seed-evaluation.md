@@ -269,6 +269,78 @@ evaluated** (no evaluation step enters its body) — tagged `(oracle)`.
 
 ---
 
+## CAN3a — computed `Bool` agrees with constructor elimination
+
+Runtime primitive reduction may produce a closed `Bool` that is then consumed
+by the ordinary `Bool` eliminator (`42 §1`, `§3.3`). The selected method MUST
+be the one labeled by that computed logical constructor, exactly as for the
+corresponding literal `True` or `False`. The orientation pair below is
+non-degenerate, the agreement row couples computed and literal elimination,
+and the producer property prevents the seam from narrowing to one primitive.
+
+### runtime/evaluation/computed-bool-true-selects-true-method (oracle)
+- spec: `42 §1`/`§3.3` (runtime primitive reduction and `Bool` elimination);
+  `14 §3`/`§5` (elimination and registered primitives)
+- given: a closed primitive computation whose specified `Bool` result is
+  `True`, for example `eq_int 5 5`, used as the scrutinee of a `Bool`
+  eliminator whose `True` and `False` methods return observably distinct closed
+  values.
+- expect: evaluation **reduces-to** the value of the `True` method, not the
+  `False` method and not a stuck neutral.
+- why: pins the positive orientation of a computed `Bool` at the eliminator.
+  Distinct method results make a swapped or collapsed selection observable.
+  (oracle; verdict-flip.)
+
+### runtime/evaluation/computed-bool-false-selects-false-method (oracle)
+- spec: `42 §1`/`§3.3`; `14 §3`/`§5`
+- given: a closed primitive computation whose specified `Bool` result is
+  `False`, for example `eq_int 5 6`, used with the same kind of discriminating
+  `Bool` eliminator.
+- expect: evaluation **reduces-to** the value of the `False` method, not the
+  `True` method and not a stuck neutral.
+- why: supplies the non-degenerate opposite orientation. Together the pair
+  rejects swapped selection and a defect that selects one method for both
+  `Bool` results. (oracle; verdict-flip.)
+
+### runtime/evaluation/computed-bool-agrees-with-constructor (property)
+- spec: `42 §1`/`§3.3`; `14 §3`/`§5`
+- given: for each `b` in `{True, False}`, (a) a closed primitive computation
+  whose specified result is `b` and (b) the corresponding literal `Bool`
+  constructor `b`, each consumed by the same `Bool` eliminator with observably
+  distinct methods.
+- expect: the computed and literal scrutinees **reduce-to identical selected
+  method values** for both `True` and `False`.
+- why: the computed result and the constructor literal reach the `Bool`
+  eliminator through **independent index derivations**, so agreement is the
+  coupling property that ties both routes to the same logical constructor. A
+  computed route that is stuck or reverses the constructor association
+  disagrees even while literal-constructor elimination remains correct.
+  (property; coupling.)
+
+### runtime/evaluation/computed-bool-elimination-producer-independent (property)
+- spec: `42 §1`/`§3.3`; `14 §3`/`§5`
+- given: closed `Bool` computations from replaceable registered primitives,
+  with witnesses from both `eq_int` and `leq_int`, including one computation
+  specified to produce each `Bool` constructor, consumed by a discriminating
+  `Bool` eliminator.
+- expect: every witness **reduces-to** the method labeled by its specified
+  `Bool` constructor and therefore agrees with the corresponding literal.
+- why: the semantic obligation ranges over primitive computations yielding
+  `Bool`, not one producer symbol. This separate property member attaches the
+  existing `leq_int` executable witness explicitly, so future coverage cannot
+  narrow silently to `eq_int`; it adds no `leq_int`-specific semantic rule.
+  (property; producer diversity.)
+
+**Coverage residual.** The four executing witnesses cover the orientation pair,
+computed-versus-literal agreement for both constructors, and producer diversity,
+so no behavioral member of this family remains uncovered. The current automated
+row-claim checker recognizes only `surface/…` ids, however, so these four
+`runtime/evaluation/…` claims are not governed by automated heading resolution.
+Their headings are resolved directly here; generalizing that checker is a
+separate Verify node.
+
+---
+
 ## CAN4 — `unknown` propagation (frame AC4)
 
 A term depending on an **open verification hole** yields `unknown` (`42 §4`,
