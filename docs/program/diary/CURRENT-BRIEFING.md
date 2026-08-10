@@ -42,19 +42,61 @@
 > interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
 > is process-local and dies with every MCP restart.
 
-**`main` = `7b7225f0`.** Worktree clean. Nothing of mine is unpublished.
+**`main` = `95322b0e`.** Worktree clean. Nothing of mine is unpublished.
 
-> ### RESUME HERE — state at 2026-08-10 ~00:1xZ
+> ### RESUME HERE — state at 2026-08-10 ~01:0xZ
+>
+> ⛔ **BUILD FREEZE IN EFFECT (operator, ~00:52Z).** No `ken-cargo`/`cargo`/
+> `nextest` on this box until the operator lifts it and I post an explicit
+> all-clear. Nothing was running when it landed. Authoring, doc work, and
+> **publishing are still fine** — the publisher does not compile locally and CI
+> is remote. ⛔ **QA may not approve on unexecuted evidence**; a held handoff is
+> correct and must not be resolved by weakening a gate. The watchdog is rewritten
+> for the freeze (1800s, minimal, forbidden from nudging a build) and
+> **re-arming the normal 900s sweep is part of the all-clear.**
+>
+> ### I OWE A RULING: `AC-K10`'s METRIC. `D7` IS STOPPED ON IT.
+>
+> **My frame pre-ruled the outcome and the measurement contradicts it.** The node
+> says the `trusted_base()` delta is *"not a zero"*, and I repeated that in the
+> `D7` kick. Kernel then grounded that `GlobalEnv::trusted_base()` counts only
+> non-prelude `Opaque` and non-literal `Primitive` `GlobalId`s, while the support
+> families are checked `Inductive`s ⇒ **its real delta is `+0 GlobalId`, with set
+> identity.** The node supplies no alternate unit, so `AC-K10` as written cannot
+> be discharged honestly.
+>
+> ⇒ **This is the same error shape as the census and the `D6` framing: I asserted
+> an outcome I had not measured and made it binding.** The ruling owed is the
+> *unit* — `trusted_base()` is the wrong instrument for "audited kernel TCB code
+> grew", and `+0` against it is a true measurement, not a failure to find growth.
+> Rule the metric before Kernel authors anything. `D7` is also freeze-blocked, so
+> there is no rush, but do not let the ruling be inferred from either fact.
+>
+> **`D6` retros in** (no action, recorded per §1 — retros do not gate): impl
+> `evt_362prpf1v9vth`, QA `evt_5zhsx9zv12qqy`, leader `evt_5f18ba3jgwr1e`
+> (corrected from a mistyped id in the leader's first handoff).
 >
 > **Kernel — `KERNEL-NESTED-IND` `D6`, recut to SEVEN cases and released back
 > (PR #1750).** The eighth row, `nested-size-uses-lift`, is **gated**: the
-> current surface cannot express its unbounded residual-`All` fold. Three
+> current surface cannot express its unbounded residual-`All` fold. **FOUR**
 > candidates were built and rejected cleanly, each moving the counterexample one
-> level deeper, and `kernel-implementer` then grounded the exact obstruction —
+> level deeper (the last on the depth-three counterexample), and `kernel-implementer` then grounded the exact obstruction —
 > `method_type` supplies one recursive method result per recursive support field,
 > but `check_match_with_lift` hides those binders and no source term denotes one.
-> **Seed marker census 14 → 15; a candidate reporting 14 has not done the recut.**
+> **Seed marker census `19 → 14`, and `14` is CORRECT.** Population: `^### `
+> heading markers in `conformance/kernel/inductive/seed-nested.md`. Corpus-wide
+> the same state reads `15`, because `seed-judgments.md` carries one unchanged
+> marker — name the population in any criterion citing a count.
 > `dec_8pyjkfs3qv7m` and every earlier `D6` vote are spent.
+>
+> > ⛔ **This line previously read *"census 14 → 15; a candidate reporting 14 has
+> > not done the recut"* — a stand-down clause telling the reader to reject the
+> > correct number, in the file whose whole purpose is being read first.** It
+> > fired once, blocking `d9b1d5b1` on its one correct property. Corrected at
+> > source in PR #1752 and swept here only after the Adversary found it
+> > (`evt_2zzy9q33cetm1`). **A wrong number promoted to a rejection criterion
+> > generates no evidence when it fires** — the reviewer rejects and nobody
+> > records why.
 >
 > ⇒ **My "`D6` is a binding task" framing was FALSIFIED.** I wrote it from a
 > measurement that the behaviour was covered and only provenance was missing.
