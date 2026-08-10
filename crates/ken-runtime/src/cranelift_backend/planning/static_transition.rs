@@ -7920,6 +7920,137 @@ pub(in crate::cranelift_backend) fn set_continuation_descent_owner_duplication(a
     DUPLICATE_DESCENT_AS_TOP_LEVEL.with(|cell| cell.set(armed));
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — what one binder of a checked
+/// computational-match case IS.**
+///
+/// ⭐⭐ **The role a slot plays, which the derived environment did not carry.**
+/// [`derive_case_producer_fact`]'s `ComputationalMatch` arm pushes
+/// `argument_binders + recursive_positions.len()` entries and makes every one of
+/// them `CaseProducerFact::open(origin)` — the **count** is right and the
+/// **role** is absent. `RuntimeExpr::Var(index)` then indexes that environment,
+/// so an induction hypothesis, an ordinary constructor child and a frame value
+/// are indistinguishable in the derived fact.
+///
+/// ⛔ That absence is why `build_continuation_specialization_plan` falls back to
+/// the *syntactic* predicate — the argument at a recursive position must be a
+/// `Closure` or `LexicalClosure` — and skips a `Var` that names the
+/// compiler-minted hypothesis. This enum is what lets the role be **derived**
+/// instead of searched for.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum CheckedCaseBinderRole {
+    /// The compiler-minted induction hypothesis over the child at this
+    /// **recursive source position**.
+    ///
+    /// ⛔ The position is the one the *case* declared, never the binder's de
+    /// Bruijn index — the two differ whenever a case has more than one
+    /// recursive position, which is exactly the population a single-position
+    /// witness cannot discriminate.
+    InductionHypothesis { recursive_position: u32 },
+    /// An ordinary constructor child binder, at its declaration-order field
+    /// position.
+    ConstructorChild { field_position: u32 },
+    /// Outside this case's own binder run: the enclosing frame environment.
+    FrameEnvironment,
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked case binder layout,
+/// MEASURED rather than remembered.**
+///
+/// ## The measurement, and its population
+///
+/// The frame declined to pin this order, because which range occupies which de
+/// Bruijn prefix is a property of the lowering rather than of the frame. It was
+/// measured at **two independent induction-hypothesis construction sites** — the
+/// carried computational-match arm and the specialized composed arm — by
+/// instrumenting the assembled case environment and reading back the kind of
+/// each binding:
+///
+/// ```text
+/// carried arm, R3 before-hole under B-only exclusion, origins 5 and 18:
+///   argument_binders=1 recursive_positions=[0]
+///   Var(0) -> ComputationalRecursorClosure      Var(1) -> Carried child
+///
+/// specialized composed arm, PX8JSiblingTree::Node:
+///   argument_binders=2 recursive_positions=[0, 1]
+///   Var(0) -> IH for sibling_position=1         Var(1) -> IH for sibling_position=0
+/// ```
+///
+/// ⇒ **Induction hypotheses occupy the LEADING prefix, and within it they run in
+/// REVERSE `recursive_positions` order.** The children follow in declaration
+/// order, then the frame environment.
+///
+/// ⚠ **The reversal is the half a one-position witness cannot see**, because
+/// forward and reversed coincide at length one. It is measured here only because
+/// the two-sibling fixture exists; the `R3` witness alone would have left it
+/// unmeasured and a "remembered" order would have had an even chance.
+///
+/// ## Why the order lives in exactly one place
+///
+/// [`Self::for_case`] performs the one `.rev()` and stores the result **in de
+/// Bruijn order**. Every consumer indexes that vector. ⛔ No consumer re-derives
+/// the order, so a lowering change that moves the prefix is a single-site
+/// correction rather than a hunt — and [`Self::role_at`] cannot disagree with
+/// itself between two call sites.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedCaseBinderLayout {
+    /// The recursive source position each induction-hypothesis slot stands for,
+    /// **indexed by de Bruijn position**. Element `i` is the role of `Var(i)`.
+    induction_hypotheses: Vec<u32>,
+    argument_binders: u32,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl CheckedCaseBinderLayout {
+    /// Derive the layout from the case's own checked declaration.
+    ///
+    /// ⛔ Reads `recursive_positions` and `argument_binders` and nothing else —
+    /// not the body, not a lowered shape, not a constructor spelling, not an
+    /// arity recovered from a value.
+    fn for_case(
+        case: &crate::RuntimeComputationalMatchCase,
+    ) -> Result<Self, CraneliftBackendError> {
+        let mut induction_hypotheses = Vec::with_capacity(case.recursive_positions.len());
+        // THE MEASURED ORDER, and the only place it is spelled: the hypothesis
+        // prefix runs in reverse declaration order.
+        for position in case.recursive_positions.iter().rev().copied() {
+            induction_hypotheses.push(u32::try_from(position).map_err(|_| {
+                planner_capacity_error("checked case recursive position exhausted")
+            })?);
+        }
+        Ok(Self {
+            induction_hypotheses,
+            argument_binders: u32::try_from(case.argument_binders).map_err(|_| {
+                planner_capacity_error("checked case argument binder run exhausted")
+            })?,
+        })
+    }
+
+    /// What the binder at this de Bruijn index is.
+    ///
+    /// ⛔ Total by construction: an index past this case's own binder run is the
+    /// enclosing frame environment, which is a **role**, not an error. A `Var`
+    /// reaching past the run is ordinary and must not be refused here.
+    fn role_at(&self, index: usize) -> CheckedCaseBinderRole {
+        if let Some(recursive_position) = self.induction_hypotheses.get(index).copied() {
+            return CheckedCaseBinderRole::InductionHypothesis { recursive_position };
+        }
+        let past_hypotheses = index - self.induction_hypotheses.len();
+        if past_hypotheses < self.argument_binders as usize {
+            return CheckedCaseBinderRole::ConstructorChild {
+                field_position: past_hypotheses as u32,
+            };
+        }
+        CheckedCaseBinderRole::FrameEnvironment
+    }
+
+    /// How many binders this case introduces before the enclosing environment.
+    fn binder_count(&self) -> usize {
+        self.induction_hypotheses.len() + self.argument_binders as usize
+    }
+}
+
 fn build_continuation_specialization_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<
@@ -13545,6 +13676,138 @@ pub(in crate::cranelift_backend) use tests::contspec_nested_fixture;
 #[cfg(test)]
 mod tests {
     use super::abi::{AbiCarrier, AbiSlot, AbiSlotKind};
+    /// `D2e` `AC-1` — the role DISCRIMINATES, in both directions on one shape.
+    ///
+    /// ⛔ A classifier that answered `InductionHypothesis` for everything would
+    /// pass an IH-only assertion, and one that answered `ConstructorChild` for
+    /// everything would pass a child-only assertion. So the same case supplies
+    /// both, at adjacent de Bruijn indices, and each is named exactly.
+    ///
+    /// ⚠ The case declares TWO binders of which ONE is recursive, so the two
+    /// roles are genuinely a pair drawn from one declaration rather than from
+    /// two fixtures whose difference could be anything.
+    #[test]
+    fn d2e_binder_role_separates_a_hypothesis_from_an_ordinary_child() {
+        let case = RuntimeComputationalMatchCase {
+            constructor: "ctor:fixture::D2eShape::Node".to_string(),
+            argument_binders: 2,
+            recursive_positions: vec![1],
+            body: RuntimeExpr::Var(0),
+        };
+        let layout = CheckedCaseBinderLayout::for_case(&case).expect("the layout derives");
+
+        assert_eq!(
+            layout.role_at(0),
+            CheckedCaseBinderRole::InductionHypothesis {
+                recursive_position: 1
+            },
+            "the leading slot is the hypothesis, and it names the RECURSIVE POSITION \\
+             the case declared -- not its own de Bruijn index"
+        );
+        assert_eq!(
+            layout.role_at(1),
+            CheckedCaseBinderRole::ConstructorChild { field_position: 0 },
+            "the binder immediately after the hypothesis prefix is an ordinary child"
+        );
+        assert_eq!(
+            layout.role_at(2),
+            CheckedCaseBinderRole::ConstructorChild { field_position: 1 }
+        );
+    }
+
+    /// `D2e` — the hypothesis prefix runs in REVERSE declaration order, and this
+    /// is the half a single-recursive-position witness cannot see.
+    ///
+    /// ⭐⭐ **MEASURED, not assumed.** At the specialized composed arm, a
+    /// `PX8JSiblingTree::Node` case with `recursive_positions=[0, 1]` put the
+    /// hypothesis for `sibling_position=1` at `Var(0)` and the one for
+    /// `sibling_position=0` at `Var(1)`.
+    ///
+    /// ⛔ **This test is the whole reason the reversal is not a guess.** Forward
+    /// and reversed coincide at length one, so every one-position fixture in the
+    /// corpus agrees with BOTH spellings; only a case with two positions can
+    /// tell them apart. Deleting this test would leave the order pinned by
+    /// nothing.
+    #[test]
+    fn d2e_binder_role_hypothesis_prefix_is_reverse_declaration_order() {
+        let case = RuntimeComputationalMatchCase {
+            constructor: "ctor:fixture::D2eShape::Pair".to_string(),
+            argument_binders: 2,
+            recursive_positions: vec![0, 1],
+            body: RuntimeExpr::Var(0),
+        };
+        let layout = CheckedCaseBinderLayout::for_case(&case).expect("the layout derives");
+
+        assert_eq!(
+            layout.role_at(0),
+            CheckedCaseBinderRole::InductionHypothesis {
+                recursive_position: 1
+            },
+            "Var(0) carries the LAST declared recursive position"
+        );
+        assert_eq!(
+            layout.role_at(1),
+            CheckedCaseBinderRole::InductionHypothesis {
+                recursive_position: 0
+            },
+            "Var(1) carries the FIRST declared recursive position"
+        );
+        assert_ne!(
+            layout.role_at(0),
+            layout.role_at(1),
+            "the two hypotheses must not collapse to one role, or the reversal is unobservable"
+        );
+    }
+
+    /// `D2e` — the run ENDS, and what follows is the enclosing frame.
+    ///
+    /// ⛔ Total rather than fallible: a `Var` reaching past this case's binders
+    /// is ordinary, and refusing it here would turn every outer-scope reference
+    /// into a planner error.
+    #[test]
+    fn d2e_binder_role_past_the_case_run_is_the_frame_environment() {
+        let case = RuntimeComputationalMatchCase {
+            constructor: "ctor:fixture::D2eShape::Node".to_string(),
+            argument_binders: 1,
+            recursive_positions: vec![0],
+            body: RuntimeExpr::Var(0),
+        };
+        let layout = CheckedCaseBinderLayout::for_case(&case).expect("the layout derives");
+        assert_eq!(layout.binder_count(), 2);
+        assert_eq!(
+            layout.role_at(2),
+            CheckedCaseBinderRole::FrameEnvironment,
+            "the first index past the run belongs to the enclosing frame"
+        );
+        assert_eq!(
+            layout.role_at(97),
+            CheckedCaseBinderRole::FrameEnvironment,
+            "and so does every index beyond it"
+        );
+    }
+
+    /// `D2e` — a case with NO recursive positions has no hypothesis slot at all.
+    ///
+    /// ⚠ The population that must not acquire a role by accident: every
+    /// non-recursive case in the corpus. If the prefix were computed from a
+    /// count that could be nonzero here, `Var(0)` would misclassify.
+    #[test]
+    fn d2e_binder_role_a_nonrecursive_case_has_no_hypothesis_slot() {
+        let case = RuntimeComputationalMatchCase {
+            constructor: "ctor:fixture::D2eShape::Leaf".to_string(),
+            argument_binders: 1,
+            recursive_positions: Vec::new(),
+            body: RuntimeExpr::Var(0),
+        };
+        let layout = CheckedCaseBinderLayout::for_case(&case).expect("the layout derives");
+        assert_eq!(
+            layout.role_at(0),
+            CheckedCaseBinderRole::ConstructorChild { field_position: 0 },
+            "with nothing recursive declared, the leading binder is the child itself"
+        );
+        assert_eq!(layout.role_at(1), CheckedCaseBinderRole::FrameEnvironment);
+    }
+
     use super::semantic_ir::{
         build_semantic_plane, DenseRange, PredeclaredFunctionId, RuntimeExprShape,
         SemanticAtomKind, SemanticOperandElement, SemanticOwner, SemanticSourceKind,
