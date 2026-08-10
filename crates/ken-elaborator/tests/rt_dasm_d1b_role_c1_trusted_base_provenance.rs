@@ -296,59 +296,211 @@ fn c1_a_package_without_a_roster_is_refused() {
     );
 }
 
-/// THE VACUITY CONTROL — why report propagation carries nothing today.
-///
-/// ⛔ MEASURED: the clean carrier is **admitted**, its admitted trust is
-/// **non-empty**, and `reject_program_blockers` **refuses** it. CLAIMED:
-/// therefore no production path can currently produce a report carrying a
-/// non-empty admitted-trust set, because every report-producing path runs that
-/// refusal on the same package. THE GAP: this measures one carrier, not the
-/// whole reachable population — it establishes that the refusal fires on the
-/// canonical case, not that no exotic package escapes it.
-///
-/// This exists so the propagation wiring in `ken-runtime` is not read as
-/// something it is not. That wiring is real and its seam is proven by the A/B
-/// control beside it, but end to end it is **currently vacuous**, and a reader
-/// who assumed otherwise would over-trust an emitted artifact's assumption set.
-///
-/// PROMISE CLASS: transition sentinel. It goes red — deliberately — when the
-/// native supported subset is widened to admit packages carrying trusted-base
-/// assumptions, which is exactly the event that makes propagation live and the
-/// moment this note must be re-read rather than silently kept.
-#[test]
-fn c1_an_admitted_package_still_cannot_reach_a_report_so_propagation_is_vacuous_today() {
-    let program = erased(CLEAN_SOURCE);
+/// A native artifact identity for a program, spelled the way an outside
+/// consumer must (`NativeArtifactIdentity::from_program` is crate-private).
+fn native_identity(program: &RuntimeProgram) -> ken_runtime::NativeArtifactIdentity {
+    ken_runtime::NativeArtifactIdentity {
+        package_identity: program.package_identity.clone(),
+        core_semantic_hash: program.core_semantic_hash,
+        runtime_artifact_hash: program.artifact_hash,
+    }
+}
 
+/// END-TO-END — a REAL driver carrier reaches lowering, and both report
+/// surfaces carry exactly the trust admission proved.
+///
+/// ⛔ MEASURED, on the production `run_example_with_interpreter_observation`
+/// path with no test-only entrypoint anywhere in it: the clean carrier is
+/// admitted with a non-empty trust set, the residual subset check passes, the
+/// native side **runs**, and `trust.assumptions` contains **every** admitted
+/// identity. CLAIMED: an artifact states the assumptions it rests on. THE GAP:
+/// this is the run-report surface; the object surface is asserted separately
+/// below, because one does not imply the other -- they are built by different
+/// functions.
+///
+/// This **replaces** the earlier transitional evidence, per the Architect's
+/// ruling that a fabricated admitted-trust constructor and a vacuity sentinel
+/// are not the durable end state. Nothing here is supplied by the test: the
+/// trust set comes from the compiler, through admission, into the report.
+///
+/// PROMISE CLASS: durable invariant. Every assertion is a set relation against
+/// the package's own admitted set, so a prelude that grows or shrinks keeps it
+/// green; only a break in propagation reds it.
+#[test]
+fn c1_a_real_carrier_reaches_lowering_and_its_reports_carry_the_admitted_trust() {
+    let program = erased(CLEAN_SOURCE);
     let admission = ken_runtime::native_program_admission(&program)
-        .expect("the clean carrier is admitted -- established by the control above");
-    let admitted = admission.admitted_trust();
+        .expect("the clean carrier is admitted");
+    let admitted = admission.admitted_trust().clone();
     assert!(
         !admitted.is_empty(),
-        "the admitted trust is empty, so this control cannot distinguish 'nothing to propagate' \
-         from 'propagation blocked'"
+        "the admitted trust is empty, so every containment below would hold vacuously"
     );
 
-    // The admitted set IS the package's assumption keys, which is precisely the
-    // lane the blocker refuses.
-    let assumption_keys: BTreeSet<String> = program
-        .erased_core
-        .metadata
-        .assumptions
-        .keys()
-        .cloned()
-        .collect();
-    assert_eq!(
-        *admitted, assumption_keys,
-        "the admitted trust is no longer the package's assumption keys, so the refusal below no \
-         longer explains the vacuity"
-    );
-
-    let refusal = ken_runtime::reject_program_blockers(&program)
-        .expect_err("a package carrying trusted-base assumptions is outside the native subset");
-    let rendered = refusal.to_string();
+    let identity = native_identity(&program);
+    // The first example that genuinely reaches the native backend. Not every
+    // seed example does -- one needs a captured local the seed environment does
+    // not bind -- and picking by NAME would pin a fixture rather than the
+    // property. So: take the ones that ran, and require at least one.
+    let mut ran = 0usize;
+    for example in &program.examples {
+        let report = ken_runtime::run_example_with_interpreter_observation(
+            &program,
+            example,
+            &ken_runtime::NativeSeedEnvironment::empty(),
+            ken_runtime::InterpreterOracleObservation {
+                artifact: identity.clone(),
+                observation: example.observation.clone(),
+                evidence_source: "c1 provenance control".to_string(),
+            },
+        );
+        let Some(native) = report.native.as_ref() else {
+            continue;
+        };
+        ran += 1;
+        let carried = &native.trust.assumptions;
+        let missing: Vec<_> = admitted.difference(carried).collect();
+        assert!(
+            missing.is_empty(),
+            "the run report for {} dropped admitted trust: missing {:?}",
+            example.name,
+            missing
+        );
+    }
     assert!(
-        rendered.contains("trust metadata"),
-        "the refusal must be the trust-metadata blocker, or the vacuity has a different cause \
-         than this control claims, got: {rendered}"
+        ran > 0,
+        "no example reached the native backend at all, so the containment above never ran -- \
+         the carrier is refused somewhere before lowering"
+    );
+}
+
+/// The object surface carries it too, and the refusal ordering is preserved.
+///
+/// ⛔ The residual subset check now grants **exactly** the set admission proved.
+/// This asserts the other direction of that: a package whose trust admission did
+/// NOT prove is still refused, and refused by admission rather than slipping
+/// through to lowering.
+#[test]
+fn c1_the_user_foreign_still_fails_in_admission_before_the_residual_blockers() {
+    let dirty = erased(USER_TRUST_SOURCE);
+
+    // Admission refuses it, naming the roster mismatch.
+    let rendered = ken_runtime::native_program_admission(&dirty)
+        .expect_err("a package claiming source-introduced trust is not admitted")
+        .to_string();
+    assert!(
+        rendered.contains("pre-source trusted-base roster") && rendered.contains("c1_user_trust"),
+        "admission must refuse on the roster mismatch and name the target, got: {rendered}"
+    );
+
+    // And the production path refuses it too -- at the authority stage, before
+    // anything is lowered. A generic later refusal would not establish this.
+    let identity = native_identity(&dirty);
+    let example = dirty.examples.first().expect("the carrier has examples");
+    let report = ken_runtime::run_example_with_interpreter_observation(
+        &dirty,
+        example,
+        &ken_runtime::NativeSeedEnvironment::empty(),
+        ken_runtime::InterpreterOracleObservation {
+            artifact: identity,
+            observation: example.observation.clone(),
+            evidence_source: "c1 provenance control".to_string(),
+        },
+    );
+    assert!(
+        report.native.is_none(),
+        "a package with source-introduced trust reached the native backend"
+    );
+}
+
+/// The OBJECT surface carries the admitted trust too.
+///
+/// ⛔ This is a **separate** row from the run report on purpose: the two are
+/// built by different functions, so one carrying the set does not imply the
+/// other does. Both are named in the ruling's discriminator list.
+///
+/// The `RuntimeIrRunReport` below is hand-built, and that is a statement about
+/// scaffolding rather than about trust. `emit_runtime_ir_object_with_cranelift`
+/// takes the report as the *comparison input* it checks identity against; the
+/// production runtime-IR evaluator that would normally produce it applies its
+/// own separate `supported runtime-IR subset` refusal, which this node's ruling
+/// did not reach and which I have deliberately not widened. Nothing about the
+/// package, its authority, its roster or its trust is fabricated here — the
+/// carrier is the real one and the object path is the real one.
+#[test]
+fn c1_the_object_artifact_carries_the_admitted_trust() {
+    let program = erased(CLEAN_SOURCE);
+    let admitted = ken_runtime::native_program_admission(&program)
+        .expect("the clean carrier is admitted")
+        .admitted_trust()
+        .clone();
+    assert!(
+        !admitted.is_empty(),
+        "the admitted trust is empty, so the containment below would be vacuous"
+    );
+
+    let example = program
+        .examples
+        .iter()
+        .find(|example| example.name == "closed-scalar-primitive")
+        .expect("the carrier carries the closed scalar example")
+        .clone();
+
+    let artifact = ken_runtime::RuntimeArtifactIdentity {
+        package_identity: program.package_identity.clone(),
+        core_semantic_hash: program.core_semantic_hash,
+        artifact_hash: program.artifact_hash,
+    };
+    let target = ken_runtime::RuntimeIrTargetIdentity::from_example(&example);
+    let unavailable = |reason: &str| ken_runtime::RuntimeIrEvidenceFact::Unavailable {
+        reason: reason.to_string(),
+    };
+    let run_report = ken_runtime::RuntimeIrRunReport {
+        evaluator: ken_runtime::RuntimeIrEvaluator::DirectRuntimeIrEvaluatorV1,
+        target: target.clone(),
+        artifact: artifact.clone(),
+        observation: ken_runtime::RuntimeIrObservation {
+            artifact,
+            target: target.clone(),
+            observation: example.observation.clone(),
+            evidence_source: "c1 object-surface control".to_string(),
+        },
+        evidence: ken_runtime::RuntimeIrRunEvidence {
+            package_identity: program.package_identity.clone(),
+            core_semantic_hash: program.core_semantic_hash,
+            runtime_artifact_hash: program.artifact_hash,
+            target_example: target.example.clone(),
+            checked_core_shape: target.checked_core_shape.clone(),
+            evidence_sources: std::collections::BTreeMap::new(),
+            unavailable: BTreeSet::new(),
+        },
+        trust: ken_runtime::RuntimeIrTrustReport {
+            tier: ken_runtime::RuntimeIrTrustTier::RuntimeIrObservation,
+            evaluator: unavailable("the control supplies the comparison input directly"),
+            interpreter_oracle: unavailable("no interpreter oracle in this control"),
+            native_backend: unavailable("measured by the object emission below"),
+            object_artifact: unavailable("measured by the object emission below"),
+            linker: unavailable("no linker in this control"),
+            source_level_proof: unavailable("not a source-level semantics proof"),
+        },
+    };
+
+    let object = ken_runtime::emit_runtime_ir_object_with_cranelift(
+        &program,
+        &run_report,
+        &ken_runtime::NativeSeedEnvironment::empty(),
+        "ken_c1_object_surface_control",
+    )
+    .expect("the real carrier emits an object through the production path");
+
+    let missing: Vec<_> = admitted.difference(&object.assumptions).collect();
+    assert!(
+        missing.is_empty(),
+        "the object artifact dropped admitted trust: missing {missing:?}"
+    );
+    assert!(
+        !object.object_bytes.is_empty(),
+        "an object with no bytes did not really emit, so the containment above is not about an \
+         artifact"
     );
 }

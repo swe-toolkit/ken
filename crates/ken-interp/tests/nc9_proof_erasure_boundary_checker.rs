@@ -5,6 +5,10 @@ use ken_elaborator::checked_core::{
     AssumptionTrustMetadata, CheckedCorePackage, LowerabilityStatus, ObligationMetadata,
     ObligationStatus, RecordSigmaKind, RecordSigmaMetadata, StableSymbol, SymbolNamespace,
 };
+use ken_elaborator::compiler_driver::{
+    compile_ken_package_sources, CompilerManifest, CompilerSource, CompilerTargetKind,
+    TargetSelector,
+};
 use ken_elaborator::erasure::{
     emit_proof_erasure_boundary_witness_for_targets, erase_checked_core_package_for_target,
 };
@@ -14,14 +18,12 @@ use ken_interp::{
     NC9_PROOF_ERASURE_BOUNDARY_CHECKER_SOURCE,
 };
 use ken_runtime::{
-    nc5_seed_examples, proof_erasure_boundary_facts_from_program,
-    run_ken_checked_proof_erasure_example_with_interpreter_observation, ErasedExecutableCore,
+    proof_erasure_boundary_facts_from_program,
+    run_ken_checked_proof_erasure_example_with_interpreter_observation,
     InterpreterOracleObservation, KenProofErasureBoundaryChecker, NativeArtifactIdentity,
     NativeDifferentialStage, NativeDifferentialVerdict, NativeFidelity, NativeSeedEnvironment,
     ProofErasureBoundaryWitness, ProofErasureBoundaryWitnessStage, ProofErasureBoundaryWitnessTier,
-    RuntimeArtifactIdentity, RuntimeDeclaration, RuntimeDeclarationKind, RuntimeField,
-    RuntimeFieldStatus, RuntimeGroundValue, RuntimeLowerabilityStatus, RuntimeMetadata,
-    RuntimeObservation, RuntimeProgram, RuntimeSymbolMetadata,
+    RuntimeArtifactIdentity, RuntimeGroundValue, RuntimeObservation, RuntimeProgram,
 };
 
 fn fixture_package() -> CheckedCorePackage {
@@ -156,39 +158,48 @@ fn proof_erasure_record_package() -> (CheckedCorePackage, StableSymbol, StableSy
     (reemit(package), target, obligation, assumption)
 }
 
-fn simple_runtime_program() -> RuntimeProgram {
-    let example = nc5_seed_examples()
-        .into_iter()
-        .find(|example| example.name == "closed-scalar-primitive")
-        .expect("closed scalar seed exists");
-    let symbol = "decl:fixture::Main::main".to_string();
-    let mut metadata = RuntimeMetadata::default();
-    metadata
-        .lowerability
-        .insert(symbol.clone(), RuntimeLowerabilityStatus::Supported);
-    RuntimeProgram {
-        package_identity: "module:fixture::nc9".to_string(),
-        core_semantic_hash: 0x9001,
-        artifact_hash: 0x9002,
-        erased_core: ErasedExecutableCore {
-            symbols: BTreeSet::from([symbol.clone()]),
-            metadata,
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — NC9's native row runs on a
+/// **real** driver-compiled carrier.
+///
+/// The hand-built program it replaced carried no checked role record and no
+/// pre-source trusted-base roster, so once package-backed compilation began
+/// failing closed on those it could not reach the native backend, and the row
+/// measures a native trust report. This carrier comes from the same
+/// `compile_ken_package_sources -> erase_checked_core_package_for_target` path a
+/// real package takes.
+///
+/// ⛔ The NC9 witness and checker are **unchanged**: the proof-erasure boundary
+/// facts are still recomputed from the program and checked by `ken-interp`'s own
+/// checker, so the migration swaps the carrier without touching the property.
+const NC9_CARRIER_PKG: &str = "nc9_boundary_carrier";
+const NC9_CARRIER_SOURCE: &str = "const addTwoThree : Nat = Suc (Suc (Suc Zero))";
+
+fn real_scalar_carrier() -> RuntimeProgram {
+    let out = compile_ken_package_sources(
+        &CompilerManifest::new(NC9_CARRIER_PKG, Vec::new()),
+        vec![CompilerSource::new("src/main.ken", NC9_CARRIER_SOURCE)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![NC9_CARRIER_PKG.to_string()],
+            ),
+            symbol: StableSymbol::declaration(NC9_CARRIER_PKG, &[], "addTwoThree"),
+            kind: CompilerTargetKind::Executable,
         },
-        declarations: vec![RuntimeDeclaration {
-            symbol,
-            kind: RuntimeDeclarationKind::Record {
-                fields: vec![RuntimeField {
-                    name: "value".to_string(),
-                    status: RuntimeFieldStatus::Runtime,
-                }],
-            },
-            metadata: RuntimeSymbolMetadata {
-                lowerability: Some(RuntimeLowerabilityStatus::Supported),
-                ..RuntimeSymbolMetadata::empty()
-            },
-        }],
-        examples: vec![example],
-    }
+    )
+    .expect("the NC9 carrier source emits a checked-core package");
+    let closure = out.closures.first().expect("selected target closure");
+    let program =
+        erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
+            .expect("the NC9 carrier package erases");
+    assert!(
+        program
+            .examples
+            .iter()
+            .any(|example| example.name == "closed-scalar-primitive"),
+        "the carrier must carry the closed scalar example the row runs"
+    );
+    program
 }
 
 #[test]
@@ -301,14 +312,21 @@ fn ken_checker_rejects_witness_program_mismatch_with_named_lane() {
 
 #[test]
 fn native_trust_report_records_nc9_separately_from_nc8_and_f1() {
-    let program = simple_runtime_program();
+    let program = real_scalar_carrier();
     let witness = ProofErasureBoundaryWitness {
         artifact: RuntimeArtifactIdentity::from_program(&program),
         facts: proof_erasure_boundary_facts_from_program(&program),
     };
     let nc9_report = ken_check_proof_erasure_boundary_witness(&program, &witness)
         .expect("simple witness accepts");
-    let example = program.examples[0].clone();
+    // Selected by NAME, not by position: the real carrier emits several
+    // examples and their order is not a contract.
+    let example = program
+        .examples
+        .iter()
+        .find(|example| example.name == "closed-scalar-primitive")
+        .expect("the carrier carries the closed scalar example")
+        .clone();
     let oracle = InterpreterOracleObservation {
         artifact: NativeArtifactIdentity {
             package_identity: program.package_identity.clone(),

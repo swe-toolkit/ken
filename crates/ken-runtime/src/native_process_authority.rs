@@ -286,30 +286,6 @@ pub(crate) fn synthetic_admitted_compilation(
     }
 }
 
-/// A synthetic compilation pair carrying an **explicit** admitted-trust set.
-///
-/// ⛔ `#[cfg(test)]`, and it exists for one reason: the report-propagation
-/// control needs a *non-empty* admitted set at the report seam, and no
-/// production program can currently supply one. `reject_program_blockers`
-/// refuses any package whose `assumptions` are non-empty, and the admitted set
-/// **is** those assumption keys — so on every path that actually produces a
-/// report today the set is empty and the union below is vacuous.
-///
-/// That makes this the only way to prove the union is real rather than
-/// decorative. It is not a fabricated record: it does not claim a program was
-/// admitted, it supplies the pair the seam consumes so the seam's behaviour can
-/// be measured. See the vacuity control in the elaborator provenance suite,
-/// which measures the refusal that makes production paths empty.
-#[cfg(test)]
-pub(crate) fn synthetic_admitted_compilation_with_trust<'a>(
-    authority: &'a NativeProcessSymbols,
-    admitted_trust: &'a std::collections::BTreeSet<RuntimeSymbol>,
-) -> AdmittedNativeCompilation<'a> {
-    AdmittedNativeCompilation {
-        authority,
-        admitted_trust,
-    }
-}
 
 /// The canonical assumption identity for a trust target.
 ///

@@ -6923,6 +6923,34 @@ mod px7l_tests {
     /// slot marker in the selected case, the call marker inside that -- so the
     /// fixture supplies exactly that seat. The MARKER and the PLAN's call
     /// template are the real route's output and are inserted unchanged.
+    /// A real driver-compiled carrier, for its checked-core provenance only.
+    ///
+    /// ⛔ Its `erased_core` is what the marker-gate fixture borrows: role
+    /// record, pre-source roster, trust tuples. Nothing executable comes from
+    /// it. See the call site.
+    fn marker_gate_carrier() -> RuntimeProgram {
+        const PKG: &str = "d7_1b_marker_gate_carrier";
+        let out = crate::compiler_driver::compile_ken_package_sources(
+            &crate::compiler_driver::CompilerManifest::new(PKG, Vec::new()),
+            vec![crate::compiler_driver::CompilerSource::new(
+                "src/main.ken",
+                "const addTwoThree : Nat = Suc (Suc (Suc Zero))",
+            )],
+            crate::compiler_driver::TargetSelector::StableSymbol {
+                package_identity: StableSymbol::new(
+                    checked_core::SymbolNamespace::Module,
+                    vec![PKG.to_string()],
+                ),
+                symbol: StableSymbol::declaration(PKG, &[], "addTwoThree"),
+                kind: crate::compiler_driver::CompilerTargetKind::Executable,
+            },
+        )
+        .expect("the marker-gate carrier source emits a checked-core package");
+        let closure = out.closures.first().expect("selected target closure");
+        erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
+            .expect("the marker-gate carrier package erases")
+    }
+
     fn runtime_marker_gate_refusal(
         marker: RuntimeExpr,
         mut plan: ken_runtime::OrientedSubcontinuationPlanV1,
@@ -6982,13 +7010,32 @@ mod px7l_tests {
         frame.runtime_frame_fingerprint = frame_fingerprint;
         frame.occurrence_binding_fingerprint =
             ken_runtime::compiler_private_oriented_occurrence_binding_fingerprint(frame);
+        // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`: the CARRIER is a real
+        // driver-compiled package, not a hand-built shell.
+        //
+        // ⛔ Only `erased_core` is taken from it -- its checked role record,
+        // pre-source trusted-base roster and trust tuples, which package-backed
+        // compilation now fails closed without. The declaration, example, marker
+        // and plan below are still this fixture's own, so the row keeps
+        // measuring the marker gate rather than the carrier. Without this the
+        // program is refused at `checked-role-authority` before the gate is
+        // reached, and the row would assert a refusal it did not cause.
+        let carrier = marker_gate_carrier();
         let mut program = RuntimeProgram {
-            package_identity: "d7-1b-marker-gate".to_string(),
-            core_semantic_hash: 0,
-            artifact_hash: 0,
+            package_identity: carrier.package_identity.clone(),
+            core_semantic_hash: carrier.core_semantic_hash,
+            artifact_hash: carrier.artifact_hash,
             erased_core: ErasedExecutableCore {
-                symbols: BTreeSet::new(),
-                metadata: RuntimeMetadata::default(),
+                // The fixture's own declaration must be a package symbol, or the
+                // marker's declaration reference does not resolve.
+                symbols: carrier
+                    .erased_core
+                    .symbols
+                    .iter()
+                    .cloned()
+                    .chain(std::iter::once(declaration.symbol.clone()))
+                    .collect(),
+                metadata: carrier.erased_core.metadata.clone(),
             },
             declarations: vec![declaration],
             examples: Vec::new(),
