@@ -1,7 +1,7 @@
 ---
 id: CI-DOCTEST-UNEXECUTED
 title: "CI runs no --doc step on a premise that is false -- doctests are collected but never executed, and the positive control for a 20-block compile_fail set is among the dead ones"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none
@@ -78,3 +78,44 @@ a mechanical blocker, not the "a working path would go red" intuition the
 
 **Do not resolve a failing doctest by deleting it.** A doctest that fails is a
 finding; deleting it reproduces this defect in a quieter form.
+
+## Known limitation, recorded so it is not re-filed (Adversary, `evt_6nnxsec6kpnkm`)
+
+The Adversary measured the axis this node left un-remeasured, on `5790c761`,
+per site rather than in aggregate: it unfenced all ten `compile_fail` blocks,
+read the real compiler error at each, and reverted byte-identically.
+
+**All seven annotated sites fail with exactly the code they claim** — `E0277` at
+`ir.rs:923/932/941` and `values.rs:94/103/112`, `E0599` at `values.rs:87`.
+Nobody wrote a wrong annotation. The aggregate could not have established that:
+6xE0277 / 1xE0599 / 2xE0308 / 1xE0560 is consistent with several wrong
+pairings, so the per-site attribution is what settles it.
+
+**The residual is that this correctness is unenforced, and the `--doc` step does
+not change it.** rustdoc does not enforce the error code on `compile_fail` on
+stable, so those seven annotations are accurate by the author's care and nothing
+keeps them so — a future change failing with, say, `E0433` would still pass and
+the annotation would silently become false. The three bare `compile_fail` blocks
+at `ir.rs:704/719/734` assert nothing at all; they are green under any compile
+error whatever, `E0308` and `E0560` merely being today's.
+
+**Executing a `compile_fail` validates only that the code fails to compile,
+never that it fails for the claimed reason.** This is stated plainly because
+"the doctests now run" is exactly the sentence that would be read as closing the
+discrimination axis. It does not.
+
+This is an **accepted trade-off, not a defect in this node** — promoting the
+codes into reason certificates was deliberately excluded, and the sibling
+controls remain the attribution mechanism.
+
+**What remains genuinely open, and is therefore not closed by the above:**
+whether each of those negatives actually has a positive partner that would
+redden if the constraint were removed. The Adversary measured the annotation
+axis only and declined to infer the sibling-control question from fence parity.
+Fold that measurement into the next Verify node that touches these doctests
+rather than filing it as its own node — it is a test-adequacy question on ten
+fences, not a capability gap.
+
+The census-as-a-moment item also stands but shrank: the gate now executes any
+newly added bare fence, so the failure mode moved from *silently uncollected* to
+*silently collected and passing*.

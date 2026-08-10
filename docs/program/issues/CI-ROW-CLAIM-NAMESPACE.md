@@ -1,7 +1,7 @@
 ---
 id: CI-ROW-CLAIM-NAMESPACE
 title: "verify-row-claims hardcodes surface/ in both its claim and heading patterns, so eight of the nine conformance namespaces are structurally invisible to it -- a claim it cannot see is indistinguishable from a claim that does not exist"
-status: ready
+status: active
 owner: verify
 size: S
 gate: none

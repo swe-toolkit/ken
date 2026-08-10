@@ -1,7 +1,7 @@
 ---
 id: CONF-EVAL-COMPUTED-BOOL-ELIM
 title: "The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together"
-status: active
+status: merged
 owner: spec-enclave
 size: S
 gate: none
