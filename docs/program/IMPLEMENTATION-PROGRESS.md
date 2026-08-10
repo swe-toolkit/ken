@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-09 22:41:27Z — from 193 issue file(s) in `docs/program/issues/`.
+2026-08-10 00:09:04Z — from 194 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -105,6 +105,7 @@ the committed file matches the generator's output.
 | `F3-39` | F3 [task-list #39] — reducer: degrade-not-wrap + retire legacy arms | draft | runtime | TBD | none | — |
 | `F4` | content-addressing + value-model design (aka PX8-F-PROOF) | draft | foundation+spec-enclave | M | none | — |
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
+| `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | draft | spec-enclave | TBD | none | — |
 | `KW-ORACLE-CLOSURE` | close the KW-THEOREM source oracle structurally — the occurrence sweep is never applied, and the file population is a five-arm hand enumeration | merged | language | S | none | 986 |
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
 | `KW-THEOREM` | rename the surface keyword `lemma` to `theorem` | merged | language | M | none | — |
@@ -269,6 +270,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
+- `KERNEL-RECURSIVE-RESULT-SURFACE` blocked by `KERNEL-NESTED-IND` (status: active)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-MODULE-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)

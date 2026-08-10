@@ -97,7 +97,75 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > ⇒ **Do not release a lane on the strength of `AC-K12` being blocked.** Verify
 > stays held on the two-lane cap; Kernel goes `D5`-partial → `D6` → `D7`.
 >
+> ## `D6` IS RECUT TO SEVEN CASES 2026-08-10. THE HEADLINE ROW STAYS GATED.
+>
+> **Architect ruling `evt_2s6gmzqvaj5mr`, executed by the Steward, who owns this
+> recut and the separate-node routing.** ⛔ **Kernel must not attempt a fourth
+> `D6` candidate until this recut has landed.** Everything below this block
+> describing `D6` as eight cases is superseded on that one point; the rest of it
+> stands.
+>
+> ### What three rejections established
+>
+> `nested-size-uses-lift` requires a fold over **all** `Bag`-indexed Nat leaves.
+> **The current surface cannot express it.** In an `All_Bag.Join` method,
+> `method_type` already supplies exactly what the fold needs — one recursive
+> method result per recursive support field, after the support constructor's
+> fields and evidence — but `check_match_with_lift` hides those binders and
+> **no term in today's source vocabulary denotes one**. A residual `match` is a
+> fresh finite elimination; a source variable denotes the `Bag` value;
+> `liftSize xs` is ill-typed at `Bag LiftRose` versus `LiftRose`; helper or
+> general self-recursion reconstructs calls instead of consuming the
+> kernel-supplied result. No elaborator-only reinterpretation of the existing
+> forms is faithful.
+>
+> Three candidates were built cleanly and rejected cleanly, each moving the
+> counterexample exactly one level deeper — `d6a72371` (header only),
+> `916af824` (depth two), `d7681153` (depth three,
+> `LiftNode (Join (Join (Join (One LiftLeaf) (One LiftLeaf)) Empty) Empty)`
+> returns `1` where the fold requires `3`). ⇒ **Successive repairs defeated the
+> same way by one checker mean the default branch is wrong.** The wrong default
+> was the Steward's *"`D6` is a binding task"* framing directly below: it was
+> written from a measurement that the behaviour was covered and only provenance
+> was missing. **The behaviour is not covered.**
+>
+> ### The recut — this is `D6` now
+>
+> | change | detail |
+> |---|---|
+> | bind **seven** cases | the contract-point-4 subset minus `nested-size-uses-lift` |
+> | **restore** `[KERNEL-NESTED-IND]` on `nested-size-uses-lift` | and **remove its claimed exact executing binding**. It is blocked on the recursive-result surface node, and the seed row must say so |
+> | seed marker census **14 → 15** | the restored gate is a marker. ⛔ A candidate reporting 14 has not done the recut |
+> | the shallow and finite-depth controls | **may remain, only if labelled partial topology/association regressions.** ⛔ They may not be cited as the unbounded fold, nor as discharge of `nested-size-uses-lift` |
+> | the other seven bindings and their evidence | preserved, but **only after fresh scope/QA/review** — no prior verdict transfers |
+>
+> ⛔ **`dec_8pyjkfs3qv7m` and its whole lineage are spent.** No QA, Architect,
+> or conformance-validator vote from any earlier `D6` SHA transfers.
+>
+> ⛔ **Do NOT widen `D6` to invent the missing surface.** Two repairs are
+> specifically prohibited: making hidden binders visible through `surface_var` or
+> as ordinary constructor-pattern fields, which changes source constructor arity
+> and exposes kernel-internal support topology; and coercing an ordinary field
+> reference or an owner self-call into the IH, which either changes a field's
+> source type contextually or admits a call that is neither a direct
+> guest-motive instance nor SCT-justified.
+>
+> ### The capability is a separate node
+>
+> [[KERNEL-RECURSIVE-RESULT-SURFACE]]. A lawful mechanism exists and the
+> Architect has approved its shape, but it is **a new explicit surface
+> capability**, not a bounded `D6` repair — the spelling, scoping, diagnostics,
+> and interaction with ordinary direct/W-style matches need a Spec-owned
+> contract before any implementation frame. The kernel and the generated `All`
+> representation need no change.
+>
+> **Gating a conformance row for a capability that does not exist is the correct
+> outcome, not a failure.** What was wrong was claiming an executing binding for
+> it.
+>
 > **`D6` IS A BINDING TASK, NOT A TEST-AUTHORING TASK. Size it accordingly.**
+> ⚠ **True for the seven remaining rows; it is exactly what was FALSE for
+> `nested-size-uses-lift`.** Read the recut block above before this table.
 > Most of the contract-point-4 *behaviour* is already covered by landed kernel
 > tests — what is missing is the **binding to the conformance corpus**:
 >
