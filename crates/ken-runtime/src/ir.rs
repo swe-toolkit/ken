@@ -682,12 +682,9 @@ pub struct ComputationalFrameHeader<'a> {
 ///
 /// # `AC-F4` — a full case CANNOT reach the core
 ///
-/// ⚠ **Execution inventory:** the three `compile_fail` fences in this section
-/// (ordinary case slice, computational case slice, and header `body`) are
-/// **not executed by CI**. CI runs nextest, which does not run rustdoc
-/// doctests. They are local documentation probes, not mechanized acceptance
-/// evidence; if a forbidden conversion became available, these fences would
-/// contribute no CI-red signal.
+/// **Execution inventory:** CI executes the three `compile_fail` fences in this
+/// section (ordinary case slice, computational case slice, and header `body`)
+/// together with their compiling sibling through the workspace doctest gate.
 ///
 /// ⚠ **These blocks carry no `EXXXX` code, and that is deliberate.** A
 /// ```` ```compile_fail,E0277 ```` fence passes when the block fails to compile
@@ -913,12 +910,9 @@ pub fn compiler_private_computational_match_frame_fingerprint(
 /// `ClosureRef` in every block — the forbidden *value*, not the enum in
 /// general.
 ///
-/// ⚠ **Execution inventory:** all three `AC-V4` `compile_fail` fences below
-/// (no `PartialEq`, no `Ord`, and no `Hash`) are **not executed by CI**. CI
-/// runs nextest, which does not run rustdoc doctests. The fences and their
-/// compiling siblings are local documentation probes, not mechanized
-/// acceptance evidence; if a forbidden impl became available, these fences
-/// would contribute no CI-red signal.
+/// **Execution inventory:** CI executes all three `AC-V4` `compile_fail`
+/// fences below (no `PartialEq`, no `Ord`, and no `Hash`) together with their
+/// compiling siblings through the workspace doctest gate.
 ///
 /// ⛔ **The `EXXXX` codes are documentation, not a check** — rustdoc was
 /// measured not to bind them (see [`crate::values::Value`]'s block for the

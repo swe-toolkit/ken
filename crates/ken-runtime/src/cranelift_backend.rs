@@ -33,12 +33,9 @@
 //! use ken_runtime::cranelift_backend::emit_runtime_ir_object_with_cranelift as _;           // positive control
 //! ```
 //!
-//! ⛔ These fences are `text` on purpose — they are illustration, not a
-//! running check. `nextest` does not run doctests and CI has no `--doc` step,
-//! so a real `compile_fail` block here would assert the property in a lane
-//! that never executes, and a green gate would say nothing about it. The
-//! executable form lives in the test named above, which runs in the sharded
-//! lane. Keep it that way unless a doctest lane is actually wired up.
+//! These fences are `text` on purpose: they remain illustrations and do not
+//! appear in CI's workspace doctest population. The executable form lives in
+//! the test named above, which runs in the sharded lane.
 
 use std::collections::{BTreeMap, BTreeSet};
 
