@@ -347,25 +347,38 @@ existed only in prose; what is committed now, in
 | the abandoned origin is **never entered** and gets **no static-worker call**, with a non-empty entered set so both absences are non-vacuous | yes |
 | the suppressed leg dispositions it in **no** close | yes |
 
-**The non-backedge shape now has its OWN row**, not an implication:
-`d2b_the_same_let_with_a_nonbackedge_value_runs_its_body_and_dispositions_nothing`.
-It is derived from row 3's fixture by rewriting one node, so "differs only in
-the `Let` value" holds by construction. It asserts nothing is dispositioned in
-any close, the union closes, and **both disposition modes agree exactly** —
-outcome, accounting and entry — which is what confines the mutation to the
-backedge branch.
+**The non-backedge obligation is TWO rows, on two distinct axes.** One row could
+not carry both: the shape that makes the comparison (row 3's two positions) is
+the shape whose retained refusal prevents the body from running.
 
-⛔ **One half of that row's specification is not satisfiable and this is
-measured, not conceded.** The re-cut also asked it to prove the body's `Call`
-reaches a static-worker edge and its join is consumed. It cannot: the producer
-keeps row 3's **two** recursive positions, so the segment-1 hard stop this
-deliverable **retains** fires during unit definition, before the case body
-lowers. Changing only the `Let` value cannot get past a refusal triggered by the
-producer's *shape*. A fixture that reached the body would need a
-single-recursive-position producer — no longer row 3's shape, and no longer the
-comparison the row exists to make. The assertion is inverted and armed instead:
-if a static-worker edge is ever reached there, the row **reds** and says to
-write the live half, so the limitation cannot silently outlive its cause.
+**Row A**, the capability gate:
+`d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body`.
+A **capability gate only**. On row 3's two-position shape with an ordinary `Let`
+value, the retained segment-1 refusal fires **before the case body**, so the body
+and its static-worker edge are **unreachable in both modes**. It asserts that
+unreachability, that nothing is dispositioned, that the union closes, and that
+both modes agree. ⛔ It is **not** a live-body row and must not be read as one —
+an earlier revision claimed it was, and on that shape the body never lowers.
+Its zero-worker-call assertion is **armed**: if an edge is ever reached there,
+the row reds and says to write the live half, so the limitation cannot outlive
+its cause.
+
+**Row B**, the reaching row:
+`d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join`.
+The **reaching** row. On the **single**-position shape, with the recursive `Call`
+wrapped in the same `Let` under an ordinary value and the de Bruijn shift
+applied (`Var(0)` → `Var(1)`, or the callee would be the `Let`'s own `Unit`),
+it proves:
+the arm is reached with a non-backedge value; **the body occurrence the arm
+itself reports is entered**; a static-worker edge is reached through the shared
+recorder; every close has empty `dispositioned`; consumed and dispositioned are
+disjoint and close `required`; and Exact and Suppress agree on **all five** axes
+— outcome, arrivals, entry, calls and accounting.
+
+⛔ The body occurrence is the **arm's own** `body.static_origin`, reported by an
+arm-local observation, never a numeric origin — so "the body was entered" is a
+relation between what the arm saw and what the traversal entered, not two
+constants agreeing by luck.
 
 **Zero withdrawn-plan invocations** is recorded as a **candidate-scope /
 full-diff invariant**, not a behavioural control: `units.rs` is untouched across

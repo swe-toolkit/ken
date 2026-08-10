@@ -19716,6 +19716,14 @@ thread_local! {
     /// Every origin a static-worker call was emitted for.
     static LRC_D2B_WORKER_CALLS: std::cell::RefCell<BTreeSet<StaticOriginId>> =
         const { std::cell::RefCell::new(BTreeSet::new()) };
+    /// Arm-local: every `LetBody` arrival, as `(body.static_origin, backedge?)`.
+    ///
+    /// ⛔ This is how a control names the body occurrence WITHOUT a numeric
+    /// origin: the arm reports its own `body.static_origin`, which is the
+    /// planner's, so the control asserts a relation between what the arm saw
+    /// and what the traversal entered.
+    static LRC_D2B_LET_ARRIVALS: std::cell::RefCell<Vec<(StaticOriginId, bool)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 #[cfg(test)]
@@ -19723,6 +19731,7 @@ pub(in crate::cranelift_backend) fn lrc_d2b_reset_observation() {
     LRC_D2B_JOIN_OBSERVATION.with(|cell| cell.borrow_mut().clear());
     LRC_D2B_ENTERED.with(|cell| cell.borrow_mut().clear());
     LRC_D2B_WORKER_CALLS.with(|cell| cell.borrow_mut().clear());
+    LRC_D2B_LET_ARRIVALS.with(|cell| cell.borrow_mut().clear());
 }
 
 /// Every closeout's three sets, in call order.
@@ -19734,6 +19743,20 @@ pub(in crate::cranelift_backend) fn lrc_d2b_reset_observation() {
 pub(in crate::cranelift_backend) fn lrc_d2b_join_observation(
 ) -> Vec<(BTreeSet<StaticOriginId>, BTreeSet<StaticOriginId>, BTreeSet<StaticOriginId>)> {
     LRC_D2B_JOIN_OBSERVATION.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn lrc_d2b_record_let_arrival(
+    body_origin: StaticOriginId,
+    backedge: bool,
+) {
+    LRC_D2B_LET_ARRIVALS.with(|cell| cell.borrow_mut().push((body_origin, backedge)));
+}
+
+/// Every `LetBody` arrival on this thread, in order.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn lrc_d2b_let_arrivals() -> Vec<(StaticOriginId, bool)> {
+    LRC_D2B_LET_ARRIVALS.with(|cell| cell.borrow().clone())
 }
 
 #[cfg(test)]

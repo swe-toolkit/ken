@@ -6257,6 +6257,16 @@ impl<'a> Lowering<'a> {
                         }
                         SourceContinuation::LetBody { body, env, next } => {
                             control.continuation = *next;
+                            // `D2b` OBSERVATION ONLY, arm-local: what this arm
+                            // saw. It decides nothing and changes no branch.
+                            #[cfg(test)]
+                            crate::cranelift_backend::lowering::lrc_d2b_record_let_arrival(
+                                body.static_origin,
+                                matches!(
+                                    value,
+                                    LoweringOperand::Specialized(Lowered::RecursiveBackedge)
+                                ),
+                            );
                             if matches!(value, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
                                 // ⭐⭐ `RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — THE
                                 // ABANDONED LET BODY IS DISPOSITIONED, NOT
