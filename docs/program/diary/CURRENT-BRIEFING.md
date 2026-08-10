@@ -38,7 +38,68 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~09:5xZ. `main` = `5790c761`.
+> ### RESUME HERE — state at 2026-08-10 ~10:0xZ. `main` = `379bc0f4`.
+>
+> **TWO MERGES CLOSED THIS WINDOW. All three rings are working. Nothing is
+> waiting on me except the operator queue.**
+>
+> | ring | state |
+> |---|---|
+> | Verify | `CI-ROW-CLAIM-NAMESPACE` held `8f8bad6d`; AC-1 and AC-2 discharged; AC-3 replaced and running |
+> | spec enclave | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` active, anchor `evt_7eynqwrcxx5ft` |
+> | Runtime | c1 recut building from `2cf3dd2a` on the Architect's six-point ruling |
+>
+> **MERGED: `CI-DOCTEST-UNEXECUTED` `2dfda20d` and `CONF-EVAL-COMPUTED-BOOL-ELIM`
+> `d9609b60`.** Both M6-verified from their declared bases with path counts
+> checked (5 and 2); both landed trees matched the pre-publish merge trees.
+> Adversary notified for both. Doc batch published as PR #1790.
+>
+> #### THE ONE HARD GATE I MUST NOT DROP
+>
+> **Runtime's c1 MERGE waits on the operator.** The Architect's ruling
+> (`evt_m763kh1qmez8`) states in its own words that this is *"an explicit but
+> bounded native supported-subset/TCB change."* **TCB growth is operator-forward
+> and the Architect's approval does not substitute.** Runtime is building
+> normally; I told them at `evt_30y1fybk4zn4r` that I will not run the publisher
+> on it until the operator has seen it. **Do not publish c1 before that.**
+>
+> #### VERIFY IS BLOCKED ON THE ENCLAVE, MECHANICALLY
+>
+> `verify_row_claims` raises on any unresolved claim, `main()` returns 2, and the
+> `ignored-row-sweep` step runs under `bash -e` ⇒ merging the widening while four
+> claims are unresolved **reds `main` and blocks every ring's publisher.** The
+> job's name says "findings non-blocking" — **true of findings, false of
+> instrument failures. Do not read the name as the contract.**
+>
+> The four are pre-existing `verify/spec-syntax` claims in
+> `v1_acceptance.rs:205/543/583/624` with **zero** occurrences anywhere under
+> `conformance/` and no near-miss among the seed's 16 headings. Routed to the
+> enclave because whether a behaviour earns a row is a conformance judgment, not
+> mine.
+>
+> #### TWO OF MY OWN FRAME ERRORS, BOTH CORRECTED ON `main`
+>
+> - **Runtime's control AC was unsatisfiable as framed** ("a real carrier must
+>   reach lowering"). Replaced by the Architect's discriminator list. **Mine to
+>   re-cut, not theirs to work around.**
+> - **`CI-ROW-CLAIM-NAMESPACE` AC-3 cited a bogus 29.** At `376d495d` the 29
+>   counts attached `/// surface/...` row claims; the `//!` claim-form count is 0.
+>   AC-3 now keeps the property and carries no count, discharged against two
+>   facts I measured on `379bc0f4`: `conformance` and `spec` are **not** members
+>   of a filesystem-derived namespace set, so a citation carrying its leading
+>   directory cannot match; and **zero of the 825 row headings end in `.md`**
+>   while every citation does. Corrected in **both** frame and node operative
+>   text, not appended.
+>
+> #### LEDGER: NOT MY BLAST RADIUS, AND THE LIBRARIAN CLOSED IT
+>
+> M3 flagged `ci.yml` and `cranelift_backend.rs` as attested. **Both rows were
+> already red before the merge.** Librarian (`evt_5h7cpga0q71wx`): no library
+> edit, no row fold, no tracked follow-on — under the release-point policy a
+> source row may drift and must not be brought current while the ledger is
+> pinned to `library/REVISION`. **Closed; do not re-file.**
+>
+> #### EARLIER BLOCK, ~09:5xZ — SHAs below are superseded by the above
 >
 > #### WHAT CHANGED SINCE THE ~09:3xZ BLOCK BELOW — read this first
 >
