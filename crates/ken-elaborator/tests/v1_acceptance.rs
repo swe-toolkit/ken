@@ -202,7 +202,6 @@ fn result_out_of_ensures_rejects() {
 // B. `old`-capture scope guard
 // ======================================================================
 
-/// verify/spec-syntax/old-fails-closed-without-pre-state
 ///
 /// Shape B: an ordinary space-operation `ensures` still emits an obligation,
 /// while either elaboration route for `old` rejects specifically because no
@@ -621,7 +620,7 @@ fn requires_on_middle_param_of_three() {
     assert_eq!(body, expected, "body must be a (Var(3) in proof-ctx)");
 }
 
-/// verify/spec-syntax/requires-on-final-param-unaffected
+/// verify/spec-syntax/requires-elaborates-to-pi-proof-arg
 ///
 /// Regression: the existing working form (`requires` on the final/last param)
 /// must be unaffected by the fix. Same case as `requires_elaborates_to_pi_proof_arg`
