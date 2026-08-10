@@ -21,6 +21,7 @@
 //! is the identity, and the parent is what a substitution changes.
 
 use ken_elaborator::checked_core::{CheckedCorePackage, StableSymbol, SymbolNamespace};
+use ken_elaborator::prelude::CanonicalRuntimeRoles;
 use ken_elaborator::compiler_driver::{
     checked_runtime_symbols_v1_key, compile_ken_package_sources, CompilerManifest, CompilerSource,
     CompilerTargetKind, TargetSelector,
@@ -276,4 +277,66 @@ fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
              were not merely un-redirected, they are missing"
         );
     }
+}
+
+/// Inventory completeness, stated as a **relation between two artifacts**.
+///
+/// The test above proves that nothing the fixture shadows can be redirected.
+/// That is only a completeness argument if the fixture shadows *every* role the
+/// producers derive — and the fixture's table is hand-written, so on its own it
+/// is a snapshot that a newly added role would silently escape.
+///
+/// This closes that: the roster is the producers' sole authority, and its
+/// spelling table is compared against the fixture's shadow inventory in both
+/// directions. Add a role to `canonical_runtime_roles!` without shadowing it and
+/// this reds, naming it, before the substitution control can go quietly partial.
+///
+/// ⚠ **Promise class: durable invariant.** It asserts set equality between two
+/// enumerations, not a count. Adding a role keeps it green once the role is
+/// shadowed, and removing one keeps it green once the row goes; only a
+/// divergence between the two reds it. There is no frozen number to maintain.
+#[test]
+fn d1b_role_a_every_canonical_role_is_covered_by_the_shadowing_fixture() {
+    let mut shadowed: Vec<&str> = SHADOWED_ROLES
+        .iter()
+        .map(|(_, constructor)| *constructor)
+        .chain(SHADOWED_FAMILIES.iter().copied())
+        .collect();
+    shadowed.sort_unstable();
+
+    // Neither side may be empty, or the two filters below would both find
+    // nothing and this would pass while comparing nothing to nothing.
+    assert!(!shadowed.is_empty(), "the fixture inventory is empty");
+    assert!(
+        !CanonicalRuntimeRoles::spellings().is_empty(),
+        "the canonical roster is empty"
+    );
+
+    let roster: Vec<&str> = CanonicalRuntimeRoles::spellings()
+        .iter()
+        .map(|(_, spelling)| *spelling)
+        .collect();
+
+    let unshadowed: Vec<&(&str, &str)> = CanonicalRuntimeRoles::spellings()
+        .iter()
+        .filter(|(_, spelling)| !shadowed.contains(spelling))
+        .collect();
+    assert!(
+        unshadowed.is_empty(),
+        "these canonical roles are NOT shadowed by the fixture, so the substitution control says \
+         nothing about them: {unshadowed:?}\n\
+         Add each spelling to the fixture's declarations and to SHADOWED_ROLES (or \
+         SHADOWED_FAMILIES for a type), or the completeness claim is partial."
+    );
+
+    let stale: Vec<&&str> = shadowed
+        .iter()
+        .filter(|spelling| !roster.contains(spelling))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "the fixture shadows spellings that are no longer canonical roles: {stale:?}\n\
+         A stale row is not harmless -- it makes the inventory look larger than the authority it \
+         is meant to cover."
+    );
 }
