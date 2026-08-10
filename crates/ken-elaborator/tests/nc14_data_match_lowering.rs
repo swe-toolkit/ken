@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::checked_core::{
     canonical_decl_bytes, emit_checked_core_package, CheckedCoreArtifactInputs, CheckedCorePackage,
@@ -235,6 +235,22 @@ fn nested_recursive_field_elaborates_checks_erases_and_interprets_at_nat_three()
             .iter()
             .any(|declaration| declaration.symbol == target.to_string()),
         "checked runtime program contains the selected liftSize declaration"
+    );
+}
+
+#[test]
+fn nested_inductive_elaboration_preserves_trusted_base_set() {
+    // Durable invariant (AC-K10): generated support families are checked
+    // inductives, so nested admission cannot add or replace an unchecked
+    // assumption in the declaration trust ledger.
+    let mut env = ElabEnv::new().expect("prelude env");
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_file(NESTED_LIFT_NAT_THREE_SOURCE)
+        .expect("nested inductive source elaborates and admits");
+    let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(
+        before, after,
+        "nested support generation must preserve the exact trusted_base() set"
     );
 }
 

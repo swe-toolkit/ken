@@ -871,6 +871,38 @@ prose half lands as a `D7` block in this node. No separate report file.
 which point it bound the ring. Anyone reading a downstream artifact that still
 says the delta is nonzero is reading the withdrawn clause.
 
+### `D7` report — declaration ledger unchanged; checker growth enumerated
+
+**Authoritative mechanical control.**
+`crates/ken-elaborator/tests/nc14_data_match_lowering.rs:242` captures
+`GlobalEnv::trusted_base()` as a `BTreeSet<GlobalId>` before and after nested
+elaboration in one `ElabEnv`, then asserts set identity. The declaration-ledger
+delta is **`+0 GlobalId`**: generated support families are checked `Inductive`
+declarations, not non-prelude `Opaque` or non-literal `Primitive` assumptions.
+Set identity is the result; equal cardinality would miss an assumption swap.
+
+**Audited checker growth, named rather than assigned a fabricated count.**
+
+- `crates/ken-kernel/src/inductive.rs:954` — `build_all_support_decl` constructs
+  each terminal, source-indexed support family and its topology-aligned
+  evidence constructors.
+- `crates/ken-kernel/src/check.rs:921` — `declare_inductive` owns the atomic
+  host-plus-support admission transaction; its publication and rollback paths
+  are at lines 953–1014, so a failed host or support check cannot expose a
+  partial declaration set.
+- `crates/ken-kernel/src/inductive.rs:2185` — `iota_reduct` derives recursive
+  shapes and constructs the matching lifted terms at lines 2233–2259 before
+  applying the selected method.
+
+Thus the kernel checker grew by these three load-bearing mechanisms while the
+unchecked-assumption ledger grew by **`+0 GlobalId`**. No LOC, function, or file
+count is claimed because the repository has no instrumented baseline for one.
+This report does not advance `AC-K12`, which remains Runtime-blocked.
+
+**Validation.** After the operator all-clear, the exact set-identity control
+passed 1/1 and the complete affected `nc14_data_match_lowering` suite passed
+12/12. `D7`/`AC-K10` is ready for fresh QA; this does not advance `AC-K12`.
+
 ### `AC-K12` ACQUIRED A RIDER — it now owns a carried Runtime control
 
 **Added 2026-08-09 from Adversary triage of finding `evt_37y39vcj7y695` on
