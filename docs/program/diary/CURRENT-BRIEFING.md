@@ -38,7 +38,64 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~11:2xZ. `main` = `3d2e7ffb`.
+> ### RESUME HERE — state at 2026-08-10 ~11:5xZ. `main` = `00bdcc14`.
+>
+> **Since the block below: the corpus batch published (PR #1794, 9/9 blobs
+> verified), and two WPs were released rather than leave rings parked.**
+>
+> | ring | state |
+> |---|---|
+> | spec enclave | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` active. Candidate `ffaffb71` is **SUPERSEDED — do not publish it.** CV owes a fresh SHA |
+> | Runtime | `RT-CALL-EDGE-EXECUTABILITY-AXIS` active, implementer committed `aa60c99e`, in QA |
+> | Runtime c1 | `7bfc8ae5` **still waits only on the operator.** Intersection re-derived empty at `00bdcc14`, so no re-anchor is owed |
+>
+> #### THE GATE RULING, and why it is worth repeating
+>
+> spec-leader requested publication of `ffaffb71` asserting *"no Architect vote
+> or full two-gate merge Decision is owed"* because it was a narrow one-lane
+> doc-only correction. **I held it** (`evt_zn2yhapt5dyh`) on two independent
+> grounds: `conformance/` is not `library/` and not one of `§14a`'s named
+> exceptions, so the predicate escalates **by construction**; and the diff
+> flipped a row's `expect` from **accepts** to **rejected at elaboration as
+> unsupported**, which is `§14a`'s explicit *normative claim about the language*
+> condition. **Size is not a cell in that predicate.**
+>
+> **The Architect then found a real blocker** (`evt_71zjn7a58xf5a`): the
+> candidate corrected the `old` row while its **adjacent** pure-view row still
+> described the landed relation as an accept/reject flip. Today **both** cases
+> reject, at **distinct gates** — pure view `UnboundName("old")` at scope
+> resolution, space op unsupported-pre-state at elaboration. Correcting one row
+> and leaving its neighbour making the same class of false claim would have
+> shipped. The enclave reconciled itself at `evt_5antqkvaa5xvq`.
+>
+> **Twice today a publish was held on the Decision gate** — once because my own
+> instruction had created the gap, once because a ring asserted the gate did not
+> apply. Both cost one round-trip and both found something. **Never publish
+> without a Decision read `resolved` from the object**, least of all when
+> relaxing it would save the Steward a round-trip.
+>
+> #### RELEASED WHILE c1 SITS UNMERGED, deliberately
+>
+> c1 is **finished**, not in progress — it needs nothing from its ring, and I
+> hold and publish it. `COORDINATION §0`'s wait-idle rule governs waiting on
+> **CI**, which is minutes; this is an open-ended wait on a human, and three idle
+> seats behind it is the expensive outcome. Runtime's ring was **not** compacted
+> before that kickoff: `§15` also forbids compacting mid-reasoning, c1 is live
+> pending an operator question, and the implementer had 34% context headroom.
+>
+> #### INSTRUMENT FIX — my liveness detector was wrong
+>
+> Grepping panes for `esc to interrupt` reports **false idle** on a Claude Code
+> seat mid-tool-call, which renders a spinner plus an elapsed timer instead. It
+> nearly drew a nudge onto `runtime-implementer` while it was running a targeted
+> `ken-cargo` test under the machine-wide flock. Match **any** of
+> `esc to interrupt`, `Running N shell command`, `([0-9]+m [0-9]+s`. Codex prints
+> `Worked for Nm` **after** a turn ends — that is idle. **The failure direction
+> is toward action, so the recovery is what does the damage.**
+>
+> ---
+>
+> ### Earlier — state at 2026-08-10 ~11:2xZ. `main` was `3d2e7ffb`.
 >
 > **Two merges landed. One thing waits only on you. Nothing else is blocked.**
 >
