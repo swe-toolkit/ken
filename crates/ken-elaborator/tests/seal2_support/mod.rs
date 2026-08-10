@@ -626,7 +626,8 @@ pub fn type_names_in_expr(e: &Expr, out: &mut BTreeSet<String>) {
         Expr::EUniv(_, _)
         | Expr::ENumLit(_, _)
         | Expr::EStr(_, _)
-        | Expr::EAttachedProofRef { .. } => {}
+        | Expr::EAttachedProofRef { .. }
+        | Expr::EStructuralResult { .. } => {}
         Expr::EApp(a, b, _)
         | Expr::EBecomes(a, b, _)
         | Expr::EBinOp(_, a, b, _)
