@@ -82,11 +82,31 @@ Ancestry lies after a squash; phrase greps lie on wrapped lines.
 
 ```sh
 git fetch origin
-for f in $(git diff --name-only <SHA>^ <SHA>); do
+# <BASE> is the cut's merge-base -- the base the ring declared, NOT <SHA>^.
+for f in $(git diff --name-only <BASE>...<SHA>); do
   r=$(git rev-parse "origin/main:$f" 2>/dev/null); l=$(git rev-parse "<SHA>:$f")
   [ "$r" = "$l" ] && echo "MATCH  $f" || echo "DIFFER $f"
 done
 ```
+
+> ### `<SHA>^ <SHA>` IS WRONG AND SILENTLY UNDER-VERIFIES. Corrected 2026-08-10.
+>
+> This recipe said `git diff --name-only <SHA>^ <SHA>` until DS-9 `D1` caught
+> it. **That range is the last commit only.** The cut was two commits —
+> `2ef20dc5` added `Json.ken.md`, `6675ff54` added the signature assertions —
+> so `6675ff54^..6675ff54` enumerated **one** of the two declared paths. The
+> loop printed a single confident `MATCH` and the package itself went
+> unverified.
+>
+> **The failure direction is the bad one: it reports success on a smaller
+> population than you declared.** There is no error, no empty output, no
+> DIFFER — just a short list that looks like a complete one. Any cut of more
+> than one commit hits this, which is most of them.
+>
+> **Always enumerate from the declared merge-base**, the same `<BASE>...<SHA>`
+> range the ring cited and the Architect reviewed, and **check the path count
+> against the ring's declared scope.** If the loop prints fewer paths than the
+> handoff named, the instrument is wrong, not the handoff.
 
 The publisher squashes. `git reset --hard origin/main` afterwards —
 `steward/work` is stale the instant any publish lands.
