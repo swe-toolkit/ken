@@ -1,6 +1,23 @@
 # RT-LEXICAL-RECURSOR-CONSUMERS — `D2b` grounding
 
-**Evidence only: no repair, no control, `crates/` byte-identical.**
+> # ⛔ HISTORICAL. FROZEN AT THE `D2b` GROUNDING COMMIT.
+>
+> Named by **subject**, not SHA — the commit whose subject is *"`D2b`
+> grounding: the closed projection IS available, measured"*. Re-anchoring
+> rewrites SHAs; it does not rewrite subjects.
+>
+> **The claim below that is NO LONGER TRUE:** *"Evidence only: no repair, no
+> control, `crates/` byte-identical"*. That was true of the grounding commit.
+> The **planner plane of `D2b` has since landed on this branch**, so `crates/`
+> has changed and the branch now carries a repair and a control. See
+> §6 and the accepted-partial section at the end.
+>
+> ⛔ **The MEASUREMENTS in §1-§2 are not withdrawn.** They were taken on the
+> grounding tree and stand; what went stale is this file's description of the
+> *candidate*.
+
+**As of the grounding commit: evidence only, no repair, no control, `crates/`
+byte-identical.**
 
 ## 0. Provenance — two coordinates
 
@@ -121,3 +138,53 @@ change, no new `Lowered`/ABI/capture lane, no `StaticWorkerBinding`
 successor-wall work, no `D3`, no `R4`, no tracker `status:` change, no
 retirement. The probes were temporary and are removed —
 `planning/static_transition.rs` sha256 `609e5bec…869f` matches base.
+
+## 6. ACCEPTED PARTIAL — the planner plane landed after this checkpoint
+
+**Landed:** the closed projection is stored on the continuation key and
+**enforced** — unique by source position (a set, and a duplicate in the checked
+case refuses), self-membership required, and copied from the checked
+`recursive_positions` rather than derived from any body, shape, arity or
+constructor symbol. Its two consumers are corrected:
+
+| site | was | now |
+|---|---|---|
+| `exact_continuation_ordinary_parameters` | counted every field except **the** recursive position | counts only fields in **no** recursive position |
+| `ordinary_envelope` | omitted `selected` only | omits **every** projected position |
+| `ordinary_envelope` field count | `nonrecursive + 1` | `nonrecursive + |projection|` |
+
+⛔ **The `+ 1` was a second expression of the same singular assumption**, and
+fixing only the filter left the envelope failing to cover its own `Parameter`
+slot run — four suites caught it immediately, which is what identified it.
+
+**Measured effect on row 3:** the `Closure` refusal is **gone**. The value no
+longer reaches `boundary_transfer_admissibility` at all, because no recursive
+field is an ordinary ABI parameter any more.
+
+**Row 3 still does not compile.** It now stops at:
+
+```text
+Backend(Module("function left planned source join StaticOriginId(12) neither
+emitted nor statically unselected"))
+```
+
+That is **`AC-3` guard 4, intact and firing** — the sibling's source join is
+neither emitted nor unselected, because the compiler-only binder that would
+account for it is **not in this candidate**.
+
+## 7. What remains of `D2b`
+
+1. compiler-only binders — sealed case-binder plan; nonselected built at callee
+   as `StaticWorkerBinding` via `construct_static_worker_binding`, entering
+   `LoweringEnvironmentBinding::StaticWorker`, zero ABI slots, never a
+   `LoweringOperand`;
+2. caller-side reconciliation before `call_declared_unit_target`, with the four
+   fail-closed conditions (captured sibling, generated-context suffix, missing
+   exact sibling unit/callee, recursive-set disagreement);
+3. the remainder of the control matrix — live row 3 with a nonzero denominator
+   and its exact successor refusal, the suppression leg restoring the sibling to
+   the ordinary envelope, the direct raw-`Closure` boundary row, descriptor and
+   assembly reconciliation rows, and the callee body/arity/capture rows.
+
+**No wider projection, ABI, capture lane or guard change was needed for the
+planner plane** — the stop clause did not fire.

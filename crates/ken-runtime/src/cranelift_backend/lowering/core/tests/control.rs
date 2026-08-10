@@ -28968,9 +28968,14 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 /// ⛔ **This does NOT key on the absence of the refusal alone.** A repair that
 /// deleted the sentence from production would make `!contains(...)` true for
 /// free, and this campaign has already shipped one control with that defect.
-/// The load-bearing assertions are the **non-zero arrival denominator** — the
-/// marker really reached this exact continuation — and the **suppression A/B**,
-/// which makes the pre-repair refusal producible again from the committed tree.
+/// ⛔ **The three assertions below are NOT co-equal, and billing them as a flat
+/// list was wrong.** `arrivals > 0` is the **denominator**, and it is
+/// irreplaceable: every other clause is conditional on it.
+/// `forwards == arrivals` is satisfied by `0 == 0`, so on its own it is a
+/// **prospective** guard — it catches a *future* arrival that fails to forward
+/// and is evidence about nothing today. The **suppression A/B** is likewise
+/// only meaningful once something arrived. So the denominator is asserted
+/// **first and alone**, before either dependent clause is allowed to run.
 ///
 /// **`AC-3` guard 3, as far as this deliverable can establish it.** The
 /// suppressed leg proves the constructor guard is **still present, still
@@ -28984,9 +28989,8 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 /// authoring one is new fixture work outside `D2a`'s one-authority mandate.
 /// That witness is owed to `D3` and is recorded as owed rather than implied.
 ///
-/// PROMISE CLASS: durable invariant. Arrivals and forwards are asserted as a
-/// relation (`forwards == arrivals`, `arrivals > 0`), never as a fixed count, so
-/// a fixture that grows a compile keeps it green.
+/// PROMISE CLASS: durable invariant. Both are relations — never a pinned count —
+/// so a fixture that grows a compile keeps this green.
 #[test]
 fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compiles() {
     use crate::cranelift_backend::lowering::core::{
@@ -29057,16 +29061,26 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
     // ── REPAIRED ────────────────────────────────────────────────────────────
     let (arrivals, forwards, repaired) = run(false);
 
-    // THE DENOMINATOR. Without this, every `!contains` below would hold just as
-    // well if the marker never reached this continuation at all.
+    // ⭐⭐ THE DENOMINATOR, ESTABLISHED FIRST AND ALONE.
+    //
+    // ⛔ It is not one of three peers. `forwards == arrivals` holds at `0 == 0`
+    // and the suppression legs compare refusals that never occurred, so BOTH
+    // are conditional on this line. Reading them as co-equal supports is how a
+    // control can look triply-defended while resting on one clause.
     assert!(
         arrivals > 0,
         "no backedge marker arrived at ComputationalMatchScrutinee, so the forward was never \
-         exercised and the absences below say nothing"
+         exercised and every clause below is vacuous"
     );
+    // Bound to the denominator rather than stated beside it: the equality is
+    // read off a value that only exists because arrivals was proven non-zero,
+    // so it cannot be quoted as evidence in the all-zero case.
+    let established_arrivals = arrivals;
     assert_eq!(
-        forwards, arrivals,
-        "an arriving marker was not forwarded: arrivals={arrivals} forwards={forwards}"
+        forwards, established_arrivals,
+        "an arriving marker was not forwarded: arrivals={established_arrivals} \
+         forwards={forwards}. NOTE: this clause is PROSPECTIVE -- it holds at 0 == 0 and is \
+         meaningful only because the denominator above is non-zero"
     );
     for (label, rendered) in &repaired {
         assert!(
@@ -29092,4 +29106,75 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
              removed it: {rendered}"
         );
     }
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` (planner plane) — the runtime
+/// envelope excludes EVERY recursive constructor position.**
+///
+/// > **MEASURED:** on row 3's plan, whose producer has **two** recursive
+/// > positions, every interned continuation unit's closed projection is
+/// > set-equal to the checked `recursive_positions`, and its ordinary envelope
+/// > names **no** recursive position. **CLAIMED:** no recursive field reaches
+/// > the declared-unit ABI, so a sibling `Specialized(Closure)` can no longer be
+/// > cloned into the ordinary run. **THE GAP:** this is the planner plane only —
+/// > row 3 does not compile (see the handback); the compiler-only binder and the
+/// > caller-side reconciliation are not in this candidate.
+///
+/// ⛔ **The non-vacuity clause is the load-bearing one, and it comes first.**
+/// A producer with a single recursive position satisfies every assertion below
+/// under both the old and the new derivation — the two coincide there, which is
+/// exactly why the defect survived every landed fixture. `projected > 1` is what
+/// makes this row about the sibling case at all; the exclusion assertions are
+/// conditional on it and say nothing without it.
+#[test]
+fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
+    let expression =
+        host_result_closure_match(px8j_recursive_sibling_result(1, 2, px8j_aggregate_result()));
+    let plan = plan_static_transition_graph(&expression, &BTreeMap::new())
+        .expect("row 3's fixture plans");
+
+    let units = plan.continuation_units().expect("continuation units");
+    assert!(
+        !units.is_empty(),
+        "the fixture interned no continuation unit, so every assertion below is vacuous"
+    );
+
+    let mut sibling_units = 0usize;
+    for unit in &units {
+        let projected = unit.recursive_positions();
+
+        // NON-VACUITY FIRST: this row exists for producers with MORE THAN ONE
+        // recursive position. Below two, old and new derivations agree.
+        if projected.len() > 1 {
+            sibling_units += 1;
+        }
+
+        // The unit's own position is a member, which is what lets the envelope
+        // derive its field count from the projection at all.
+        assert!(
+            projected.contains(&unit.recursive_position()),
+            "a unit's own recursive position is absent from its closed projection: {projected:?}"
+        );
+
+        // THE EXCLUSION. No envelope role may name a recursive position.
+        let envelope = unit.ordinary_envelope().expect("the envelope builds");
+        for role in &envelope {
+            if let ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
+                source_position,
+            } = role
+            {
+                assert!(
+                    !projected.contains(source_position),
+                    "the runtime envelope names recursive source position {source_position}, so a \
+                     recursive field is still an ordinary ABI parameter: projected={projected:?}"
+                );
+            }
+        }
+    }
+
+    assert!(
+        sibling_units > 0,
+        "no interned unit has more than one recursive position, so this fixture is not the \
+         sibling shape and the exclusion above holds under the single-position derivation too"
+    );
 }
