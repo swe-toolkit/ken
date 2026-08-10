@@ -73,6 +73,76 @@ origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 202
 > **`c2` remains unauthorized** and returns to the Steward before assignment
 > with its `AC-K12` relationship stated. `AC-K12` is not claimed or advanced here.
 
+> # `c2-pre` — ADDED 2026-08-10. THE FAIL-CLOSED ARGUMENT IS WRONG IN BOTH
+> # DIRECTIONS. THE PROPERTY ITSELF HOLDS.
+>
+> **Confirmed Adversary finding `evt_2xryrnxz7g0mb` on merged `c1`
+> (`7bfc8ae5`), measured at `90ddcf1c`, triaged by the Steward and folded here
+> rather than filed as a node** (`steward.md §4c` — same file, same premise, and
+> the harm lands on this node's own next author).
+>
+> **Severity, in the honest direction: a documentation defect on a load-bearing
+> safety argument. Over-claim. The mechanism is correct; the reason given for
+> trusting it is not.** The Adversary attacked the impossibility claim on four
+> axes — parameter, wider-typed sibling, module scope, call graph — and **all
+> four hold**. Do not repair the mechanism.
+>
+> `crates/ken-runtime/src/cranelift_backend/artifact/mod.rs:71-76` discharges
+> *"implicit legacy fallback is structurally unreachable"* with a producer
+> enumeration. **The type system supplies only the first clause** — the
+> authority is a required parameter, not an `Option`. Everything after the
+> semicolon is prose, and both halves of it are wrong:
+>
+> 1. **`program_authority` exists in no tree.** One hit at `7bfc8ae5` and it is
+>    this comment; zero at the declared base `b654d33a`, so it is not a stale
+>    operand. `git log -S` places it: introduced as `fn program_authority` in
+>    `b24a537e`, renamed to `program_admission` in `39bc86f7`, **both inside this
+>    branch**. The rename moved the function eleven lines above (`:63`) and left
+>    the sibling citation behind.
+> 2. **There is a third production producer and it is not `#[cfg(test)]`.**
+>    `lowering/core.rs:1771` `seed_only_legacy_authority()` is ungated
+>    production, reaches lowering via `unwrap_or_else` at `:1744`, and
+>    `NativeProcessSymbols::legacy_prelude()` (`native_process_entrypoint.rs:67`)
+>    is `pub(crate)` with no `cfg`.
+>
+> ⇒ *"the only other producer is the `#[cfg(test)]` synthetic entrypoint"* and
+> *"no third way to reach lowering"* are both false **as written**. The true
+> statement is narrower and the seed-lane comment at `core.rs:1738-1742` already
+> makes it correctly: no third way for a **package-backed** program.
+>
+> ### WHY THIS IS WORSE THAN A TYPO, AND WHY IT IS `c2`'s
+>
+> **The two defects hide each other.** A reader auditing *"is there really no
+> third way?"* greps `program_authority`, gets zero, and silently repairs it to
+> `program_admission` — the obvious and correct fix. **The citation defect then
+> vanishes and the enumeration is never re-audited**, which is the half that is
+> actually wrong.
+>
+> **The unqualified sentence is what a `c2` author adding a lowering entry
+> reads**, which is why this is folded here and not deferred: `c2` is the
+> deliverable that adds lowering outcomes against this exact boundary.
+>
+> **The shape is the durable lesson.** The safety property is carried by a
+> **call-graph fact**, not by the type. A non-`Option` parameter proves that
+> whoever calls that function supplies authority; it proves **nothing** about
+> which function a package-backed compile calls. That gap is precisely the
+> obligation the comment set out to discharge.
+>
+> | AC | criterion |
+> |---|---|
+> | `AC-c2p-1` | the comment names `program_admission`; `git grep program_authority -- crates/` returns zero |
+> | `AC-c2p-2` | the impossibility claim is **qualified to package-backed**, matching `core.rs:1738-1742` |
+> | `AC-c2p-3` | `seed_only_legacy_authority` is named as a real production producer, not omitted and not described as test-gated |
+> | `AC-c2p-4` | the argument states it rests on a **call-graph fact**, not on the parameter's type |
+>
+> **Scope: comment prose only.** No signature change, no `cfg` change, no
+> mechanism change. All four attacked axes hold and must stay as they are.
+>
+> ⛔ **This does NOT go in front of the RecursiveDescent campaign.** It rides
+> with `c2` whenever `c2` is authorized. Filing an Adversary finding into
+> Runtime's lane ahead of the campaign is exactly the shadow-gate error that
+> cost this program ~13.5 hours on 08-09/08-10.
+
 > # `D1b-role-b` MERGED 2026-08-10. SLICE `c` IS CUT IN TWO. START AT `c1`.
 >
 > Exact `7e918bdf`, PR #1771, CI green, `main` `8e2883b0`. All four declared
