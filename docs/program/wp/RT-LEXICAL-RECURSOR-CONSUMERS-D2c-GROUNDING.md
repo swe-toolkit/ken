@@ -2,9 +2,11 @@
 
 **No production repair.** The candidate's only `crates/` change is the `D2a`
 test-only `NonZeroUsize` durability rider in
-`lowering/core/tests/control.rs`, which `D2c` did not author and does not
-modify. `D2c` itself is evidence only: this record and the differential below
-add **no further control** and no production code.
+`lowering/core/tests/control.rs`. `D2c` did not author that rider and does not
+modify its mechanism; its sole interaction with it is the comment-only
+decorative-glyph removal recorded in §6. `D2c` itself is evidence only: this
+record and the differential below add **no further control** and no production
+code.
 
 ## 0. Provenance — two coordinates, derived at the moment of writing
 
