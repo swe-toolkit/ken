@@ -251,73 +251,69 @@ for row 3, or whether the caller-side omission must also account for something
 the subtree walk does not reach. That is measurable only by building it, and it
 is the first thing the next turn should measure rather than assume.
 
-## 9. The ruled lowering plane, corrected — for whichever turn implements it
+## 9. WITHDRAWN — the binder-telescope plan, and what replaced it
 
-⛔ **§8 located the seams; this section records the RULED SHAPE, including one
-correction to what I proposed.** No implementation is in this candidate.
+> # ⛔ THIS SECTION'S PLAN IS WITHDRAWN IN FULL.
+>
+> An earlier revision of §9 specified a fact-resolving member lookup, a plural
+> IH telescope, a nonselected binder and caller reconciliation, and the
+> consumption of origin 12 by a live `Call`. **All of it is withdrawn** by the
+> Architect re-cut, and none of it is in this candidate.
+>
+> It is recorded as withdrawn rather than deleted, because the reason it failed
+> is the useful part.
 
-### 9.1 The telescope — the sibling gets an IH, it is NOT skipped
+### 9.1 Why it was wrong, measured rather than reviewed
 
-I proposed skipping the nonselected recursive position in segment 1. **That is
-wrong and is superseded.** The ruled telescope is:
+I built the whole mechanism. `nonselected_member_binding` was **never invoked**
+for row 3 — zero calls — and origin 12 was **never entered**: the traversal goes
+`8 → 13`.
 
-```text
-[ IH for EVERY recursive position, in reverse position order ]
-    ++ [ argument for EVERY constructor field, in source order ]
-    ++ [ continuation inputs ]
-```
+⇒ **Row 3's failing compile never reaches a continuation-specialization
+definition at all.** The binder telescope is a *specialization's* case
+environment; the compile that fails is the **root machine's**. No amount of work
+in that environment could consume a join the root machine never enters. That is
+consistent with the earlier measurement that origin 12 lives only in
+`PredeclaredFunctionId(0)`'s subtree and in no worker subtree.
 
-with the **sealed cardinality unchanged**. So segment 1 keeps one
-`InductionHypothesis` per recursive position — the sibling included — and
-segment 2 has an argument member for **every** recursive source field, not only
-the selected one.
+It also reddened **four committed controls** whose subject is the
+singular-specialization model — one of them exists solely to assert the hard stop
+the plural telescope removes. Those controls are **retained unchanged**.
 
-⛔ **The callee resolves both roles only through the planner's closed-member
-projection — never by cloning the selected worker.** Cloning would make the
-sibling's binding a copy of a different unit's facts, which is exactly the
-substitution the projection exists to prevent.
+### 9.2 The actual route, and the landed repair
 
-⛔ The blocker `segment 1` currently presents — *"a recursive position that the
-continuation specialization projects no worker for"* — is therefore **not**
-removed by skipping. It is removed because the projection can now resolve that
-position to its own interned worker.
+The root machine's `Let` value returns `Specialized(RecursiveBackedge)`;
+`SourceContinuation::LetBody { body, env, next }` forwards it **without
+scheduling the body**. Origin 12 is a **non-live body `Call`** — it never
+executes, so there is nothing to consume it.
 
-### 9.2 The lookup I owe, and its validation contract
+⇒ It is **dispositioned, not consumed**. At that existing arm only, before
+forwarding the backedge, the landed repair calls
+`disposition_statically_unselected_source_subtree(body.static_origin)`.
 
-Keyed by `(emission_owner, producer_result_origin, producer_construct_origin,
-producer_alternative, consumer_owner, continuation_origin)` **plus position**.
-It accepts the selected exact view and **validates the whole group before
-returning**:
+**The selector is the planner's own retained body root** — never a numeric
+origin, never a worker or closure root, and never the whole root function, which
+would swallow joins that legitimately executed. The body's source occurrence is
+deliberately **not** entered: it did not execute.
 
-- group keys **set-equal** to the checked positions;
-- **exactly one** unit per position;
-- every member agrees on the group coordinate **and** the checked set;
-- exposes specialization, closure/body occurrences, declared arity, capture
-  count and provenance, IH route/context.
+### 9.3 What this candidate does and does not achieve
 
-⛔ **Zero, duplicate, conflict, short or extra is a planner invariant failure** —
-never `None`, never first-match, never a fallback, never a lowering-side filter.
+**Achieves:** the missing-join refusal is gone, proved by an A/B whose suppressed
+leg reproduces the exact refusal from the committed tree.
 
-**This is the clause I under-delivered.** The landed projection is
-`recursive_positions: BTreeSet<u32>` — set-equality and uniqueness only. It
-closed the envelope question completely, which is why the planner plane passed;
-it carries no worker facts, and the lowering plane is the only consumer that
-needs them.
+**Does not achieve:** row 3 compiling. It advances to the
+singular-specialization hard stop, which this deliverable **keeps** — and the
+control asserts that advance positively, so a row failing *earlier* cannot pass
+as a fix.
 
-### 9.3 The bounded member for row 3
+### 9.4 One control shape I could not construct, recorded rather than faked
 
-Exact worker facts, **empty captures**, `RawWorker`, `DirectSpecializationCall`;
-IH only on the exact planner-issued raw/capture-free route. Installed as a
-compiler-only `StaticWorker` with **zero ABI slots** and never a
-`LoweringOperand`.
+The re-cut asked for a whole-root-function substitution and a no-join sibling
+root alongside the suppression mutation. **Neither is constructible at this
+arm:** both need a `StaticOriginId` that is not the body's, and none is in
+scope — `required_join_origins` is keyed on a `PredeclaredFunctionId`, and the
+only other reachable origin is a `RecursorProducerOriginId`, a different type.
 
-**Stop conditions:** the group is not uniquely complete, or the sibling is
-captured or carries a generated context.
-
-### 9.4 Unchanged from the earlier rulings
-
-The caller-side reconciliation and the live-`Call` consumption of origin 12 are
-as previously ruled — the caller omits the runtime ABI field only and consumes
-no join; origin 12 is consumed by ordinary `lower_expr(Call)` →
-`enter_source_occurrence_plan` → `call_static_worker` once the binder exists.
-`finalize_join_disposition` stays byte-for-behaviour unchanged.
+Reaching outside the arm to manufacture one would be widening, and naming a
+different origin "the root function" would be a control passing for a reason
+unrelated to the shape it claims. Recorded as not covered.

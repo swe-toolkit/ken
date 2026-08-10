@@ -29196,3 +29196,79 @@ fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
         }
     }
 }
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — an abandoned `Let` body's joins are
+/// DISPOSITIONED, and the missing-join refusal is gone.**
+///
+/// > **MEASURED:** under B-only exclusion row 3 no longer renders *"function
+/// > left planned source join … neither emitted nor statically unselected"*.
+/// > Suppressing **only** the new arm's disposition brings that exact refusal
+/// > back. **CLAIMED:** the abandoned body's joins are accounted at the arm that
+/// > abandons it. **THE GAP:** row 3 still does not compile — it advances to the
+/// > singular-specialization hard stop, which this deliverable keeps.
+///
+/// ⛔ **The A/B is the whole control, because the repaired side is an ABSENCE.**
+/// Asserting only that the sentence is gone would pass for free if the sentence
+/// were deleted from production, or if the row failed earlier for an unrelated
+/// reason. The suppressed leg is what makes the absence attributable: it
+/// reproduces the exact refusal from the committed tree, with nothing else
+/// changed.
+///
+/// ⛔ **And the advance is asserted positively**, not merely as "some other
+/// error": the row must reach the hard stop, which is strictly later than the
+/// join closeout. A row that started failing *earlier* would also stop
+/// rendering the join refusal, and that would be a regression wearing the
+/// shape of a fix.
+#[test]
+fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_it() {
+    use crate::cranelift_backend::lowering::core::{
+        set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+            set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        }
+    }
+    const MISSING_JOIN: &str = "neither emitted nor statically unselected";
+    const HARD_STOP: &str = "projects no worker for";
+
+    let run = |mode: LrcD2bLetDisposition| -> String {
+        let _restore = Restore;
+        let expression = host_result_closure_match(px8j_recursive_sibling_result(
+            1,
+            2,
+            px8j_aggregate_result(),
+        ));
+        set_lrc_d2b_let_disposition(mode);
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let (result, _trace) = px8j_capture_source_trace(&expression, false, "ken_d2b_let");
+        set_selector_variant_exclusion(None);
+        set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
+        format!("{result:?}")
+    };
+
+    // ── REPAIRED ────────────────────────────────────────────────────────────
+    let repaired = run(LrcD2bLetDisposition::Exact);
+    assert!(
+        !repaired.contains(MISSING_JOIN),
+        "the abandoned body's join is still unaccounted: {repaired}"
+    );
+    assert!(
+        repaired.contains(HARD_STOP),
+        "the row did not reach the singular-specialization hard stop, so it is failing EARLIER \
+         than the join closeout and the absence above is a regression rather than the repair: \
+         {repaired}"
+    );
+
+    // ── SUPPRESSED — the pre-repair state, from the committed tree ──────────
+    let suppressed = run(LrcD2bLetDisposition::Suppress);
+    assert!(
+        suppressed.contains(MISSING_JOIN),
+        "suppressing ONLY the new arm's disposition did not recreate the missing-join refusal, \
+         so that arm is not what accounts the join: {suppressed}"
+    );
+}

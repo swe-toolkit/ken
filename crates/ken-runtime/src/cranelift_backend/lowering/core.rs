@@ -357,6 +357,47 @@ thread_local! {
     static LRC_D2A_BACKEDGE_FORWARDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// `D3`'s mutation: suppress the forward, restoring the pre-`D2a` refusal.
     static LRC_D2A_SUPPRESS_FORWARD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `D2b` — the abandoned-`Let` disposition mutation seat.
+    static LRC_D2B_LET_DISPOSITION: std::cell::Cell<LrcD2bLetDisposition> =
+        const { std::cell::Cell::new(LrcD2bLetDisposition::Exact) };
+}
+
+/// `D2b` — how the abandoned-`Let` arm selects its disposition subtree.
+///
+/// ⛔ Each variant is a selector a wrong derivation would plausibly produce, so
+/// a refusal is attributable to the selector rather than to a rewritten arm.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum LrcD2bLetDisposition {
+    /// Production: the planner's retained body root.
+    Exact,
+    /// The arm does nothing -- the pre-repair state.
+    Suppress,
+}
+
+// ⛔ THE TWO WRONG-ROOT MUTATIONS ARE NOT CONSTRUCTIBLE AT THIS ARM, and this
+// is recorded rather than approximated.
+//
+// The ruling asked additionally for a whole-root-function substitution and a
+// no-join sibling root. Both need a `StaticOriginId` that is not the body's,
+// and **no such origin is in scope here**: `required_join_origins` is keyed on
+// a `PredeclaredFunctionId` rather than an origin, and the only other origin
+// this arm can reach -- the enclosing selected scope -- is a
+// `RecursorProducerOriginId`, a different type entirely.
+//
+// Manufacturing one by reaching outside the arm would be widening, and naming a
+// different origin "the root function" would be a control that passes for a
+// reason unrelated to the shape it claims. The suppression mutation below is
+// the one this seam can honestly carry.
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_lrc_d2b_let_disposition(mode: LrcD2bLetDisposition) {
+    LRC_D2B_LET_DISPOSITION.with(|cell| cell.set(mode));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn lrc_d2b_let_disposition() -> LrcD2bLetDisposition {
+    LRC_D2B_LET_DISPOSITION.with(std::cell::Cell::get)
 }
 
 #[cfg(test)]
@@ -6217,6 +6258,56 @@ impl<'a> Lowering<'a> {
                         SourceContinuation::LetBody { body, env, next } => {
                             control.continuation = *next;
                             if matches!(value, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+                                // ⭐⭐ `RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — THE
+                                // ABANDONED LET BODY IS DISPOSITIONED, NOT
+                                // CONSUMED.
+                                //
+                                // A backedge value means this `Let` never binds
+                                // and its body never runs. The body is still a
+                                // planned source subtree, so its joins are in
+                                // the function's `required` set -- and with
+                                // nothing executing them they are consumed by
+                                // nobody, which `finalize_join_disposition`
+                                // correctly refuses.
+                                //
+                                // ⛔ DISPOSITION, not consumption, and the
+                                // distinction is the measured route rather than
+                                // a preference: the body's `Call` is never
+                                // entered, so there is no execution to consume
+                                // it. An earlier plan tried to make it execute
+                                // through a case-binder telescope; that was
+                                // withdrawn once the route was measured, because
+                                // the failing compile is this root machine's and
+                                // never reaches a specialization definition.
+                                //
+                                // ⛔ The selector is the PLANNER'S OWN retained
+                                // body root. Not a numeric origin, not a worker
+                                // or closure root, and not the whole root
+                                // function -- the last would swallow joins that
+                                // legitimately executed and report a false
+                                // accounting rather than a fix.
+                                //
+                                // ⛔ The body's source occurrence is deliberately
+                                // NOT entered: it did not execute, and entering
+                                // it would claim an execution that never
+                                // happened.
+                                #[cfg(test)]
+                                {
+                                    let root = match lrc_d2b_let_disposition() {
+                                        LrcD2bLetDisposition::Exact => Some(body.static_origin),
+                                        LrcD2bLetDisposition::Suppress => None,
+
+                                    };
+                                    if let Some(root) = root {
+                                        self.disposition_statically_unselected_source_subtree(
+                                            root,
+                                        )?;
+                                    }
+                                }
+                                #[cfg(not(test))]
+                                self.disposition_statically_unselected_source_subtree(
+                                    body.static_origin,
+                                )?;
                                 SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
                             } else if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
                                 SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
