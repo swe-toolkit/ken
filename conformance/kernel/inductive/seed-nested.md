@@ -17,11 +17,12 @@ Ken-owned objects and first principles; no reference implementation or
 Cases marked `[KERNEL-NESTED-IND]` remain design-locked and
 implementation-gated. Seven D6 cases now execute un-gated: DS-9 and fresh-carrier
 admission; negative-under-positive and Pair-negative rejection; unknown-head and
-nonpositive rejection; and unchanged direct/W-style behavior. Of those D6 cases,
-only `nested-size-uses-lift` remains gated for the missing recursive-result
-capability. Independently gated non-D6 residual cases remain marked below. The
-existing direct and W-style controls remain live throughout, so staging the
-residual completeness class does not suspend the positivity posture.
+nonpositive rejection; and unchanged direct/W-style behavior. Both
+`nested-size-uses-lift` and `nested-dependent-motive-uses-lift` remain gated on
+`KERNEL-RECURSIVE-RESULT-SURFACE`. Independently gated non-D6 residual cases
+remain marked below. The existing direct and W-style controls remain live
+throughout, so staging the residual completeness class does not suspend the
+positivity posture.
 
 The custom positive carrier used below is deliberately not a standard-library
 name:
@@ -136,18 +137,49 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
 
 ### kernel/inductive/nested-size-uses-lift [KERNEL-NESTED-IND]
 
-Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE`. The current surface cannot
-denote the kernel-supplied recursive result; finite-depth topology controls do
-not discharge this all-leaf fold, and this row remains gated.
+Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE`. The current implementation
+cannot yet elaborate or execute the specified selector. This D1 entry records
+the future binding contract only: finite-depth topology controls do not
+discharge the all-leaf fold, no executing result is claimed here, and the marker
+remains gated.
 
-- spec: `14 §3.2`, `§7.8`, `§9.5`; `39 §2.2`; `43 §1`
-- given: define `size : Rose -> Nat` by the generated eliminator. The `leaf`
-  method returns `1`; the `node` method eliminates the supplied
-  `All^Type_{Bag,0} (λ_. Nat) b` inhabitant, folds its `Bag`-indexed
-  `Nat` leaves, and adds `1`. Evaluate
+- spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1.1`; `39 §2.3`, `§4`; `43 §1`
+- given (future binding, gated): define `size : Rose -> Nat` by the generated
+  eliminator. The `leaf` method returns `1`; the `node` method folds the
+  supplied `All^Type_{Bag,0} (λ_. Nat) b` inhabitant and adds `1`. In a
+  `Bag.join xs ys` branch, combine `structural result of xs` with
+  `structural result of ys`. Each operand must be the resolved surface binding
+  whose checked method telescope supplies exactly one recursive result for the
+  same field occurrence and support evidence. The association must be
+  one-to-one in both directions, in range, and from that same method and support
+  provenance. Evaluate
   `size (node (join (one leaf) (one (node empty))))`
-- expect: **reduces-to `3`**. The two contained children contribute `1` each,
-  and the outer node contributes `1`
+- expect (future binding, gated): **reduces-to `3`** after surface elaboration,
+  kernel checking, erasure, and interpretation. The two contained children
+  contribute `1` each, and the outer node contributes `1`. The selector emits
+  each exact associated hidden result; it does not expose a hidden binder,
+  change constructor-pattern arity, coerce an ordinary field reference, or
+  reinterpret an owner self-call
+- fail-closed boundary (future binding, gated): a missing, duplicate, swapped,
+  or foreign association rejects with the corresponding
+  `StructuralResultAssociationMissing`, `...Duplicate`, `...Swapped`, or
+  `...Foreign` diagnostic. Shadowing, copying, projecting, or merely reusing a
+  spelling does not transfer an association. An ordinary resolved binding with
+  no association rejects with `StructuralResultOutOfScope`; an unresolved
+  operand rejects with `UnboundName`
+- executing-binding requirement (future only): the eventual row binding must
+  name the kernel structured-IH/iota witness
+  `production_nested_lift_is_consumed_and_iota_computes` and executing surface
+  witnesses
+  `nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_three`
+  and
+  `nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three`. Those
+  surface witnesses must use the selector through the full pipeline for both
+  the Nat-3 `Bag`/`Rose` computation above and a deeper residual `Bag.join`
+  topology. A finite unroll, a depth-three snapshot that never consumes a
+  residual recursive result, or a header naming only one side does not bind
+  this row. These names are requirements for the future binding, not claims
+  that the tests exist or execute now
 - why: this is the load-bearing value flip. With the correct lifted IH the
   result is `3`; a guard-deletion-only implementation that admits `Rose` but
   supplies no lift cannot type-check the definition, and an implementation that
@@ -158,9 +190,9 @@ not discharge this all-leaf fold, and this row remains gated.
 ### kernel/inductive/nested-dependent-motive-uses-lift [KERNEL-NESTED-IND]
 
 Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE` — the **same** blocker as
-`nested-size-uses-lift`, and for the same reason. Architect ruling
-`evt_5dg9ypms4d4ed` (2026-08-10), from an Adversary finding that nothing in this
-seed distinguished the two rows.
+`nested-size-uses-lift`, and for the same reason. This D1 entry records the
+future binding contract only; no executing dependent-motive result is claimed,
+and the marker remains gated.
 
 The existing NC14 control `nested_dependent_motive_consumes_correlated_child_proofs`
 is a **direct-leaf association discriminator, not an executing binding for this
@@ -168,10 +200,12 @@ row.** Its fixture is flat — `ProofJoin : a -> a -> ProofBag a` — so every c
 binding is `support: None` and an owner self-call consumes the exact motive
 instance. This row's carrier is `join : Bag A -> Bag A -> Bag A`, where `xs` and
 `ys` carry `support: Some(All^Omega_Bag)`; the kernel telescope supplies their
-recursive results, `check_match_with_lift` hides every trailing binder, and no
-source term denotes either one. Implicit lockstep preserves the correlation but
-does **not** synthesize the branch's recursive result — another source `match`
-only finite-unrolls the residual `Bag`, exactly as in the Nat-size case.
+recursive results, and `check_match_with_lift` hides every trailing binder. D0
+now specifies how `structural result of xs` and `structural result of ys`
+denote those associated results, but the landed surface pipeline does not yet
+elaborate that selector. Implicit lockstep preserves the correlation but does
+**not** synthesize the branch's recursive result — another source `match` only
+finite-unrolls the residual `Bag`, exactly as in the Nat-size case.
 
 The obstruction is **sort-independent**: `All^Type` versus `All^Omega` changes
 the leaf motive, not the need to consume the support eliminator's recursive
@@ -182,19 +216,37 @@ source can name.
 
 ⇒ **One capability un-gates both rows.** No second surface form is needed.
 
-- spec: `14 §3.2`, `§9.5`; `34 §3.1`; `39 §2.2`
-- given: a dependent motive `AllGood : Rose -> Omega_0` whose `node` proof
-  matches the `Bag Rose` field and its
-  `All^Omega_{Bag,0} (λr. AllGood r) b` inhabitant in lockstep, consuming
-  the motive instance attached to each exposed child
-- expect: **accepts**. Each exposed `Rose` child is accompanied by its exact
+- spec: `14 §3.2`, `§9.5`; `34 §3.1.1`; `39 §2.3`, `§4`
+- given (future binding, gated): a dependent motive
+  `AllGood : Rose -> Omega_0` whose `node` proof matches the `Bag Rose` field
+  and its `All^Omega_{Bag,0} (λr. AllGood r) b` inhabitant in lockstep. In a
+  `Bag.join xs ys` branch, `structural result of xs` and
+  `structural result of ys` select the exact residual proofs associated by the
+  checked method telescope with those surface bindings, field occurrences, and
+  support evidence. Each association is one-to-one in both directions, in
+  range, and from the same method and support provenance
+- expect (future binding, gated): **accepts** through elaboration and kernel
+  checking. Each exposed `Rose` child is accompanied by its exact
   `AllGood child` proof; each residual `Bag Rose` value is accompanied by the
   correspondingly indexed residual `All^Omega` inhabitant. The leaf proofs
   remain irrelevant at their `Omega_0` proposition types, while the
-  topology-carrying `All^Omega` application itself is in `Type 0`
+  topology-carrying `All^Omega` application itself is in `Type 0`. The
+  selector emits the exact associated hidden result without exposing hidden
+  binders or changing ordinary direct and W-style match behavior
+- fail-closed boundary (future binding, gated): missing, duplicate, swapped,
+  and foreign associations reject with the corresponding D0 diagnostic. A
+  same-spelled, copied, projected, or shadowed binding has no authority unless
+  it independently carries exactly one validated same-occurrence association;
+  neither its type nor an owner self-call may be used to guess one
 - why: a non-dependent recursor or an elaborator that binds the field but loses
   the correlated lift cannot construct the branch proof. This pins that the
   feature is induction, not merely a constant-result fold.
+
+Future binding census, not current discharge: once the implementation successor
+executes and both rows are validly bound, the seed-local population of headings
+marked `[KERNEL-NESTED-IND]` changes from **14 to 12**, and the corpus-wide
+population of the same heading markers changes from **15 to 13**. Until then,
+both headings and both markers remain present.
 
 ---
 
@@ -463,9 +515,9 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
 
 - Correct custom-positive and DS-9 paths accept; unknown, known non-positive,
   nested-negative, and mutual paths reject for distinct named guards.
-- The real `size` computation and the structural nested-ι case both require the
-  same source-indexed `All^Type_{Bag,0}` inhabitant. Neither can pass by deleting
-  the old `occurs` guard.
+- The future `size` computation and the structural nested-ι case both require
+  the same source-indexed `All^Type_{Bag,0}` inhabitant. Neither can pass by
+  deleting the old `occurs` guard.
 - On neutral `v : Box Bool`, the method binder and generated inhabitant share
   one literal `All^Type` application; the method-dependent eliminator mutation
   rejects rather than being papered over by an equality or transport.
@@ -486,8 +538,10 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
   nonpositive rejection; and unchanged direct/W-style behavior. Their paired
   positive controls admit while each exact negative/unknown mutation flips the
   verdict.
-- `nested-size-uses-lift` remains gated on
-  `KERNEL-RECURSIVE-RESULT-SURFACE`: the current surface cannot denote the
-  kernel-supplied recursive result, and finite-depth topology controls cannot
-  discharge its all-leaf fold. Independently gated non-D6 residual rows remain
-  marked; blanket nested rejection is no longer the live boundary.
+- `nested-size-uses-lift` and `nested-dependent-motive-uses-lift` remain gated
+  on `KERNEL-RECURSIVE-RESULT-SURFACE`. D1 states their future selector,
+  association, fail-closed, and executing-binding contracts without claiming
+  current execution or removing either marker. Their future binding changes
+  the seed-local marker population from 14 to 12 and the corpus-wide population
+  from 15 to 13. Independently gated non-D6 residual rows remain marked;
+  blanket nested rejection is no longer the live boundary.

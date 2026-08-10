@@ -541,6 +541,14 @@ free identifier to preserve future optionality. Contextual keywords
 (`infixl`, `derive`, …) are not globally reserved. The decided post-freeze
 surface tokens are also lexed here (all spellings OQ-syntax):
 
+- the contextual primary-expression phrase `structural result of x` (`32 §3`,
+  `34 §3.1.1`). `structural`, `result`, and `of` remain ordinary identifier
+  tokens outside that exact production. In particular, this does not change
+  the existing `result` binder in an `ensures` clause. At a primary-expression
+  boundary, the exact four-token sequence commits to the structural-result
+  production; parentheses may disambiguate an ordinary application using the
+  same identifier spellings. The formatter treats the whole phrase as one
+  primary expression and preserves the spaces between its words;
 - the wrapping-arithmetic operator `+%` (and `wrapping_add`, …) in the operator
   set (`35 §3`, OQ-1a);
 - the type-level identifiers `Lazy` (OQ-eval-order) and `Wrapping` (OQ-1a,
