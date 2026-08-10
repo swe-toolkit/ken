@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-10 20:16:03Z — from 209 issue file(s) in `docs/program/issues/`.
+2026-08-10 21:09:09Z — from 210 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -118,6 +118,7 @@ the committed file matches the generator's output.
 | `KW-THEOREM` | rename the surface keyword `lemma` to `theorem` | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
 | `LANG-SELECTOR-SORT-SPLIT-ELAB` | Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates | ready | language | L | none | — |
+| `LANG-SORT-META-CAPABILITY` | Rule whether a term/sort metavariable representation is authorized -- the elaborator cannot today leave a selected result undecided between Type and Omega, so the spec's conditional ambiguity clause has an unreachable antecedent | draft | spec-enclave | S | none | — |
 | `LANG-STRUCTURAL-RESULT-ELAB` | Implement the structural-result selector in the elaborator -- derive the field/evidence/result association from the kernel method telescope and elaborate `structural result of x` to the hidden recursive method result | merged | language | L | none | — |
 | `LIB-GATE-DECOUPLE` | main is red on two library documentation-census gates: the currency gate the operator decoupled from merges still fires from inside CI, and a doc-only merge invalidated the ledger unreported | merged | verify | S | none | 1039 |
 | `LOADER-CITE-ANCHOR` | LOADER-STALE-PREMISE cites the spec by line number (:147-158) — rots silently in the one catalog file outside the currency gate | merged | doc | XS | none | — |
