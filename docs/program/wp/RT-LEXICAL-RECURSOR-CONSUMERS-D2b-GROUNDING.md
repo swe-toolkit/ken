@@ -331,12 +331,33 @@ seam wearing this one's name, and it would red for a reason unrelated to the
 property.
 
 **What discharges the concern instead** is the pairing of that sole-root
-dataflow with the behavioural package already committed: the `Suppress`
-mutation, the exact missing-join A/B, the positive singular-stop advance
-assertion, the non-backedge live-body row, and the accounting / no-entry /
-no-static-worker-call assertions. Between them, an arm that dispositioned the
-wrong subtree could not stay green — the accounting would not close, or the
-advance assertion would fail.
+dataflow with the behavioural package, which is **committed and reaching**. QA
+blocked an earlier revision of this paragraph for citing that package while it
+existed only in prose; what is committed now, in
+`d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_it`:
+
+| assertion | committed |
+|---|---|
+| exact missing-join A/B — `Suppress` replays the exact refusal | yes |
+| positive singular-stop advance, so an earlier failure cannot pass | yes |
+| **exactly one** function dispositions anything | yes |
+| dispositioned is a **singleton** — no wider subtree | yes |
+| dispositioned ⊆ required, and consumed ∩ dispositioned = ∅ | yes |
+| consumed ⊎ dispositioned **closes** required, with consumed non-empty | yes |
+| the abandoned origin is **never entered** and gets **no static-worker call**, with a non-empty entered set so both absences are non-vacuous | yes |
+| the suppressed leg dispositions it in **no** close | yes |
+
+⛔ **Two things named in the re-cut are covered by implication rather than by
+their own row, and that is stated rather than glossed.** The *non-backedge live
+body* is covered by the uniqueness clause — exactly one close dispositions
+anything, so every other `LetBody` traversal in the suite disposes nothing — and
+by `consumed` being non-empty. *Zero withdrawn-plan invocations* is a **git**
+fact, not a test: `units.rs` is untouched across the candidate range, so the
+lookup, binder and telescope do not exist to be invoked.
+
+Between them, an arm that dispositioned the wrong subtree could not stay green —
+the union would not close, the singleton clause would fail, or the advance
+assertion would.
 
 ⛔ **This discharge is conditional on the interface, and it reopens.** If a
 future change gives this arm a second `StaticOriginId`, or any means of

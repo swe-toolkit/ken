@@ -11067,6 +11067,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         static_origin: StaticOriginId,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        #[cfg(test)]
+        crate::cranelift_backend::lowering::lrc_d2b_record_worker_call(static_origin);
         // Explicit arguments in source order: argument `i` is child `1 + i` of
         // the `Call` occurrence, the callee being child `0`.
         //

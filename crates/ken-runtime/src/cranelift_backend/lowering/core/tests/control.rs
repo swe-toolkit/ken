@@ -29224,6 +29224,9 @@ fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_i
     use crate::cranelift_backend::lowering::core::{
         set_lrc_d2b_let_disposition, set_selector_variant_exclusion, LrcD2bLetDisposition,
     };
+    use crate::cranelift_backend::lowering::{
+        lrc_d2b_entered, lrc_d2b_join_observation, lrc_d2b_reset_observation, lrc_d2b_worker_calls,
+    };
     struct Restore;
     impl Drop for Restore {
         fn drop(&mut self) {
@@ -29234,13 +29237,14 @@ fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_i
     const MISSING_JOIN: &str = "neither emitted nor statically unselected";
     const HARD_STOP: &str = "projects no worker for";
 
-    let run = |mode: LrcD2bLetDisposition| -> String {
+    let run = |mode: LrcD2bLetDisposition| -> D2bObservation {
         let _restore = Restore;
         let expression = host_result_closure_match(px8j_recursive_sibling_result(
             1,
             2,
             px8j_aggregate_result(),
         ));
+        lrc_d2b_reset_observation();
         set_lrc_d2b_let_disposition(mode);
         set_selector_variant_exclusion(Some(
             RecursiveDescentResidual::LexicalCallArgumentRecursor,
@@ -29248,27 +29252,131 @@ fn d2b_the_abandoned_let_body_joins_are_dispositioned_at_the_arm_that_abandons_i
         let (result, _trace) = px8j_capture_source_trace(&expression, false, "ken_d2b_let");
         set_selector_variant_exclusion(None);
         set_lrc_d2b_let_disposition(LrcD2bLetDisposition::Exact);
-        format!("{result:?}")
+        D2bObservation {
+            rendered: format!("{result:?}"),
+            closeout: lrc_d2b_join_observation(),
+            entered: lrc_d2b_entered(),
+            worker_calls: lrc_d2b_worker_calls(),
+        }
     };
 
     // ── REPAIRED ────────────────────────────────────────────────────────────
     let repaired = run(LrcD2bLetDisposition::Exact);
     assert!(
-        !repaired.contains(MISSING_JOIN),
-        "the abandoned body's join is still unaccounted: {repaired}"
+        !repaired.rendered.contains(MISSING_JOIN),
+        "the abandoned body's join is still unaccounted: {}",
+        repaired.rendered
     );
     assert!(
-        repaired.contains(HARD_STOP),
+        repaired.rendered.contains(HARD_STOP),
         "the row did not reach the singular-specialization hard stop, so it is failing EARLIER \
-         than the join closeout and the absence above is a regression rather than the repair: \
-         {repaired}"
+         than the join closeout and the absence above is a regression rather than the repair: {}",
+        repaired.rendered
+    );
+
+    // ⭐⭐ THE ACCOUNTING ITSELF, not inferred from the absence of a sentence.
+    //
+    // ⛔ `None` here would mean the closeout guard never ran, which the absence
+    // assertion above cannot distinguish from "it ran and closed". That is the
+    // reading this unwrap refuses.
+    assert!(
+        !repaired.closeout.is_empty(),
+        "no join closeout ran at all, so the accounting below would be vacuous"
+    );
+    // ⛔ The guard runs once per function; select the close that actually
+    // dispositioned something, and require it to be UNIQUE. Taking the last
+    // close would record a different function's accounting.
+    let dispositioning: Vec<_> = repaired
+        .closeout
+        .iter()
+        .filter(|(_, _, dispositioned)| !dispositioned.is_empty())
+        .collect();
+    assert_eq!(
+        dispositioning.len(),
+        1,
+        "expected exactly one function to disposition anything; got {} -- the arm is firing in \
+         more places than the abandoned body",
+        dispositioning.len()
+    );
+    let (required, consumed, dispositioned) = dispositioning[0].clone();
+    let abandoned = *dispositioned
+        .iter()
+        .next()
+        .expect("the abandoned body's join is dispositioned");
+
+    assert_eq!(
+        dispositioned.len(),
+        1,
+        "exactly the abandoned body's join is dispositioned; a wider subtree would swallow joins \
+         that legitimately executed: {dispositioned:?}"
+    );
+    assert!(
+        required.contains(&abandoned),
+        "the dispositioned join is not in the required set, so it belongs to another function"
+    );
+    assert!(
+        !consumed.contains(&abandoned),
+        "the abandoned join is BOTH consumed and dispositioned; the two sets must stay disjoint"
+    );
+    assert!(
+        consumed.is_disjoint(&dispositioned),
+        "consumed and dispositioned overlap: {consumed:?} vs {dispositioned:?}"
+    );
+    let mut covered = consumed.clone();
+    covered.extend(dispositioned.iter().copied());
+    assert_eq!(
+        covered, required,
+        "the disjoint union of consumed and dispositioned does not close the required set"
+    );
+    assert!(
+        !consumed.is_empty(),
+        "nothing was consumed, so the closure above holds for the degenerate reason that \
+         everything was dispositioned"
+    );
+
+    // THE BODY DID NOT EXECUTE, and that is asserted rather than assumed.
+    assert!(
+        !repaired.entered.contains(&abandoned),
+        "the abandoned body's occurrence was ENTERED, so it did execute and dispositioning it is \
+         the wrong accounting"
+    );
+    assert!(
+        !repaired.worker_calls.contains(&abandoned),
+        "a static-worker call was emitted for the abandoned body's origin, so it did execute"
+    );
+    assert!(
+        !repaired.entered.is_empty(),
+        "no occurrence was entered at all, so the two absences above are vacuous"
     );
 
     // ── SUPPRESSED — the pre-repair state, from the committed tree ──────────
     let suppressed = run(LrcD2bLetDisposition::Suppress);
     assert!(
-        suppressed.contains(MISSING_JOIN),
+        suppressed.rendered.contains(MISSING_JOIN),
         "suppressing ONLY the new arm's disposition did not recreate the missing-join refusal, \
-         so that arm is not what accounts the join: {suppressed}"
+         so that arm is not what accounts the join: {}",
+        suppressed.rendered
     );
+    assert!(
+        suppressed
+            .closeout
+            .iter()
+            .all(|(_, _, dispositioned)| !dispositioned.contains(&abandoned)),
+        "the suppressed run still dispositioned the abandoned join, so the suppression did not \
+         reach the arm and the A/B compares one state with itself"
+    );
+}
+
+/// The observation one run yields. Grouped so the two legs are compared on the
+/// same axes rather than on whichever field each happened to read.
+#[cfg(test)]
+struct D2bObservation {
+    rendered: String,
+    closeout: Vec<(
+        BTreeSet<StaticOriginId>,
+        BTreeSet<StaticOriginId>,
+        BTreeSet<StaticOriginId>,
+    )>,
+    entered: BTreeSet<StaticOriginId>,
+    worker_calls: BTreeSet<StaticOriginId>,
 }
