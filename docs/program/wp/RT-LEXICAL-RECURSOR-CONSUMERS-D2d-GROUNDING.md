@@ -89,12 +89,13 @@ continuation is *return through the ABI*.
 `RoutedAnswer` through. The fused region has to be **formed**, which is what the
 new unit class is for.
 
-## 4. Both of the ruling's stop conditions are measured CLEAR
+## 4. The two planner preconditions are measured CLEAR
 
-The ruling says to stop again only if planning cannot project the exact producer
-invocation edge or its complete input run, or if the recursor activation would
-have to enter a descriptor or ABI carrier. **All three were measured, and none
-fires.**
+The ruling requires planning to project the exact producer invocation edge and
+its complete input run. Both planner preconditions are measured clear below. The
+independent emitter/ABI stop condition cannot be discharged by this
+non-implementation partial: §4.3 establishes only that no activation appears in
+the projected inputs. It remains a live obligation on the emitter.
 
 ### 4.1 The exact producer invocation edge is projectable and unique
 
