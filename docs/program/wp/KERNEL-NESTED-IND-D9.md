@@ -1,10 +1,16 @@
 # KERNEL-NESTED-IND D9 — ungate `nested-size-uses-lift`, on the repaired fixture
 
 Owner: kernel. Size: S. Node: [[KERNEL-NESTED-IND]] (`active`).
-**Held pending [[LANG-SELECTOR-SORT-SPLIT-ELAB]] — see Contention.**
-Fixed inputs measured at `main` `c380ab32`. `D2c` lands between framing and
-release and touches only `crates/ken-runtime` and `docs/`, so every input this
-frame names is unchanged by it.
+**RELEASED 2026-08-10. The hold is discharged** —
+[[LANG-SELECTOR-SORT-SPLIT-ELAB]] merged as `main` `c0757335`, the crates now
+parse `recursive result for`, and the old spelling is at **zero** under
+`crates/`. Re-derive your merge-base; do not reuse a SHA from this frame.
+
+**Your fixed inputs are unchanged and I checked rather than assumed it.** The
+Language merge touched ten `crates/ken-elaborator` paths and
+`tests/nc14_data_match_lowering.rs` **is not among them** — the fixture this
+frame quotes is byte-identical. `D2c` and the Runtime `D2d`/`D2e` merges touch
+only `crates/ken-runtime` and `docs/`.
 
 ## This is D8 again, with the blocker removed
 
@@ -115,20 +121,44 @@ Paths are `conformance/kernel/inductive/seed-nested.md` and the
 targets and the conformance row, so the intersection is empty, but check before
 you write.** A `conformance/` path pulls a Spec vote on the merge Decision.
 
-**A sequencing constraint, and it is why this frame is not released yet.**
-`SPEC-SELECTOR-SORT-SPLIT` respells this row: `nested-size-uses-lift` now
-requires **`recursive result for xs`**. The crates still parse only `structural
-result of`, and the elaborator respell is
-[[LANG-SELECTOR-SORT-SPLIT-ELAB]].
+**The sequencing constraint is DISCHARGED.** `SPEC-SELECTOR-SORT-SPLIT`
+respelled this row and [[LANG-SELECTOR-SORT-SPLIT-ELAB]] landed the elaborator
+half at `c0757335`. Take the spelling from the row in the file, not from this
+frame — measured there today, the `join` branch combines **`recursive result for
+xs`** with **`recursive result for ys`**.
 
-⇒ **Until that lands, no executing witness can spell the selector the way the
-row it binds specifies.** Writing the witness in the old spelling would bind the
-row to a source that contradicts it, which is worse than leaving it gated.
+## The row's sort boundary — read this before you write the witness
 
-**Do not start this deliverable until `LANG-SELECTOR-SORT-SPLIT-ELAB` has
-merged.** I will release it then; if you receive this frame before that, the
-kickoff is the error and it comes back to me. When you do start, take the
-spelling from the row in the file rather than from this frame.
+The respell gave the row a clause `D8` never saw, and **it has two halves that
+must be treated differently.** Both sit under "sort boundary" in
+`seed-nested.md`.
+
+**The half you must bind.** The selected hidden `Nat` result is classified by
+`Type`, so **`induction hypothesis for xs` rejects with
+`RecursiveResultSortMismatch`, naming `recursive result for xs` as the exact
+required spelling.** That is implemented and reachable — bind it.
+
+**The half you must NOT fabricate.** The clause continues: *"If metavariables
+leave the selected result ambiguous between `Type` and `Omega`,
+`RecursiveResultSortAmbiguous` rejects without a guessed or default selector."*
+
+⇒ **That state is unreachable in the current representation, and this is
+settled — do not spend a turn rediscovering it.** `MetaCtx` holds only
+`Vec<Option<Level>>`, core `Term` has no term or sort metavariable, `zonk_term`
+preserves the `Term::Type` versus `Term::Omega` constructor, and kernel
+`classify` matches that constructor. A level solution moves the payload, never
+the constructor. `RecursiveResultSortAmbiguous` is landed **defined and
+Display-pinned with zero production construction sites**, reserved to
+[[LANG-SORT-META-CAPABILITY]].
+
+**The clause is conditional and its antecedent cannot arise, so it is satisfied,
+not breached.** Do not build a witness for it, do not construct a malformed term
+to trigger it, and **do not escalate it** — this paragraph is the ruling. It
+cost Language a full turn and an Architect rejection; it should cost you
+nothing.
+
+**Report it as excluded with its reason**, so a reader does not read the row's
+silence on that half as an oversight.
 
 ## Validation
 

@@ -141,6 +141,42 @@ grounding record was careful in its operative text and slipped in its headings �
 general property, and a scanner reads headings. One qualifier per claim closes
 it.
 
+**AC-9 and AC-10 — added 2026-08-10, after the first partial merged.** The
+bounded partial `5add1cb9` landed the checked binder layout and `AC-7` at `main`
+`f37ecd13`; confirmed Adversary finding `evt_kjjhmt36kt54` measured two defects
+in it, and I verified both. They are not new scope — `AC-9` is discharged by the
+occurrence-walk threading this deliverable already owes.
+
+**AC-9 — the layout control must observe production, not itself.**
+`CheckedCaseBinderLayout::for_case` **recomputes** the reversal from
+`recursive_positions` and `argument_binders` — the same inputs production uses —
+and never reads production's assembled environment. **Delete the `.rev()` at
+`lowering/core.rs:4939` and `for_case` still reverses, so every layout assertion
+stays green.** The one artifact named as owning the order cannot detect the
+order changing.
+
+Flip or delete the reversal at a **production** site and a layout control must
+**red**. Report the mutation and its result. **A control that recomputes its own
+answer from the same inputs is not a control** — it is the claim restated in
+executable form, and adding more tests of the same shape does not help.
+
+**AC-10 — the single-owner claim must be true when asserted, or qualified until
+it is.** The landed comment says `for_case` performs *"the one `.rev()`"* and
+that a lowering change moving the prefix is *"a single-site correction rather
+than a hunt."* **Measured at `f37ecd13` there are four production `.rev()` sites
+over `recursive_positions` in `lowering/core.rs` — 4939, 5496, 7094, 13708 — and
+all four predate the candidate.** `CheckedCaseBinderLayout` carries
+`#[cfg_attr(not(test), allow(dead_code))]` and is named only from `mod tests`.
+
+The literal sentence is about consumers *of the layout* and is true of them; the
+conclusion drawn from it is not. **"Single-site correction rather than a hunt"
+is an instruction to the next implementer not to look, resting on a premise that
+is false today.** Either make the four production sites index the layout, or say
+plainly that they do not yet and name them, with a pointer at `core.rs:4939`
+naming `for_case` as the intended owner so the sites are findable from either
+end. **Fix the tense, not the design** — scaffolding for an unbuilt plane is
+fine; stating an aspiration in the perfect tense is not.
+
 ## Excluded scope
 
 - **No emission, and this is the cut.** No `AbiUnitDefinition` arm, no
