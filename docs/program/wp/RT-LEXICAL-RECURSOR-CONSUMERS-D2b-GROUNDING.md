@@ -24,7 +24,7 @@ byte-identical.**
 | coordinate | exact | moves? |
 |---|---|---|
 | **measurement base** — the tree every figure was taken on | `a6186741` | **no.** A commit on `main` |
-| **candidate merge-base** — where this candidate sits | `a6186741` | **yes.** Every re-anchor moves it |
+| **candidate merge-base** — where this candidate sits | `c3162c99` | **yes.** Every re-anchor moves it; it was `a6186741` before this one |
 
 They coincide **today**. They are still recorded separately, because one of them
 is not stable and this lane has been blocked three times for collapsing them
@@ -188,3 +188,56 @@ account for it is **not in this candidate**.
 
 **No wider projection, ABI, capture lane or guard change was needed for the
 planner plane** — the stop clause did not fire.
+
+## 8. Lowering-plane grounding — the three seams, located
+
+Taken after the planner partial was approved. **Grounding only; no lowering
+change is in this candidate.**
+
+### 8.1 The guard row 3 now stops at
+
+`Lowering::finalize_join_disposition` (`lowering/mod.rs`) requires, for the
+function's `required` join set:
+
+```text
+required  ==  consumed_join_origins  ∪  dispositioned_join_origins
+```
+
+and refuses a member of neither with *"function left planned source join
+`<origin>` neither emitted nor statically unselected"*. Row 3's sibling join is
+in neither set: the planner no longer emits it as an ordinary parameter, so it
+is not **consumed**, and nothing yet declares it **dispositioned**.
+
+⛔ **The guard is correct and is not the thing to change.** It is `AC-3` guard 4.
+
+### 8.2 The disposition mechanism already exists
+
+`Lowering::disposition_statically_unselected_source_subtree(root)` marks every
+planned join in a statically unselected source branch, deriving the subtree from
+the planner's validated positional-child inventory — *"lowering maintains no
+second source spelling inventory"*. **Three production call sites already use
+it**, so accounting a nonselected sibling's joins is an established pattern
+rather than a new one.
+
+### 8.3 The binder constructor and its required decisions
+
+`construct_static_worker_binding(closure_origin, body_origin, declared_arity,
+source_capture_count, captures, route, discharge)`.
+
+Its `discharge` argument is deliberately **required and not inferred from
+`route`** — the two facets are independent, and its own comment says a caller
+that has not decided which causal obligation the binding may answer for *"has
+not finished building it"*. So the nonselected sibling's `RawWorker` /
+`DirectSpecializationCall` choice is an explicit decision at the call site, not
+a default.
+
+### 8.4 What this does and does not settle
+
+**Settles:** every seam the ruled mechanism names exists, is production-reachable,
+and has a precedent — no new lowering population, ABI lane or guard is implied.
+
+**Does not settle:** whether dispositioning the sibling subtree is *sufficient*
+for row 3, or whether the caller-side omission must also account for something
+the subtree walk does not reach. That is measurable only by building it, and it
+is the first thing the next turn should measure rather than assume.
+
