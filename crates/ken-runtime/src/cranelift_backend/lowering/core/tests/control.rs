@@ -29105,7 +29105,7 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
     // `assert!(s_arrivals > 0)` that a trim pass could delete without breaking
     // anything.
     //
-    // ⛔ A DENOMINATOR READ ONLY BY THE MESSAGE IS TWO EDITS FROM GONE, NOT ONE.
+    // A DENOMINATOR READ ONLY BY THE MESSAGE IS TWO EDITS FROM GONE, NOT ONE.
     // A previous revision bound this `NonZeroUsize` and then compared against the
     // literal `0`, reading the value only inside the format string. Deleting the
     // binding was a compile error -- but *shortening the message* first, which

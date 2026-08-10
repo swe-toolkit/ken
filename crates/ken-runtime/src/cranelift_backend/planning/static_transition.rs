@@ -7923,7 +7923,7 @@ pub(in crate::cranelift_backend) fn set_continuation_descent_owner_duplication(a
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — what one binder of a checked
 /// computational-match case IS.**
 ///
-/// ⭐⭐ **The role a slot plays, which the derived environment did not carry.**
+/// **The role a slot plays, which the derived environment did not carry.**
 /// [`derive_case_producer_fact`]'s `ComputationalMatch` arm pushes
 /// `argument_binders + recursive_positions.len()` entries and makes every one of
 /// them `CaseProducerFact::open(origin)` — the **count** is right and the
@@ -7931,7 +7931,7 @@ pub(in crate::cranelift_backend) fn set_continuation_descent_owner_duplication(a
 /// so an induction hypothesis, an ordinary constructor child and a frame value
 /// are indistinguishable in the derived fact.
 ///
-/// ⛔ That absence is why `build_continuation_specialization_plan` falls back to
+/// That absence is why `build_continuation_specialization_plan` falls back to
 /// the *syntactic* predicate — the argument at a recursive position must be a
 /// `Closure` or `LexicalClosure` — and skips a `Var` that names the
 /// compiler-minted hypothesis. This enum is what lets the role be **derived**
@@ -7942,7 +7942,7 @@ pub(in crate::cranelift_backend) enum CheckedCaseBinderRole {
     /// The compiler-minted induction hypothesis over the child at this
     /// **recursive source position**.
     ///
-    /// ⛔ The position is the one the *case* declared, never the binder's de
+    /// The position is the one the *case* declared, never the binder's de
     /// Bruijn index — the two differ whenever a case has more than one
     /// recursive position, which is exactly the population a single-position
     /// witness cannot discriminate.
@@ -7980,7 +7980,7 @@ pub(in crate::cranelift_backend) enum CheckedCaseBinderRole {
 /// REVERSE `recursive_positions` order.** The children follow in declaration
 /// order, then the frame environment.
 ///
-/// ⚠ **The reversal is the half a one-position witness cannot see**, because
+/// **The reversal is the half a one-position witness cannot see**, because
 /// forward and reversed coincide at length one. It is measured here only because
 /// the two-sibling fixture exists; the `R3` witness alone would have left it
 /// unmeasured and a "remembered" order would have had an even chance.
@@ -7988,7 +7988,7 @@ pub(in crate::cranelift_backend) enum CheckedCaseBinderRole {
 /// ## Why the order lives in exactly one place
 ///
 /// [`Self::for_case`] performs the one `.rev()` and stores the result **in de
-/// Bruijn order**. Every consumer indexes that vector. ⛔ No consumer re-derives
+/// Bruijn order**. Every consumer indexes that vector. No consumer re-derives
 /// the order, so a lowering change that moves the prefix is a single-site
 /// correction rather than a hunt — and [`Self::role_at`] cannot disagree with
 /// itself between two call sites.
@@ -8005,7 +8005,7 @@ pub(in crate::cranelift_backend) struct CheckedCaseBinderLayout {
 impl CheckedCaseBinderLayout {
     /// Derive the layout from the case's own checked declaration.
     ///
-    /// ⛔ Reads `recursive_positions` and `argument_binders` and nothing else —
+    /// Reads `recursive_positions` and `argument_binders` and nothing else —
     /// not the body, not a lowered shape, not a constructor spelling, not an
     /// arity recovered from a value.
     fn for_case(
@@ -8029,7 +8029,7 @@ impl CheckedCaseBinderLayout {
 
     /// What the binder at this de Bruijn index is.
     ///
-    /// ⛔ Total by construction: an index past this case's own binder run is the
+    /// Total by construction: an index past this case's own binder run is the
     /// enclosing frame environment, which is a **role**, not an error. A `Var`
     /// reaching past the run is ordinary and must not be refused here.
     fn role_at(&self, index: usize) -> CheckedCaseBinderRole {
@@ -13678,12 +13678,12 @@ mod tests {
     use super::abi::{AbiCarrier, AbiSlot, AbiSlotKind};
     /// `D2e` `AC-1` — the role DISCRIMINATES, in both directions on one shape.
     ///
-    /// ⛔ A classifier that answered `InductionHypothesis` for everything would
+    /// A classifier that answered `InductionHypothesis` for everything would
     /// pass an IH-only assertion, and one that answered `ConstructorChild` for
     /// everything would pass a child-only assertion. So the same case supplies
     /// both, at adjacent de Bruijn indices, and each is named exactly.
     ///
-    /// ⚠ The case declares TWO binders of which ONE is recursive, so the two
+    /// The case declares TWO binders of which ONE is recursive, so the two
     /// roles are genuinely a pair drawn from one declaration rather than from
     /// two fixtures whose difference could be anything.
     #[test]
@@ -13718,12 +13718,12 @@ mod tests {
     /// `D2e` — the hypothesis prefix runs in REVERSE declaration order, and this
     /// is the half a single-recursive-position witness cannot see.
     ///
-    /// ⭐⭐ **MEASURED, not assumed.** At the specialized composed arm, a
+    /// **MEASURED, not assumed.** At the specialized composed arm, a
     /// `PX8JSiblingTree::Node` case with `recursive_positions=[0, 1]` put the
     /// hypothesis for `sibling_position=1` at `Var(0)` and the one for
     /// `sibling_position=0` at `Var(1)`.
     ///
-    /// ⛔ **This test is the whole reason the reversal is not a guess.** Forward
+    /// **This test is the whole reason the reversal is not a guess.** Forward
     /// and reversed coincide at length one, so every one-position fixture in the
     /// corpus agrees with BOTH spellings; only a case with two positions can
     /// tell them apart. Deleting this test would leave the order pinned by
@@ -13761,7 +13761,7 @@ mod tests {
 
     /// `D2e` — the run ENDS, and what follows is the enclosing frame.
     ///
-    /// ⛔ Total rather than fallible: a `Var` reaching past this case's binders
+    /// Total rather than fallible: a `Var` reaching past this case's binders
     /// is ordinary, and refusing it here would turn every outer-scope reference
     /// into a planner error.
     #[test]
@@ -13788,7 +13788,7 @@ mod tests {
 
     /// `D2e` — a case with NO recursive positions has no hypothesis slot at all.
     ///
-    /// ⚠ The population that must not acquire a role by accident: every
+    /// The population that must not acquire a role by accident: every
     /// non-recursive case in the corpus. If the prefix were computed from a
     /// count that could be nonzero here, `Var(0)` would misclassify.
     #[test]
