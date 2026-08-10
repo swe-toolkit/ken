@@ -3434,20 +3434,31 @@ fn checked_runtime_symbols_v1(
 /// captured before elaboration through **the caller's own**
 /// `stable_symbols_for_env` table and nothing else.
 ///
-/// A missing id is an error, never a skipped entry: a roster that quietly
-/// dropped a target would admit a tuple whose partner it could not name.
+/// ⛔ A missing id is an **error**, never a skipped entry.
+///
+/// This is the fail-closed direction, and the tempting alternative is wrong in
+/// a way that is invisible downstream. Dropping an unnameable id would emit a
+/// **smaller authoritative roster**, and admission compares a package's trust
+/// targets against exactly that artifact — so it would compare against the
+/// already-shrunk set and never learn that a captured trust root could not be
+/// named. The whole mechanism rests on the roster being the *complete*
+/// pre-source trusted base; a silent shrink here forges that completeness.
+///
+/// A clean carrier measuring 107 targets against 107 roster entries proves the
+/// table is complete **today**. It does not make the discard safe: any later
+/// producer or table drift would silently narrow the roster instead of
+/// refusing, and nothing downstream could tell the difference.
 fn checked_native_trusted_base_v1(
     prelude: &crate::prelude::PreludeEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
 ) -> Result<crate::erasure::CheckedNativeTrustedBaseV1, CompilerDriverError> {
     let mut targets = std::collections::BTreeSet::new();
     for id in &prelude.native_trusted_base {
-        // Ids outside this package's emitted table are not addressable by a
-        // consumer and are dropped deliberately -- the roster is the set the
-        // package can NAME, and admission compares against exactly that.
-        if let Some(symbol) = symbols.get(id) {
-            targets.insert(symbol.clone());
-        }
+        let symbol = symbols
+            .get(id)
+            .cloned()
+            .ok_or(CompilerDriverError::MissingStableSymbol { id: *id })?;
+        targets.insert(symbol);
     }
     Ok(crate::erasure::CheckedNativeTrustedBaseV1 { targets })
 }
@@ -6520,6 +6531,86 @@ mod d1b_role_c1_roster_identity {
         assert!(
             uncovered.is_empty(),
             "these canonical roles are asserted by nothing above: {uncovered:?}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod d1b_role_c1_roster_projection_is_fail_closed {
+    use super::*;
+
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — an unnameable captured
+    /// trust root is a **refusal**, never a smaller roster.
+    ///
+    /// ⛔ MEASURED: severing exactly one captured id from the
+    /// `stable_symbols_for_env` table makes `checked_native_trusted_base_v1`
+    /// return `MissingStableSymbol` naming that id, and the positive control
+    /// beside it shows the same inputs project a full roster when the mapping is
+    /// intact. CLAIMED: the emitted roster is the complete pre-source trusted
+    /// base, so admission compares against everything that was captured. THE
+    /// GAP: this measures the producer's projection, not the whole emission
+    /// path — a later stage could still drop the roster, which the decode-side
+    /// integrity check owns.
+    ///
+    /// **Why the discard this replaces was unsafe, and why a green suite hid
+    /// it.** Skipping an unnameable id emits a *smaller authoritative roster*,
+    /// and admission compares a package's trust targets against exactly that
+    /// artifact — so it would compare against the already-shrunk set and never
+    /// learn a trust root went missing. The clean carrier's 107-vs-107 equality
+    /// proves the table is complete today; it says nothing about what happens
+    /// when it is not, because with a complete table both branches agree. Only
+    /// severing a mapping separates them.
+    ///
+    /// PROMISE CLASS: durable invariant. It asserts a relation between the
+    /// captured set and the table, with no count pinned, so a prelude that grows
+    /// or shrinks keeps it green.
+    #[test]
+    fn a_captured_id_absent_from_the_symbol_table_refuses_instead_of_shrinking_the_roster() {
+        let mut env = ElabEnv::new().expect("prelude env");
+        env.elaborate_file("const two : Nat = Suc (Suc Zero)\n")
+            .expect("package source elaborates");
+
+        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false);
+
+        // POSITIVE CONTROL: with the table intact the projection succeeds, and
+        // it names every captured id. Without this, the refusal below could be
+        // caused by inputs that never worked at all.
+        let intact = checked_native_trusted_base_v1(&env.prelude_env, &symbols)
+            .expect("an intact table projects the whole captured roster");
+        assert_eq!(
+            intact.targets.len(),
+            env.prelude_env.native_trusted_base.len(),
+            "the intact projection is not one target per captured id, so the shrink this control \
+             is about may already be happening"
+        );
+        assert!(
+            !intact.targets.is_empty(),
+            "the captured roster is empty, so severing an entry below would be impossible and \
+             the whole control vacuous"
+        );
+
+        // THE DISCRIMINATOR: sever exactly one captured id's mapping.
+        let victim = *env
+            .prelude_env
+            .native_trusted_base
+            .iter()
+            .next()
+            .expect("the captured roster is non-empty, asserted above");
+        let mut severed = symbols.clone();
+        assert!(
+            severed.remove(&victim).is_some(),
+            "the victim id had no mapping to begin with, so removing it changes nothing and the \
+             refusal below would not be caused by this control"
+        );
+
+        let error = checked_native_trusted_base_v1(&env.prelude_env, &severed)
+            .expect_err("a captured trust root the package cannot name must refuse");
+        assert!(
+            matches!(
+                error,
+                CompilerDriverError::MissingStableSymbol { id } if id == victim
+            ),
+            "the refusal must name the unnameable captured id, got {error:?}"
         );
     }
 }

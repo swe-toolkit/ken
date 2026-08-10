@@ -2521,9 +2521,15 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // their postulates belong to the pre-source base; a roster captured here
     // would refuse every real package for entries the user never wrote.
     //
-    // The capture therefore sits at `install_prelude_floor()` in `lib.rs` --
-    // the actual boundary between compiler-owned prelude and user source, and
-    // the one the "before source elaboration" requirement means.
+    // The capture therefore sits at the END of `ElabEnv::empty()` in `lib.rs`,
+    // after every compiler-owned initializer has run and immediately before the
+    // constructor returns an environment any package source could elaborate
+    // into. That constructor phase transition is the authority boundary.
+    //
+    // ⛔ It is NOT `install_prelude_floor()`, even though the assignment sits
+    // adjacent to that call. That method installs only the unshadowable source-
+    // NAME floor; naming it as the boundary would attribute the guarantee to a
+    // mechanism that does not provide it. See the comment at the capture site.
     Ok(PreludeEnv {
         runtime_roles,
         native_trusted_base: std::collections::BTreeSet::new(),
