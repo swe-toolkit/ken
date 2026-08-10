@@ -38,9 +38,36 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~05:4xZ. `main` = `129ff353`.
+> ### RESUME HERE — state at 2026-08-10 ~06:2xZ. `main` = `8e2883b0`.
 >
-> Worktree clean, publisher queue EMPTY, nothing unpublished.
+> Publisher queue EMPTY. **Two code merges landed this window, both CI green.**
+>
+> - **DS-9 `D1`** — exact `6675ff54`, PR #1770, `main` `258336bf`. Both paths
+>   blob-verified. **The declaration DS-9 was stood down for on 2026-07-27 now
+>   elaborates on `main`.** Merged as an **accepted partial** under
+>   `merge-policy.md`: foundation-leader had said "no merge Decision until
+>   D2-D7", and had already started `D2` on top of it, which made it the floor
+>   rather than a candidate. Node stays `active`.
+> - **RT `D1b-role-b`** — exact `7e918bdf`, PR #1771, `main` `8e2883b0`. Four
+>   paths blob-verified from the declared merge-base, count checked.
+>
+> **Slice `c` is CUT IN TWO and `c1` is assigned** (`evt_6z7wf6dw94cym`);
+> `c2` returns to me before assignment and must state its `AC-K12`
+> relationship, because two Kernel seats are idle behind that criterion.
+>
+> **OPEN, not mine to chase: Architect question `evt_6mbzn0y6jh232`.** Does
+> `KERNEL-RECURSIVE-RESULT-SURFACE`'s block extend to `List`-carried
+> recursion? `List` is `Nil | Cons a (List a)` — structurally the recursive
+> carrier the ruling named, and `JsonArray : List Json → Json` is DS-9's whole
+> recursion surface. **If yes, DS-9's codec deliverables (`D3`+) are not
+> writable and DS-9 owes a `depends_on` on a node that is `draft`, unframed,
+> size TBD.** `D2` is unaffected; Foundation told to keep going.
+>
+> **M6 WAS UNDER-VERIFYING and is fixed.** It said `git diff --name-only
+> <SHA>^ <SHA>` — the last commit only. DS-9 `D1` was two commits, so it
+> enumerated one of two declared paths and printed a confident `MATCH` while
+> the package went unchecked. No error, no empty output. Now enumerates from
+> the declared merge-base and checks the path count against the ring's scope.
 >
 > **`CI-ASSERTIONLESS-L1` MERGED** at exact `3d6622c9` (PR #1765), all three
 > blobs verified. Four SHAs, three rejections, every one on the file header's

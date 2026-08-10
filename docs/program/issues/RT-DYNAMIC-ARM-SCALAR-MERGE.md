@@ -11,7 +11,54 @@ github: null
 origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 2026-08-09). Kernel reached the native boundary after interpreter Nat-3 and provenance-gated erasure both passed, and stopped without Runtime edits exactly as the durable D5 ruling at main 46c12adb requires. Steward-filed (agents cannot create tracked work per COORDINATION §2). Steward owns the frame and AC/control placement.
 ---
 
-> # `D0` AND `D1a` ARE DONE. START AT `D1b-role`.
+> # `D1b-role-b` MERGED 2026-08-10. SLICE `c` IS CUT IN TWO. START AT `c1`.
+>
+> Exact `7e918bdf`, PR #1771, CI green, `main` `8e2883b0`. All four declared
+> paths blob-verified from the declared merge-base `faabc2ed`, count checked
+> against the ring's declared scope. Decision `dec_1amndpa3aaay5`.
+>
+> **Landed:** `RuntimeCheckedRoleSymbolsV1` decoded from the `semantic.metadata`
+> lane at erasure into typed Runtime metadata and validated -- every role in
+> `semantic.symbols`, constructor roles resolving through `data_metadata` to
+> exactly one family. Absence stays `None`; corruption is
+> `ErasureError::InvalidRuntimeRoleAuthority`. Partial-b only: **no `AC-K12`
+> claim**.
+>
+> ## Slice `c` cut, confirmed by the Steward 2026-08-10 (`evt_6z7wf6dw94cym`)
+>
+> Proposed by runtime-leader (`evt_5bhxf5cj2xh6b`) and confirmed as cut, not
+> subdivision -- `c1` is a **fail-closed contract** that merges independently,
+> `c2` is **semantic admission**. Combining them would put an unbounded
+> question behind a bounded one, which is what made slice `a` too wide.
+>
+> - **`c1` -- the consumption boundary.** Require the typed record for
+>   package-backed compilation; reject missing/malformed/duplicate/inconsistent
+>   authority before `plan_static_transition_graph_with_symbols`; pass the exact
+>   record into lowering; make package lowering take non-`Option` authority so
+>   implicit legacy fallback is structurally unreachable. Controls: the three
+>   named pre-lowering rejection cases, explicit-legacy lowerer causality, and
+>   the seed-only-explicit-legacy versus no-package-implicit-fallback boundary.
+> - **`c2` -- the lowering outcomes that rely on that boundary.** Real-`D5`
+>   refusal `1→0`/`StructuralNat`; unrelated Peano-shaped user `Data` remaining
+>   `Constructor`; all merge shapes and the catch-all retained.
+>   **Comes back to the Steward before assignment.**
+>
+> **Two Steward conditions on the cut:**
+>
+> 1. **`c1`'s three rejection controls sit BEHIND the validation `D1b-role-b`
+>    just landed.** Each may red at erasure validation before the new
+>    pre-lowering check runs -- the same false discharge this ring documented
+>    an hour earlier. Establish which layer produced each red; where the outer
+>    layer subsumes the inner, use the two-factor construction and say so
+>    rather than reporting three independent controls. An unreachable case is a
+>    finding.
+> 2. **`c2` must state its relationship to `AC-K12` before assignment.**
+>    `KERNEL-NESTED-IND` is `active` on that one criterion, it is
+>    Runtime-owned, and two Kernel seats are idle behind it. Discharges,
+>    partially advances, or orthogonal -- and if not discharged, what still
+>    stands between them.
+>
+> # `D0` AND `D1a` ARE DONE.
 >
 > ⚠ **`D1a` closed 2026-08-09 (`evt_3g4n00s7ftd9q`) with a verdict my own
 > taxonomy could not express**, and Architect ruling `evt_2wm35zk98p9nr` recut

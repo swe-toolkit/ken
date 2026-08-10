@@ -267,6 +267,25 @@ repeats the defect this node exists to fix.
 | `AC-6` | `ac5_no_implicit_cross_type_coercion` can detect the bug its row names. | **Mutation, and it must flip.** Make the elaborator accept a widening `Int` to `Int64` on a bare `+` -- the exact hole the row denies exists -- and show the test **RED**. Restore byte-identically (`git diff --quiet`) and show it GREEN. **Separately, run the accepting arm's assertion against the *pre-repair* un-annotated form and show it still passes** -- that is the positive control proving the repair changed something, and §3e is why a green-only report is worthless here. |
 | `AC-7` | The row-id checker fails on a claim that does not resolve. | Point one test's `///` id at a fabricated row, run the checker, show it **RED** naming that test and that id. Restore and show GREEN. **Then run it unmutated against the tree as delivered and report the count of ids checked** -- a checker that resolves zero claims also passes. |
 
+> ### On `AC-1` and `AC-6`: a control you cannot REACH is not a control
+>
+> Carried from Runtime's `D1b-role-b` ring, 2026-08-10, where a mandated
+> mutation **reddened exactly as specified while the assertion it was meant to
+> exercise never executed** — an outer validation layer rejected the input
+> first. The letter of the instruction was satisfied and the substance was not,
+> and nothing downstream would have caught the difference.
+>
+> Both mutation ACs here are exposed to it. `AC-1` makes kernel conversion
+> accept `a + b ≡ b + a`; if elaboration or a guard refuses the mutated
+> conversion before `sec62` queries it, the red is that refusal. `AC-6` is
+> worse-placed — §3e is precisely a measurement that `ac5`'s failure comes from
+> an **outer** layer than the one its row is about.
+>
+> ⇒ **Report which layer produced each red.** Where an outer layer subsumes the
+> inner one, use a two-factor mutation — disable the outer layer *and* apply
+> the defect — and say plainly that they are defence in depth rather than
+> independent controls.
+
 ## 6. Guardrails — do not reopen
 
 - **Do not reopen the four `CI-ASSERTIONLESS-L1` dispositions.** Named exactly,
