@@ -306,14 +306,45 @@ singular-specialization hard stop, which this deliverable **keeps** — and the
 control asserts that advance positively, so a row failing *earlier* cannot pass
 as a fix.
 
-### 9.4 One control shape I could not construct, recorded rather than faked
+### 9.4 Wrong-root substitution is inapplicable at this typed arm
 
-The re-cut asked for a whole-root-function substitution and a no-join sibling
-root alongside the suppression mutation. **Neither is constructible at this
-arm:** both need a `StaticOriginId` that is not the body's, and none is in
-scope — `required_join_origins` is keyed on a `PredeclaredFunctionId`, and the
-only other reachable origin is a `RecursorProducerOriginId`, a different type.
+The re-cut asked additionally for a whole-root-function substitution and a
+no-join sibling root alongside the suppression mutation. **Those mutations are
+not missing coverage — they are inapplicable here, and structurally
+discharged.**
 
-Reaching outside the arm to manufacture one would be widening, and naming a
-different origin "the root function" would be a control passing for a reason
-unrelated to the shape it claims. Recorded as not covered.
+**The boundary is the arm's own type structure.** `SourceContinuation::LetBody`
+exposes exactly one root: `body: OwnedSourceOccurrence`, carrying a
+`StaticOriginId`. The two candidates a wrong-root mutation would substitute are
+**not of that type and not substitutable**:
+
+| candidate | its type | substitutable? |
+|---|---|---|
+| the abandoned body — the production selector | `StaticOriginId` | it **is** the sole root |
+| the owning function | `PredeclaredFunctionId` | **no** — not an origin at all |
+| the enclosing selected scope | `RecursorProducerOriginId` | **no** — a different origin type |
+
+⇒ **`body.static_origin` is the sole root reachable at this arm by dataflow**,
+so there is no wrong root to pass. A mutation would have to *manufacture* one,
+and manufacturing a root is not a perturbation of this seam — it is a different
+seam wearing this one's name, and it would red for a reason unrelated to the
+property.
+
+**What discharges the concern instead** is the pairing of that sole-root
+dataflow with the behavioural package already committed: the `Suppress`
+mutation, the exact missing-join A/B, the positive singular-stop advance
+assertion, the non-backedge live-body row, and the accounting / no-entry /
+no-static-worker-call assertions. Between them, an arm that dispositioned the
+wrong subtree could not stay green — the accounting would not close, or the
+advance assertion would fail.
+
+⛔ **This discharge is conditional on the interface, and it reopens.** If a
+future change gives this arm a second `StaticOriginId`, or any means of
+acquiring another root, the wrong-root mutations become constructible and are
+**owed again**. They are discharged by the shape of the seam, not by a judgement
+that they do not matter.
+
+⛔ **Do not discharge it by other means.** No lookup, query, cast, synthetic
+root, walk, or test-only alternate root — each of those *creates* the second
+root whose absence is the discharge, which is the one way to make this section
+false while appearing to strengthen it.
