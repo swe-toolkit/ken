@@ -45,7 +45,7 @@ use crate::cranelift_backend::surface::{
 // rest of this file is untouched (§10.5).
 use super::{
     compile_expr, compile_expr_with_declarations_and_process_input, compile_program_expr,
-    compile_program_expr_object, native_platform_target_name, new_object_module, program_authority,
+    compile_program_expr_object, native_platform_target_name, new_object_module, program_admission,
 };
 
 pub fn run_nc6_seed_examples(
@@ -66,7 +66,8 @@ pub fn run_nc8_validated_seed_examples(
     let validation = validate_supported_runtime_artifact_certificate(program, certificate)?;
     reject_program_blockers(program)?;
     // Fail closed on the authority before any example is lowered.
-    let authority = program_authority(program)?;
+    let admission = program_admission(program)?;
+    let authority = admission.authority().clone();
     let env = NativeSeedEnvironment::nc5_seed();
     program
         .examples
@@ -187,8 +188,8 @@ pub fn run_runtime_ir_report_with_cranelift(
     run_report: RuntimeIrRunReport,
     env: &NativeSeedEnvironment,
 ) -> NativeRuntimeIrComparisonReport {
-    let authority = match program_authority(program) {
-        Ok(authority) => authority,
+    let authority = match program_admission(program) {
+        Ok(admission) => admission.authority().clone(),
         Err(err) => {
             return runtime_ir_comparison_error_report(
                 NativeArtifactIdentity::from_program(program),
@@ -302,7 +303,7 @@ pub fn emit_runtime_ir_object_with_cranelift(
     env: &NativeSeedEnvironment,
     entry_symbol: impl Into<String>,
 ) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
-    let authority = program_authority(program)?;
+    let authority = program_admission(program)?.authority().clone();
     emit_runtime_ir_object_with_authority(program, run_report, env, entry_symbol, &authority)
 }
 
@@ -478,8 +479,8 @@ fn run_example_with_interpreter_observation_and_reports(
     // and blocker guards, so a program refused by either is still refused for
     // that reason — and before lowering, so a package that cannot produce one
     // never reaches planning.
-    let authority = match program_authority(program) {
-        Ok(authority) => authority,
+    let authority = match program_admission(program) {
+        Ok(admission) => admission.authority().clone(),
         Err(err) => return differential_error_report(example, artifact, oracle, err, true),
     };
 

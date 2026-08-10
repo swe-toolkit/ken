@@ -60,10 +60,10 @@ fn compile_expr(
 /// every production entrypoint calls it before it can reach the functions
 /// below. They take the resolved value and have no `None` to fill, so the
 /// refusal cannot be routed around by an intermediate layer.
-pub(super) fn program_authority(
+pub(super) fn program_admission(
     program: &RuntimeProgram,
-) -> Result<crate::NativeProcessSymbols, CraneliftBackendError> {
-    crate::native_authority_for_program(program).map_err(|err| {
+) -> Result<crate::NativeProgramAdmission, CraneliftBackendError> {
+    crate::native_program_admission(program).map_err(|err| {
         crate::cranelift_backend::surface::unsupported("checked-role-authority", err.to_string())
     })
 }

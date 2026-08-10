@@ -539,7 +539,12 @@ pub fn package_starter_executable_artifact_with_options(
     producer: impl Into<String>,
     options: &ObjectLinkerPackagingOptions,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
-    let authority = crate::native_authority_for_program(program).map_err(|err| {
+    // `D1b-role-c1`: full admission, not authority alone -- the packaging lane
+    // must not admit a program whose trust fails to close against its own
+    // pre-source roster.
+    let authority = crate::native_program_admission(program)
+        .map(|admission| admission.authority().clone())
+        .map_err(|err| {
         packaging_error(
             ObjectLinkerPackagingStage::NativeComparison,
             "checked_role_authority",
