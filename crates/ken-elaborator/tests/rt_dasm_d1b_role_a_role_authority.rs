@@ -1,16 +1,35 @@
 //! `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a` — the role-authority discriminator.
 //!
-//! **What this pins, in two separate properties.**
+//! **What this pins, in two separate properties.** ⚠ Neither is the statement
+//! "no role in either producer is selected by source spelling" — that one is
+//! not a test's to make, and the section below says who makes it instead.
 //!
 //! 1. **Substitution resistance.** A package that declares its own constructors
 //!    under the prelude's role spellings must not redirect any stored Runtime
 //!    role onto them. The record must still carry the roles the *canonical
 //!    prelude* `GlobalId`s denote.
-//! 2. **Inventory completeness.** No role in either producer may still be
-//!    selected by source spelling. This is proved *through* property 1 rather
-//!    than by reading the producers' source: the fixture shadows a spelling from
-//!    every namespace and path class both producers resolve, so any role still
-//!    going through `env.globals.get(name)` would be redirected and observed.
+//! 2. **Roster inventory.** Every role the canonical roster carries is covered
+//!    by property 1's fixture, in both directions. This keeps the substitution
+//!    control exhaustive over the roster as the roster changes; it is a claim
+//!    about the fixture's coverage, not about the producers.
+//!
+//! **The producer property is closed by the SIGNATURE, not by this file.** Both
+//! `checked_host_spine_v1` and `checked_runtime_symbols_v1` take `&PreludeEnv`
+//! and the stable-symbol map — never `&ElabEnv`. The mutable package namespace
+//! is therefore *unnameable* inside either producer: `env.globals` is not in
+//! scope, so source-name authority cannot be reintroduced by an ordinary edit,
+//! only by widening a signature, which a reviewer sees and the compiler forces
+//! through every call site.
+//!
+//! **An earlier revision of this file got that division wrong**, and the
+//! Architect blocked it. It asserted equality between the roster and a
+//! hand-written fixture and called the result "inventory completeness" — but
+//! both producers still took `&ElabEnv`, so a new direct
+//! `env.globals.get("SomethingNew")` would have bypassed both enumerations and
+//! left every test green. A test that enumerates today's roles establishes that
+//! the roles *reviewed* are sound; it cannot establish that no other role can be
+//! added. The repair was to narrow the boundary so the bypass does not exist,
+//! and to stop this file claiming a property it was never able to hold.
 //!
 //! **Why bare-name containment is not the assertion.** The rejected candidate
 //! `aade3c2f` searched the serialized record for the bare strings `"Nil"`,
@@ -30,16 +49,20 @@
 //! role; and three on the inventory relation (fixture shrinks, roster grows,
 //! fixture goes stale).
 //!
-//! **CLAIMED.** Neither producer selects any role by source spelling after
-//! package elaboration, so no package declaration can capture a Runtime role.
+//! **CLAIMED.** No package declaration can capture a Runtime role: the roles
+//! the roster carries resist substitution (measured here), and no role outside
+//! the roster can be selected by spelling at all (closed by the signature, and
+//! not measurable from a test).
 //!
-//! **THE GAP.** The claim is closed over *today's* roster. A future edit that
-//! adds `env.globals.get("SomethingNew")` directly to a producer — bypassing the
-//! roster rather than extending it — is seen by neither control: the relation
-//! compares the fixture against the roster, not against the producers, and the
-//! fixture cannot shadow a spelling nobody has written yet. What forces such an
-//! edit into view is that the roster is the producers' only other source of
-//! ids, so adding a role *through* it reds this file until the fixture follows.
+//! **THE GAP.** This file cannot see a role that stops going through the roster,
+//! because the relation compares the fixture against the roster rather than
+//! against the producers. That is now a *bounded* gap rather than a bypass: with
+//! only `&PreludeEnv` and the symbol map in scope, the roster and the
+//! already-canonical `PreludeEnv` ids are the sole ids a producer can reach, so
+//! leaving the roster means widening a signature. What this file still cannot
+//! discriminate is a role that moves from the roster to one of those
+//! already-canonical fields — sound, since both are captured at registration,
+//! but invisible here.
 //! Roles whose ids were already canonical before this repair (`Zero`/`Suc`, the
 //! private operations, the resource ids) are outside the fixture by
 //! construction — they never passed through name lookup, so there is nothing to
@@ -304,17 +327,24 @@ fn d1b_role_a_package_shadowing_cannot_redirect_any_stored_runtime_role() {
     }
 }
 
-/// Inventory completeness, stated as a **relation between two artifacts**.
+/// Roster inventory, stated as a **relation between two artifacts**.
 ///
 /// The test above proves that nothing the fixture shadows can be redirected.
-/// That is only a completeness argument if the fixture shadows *every* role the
-/// producers derive — and the fixture's table is hand-written, so on its own it
-/// is a snapshot that a newly added role would silently escape.
+/// That stays exhaustive over the roster only if the fixture shadows every role
+/// the roster carries — and the fixture's table is hand-written, so on its own
+/// it is a snapshot that a newly added role would silently escape.
 ///
-/// This closes that: the roster is the producers' sole authority, and its
-/// spelling table is compared against the fixture's shadow inventory in both
-/// directions. Add a role to `canonical_runtime_roles!` without shadowing it and
-/// this reds, naming it, before the substitution control can go quietly partial.
+/// This keeps the two in step: the roster's spelling table is compared against
+/// the fixture's shadow inventory in both directions. Add a role to
+/// `canonical_runtime_roles!` without shadowing it and this reds, naming it,
+/// before the substitution control can go quietly partial.
+///
+/// ⚠ **What this is NOT.** It is not a proof that the producers resolve nothing
+/// by spelling. It compares the fixture against the roster, and neither side is
+/// the producers. That property is closed by the producers' `&PreludeEnv`
+/// signature, which puts the package namespace out of scope — see this file's
+/// module documentation. An earlier revision of this test claimed the producer
+/// property and was blocked for it.
 ///
 /// ⚠ **Promise class: durable invariant.** It asserts set equality between two
 /// enumerations, not a count. Adding a role keeps it green once the role is

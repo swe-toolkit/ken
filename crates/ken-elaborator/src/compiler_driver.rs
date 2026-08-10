@@ -629,7 +629,7 @@ pub fn compile_checked_target_denotation(
         .get(&target_id)
         .cloned()
         .ok_or(CompilerDriverError::MissingStableSymbol { id: target_id })?;
-    let host_spine = checked_host_spine_v1(&env, &symbols)?;
+    let host_spine = checked_host_spine_v1(&env.prelude_env, &symbols)?;
 
     admitted.extend(env.env.decls().map(Decl::id));
     admitted.sort();
@@ -2092,7 +2092,7 @@ pub fn compile_native_program_sources(
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
     let plan_transport_hash = fingerprint(&plan_bytes);
     let host_spine =
-        checked_host_spine_v1(&env, &symbols).map_err(NativeProgramBuildError::Driver)?;
+        checked_host_spine_v1(&env.prelude_env, &symbols).map_err(NativeProgramBuildError::Driver)?;
     let host_spine_bytes = canonical_checked_host_spine_v1_bytes(&host_spine);
     // The production package owns the exact live-environment closure, including
     // prelude definitions referenced by `main`; source-only generic packages
@@ -2984,7 +2984,7 @@ fn emit_package_from_env(
     // role record here, after the exact `stable_symbols_for_env` call above and
     // while the live `ElabEnv` is still in scope, and store it in the versioned
     // semantic lane so it participates in `core_semantic_hash`.
-    let runtime_symbols = checked_runtime_symbols_v1(env, &symbols)?;
+    let runtime_symbols = checked_runtime_symbols_v1(&env.prelude_env, &symbols)?;
     semantic.metadata.insert(
         checked_runtime_symbols_v1_key(),
         canonical_checked_runtime_symbols_v1_bytes(&runtime_symbols),
@@ -3218,15 +3218,23 @@ fn native_entrypoint_plan(
 }
 
 fn checked_host_spine_v1(
-    env: &ElabEnv,
+    prelude: &crate::prelude::PreludeEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
 ) -> Result<crate::erasure::CheckedHostSpineV1, CompilerDriverError> {
     // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Every role below is selected
     // by the immutable canonical `GlobalId` captured at prelude registration and
-    // then mapped through this exact stable-symbol table. ⛔ `env.globals` is
-    // NOT consulted by role spelling: package source has been elaborated by now,
-    // so a spelling can denote a package declaration rather than the prelude's.
-    let roles = &env.prelude_env.runtime_roles;
+    // then mapped through this exact stable-symbol table.
+    //
+    // ⛔ **This takes `&PreludeEnv`, not `&ElabEnv`, and that is the guarantee.**
+    // Package source has been elaborated by the time either producer runs, so a
+    // role spelling can denote a package declaration rather than the prelude's.
+    // Narrowing the parameter makes `env.globals` unnameable here: source-name
+    // authority cannot be reintroduced by an ordinary edit, only by widening
+    // this signature, which a reviewer sees and the compiler forces through
+    // every call site. An earlier revision took the whole `ElabEnv` and leaned
+    // on a test enumerating today's roles — that proved the roles *reviewed*
+    // were sound, not that no other role could be added.
+    let roles = &prelude.runtime_roles;
     let resolve_id = |id: GlobalId| {
         symbols
             .get(&id)
@@ -3279,31 +3287,31 @@ fn checked_host_spine_v1(
     }
     for (id, operation) in [
         (
-            env.prelude_env.private_fs_open_id,
+            prelude.private_fs_open_id,
             ken_host::HostOpV1::FsOpen,
         ),
         (
-            env.prelude_env.private_fs_handle_metadata_id,
+            prelude.private_fs_handle_metadata_id,
             ken_host::HostOpV1::FsHandleMetadata,
         ),
         (
-            env.prelude_env.private_buffer_allocate_id,
+            prelude.private_buffer_allocate_id,
             ken_host::HostOpV1::BufferAllocate,
         ),
         (
-            env.prelude_env.private_fs_read_at_id,
+            prelude.private_fs_read_at_id,
             ken_host::HostOpV1::FsReadAt,
         ),
         (
-            env.prelude_env.private_fs_write_at_id,
+            prelude.private_fs_write_at_id,
             ken_host::HostOpV1::FsWriteAt,
         ),
         (
-            env.prelude_env.private_buffer_freeze_id,
+            prelude.private_buffer_freeze_id,
             ken_host::HostOpV1::BufferFreeze,
         ),
         (
-            env.prelude_env.private_resource_release_id,
+            prelude.private_resource_release_id,
             ken_host::HostOpV1::ResourceRelease,
         ),
     ] {
@@ -3344,24 +3352,24 @@ fn checked_host_spine_v1(
         .into_iter()
         .map(resolve_id)
         .collect::<Result<Vec<_>, _>>()?,
-        resource_host_io: resolve_id(env.prelude_env.resource_host_io_id)?,
-        resource_closed: resolve_id(env.prelude_env.closed_id)?,
-        resource_malformed: resolve_id(env.prelude_env.malformed_resource_id)?,
-        resource_right_not_held: resolve_id(env.prelude_env.right_not_held_id)?,
-        resource_release_failed: resolve_id(env.prelude_env.release_failed_id)?,
+        resource_host_io: resolve_id(prelude.resource_host_io_id)?,
+        resource_closed: resolve_id(prelude.closed_id)?,
+        resource_malformed: resolve_id(prelude.malformed_resource_id)?,
+        resource_right_not_held: resolve_id(prelude.right_not_held_id)?,
+        resource_release_failed: resolve_id(prelude.release_failed_id)?,
         resource_kind_mismatch: resolve_id(roles.resource_kind_mismatch)?,
         resource_buffer_limit: resolve_id(roles.resource_buffer_limit)?,
         resource_allocation_failed: resolve_id(roles.resource_allocation_failed)?,
         resource_invalid_offset: resolve_id(roles.resource_invalid_offset)?,
         resource_invalid_bounds: resolve_id(roles.resource_invalid_bounds)?,
         resource_no_progress: resolve_id(roles.resource_no_progress)?,
-        resource_kind_fs_handle: resolve_id(env.prelude_env.fs_handle_id)?,
+        resource_kind_fs_handle: resolve_id(prelude.fs_handle_id)?,
         resource_kind_buffer: resolve_id(roles.resource_kind_buffer)?,
-        resource_trace_identity: resolve_id(env.prelude_env.private_resource_trace_identity_id)?,
-        nat_zero: resolve_id(env.prelude_env.zero_id)?,
-        nat_suc: resolve_id(env.prelude_env.suc_id)?,
-        private_buffer_span: resolve_id(env.prelude_env.private_buffer_span_id)?,
-        private_transfer_count: resolve_id(env.prelude_env.private_transfer_count_id)?,
+        resource_trace_identity: resolve_id(prelude.private_resource_trace_identity_id)?,
+        nat_zero: resolve_id(prelude.zero_id)?,
+        nat_suc: resolve_id(prelude.suc_id)?,
+        private_buffer_span: resolve_id(prelude.private_buffer_span_id)?,
+        private_transfer_count: resolve_id(prelude.private_transfer_count_id)?,
         read_some: resolve_id(roles.read_some)?,
         read_eof: resolve_id(roles.read_eof)?,
         wrote: resolve_id(roles.wrote)?,
@@ -3379,15 +3387,15 @@ fn checked_host_spine_v1(
 /// generic package emission that builds no plan. ⛔ The starter-only plan is
 /// neither consulted nor persisted.
 fn checked_runtime_symbols_v1(
-    env: &ElabEnv,
+    prelude: &crate::prelude::PreludeEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
 ) -> Result<crate::erasure::CheckedRuntimeSymbolsV1, CompilerDriverError> {
-    let spine = checked_host_spine_v1(env, symbols)?;
-    // Same authority as the spine: the immutable canonical roster, mapped
-    // through this exact table. ⛔ Not `env.globals.get(name)` — a package that
+    let spine = checked_host_spine_v1(prelude, symbols)?;
+    // Same authority and the same narrowed boundary as the spine: a package that
     // declares its own `Nil`/`Cons` must not be able to redirect Runtime's list
-    // roles onto its constructors, which name lookup here would permit.
-    let roles = &env.prelude_env.runtime_roles;
+    // roles onto its constructors, and with only `&PreludeEnv` in hand there is
+    // no package namespace here to redirect them through.
+    let roles = &prelude.runtime_roles;
     let resolve_id = |id: GlobalId| {
         symbols
             .get(&id)
