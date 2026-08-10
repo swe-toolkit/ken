@@ -7985,13 +7985,33 @@ pub(in crate::cranelift_backend) enum CheckedCaseBinderRole {
 /// the two-sibling fixture exists; the `R3` witness alone would have left it
 /// unmeasured and a "remembered" order would have had an even chance.
 ///
-/// ## Why the order lives in exactly one place
+/// ## Single ownership is the GOAL, and it is not true yet
 ///
-/// [`Self::for_case`] performs the one `.rev()` and stores the result **in de
-/// Bruijn order**. Every consumer indexes that vector. No consumer re-derives
-/// the order, so a lowering change that moves the prefix is a single-site
-/// correction rather than a hunt — and [`Self::role_at`] cannot disagree with
-/// itself between two call sites.
+/// [`Self::for_case`] performs its `.rev()` once and stores the result **in de
+/// Bruijn order**, so every consumer *of this type* indexes that vector and
+/// none re-derives the order.
+///
+/// **That is a claim about this type's consumers, and it must not be read as a
+/// claim about the program.** Production assembles the hypothesis prefix at
+/// **four** sites in `cranelift_backend/lowering/core.rs`, each with its own
+/// `case.recursive_positions.iter().rev()`:
+///
+/// | site | arm |
+/// |---|---|
+/// | `4939` | specialized composed |
+/// | `5496` | recursor-layer construction |
+/// | `7094` | source machine |
+/// | `13708` | carried computational match |
+///
+/// All four predate this type. So there are five reversals, and the one here is
+/// the only one nothing in production depends on.
+///
+/// **Do not read this as an instruction not to look.** A lowering change that
+/// moves the prefix becomes a single-site correction **once the identity plane
+/// adopts this type at those four sites** — until then it is a five-site
+/// change, and the four above are where to start. They are named so the
+/// relation is findable from either end; `core.rs:4939` carries the pointer
+/// back.
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct CheckedCaseBinderLayout {
@@ -8008,7 +8028,7 @@ impl CheckedCaseBinderLayout {
     /// Reads `recursive_positions` and `argument_binders` and nothing else —
     /// not the body, not a lowered shape, not a constructor spelling, not an
     /// arity recovered from a value.
-    fn for_case(
+    pub(in crate::cranelift_backend) fn for_case(
         case: &crate::RuntimeComputationalMatchCase,
     ) -> Result<Self, CraneliftBackendError> {
         let mut induction_hypotheses = Vec::with_capacity(case.recursive_positions.len());
@@ -8032,7 +8052,7 @@ impl CheckedCaseBinderLayout {
     /// Total by construction: an index past this case's own binder run is the
     /// enclosing frame environment, which is a **role**, not an error. A `Var`
     /// reaching past the run is ordinary and must not be refused here.
-    fn role_at(&self, index: usize) -> CheckedCaseBinderRole {
+    pub(in crate::cranelift_backend) fn role_at(&self, index: usize) -> CheckedCaseBinderRole {
         if let Some(recursive_position) = self.induction_hypotheses.get(index).copied() {
             return CheckedCaseBinderRole::InductionHypothesis { recursive_position };
         }
@@ -8046,9 +8066,219 @@ impl CheckedCaseBinderLayout {
     }
 
     /// How many binders this case introduces before the enclosing environment.
-    fn binder_count(&self) -> usize {
+    pub(in crate::cranelift_backend) fn binder_count(&self) -> usize {
         self.induction_hypotheses.len() + self.argument_binders as usize
     }
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the induction hypothesis a `Var`
+/// occurrence names.**
+///
+/// Both members are planner-issued: the frame's own occurrence origin, and the
+/// recursive source position the case declared. Neither is a constructor
+/// spelling, a type, a row number, a runtime tag, nor a position recovered from
+/// a lowered value.
+///
+/// The recursive position is the one the case declared and NOT the binder's de
+/// Bruijn index. The two differ whenever a case declares more than one
+/// recursive position, because the hypothesis prefix runs reversed -- see
+/// [`CheckedCaseBinderLayout`], which is the only place that order is spelled.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedIhBinding {
+    frame_origin: StaticOriginId,
+    recursive_position: u32,
+}
+
+/// What one binder in scope is, threaded down the occurrence tree.
+///
+/// This is the environment element [`derive_case_producer_fact`] never had. It
+/// pushes `argument_binders + recursive_positions.len()` entries and makes every
+/// one of them `CaseProducerFact::open(origin)`, so the count is right and the
+/// role is absent. Carrying the role is what lets a `Var` be **resolved** to the
+/// hypothesis it names rather than **recognised by shape**.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CheckedBinderProvenance {
+    InductionHypothesis(CheckedIhBinding),
+    /// Every other binder: an ordinary constructor child, a `Let` value, a
+    /// `Match` case binder, a closure parameter or capture.
+    Ordinary,
+}
+
+/// Resolve every `Var` occurrence that names a compiler-minted induction
+/// hypothesis, by threading the binder environment the lowering builds.
+///
+/// ## Why this is a derivation and not a search
+///
+/// The walk never asks what an expression *looks like*. It carries a binder
+/// environment down the tree exactly as [`derive_case_producer_fact`] does --
+/// same variants, same child positions, same fresh-environment rule at a
+/// closure body -- and a `Var` is answered by **indexing** that environment. A
+/// `Var` is classified as a hypothesis if and only if the binder it resolves to
+/// was pushed as one by [`CheckedCaseBinderLayout`].
+///
+/// So the population is closed by construction: nothing is matched on
+/// `RuntimeExpr::Var(0)`, on an argument position, or on a constructor symbol,
+/// and an expression that merely resembles the witness cannot enter.
+///
+/// ## The two things a role-blind classifier gets wrong
+///
+/// A classifier keyed on de Bruijn *depth* misses an occurrence reached through
+/// a `Let` or a nested `Match`, because those push binders and shift every
+/// index below them. A classifier keyed on *position* misses a case with more
+/// than one recursive position, because the hypothesis prefix is reversed.
+/// Threading answers both without either key existing.
+fn derive_checked_ih_bindings(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    environment: &[CheckedBinderProvenance],
+    out: &mut BTreeMap<StaticOriginId, CheckedIhBinding>,
+) -> Result<(), CraneliftBackendError> {
+    let expr = plan.planned_occurrence_expr(origin)?;
+    let child = |position| plan.semantic.child_origin(origin, position);
+    match expr {
+        RuntimeExpr::Var(index) => {
+            if let Some(CheckedBinderProvenance::InductionHypothesis(binding)) =
+                environment.get(*index as usize).copied()
+            {
+                out.insert(origin, binding);
+            }
+        }
+        RuntimeExpr::CheckedJoinSite { .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { .. }
+        | RuntimeExpr::Project { .. } => {
+            derive_checked_ih_bindings(plan, child(0)?, environment, out)?;
+        }
+        RuntimeExpr::Construct { args, .. } => {
+            for position in 0..args.len() {
+                derive_checked_ih_bindings(plan, child(position)?, environment, out)?;
+            }
+        }
+        RuntimeExpr::PrimitiveCall { args, .. } => {
+            for position in 0..args.len() {
+                derive_checked_ih_bindings(plan, child(position)?, environment, out)?;
+            }
+        }
+        RuntimeExpr::Record { fields } => {
+            for position in 0..fields.len() {
+                derive_checked_ih_bindings(plan, child(position)?, environment, out)?;
+            }
+        }
+        RuntimeExpr::Let { .. } => {
+            derive_checked_ih_bindings(plan, child(0)?, environment, out)?;
+            // The value's binder shifts every index below it. This push is why a
+            // hypothesis reached through a `Let` keeps its role.
+            let mut nested = Vec::with_capacity(environment.len() + 1);
+            nested.push(CheckedBinderProvenance::Ordinary);
+            nested.extend_from_slice(environment);
+            derive_checked_ih_bindings(plan, child(1)?, &nested, out)?;
+        }
+        RuntimeExpr::If { .. } => {
+            for position in 0..3 {
+                derive_checked_ih_bindings(plan, child(position)?, environment, out)?;
+            }
+        }
+        RuntimeExpr::Match { cases, .. } => {
+            derive_checked_ih_bindings(plan, child(0)?, environment, out)?;
+            for (index, case) in cases.iter().enumerate() {
+                let mut nested = Vec::with_capacity(case.binders + environment.len());
+                nested.extend((0..case.binders).map(|_| CheckedBinderProvenance::Ordinary));
+                nested.extend_from_slice(environment);
+                derive_checked_ih_bindings(plan, child(1 + index)?, &nested, out)?;
+            }
+        }
+        RuntimeExpr::ComputationalMatch { cases, .. } => {
+            derive_checked_ih_bindings(plan, child(0)?, environment, out)?;
+            for (index, case) in cases.iter().enumerate() {
+                // The layout is the sole authority for which prefix is which and
+                // for the order inside it. Nothing here re-derives either.
+                let layout = CheckedCaseBinderLayout::for_case(case)?;
+                let mut nested = Vec::with_capacity(layout.binder_count() + environment.len());
+                for binder in 0..layout.binder_count() {
+                    nested.push(match layout.role_at(binder) {
+                        CheckedCaseBinderRole::InductionHypothesis { recursive_position } => {
+                            CheckedBinderProvenance::InductionHypothesis(CheckedIhBinding {
+                                frame_origin: origin,
+                                recursive_position,
+                            })
+                        }
+                        CheckedCaseBinderRole::ConstructorChild { .. }
+                        | CheckedCaseBinderRole::FrameEnvironment => {
+                            CheckedBinderProvenance::Ordinary
+                        }
+                    });
+                }
+                nested.extend_from_slice(environment);
+                derive_checked_ih_bindings(plan, child(1 + index)?, &nested, out)?;
+            }
+        }
+        RuntimeExpr::Closure {
+            captures, params, ..
+        } => {
+            // A closure body does NOT see the enclosing environment by de Bruijn
+            // index, so a hypothesis does not leak across the boundary. Building
+            // a fresh environment here is what keeps that true; extending the
+            // outer one would classify an unrelated parameter as a hypothesis.
+            let mut body_environment = Vec::with_capacity(captures.len() + params.len());
+            body_environment.extend(
+                (0..captures.len() + params.len()).map(|_| CheckedBinderProvenance::Ordinary),
+            );
+            derive_checked_ih_bindings(plan, child(0)?, &body_environment, out)?;
+        }
+        RuntimeExpr::LexicalClosure {
+            captures, params, ..
+        } => {
+            for position in 0..captures.len() {
+                derive_checked_ih_bindings(plan, child(1 + position)?, environment, out)?;
+            }
+            let mut body_environment = Vec::with_capacity(captures.len() + params.len());
+            body_environment.extend(
+                (0..params.len() + captures.len()).map(|_| CheckedBinderProvenance::Ordinary),
+            );
+            derive_checked_ih_bindings(plan, child(0)?, &body_environment, out)?;
+        }
+        RuntimeExpr::Call { args, .. } => {
+            derive_checked_ih_bindings(plan, child(0)?, environment, out)?;
+            for position in 0..args.len() {
+                derive_checked_ih_bindings(plan, child(1 + position)?, environment, out)?;
+            }
+        }
+        RuntimeExpr::Effect {
+            capability, args, ..
+        } => {
+            let child_count = args.len() + usize::from(capability.is_some());
+            for position in 0..child_count {
+                derive_checked_ih_bindings(plan, child(position)?, environment, out)?;
+            }
+        }
+        RuntimeExpr::Trap(_)
+        | RuntimeExpr::Value(_)
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. } => {}
+    }
+    Ok(())
+}
+
+/// Every `Var` occurrence in the program that names an induction hypothesis.
+///
+/// Walked from the same roots [`build_case_emission_plan`] uses -- the program
+/// root and every transparent declaration -- each with an empty environment,
+/// because neither has binders in scope at its own occurrence.
+#[cfg_attr(not(test), allow(dead_code))]
+fn build_checked_ih_bindings(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<BTreeMap<StaticOriginId, CheckedIhBinding>, CraneliftBackendError> {
+    let mut out = BTreeMap::new();
+    if let Some(root) = plan.root_occurrence {
+        derive_checked_ih_bindings(plan, root, &[], &mut out)?;
+    }
+    for origin in plan.declaration_occurrences.values().copied() {
+        derive_checked_ih_bindings(plan, origin, &[], &mut out)?;
+    }
+    Ok(out)
 }
 
 fn build_continuation_specialization_plan(
@@ -13676,6 +13906,166 @@ pub(in crate::cranelift_backend) use tests::contspec_nested_fixture;
 #[cfg(test)]
 mod tests {
     use super::abi::{AbiCarrier, AbiSlot, AbiSlotKind};
+    /// The one fixture for `AC-1` and `AC-2`: a hypothesis reached three ways
+    /// and an ordinary child sitting beside it in the same scope.
+    ///
+    /// Inside the `Node` case the environment is `[IH, child0, ..]`. The `Let`
+    /// pushes one binder and the nested `Match` case pushes another, so the same
+    /// hypothesis is `Var(0)`, then `Var(1)`, then `Var(2)` at three different
+    /// depths -- and `Var(3)` beside the last one is the ordinary child.
+    ///
+    /// One fixture rather than three, so the ordinary child is drawn from the
+    /// same declaration as the hypotheses and the pair cannot differ by
+    /// something other than its role.
+    #[cfg(test)]
+    fn d2e_indirection_fixture() -> RuntimeExpr {
+        let unit = || RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            args: Vec::new(),
+        };
+        let trap = || RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "D2e indirection fixture".to_string(),
+        };
+        RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::D2eIn::Node".to_string(),
+                args: vec![RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["unit".to_string()],
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::D2eIn::Leaf".to_string(),
+                        args: Vec::new(),
+                    }),
+                }],
+            }),
+            cases: vec![
+                RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::D2eIn::Node".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: RuntimeExpr::Let {
+                        // env here is [IH, child0, ..] -- the DIRECT reference.
+                        value: Box::new(RuntimeExpr::Var(0)),
+                        body: Box::new(RuntimeExpr::Match {
+                            // env is now [let, IH, child0, ..] -- through a Let.
+                            scrutinee: Box::new(RuntimeExpr::Var(1)),
+                            cases: vec![RuntimeMatchCase {
+                                constructor: "ctor:fixture::D2eIn::Wrap".to_string(),
+                                binders: 1,
+                                // env is now [match, let, IH, child0, ..].
+                                body: RuntimeExpr::Construct {
+                                    constructor: "ctor:fixture::D2eIn::Pair".to_string(),
+                                    args: vec![RuntimeExpr::Var(2), RuntimeExpr::Var(3)],
+                                },
+                            }],
+                            default: trap(),
+                        }),
+                    },
+                },
+                RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::D2eIn::Leaf".to_string(),
+                    argument_binders: 0,
+                    recursive_positions: Vec::new(),
+                    body: unit(),
+                },
+            ],
+            default: trap(),
+        }
+    }
+
+    /// `D2e` `AC-2`/`AC-3` — indirection does not lose the role, and an ordinary
+    /// binder beside it does not acquire one.
+    ///
+    /// The three hypothesis references sit at de Bruijn indices 0, 1 and 2 and
+    /// all resolve to the SAME frame origin and recursive position. A classifier
+    /// keyed on depth or on index would answer differently at each; threading
+    /// answers the same, which is the property.
+    ///
+    /// `Var(3)` is the discriminator: it is an ordinary constructor child in the
+    /// same scope as the third hypothesis reference, so a classifier that
+    /// answered "hypothesis" for everything in a recursive case fails here.
+    #[test]
+    fn d2e_ih_binding_survives_let_and_nested_match_indirection() {
+        let expr = d2e_indirection_fixture();
+        let plan = b2r_plan(&expr);
+        let bindings = build_checked_ih_bindings(&plan).expect("bindings derive");
+
+        let root = plan.root_occurrence.expect("the fixture has a root occurrence");
+        let case_body = plan.semantic.child_origin(root, 1).expect("Node case body");
+        let let_value = plan.semantic.child_origin(case_body, 0).expect("Let value");
+        let inner_match = plan.semantic.child_origin(case_body, 1).expect("Let body");
+        let match_scrutinee = plan
+            .semantic
+            .child_origin(inner_match, 0)
+            .expect("Match scrutinee");
+        let pair = plan
+            .semantic
+            .child_origin(inner_match, 1)
+            .expect("Wrap case body");
+        let pair_hypothesis = plan.semantic.child_origin(pair, 0).expect("Pair arg 0");
+        let pair_child = plan.semantic.child_origin(pair, 1).expect("Pair arg 1");
+
+        let expected = CheckedIhBinding {
+            frame_origin: root,
+            recursive_position: 0,
+        };
+        assert_eq!(
+            bindings.get(&let_value).copied(),
+            Some(expected),
+            "the direct reference resolves to the frame's hypothesis"
+        );
+        assert_eq!(
+            bindings.get(&match_scrutinee).copied(),
+            Some(expected),
+            "a Let between the binder and the use shifts the index, not the role"
+        );
+        assert_eq!(
+            bindings.get(&pair_hypothesis).copied(),
+            Some(expected),
+            "a Let AND a nested Match case binder still leave the role intact"
+        );
+        assert_eq!(
+            bindings.get(&pair_child).copied(),
+            None,
+            "the ordinary constructor child beside it acquires no role, so the \
+             classifier is not answering `hypothesis` for everything in scope"
+        );
+    }
+
+    /// `D2e` `AC-3` — a closure body does not inherit the enclosing hypothesis.
+    ///
+    /// The lowering gives a closure body a FRESH environment, so a `Var(0)`
+    /// inside one is that closure's own parameter and not the hypothesis that
+    /// happens to be `Var(0)` outside it. This is the case a walk that extended
+    /// the outer environment would get wrong, and it is silent -- the classifier
+    /// would simply claim a hypothesis that is not there.
+    #[test]
+    fn d2e_ih_binding_does_not_leak_into_a_closure_body() {
+        let expr = d2e_indirection_fixture();
+        let plan = b2r_plan(&expr);
+        let bindings = build_checked_ih_bindings(&plan).expect("bindings derive");
+        let root = plan.root_occurrence.expect("the fixture has a root occurrence");
+        let scrutinee = plan.semantic.child_origin(root, 0).expect("scrutinee");
+        let closure = plan
+            .semantic
+            .child_origin(scrutinee, 0)
+            .expect("the constructor's closure argument");
+        let closure_body = plan
+            .semantic
+            .child_origin(closure, 0)
+            .expect("the closure body");
+        assert_eq!(
+            bindings.get(&closure_body).copied(),
+            None,
+            "nothing inside a closure body resolves to the enclosing hypothesis"
+        );
+        assert!(
+            !bindings.is_empty(),
+            "and the sweep is not vacuously empty -- the fixture does produce bindings"
+        );
+    }
+
     /// `D2e` `AC-1` — the role DISCRIMINATES, in both directions on one shape.
     ///
     /// A classifier that answered `InductionHypothesis` for everything would

@@ -4936,6 +4936,11 @@ impl<'a> Lowering<'a> {
                 let mut induction_hypotheses = Vec::with_capacity(case.recursive_positions.len());
                 let ih_slots =
                     self.computational_ih_slots_for_case(case, eliminator.checked_frame_id)?;
+                // The hypothesis prefix runs in REVERSE declaration order. Three
+                // sibling sites do the same reversal (5496, 7094, 13708), and
+                // `CheckedCaseBinderLayout::for_case` in the planner is the
+                // intended single owner of this order -- it is not adopted here
+                // yet, so a change to the order is still a five-site change.
                 for position in case.recursive_positions.iter().rev().copied() {
                     // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE
                     // IS HERE, and the claim cannot be made yet.
@@ -4987,6 +4992,8 @@ impl<'a> Lowering<'a> {
                     induction_hypotheses
                         .push(LoweringEnvironmentBinding::Value(induction_hypothesis));
                 }
+                #[cfg(test)]
+                d2e_record_binder_assembly(case, &induction_hypotheses);
                 let mut case_env = induction_hypotheses;
                 extend_specialized(&mut case_env, args);
                 let frame_env = match self.materialize_eliminator_frame_env(
