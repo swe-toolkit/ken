@@ -46,14 +46,21 @@
 
 > ### RESUME HERE — state at 2026-08-10 ~01:0xZ
 >
-> ⛔ **BUILD FREEZE IN EFFECT (operator, ~00:52Z).** No `ken-cargo`/`cargo`/
-> `nextest` on this box until the operator lifts it and I post an explicit
-> all-clear. Nothing was running when it landed. Authoring, doc work, and
-> **publishing are still fine** — the publisher does not compile locally and CI
-> is remote. ⛔ **QA may not approve on unexecuted evidence**; a held handoff is
-> correct and must not be resolved by weakening a gate. The watchdog is rewritten
-> for the freeze (1800s, minimal, forbidden from nudging a build) and
-> **re-arming the normal 900s sweep is part of the all-clear.**
+> ### BUILD FREEZE: IMPOSED ~00:52Z, LIFTED ~02:0xZ. BUILDS ARE ALLOWED.
+>
+> The operator needed the CPU and has released it. All-clear broadcast
+> `evt_3mwcmpw13655c`; the normal **900s** watchdog sweep is re-armed with items
+> (a)-(f). ⛔ **The targeted-only rule is unaffected and was never part of the
+> freeze — still NEVER `--workspace`** (`COORDINATION §12`).
+>
+> **What the freeze cost: nothing, and that is the reusable part.** Both lanes
+> stopped at clean seams with candidates preserved (`cc0906f2` Kernel,
+> `1574e270` Runtime), publishing continued throughout because the publisher does
+> not compile locally and CI is remote, and Kernel used the window to author `D7`
+> to the ruled shape and stop exactly at the validation boundary. ⇒ **A CPU
+> freeze is a lane-pause, not a program-pause**, provided QA holds its handoff
+> rather than approving on unexecuted evidence. Nobody weakened a gate to keep
+> moving.
 >
 > ### `AC-K10` METRIC RULING — ISSUED 2026-08-10. `D7` CAN AUTHOR.
 >
