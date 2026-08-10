@@ -63,7 +63,56 @@
 > writable and DS-9 owes a `depends_on` on a node that is `draft`, unframed,
 > size TBD.** `D2` is unaffected; Foundation told to keep going.
 >
-> ### RUNTIME `c1` — HELD RED at WIP `24995e5e`, executing three Steward rulings
+> ### THREE LANES as of ~07:1xZ. `main` = `d32f8a0c`.
+>
+> - **Foundation** — DS-9 `D2` (`CursorOps (List Char)` + `CursorLaws`).
+> - **Verify** — `CI-L1-EXECUTING-COVER` **RELEASED 06:45Z**, anchor
+>   `evt_4g93v1m7m630n`, thread `thr_3p2k2nj67wc1p`. The lane opened because
+>   **Runtime went held**, not because anything was reversed.
+> - **Runtime** — `c1` **HELD RED at WIP `9b55a421`, not working.** Awaiting an
+>   Architect ruling plus a Steward recut plus a fresh authoring turn
+>   (implementer hit a context limit).
+>
+> **The operator's queued item 1 is MOOT in one direction** — DS-9 and
+> `CI-L1-EXECUTING-COVER` are both running. Present it as resolved-by-events.
+>
+> ### `D5` FOUND FIVE MORE PHANTOM ROW IDS ON ITS FIRST RUN
+>
+> Ruled at `evt_4ge8k5v4kt1kn`. The new checker reds on five pre-existing
+> claims whose ids exist in **no** `conformance/` seed — four in
+> `crates/ken-interp/tests/elim_bool_dispatch_acceptance.rs`
+> (`elim-reduce-computed-bool-{true-branch,false-branch,vs-literal-bool-agree,
+> via-leq-int}`) and one in `crates/ken-interp/tests/f2f3_acceptance.rs`
+> (`legacy-add-sub-mul-retired`). Same class as `sec61`, now measured.
+>
+> **Ruled: retire the five as cover claims** (drop the `/// surface/<id>` form,
+> keep the prose, touch no assertion). **Do NOT narrow `D5`'s population** --
+> shrinking a checker until it passes is weakening a probe to make it green.
+> **Do NOT author `conformance/` rows** -- that is the spec enclave and CV's
+> lane, out of scope by ownership. **Verify owes a Finding** with per-id
+> judgment on whether a row should exist; I route the residual.
+>
+> ### RUNTIME `c1` — three Steward rulings, then a THIRD stop that is mine
+>
+> **Stop 3 (`evt_jrzrvbxqs57t`): my condition (c) was not implementable.**
+> Threading authority reached **77** callers, not 38, and attaches **nothing**
+> -- the gate reads
+> `RuntimeProgram.erased_core.metadata.checked_core.runtime_symbols`, proven by
+> five unused-parameter warnings. Attaching legacy roles then trades
+> `MissingRoleRecord` for `MetadataInconsistent` because all five synthetic
+> fixtures have empty `data_metadata`. **Second time I named a mechanism
+> without checking the data path.** Three stops on one slice is the WIP-audit
+> signal: **the cut was mine and the recut is mine.**
+>
+> Refused: weakening agreement on empty `data_metadata` (a gate that switches
+> off on inputs it cannot satisfy is not a gate); minting checked-package
+> provenance. **Deferred, not rejected:** fabricating 65-role authority across
+> five fixtures -- heavy, drift-prone, and built to satisfy a gate whose scope
+> is the open question.
+>
+> **Triage discharged condition (a):** all 38 synthetic, reaching five
+> `#[cfg(test)]` fixture literals; **zero from `CheckedCorePackage`/erasure**,
+> so no checked package is excused.
 >
 > All in `thr_1wn4ydb4kjqxt`. **Do not re-litigate them; do check they were
 > followed.**
