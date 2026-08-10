@@ -13,10 +13,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::cranelift_backend::{
+    emit_runtime_ir_object_with_authority, run_runtime_ir_report_with_authority,
+};
 use crate::platform_runtime_support::validate_entrypoint_metadata_payload;
 use crate::{
-    emit_runtime_ir_object_with_cranelift, fnv1a_64, platform_runtime_support_report_hash,
-    run_runtime_ir_report_with_cranelift, runtime_executable_entrypoint_package_hash,
+    fnv1a_64, platform_runtime_support_report_hash, runtime_executable_entrypoint_package_hash,
     CraneliftObjectArtifact, NativeDifferentialStage, NativeRuntimeIrComparisonVerdict,
     NativeSeedEnvironment, PlatformRuntimeEvidenceFact, PlatformRuntimeEvidenceLane,
     PlatformRuntimeSupportReport, RuntimeArtifactIdentity, RuntimeExecutableEntrypointPackage,
@@ -438,7 +440,8 @@ pub struct ObjectLinkerPackagingOptions {
     /// `validate_options`, ⭐ **before any object is emitted or anything is
     /// linked** — which is `AC-7`'s whole point, and is a different observation
     /// from a starter that links, runs, and then declines to execute.
-    pub boundary_resource_profile: Option<crate::boundary_resource_profile::BoundaryResourceProfileV1>,
+    pub boundary_resource_profile:
+        Option<crate::boundary_resource_profile::BoundaryResourceProfileV1>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -520,6 +523,12 @@ pub fn package_starter_executable_artifact(
     )
 }
 
+/// Package a starter executable from a **package-backed** program.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`: ⛔ resolves the checked role
+/// authority through the fail-closed lane before any native work happens. A
+/// program that cannot produce one is refused here, not lowered against legacy
+/// prelude spellings its own checked package never recorded.
 pub fn package_starter_executable_artifact_with_options(
     program: &RuntimeProgram,
     entrypoint_package: &RuntimeExecutableEntrypointPackage,
@@ -530,12 +539,111 @@ pub fn package_starter_executable_artifact_with_options(
     producer: impl Into<String>,
     options: &ObjectLinkerPackagingOptions,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
+    // `D1b-role-c1`: full admission, not authority alone -- the packaging lane
+    // must not admit a program whose trust fails to close against its own
+    // pre-source roster.
+    let admission = crate::native_program_admission(program).map_err(|err| {
+        packaging_error(
+            ObjectLinkerPackagingStage::NativeComparison,
+            "checked_role_authority",
+            err.to_string(),
+        )
+    })?;
+    package_starter_executable_artifact_with_authority(
+        program,
+        entrypoint_package,
+        platform_support,
+        run_report,
+        env,
+        output_dir,
+        producer,
+        options,
+        admission.compilation(),
+    )
+}
+
+/// Package a starter executable from a **synthetic** hand-built program against
+/// an explicitly supplied authority — the profile form, mirroring
+/// `package_starter_executable_artifact`.
+///
+/// ⛔ `#[cfg(test)]`, and the `authority` argument is required.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn package_synthetic_starter_executable_artifact_with_profile(
+    program: &RuntimeProgram,
+    entrypoint_package: &RuntimeExecutableEntrypointPackage,
+    platform_support: &PlatformRuntimeSupportReport,
+    run_report: &RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    output_dir: impl AsRef<Path>,
+    producer: impl Into<String>,
+    profile: crate::boundary_resource_profile::BoundaryResourceProfileV1,
+    authority: &crate::NativeProcessSymbols,
+) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
+    package_starter_executable_artifact_with_authority(
+        program,
+        entrypoint_package,
+        platform_support,
+        run_report,
+        env,
+        output_dir,
+        producer,
+        &ObjectLinkerPackagingOptions::starter_host_with_profile(profile),
+        crate::synthetic_admitted_compilation(authority),
+    )
+}
+
+/// Package a starter executable from a **synthetic** hand-built program against
+/// an explicitly supplied authority.
+///
+/// ⛔ `#[cfg(test)]`, and the `authority` argument is required — a synthetic
+/// test cannot omit it and inherit a default. See
+/// `crate::native_process_authority::synthetic_test_legacy_authority`.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn package_synthetic_starter_executable_artifact(
+    program: &RuntimeProgram,
+    entrypoint_package: &RuntimeExecutableEntrypointPackage,
+    platform_support: &PlatformRuntimeSupportReport,
+    run_report: &RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    output_dir: impl AsRef<Path>,
+    producer: impl Into<String>,
+    options: &ObjectLinkerPackagingOptions,
+    authority: &crate::NativeProcessSymbols,
+) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
+    package_starter_executable_artifact_with_authority(
+        program,
+        entrypoint_package,
+        platform_support,
+        run_report,
+        env,
+        output_dir,
+        producer,
+        options,
+        crate::synthetic_admitted_compilation(authority),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn package_starter_executable_artifact_with_authority(
+    program: &RuntimeProgram,
+    entrypoint_package: &RuntimeExecutableEntrypointPackage,
+    platform_support: &PlatformRuntimeSupportReport,
+    run_report: &RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    output_dir: impl AsRef<Path>,
+    producer: impl Into<String>,
+    options: &ObjectLinkerPackagingOptions,
+    admitted: crate::AdmittedNativeCompilation<'_>,
+) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     validate_options(options)?;
     validate_entrypoint_package(program, entrypoint_package)?;
     validate_platform_support(program, entrypoint_package, platform_support)?;
     validate_runtime_ir_run_report(program, entrypoint_package, run_report)?;
 
-    let native_comparison = run_runtime_ir_report_with_cranelift(program, run_report.clone(), env);
+    let native_comparison =
+        run_runtime_ir_report_with_authority(program, run_report.clone(), env, admitted);
     match &native_comparison.verdict {
         NativeRuntimeIrComparisonVerdict::RuntimeIrNativeAgreement {
             stage: NativeDifferentialStage::RuntimeIrNativeCompare,
@@ -559,15 +667,20 @@ pub fn package_starter_executable_artifact_with_options(
         )
     })?;
 
-    let object =
-        emit_runtime_ir_object_with_cranelift(program, run_report, env, STARTER_ENTRY_SYMBOL)
-            .map_err(|err| {
-                packaging_error(
-                    ObjectLinkerPackagingStage::ObjectEmission,
-                    "cranelift_object",
-                    err.to_string(),
-                )
-            })?;
+    let object = emit_runtime_ir_object_with_authority(
+        program,
+        run_report,
+        env,
+        STARTER_ENTRY_SYMBOL,
+        admitted,
+    )
+    .map_err(|err| {
+        packaging_error(
+            ObjectLinkerPackagingStage::ObjectEmission,
+            "cranelift_object",
+            err.to_string(),
+        )
+    })?;
     let object_path = output_dir.join(&options.object_relative_path);
     fs::write(&object_path, &object.object_bytes).map_err(|err| {
         packaging_error(
@@ -2387,7 +2500,7 @@ mod tests {
         .expect("platform support materializes");
         let output_dir = temp_output_dir("nc23-smoke");
 
-        let package = package_starter_executable_artifact(
+        let package = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -2396,6 +2509,7 @@ mod tests {
             &output_dir,
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("object/linker package materializes");
 
@@ -2457,7 +2571,7 @@ mod tests {
         let run_report = runtime_ir_run_report(&program);
         let support = platform_support(&program, &entrypoint, &run_report);
         let output_dir = temp_output_dir("px8i-generic-big-int");
-        let package = package_starter_executable_artifact(
+        let package = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -2466,6 +2580,7 @@ mod tests {
             &output_dir,
             "PX8-I generic object Big discriminator",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("generic object executes the shared exact-Int graph");
         assert_eq!(package.smoke.stdout, "7\n");
@@ -2495,7 +2610,7 @@ mod tests {
         let run_report = runtime_ir_run_report(&program);
         let support = platform_support(&program, &entrypoint, &run_report);
         let output_dir = temp_output_dir("px8i-generic-terminal-big-int");
-        let package = package_starter_executable_artifact(
+        let package = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -2504,6 +2619,7 @@ mod tests {
             &output_dir,
             "PX8-I generic terminal Big discriminator",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("generic object decodes terminal Big while its arena is live");
         assert_eq!(package.smoke.stdout, "-0x10000000000000007\n");
@@ -2520,7 +2636,7 @@ mod tests {
         crate::cranelift_backend::NATIVE_INT_LOWERING_MUTATION.with(|mutation| {
             mutation.set(crate::cranelift_backend::NativeIntLoweringMutation::Wrapping)
         });
-        let result = package_starter_executable_artifact(
+        let result = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -2529,6 +2645,7 @@ mod tests {
             &output_dir,
             "PX8-I shared-helper mutation",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         );
         crate::cranelift_backend::NATIVE_INT_LOWERING_MUTATION.with(|mutation| {
             mutation.set(crate::cranelift_backend::NativeIntLoweringMutation::Exact)
@@ -2749,8 +2866,14 @@ mod tests {
         };
         let executable = build_process_starter_executable_artifact(&entry, &output_dir)
             .expect("process starter links");
-        assert!(!process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile()).contains("fnv"));
-        assert!(!process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile()).contains("discriminator"));
+        assert!(
+            !process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile())
+                .contains("fnv")
+        );
+        assert!(
+            !process_starter_c_stub(&crate::boundary_resource_profile::starter_smoke_profile())
+                .contains("discriminator")
+        );
 
         let argument_one = OsString::from_vec(vec![0xff, b'a', b'1']);
         let key_one = OsString::from_vec(vec![b'K', 0xfd]);
@@ -2925,10 +3048,7 @@ mod tests {
             },
         );
         assert_eq!(retained_root_trap.status.code(), Some(1));
-        assert!(
-            String::from_utf8_lossy(&retained_root_trap.stderr)
-                .contains("explicit entry trap")
-        );
+        assert!(String::from_utf8_lossy(&retained_root_trap.stderr).contains("explicit entry trap"));
     }
 
     #[cfg(target_os = "linux")]
@@ -3064,7 +3184,9 @@ mod tests {
                 } if trap != &expected => Some(*planned_identity),
                 _ => None,
             })
-            .expect("the fixture also plans a distinct sibling default, so identity can discriminate");
+            .expect(
+                "the fixture also plans a distinct sibling default, so identity can discriminate",
+            );
         assert_ne!(
             planted.0, sibling,
             "two different planned traps sharing one identity would make this row vacuous"
@@ -3518,7 +3640,7 @@ mod tests {
         .expect("platform support materializes");
         support.header.support_hash ^= 1;
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3527,6 +3649,7 @@ mod tests {
             temp_output_dir("nc23-stale-support"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("stale support report rejects");
 
@@ -3543,7 +3666,7 @@ mod tests {
         let support = platform_support(&program, &entrypoint, &run_report);
         entrypoint.entrypoint.target_kind = ExecutableEntrypointTargetKind::Library;
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3552,6 +3675,7 @@ mod tests {
             temp_output_dir("nc23-stale-payload"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("stale mutated entrypoint payload rejects");
 
@@ -3575,7 +3699,7 @@ mod tests {
         support.entrypoint_metadata_identity = entrypoint.entrypoint.metadata_identity;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3584,6 +3708,7 @@ mod tests {
             temp_output_dir("nc23-forged-support"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged support around non-executable payload rejects");
 
@@ -3605,7 +3730,7 @@ mod tests {
         support.entrypoint_package_hash = entrypoint.header.package_hash;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3614,6 +3739,7 @@ mod tests {
             temp_output_dir("nc23-forged-entrypoint-header"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC20 package header rejects");
 
@@ -3634,7 +3760,7 @@ mod tests {
         support.entrypoint_package_hash = entrypoint.header.package_hash;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3643,6 +3769,7 @@ mod tests {
             temp_output_dir("nc23-forged-entrypoint-version"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC20 package version rejects");
 
@@ -3662,7 +3789,7 @@ mod tests {
         support.header.version = PLATFORM_RUNTIME_SUPPORT_VERSION + 1;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3671,6 +3798,7 @@ mod tests {
             temp_output_dir("nc23-forged-support-header"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC21 support header rejects");
 
@@ -3692,7 +3820,7 @@ mod tests {
         support.header.version = PLATFORM_RUNTIME_SUPPORT_VERSION + 1;
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3701,6 +3829,7 @@ mod tests {
             temp_output_dir("nc23-forged-support-version"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("forged NC21 support version rejects");
 
@@ -3733,7 +3862,7 @@ mod tests {
         };
         support.header.support_hash = platform_runtime_support_report_hash(&support);
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3742,6 +3871,7 @@ mod tests {
             temp_output_dir("nc23-platform"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("non-host starter platform rejects");
 
@@ -3784,7 +3914,7 @@ mod tests {
             "object linker unit test",
         )
         .expect("platform support materializes");
-        let package = package_starter_executable_artifact(
+        let package = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3793,6 +3923,7 @@ mod tests {
             temp_output_dir("c3-d5-identity"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("package materializes");
 
@@ -3878,7 +4009,7 @@ mod tests {
             "non-vacuity: `starter_host` must carry no profile, or this test \
              measures nothing"
         );
-        let err = package_starter_executable_artifact_with_options(
+        let err = package_synthetic_starter_executable_artifact(
             &program,
             &entrypoint,
             &support,
@@ -3887,6 +4018,7 @@ mod tests {
             &output_dir,
             "object linker unit test",
             &options,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("packaging without a profile must be refused");
         assert_eq!(err.stage, ObjectLinkerPackagingStage::ResourceProfile);
@@ -3903,7 +4035,7 @@ mod tests {
 
         // And the same inputs DO package once a profile is named — otherwise the
         // refusal above could be about anything.
-        let package = package_starter_executable_artifact_with_options(
+        let package = package_synthetic_starter_executable_artifact(
             &program,
             &entrypoint,
             &support,
@@ -3914,6 +4046,7 @@ mod tests {
             &ObjectLinkerPackagingOptions::starter_host_with_profile(
                 crate::boundary_resource_profile::starter_smoke_profile(),
             ),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("packaging with a named profile succeeds");
         assert!(package.smoke.passed);
@@ -3943,7 +4076,7 @@ mod tests {
         );
         options.linker_command = "definitely-missing-ken-linker".to_string();
 
-        let err = package_starter_executable_artifact_with_options(
+        let err = package_synthetic_starter_executable_artifact(
             &program,
             &entrypoint,
             &support,
@@ -3952,6 +4085,7 @@ mod tests {
             temp_output_dir("nc23-missing-linker"),
             "object linker unit test",
             &options,
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("missing linker fails in the toolchain lane");
 
@@ -3984,7 +4118,7 @@ mod tests {
         )
         .expect("platform support materializes");
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -3993,6 +4127,7 @@ mod tests {
             temp_output_dir("nc23-aggregate"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("aggregate smoke is not packaged as an external ABI");
 
@@ -4019,7 +4154,7 @@ mod tests {
         )
         .expect("platform support materializes");
 
-        let err = package_starter_executable_artifact(
+        let err = package_synthetic_starter_executable_artifact_with_profile(
             &program,
             &entrypoint,
             &support,
@@ -4028,6 +4163,7 @@ mod tests {
             temp_output_dir("nc23-trap"),
             "object linker unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect_err("trap smoke is not reported as linker success");
 

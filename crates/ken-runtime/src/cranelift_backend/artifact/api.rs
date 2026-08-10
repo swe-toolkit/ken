@@ -45,7 +45,7 @@ use crate::cranelift_backend::surface::{
 // rest of this file is untouched (§10.5).
 use super::{
     compile_expr, compile_expr_with_declarations_and_process_input, compile_program_expr,
-    compile_program_expr_object, native_platform_target_name, new_object_module,
+    compile_program_expr_object, native_platform_target_name, new_object_module, program_admission,
 };
 
 pub fn run_nc6_seed_examples(
@@ -64,14 +64,18 @@ pub fn run_nc8_validated_seed_examples(
     certificate: &RuntimeArtifactCertificate,
 ) -> Result<Vec<CraneliftRunReport>, ValidatedNativeRunError> {
     let validation = validate_supported_runtime_artifact_certificate(program, certificate)?;
-    reject_program_blockers(program)?;
+    // `D1b-role-c1`: admit FIRST, then the residual subset check. The order is
+    // structural, not stylistic -- the residual check's permission is exactly
+    // the set admission proved, so it cannot run before that proof exists.
+    let admission = program_admission(program)?;
+    reject_admitted_program_blockers(program, admission.compilation())?;
     let env = NativeSeedEnvironment::nc5_seed();
     program
         .examples
         .iter()
         .map(|example| {
             let mut report = run_example_native(
-                Some(program),
+                Some((program, admission.compilation())),
                 example,
                 &env,
                 NativeFidelity::F0NativeExample,
@@ -108,6 +112,31 @@ pub fn run_validated_example_with_interpreter_observation(
         env,
         oracle,
         Some(validation),
+    ))
+}
+
+/// Run a **synthetic** hand-built program through the validated differential
+/// lane against an explicitly supplied authority.
+///
+/// ⛔ `#[cfg(test)]`; see `run_synthetic_runtime_ir_report_with_cranelift`.
+#[cfg(test)]
+pub(crate) fn run_synthetic_validated_example_with_interpreter_observation(
+    program: &RuntimeProgram,
+    example: &RuntimeExample,
+    env: &NativeSeedEnvironment,
+    oracle: InterpreterOracleObservation,
+    certificate: &RuntimeArtifactCertificate,
+    authority: &crate::NativeProcessSymbols,
+) -> Result<NativeDifferentialReport, RuntimeArtifactValidationError> {
+    let validation = validate_supported_runtime_artifact_certificate(program, certificate)?;
+    Ok(run_example_with_interpreter_observation_with_authority(
+        program,
+        example,
+        env,
+        oracle,
+        Some(validation),
+        None,
+        authority,
     ))
 }
 pub fn run_ken_checked_proof_erasure_example_with_interpreter_observation(
@@ -148,10 +177,66 @@ pub fn run_ken_checked_proof_erasure_example_with_interpreter_observation(
         Some(proof_erasure_boundary),
     ))
 }
+/// Package-backed differential run. ⛔ Fails closed on the checked authority
+/// **before** the example is lowered and before planning.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`: the refusal is reported at
+/// `BoundaryPreflight` rather than `NativeLoweringOrExecution`, because the
+/// authority is now resolved ahead of lowering rather than inside it. That is a
+/// deliberate stage change, stated here because a reader of the report sees it.
 pub fn run_runtime_ir_report_with_cranelift(
     program: &RuntimeProgram,
     run_report: RuntimeIrRunReport,
     env: &NativeSeedEnvironment,
+) -> NativeRuntimeIrComparisonReport {
+    let admission = match program_admission(program) {
+        Ok(admission) => admission,
+        Err(err) => {
+            return runtime_ir_comparison_error_report(
+                NativeArtifactIdentity::from_program(program),
+                run_report,
+                err,
+                NativeDifferentialStage::BoundaryPreflight,
+            );
+        }
+    };
+    run_runtime_ir_report_with_authority(program, run_report, env, admission.compilation())
+}
+
+/// Compile a **synthetic** hand-built program against an explicitly supplied
+/// authority.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. ⛔ `#[cfg(test)]` is the
+/// boundary: this item does not exist in a production build, so no production
+/// path can name it, and the `authority` argument is required so a caller
+/// cannot omit it and inherit a default. Synthetic programs are entitled to
+/// legacy spellings because their IR is minted in the `prelude::` namespace —
+/// but they must **say so**, which is the whole point of this entrypoint.
+#[cfg(test)]
+pub(crate) fn run_synthetic_runtime_ir_report_with_cranelift(
+    program: &RuntimeProgram,
+    run_report: RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    authority: &crate::NativeProcessSymbols,
+) -> NativeRuntimeIrComparisonReport {
+    run_runtime_ir_report_with_authority(
+        program,
+        run_report,
+        env,
+        crate::synthetic_admitted_compilation(authority),
+    )
+}
+
+
+/// The shared body. ⛔ Reachable only with an **already resolved** authority,
+/// which arrives paired with the trust it was admitted on. The only production
+/// producer of that pair is `program_admission`, which fails closed; the only
+/// other is the `#[cfg(test)]` synthetic constructor.
+pub(crate) fn run_runtime_ir_report_with_authority(
+    program: &RuntimeProgram,
+    run_report: RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    admitted: crate::AdmittedNativeCompilation<'_>,
 ) -> NativeRuntimeIrComparisonReport {
     let artifact = NativeArtifactIdentity::from_program(program);
     let example = match runtime_ir_report_example(program, &run_report) {
@@ -166,7 +251,7 @@ pub fn run_runtime_ir_report_with_cranelift(
         }
     };
 
-    if let Err(err) = reject_program_blockers(program) {
+    if let Err(err) = reject_admitted_program_blockers(program, admitted) {
         return runtime_ir_comparison_error_report(
             artifact,
             run_report,
@@ -176,7 +261,7 @@ pub fn run_runtime_ir_report_with_cranelift(
     }
 
     match run_example_native(
-        Some(program),
+        Some((program, admitted)),
         example,
         env,
         NativeFidelity::F0NativeExample,
@@ -218,19 +303,70 @@ pub fn run_runtime_ir_report_with_cranelift(
         ),
     }
 }
+/// Package-backed object emission. ⛔ Fails closed on the checked authority
+/// before lowering. See `run_runtime_ir_report_with_cranelift`.
 pub fn emit_runtime_ir_object_with_cranelift(
     program: &RuntimeProgram,
     run_report: &RuntimeIrRunReport,
     env: &NativeSeedEnvironment,
     entry_symbol: impl Into<String>,
 ) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
+    let admission = program_admission(program)?;
+    emit_runtime_ir_object_with_authority(
+        program,
+        run_report,
+        env,
+        entry_symbol,
+        admission.compilation(),
+    )
+}
+
+/// Emit an object for a **synthetic** hand-built program against an explicitly
+/// supplied authority. ⛔ `#[cfg(test)]`; see
+/// `run_synthetic_runtime_ir_report_with_cranelift`.
+#[cfg(test)]
+pub(crate) fn emit_synthetic_runtime_ir_object_with_cranelift(
+    program: &RuntimeProgram,
+    run_report: &RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    entry_symbol: impl Into<String>,
+    authority: &crate::NativeProcessSymbols,
+) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
+    emit_runtime_ir_object_with_authority(
+        program,
+        run_report,
+        env,
+        entry_symbol,
+        crate::synthetic_admitted_compilation(authority),
+    )
+}
+
+
+/// The shared body. ⛔ See `run_runtime_ir_report_with_authority`.
+pub(crate) fn emit_runtime_ir_object_with_authority(
+    program: &RuntimeProgram,
+    run_report: &RuntimeIrRunReport,
+    env: &NativeSeedEnvironment,
+    entry_symbol: impl Into<String>,
+    admitted: crate::AdmittedNativeCompilation<'_>,
+) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
     let entry_symbol = entry_symbol.into();
     let example = runtime_ir_report_example(program, run_report)?;
-    reject_program_blockers(program)?;
+    reject_admitted_program_blockers(program, admitted)?;
 
-    let compiled = compile_program_expr_object(program, &example.ir, env, &entry_symbol)?;
+    let compiled = compile_program_expr_object(
+        program,
+        &example.ir,
+        env,
+        &entry_symbol,
+        admitted.authority(),
+    )?;
     let verifier_passed = compiled.verifier_passed;
-    let assumptions = compiled.assumptions.clone();
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the emitted object rests on
+    // the assumptions admission validated, so the artifact must SAY so. Dropping
+    // them here would ship an artifact whose own trust record understates what
+    // it depends on.
+    let assumptions = with_admitted_trust(compiled.assumptions.clone(), admitted);
     let unsupported = compiled.unsupported.clone();
     let object_bytes = compiled
         .module
@@ -365,12 +501,89 @@ fn run_example_with_interpreter_observation_and_reports(
         return oracle_identity_mismatch_report(example, artifact, oracle);
     }
 
-    if let Err(err) = reject_program_blockers(program) {
+    // `D1b-role-c1`, Architect ruling `evt_m763kh1qmez8`: admission runs BEFORE
+    // the residual subset check, because that check's permission is exactly the
+    // set admission proved. The oracle-identity guard still precedes both, so a
+    // program refused by it is still refused for that reason.
+    let admission = match program_admission(program) {
+        Ok(admission) => admission,
+        Err(err) => return differential_error_report(example, artifact, oracle, err, true),
+    };
+
+    if let Err(err) = reject_admitted_program_blockers(program, admission.compilation()) {
         return differential_error_report(example, artifact, oracle, err, true);
     }
 
+    run_example_differential_with_authority(
+        program,
+        example,
+        env,
+        oracle,
+        artifact,
+        artifact_validation,
+        ken_checked_proof_erasure_boundary,
+        admission.compilation(),
+    )
+}
+
+/// The **synthetic** counterpart: same guards, then the same shared tail
+/// against an explicitly supplied authority.
+///
+/// ⛔ `#[cfg(test)]`. The two guards are repeated rather than hoisted because
+/// hoisting them would mean passing the authority as an `Option` and branching
+/// on its absence, which is the implicit fallback this node deletes. Repeating
+/// six lines under a test-only cfg is the smaller cost; the lowering tail
+/// itself is shared, not duplicated.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn run_example_with_interpreter_observation_with_authority(
+    program: &RuntimeProgram,
+    example: &RuntimeExample,
+    env: &NativeSeedEnvironment,
+    oracle: InterpreterOracleObservation,
+    artifact_validation: Option<RuntimeArtifactValidationReport>,
+    ken_checked_proof_erasure_boundary: Option<KenCheckedProofErasureBoundaryReport>,
+    authority: &crate::NativeProcessSymbols,
+) -> NativeDifferentialReport {
+    let artifact = NativeArtifactIdentity::from_program(program);
+
+    if oracle.artifact != artifact {
+        return oracle_identity_mismatch_report(example, artifact, oracle);
+    }
+
+    // The synthetic lane was never admitted, so it checks against its OWN
+    // explicit empty admitted set -- equivalent to the raw empty-trust rule,
+    // and stated as a comparison rather than assumed.
+    let admitted = crate::synthetic_admitted_compilation(authority);
+    if let Err(err) = reject_admitted_program_blockers(program, admitted) {
+        return differential_error_report(example, artifact, oracle, err, true);
+    }
+
+    run_example_differential_with_authority(
+        program,
+        example,
+        env,
+        oracle,
+        artifact,
+        artifact_validation,
+        ken_checked_proof_erasure_boundary,
+        crate::synthetic_admitted_compilation(authority),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_example_differential_with_authority(
+    program: &RuntimeProgram,
+    example: &RuntimeExample,
+    env: &NativeSeedEnvironment,
+    oracle: InterpreterOracleObservation,
+    artifact: NativeArtifactIdentity,
+    artifact_validation: Option<RuntimeArtifactValidationReport>,
+    ken_checked_proof_erasure_boundary: Option<KenCheckedProofErasureBoundaryReport>,
+    admitted: crate::AdmittedNativeCompilation<'_>,
+) -> NativeDifferentialReport {
     match run_example_native(
-        Some(program),
+        Some((program, admitted)),
         example,
         env,
         NativeFidelity::F0NativeExample,
@@ -407,7 +620,86 @@ fn run_example_with_interpreter_observation_and_reports(
         Err(err) => differential_error_report(example, artifact, oracle, err, false),
     }
 }
+/// The raw/seed/synthetic backend-subset check.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. ⛔ This form is for programs
+/// that were **never admitted** — the seed lane, and hand-built synthetic
+/// fixtures. It keeps the package-level empty-trust rule, because nothing has
+/// proved anything about trust metadata on these paths. A package-backed
+/// compile must not reach it: use `reject_admitted_program_blockers`, which is
+/// reachable only with the admission token.
 pub fn reject_program_blockers(program: &RuntimeProgram) -> Result<(), CraneliftBackendError> {
+    reject_unadmitted_package_trust(program)?;
+    reject_residual_program_blockers(program)
+}
+
+/// The package-level trust rule for a program nothing has admitted.
+fn reject_unadmitted_package_trust(
+    program: &RuntimeProgram,
+) -> Result<(), CraneliftBackendError> {
+    if !program.erased_core.metadata.assumptions.is_empty()
+        || !program
+            .erased_core
+            .metadata
+            .assumption_trust_metadata
+            .is_empty()
+        || !program.erased_core.metadata.trusted_base_delta.is_empty()
+    {
+        return Err(unsupported(
+            "RuntimeProgram",
+            "package carries trust metadata outside the supported native subset",
+        ));
+    }
+    Ok(())
+}
+
+/// The residual backend-subset check for a program admission has **proved**.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`, Architect ruling
+/// `evt_m763kh1qmez8`. Trust provenance has exactly one owner —
+/// `NativeProgramAdmission` — so the coarse "any non-empty trust metadata"
+/// refusal is dropped here rather than duplicated: on an admitted package it
+/// was a strictly weaker duplicate whose emptiness condition contradicts the
+/// real compiler-owned pre-source floor.
+///
+/// ⛔ **This is not an unchecked deletion.** The permission granted is exactly
+/// the set admission proved, and nothing wider: the program's own assumption
+/// keys must equal `admitted_trust`. Reaching this function requires the
+/// indivisible authority+admitted-trust token, so no path can grant itself the
+/// permission without first passing the typed proof. Every independent blocker
+/// below — effects, capabilities, runtime checks, unsupported entries,
+/// declaration lowerability, effect/foreign metadata, and the **per-declaration**
+/// trust clause, which admission does not reconcile — is preserved untouched.
+pub(crate) fn reject_admitted_program_blockers(
+    program: &RuntimeProgram,
+    admitted: crate::AdmittedNativeCompilation<'_>,
+) -> Result<(), CraneliftBackendError> {
+    let assumption_keys: std::collections::BTreeSet<crate::RuntimeSymbol> =
+        program.erased_core.metadata.assumptions.keys().cloned().collect();
+    if assumption_keys != *admitted.admitted_trust() {
+        return Err(unsupported(
+            "RuntimeProgram",
+            format!(
+                "package trust metadata is not the set admission proved: not admitted {:?}; \
+                 admitted but absent {:?}",
+                assumption_keys
+                    .difference(admitted.admitted_trust())
+                    .collect::<Vec<_>>(),
+                admitted
+                    .admitted_trust()
+                    .difference(&assumption_keys)
+                    .collect::<Vec<_>>()
+            ),
+        ));
+    }
+    reject_residual_program_blockers(program)
+}
+
+/// Everything both forms share: every blocker that is **independent** of trust
+/// provenance. Unchanged by this node.
+fn reject_residual_program_blockers(
+    program: &RuntimeProgram,
+) -> Result<(), CraneliftBackendError> {
     if !program.erased_core.metadata.effects.is_empty() {
         return Err(unsupported(
             "RuntimeProgram",
@@ -426,20 +718,6 @@ pub fn reject_program_blockers(program: &RuntimeProgram) -> Result<(), Cranelift
             "package carries runtime-check metadata outside the supported native subset",
         ));
     }
-    if !program.erased_core.metadata.assumptions.is_empty()
-        || !program
-            .erased_core
-            .metadata
-            .assumption_trust_metadata
-            .is_empty()
-        || !program.erased_core.metadata.trusted_base_delta.is_empty()
-    {
-        return Err(unsupported(
-            "RuntimeProgram",
-            "package carries trust metadata outside the supported native subset",
-        ));
-    }
-
     for declaration in &program.declarations {
         if declaration.metadata.unsupported.is_some()
             || program
@@ -618,8 +896,31 @@ pub(crate) fn run_process_expr_with_cranelift(
         },
     })
 }
+/// Fold the admitted trust into a compiled unit's own assumption set.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. The lowering discovers
+/// assumptions of its own (undischarged checked-partial obligations, visible
+/// trusted-partial assumptions); admission separately establishes the
+/// trusted-base assumptions the whole package rests on. **A trust report that
+/// carried only the first would be an understatement**, so the emitted set is
+/// the union. The identities are inserted verbatim — they are already
+/// `assume:`-namespaced, so they stay distinguishable from the lowering's own
+/// prose entries and a control can relate them to `metadata.assumptions` as a
+/// set rather than by matching a sentence.
+fn with_admitted_trust(
+    mut assumptions: std::collections::BTreeSet<String>,
+    admitted: crate::AdmittedNativeCompilation<'_>,
+) -> std::collections::BTreeSet<String> {
+    assumptions.extend(admitted.admitted_trust().iter().cloned());
+    assumptions
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the program and its authority
+/// travel as one value, so a package-backed compile cannot be expressed without
+/// one. `None` is the seed lane, which has no program and is entitled to legacy
+/// spellings because seed IR is minted in the `prelude::` namespace.
 fn run_example_native(
-    program: Option<&RuntimeProgram>,
+    program: Option<(&RuntimeProgram, crate::AdmittedNativeCompilation<'_>)>,
     example: &RuntimeExample,
     env: &NativeSeedEnvironment,
     fidelity: NativeFidelity,
@@ -628,11 +929,19 @@ fn run_example_native(
     ken_checked_proof_erasure_boundary: Option<KenCheckedProofErasureBoundaryReport>,
 ) -> Result<CraneliftRunReport, CraneliftBackendError> {
     let compiled = match program {
-        Some(program) => compile_program_expr(program, &example.ir, env)?,
+        Some((program, admitted)) => {
+            compile_program_expr(program, &example.ir, env, admitted.authority())?
+        }
         None => compile_expr(&example.ir, env)?,
     };
     let verifier_passed = compiled.verifier_passed;
-    let assumptions = compiled.assumptions.clone();
+    // See `emit_runtime_ir_object_with_authority`. The seed lane has no program
+    // and therefore no admitted trust to add -- that is its lawful state, not a
+    // dropped value.
+    let assumptions = match program {
+        Some((_, admitted)) => with_admitted_trust(compiled.assumptions.clone(), admitted),
+        None => compiled.assumptions.clone(),
+    };
     let unsupported = compiled.unsupported.clone();
     let (observation, native_returned) = compiled.run(None)?;
     Ok(CraneliftRunReport {

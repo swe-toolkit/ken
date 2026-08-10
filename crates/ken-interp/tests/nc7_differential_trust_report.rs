@@ -1,13 +1,15 @@
-use std::collections::BTreeSet;
-
+use ken_elaborator::checked_core::{StableSymbol, SymbolNamespace};
+use ken_elaborator::compiler_driver::{
+    compile_ken_package_sources, CompilerManifest, CompilerSource, CompilerTargetKind,
+    TargetSelector,
+};
+use ken_elaborator::erasure::erase_checked_core_package_for_target;
 use ken_interp::{eval, EvalStore, EvalVal};
 use ken_kernel::{declare_primitive, GlobalEnv, Level, PrimReduction, Term};
 use ken_runtime::{
-    nc5_seed_examples, ErasedExecutableCore, InterpreterOracleObservation, NativeArtifactIdentity,
-    NativeDifferentialStage, NativeDifferentialVerdict, NativeEvidenceFact, NativeFidelity,
-    RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeField, RuntimeFieldStatus,
-    RuntimeGroundValue, RuntimeLowerabilityStatus, RuntimeMetadata, RuntimeObservation,
-    RuntimeProgram, RuntimeSymbolMetadata, RuntimeValue,
+    InterpreterOracleObservation, NativeArtifactIdentity, NativeDifferentialStage,
+    NativeDifferentialVerdict, NativeEvidenceFact, NativeFidelity, RuntimeExpr, RuntimeGroundValue,
+    RuntimeObservation, RuntimeProgram, RuntimeValue,
 };
 
 struct OracleFixture {
@@ -67,14 +69,59 @@ fn interpreter_add_2_3_fixture() -> OracleFixture {
     }
 }
 
-fn artifact_identity(artifact_hash: u64) -> NativeArtifactIdentity {
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — NC7 runs on a **real**
+/// driver-compiled carrier, not a hand-built `RuntimeProgram`.
+///
+/// The hand-built fixture carried no checked role record and no pre-source
+/// trusted-base roster, so once package-backed compilation began failing closed
+/// on those it could not reach the native backend at all — and a differential
+/// report is exactly what it exists to measure. The carrier below is produced by
+/// the same `compile_ken_package_sources -> erase_checked_core_package_for_target`
+/// path a real package takes, so its role record, roster and trust tuples are
+/// the compiler's rather than this test's.
+///
+/// ⛔ The **oracle stays `ken-interp`'s**. That is the whole point of NC7: the
+/// native side is compared against a real interpreter evaluation of a closed
+/// core `Term`, not against the example's recorded observation. Migrating the
+/// carrier must not quietly turn this into a seed-observation comparison, so
+/// `oracle_observation` below is untouched.
+const CARRIER_PKG: &str = "nc7_differential_carrier";
+const CARRIER_SOURCE: &str = "const addTwoThree : Nat = Suc (Suc (Suc Zero))";
+
+fn real_carrier() -> RuntimeProgram {
+    let out = compile_ken_package_sources(
+        &CompilerManifest::new(CARRIER_PKG, Vec::new()),
+        vec![CompilerSource::new("src/main.ken", CARRIER_SOURCE)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(
+                SymbolNamespace::Module,
+                vec![CARRIER_PKG.to_string()],
+            ),
+            symbol: StableSymbol::declaration(CARRIER_PKG, &[], "addTwoThree"),
+            kind: CompilerTargetKind::Executable,
+        },
+    )
+    .expect("the NC7 carrier source emits a checked-core package");
+    let closure = out.closures.first().expect("selected target closure");
+    erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
+        .expect("the NC7 carrier package erases")
+}
+
+/// The carrier's own identity. Asserting against this rather than against
+/// hardcoded hashes keeps the rows about the differential lane instead of about
+/// a fixture's literals.
+fn carrier_identity(program: &RuntimeProgram) -> NativeArtifactIdentity {
     NativeArtifactIdentity {
-        package_identity: "module:fixture::nc7".to_string(),
-        core_semantic_hash: 0x7001,
-        runtime_artifact_hash: artifact_hash,
+        package_identity: program.package_identity.clone(),
+        core_semantic_hash: program.core_semantic_hash,
+        runtime_artifact_hash: program.artifact_hash,
     }
 }
 
+/// The `ken-interp` oracle. ⛔ UNCHANGED by the carrier migration: NC7 exists
+/// to compare the native side against a real interpreter evaluation of a closed
+/// core `Term`, and swapping this for the example's recorded observation would
+/// delete the property while leaving the test green.
 fn oracle_observation(artifact: NativeArtifactIdentity) -> InterpreterOracleObservation {
     let OracleFixture {
         globals,
@@ -94,49 +141,22 @@ fn oracle_observation(artifact: NativeArtifactIdentity) -> InterpreterOracleObse
     }
 }
 
-fn runtime_program(example: ken_runtime::RuntimeExample, artifact_hash: u64) -> RuntimeProgram {
-    let symbol = "decl:fixture::Main::main".to_string();
-    let mut metadata = RuntimeMetadata::default();
-    metadata
-        .lowerability
-        .insert(symbol.clone(), RuntimeLowerabilityStatus::Supported);
-    RuntimeProgram {
-        package_identity: "module:fixture::nc7".to_string(),
-        core_semantic_hash: 0x7001,
-        artifact_hash,
-        erased_core: ErasedExecutableCore {
-            symbols: BTreeSet::from([symbol.clone()]),
-            metadata,
-        },
-        declarations: vec![RuntimeDeclaration {
-            symbol,
-            kind: RuntimeDeclarationKind::Record {
-                fields: vec![RuntimeField {
-                    name: "value".to_string(),
-                    status: RuntimeFieldStatus::Runtime,
-                }],
-            },
-            metadata: RuntimeSymbolMetadata {
-                lowerability: Some(RuntimeLowerabilityStatus::Supported),
-                ..RuntimeSymbolMetadata::empty()
-            },
-        }],
-        examples: vec![example],
-    }
-}
-
-fn scalar_seed_example() -> ken_runtime::RuntimeExample {
-    nc5_seed_examples()
-        .into_iter()
+/// The carrier's closed scalar example -- the one whose native run is compared
+/// against the `ken-interp` oracle.
+fn scalar_example(program: &RuntimeProgram) -> ken_runtime::RuntimeExample {
+    program
+        .examples
+        .iter()
         .find(|example| example.name == "closed-scalar-primitive")
-        .expect("closed scalar seed exists")
+        .expect("the erased carrier carries the closed scalar example")
+        .clone()
 }
 
 #[test]
 fn interpreter_backed_f1_report_uses_real_oracle_not_seed_observation() {
-    let example = scalar_seed_example();
-    let program = runtime_program(example.clone(), 0x7002);
-    let artifact = artifact_identity(0x7002);
+    let program = real_carrier();
+    let example = scalar_example(&program);
+    let artifact = carrier_identity(&program);
 
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
@@ -157,9 +177,8 @@ fn interpreter_backed_f1_report_uses_real_oracle_not_seed_observation() {
         native.trust.fidelity,
         NativeFidelity::F1InterpreterDifferentialAgreement
     );
-    assert_eq!(report.artifact.package_identity, "module:fixture::nc7");
-    assert_eq!(report.artifact.core_semantic_hash, 0x7001);
-    assert_eq!(report.artifact.runtime_artifact_hash, 0x7002);
+    // The report's identity is the carrier's own, asserted as a relation.
+    assert_eq!(report.artifact, artifact);
     assert!(matches!(
         native.trust.toolchain.cranelift,
         NativeEvidenceFact::Unavailable { .. }
@@ -172,6 +191,7 @@ fn interpreter_backed_f1_report_uses_real_oracle_not_seed_observation() {
         native.trust.toolchain.runtime,
         NativeEvidenceFact::Available { .. }
     ));
+    // ⛔ THE ORACLE IS STILL `ken-interp`'s, not the example's observation.
     assert!(report
         .oracle
         .evidence_source
@@ -180,15 +200,32 @@ fn interpreter_backed_f1_report_uses_real_oracle_not_seed_observation() {
         native.observation,
         RuntimeObservation::Returned(RuntimeGroundValue::Int((5).into()))
     );
+
+    // `D1b-role-c1`: and because this is a real carrier, the trust report now
+    // states the assumptions admission proved. On the hand-built fixture this
+    // set was necessarily empty, so it could assert nothing.
+    let admitted = ken_runtime::native_program_admission(&program)
+        .expect("the carrier is admitted")
+        .admitted_trust()
+        .clone();
+    assert!(
+        !admitted.is_empty(),
+        "the carrier admits no trust, so the containment below would be vacuous"
+    );
+    let missing: Vec<_> = admitted.difference(&native.trust.assumptions).collect();
+    assert!(
+        missing.is_empty(),
+        "the differential trust report dropped admitted trust: missing {missing:?}"
+    );
 }
 
 #[test]
 fn mismatch_report_names_compare_stage_after_both_sides_run() {
-    let mut example = scalar_seed_example();
+    let program = real_carrier();
+    let mut example = scalar_example(&program);
     example.name = "mismatched-runtime-ir".to_string();
     example.ir = RuntimeExpr::Value(RuntimeValue::Int((4).into()));
-    let program = runtime_program(example.clone(), 0x7003);
-    let artifact = artifact_identity(0x7003);
+    let artifact = carrier_identity(&program);
 
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
@@ -198,7 +235,6 @@ fn mismatch_report_names_compare_stage_after_both_sides_run() {
     );
 
     assert!(report.native.is_some(), "native side must have run");
-    assert_eq!(report.artifact.runtime_artifact_hash, 0x7003);
     assert!(matches!(
         report.verdict,
         NativeDifferentialVerdict::Mismatch {
@@ -213,16 +249,33 @@ fn mismatch_report_names_compare_stage_after_both_sides_run() {
     ));
 }
 
+/// An unsupported program emits no differential claim -- and the refusal is
+/// still the **residual subset** blocker's, not a coarser earlier one.
+///
+/// ⛔ The effect is placed on a **declaration**, deliberately. Package-level
+/// effect metadata is refused by admission, which now runs first, so using it
+/// would move the diagnosis to the authority stage and this row would stop
+/// discriminating what it names. Declaration-level effects are outside what
+/// admission reconciles, so they are refused by the residual blocker -- which is
+/// exactly the clause this row is about, and proves that blocker still fires
+/// after admission rather than having been deleted with the coarse trust rule.
 #[test]
 fn unsupported_preflight_report_emits_no_differential_claim() {
-    let example = scalar_seed_example();
-    let mut program = runtime_program(example.clone(), 0x7004);
-    let artifact = artifact_identity(0x7004);
+    let mut program = real_carrier();
+    let example = scalar_example(&program);
+    let artifact = carrier_identity(&program);
     program
-        .erased_core
+        .declarations
+        .first_mut()
+        .expect("the carrier has a declaration")
         .metadata
         .effects
         .insert("Console".to_string());
+
+    // The carrier is still admitted: this is a residual-blocker refusal, not an
+    // authority one, and saying so is what makes the row discriminating.
+    ken_runtime::native_program_admission(&program)
+        .expect("a declaration-level effect does not defeat admission");
 
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
@@ -244,20 +297,28 @@ fn unsupported_preflight_report_emits_no_differential_claim() {
 
 #[test]
 fn oracle_identity_mismatch_emits_no_f1_and_does_not_run_native() {
-    let example = scalar_seed_example();
-    let program = runtime_program(example.clone(), 0x7005);
-    let wrong_artifact = artifact_identity(0x7777);
+    let program = real_carrier();
+    let example = scalar_example(&program);
+    let correct = carrier_identity(&program);
+    let wrong_artifact = NativeArtifactIdentity {
+        runtime_artifact_hash: correct.runtime_artifact_hash ^ 0x7777,
+        ..correct.clone()
+    };
+    assert_ne!(
+        correct, wrong_artifact,
+        "the two identities must differ, or this row compares a thing with itself"
+    );
 
     let report = ken_runtime::run_example_with_interpreter_observation(
         &program,
         &example,
         &ken_runtime::NativeSeedEnvironment::empty(),
-        oracle_observation(wrong_artifact),
+        oracle_observation(wrong_artifact.clone()),
     );
 
     assert!(report.native.is_none());
-    assert_eq!(report.artifact, artifact_identity(0x7005));
-    assert_eq!(report.oracle.artifact, artifact_identity(0x7777));
+    assert_eq!(report.artifact, correct);
+    assert_eq!(report.oracle.artifact, wrong_artifact);
     assert!(matches!(
         report.verdict,
         NativeDifferentialVerdict::Unsupported {

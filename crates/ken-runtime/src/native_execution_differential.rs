@@ -3273,7 +3273,7 @@ mod tests {
             "native differential unit test",
         )
         .expect("platform support materializes");
-        package_starter_executable_artifact(
+        crate::object_linker_packaging::package_synthetic_starter_executable_artifact_with_profile(
             program,
             &entrypoint,
             &support,
@@ -3282,6 +3282,7 @@ mod tests {
             output_dir,
             "native differential unit test",
             crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
         )
         .expect("object/linker package materializes")
     }

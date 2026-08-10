@@ -30,7 +30,8 @@ use crate::{RuntimeDeclaration, RuntimeExpr, RuntimeProgram, RuntimeValue};
 // planning, surface`). Never through the facade.
 use crate::cranelift_backend::compiled::{CompiledExpr, CompiledModule};
 use crate::cranelift_backend::lowering::core::{
-    compile_expr_into_module, compile_expr_into_object_module,
+    compile_expr_into_module, compile_expr_into_object_module, compile_program_expr_into_module,
+    compile_program_expr_into_object_module,
 };
 use crate::cranelift_backend::planning::{
     native_join_plan_for_program, oriented_subcontinuation_plan_for_program,
@@ -46,12 +47,43 @@ fn compile_expr(
     compile_expr_with_declarations(expr, seed_env, BTreeMap::new())
 }
 
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the fail-closed authority gate.
+///
+/// Package-backed compilation resolves its constructor identities through the
+/// named validation lane and **refuses** when they are missing, malformed,
+/// duplicated, or inconsistent with the package's own metadata. ⛔ There is no
+/// fallback branch here: a package that cannot produce an authority does not
+/// compile, rather than compiling against legacy prelude spellings its own
+/// checked package never recorded.
+///
+/// This is the **only** production producer of a package-backed authority, and
+/// every production entrypoint calls it before it can reach the functions
+/// below. They take the resolved value and have no `None` to fill, so the
+/// refusal cannot be routed around by an intermediate layer.
+pub(super) fn program_admission(
+    program: &RuntimeProgram,
+) -> Result<crate::NativeProgramAdmission, CraneliftBackendError> {
+    crate::native_program_admission(program).map_err(|err| {
+        crate::cranelift_backend::surface::unsupported("checked-role-authority", err.to_string())
+    })
+}
+
+/// Package-backed JIT compilation against an authority the caller resolved.
+///
+/// ⛔ The authority is a **required** parameter, not an `Option`. Production
+/// callers obtain it from `program_authority`, which fails closed; the only
+/// other producer is the `#[cfg(test)]` synthetic entrypoint, which does not
+/// exist in a production build. There is no third way to reach lowering.
 fn compile_program_expr(
     program: &RuntimeProgram,
     expr: &RuntimeExpr,
     seed_env: &NativeSeedEnvironment,
+    authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledExpr, CraneliftBackendError> {
-    compile_expr_with_declarations(
+    compile_program_expr_into_module(
+        new_jit_module()?,
+        "ken_nc6_seed",
+        Linkage::Local,
         expr,
         seed_env,
         program
@@ -59,6 +91,11 @@ fn compile_program_expr(
             .iter()
             .map(|declaration| (declaration.symbol.as_str(), declaration))
             .collect(),
+        None,
+        false,
+        authority,
+        None,
+        None,
     )
 }
 
@@ -91,13 +128,15 @@ fn compile_expr_with_declarations_and_process_input<'a>(
     )
 }
 
+/// Package-backed object compilation against a resolved authority. See above.
 fn compile_program_expr_object(
     program: &RuntimeProgram,
     expr: &RuntimeExpr,
     seed_env: &NativeSeedEnvironment,
     entry_symbol: &str,
+    authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledModule<ObjectModule>, CraneliftBackendError> {
-    compile_expr_into_object_module(
+    compile_program_expr_into_object_module(
         new_object_module("ken-runtime-cranelift-object")?,
         entry_symbol,
         Linkage::Export,
@@ -110,7 +149,7 @@ fn compile_program_expr_object(
             .collect(),
         None,
         false,
-        None,
+        authority,
         native_join_plan_for_program(program)?,
         oriented_subcontinuation_plan_for_program(program)?,
     )

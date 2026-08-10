@@ -178,8 +178,12 @@ fn nc22_cranelift_agrees_with_runtime_ir_report_for_broad_starter_shapes() {
     )
     .expect("runtime-IR evaluator runs the compiler-produced artifact");
 
-    let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+    let report = run_synthetic_runtime_ir_report_with_cranelift(
+        &program,
+        run_report,
+        &NativeSeedEnvironment::empty(),
+        &crate::native_process_authority::synthetic_test_legacy_authority(),
+    );
 
     assert_eq!(
         report.verdict,
@@ -234,8 +238,12 @@ fn nc22_imported_dependency_lowers_as_stable_unsupported_native_lane() {
     let run_report = evaluate_runtime_ir_example(&program, &program.examples[0], &runtime_env)
         .expect("runtime-IR evaluator can use an exact imported seed binding");
 
-    let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+    let report = run_synthetic_runtime_ir_report_with_cranelift(
+        &program,
+        run_report,
+        &NativeSeedEnvironment::empty(),
+        &crate::native_process_authority::synthetic_test_legacy_authority(),
+    );
 
     assert!(matches!(
         report.verdict,
@@ -261,8 +269,12 @@ fn nc22_runtime_ir_report_identity_mismatch_rejects_before_native_lowering() {
     .expect("runtime-IR evaluator runs");
     run_report.evidence.runtime_artifact_hash = 0xdead_beef;
 
-    let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+    let report = run_synthetic_runtime_ir_report_with_cranelift(
+        &program,
+        run_report,
+        &NativeSeedEnvironment::empty(),
+        &crate::native_process_authority::synthetic_test_legacy_authority(),
+    );
 
     assert!(matches!(
         report.verdict,
@@ -296,8 +308,12 @@ fn nc22_ambiguous_runtime_ir_report_target_rejects_before_native_lowering() {
     run_report.evidence.core_semantic_hash = program.core_semantic_hash;
     run_report.evidence.runtime_artifact_hash = program.artifact_hash;
 
-    let report =
-        run_runtime_ir_report_with_cranelift(&program, run_report, &NativeSeedEnvironment::empty());
+    let report = run_synthetic_runtime_ir_report_with_cranelift(
+        &program,
+        run_report,
+        &NativeSeedEnvironment::empty(),
+        &crate::native_process_authority::synthetic_test_legacy_authority(),
+    );
 
     assert!(matches!(
         report.verdict,
@@ -324,12 +340,13 @@ fn nc8_valid_certificate_records_f2_validation_separate_from_f1() {
         evidence_source: "test oracle over matching RuntimeProgram identity".to_string(),
     };
 
-    let report = run_validated_example_with_interpreter_observation(
+    let report = run_synthetic_validated_example_with_interpreter_observation(
         &program,
         &example,
         &NativeSeedEnvironment::empty(),
         oracle,
         &certificate,
+        &crate::native_process_authority::synthetic_test_legacy_authority(),
     )
     .expect("certificate validates");
 
@@ -917,4 +934,186 @@ fn reachable_foreign_checked_core_metadata_rejects_before_backend_lowering() {
             ..
         })
     ));
+}
+
+// ── `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` controls ─────────────────────
+//
+// The boundary this node lands is **structural in the call graph**: a
+// package-backed compile resolves its authority through the fail-closed lane,
+// and a synthetic hand-built program reaches the same lowering only by naming
+// its authority at the call. These controls check the two halves that a test
+// profile can see. The other two halves — that the synthetic entrypoint does
+// not exist in a production build, and that omitting its authority argument
+// fails rather than defaulting — are **compilation** facts, checked by the
+// compilation-boundary controls in `scripts/` and recorded in the handback,
+// because a `cargo test` run is structurally blind to both.
+
+/// A body that constructs a Peano `Nat` out of the legacy spellings, so the
+/// lowering's constructor dispatch actually consults `nat_zero` / `nat_suc`.
+///
+/// The control below turns on that consultation: an authority naming a
+/// different package must change what is emitted.
+fn nat_construct_body() -> RuntimeExpr {
+    RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Nat::Suc".to_string(),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Nat::Zero".to_string(),
+            args: Vec::new(),
+        }],
+    }
+}
+
+/// Control (a): a package-backed program carrying no role record is refused
+/// **before the inner lowering is entered**, not merely refused.
+///
+/// The refusal itself is the weak half — an error can be produced anywhere.
+/// The discriminating half is the sentinel: `arm_lowering_entry_sentinel`
+/// survives the call only if `compile_expr_into_module_with_root_projection`
+/// was never reached, and planning is invoked from inside that function.
+#[test]
+fn a_package_backed_program_without_a_role_record_refuses_before_lowering() {
+    let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int((5).into()));
+    let body = total_primitive(
+        "add_int",
+        vec![
+            RuntimeExpr::Value(RuntimeValue::Int((2).into())),
+            RuntimeExpr::Value(RuntimeValue::Int((3).into())),
+        ],
+    );
+    let program = nc22_program_with_body(body, observation);
+    let run_report = evaluate_runtime_ir_example(
+        &program,
+        &program.examples[0],
+        &RuntimeIrSeedEnvironment::empty(),
+    )
+    .expect("the runtime-IR evaluator runs the fixture");
+
+    // This program carries no `checked_core.runtime_symbols` record, which is
+    // exactly the state a package-backed compile must refuse.
+    assert!(
+        program
+            .erased_core
+            .metadata
+            .checked_core
+            .runtime_symbols
+            .is_none(),
+        "the fixture must carry NO role record, or this control is about something else"
+    );
+
+    // ── NEGATIVE HALF: the production entrypoint refuses before lowering ─────
+    crate::cranelift_backend::lowering::core::arm_lowering_entry_sentinel();
+    let refused = run_runtime_ir_report_with_cranelift(
+        &program,
+        run_report.clone(),
+        &NativeSeedEnvironment::empty(),
+    );
+    assert!(
+        matches!(
+            refused.verdict,
+            NativeRuntimeIrComparisonVerdict::Unsupported {
+                construct: "checked-role-authority",
+                ..
+            }
+        ),
+        "a record-less package-backed program must be refused by the authority lane, got {:?}",
+        refused.verdict
+    );
+    assert!(
+        !crate::cranelift_backend::lowering::core::lowering_was_entered(),
+        "the refusal happened only AFTER the inner lowering was entered, so it did not precede \
+         planning -- the gate is in the wrong place"
+    );
+    assert!(refused.native.is_none(), "no native side may have run");
+
+    // ── POSITIVE CONTROL ON THE SENTINEL ────────────────────────────────────
+    // Without this, `!lowering_was_entered()` above would also hold if the
+    // sentinel simply never flipped -- for instance if the epoch reset moved,
+    // or if the fixture failed for an unrelated reason before any compile. The
+    // same program, same report, differing only in HOW the authority is
+    // supplied, must reach lowering.
+    crate::cranelift_backend::lowering::core::arm_lowering_entry_sentinel();
+    let ran = run_synthetic_runtime_ir_report_with_cranelift(
+        &program,
+        run_report,
+        &NativeSeedEnvironment::empty(),
+        &crate::native_process_authority::synthetic_test_legacy_authority(),
+    );
+    assert_eq!(
+        ran.verdict,
+        NativeRuntimeIrComparisonVerdict::RuntimeIrNativeAgreement {
+            stage: NativeDifferentialStage::RuntimeIrNativeCompare,
+        },
+        "the synthetic entrypoint must compile the same program once authority is named"
+    );
+    assert!(
+        crate::cranelift_backend::lowering::core::lowering_was_entered(),
+        "the sentinel never flipped even on a successful compile, so the negative half above \
+         asserted nothing"
+    );
+}
+
+/// Control (b): the synthetic entrypoint **consumes** the authority it is
+/// handed, rather than accepting it and lowering against something else.
+///
+/// This is the control the previous attempt at this node lacked. Threading an
+/// authority argument through five fixture builders left all 38 tests red and
+/// produced five `unused variable` warnings, because the value was accepted and
+/// never read. A required parameter proves a caller *supplied* something; only
+/// a behavioural difference proves the callee *used* it.
+#[test]
+fn the_synthetic_entrypoint_consumes_the_authority_it_is_given() {
+    let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int((0).into()));
+    let program = nc22_program_with_body(nat_construct_body(), observation);
+    let run_report = evaluate_runtime_ir_example(
+        &program,
+        &program.examples[0],
+        &RuntimeIrSeedEnvironment::empty(),
+    )
+    .expect("the runtime-IR evaluator runs the Nat fixture");
+
+    let legacy = crate::native_process_authority::synthetic_test_legacy_authority();
+    // Same authority in every role EXCEPT the Peano pair, which now names a
+    // different package. Nothing else differs between the two emissions.
+    let mut foreign = legacy.clone();
+    foreign.nat_zero = "ctor:other_package::Nat::Zero".to_string();
+    foreign.nat_suc = "ctor:other_package::Nat::Suc".to_string();
+    assert_ne!(
+        legacy.nat_zero, foreign.nat_zero,
+        "the two authorities must actually differ, or this control compares a thing with itself"
+    );
+
+    let with_legacy = emit_synthetic_runtime_ir_object_with_cranelift(
+        &program,
+        &run_report,
+        &NativeSeedEnvironment::empty(),
+        "ken_d1b_role_c1_authority_probe",
+        &legacy,
+    );
+    let with_foreign = emit_synthetic_runtime_ir_object_with_cranelift(
+        &program,
+        &run_report,
+        &NativeSeedEnvironment::empty(),
+        "ken_d1b_role_c1_authority_probe",
+        &foreign,
+    );
+
+    // POSITIVE CONTROL: the fixture must genuinely compile under the authority
+    // it was written for, or "the two differ" would hold for the boring reason
+    // that neither ever worked.
+    let legacy_artifact = with_legacy
+        .as_ref()
+        .expect("the Nat fixture compiles under the authority whose spellings it uses");
+
+    let differs = match &with_foreign {
+        Ok(foreign_artifact) => foreign_artifact.object_hash != legacy_artifact.object_hash,
+        // A refusal is also consumption: the authority reached the lowering and
+        // changed the outcome.
+        Err(_) => true,
+    };
+    assert!(
+        differs,
+        "emitting the SAME program under two DIFFERENT authorities produced byte-identical \
+         output, so the authority argument was ignored -- exactly the failure the previous \
+         builder-parameter threading had"
+    );
 }

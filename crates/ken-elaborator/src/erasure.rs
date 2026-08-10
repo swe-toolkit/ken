@@ -100,6 +100,8 @@ fn erase_checked_package_with_host_root(
     mut native_plans: Option<&mut NativeLoweringPlanCollector>,
 ) -> Result<RuntimeProgram, ErasureError> {
     validate_checked_core_package(package)?;
+    // `D1b-role-c1` — integrity before the role record is trusted as authority.
+    validate_semantic_integrity(package)?;
     let requested_targets = targets.clone();
     let mut prelowered = BTreeMap::new();
     if let Some((root, spine)) = host_root {
@@ -562,6 +564,21 @@ pub(crate) struct CheckedRuntimeSymbolsV1 {
     pub prod: StableSymbol,
     pub exit_success: StableSymbol,
     pub exit_failure: StableSymbol,
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the pre-source trusted-base
+/// roster, as emitted.
+///
+/// This is the **provenance** record. It answers one question that no amount of
+/// inspection of a finished package can otherwise answer: *was this target
+/// already trusted before the package's own source was elaborated?* The roster
+/// is captured at the end of prelude registration and projected through the
+/// package's own stable-symbol table, so a postulate the source introduces is
+/// necessarily absent from it — whatever identity, namespace, or spelling the
+/// source gives that postulate.
+#[derive(Clone, Debug)]
+pub(crate) struct CheckedNativeTrustedBaseV1 {
+    pub targets: std::collections::BTreeSet<StableSymbol>,
 }
 
 #[derive(Clone)]
@@ -6000,6 +6017,9 @@ fn checked_core_metadata(
         // is the only caller that can report a validation failure. Building it
         // here would have to swallow one.
         runtime_symbols: None,
+        // Both typed projections are filled by `checked_core_metadata_with_roles`
+        // on the package-backed path; this base builder leaves them absent.
+        native_trusted_base: None,
     }
 }
 
@@ -6026,7 +6046,89 @@ fn checked_core_metadata_with_roles(
     let record = decode_checked_runtime_symbols_v1(bytes)?;
     validate_runtime_role_symbols(&record, semantic)?;
     audit.runtime_symbols = Some(record);
+    audit.native_trusted_base = decode_native_trusted_base_if_present(semantic)?;
     Ok(audit)
+}
+
+/// Decode the pre-source trusted-base roster, if the package carries one.
+///
+/// ⛔ Absence is passed through as `None` **here only**, because this same
+/// function serves the seed representation boundary. The refusal for a
+/// package-backed compile lives in `native_program_admission`, which requires
+/// the roster. Nothing in this function may be read as admitting a program.
+///
+/// A roster that is *present but malformed* is a hard error, not a `None`:
+/// silently degrading a corrupt roster to "absent" would hand the admission the
+/// one input it treats as a lawful seed program.
+fn decode_native_trusted_base_if_present(
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+) -> Result<Option<ken_runtime::RuntimeCheckedNativeTrustedBaseV1>, ErasureError> {
+    let key = crate::compiler_driver::checked_native_trusted_base_v1_key();
+    let Some(bytes) = semantic.metadata.get(&key) else {
+        return Ok(None);
+    };
+    const HEADER: &[u8] = b"CheckedNativeTrustedBaseV1\0";
+    if !bytes.starts_with(HEADER) {
+        return Err(role_record_error(
+            "the trusted-base roster does not carry its version header",
+        ));
+    }
+    let mut offset = HEADER.len();
+    let count = read_role_count(bytes, &mut offset)?;
+    let mut targets = std::collections::BTreeSet::new();
+    for _ in 0..count {
+        let target = read_role_symbol(bytes, &mut offset)?;
+        if target.trim().is_empty() {
+            return Err(role_record_error("the roster carries an empty target"));
+        }
+        // A duplicate cannot survive a `BTreeSet`, so it would silently shrink
+        // the roster rather than being noticed. Catch it on the way in.
+        if !targets.insert(target.clone()) {
+            return Err(role_record_error(&format!(
+                "the roster carries {target} twice; a set cannot represent that, so the encoded \
+                 count and the decoded roster disagree"
+            )));
+        }
+    }
+    if offset != bytes.len() {
+        return Err(role_record_error(
+            "the trusted-base roster has trailing bytes after its declared targets",
+        ));
+    }
+    Ok(Some(ken_runtime::RuntimeCheckedNativeTrustedBaseV1 {
+        targets,
+    }))
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — decode-side integrity.
+///
+/// Recompute the package's semantic fingerprint and require it to equal the
+/// `core_semantic_hash` the package carries. `D1b-role-a` established that the
+/// role record's bytes live in the `semantic.metadata` lane and that the lane is
+/// covered by that fingerprint, so **any** substitution inside the record moves
+/// the recomputed value — a same-family sibling included, because this compares
+/// exact bytes rather than names or shapes.
+///
+/// ⚠ **State the division, because neither half covers the other.** This catches
+/// a **stale** record paired with a newer package, and a **tampered** record. It
+/// does **not** catch a record that was consistently mis-produced and hashed
+/// consistently with its own package — that is a producer bug, and the roster
+/// identity test in `compiler_driver` is what catches it, in CI, where the
+/// canonical roles and the exact stable-symbol table are both in scope. That
+/// test in turn cannot see a stale or tampered record inside a running process.
+fn validate_semantic_integrity(package: &CheckedCorePackage) -> Result<(), ErasureError> {
+    let recomputed = checked_core::semantic_fingerprint(&package.artifact.semantic);
+    if recomputed != package.core_semantic_hash {
+        return Err(ErasureError::InvalidRuntimeRoleAuthority {
+            role: "package",
+            reason: format!(
+                "the package's semantic inputs hash to {recomputed:#x} but it carries {:#x}; \
+                 the checked role record is stale or tampered and cannot be trusted as authority",
+                package.core_semantic_hash
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// Read one length-prefixed symbol from `bytes` at `offset`.
@@ -6821,6 +6923,34 @@ mod px7l_tests {
     /// slot marker in the selected case, the call marker inside that -- so the
     /// fixture supplies exactly that seat. The MARKER and the PLAN's call
     /// template are the real route's output and are inserted unchanged.
+    /// A real driver-compiled carrier, for its checked-core provenance only.
+    ///
+    /// ⛔ Its `erased_core` is what the marker-gate fixture borrows: role
+    /// record, pre-source roster, trust tuples. Nothing executable comes from
+    /// it. See the call site.
+    fn marker_gate_carrier() -> RuntimeProgram {
+        const PKG: &str = "d7_1b_marker_gate_carrier";
+        let out = crate::compiler_driver::compile_ken_package_sources(
+            &crate::compiler_driver::CompilerManifest::new(PKG, Vec::new()),
+            vec![crate::compiler_driver::CompilerSource::new(
+                "src/main.ken",
+                "const addTwoThree : Nat = Suc (Suc (Suc Zero))",
+            )],
+            crate::compiler_driver::TargetSelector::StableSymbol {
+                package_identity: StableSymbol::new(
+                    checked_core::SymbolNamespace::Module,
+                    vec![PKG.to_string()],
+                ),
+                symbol: StableSymbol::declaration(PKG, &[], "addTwoThree"),
+                kind: crate::compiler_driver::CompilerTargetKind::Executable,
+            },
+        )
+        .expect("the marker-gate carrier source emits a checked-core package");
+        let closure = out.closures.first().expect("selected target closure");
+        erase_checked_core_package_for_target(&out.package, closure.reachable_declarations.iter())
+            .expect("the marker-gate carrier package erases")
+    }
+
     fn runtime_marker_gate_refusal(
         marker: RuntimeExpr,
         mut plan: ken_runtime::OrientedSubcontinuationPlanV1,
@@ -6880,13 +7010,32 @@ mod px7l_tests {
         frame.runtime_frame_fingerprint = frame_fingerprint;
         frame.occurrence_binding_fingerprint =
             ken_runtime::compiler_private_oriented_occurrence_binding_fingerprint(frame);
+        // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`: the CARRIER is a real
+        // driver-compiled package, not a hand-built shell.
+        //
+        // ⛔ Only `erased_core` is taken from it -- its checked role record,
+        // pre-source trusted-base roster and trust tuples, which package-backed
+        // compilation now fails closed without. The declaration, example, marker
+        // and plan below are still this fixture's own, so the row keeps
+        // measuring the marker gate rather than the carrier. Without this the
+        // program is refused at `checked-role-authority` before the gate is
+        // reached, and the row would assert a refusal it did not cause.
+        let carrier = marker_gate_carrier();
         let mut program = RuntimeProgram {
-            package_identity: "d7-1b-marker-gate".to_string(),
-            core_semantic_hash: 0,
-            artifact_hash: 0,
+            package_identity: carrier.package_identity.clone(),
+            core_semantic_hash: carrier.core_semantic_hash,
+            artifact_hash: carrier.artifact_hash,
             erased_core: ErasedExecutableCore {
-                symbols: BTreeSet::new(),
-                metadata: RuntimeMetadata::default(),
+                // The fixture's own declaration must be a package symbol, or the
+                // marker's declaration reference does not resolve.
+                symbols: carrier
+                    .erased_core
+                    .symbols
+                    .iter()
+                    .cloned()
+                    .chain(std::iter::once(declaration.symbol.clone()))
+                    .collect(),
+                metadata: carrier.erased_core.metadata.clone(),
             },
             declarations: vec![declaration],
             examples: Vec::new(),

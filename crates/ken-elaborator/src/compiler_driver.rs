@@ -2990,6 +2990,18 @@ fn emit_package_from_env(
         canonical_checked_runtime_symbols_v1_bytes(&runtime_symbols),
     );
 
+    // `D1b-role-c1` — the same treatment for the pre-source trusted-base
+    // roster, and for the same reason: it is projected through THIS
+    // `stable_symbols_for_env` table (`symbols`), not re-derived, and stored in
+    // the versioned semantic lane so it is covered by `core_semantic_hash`.
+    // A roster that were not hash-covered could be edited without moving the
+    // package's identity, which would make the admission it feeds worthless.
+    let native_trusted_base = checked_native_trusted_base_v1(&env.prelude_env, &symbols)?;
+    semantic.metadata.insert(
+        checked_native_trusted_base_v1_key(),
+        canonical_checked_native_trusted_base_v1_bytes(&native_trusted_base),
+    );
+
     add_data_metadata(env, &symbols, &mut semantic);
     add_admitted_recursion_metadata(
         &manifest.package_name,
@@ -3411,6 +3423,72 @@ fn checked_runtime_symbols_v1(
         exit_success: resolve_id(roles.exit_success)?,
         exit_failure: resolve_id(roles.exit_failure)?,
     })
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — project the immutable
+/// pre-source trusted-base roster onto stable symbols.
+///
+/// ⛔ Narrowed to `&PreludeEnv` for exactly the reason the role record is: with
+/// no `ElabEnv` in scope there is no `env.globals` to consult, so this cannot
+/// silently re-derive the roster from post-source state. It projects the ids
+/// captured before elaboration through **the caller's own**
+/// `stable_symbols_for_env` table and nothing else.
+///
+/// ⛔ A missing id is an **error**, never a skipped entry.
+///
+/// This is the fail-closed direction, and the tempting alternative is wrong in
+/// a way that is invisible downstream. Dropping an unnameable id would emit a
+/// **smaller authoritative roster**, and admission compares a package's trust
+/// targets against exactly that artifact — so it would compare against the
+/// already-shrunk set and never learn that a captured trust root could not be
+/// named. The whole mechanism rests on the roster being the *complete*
+/// pre-source trusted base; a silent shrink here forges that completeness.
+///
+/// A clean carrier measuring 107 targets against 107 roster entries proves the
+/// table is complete **today**. It does not make the discard safe: any later
+/// producer or table drift would silently narrow the roster instead of
+/// refusing, and nothing downstream could tell the difference.
+fn checked_native_trusted_base_v1(
+    prelude: &crate::prelude::PreludeEnv,
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
+) -> Result<crate::erasure::CheckedNativeTrustedBaseV1, CompilerDriverError> {
+    let mut targets = std::collections::BTreeSet::new();
+    for id in &prelude.native_trusted_base {
+        let symbol = symbols
+            .get(id)
+            .cloned()
+            .ok_or(CompilerDriverError::MissingStableSymbol { id: *id })?;
+        targets.insert(symbol);
+    }
+    Ok(crate::erasure::CheckedNativeTrustedBaseV1 { targets })
+}
+
+/// Canonical, versioned bytes for the trusted-base roster.
+///
+/// `BTreeSet` iteration is ordered, so the encoding is deterministic without a
+/// separate sort — the same property the role record relies on.
+pub(crate) fn canonical_checked_native_trusted_base_v1_bytes(
+    record: &crate::erasure::CheckedNativeTrustedBaseV1,
+) -> Vec<u8> {
+    let mut out = b"CheckedNativeTrustedBaseV1\0".to_vec();
+    out.extend_from_slice(&(record.targets.len() as u64).to_le_bytes());
+    for target in &record.targets {
+        let text = target.to_string();
+        out.extend_from_slice(&(text.len() as u64).to_le_bytes());
+        out.extend_from_slice(text.as_bytes());
+    }
+    out
+}
+
+/// The semantic-metadata key the trusted-base roster is stored under.
+pub const CHECKED_NATIVE_TRUSTED_BASE_V1_KEY: &str = "checked-native-trusted-base-v1";
+
+/// The key as a `StableSymbol`, built once so producer and decoder cannot drift.
+pub fn checked_native_trusted_base_v1_key() -> StableSymbol {
+    StableSymbol::new(
+        SymbolNamespace::Declaration,
+        [CHECKED_NATIVE_TRUSTED_BASE_V1_KEY.to_string()],
+    )
 }
 
 /// Canonical, versioned bytes for the record above.
@@ -6313,5 +6391,226 @@ mod tests {
         plan.allow_root_execution = false;
         plan.fs_root_spec = ken_host::FsRootSpec::ExecutionStartCwd(b"data".to_vec());
         assert!(!plan.matches_transport_hash(stale_hash));
+    }
+}
+
+#[cfg(test)]
+mod d1b_role_c1_roster_identity {
+    use super::*;
+
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — every emitted role symbol
+    /// is the exact canonical `GlobalId` projection.
+    ///
+    /// **This is the sibling-substitution detector**, and it lives here because
+    /// this is the only place both operands exist: the canonical roster
+    /// (`CanonicalRuntimeRoles::all()`) and the exact `stable_symbols_for_env`
+    /// table. Erasure has neither — it holds no `GlobalId` and no symbol table —
+    /// so the comparison cannot be made decode-side, and the decode-side
+    /// protection is the semantic-fingerprint integrity check instead.
+    ///
+    /// ⚠ **The coverage division, because neither half covers the other.** This
+    /// catches a **producer bug**: a role wired to the wrong canonical id,
+    /// including a same-family sibling such as `IOError.PermissionDenied`
+    /// standing in the `NotFound` role, which every arity, family-uniqueness and
+    /// existence check accepts because the sibling is a perfectly valid nullary
+    /// constructor of the right family. It runs in CI and **cannot** see a stale
+    /// or tampered record inside a running process; the fingerprint check owns
+    /// that direction.
+    ///
+    /// ⛔ Not a source scan and not a bare-name check. Each assertion compares a
+    /// full `StableSymbol` against `exact_table[canonical_role_global_id]`.
+    #[test]
+    fn every_emitted_role_equals_its_canonical_global_id_projection() {
+        let mut env = ElabEnv::new().expect("prelude env");
+        env.elaborate_file("const two : Nat = Suc (Suc Zero)\n")
+            .expect("package source elaborates");
+
+        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false);
+        let record = checked_runtime_symbols_v1(&env.prelude_env, &symbols)
+            .expect("the record builds from the canonical roster");
+
+        // The canonical expectation: role field -> exact_table[canonical id].
+        let canonical: BTreeMap<&'static str, StableSymbol> = env
+            .prelude_env
+            .runtime_roles
+            .all()
+            .into_iter()
+            .map(|(field, id)| {
+                let symbol = symbols
+                    .get(&id)
+                    .unwrap_or_else(|| panic!("canonical role {field} has no stable symbol"))
+                    .clone();
+                (field, symbol)
+            })
+            .collect();
+
+        let emitted: Vec<(&'static str, StableSymbol)> = vec![
+            ("ret", record.spine.ret.clone()),
+            ("vis", record.spine.vis.clone()),
+            ("in_l", record.spine.in_l.clone()),
+            ("in_r", record.spine.in_r.clone()),
+            ("fs_family", record.spine.fs_family.clone()),
+            ("console_family", record.spine.console_family.clone()),
+            ("clock_family", record.spine.clock_family.clone()),
+            ("entropy_family", record.spine.entropy_family.clone()),
+            ("capability", record.spine.capability.clone()),
+            ("result_err", record.spine.result_err.clone()),
+            ("result_ok", record.spine.result_ok.clone()),
+            ("option_some", record.spine.option_some.clone()),
+            ("file_error", record.spine.file_error.clone()),
+            ("file_operation_read", record.spine.file_operation_read.clone()),
+            ("file_operation_write", record.spine.file_operation_write.clone()),
+            ("file_operation_change_mode", record.spine.file_operation_change_mode.clone()),
+            ("resource_kind_mismatch", record.spine.resource_kind_mismatch.clone()),
+            ("resource_buffer_limit", record.spine.resource_buffer_limit.clone()),
+            ("resource_allocation_failed", record.spine.resource_allocation_failed.clone()),
+            ("resource_invalid_offset", record.spine.resource_invalid_offset.clone()),
+            ("resource_invalid_bounds", record.spine.resource_invalid_bounds.clone()),
+            ("resource_no_progress", record.spine.resource_no_progress.clone()),
+            ("resource_kind_buffer", record.spine.resource_kind_buffer.clone()),
+            ("read_some", record.spine.read_some.clone()),
+            ("read_eof", record.spine.read_eof.clone()),
+            ("wrote", record.spine.wrote.clone()),
+            ("unit", record.spine.unit.clone()),
+            ("bool_false", record.spine.bool_false.clone()),
+            ("bool_true", record.spine.bool_true.clone()),
+            ("io_error_not_found", record.spine.io_errors[0].clone()),
+            ("io_error_permission_denied", record.spine.io_errors[1].clone()),
+            ("io_error_capability_denied", record.spine.io_errors[2].clone()),
+            ("io_error_broken_pipe", record.spine.io_errors[3].clone()),
+            ("io_error_interrupted", record.spine.io_errors[4].clone()),
+            ("io_error_already_exists", record.spine.io_errors[5].clone()),
+            ("io_error_invalid_input", record.spine.io_errors[6].clone()),
+            ("io_error_is_directory", record.spine.io_errors[7].clone()),
+            ("io_error_not_directory", record.spine.io_errors[8].clone()),
+            ("io_error_not_empty", record.spine.io_errors[9].clone()),
+            ("io_error_unsupported", record.spine.io_errors[10].clone()),
+            ("io_error_other", record.spine.io_errors[11].clone()),
+            ("process_input", record.process_input.clone()),
+            ("list_nil", record.list_nil.clone()),
+            ("list_cons", record.list_cons.clone()),
+            ("prod", record.prod.clone()),
+            ("exit_success", record.exit_success.clone()),
+            ("exit_failure", record.exit_failure.clone()),
+        ];
+
+        for (field, symbol) in &emitted {
+            let expected = canonical
+                .get(field)
+                .unwrap_or_else(|| panic!("no canonical roster entry named {field}"));
+            assert_eq!(
+                symbol, expected,
+                "emitted role {field} is {symbol} but the canonical GlobalId projects to \
+                 {expected} -- the producer wired this role to the wrong id. A same-family \
+                 sibling passes every arity, family and existence check, so THIS is the \
+                 assertion that catches it."
+            );
+        }
+
+        // Operations are keyed by symbol rather than positional, so each
+        // canonical operation symbol must be a KEY of the emitted map.
+        for field in ["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"] {
+            let expected = canonical
+                .get(field)
+                .unwrap_or_else(|| panic!("no canonical roster entry named {field}"));
+            assert!(
+                record.spine.operations.contains_key(expected),
+                "emitted operations map has no entry for canonical role {field} ({expected})"
+            );
+        }
+
+        // COMPLETENESS, so the loops above cannot go quietly partial: every
+        // canonical role is covered by one of the three checks.
+        let mut covered: BTreeSet<&'static str> =
+            emitted.iter().map(|(field, _)| *field).collect();
+        covered.extend(["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"]);
+        let uncovered: Vec<&&'static str> = canonical
+            .keys()
+            .filter(|field| !covered.contains(*field))
+            .collect();
+        assert!(
+            uncovered.is_empty(),
+            "these canonical roles are asserted by nothing above: {uncovered:?}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod d1b_role_c1_roster_projection_is_fail_closed {
+    use super::*;
+
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — an unnameable captured
+    /// trust root is a **refusal**, never a smaller roster.
+    ///
+    /// ⛔ MEASURED: severing exactly one captured id from the
+    /// `stable_symbols_for_env` table makes `checked_native_trusted_base_v1`
+    /// return `MissingStableSymbol` naming that id, and the positive control
+    /// beside it shows the same inputs project a full roster when the mapping is
+    /// intact. CLAIMED: the emitted roster is the complete pre-source trusted
+    /// base, so admission compares against everything that was captured. THE
+    /// GAP: this measures the producer's projection, not the whole emission
+    /// path — a later stage could still drop the roster, which the decode-side
+    /// integrity check owns.
+    ///
+    /// **Why the discard this replaces was unsafe, and why a green suite hid
+    /// it.** Skipping an unnameable id emits a *smaller authoritative roster*,
+    /// and admission compares a package's trust targets against exactly that
+    /// artifact — so it would compare against the already-shrunk set and never
+    /// learn a trust root went missing. The clean carrier's 107-vs-107 equality
+    /// proves the table is complete today; it says nothing about what happens
+    /// when it is not, because with a complete table both branches agree. Only
+    /// severing a mapping separates them.
+    ///
+    /// PROMISE CLASS: durable invariant. It asserts a relation between the
+    /// captured set and the table, with no count pinned, so a prelude that grows
+    /// or shrinks keeps it green.
+    #[test]
+    fn a_captured_id_absent_from_the_symbol_table_refuses_instead_of_shrinking_the_roster() {
+        let mut env = ElabEnv::new().expect("prelude env");
+        env.elaborate_file("const two : Nat = Suc (Suc Zero)\n")
+            .expect("package source elaborates");
+
+        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false);
+
+        // POSITIVE CONTROL: with the table intact the projection succeeds, and
+        // it names every captured id. Without this, the refusal below could be
+        // caused by inputs that never worked at all.
+        let intact = checked_native_trusted_base_v1(&env.prelude_env, &symbols)
+            .expect("an intact table projects the whole captured roster");
+        assert_eq!(
+            intact.targets.len(),
+            env.prelude_env.native_trusted_base.len(),
+            "the intact projection is not one target per captured id, so the shrink this control \
+             is about may already be happening"
+        );
+        assert!(
+            !intact.targets.is_empty(),
+            "the captured roster is empty, so severing an entry below would be impossible and \
+             the whole control vacuous"
+        );
+
+        // THE DISCRIMINATOR: sever exactly one captured id's mapping.
+        let victim = *env
+            .prelude_env
+            .native_trusted_base
+            .iter()
+            .next()
+            .expect("the captured roster is non-empty, asserted above");
+        let mut severed = symbols.clone();
+        assert!(
+            severed.remove(&victim).is_some(),
+            "the victim id had no mapping to begin with, so removing it changes nothing and the \
+             refusal below would not be caused by this control"
+        );
+
+        let error = checked_native_trusted_base_v1(&env.prelude_env, &severed)
+            .expect_err("a captured trust root the package cannot name must refuse");
+        assert!(
+            matches!(
+                error,
+                CompilerDriverError::MissingStableSymbol { id } if id == victim
+            ),
+            "the refusal must name the unnameable captured id, got {error:?}"
+        );
     }
 }
