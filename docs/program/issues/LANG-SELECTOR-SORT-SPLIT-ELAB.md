@@ -56,11 +56,24 @@ classification that is metavariable-ambiguous raises the spec's ambiguity
 diagnostic and **rejects, with no default either way**, under the existing
 no-guessing rule.
 
-**3. The sweep.** The 22 old-spelling matches under `crates/` go to zero —
-source, tests, fixtures, and diagnostic identifiers alike. **Identifiers follow
-the landed spec's names exactly.** Where the spec pins a name, use it verbatim;
-where it does not, keep the existing failure condition and respell only the
-vocabulary.
+**3. The sweep, and read its boundary before you start.** The old **surface
+spelling** `structural result of` and the retired grammar production go to zero
+under `crates/` — source, tests, and fixtures.
+
+**The five `StructuralResult*` diagnostic identifiers are OUT of the sweep and
+keep their names.** `StructuralResultOutOfScope`,
+`StructuralResultAssociationMissing`, `-Duplicate`, `-Foreign`, and `-Swapped`
+are **still pinned by name in the landed `39-elaboration.md`**, verified at
+`e8445a12`. The spec's own sweep reported zero only because it searched the
+surface phrase and the snake-case production, neither of which matches a
+CamelCase identifier.
+
+**This is deliberate, not an oversight to repair.** The operator's directive
+removes the spelling a *user writes*; an internal diagnostic identifier is not
+surface syntax, and renaming five spec-pinned identifiers is an enclave change
+with its own cost. **Do not rename them, and do not escalate it — this
+paragraph is the ruling.** Use the two new names, `RecursiveResultSortMismatch`
+and `RecursiveResultSortAmbiguous`, exactly as `39 §4` pins them.
 
 **4. The control-attribution repair**, carried over from
 `SPEC-SELECTOR-SORT-SPLIT` by spec-leader's routing. The identity control
@@ -95,9 +108,11 @@ derives from the kernel `method_type`/`recursive_shapes` telescope and binding
 identity still governs.
 
 **AC-2 — the removal is real, not shadowed.** `structural result of` is a parse
-error, and the crate-wide match count for the old spelling and the retired
-grammar production is **zero**. Report the count; a sweep that reports "clean"
-without a number is not evidence.
+error, and the crate-wide match count for the old **surface** spelling and the
+retired grammar production is **zero**. Report the count; a sweep that reports
+"clean" without a number is not evidence. The five `StructuralResult*`
+identifiers are excluded by deliverable 3 and their presence is not a miss —
+**report them separately so the zero is not read as covering them.**
 
 **AC-3 — the classification discriminates.** A witness whose result is
 `Omega`-classified must **reject** under `recursive result for`, and a
@@ -133,9 +148,11 @@ where it previously greened. Report the mutation and its result.
 
 ## Stop conditions — return to me, do not decide
 
-The landed spec still spelling a removed term in a pinned diagnostic name; a
-classification the spec does not settle; any case where honouring the sort split
-would require touching the association mechanism.
+A classification the spec does not settle; any case where honouring the sort
+split would require touching the association mechanism.
+
+**Not a stop condition:** the five `StructuralResult*` identifiers surviving the
+respell. That is ruled in deliverable 3 and needs no escalation.
 
 ## Contention and validation
 
