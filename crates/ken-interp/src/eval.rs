@@ -8448,7 +8448,7 @@ mod f1_bignum_tests {
         }
     }
 
-    // surface/numbers/f1-store-roundtrip-above-i128-byte-identical (soundness)
+    // Exercises store round-trip above i128 and byte-identical reconstruction.
     #[test]
     fn f1_store_roundtrip_above_i128_byte_identical() {
         // given: mul_int(2^127, 4) = 2^129, produced by the real arithmetic
@@ -8494,7 +8494,7 @@ mod f1_bignum_tests {
         );
     }
 
-    // surface/numbers/f1-dedup-content-address-stable-across-paths (soundness)
+    // Exercises content-address dedup stability across arithmetic paths.
     #[test]
     fn f1_dedup_content_address_stable_across_paths() {
         // given: the same 2^128 reached by two distinct arithmetic paths.
