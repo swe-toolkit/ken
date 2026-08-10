@@ -17,8 +17,8 @@ use ken_kernel::{
     infer as kernel_infer,
     sct::sct_check,
     subst::{subst0, subst_levels, subst_outer, subst_tel, weaken},
-    whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, KernelError, Level,
-    LevelVar, Term,
+    whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
+    Term,
 };
 
 use crate::ast::{BinOp, DefKeyword, NumLit, RecursiveResultSelector};
@@ -2819,13 +2819,12 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
                     RecursiveResultSort::Omega(level),
                     RecursiveResultSelector::InductionHypothesis,
                 ),
-                other => return Err(ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch {
-                        expected: Box::new(Term::Type(Level::Var(LevelVar(0)))),
-                        found: Box::new(other),
-                    },
-                    span: span.clone(),
-                }),
+                _ => {
+                    return Err(ElabError::RecursiveResultClassifierNotUniverse {
+                        selector_span: span.clone(),
+                        binding_span: binding_span.clone(),
+                    })
+                }
             };
             if *selector != required {
                 return Err(ElabError::RecursiveResultSortMismatch {
@@ -7838,7 +7837,7 @@ mod nested_lift_association_tests {
         resolve::{resolve_expr_standalone, RExpr},
         ElabEnv,
     };
-    use ken_kernel::{KernelError, Level, LevelVar, Term};
+    use ken_kernel::{KernelError, Level, Term};
 
     use super::{
         infer, lift_association_error, validate_lift_associations, ElabCtx, ElabError, GlobalId,
@@ -8138,14 +8137,16 @@ mod nested_lift_association_tests {
     }
 
     #[test]
-    fn unclassifiable_result_rejects_both_selectors_without_defaulting() {
-        // Promise class: durable invariant. Both spellings preserve the same
-        // underlying classification failure, so neither can become a default.
+    fn selector_distinguishes_nonuniverse_classifier_from_kernel_failure() {
+        // Promise class: durable invariant. A successful kernel inference with
+        // a non-universe classifier is the elaborator's refusal, while a real
+        // kernel inference failure on the identical selector remains kernel-
+        // attributed. Both selector spellings refuse the former, so neither
+        // can become a default.
         let recursive = resolved_selector("let u : Type = Type in recursive result for u");
         let induction =
             resolved_selector("let u : Type = Type in induction hypothesis for u");
         let mut env = ElabEnv::new().unwrap();
-        let int_type = env.env.int_lit_type().expect("prelude registers Int literals");
         let mut selected = ElabCtx::new(
             &mut env.env,
             &env.globals,
@@ -8155,9 +8156,9 @@ mod nested_lift_association_tests {
         );
         selected.ctx.push(Term::Type(Level::Zero));
         selected.ctx.push(Term::Type(Level::Zero));
-        // A checked-telescope invariant violation: this is a well-typed Int
-        // value where a result TYPE is required. Classification must preserve
-        // the kernel TypeMismatch instead of inventing a selector diagnostic.
+        // This is a well-typed Int value, not a fabricated malformed term.
+        // Its successful inference produces a non-universe classifier; putting
+        // the value in a result-type slot models the defensive invariant arm.
         selected
             .ctx
             .push(Term::IntLit(num_bigint::BigInt::from(0)));
@@ -8167,14 +8168,33 @@ mod nested_lift_association_tests {
             .insert(0, binding(1, Some(2), None));
 
         for selector in [&recursive, &induction] {
+            let RExpr::RRecursiveResult {
+                binding_span: expected_binding_span,
+                ..
+            } = selector
+            else {
+                panic!("expected resolved recursive-result selector");
+            };
             assert!(matches!(
                 infer(&mut selected, selector),
-                Err(ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch { expected, found },
-                    ..
-                }) if *expected == Term::Type(Level::Var(LevelVar(0)))
-                    && *found == Term::const_(int_type, Vec::new())
+                Err(ElabError::RecursiveResultClassifierNotUniverse {
+                    selector_span,
+                    binding_span,
+                }) if selector_span == *selector.span()
+                    && binding_span == *expected_binding_span
             ));
         }
+
+        // Change only the selected slot, retaining the exact resolved selector
+        // and association shape. This raw out-of-scope variable makes
+        // kernel_infer itself fail before the classifier arm.
+        selected.ctx.types[2] = Term::var(99);
+        assert!(matches!(
+            infer(&mut selected, &recursive),
+            Err(ElabError::KernelRejected {
+                error: KernelError::VarOutOfScope { index: 100, depth: 3 },
+                span,
+            }) if span == *recursive.span()
+        ));
     }
 }
