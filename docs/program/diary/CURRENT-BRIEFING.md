@@ -45,7 +45,57 @@
 **`main` = `69b1504b`.** Worktree clean, publisher queue EMPTY, nothing
 unpublished. Builds allowed, targeted only.
 
-> ### RESUME HERE — state at 2026-08-10 ~04:3xZ. `main` = `69b1504b`.
+> ### RESUME HERE — state at 2026-08-10 ~05:1xZ. `main` = `2ace237f`.
+>
+> **`CI-ASSERTIONLESS-L1` MERGED** at exact `3d6622c9` (PR #1765), all three
+> blobs verified. Four SHAs, three rejections, every one on the file header's
+> per-row conformance-cover claim. **What landed it was dropping the claim, not
+> restating it** -- the header now points at
+> `.github/ignored-test-exemptions.toml` and says it makes no claim about any
+> other row. Adversary notified (`evt_78ste7892zmdv`, carries code); ring
+> notified (`evt_5dj0f9ps9dt1c`).
+>
+> **`DS-9` RELEASED TO FOUNDATION**, anchor `evt_6sb1ypxndtv4v`,
+> foundation-leader confirmed `Working`. Stand-down lifted; the Architect's
+> named re-encoding prohibitions still bind. Frame §7 contention caveat
+> re-checked at release and clear.
+>
+> **FOR THE OPERATOR, FIRST THING: I made a priority call that is yours.**
+> Releasing DS-9 ahead of Verify's `CI-L1-EXECUTING-COVER` was a choice between
+> two `ready` WPs, which `steward.md §3` routes to you. I made it to avoid a
+> seven-hour idle lane. Grounds: Foundation has had no active work since
+> 2026-07-27 while Verify has been continuously busy; DS-9 is the tier's
+> acceptance test and its kernel blocker landed; and `CI-L1-EXECUTING-COVER` is
+> a node I created tonight, so letting it pre-empt one waiting two weeks would
+> be bad sequencing. **DS-9 yields if you disagree** -- nothing is sunk.
+>
+> **LANES: Runtime `D1b-role-b` (working ~50m) + Foundation `DS-9` (starting).**
+> Publisher queue empty. Verify is free and its successor
+> `CI-L1-EXECUTING-COVER` is framed, `ready`, and deliberately NOT released.
+>
+> ### TONIGHT'S MERGES: 1763, 1764, 1765, 1766, plus the three before compaction
+>
+> ### STILL QUEUED FOR 11:30Z
+>
+> 1. The DS-9 priority call above -- reverse it or confirm it.
+> 2. Releasing draft `KERNEL-RECURSIVE-RESULT-SURFACE`.
+> 3. **Promoting WS-L into the tracked frontier.** Language has 7 tracked nodes:
+>    5 merged, 1 closed, 1 draft, **zero `ready`**, while three Language seats
+>    sit idle. The three severed `CI-ASSERTIONLESS-L1` capability links
+>    (`Int.toInt64` on L-classes, integer-division op registration, Char literal
+>    syntax) all land there. They are named in the catalog as `L1`
+>    (`03-program-of-work.md:215`) with three frames, and recorded in the
+>    CI-enumerated exemption registry -- but **none is a tracked issue node**. I
+>    did not file L1-L8 unilaterally because promoting a stream into the
+>    frontier is direction, not sequencing.
+> 4. Spec-enclave lane cap; scope forks; TCB growth; CPU trades.
+>
+> ### OWED ITEM 2, unchanged
+>
+> `RT-TERMINAL-ALL-ELIM-AUTHORITY` `AC-8` -- open soundness concern against
+> `register_all_supports`. Still `ready` and base-blocked.
+
+> ### SUPERSEDED — 2026-08-10 ~04:3xZ. `main` was `69b1504b`.
 >
 > **CI-ASSERTIONLESS-L1 WAS REJECTED A THIRD TIME.** `dec_7yn4qg6q05t8n`
 > rejected 04:21:58Z, read from the object. Nothing is in the publisher queue
