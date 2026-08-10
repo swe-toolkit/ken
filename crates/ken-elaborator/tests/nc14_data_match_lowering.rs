@@ -19,7 +19,7 @@ use ken_runtime::{
 };
 
 const NESTED_LIFT_NAT_THREE_SOURCE: &str = "data Bag (a : Type) : Type where { \
-      Empty : Bag a ; One : a -> Bag a ; Join : a -> a -> Bag a \
+      Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a \
     }\n\
     data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)\n\
     fn liftAdd (x : Nat) (y : Nat) : Nat = match x { \
@@ -27,14 +27,25 @@ const NESTED_LIFT_NAT_THREE_SOURCE: &str = "data Bag (a : Type) : Type where { \
     }\n\
     fn liftSize (r : LiftRose) : Nat = match r { \
       LiftLeaf |-> Suc Zero ; \
-      LiftNode b |-> match b { \
-        Empty |-> Suc Zero ; \
-        One x |-> Suc (liftSize x) ; \
-        Join x y |-> Suc (liftAdd (liftSize x) (liftSize y)) \
-      } \
+      LiftNode b |-> Suc (match b { \
+        Empty |-> Zero ; \
+        One x |-> liftSize x ; \
+        Join xs ys |-> liftAdd (recursive result for xs) \
+                              (recursive result for ys) \
+      }) \
     }\n\
     const liftSizeResult : Nat = liftSize \
-      (LiftNode (Join LiftRose LiftLeaf (LiftNode (Empty LiftRose))))";
+      (LiftNode (Join LiftRose \
+        (One LiftRose LiftLeaf) \
+        (One LiftRose (LiftNode (Empty LiftRose)))))\n\
+    const liftSizeDeepResult : Nat = liftSize \
+      (LiftNode (Join LiftRose \
+        (Join LiftRose \
+          (Join LiftRose \
+            (One LiftRose LiftLeaf) \
+            (One LiftRose LiftLeaf)) \
+          (Empty LiftRose)) \
+        (Empty LiftRose)))";
 
 fn decl_symbol(package: &str, name: &str) -> StableSymbol {
     StableSymbol::declaration(package, &[], name)
@@ -187,6 +198,24 @@ fn nested_checked_runtime_program_for_source(
         .expect("recursive checked artifact erases")
 }
 
+fn assert_nested_full_pipeline_nat(
+    package_name: &str,
+    target_name: &str,
+    source: &str,
+    expected: usize,
+) {
+    let program = nested_checked_runtime_program_for_source(package_name, target_name, source);
+    let target = decl_symbol(package_name, target_name);
+    assert!(
+        program
+            .declarations
+            .iter()
+            .any(|declaration| declaration.symbol == target.to_string()),
+        "checked runtime program contains the selected {target_name} declaration"
+    );
+    assert_eq!(interpreter_nat_for_source(source, target_name), expected);
+}
+
 #[test]
 fn option_match_payload_binding_lowers_and_matches_interpreter() {
     let source = "const target : Bool = \
@@ -213,29 +242,72 @@ fn user_data_two_payload_binders_preserve_de_bruijn_order() {
 }
 
 #[test]
-fn nested_recursive_field_elaborates_checks_erases_and_interprets_at_nat_three() {
-    // D5 accepted-partial control: elaboration and kernel checking complete,
-    // the interpreter computes Nat 3, and provenance-gated checked-artifact
-    // erasure succeeds. Native lowering, verifier, interpreter/native
-    // agreement, and AC-K12 discharge remain unmet at
-    // RT-DYNAMIC-ARM-SCALAR-MERGE.
-    assert_eq!(
-        interpreter_nat_for_source(NESTED_LIFT_NAT_THREE_SOURCE, "liftSizeResult"),
-        3
-    );
-    let program = nested_checked_runtime_program_for_source(
+fn nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_three() {
+    // Promise class: durable invariant. The surface selector consumes both
+    // recursive Join results through elaboration, final kernel checking,
+    // checked-artifact erasure, and interpreter evaluation.
+    assert_nested_full_pipeline_nat(
         "nested_inductive_pkg",
-        "liftSize",
+        "liftSizeResult",
         NESTED_LIFT_NAT_THREE_SOURCE,
+        3,
     );
-    let target = decl_symbol("nested_inductive_pkg", "liftSize");
-    assert!(
-        program
-            .declarations
-            .iter()
-            .any(|declaration| declaration.symbol == target.to_string()),
-        "checked runtime program contains the selected liftSize declaration"
+}
+
+#[test]
+fn nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three() {
+    // Promise class: durable invariant. Three residual Join layers separate
+    // the outer node from both leaves, so a finite unroll or depth snapshot
+    // cannot obtain the expected result without consuming the generated fold.
+    assert_nested_full_pipeline_nat(
+        "nested_inductive_deep_pkg",
+        "liftSizeDeepResult",
+        NESTED_LIFT_NAT_THREE_SOURCE,
+        3,
     );
+}
+
+#[test]
+fn nested_recursive_bag_dropped_join_fold_reaches_nat_one() {
+    // Promise class: durable invariant and AC-4 discriminator. This mutation
+    // preserves the recursive constructor and a well-typed lifted method, but
+    // drops both residual results at the natural fold site. The same pipeline
+    // then observes 1 rather than the named witnesses' required 3.
+    let source = NESTED_LIFT_NAT_THREE_SOURCE.replacen(
+        "Join xs ys |-> liftAdd (recursive result for xs) \
+                              (recursive result for ys)",
+        "Join xs ys |-> Zero",
+        1,
+    );
+    assert_ne!(source, NESTED_LIFT_NAT_THREE_SOURCE);
+    assert_nested_full_pipeline_nat(
+        "nested_inductive_dropped_fold_pkg",
+        "liftSizeResult",
+        &source,
+        1,
+    );
+}
+
+#[test]
+fn nested_recursive_bag_type_result_rejects_induction_hypothesis_spelling() {
+    // Promise class: durable invariant. The selected Nat result is
+    // Type-classified, so the inverse Omega spelling must reject with the
+    // exact classifier diagnostic and required surface spelling.
+    let source = NESTED_LIFT_NAT_THREE_SOURCE.replacen(
+        "recursive result for xs",
+        "induction hypothesis for xs",
+        1,
+    );
+    assert_ne!(source, NESTED_LIFT_NAT_THREE_SOURCE);
+
+    let mut env = ElabEnv::new().expect("prelude env");
+    assert!(matches!(
+        env.elaborate_file(&source),
+        Err(ElabError::RecursiveResultSortMismatch {
+            required_spelling: "recursive result for",
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -260,8 +332,8 @@ fn duplicate_nested_lift_arm_is_reachability_error() {
     // as the ordinary dependent-match path does. Keep the accepted fixture as
     // the positive side, and change only one duplicate-arm axis here.
     let source = NESTED_LIFT_NAT_THREE_SOURCE.replacen(
-        "Empty |-> Suc Zero ; ",
-        "Empty |-> Suc Zero ; Empty |-> Suc Zero ; ",
+        "Empty |-> Zero ; ",
+        "Empty |-> Zero ; Empty |-> Zero ; ",
         1,
     );
     assert_ne!(
