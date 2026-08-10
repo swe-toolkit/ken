@@ -14,6 +14,8 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REGISTRY = ROOT / ".github" / "ignored-test-exemptions.toml"
+DEFAULT_RUST_ROOT = ROOT / "crates"
+DEFAULT_CONFORMANCE_ROOT = ROOT / "conformance"
 POPULATION_PATHS = (
     "crates/ken-cli",
     "crates/ken-verify",
@@ -31,10 +33,82 @@ PASS_PREFIX_RE = re.compile(r"^\s*PASS(?:\s|$)")
 COUNTER_RE = re.compile(
     r"^\((?P<index>\d+)/(?P<total>\d+)\)\s+(?P<identity>.+)$"
 )
+ROW_CLAIM_RE = re.compile(r"^\s*///\s+(?P<row>surface/\S+)")
+ROW_HEADING_RE = re.compile(r"^###\s+(?P<row>surface/\S+)(?:\s.*)?$")
+TEST_ATTRIBUTE_RE = re.compile(r"^\s*#\[test\]\s*$")
+ATTRIBUTE_OR_DOC_RE = re.compile(r"^\s*(?:#\[|///)")
+TEST_FN_RE = re.compile(r"^\s*fn\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
 
 class SweepError(RuntimeError):
     """The sweep instrument could not establish its claimed measurement."""
+
+
+def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
+    claims: list[tuple[str, int, str, str]] = []
+    for path in sorted(root.rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            function = TEST_FN_RE.match(line)
+            if function is None:
+                continue
+            prefix: list[tuple[int, str]] = []
+            cursor = index - 1
+            while cursor >= 0 and ATTRIBUTE_OR_DOC_RE.match(lines[cursor]):
+                prefix.append((cursor, lines[cursor]))
+                cursor -= 1
+            if not any(TEST_ATTRIBUTE_RE.match(candidate) for _, candidate in prefix):
+                continue
+            for claim_index, candidate in reversed(prefix):
+                claim = ROW_CLAIM_RE.match(candidate)
+                if claim is not None:
+                    claims.append(
+                        (
+                            str(path.relative_to(ROOT)),
+                            claim_index + 1,
+                            function.group("name"),
+                            claim.group("row"),
+                        )
+                    )
+    return claims
+
+
+def conformance_row_headings(root: Path) -> dict[str, list[tuple[str, int]]]:
+    headings: dict[str, list[tuple[str, int]]] = {}
+    for path in sorted(root.rglob("*.md")):
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            heading = ROW_HEADING_RE.match(line)
+            if heading is not None:
+                headings.setdefault(heading.group("row"), []).append(
+                    (str(path.relative_to(ROOT)), line_number)
+                )
+    return headings
+
+
+def verify_row_claims(rust_root: Path, conformance_root: Path) -> int:
+    claims = rust_test_row_claims(rust_root)
+    if not claims:
+        raise SweepError("Rust test row-claim census resolved zero claims")
+    headings = conformance_row_headings(conformance_root)
+    errors: list[str] = []
+    for path, line, test, row in claims:
+        matches = headings.get(row, [])
+        if len(matches) != 1:
+            locations = ", ".join(f"{match_path}:{match_line}" for match_path, match_line in matches)
+            errors.append(
+                f"{path}:{line} test {test} claims {row!r}, which resolves to "
+                f"{len(matches)} conformance headings"
+                + (f": {locations}" if locations else "")
+            )
+    if errors:
+        raise SweepError("row-claim resolution failed:\n" + "\n".join(errors))
+    print(
+        f"conformance row claims: {len(claims)} Rust test claims resolved "
+        "to exactly one heading"
+    )
+    return len(claims)
 
 
 def load_registry(path: Path) -> list[dict[str, str]]:
@@ -348,12 +422,16 @@ def parse_args() -> argparse.Namespace:
     report_parser.add_argument("log", type=Path)
     report_parser.add_argument("expected", type=int)
     report_parser.add_argument("exit_status", type=int)
+    subcommands.add_parser("verify-row-claims")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
+        if args.command == "verify-row-claims":
+            verify_row_claims(DEFAULT_RUST_ROOT, DEFAULT_CONFORMANCE_ROOT)
+            return 0
         rows = load_registry(args.registry)
         if args.command == "filter":
             _, identities, _ = read_listing(args.all_listing)
