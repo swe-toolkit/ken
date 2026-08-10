@@ -8,14 +8,14 @@ readmission = "not applicable: the fast depth-3000 instance is the standing gate
 [[exemption]]
 test_path = "ken-interp::l1_acceptance::ac5_explicit_conversion_is_partial_option"
 class = "placeholder-no-assertions"
-readmission = "add an assertion for the explicit partial-conversion result"
+readmission = "after L-classes expose Int.toInt64, assert acceptance with type Option Int64"
 
 [[exemption]]
 test_path = "ken-interp::l1_acceptance::sec31_int_div_zero_emits_obligation"
 class = "placeholder-no-assertions"
-readmission = "add an assertion that division emits the required obligation"
+readmission = "after integer division registration, assert V2 emits the non-zero-divisor obligation"
 
 [[exemption]]
 test_path = "ken-interp::l1_acceptance::sec24_char_excludes_surrogates"
 class = "placeholder-no-assertions"
-readmission = "add an assertion that surrogate code points are rejected"
+readmission = "after Char literal syntax, assert a valid scalar accepts and a surrogate rejects"

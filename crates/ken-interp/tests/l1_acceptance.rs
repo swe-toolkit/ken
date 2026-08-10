@@ -1,11 +1,10 @@
-//! L1 numeric tower acceptance tests (`conformance/surface/numbers/seed-numbers.md`).
+//! `l1_acceptance.rs` holds L1 numeric tower acceptance tests.
 //!
-//! Covers the 14 conformance cases defined in the L1-build WP:
-//! AC1 (Int exactness), AC2 (distinct literal types), AC3 (overflow obligation),
-//! AC4 (no silent wrap), AC5 (no implicit coercion), AC6 (Decimal exact / Float honest),
-//! §3.1 (div-by-zero obligation), §6.1/§6.2 (primitive vs prelude law), §2.4 (Char).
-//!
-//! Cases that depend on future WPs (V3+, L-classes, char literals) are marked `#[ignore]`.
+//! `CI-ASSERTIONLESS-L1` establishes only that AC-2 now has its production-fed
+//! witness and that the three named ignored placeholders are honestly marked
+//! as non-cover. The machine-checked exemption artifact and its readmission
+//! conditions live in `.github/ignored-test-exemptions.toml`. This header makes
+//! no claim about any other row's conformance-cover status.
 
 use ken_elaborator::{ElabEnv, NumericLitVal, ObligationKind};
 use ken_elaborator::extract::{v2_extract, ProvKind};
@@ -109,13 +108,52 @@ fn ac2_literal_types_distinct() {
 #[test]
 fn ac2_expected_type_overrides_default() {
     let mut env = ElabEnv::new().unwrap();
-    // The literal `1` should elaborate at Int64 because that's the expected type.
-    let result = env.elaborate_decl_v1(
-        "fn f (x : Int64) : Int64 = x + 1"
-    ).unwrap();
-    // If this compiles, `1` was correctly elaborated at `Int64`.
-    // Type of `f` should be `Int64 → Int64`.
-    let _ = result.def_id; // elaboration succeeded
+    // Preserve the old compile-only probe as the baseline: it witnesses only
+    // elaboration success and does not expose the literal's own type.
+    let _legacy_compile_only = env
+        .elaborate_decl_v1("fn f (x : Int64) : Int64 = x + 1")
+        .unwrap();
+
+    let defaulted = env.elaborate_decl_v1("const defaulted = 1").unwrap();
+    let expected = env
+        .elaborate_decl_v1("const expected : Int64 = 1")
+        .unwrap();
+
+    // The same literal takes two observably different elaboration paths. The
+    // unconstrained form fires the default table and becomes a kernel IntLit.
+    let defaulted_body = env
+        .env
+        .transparent_body(defaulted.def_id)
+        .expect("defaulted literal definition must be transparent")
+        .1;
+    assert!(
+        matches!(&defaulted_body, Term::IntLit(_)),
+        "unconstrained integer literal must take the Int default path"
+    );
+
+    // The expected-type form must instead emit a typed literal constant. If
+    // it defaulted to Int and only unified afterwards, this body would also be
+    // IntLit even though elaboration still succeeds.
+    let expected_body = env
+        .env
+        .transparent_body(expected.def_id)
+        .expect("expected-type literal definition must be transparent")
+        .1;
+    let expected_literal_id = match expected_body {
+        Term::Const { id, .. } => id,
+        other => panic!(
+            "expected-type literal must bypass the Int default path; got {other:?}"
+        ),
+    };
+    let (_, expected_literal_ty) = env
+        .env
+        .const_type(expected_literal_id)
+        .expect("expected-type literal constant must have a type");
+    let int64_ty = Term::const_(env.numeric_env.int64_id, vec![]);
+    assert_eq!(
+        expected_literal_ty, int64_ty,
+        "literal in an Int64 position must itself elaborate at Int64"
+    );
 }
 
 // ── AC3: overflow obligation emitted ────────────────────────────────────────
@@ -235,9 +273,7 @@ fn ac5_no_implicit_cross_type_coercion() {
     );
 }
 
-/// surface/numbers/explicit-conversion-is-partial-option
-/// `Int.toInt64` is not yet in scope (L-classes follow-on).
-/// This test is intentionally skipped until conversions are wired.
+/// Not conformance cover; waits on L-classes to expose `Int.toInt64`.
 #[test]
 #[ignore = "explicit conversions require L-classes or a separate conversion WP"]
 fn ac5_explicit_conversion_is_partial_option() {
@@ -280,6 +316,7 @@ fn ac6_float_not_exact() {
 
 // ── §3.1: Int div-by-zero obligation ────────────────────────────────────────
 
+/// Not conformance cover; waits on integer division op registration.
 #[test]
 #[ignore = "integer division not yet in scope for L1; requires div op registration"]
 fn sec31_int_div_zero_emits_obligation() {
@@ -330,6 +367,7 @@ fn sec62_abstract_add_is_neutral() {
 
 // ── §2.4: Char excludes surrogates ──────────────────────────────────────────
 
+/// Not conformance cover; waits on Char literal syntax.
 #[test]
 #[ignore = "Char literal syntax not yet in scope for L1"]
 fn sec24_char_excludes_surrogates() {
