@@ -29098,13 +29098,20 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
 
     // ── SUPPRESSED — the pre-repair state, producible from this tree ────────
     let (s_arrivals, s_forwards, suppressed) = run(true);
-    assert!(
-        s_arrivals > 0,
-        "the suppressed run saw no arrivals, so its reds are not attributable to the suppression"
+
+    // The same construction as the repaired leg, for the same reason. `s_forwards
+    // == 0` passes MORE easily at zero arrivals, not less, so its denominator is
+    // load-bearing in the same way -- and this leg had been left with a separable
+    // `assert!(s_arrivals > 0)` that a trim pass could delete without breaking
+    // anything. Binding the denominator here makes its removal a COMPILE ERROR at
+    // the assertion below, which reads the count to say what fraction forwarded.
+    let established_s_arrivals = std::num::NonZeroUsize::new(s_arrivals).expect(
+        "the suppressed run saw no arrivals, so its reds are not attributable to the suppression",
     );
     assert_eq!(
         s_forwards, 0,
-        "the suppression did not actually suppress the forward: {s_forwards} still forwarded"
+        "the suppression did not actually suppress the forward: {s_forwards} of \
+         {established_s_arrivals} arrivals still forwarded"
     );
     for (label, rendered) in &suppressed {
         assert!(
