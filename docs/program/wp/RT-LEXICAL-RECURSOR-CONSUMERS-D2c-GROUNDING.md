@@ -14,12 +14,17 @@ handback. A previous revision of this lane's record repeated a captured value
 that went stale while the branch stood still, because `main` advanced onto a
 commit the branch already contained.
 
-> # A LAWFUL PRECEDENT EXISTS. THE MECHANISM IS NOT YET DETERMINED.
+> # NO REUSABLE PRECEDENT. THE MECHANISM IS NOT DETERMINED.
 >
-> The **retained lane compiles this exact fixture**, so `D2c` is a question
-> about what `RecursiveDescent` does differently — a **comparison**, not an
-> invention. That is the single most useful thing this grounding establishes,
-> and it is measured rather than assumed.
+> The retained lane compiles this fixture — and the differential in §4 shows it
+> does so by making **zero carrier transfers**, not by consuming the recursor
+> closure somewhere else. **There is no retained seam to copy.**
+>
+> ⛔ An earlier revision of this banner read *"a lawful precedent exists … a
+> comparison, not an invention."* That was inferred from the retained lane's
+> `Ok` before the differential was taken, and it is **withdrawn**: outcome
+> equivalence is not mechanism equivalence, which is the inference the ruling
+> explicitly forbids.
 
 ## 1. Scope, and the row-5 split preserved
 
@@ -79,29 +84,67 @@ not a value.
 reaching a value position because nothing consumed it at its owner. It is **not
 the same root**: different owner, different route, different protocol value.
 
-## 4. The lawful precedent — measured
+## 4. The retained lane compiles it — and the differential says why
 
 **The retained lane compiles this fixture.** With no exclusion and production
 authority, `px8j_capture_source_trace` returns `Ok`.
 
-⇒ `RecursiveDescent` already handles a carried result containing this shape.
-Whatever it does is a **landed, lawful mechanism**, so `D2c` is a question of
-finding and reusing it rather than designing one.
+⛔ **I first recorded that as "a landed, lawful mechanism to find and reuse."
+The differential shows that reading is WRONG, and this section supersedes it.**
 
-⛔ **What this does NOT establish:** *which* mechanism, or that it transfers to
-the functionized lane. The two lanes differ precisely in how bodies are emitted,
-so the retained lane may consume the closure at a seam the functionized lane
-does not have. **That is the next measurement, and it is not made here.**
+### 4.1 The differential, at the same seam, on the same fixture
+
+Instrumented at `transfer_into_carrier` — the sole production entry — across
+both lanes on the identical expression:
+
+| lane | carrier transfers | outcome |
+|---|---|---|
+| **retained (`RecursiveDescent`)** | **ZERO** | `Ok` |
+| functionized, B-only exclusion | **six**, the sixth inadmissible | refused |
+
+The functionized transfers, in order: `BorrowedNativeValue`, `CapabilityToken`,
+`Constructor Unit::MkUnit`, `Constructor Result::Ok[Unit]`,
+`Constructor PX8JHoleInput::Leaf`, and then
+`Constructor PX8JHoleOutput::Node[ComputationalRecursorClosure]` — inadmissible.
+
+### 4.2 The smallest differential explanation
+
+**The retained lane does not consume the recursor closure at some other seam. It
+never carries the value at all.** Zero transfers means the carried
+computational-match route is not taken there, so the boundary the functionized
+lane meets is never reached.
+
+⇒ **There is NO retained consumption seam to copy.** The retained lane does not
+answer the question; it never asks it. An "exact lawful counterpart already
+available on the functionized path" does **not** exist, and inferring one from
+the retained lane's `Ok` would have been exactly the equivalence-from-outcome
+the ruling forbids — which is the inference my §4 originally invited.
+
+### 4.3 The first non-transferable boundary
+
+`lower_carried_computational_match` requires the case-body **result** to cross
+the carrier boundary. On this fixture that result is
+`Constructor Node[ComputationalRecursorClosure]`, and a recursor closure names
+an in-flight activation rather than a value.
+
+The boundary is therefore **structural to the functionized route**, not a
+missing consumption that the retained lane performs elsewhere.
 
 ## 5. Verdict
 
-**A lawful mechanism is NOT yet determined**, and no repair is attempted.
+**A lawful mechanism is NOT determined, and the differential closes the reuse
+route rather than opening it.**
 
-What is determined: the exact seam, the first missing owner, the incoming route,
-the isolating contrast, and the existence of a landed precedent on the retained
-lane. The next step is a **differential** — trace the same fixture on the
-retained lane to the point where the recursor closure is consumed, and ask
-whether that consumption has a functionized counterpart.
+Determined: the exact seam, the first missing owner
+(`lower_carried_computational_match`), the incoming carried computational-match
+route, the isolating contrast against four admissible sibling transfers, and now
+the measured fact that the retained lane carries **nothing** on this fixture.
+
+⇒ Any `D2c` repair is a **new mechanism on the functionized lane** — either
+consuming the recursor closure at its owner before the enclosing constructor is
+built, or not carrying that result — not the adoption of a landed one. **Both
+are design decisions and neither is authorized here**, so this checkpoint stops
+at the boundary rather than choosing.
 
 ## 6. Scope
 
