@@ -60,6 +60,50 @@ downstream is already correct.
 > false positives, and a watchdog that cries stall trains its readers to ignore
 > it (COORDINATION §13; `reason-in-agent-team-hours-not-human-days`).
 
+> ### Runtime's T1 exception is SUSPENDED for #8 (operator, 2026-08-10)
+>
+> Operator, verbatim: *"for the refactoring work, this is much more mechanical
+> than the initial implementation and discovery. We can switch to T2 model,
+> either gpt-5.6-terra (medium reasoning effort) or sonnet 5 in the
+> implementation seat performing the work."*
+>
+> ⇒ **`runtime-implementer` runs T2 for `RT-BACKEND-MODULE-SPLIT`'s slices**
+> (campaign node #8: the census, the planner and lowering domain moves, the
+> emitter families, and closure). The tier exception above is grounded in
+> *"genuinely hard coding tasks"*, and a byte-for-behaviour move against a
+> census ledger is not one.
+>
+> **THE BOUNDARY, because over-applying this is the obvious failure.** It covers
+> **#8 only**. It does **not** cover `RT-LEXICAL-RECURSOR-CONSUMERS`,
+> `RT-RECURSOR-TRANSPORT`, `RT-FNUNIT-RESULT-TOKEN`, or `RT-DESCENT-RETIRE` —
+> those precede #8, are discovery and semantic repair, and **stay T1**. Nor does
+> it cover the semantic arc deferred *after* #8 closure (canonical terms,
+> transition results, commands, law extraction), which is design work returning
+> to T1.
+>
+> **WHEN, and it is not now.** The switch happens at the phase boundary — when
+> the first #8 slice is released, not before. As of 2026-08-10 the seat is on
+> `D2b`'s closed-projection work, which is exactly what the T1 exception exists
+> for. **Downgrading a seat mid-arc would land the cost on the hardest
+> deliverable in the campaign.**
+>
+> **Which of the two: default Sonnet 5.** Both are T2 and the operator left the
+> choice open. The #8 slices carry heavy ledger and mutation-restoration
+> acceptance criteria and precise `pub(super)` seam work, and the Codex
+> stranding shapes cost the ring turns that land on the Steward across an
+> 18-slice phase.
+>
+> **The condition that flips it to Terra:** Anthropic-pool capacity becoming the
+> binding constraint. The credit-window section below is the argument — the
+> pools are independent, so putting T2 build on the GPT backend buys sustained
+> T1 enclave work at the same time. If T1 seats start waiting on capacity,
+> Terra wins on that ground alone.
+>
+> ⛔ **Confirm by observation before flipping, per the paragraph above.**
+> Observed 2026-08-10: `runtime-implementer` is `Opus 5 (1M context)`, T1, as
+> documented. A seating change proposed from the Roles column rather than from
+> the pane is the exact error that paragraph records.
+
 The operator is the human product owner; Steward is the primary proxy into the
 federation.
 
