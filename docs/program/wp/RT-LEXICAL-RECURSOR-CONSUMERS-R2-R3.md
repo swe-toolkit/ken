@@ -1,9 +1,30 @@
 # RT-LEXICAL-RECURSOR-CONSUMERS — `R2`/`R3` root evidence
 
 Node: `docs/program/issues/RT-LEXICAL-RECURSOR-CONSUMERS.md`.
-Measured at exact `origin/main` `760a0eff` — the `D2a` merge — which is also
-this candidate's base. **Evidence only: no repair, no control, `crates/`
-byte-identical.**
+**Evidence only: no repair, no control, `crates/` byte-identical.**
+
+## 0. Provenance — two coordinates, and they are NOT the same
+
+| coordinate | exact | moves? |
+|---|---|---|
+| **measurement base** — the tree every figure below was taken on | `760a0eff`, the `D2a` merge | **no.** A commit on `main`; nothing this branch does can move it |
+| **candidate merge-base** — where this candidate sits | `06eae51bb5e175a57605b2f1c3754ad1ae3310ca` | **yes.** Every re-anchor moves it |
+
+⛔ **These were one sentence in an earlier revision — *"measured at `760a0eff`,
+which is also this candidate's base"* — and a re-anchor made the second half
+false while the first stayed true.** They are recorded separately here because
+they are separately true, and because one of them is not stable.
+
+⛔ **The measurement is preserved as HISTORICAL EVIDENCE at `760a0eff`, and is
+not re-attributed to the candidate base.** It is not withdrawn: it was taken on
+a real tree and it stands as a statement about that tree.
+
+⛔ **Path-disjointness does NOT make the two bases equal, and no such argument
+is made here.** That the re-anchor touched no path this record measures is a
+reason the evidence remains *useful*; it is not a reason to call `06eae51b` the
+tree the numbers came from. Conflating "the measurement is still applicable"
+with "the measurement was taken here" is the error this section exists to
+prevent — re-measure if you need the stronger claim.
 
 > # ⛔ TWO ROOTS, NOT ONE. `D2b` IS NOT AUTHORIZED BY THIS EVIDENCE.
 >
@@ -27,10 +48,11 @@ instrument was wrong in that direction; here it would be wrong in the other —
 
 ## 2. The measurement
 
-Instrumented at `transfer_into_carrier` (`lowering/mod.rs`), the **sole**
-production entry to the walk, capturing the operand's representation, the
-static origin, and the calling owner at the moment admissibility fails. Run
-under B-only exclusion through `px8j_capture_source_trace`.
+Instrumented at the measurement base, at `transfer_into_carrier`
+(`lowering/mod.rs`) — the **sole** production entry to the walk — capturing the
+operand's representation, the static origin, and the calling owner at the moment
+admissibility fails. Run under B-only exclusion through
+`px8j_capture_source_trace`.
 
 | axis | `R2` — row 3 | `R3` — row 5, before-hole |
 |---|---|---|
@@ -58,7 +80,7 @@ own ruling turned on exactly that distinction.
 Row 5 compiles **two** expressions, before-hole and after-hole. Post-`D2a` they
 no longer fail the same way:
 
-| row 5 compile | first refusal at `760a0eff` |
+| row 5 compile | first refusal at the measurement base |
 |---|---|
 | before-hole | `ComputationalMatch` — *a computational recursor closure names an in-flight activation* (**`R3`**) |
 | after-hole | **`StaticWorkerBinding`** — *a `Var` in value position … has no value representation* |
@@ -89,5 +111,6 @@ evidence.
 
 No repair. No control. No `D3` debt touched. `R4` untouched and out of this node.
 No retirement, no lane deletion, no tracker `status:` change. `crates/` is
-byte-identical to `760a0eff`; the instrument was temporary and is removed
+byte-identical to the candidate merge-base; the instrument was temporary and is
+removed
 (`lowering/mod.rs` sha256 `3eea88f9…7e00` matches base).
