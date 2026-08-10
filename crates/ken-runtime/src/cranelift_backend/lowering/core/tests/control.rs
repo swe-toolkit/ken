@@ -29120,12 +29120,20 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
 /// > row 3 does not compile (see the handback); the compiler-only binder and the
 /// > caller-side reconciliation are not in this candidate.
 ///
-/// ⛔ **The non-vacuity clause is the load-bearing one, and it comes first.**
-/// A producer with a single recursive position satisfies every assertion below
-/// under both the old and the new derivation — the two coincide there, which is
-/// exactly why the defect survived every landed fixture. `projected > 1` is what
-/// makes this row about the sibling case at all; the exclusion assertions are
-/// conditional on it and say nothing without it.
+/// ⛔ **The qualifying population is established FIRST, and the exclusions range
+/// over it — they are not merely accompanied by a count.** A producer with a
+/// single recursive position satisfies every exclusion under **both** the old
+/// and the new derivation, because the two coincide there; that is exactly why
+/// the defect survived every landed fixture. So `projected.len() > 1` selects
+/// the population before any dependent assertion runs, which makes those
+/// assertions **unreachable** on a non-sibling fixture rather than vacuously
+/// true on one. An independent clause asserts the qualifying population is
+/// nonempty, so "nothing qualified" cannot pass as "everything passed".
+///
+/// This is the same ordering discipline as the `D2a` denominator rider, applied
+/// here — and an earlier revision of this very row got it wrong in the way the
+/// rider describes: it asserted over every unit and checked the count
+/// afterwards.
 #[test]
 fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
     let expression =
@@ -29139,15 +29147,31 @@ fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
         "the fixture interned no continuation unit, so every assertion below is vacuous"
     );
 
-    let mut sibling_units = 0usize;
-    for unit in &units {
-        let projected = unit.recursive_positions();
+    // ⭐⭐ THE QUALIFYING POPULATION IS ESTABLISHED FIRST, AND EVERYTHING ELSE
+    // RANGES OVER IT.
+    //
+    // ⛔ An earlier revision asserted the exclusions over EVERY unit and checked
+    // `sibling_units > 0` afterwards. That ordering is the defect this control
+    // exists to catch, one level up: a single-position fixture satisfies every
+    // exclusion under BOTH the old and the new derivation, so the assertions
+    // would all have passed and the count would have been the only thing
+    // standing between a green row and a vacuous one. Qualifying first makes
+    // the dependent assertions unreachable on a non-sibling fixture rather than
+    // merely accompanied by a caveat.
+    let qualified = units
+        .iter()
+        .filter(|unit| unit.recursive_positions().len() > 1)
+        .collect::<Vec<_>>();
+    assert!(
+        !qualified.is_empty(),
+        "no interned unit has more than one recursive position, so this fixture is not the \
+         sibling shape and every exclusion below would hold under the single-position \
+         derivation too"
+    );
 
-        // NON-VACUITY FIRST: this row exists for producers with MORE THAN ONE
-        // recursive position. Below two, old and new derivations agree.
-        if projected.len() > 1 {
-            sibling_units += 1;
-        }
+    for unit in qualified {
+        let projected = unit.recursive_positions();
+        debug_assert!(projected.len() > 1, "the qualified filter admitted a single-position unit");
 
         // The unit's own position is a member, which is what lets the envelope
         // derive its field count from the projection at all.
@@ -29156,7 +29180,7 @@ fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
             "a unit's own recursive position is absent from its closed projection: {projected:?}"
         );
 
-        // THE EXCLUSION. No envelope role may name a recursive position.
+        // THE EXCLUSION, on a producer that genuinely has siblings.
         let envelope = unit.ordinary_envelope().expect("the envelope builds");
         for role in &envelope {
             if let ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
@@ -29171,10 +29195,4 @@ fn d2b_the_runtime_envelope_excludes_every_recursive_position() {
             }
         }
     }
-
-    assert!(
-        sibling_units > 0,
-        "no interned unit has more than one recursive position, so this fixture is not the \
-         sibling shape and the exclusion above holds under the single-position derivation too"
-    );
 }

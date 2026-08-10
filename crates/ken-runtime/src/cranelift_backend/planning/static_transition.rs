@@ -1737,9 +1737,16 @@ impl<'plan> ContinuationUnitView<'plan> {
     /// `nonrecursive_field_count = ordinary_parameters - worker_capture_count`,
     /// computed with checked arithmetic. Positions
     /// `0..nonrecursive_field_count` are nonrecursive producer-`Construct`
-    /// fields in producer source order with the selected recursive position
+    /// fields in producer source order with **every** recursive position
     /// omitted; worker capture `ordinal` occupies
     /// `nonrecursive_field_count + ordinal`.
+    ///
+    /// ⛔ **Every projected recursive position, not just the selected one** —
+    /// `D2b`. This contract previously said "with the selected recursive
+    /// position omitted", which is the singular model that let a SIBLING
+    /// recursive field through as an ordinary ABI parameter. The field count is
+    /// `nonrecursive_field_count + |recursive_positions|` for the same reason:
+    /// `+ 1` was the same assumption written a second time.
     ///
     /// Each role is recompared against the validated slot run before it is
     /// returned: the count of `Parameter` slots must equal
@@ -1774,6 +1781,13 @@ impl<'plan> ContinuationUnitView<'plan> {
 
         // ⭐⭐ `RT-CONTSRC-PRODUCER-LOCAL` `D8l2` — THE NONRECURSIVE POPULATION
         // IS SOURCE POSITIONS, NOT ENVELOPE INDICES.
+        //
+        // ⛔ `D8l2`'s own model, retained because its defect and its controls
+        // are about field ORDER, not about how many positions are recursive.
+        // `D2b` supersedes its arithmetic: the producer has
+        // `N + |recursive_positions|` fields, and EVERY recursive position is
+        // skipped rather than only the selected one. Read the `D2b` note on
+        // this method's contract before reasoning from the paragraph below.
         //
         // The producer `Construct` has `N + 1` fields: `N` nonrecursive ones
         // and the selected recursive one. The roles are those `N` fields at
@@ -2007,7 +2021,11 @@ impl<'plan> ContinuationUnitView<'plan> {
 /// The Architect's ruling: the Parameter prefix is
 /// `[nonrecursive producer-Construct fields in source order]
 ///  ++ [selected worker captures in capture-ordinal order]`,
-/// with the selected recursive field omitted.
+/// with **every** recursive field omitted.
+///
+/// ⛔ `D2b`: this read "with the selected recursive field omitted". A producer
+/// with one recursive position makes the two readings identical, which is why
+/// the singular wording survived every landed fixture.
 ///
 /// This is a **role projection**, not a worker-body environment map. The
 /// continuation descriptor's contract and the worker's `arity + captures`
