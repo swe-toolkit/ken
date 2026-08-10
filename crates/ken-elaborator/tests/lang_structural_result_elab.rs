@@ -7,6 +7,7 @@ use ken_elaborator::{
     resolve::{resolve_expr_standalone, RExpr},
     ElabEnv, Expr,
 };
+use ken_kernel::Term;
 
 const STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
       Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a \
@@ -32,6 +33,49 @@ const STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
 const WSTYLE_OUT_OF_SCOPE_SOURCE: &str = "data WBag (a : Type) : Type where { WEmpty : WBag a ; WBranch : (Bool -> a) -> WBag a }\n\
 data WRose = WLeaf | WNode (WBag WRose)\n\
 fn wsize (r : WRose) : Nat = match r { WLeaf |-> Suc Zero ; WNode b |-> match b { WEmpty |-> Zero ; WBranch k |-> (structural result of k) True } }";
+
+const MIXED_REACHING_SOURCE: &str = "data Bag (a : Type) : Type where { \
+      Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a \
+    }\n\
+    data Rose = Leaf | Nested (Bag Rose)\n\
+    data Direct = DLeaf | DNode Direct\n\
+    data WTree = WLeaf | WNode Bool (Bool -> WTree)\n\
+    fn add (x : Nat) (y : Nat) : Nat = match x { \
+      Zero |-> y ; Suc x2 |-> Suc (add x2 y) \
+    }\n\
+    fn size (r : Rose) : Nat = match r { \
+      Leaf |-> Suc Zero ; \
+      Nested b |-> match b { \
+        Empty |-> Zero ; \
+        One x |-> size x ; \
+        Join xs ys |-> add (structural result of xs) \
+                            (structural result of ys) \
+      } \
+    }\n\
+    fn direct_size (d : Direct) : Nat = match d { \
+      DLeaf |-> Zero ; DNode child |-> Suc (direct_size child) \
+    }\n\
+    fn wsize (t : WTree) : Nat = match t { \
+      WLeaf |-> Zero ; WNode b k |-> Suc Zero \
+    }\n\
+    const nested_result : Nat = size (Nested (Join Rose (One Rose Leaf) (Empty Rose)))\n\
+    const direct_result : Nat = direct_size (DNode DLeaf)\n\
+    const wstyle_result : Nat = wsize (WNode True (\\b. WLeaf))\n\
+    const mixed_result : Nat = add direct_result (add wstyle_result nested_result)";
+
+fn elimination_family(env: &ElabEnv, name: &str) -> ken_kernel::GlobalId {
+    let (_, mut body) = env
+        .env
+        .transparent_body(env.globals[name])
+        .unwrap_or_else(|| panic!("expected transparent {name}"));
+    while let Term::Lam(_, next) = body {
+        body = *next;
+    }
+    match body {
+        Term::Elim { fam, .. } => fam,
+        other => panic!("expected {name} to retain a match elimination, got {other:?}"),
+    }
+}
 
 #[test]
 fn selector_is_contextual_and_resolves_the_surface_binding_identity() {
@@ -113,4 +157,22 @@ fn d2_wstyle_without_a_trailing_result_binder_is_exactly_out_of_scope() {
         env.elaborate_file(WSTYLE_OUT_OF_SCOPE_SOURCE),
         Err(ElabError::StructuralResultOutOfScope { .. })
     ));
+}
+
+#[test]
+fn d2_mixed_direct_wstyle_and_nested_structural_paths_reach_and_retain_behavior() {
+    // The selector appears only in `size`'s nested residual Join arm, where
+    // each source field has its complete source/evidence/trailing-result triple.
+    // The direct and W-style matches remain ordinary recursive behavior.
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_file(MIXED_REACHING_SOURCE).unwrap();
+
+    // Byte-for-behavior retention: the direct and W-style functions still emit
+    // eliminations over their own original families, while `size` emits the
+    // nested structural elimination. The concrete `mixed_result` retains calls
+    // to all three checked functions rather than replacing either ordinary path.
+    assert_eq!(elimination_family(&env, "direct_size"), env.globals["Direct"]);
+    assert_eq!(elimination_family(&env, "wsize"), env.globals["WTree"]);
+    assert_eq!(elimination_family(&env, "size"), env.globals["Rose"]);
+    assert!(env.env.transparent_body(env.globals["mixed_result"]).is_some());
 }
