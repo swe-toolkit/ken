@@ -14075,6 +14075,23 @@ mod tests {
     /// the entry only references this.
     #[cfg(test)]
     fn d2g_declaration_body(checked: bool) -> RuntimeExpr {
+        d2g_declaration_body_relocated(checked, false)
+    }
+
+    /// The same body, optionally with the OUTER SLOT WRAPPER MOVED to the
+    /// sibling case.
+    ///
+    /// This is the runtime-only mutation `AC-2` needs. The plan stays
+    /// byte-for-byte fixed and the ARTIFACT changes: the outer slot marker
+    /// stops wrapping the selected case body and wraps the sibling `OutLeaf`
+    /// case instead -- a real case body, so nothing is malformed. The
+    /// invocation marker stays on the consuming `Call` where it always was.
+    ///
+    /// Mutating the plan instead would only show that the validator notices
+    /// when its own description is edited. Moving the marker in the Runtime IR
+    /// is what shows it detects a change in the thing described.
+    #[cfg(test)]
+    fn d2g_declaration_body_relocated(checked: bool, relocate_outer_slot: bool) -> RuntimeExpr {
         let trap = |what: &str| RuntimeTrap {
             code: RuntimeTrapCode::PatternMatchFailure,
             message: format!("D2g {what} default"),
@@ -14179,26 +14196,36 @@ mod tests {
                         recursive_positions: vec![0],
                         // THE IH-CONSUMING CALL, under its slot and invocation
                         // markers in the checked form.
-                        body: slots(
-                            D2G_OUTER_SLOT,
-                            vec![20, 0],
-                            invocation(
+                        body: {
+                            let consuming = invocation(
                                 D2G_CALL,
                                 vec![30, 0],
                                 RuntimeExpr::Call {
                                     callee: Box::new(RuntimeExpr::Var(0)),
                                     args: vec![unit()],
                                 },
-                            ),
-                        ),
+                            );
+                            if relocate_outer_slot {
+                                consuming
+                            } else {
+                                slots(D2G_OUTER_SLOT, vec![20, 0], consuming)
+                            }
+                        },
                     },
                     RuntimeComputationalMatchCase {
                         constructor: "ctor:fixture::D2gOut::Leaf".to_string(),
                         argument_binders: 0,
                         recursive_positions: Vec::new(),
-                        body: RuntimeExpr::Construct {
-                            constructor: "ctor:prelude::Result::Ok".to_string(),
-                            args: vec![unit()],
+                        body: {
+                            let ok = RuntimeExpr::Construct {
+                                constructor: "ctor:prelude::Result::Ok".to_string(),
+                                args: vec![unit()],
+                            };
+                            if relocate_outer_slot {
+                                slots(D2G_OUTER_SLOT, vec![20, 0], ok)
+                            } else {
+                                ok
+                            }
                         },
                     },
                 ],
@@ -14214,6 +14241,10 @@ mod tests {
     const D2G_OUTER_SLOT: u64 = 200;
     const D2G_INNER_SLOT: u64 = 201;
     const D2G_CALL: u64 = 100;
+    /// The constructor each slot's own frame eliminates. Two different facts,
+    /// and the validator cannot tell them apart -- so they are pinned.
+    const D2G_OUTER_SLOT_CONSTRUCTOR: &str = "ctor:fixture::D2gOut::Node";
+    const D2G_INNER_SLOT_CONSTRUCTOR: &str = "ctor:fixture::D2gIn::Node";
 
     /// The marker locations, DERIVED BY HAND from the collector's documented
     /// edge convention and this fixture's structure -- never read back out of
@@ -14364,9 +14395,25 @@ mod tests {
         }
 
         let mut computational_ih_slots = Vec::new();
-        for (slot_template_id, frame_template_id, checked_path, marker) in [
-            (D2G_OUTER_SLOT, D2G_OUTER_FRAME, vec![20u64, 0], d2g_outer_slot_location()),
-            (D2G_INNER_SLOT, D2G_INNER_FRAME, vec![20u64, 1], d2g_inner_slot_location()),
+        // The constructor is a PER-SLOT fact, authored from each slot's own case.
+        // The outer frame eliminates `D2gOut` and the inner one eliminates
+        // `D2gIn`; hardcoding one for both is a semantic mismatch the landed
+        // validator cannot detect, which is why `d2g_slot_constructors` pins it.
+        for (slot_template_id, frame_template_id, checked_path, marker, constructor) in [
+            (
+                D2G_OUTER_SLOT,
+                D2G_OUTER_FRAME,
+                vec![20u64, 0],
+                d2g_outer_slot_location(),
+                D2G_OUTER_SLOT_CONSTRUCTOR,
+            ),
+            (
+                D2G_INNER_SLOT,
+                D2G_INNER_FRAME,
+                vec![20u64, 1],
+                d2g_inner_slot_location(),
+                D2G_INNER_SLOT_CONSTRUCTOR,
+            ),
         ] {
             let mut slot = crate::CheckedComputationalIHSlotTemplateV1 {
                 slot_template_id,
@@ -14374,7 +14421,7 @@ mod tests {
                 checked_match_ordinal: frame_template_id,
                 checked_occurrence_path: checked_path,
                 frame_template_id,
-                constructor: "ctor:fixture::D2gOut::Node".to_string(),
+                constructor: constructor.to_string(),
                 recursive_position: 0,
                 method_binder_ordinal: 0,
                 local_telescope: Vec::new(),
@@ -14521,49 +14568,131 @@ mod tests {
             .expect("the independently authored plan must authorize this fixture");
     }
 
-    /// `D2g` `AC-2` DISCRIMINATOR — with the plan fixed, moving one runtime
-    /// marker location must be refused for that exact reason.
+    /// `D2g` `AC-2` DISCRIMINATOR — the plan is held FIXED and the RUNTIME moves.
     ///
-    /// This is the half that makes the positive meaningful. A validator that
-    /// accepted everything would pass the positive; only a runtime-location
-    /// mutation against an unchanged plan can tell the two apart.
+    /// An earlier revision mutated the plan's own marker location and re-sealed
+    /// its fingerprint. That shows only that the validator notices when its
+    /// description is edited; it says nothing about whether it detects a change
+    /// in the artifact. **Here the plan is the same object the positive
+    /// accepted, byte for byte, including every fingerprint.**
     ///
-    /// Exactly one location moves, and nothing else: the plan, the identities,
-    /// the paths and the fingerprints are the same objects the positive used.
+    /// What moves is the Runtime declaration: the outer slot wrapper stops
+    /// wrapping the selected case body and wraps the sibling `OutLeaf` case
+    /// instead. That is a real case body, so the refusal cannot be about
+    /// malformedness. The invocation marker stays on the consuming `Call`.
+    ///
+    /// The actual collected location is asserted BEFORE validation, to show the
+    /// mutation landed where intended -- and it is used only as an observation,
+    /// never to build or feed the plan.
     #[test]
-    fn d2g_ac2_moving_one_runtime_marker_location_is_refused() {
-        use crate::cranelift_backend::planning::validate_oriented_subcontinuation_transport;
-        let declaration = d2g_declaration(true);
+    fn d2g_ac2_relocating_the_runtime_marker_against_a_fixed_plan_is_refused() {
+        use crate::cranelift_backend::planning::{
+            collect_checked_oriented_markers, validate_oriented_subcontinuation_transport,
+            CheckedOrientedMarkerSets,
+        };
+
+        // The plan the positive used, unmodified.
+        let oriented = d2g_oriented_plan();
+        assert_eq!(
+            oriented, d2g_oriented_plan(),
+            "the plan must be the positive's plan; nothing here may reseal or edit it"
+        );
+
+        let mutated_body = d2g_declaration_body_relocated(true, true);
+        let mut markers = CheckedOrientedMarkerSets::default();
+        collect_checked_oriented_markers(
+            &mutated_body,
+            &mut markers,
+            D2G_DECLARATION,
+            &mut Vec::new(),
+        )
+        .expect("markers collect");
+        let observed = markers
+            .computational_ih_slots
+            .get(&(D2G_OUTER_SLOT, vec![20, 0]))
+            .expect("the outer slot marker is still present, at its new home");
+        assert_eq!(
+            observed.iter().cloned().collect::<Vec<_>>(),
+            vec![vec![0, 2]],
+            "the mutation must have moved the outer slot marker to the sibling case"
+        );
+        assert_ne!(
+            observed.iter().cloned().collect::<Vec<_>>(),
+            vec![d2g_outer_slot_location()],
+            "and it must no longer sit where the fixed plan says it does"
+        );
+
+        let declaration = RuntimeDeclaration {
+            symbol: D2G_DECLARATION.to_string(),
+            kind: RuntimeDeclarationKind::Transparent { body: mutated_body },
+            metadata: crate::RuntimeSymbolMetadata {
+                obligations: Default::default(),
+                obligation_metadata: Default::default(),
+                assumptions: Default::default(),
+                assumption_trust_metadata: Default::default(),
+                trusted_base_delta: Default::default(),
+                lowerability: None,
+                unsupported: None,
+                runtime_checks: Default::default(),
+                capabilities: Default::default(),
+                effects: Default::default(),
+            },
+        };
         let entry = d2g_entry();
         let mut declarations = BTreeMap::new();
         declarations.insert(D2G_DECLARATION, &declaration);
 
-        let mut oriented = d2g_oriented_plan();
-        let slot = oriented
-            .computational_ih_slots
-            .iter_mut()
-            .find(|slot| slot.slot_template_id == D2G_OUTER_SLOT)
-            .expect("the outer slot is planned");
-        assert_eq!(
-            slot.runtime_marker_locations[0].runtime_path,
-            d2g_outer_slot_location(),
-            "the mutation must start from the location the positive accepted"
-        );
-        // Move the marker one edge over: the sibling case body rather than the
-        // selected one. A real location, so this cannot be refused for being
-        // malformed.
-        slot.runtime_marker_locations[0].runtime_path = vec![0, 2];
-        slot.occurrence_binding_fingerprint =
-            crate::compiler_private_computational_ih_slot_binding_fingerprint(slot);
-
         let refusal =
             validate_oriented_subcontinuation_transport(&entry, &declarations, Some(&oriented))
-                .expect_err("a moved runtime marker location must be refused");
+                .expect_err("a relocated runtime marker must be refused against the fixed plan");
         let rendered = format!("{refusal:?}");
         assert!(
             rendered.contains("checked computational-IH slot Runtime occurrences differ"),
-            "the refusal must name the exact location mismatch, not some other failure: \
-             {rendered}"
+            "the refusal must name the exact slot location mismatch: {rendered}"
+        );
+    }
+
+    /// `D2g` — each slot's constructor fact is its OWN frame's, and both are
+    /// pinned because the validator cannot tell them apart.
+    ///
+    /// The outer frame eliminates `D2gOut` and the inner one eliminates
+    /// `D2gIn`. An earlier revision wrote the outer constructor into both slot
+    /// templates. `validate_oriented_subcontinuation_transport` checks
+    /// identities, paths, locations and fingerprints -- **not** whether a slot's
+    /// constructor matches the case it stands for -- so the mismatch validated
+    /// cleanly and would have travelled into the key as a wrong fact.
+    ///
+    /// A pin is the only thing that catches it, so the two facts are asserted
+    /// separately and asserted to DIFFER; equal values would mean the
+    /// hardcoding came back.
+    #[test]
+    fn d2g_each_slot_carries_its_own_frames_constructor() {
+        let oriented = d2g_oriented_plan();
+        let constructor = |slot_template_id: u64| {
+            oriented
+                .computational_ih_slots
+                .iter()
+                .find(|slot| slot.slot_template_id == slot_template_id)
+                .map(|slot| slot.constructor.clone())
+                .expect("the slot is planned")
+        };
+        assert_eq!(constructor(D2G_OUTER_SLOT), D2G_OUTER_SLOT_CONSTRUCTOR);
+        assert_eq!(constructor(D2G_INNER_SLOT), D2G_INNER_SLOT_CONSTRUCTOR);
+        assert_ne!(
+            constructor(D2G_OUTER_SLOT),
+            constructor(D2G_INNER_SLOT),
+            "the two slots eliminate different constructors; equal values here means \
+             one was hardcoded for both again"
+        );
+
+        // And the facts agree with the fixture, so the pin is about the program
+        // rather than about two constants agreeing with each other.
+        let body = d2g_declaration_body(true);
+        let rendered = format!("{body:?}");
+        assert!(
+            rendered.contains(D2G_OUTER_SLOT_CONSTRUCTOR)
+                && rendered.contains(D2G_INNER_SLOT_CONSTRUCTOR),
+            "both constructors must actually occur in the fixture"
         );
     }
 
