@@ -100,6 +100,8 @@ fn erase_checked_package_with_host_root(
     mut native_plans: Option<&mut NativeLoweringPlanCollector>,
 ) -> Result<RuntimeProgram, ErasureError> {
     validate_checked_core_package(package)?;
+    // `D1b-role-c1` — integrity before the role record is trusted as authority.
+    validate_semantic_integrity(package)?;
     let requested_targets = targets.clone();
     let mut prelowered = BTreeMap::new();
     if let Some((root, spine)) = host_root {
@@ -6027,6 +6029,37 @@ fn checked_core_metadata_with_roles(
     validate_runtime_role_symbols(&record, semantic)?;
     audit.runtime_symbols = Some(record);
     Ok(audit)
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — decode-side integrity.
+///
+/// Recompute the package's semantic fingerprint and require it to equal the
+/// `core_semantic_hash` the package carries. `D1b-role-a` established that the
+/// role record's bytes live in the `semantic.metadata` lane and that the lane is
+/// covered by that fingerprint, so **any** substitution inside the record moves
+/// the recomputed value — a same-family sibling included, because this compares
+/// exact bytes rather than names or shapes.
+///
+/// ⚠ **State the division, because neither half covers the other.** This catches
+/// a **stale** record paired with a newer package, and a **tampered** record. It
+/// does **not** catch a record that was consistently mis-produced and hashed
+/// consistently with its own package — that is a producer bug, and the roster
+/// identity test in `compiler_driver` is what catches it, in CI, where the
+/// canonical roles and the exact stable-symbol table are both in scope. That
+/// test in turn cannot see a stale or tampered record inside a running process.
+fn validate_semantic_integrity(package: &CheckedCorePackage) -> Result<(), ErasureError> {
+    let recomputed = checked_core::semantic_fingerprint(&package.artifact.semantic);
+    if recomputed != package.core_semantic_hash {
+        return Err(ErasureError::InvalidRuntimeRoleAuthority {
+            role: "package",
+            reason: format!(
+                "the package's semantic inputs hash to {recomputed:#x} but it carries {:#x}; \
+                 the checked role record is stale or tampered and cannot be trusted as authority",
+                package.core_semantic_hash
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// Read one length-prefixed symbol from `bytes` at `offset`.

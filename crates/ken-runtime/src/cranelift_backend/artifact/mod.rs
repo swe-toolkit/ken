@@ -30,7 +30,8 @@ use crate::{RuntimeDeclaration, RuntimeExpr, RuntimeProgram, RuntimeValue};
 // planning, surface`). Never through the facade.
 use crate::cranelift_backend::compiled::{CompiledExpr, CompiledModule};
 use crate::cranelift_backend::lowering::core::{
-    compile_expr_into_module, compile_expr_into_object_module,
+    compile_expr_into_module, compile_expr_into_object_module, compile_program_expr_into_module,
+    compile_program_expr_into_object_module,
 };
 use crate::cranelift_backend::planning::{
     native_join_plan_for_program, oriented_subcontinuation_plan_for_program,
@@ -46,12 +47,37 @@ fn compile_expr(
     compile_expr_with_declarations(expr, seed_env, BTreeMap::new())
 }
 
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the fail-closed authority gate.
+///
+/// Package-backed compilation resolves its constructor identities through the
+/// named validation lane and **refuses** when they are missing, malformed,
+/// duplicated, or inconsistent with the package's own metadata. ⛔ There is no
+/// fallback branch here: a package that cannot produce an authority does not
+/// compile, rather than compiling against legacy prelude spellings its own
+/// checked package never recorded.
+fn program_authority(
+    program: &RuntimeProgram,
+) -> Result<crate::NativeProcessSymbols, CraneliftBackendError> {
+    crate::native_authority_for_program(program).map_err(|err| {
+        crate::cranelift_backend::surface::unsupported(
+            "checked-role-authority",
+            err.to_string(),
+        )
+    })
+}
+
 fn compile_program_expr(
     program: &RuntimeProgram,
     expr: &RuntimeExpr,
     seed_env: &NativeSeedEnvironment,
 ) -> Result<CompiledExpr, CraneliftBackendError> {
-    compile_expr_with_declarations(
+    // The authority is resolved BEFORE lowering, so a refusal happens before
+    // `plan_static_transition_graph_with_symbols` ever runs.
+    let authority = program_authority(program)?;
+    compile_program_expr_into_module(
+        new_jit_module()?,
+        "ken_nc6_seed",
+        Linkage::Local,
         expr,
         seed_env,
         program
@@ -59,6 +85,11 @@ fn compile_program_expr(
             .iter()
             .map(|declaration| (declaration.symbol.as_str(), declaration))
             .collect(),
+        None,
+        false,
+        &authority,
+        None,
+        None,
     )
 }
 
@@ -97,7 +128,8 @@ fn compile_program_expr_object(
     seed_env: &NativeSeedEnvironment,
     entry_symbol: &str,
 ) -> Result<CompiledModule<ObjectModule>, CraneliftBackendError> {
-    compile_expr_into_object_module(
+    let authority = program_authority(program)?;
+    compile_program_expr_into_object_module(
         new_object_module("ken-runtime-cranelift-object")?,
         entry_symbol,
         Linkage::Export,
@@ -110,7 +142,7 @@ fn compile_program_expr_object(
             .collect(),
         None,
         false,
-        None,
+        &authority,
         native_join_plan_for_program(program)?,
         oriented_subcontinuation_plan_for_program(program)?,
     )
