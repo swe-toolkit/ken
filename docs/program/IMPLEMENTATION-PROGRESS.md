@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-10 06:11:48Z — from 195 issue file(s) in `docs/program/issues/`.
+2026-08-10 07:51:41Z — from 196 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -60,9 +60,10 @@ the committed file matches the generator's output.
 | `CB-HYGIENE` | cranelift_backend facade: strip WP-token narration, separate test material from implementation | merged | runtime | S | none | — |
 | `CI-ASSERTIONLESS-L1` | Four registered conformance claims whose only cover does not check them — l1_acceptance.rs, three ignored and one live, green, and counted as cover | merged | verify | S | none | — |
 | `CI-IGNORED-SWEEP` | nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off | merged | verify | S | none | — |
-| `CI-L1-EXECUTING-COVER` | Three executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 never issues the conversion query its soundness row turns on, sec61 names a row id that does not exist, and ac5_no_implicit_cross_type_coercion is satisfied by an elaboration limitation rather than by the coercion refusal it claims | ready | verify | M | none | — |
+| `CI-L1-EXECUTING-COVER` | Three executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 never issues the conversion query its soundness row turns on, sec61 names a row id that does not exist, and ac5_no_implicit_cross_type_coercion is satisfied by an elaboration limitation rather than by the coercion refusal it claims | merged | verify | M | none | — |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
+| `CONF-EVAL-COMPUTED-BOOL-ELIM` | The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together | ready | spec-enclave | S | none | — |
 | `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | draft | spec-enclave | S | none | — |
 | `CONF-SEC4-REFL-PAIR` | Sec4's C1/C2 refl pair is stale against ADR-0013: the true arm is unreachable and the false arm is green for the wrong reason | draft | spec-enclave | S | none | — |
 | `DOC-AGENT-CITE` | agent core modules name normative authorities as a reading list rather than binding them to claim classes, so seven of seven cold runs made material claims without citing the sources D2 requires | merged | doc | M | none | — |
@@ -106,7 +107,7 @@ the committed file matches the generator's output.
 | `F3-39` | F3 [task-list #39] — reducer: degrade-not-wrap + retire legacy arms | draft | runtime | TBD | none | — |
 | `F4` | content-addressing + value-model design (aka PX8-F-PROOF) | draft | foundation+spec-enclave | M | none | — |
 | `KERNEL-NESTED-IND` | admit nested strictly-positive inductives in the kernel — structural positivity through declared parameter positions, generated and checked dependent eliminators with one lifted IH per contained recursive occurrence, iota, and surface consumability | active | kernel | L | none | — |
-| `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | draft | spec-enclave | TBD | none | — |
+| `KERNEL-RECURSIVE-RESULT-SURFACE` | A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible | draft | spec-enclave | M | none | — |
 | `KW-ORACLE-CLOSURE` | close the KW-THEOREM source oracle structurally — the occurrence sweep is never applied, and the file population is a five-arm hand enumeration | merged | language | S | none | 986 |
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
 | `KW-THEOREM` | rename the surface keyword `lemma` to `theorem` | merged | language | M | none | — |
@@ -239,7 +240,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `CI-L1-EXECUTING-COVER` — Three executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 never issues the conversion query its soundness row turns on, sec61 names a row id that does not exist, and ac5_no_implicit_cross_type_coercion is satisfied by an elaboration limitation rather than by the coercion refusal it claims
+- `CONF-EVAL-COMPUTED-BOOL-ELIM` — The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property

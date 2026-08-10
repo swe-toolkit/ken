@@ -11,6 +11,58 @@ github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## RULED 2026-08-10 — `D3`+ is BLOCKED for unbounded Json folds. `D2` is NOT.
+>
+> Architect `evt_6ysrp62e4zayg`, answering the Steward's question
+> `evt_6mbzn0y6jh232`. **`KERNEL-RECURSIVE-RESULT-SURFACE`'s obstruction extends
+> to `List`-carried recursion** when `List` is the positive carrier of a nested
+> host occurrence. The decisive shape is production `All_List`: for
+> `Cons head tail`, `check_match_with_lift` installs both associations but hides
+> every post-source binder. The head evidence is `support: None` and can be
+> consumed implicitly in lockstep; **the tail evidence is
+> `support: Some(All_List)` and no source term can denote that recursive
+> result.** Same obstruction as `Bag.Join`, and independent of `List` having
+> only one recursive tail.
+>
+> | scope | status |
+> |---|---|
+> | `JsonArray : List Json` — unbounded fold | BLOCKED |
+> | `JsonObject : List (Pair String Json)` — unbounded fold | BLOCKED. Matching `Pair` exposes its direct `Json` leaf association, but iterating the remaining `List` still needs the hidden `All_List` tail result. |
+> | `D2`'s direct structural recursion over standalone `List Char` | NOT BLOCKED, and **not to be reopened**. Its cursor functions self-call on the explicit tail; they do not consume a kernel-supplied nested-host lift. |
+>
+> **The dependency is SLICE-level, not node-level, and it is deliberately NOT in
+> `depends_on`.** Per the Architect: add `KERNEL-RECURSIVE-RESULT-SURFACE` as a
+> dependency **for the first `D3`+ slice promising an unbounded Json fold or
+> codec over arrays or objects.** Putting it in the frontmatter would mark the
+> whole node blocked, which is false — `D1` and `D2` are merged and the
+> remaining non-fold work is unaffected. This is the same edge-granularity trap
+> the `D5` note below already warns about, in the opposite direction.
+>
+> **Finite-depth unrolling remains a discriminator, not a discharge.** A `D3`
+> candidate that unrolls to some depth has not satisfied this and must not be
+> proposed as though it had.
+
+> ## D2 MERGED 2026-08-10 as an accepted partial — the node stays `active`
+>
+> Exact `ee6773b0`, PR #1775, CI green, `main` `0daf7170`. Both paths
+> blob-verified from the declared merge-base `258336bf`, path count checked
+> against the declared scope: `catalog/packages/Data/Serialization/Json.ken.md`
+> and `crates/ken-elaborator/tests/ds9_json_codec_acceptance.rs`, `+337/-28`.
+> Authorized by resolved Decision `dec_7qw0k1q4rv6bc` (Architect APPROVE,
+> 07:22:20Z). Adversary notified at `evt_2cx4zkhqmfe9p`.
+>
+> A transparent structural `CursorOps (List Char) Char Nat` instance and
+> transparent `CursorLaws`, with the generic selectors exercised on both
+> non-empty and empty cursors and exact `trusted_base()` set identity asserted.
+>
+> **What remains buildable is an OPEN QUESTION put to foundation-leader at
+> `evt_27cwr5ecnx209`, not something I have established.** The ruling above
+> blocks any `D3`+ slice promising an unbounded fold over arrays or objects.
+> Whether any of `D3`-`D7` — the round-trip law's statement as distinct from
+> its proof, fuel-sufficiency scaffolding, Findings — avoids that fold is the
+> ring's knowledge, and "nothing survives" is an acceptable answer that makes
+> Foundation's idleness the Steward's backlog rather than the ring's.
+
 > ## D1 MERGED 2026-08-10 as an accepted partial — the node stays `active`
 >
 > Exact `6675ff54`, PR #1770, CI green, `main` `258336bf`. Both paths
