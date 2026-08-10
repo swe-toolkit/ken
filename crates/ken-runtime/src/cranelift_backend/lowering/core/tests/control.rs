@@ -29067,7 +29067,7 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
     // and the suppression legs compare refusals that never occurred, so BOTH
     // are conditional on this line. Reading them as co-equal supports is how a
     // control can look triply-defended while resting on one clause.
-    // ⛔ NOT AN ASSERT PLUS A RENAME. An earlier revision wrote
+    // NOT AN ASSERT PLUS A RENAME. An earlier revision wrote
     // `assert!(arrivals > 0)` and then `let established = arrivals`, which only
     // NAMED the intent: deleting the assertion left the equality compiling and
     // passing at `0 == 0`, so the denominator was removable without breaking

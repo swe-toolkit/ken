@@ -9,7 +9,7 @@
 | **measurement base** — the tree every figure was taken on | `07dc6593` | **no.** A commit on this branch |
 | **candidate merge-base** — `git merge-base HEAD origin/main` | `39bc507b` | **yes**, whenever **either** ref moves |
 
-⛔ The merge-base is **re-derived here**, not carried forward from an earlier
+The merge-base is **re-derived here**, not carried forward from an earlier
 handback. A previous revision of this lane's record repeated a captured value
 that went stale while the branch stood still, because `main` advanced onto a
 commit the branch already contained.
@@ -20,7 +20,7 @@ commit the branch already contained.
 > does so by making **zero carrier transfers**, not by consuming the recursor
 > closure somewhere else. **There is no retained seam to copy.**
 >
-> ⛔ An earlier revision of this banner read *"a lawful precedent exists … a
+> An earlier revision of this banner read *"a lawful precedent exists … a
 > comparison, not an invention."* That was inferred from the retained lane's
 > `Ok` before the differential was taken, and it is **withdrawn**: outcome
 > equivalence is not mechanism equivalence, which is the inference the ruling
@@ -35,7 +35,7 @@ commit the branch already contained.
 | **before-hole** — `D2c`'s subject | `ComputationalMatch` — *a computational recursor closure names an in-flight activation, not a transferable value* |
 | after-hole — **outside** `D2c` | `StaticWorkerBinding` — *a `Var` in value position … has no value representation* |
 
-⛔ The after-hole compile is **reported, not repaired**, and `D2c` must not
+The after-hole compile is **reported, not repaired**, and `D2c` must not
 claim row 5 green: repairing before-hole leaves the other compile at its own
 wall.
 
@@ -89,7 +89,7 @@ the same root**: different owner, different route, different protocol value.
 **The retained lane compiles this fixture.** With no exclusion and production
 authority, `px8j_capture_source_trace` returns `Ok`.
 
-⛔ **I first recorded that as "a landed, lawful mechanism to find and reuse."
+**I first recorded that as "a landed, lawful mechanism to find and reuse."
 The differential shows that reading is WRONG, and this section supersedes it.**
 
 ### 4.1 The differential, at the same seam, on the same fixture
