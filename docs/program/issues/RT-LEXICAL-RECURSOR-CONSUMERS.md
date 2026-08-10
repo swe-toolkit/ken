@@ -121,3 +121,45 @@ that matters is `blocks: [RT-RECURSOR-TRANSPORT]`.
 - The old-green semantic controls are **not disposable**. Surface-Ken
   reachability is unproved; old-green runtime capability is **proved**, and
   these rows are the only probes for the guards they exercise.
+
+## Carried rider — the `D2a` control's durability. Owed, not optional.
+
+**Land this with the next candidate that touches `control.rs`.** It is a rider,
+not a deliverable, and it does not earn its own node. It is recorded here
+because a rider stated only in a thread strands.
+
+Adversary `evt_xyj8813ymrad`, Steward disposition `evt_3k5eg1trmw2q9`,
+independently re-derived at `origin/main` before it was routed.
+
+In the `D2a` arm, `arrivals` is incremented at `core.rs:6686` and `forwards` at
+`:6696`, and **between them there is no branch, no fallible step, and no early
+return.** In the non-suppressed leg every arrival forwards by construction, so
+`assert_eq!(forwards, arrivals)` is decided by the test's own suppression flag
+and by nothing about the mechanism.
+
+⛔ **The hazard is not the tautology, it is that the tautology passes at
+`0 == 0`** while looking like the stronger of the pair. A later trim that keeps
+the equality and drops `arrivals > 0` leaves the whole control vacuous and
+green, with every `!contains(R1)` holding because the marker never arrived —
+the exact defect class the control was written to avoid. Both counters are
+`#[cfg(test)]`, so a pass removing test-only machinery from production `core.rs`
+has a motive to touch this precise block.
+
+> **The property, stated so the route stays with the ring:** a later trim must
+> not be able to retain the half that passes at zero. Label it, or make the two
+> inseparable so there is no half to keep. Durability by instruction or by
+> construction — the Steward leans to construction where it is clean, and that
+> is a preference, not a ruling.
+
+**Do not change the predicate to make the equality informative** — no failure
+mode is available between those two increments, so it cannot be made
+informative, only labelled or fused. **Do not pin a fixed count.**
+
+**The same candidate corrects the `D2a` record's own sentence**, *"asserted as a
+relation (`forwards == arrivals`, `arrivals > 0`), never as a fixed count"*,
+which lists the two as equals and is where the mis-weighting was taught. Fixing
+the code and leaving the record reproduces the finding one layer up, which is
+the failure this lane has already had twice.
+
+Severity is **control durability, not correctness.** `D2a` merged correctly at
+`41b75c7c`; this reopens nothing.
