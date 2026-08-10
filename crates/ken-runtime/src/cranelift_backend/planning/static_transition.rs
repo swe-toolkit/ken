@@ -11370,9 +11370,14 @@ impl<'src> StaticTransitionPlan<'src> {
             .filter(|edge| match body_axis.get(&edge.callee()) {
                 Some(body) => !template_only.contains(body),
                 // A callee with no descriptor is a planner contradiction this
-                // filter does not own, and must not silently suppress:
-                // `resolve_call_edges` diagnoses it exactly, as
-                // "call edge callee has no abi descriptor".
+                // filter does not own. Retaining the edge hands it downstream
+                // for rejection rather than silently suppressing it here.
+                //
+                // ⛔ Which rejection is NOT promised. `resolve_call_edges`
+                // resolves `bundle.function(edge.callee())` BEFORE it looks the
+                // descriptor up, so an ordinary forward-declaration failure can
+                // preempt the descriptor diagnostic. The guarantee is only that
+                // the edge is rejected, never suppressed.
                 None => true,
             })
             .collect())

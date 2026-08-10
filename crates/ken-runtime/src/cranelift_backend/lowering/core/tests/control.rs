@@ -28851,38 +28851,52 @@ fn ced_d3_the_five_rows_are_five_proofs_and_not_one_shared_terminal() {
     );
 }
 
-/// **`RT-CALL-EDGE-EXECUTABILITY-AXIS` — the population sentinel.**
+/// **`RT-CALL-EDGE-EXECUTABILITY-AXIS` — the boundary sentinel.**
 ///
 /// ⛔ **THIS DOES NOT DISCHARGE `AC-2`, and must not be reported as doing so.**
 /// `AC-2` asks for a control exercising a template-only callee **whose two axes
-/// differ**. That population does not exist today, and this row is what will
-/// say so when it starts to.
+/// differ**. That population does not exist today. This row detects the moment
+/// it starts to, and nothing more.
 ///
-/// MEASURED, across the only two populations that carry either conjunct:
+/// **It ranges over call edges joined to their callee descriptors, and detects
+/// the exact disagreement between the two filters on the SAME callee:**
 ///
-/// | population | template-only bodies | split-axis units |
-/// |---|---|---|
-/// | the `D5a` witness (`px8tr_nested_post_effect_planning_inputs`) | 1 | **0** |
-/// | `b2ac` `computational`, `computational-nested` | **0** | 1 |
-/// | every other `b2ac` fixture | 0 | 0 |
+/// ```text
+/// template_only.contains(body_occurrence) && !template_only.contains(entry_origin)
+/// ```
 ///
-/// The conjuncts are **disjoint**: every fixture with a superseded worker body
-/// has no split-axis unit, and every fixture with a split-axis unit generates no
-/// contexts, so its template-only set is empty. A control written on either one
-/// alone would pass under both the body-axis and the entry-axis reading — the
-/// precise shape `AC-3`'s sibling `AC-4` calls out as measuring nothing.
+/// That conjunction is the defect's own failure direction: the callee's body is
+/// superseded, so the repaired body-axis filter drops the edge, while the old
+/// entry-axis probe kept it — and the edge then reached a unit with no emitted
+/// `Function`.
 ///
-/// So this asserts the **precondition** rather than the property: in the `D5a`
-/// witness the two axes coincide for every unit. That is why the repaired filter
-/// and the old one agree here, and it is the reason a passing suite is not
-/// evidence about the axis.
+/// ⚠ **Why it is not keyed on "some split-axis unit exists".** That was the
+/// proxy this row replaces, and it is wrong in both directions: an unrelated
+/// split-axis unit sitting beside an unrelated template-only body is **not** the
+/// `AC-2` population, so the proxy would red on a combination that proves
+/// nothing; and a unit whose axes differ without either origin being in the set
+/// is equally irrelevant. Only the per-callee conjunction above is the
+/// population, so only it is measured.
 ///
-/// PROMISE CLASS: transition sentinel, labelled for the boundary rather than the
-/// count. It goes red **deliberately** the moment a witness gains a unit whose
-/// entry and body differ — which is exactly when `AC-2`'s population becomes
-/// constructible and the real control must be written. Retire it then.
+/// **What the current witness gives, measured rather than assumed:** the `D5a`
+/// witness supersedes one worker body and every one of its call edges agrees
+/// under both readings, so the repaired filter and the old one are
+/// indistinguishable here. That is precisely why a passing suite is not evidence
+/// about the axis, and why `AC-2` stays open.
+///
+/// **The population that would close it:** a fixture that both fully retargets a
+/// worker body — today only this witness does — and has that body's selecting
+/// unit schedule something before itself, which today only the `b2ac`
+/// `computational` shapes do, and they generate no contexts at all. Concretely a
+/// **nested-post-effect specialization whose superseded worker body is a
+/// computational match**. That is a new planner fixture, not a variation.
+///
+/// PROMISE CLASS: transition sentinel, named for the boundary rather than a
+/// count. It reds **deliberately** the first time a call edge exhibits the
+/// conjunction — exactly when `AC-2`'s real control becomes writable. Retire it
+/// then.
 #[test]
-fn call_edge_executability_axis_population_for_ac2_does_not_exist_yet() {
+fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_callee() {
     with_d5a_witness_plan(|plan| {
         let template_only = plan
             .template_only_worker_bodies()
@@ -28890,33 +28904,52 @@ fn call_edge_executability_axis_population_for_ac2_does_not_exist_yet() {
         assert!(
             !template_only.is_empty(),
             "the witness no longer supersedes any worker body, so it is not the D5a population \
-             this sentinel is about"
+             this sentinel is about and the scan below is vacuous"
         );
 
         let units = plan.emittable_units().expect("emittable units");
-        let split: Vec<_> = units
-            .iter()
-            .filter(|unit| unit.body_occurrence() != unit.entry_origin())
-            .map(|unit| (unit.function(), unit.body_occurrence(), unit.entry_origin()))
-            .collect();
-        assert!(
-            split.is_empty(),
-            "AC-2's population now EXISTS: this witness has a unit whose entry and body differ \
-             {split:?}. Write the real control -- a template-only callee whose axes differ -- and \
-             retire this sentinel"
-        );
+        let edges = plan.emittable_call_edges().expect("call edges");
 
-        // And therefore the two readings are indistinguishable here. Stated so
-        // no one mistakes this suite's green for evidence about the axis.
-        for edge in plan.emittable_call_edges().expect("call edges") {
+        let mut joined = 0usize;
+        let mut superseded_callees = 0usize;
+        let mut divergent = Vec::new();
+        for edge in &edges {
             let Some(callee) = units.iter().find(|unit| unit.function() == edge.callee()) else {
                 continue;
             };
-            assert_eq!(
-                callee.body_occurrence(),
-                edge.callee_origin(),
-                "the axes diverged for a call edge callee, so the sentinel's premise is stale"
-            );
+            joined += 1;
+            let body = callee.body_occurrence();
+            let entry = edge.callee_origin();
+            if template_only.contains(&body) {
+                superseded_callees += 1;
+            }
+            if template_only.contains(&body) && !template_only.contains(&entry) {
+                divergent.push((edge.callee(), body, entry));
+            }
         }
+
+        assert!(
+            joined > 0,
+            "no call edge joined to a callee descriptor, so the disagreement scan ranged over \
+             nothing"
+        );
+        // NON-VACUITY, and the sharper half. The scan does not merely run -- it
+        // reaches a call edge whose callee body IS superseded, so the first
+        // conjunct fires on real data and the detector sits exactly ONE clause
+        // from red. Without this, an empty `divergent` would be equally
+        // consistent with "the population is absent" and "the scan never saw a
+        // superseded callee at all".
+        assert!(
+            superseded_callees > 0,
+            "no call edge names a callee whose body is superseded, so the disagreement below \
+             could never fire and this sentinel would pass for the wrong reason"
+        );
+        assert!(
+            divergent.is_empty(),
+            "AC-2's population now EXISTS: a call edge's callee has a superseded BODY whose ENTRY \
+             is not superseded {divergent:?}. The two filters disagree on this callee, which is \
+             the defect's exact failure direction. Write the real AC-2 control against it and \
+             retire this sentinel"
+        );
     });
 }
