@@ -29617,20 +29617,29 @@ fn px8j_single_position_let_wrapped_recursive_call() -> RuntimeExpr {
 /// **`D2b` ROW B — the REACHING non-backedge branch: the body runs, its join is
 /// consumed, and nothing is dispositioned.**
 ///
-/// > **MEASURED:** the arm is reached with a **non-backedge** value; the body
-/// > occurrence the arm itself reports is **entered**; a **static-worker edge**
-/// > is reached; every close has **empty** `dispositioned`; consumed and
-/// > dispositioned are disjoint and their union closes `required`; and Exact
-/// > and Suppress agree on **all** of outcome, arrival, entry, calls and
-/// > accounting. **CLAIMED:** the new arm's ordinary branch is untouched — a
+/// > **MEASURED, and every clause is about THE ARM'S OWN body origin:** the arm
+/// > is reached with a **non-backedge** value; that body occurrence is
+/// > **entered**; a static-worker edge is reached **for that origin**; the
+/// > closeout whose `required` contains it is **unique**, and in that owning
+/// > closeout the origin is **consumed** and **not dispositioned**; every close
+/// > has empty `dispositioned` and a union that closes; and Exact and Suppress
+/// > agree on **all** of outcome, arrival, entry, calls and accounting. **CLAIMED:** the new arm's ordinary branch is untouched — a
 /// > live `Let` body runs and its joins are consumed, not dispositioned.
 /// > **THE GAP:** one source shape, and the single-position producer, which is
 /// > what makes the body reachable at all.
 ///
 /// ⛔ **The body occurrence is the ARM'S OWN `body.static_origin`**, reported by
-/// the arm-local observation, never a numeric origin. So "the body was entered"
-/// is a relation between what the arm saw and what the traversal entered,
-/// rather than a coincidence of two independently written constants.
+/// the arm-local observation, never a numeric origin. So each clause is a
+/// relation between what the arm saw and what the compile did, rather than a
+/// coincidence of two independently written constants.
+///
+/// ⛔ **An earlier revision proved the arm's body was entered and then only that
+/// SOME worker call and SOME consumed join existed.** Those are existentials
+/// over unrelated occurrences — they hold even if the arm's body is entered and
+/// never lowered, while a different occurrence supplies the call and the
+/// consumption. Selecting the **owning** closeout by `required` membership, and
+/// requiring uniqueness, is what ties the accounting to *this* body instead of
+/// to whichever function happened to close last.
 ///
 /// ⛔ **Row A cannot make this claim** — on its two-position shape the retained
 /// refusal precedes the body entirely. That is why the pair is split.
@@ -29691,29 +29700,70 @@ fn d2b_row_b_a_live_nonbackedge_let_runs_its_body_and_consumes_its_join() {
             "{mode:?}: a backedge arrival occurred, so this is not purely the ordinary branch"
         );
 
-        // 2. The body the ARM named was entered, and a static-worker edge ran.
+        // 2/3. ⭐⭐ EVERY ASSERTION IS ABOUT THE ARM'S OWN BODY ORIGIN.
+        //
+        // ⛔ An earlier revision asserted `entered.contains(body)` and then only
+        // that SOME worker call and SOME consumed join existed anywhere in the
+        // compile. Those are existentials over unrelated occurrences: they hold
+        // just as well if the arm's body is entered and then never lowered,
+        // while some other occurrence supplies the call and the consumption.
+        // The relation below is per-body and closes that gap.
+        assert!(!closeout.is_empty(), "{mode:?}: no join closeout ran");
         for body in &nonbackedge {
             assert!(
                 entered.contains(body),
                 "{mode:?}: the arm's own body occurrence {body:?} was never entered, so the live \
                  body did not run"
             );
+            // THIS body reached a static-worker edge -- not merely some body.
+            assert!(
+                worker_calls.contains(body),
+                "{mode:?}: no static-worker edge was reached for the arm's own body {body:?}; \
+                 calls were emitted for {worker_calls:?}, which is a different occurrence"
+            );
+            // THIS body is consumed in ITS OWNING closeout. Selecting the close
+            // by `required` membership is what ties the accounting to this
+            // occurrence rather than to whichever function closed last.
+            let owning: Vec<_> = closeout
+                .iter()
+                .filter(|(required, _, _)| required.contains(body))
+                .collect();
+            assert_eq!(
+                owning.len(),
+                1,
+                "{mode:?}: the arm's body {body:?} is required by {} closeouts; its owning \
+                 function must be unique or the assertions below name no particular accounting",
+                owning.len()
+            );
+            let (required, consumed, dispositioned) = owning[0];
+            assert!(
+                consumed.contains(body),
+                "{mode:?}: the arm's own body {body:?} is not CONSUMED in its owning closeout, so \
+                 it did not execute there"
+            );
+            assert!(
+                !dispositioned.contains(body),
+                "{mode:?}: the arm's own body {body:?} was DISPOSITIONED in its owning closeout, \
+                 which is the abandoned-body accounting applied to a live body"
+            );
+            assert!(
+                consumed.is_disjoint(dispositioned),
+                "{mode:?}: consumed and dispositioned overlap in the owning closeout"
+            );
+            let mut covered = consumed.clone();
+            covered.extend(dispositioned.iter().copied());
+            assert_eq!(
+                covered, *required,
+                "{mode:?}: the owning closeout's disjoint union does not close its required set"
+            );
         }
-        assert!(
-            !worker_calls.is_empty(),
-            "{mode:?}: no static-worker edge was reached, so the body's Call did not lower"
-        );
 
-        // 3. The body's joins are CONSUMED, and nothing is dispositioned.
-        assert!(!closeout.is_empty(), "{mode:?}: no join closeout ran");
+        // The whole-compile invariants, retained: no close dispositions
+        // anything on this shape, and every close's union closes.
         for (required, consumed, dispositioned) in &closeout {
             assert!(
                 dispositioned.is_empty(),
                 "{mode:?}: a LIVE Let body's subtree was dispositioned {dispositioned:?}"
-            );
-            assert!(
-                consumed.is_disjoint(dispositioned),
-                "{mode:?}: consumed and dispositioned overlap"
             );
             let mut covered = consumed.clone();
             covered.extend(dispositioned.iter().copied());
