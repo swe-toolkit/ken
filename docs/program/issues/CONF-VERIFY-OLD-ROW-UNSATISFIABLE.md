@@ -1,7 +1,7 @@
 ---
 id: CONF-VERIFY-OLD-ROW-UNSATISFIABLE
 title: "The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family"
-status: ready
+status: active
 owner: spec-enclave
 size: S
 gate: none
