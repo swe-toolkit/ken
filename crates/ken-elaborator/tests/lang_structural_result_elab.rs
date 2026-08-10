@@ -191,6 +191,33 @@ fn validated_nested_results_elaborate_and_kernel_check() {
 }
 
 #[test]
+fn ordinary_let_binding_inside_lifted_arm_is_exactly_out_of_scope() {
+    // Promise class: durable invariant. A fresh ordinary binding never inherits
+    // a constructor field's structural-result association.
+    // MEASURED: inside the positive Join arm, `xs` remains a reaching named
+    // selector while a fresh ordinary `let _` receives the exact out-of-scope
+    // diagnostic. CLAIMED: association lookup follows binding identity rather
+    // than spelling or visible depth. THE GAP: the positive comparator must
+    // reach before the negative can distinguish an active association scope.
+    let mut positive_env = ElabEnv::new().unwrap();
+    positive_env.elaborate_file(STRUCTURAL_SIZE_SOURCE).unwrap();
+    assert!(positive_env.globals.contains_key("result"));
+
+    let source = STRUCTURAL_SIZE_SOURCE.replace(
+        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
+        "Join xs ys |-> add (structural result of xs) \
+         (let _ : Nat = Zero in structural result of _)",
+    );
+    assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
+
+    let mut env = ElabEnv::new().unwrap();
+    assert!(matches!(
+        env.elaborate_file(&source),
+        Err(ElabError::StructuralResultOutOfScope { .. })
+    ));
+}
+
+#[test]
 fn wildcard_slot_is_not_a_surface_addressable_structural_result_operand() {
     // Promise class: durable invariant. `_` remains a discard under extensions
     // that preserve the pattern-binding contract.
