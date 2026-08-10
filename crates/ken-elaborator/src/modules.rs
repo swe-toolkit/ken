@@ -868,12 +868,14 @@ fn rewrite_rexpr(
             RExpr::RCon(n, span)
         }
         RExpr::RVar(i, n, s) => RExpr::RVar(i, n, s),
-        RExpr::RStructuralResult {
+        RExpr::RRecursiveResult {
+            selector,
             index,
             name,
             binding_span,
             span,
-        } => RExpr::RStructuralResult {
+        } => RExpr::RRecursiveResult {
+            selector,
             index,
             name,
             binding_span,

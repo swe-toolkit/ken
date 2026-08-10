@@ -17,14 +17,14 @@ use ken_kernel::{
     infer as kernel_infer,
     sct::sct_check,
     subst::{subst0, subst_levels, subst_outer, subst_tel, weaken},
-    whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
-    Term,
+    whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, KernelError, Level,
+    LevelVar, Term,
 };
 
-use crate::ast::{BinOp, DefKeyword, NumLit};
+use crate::ast::{BinOp, DefKeyword, NumLit, RecursiveResultSelector};
 use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceInfo};
 use crate::data;
-use crate::error::{ElabError, Span};
+use crate::error::{ElabError, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
@@ -402,10 +402,10 @@ impl<'e> ElabCtx<'e> {
         Some((Term::var(index), weaken(stored, (index + 1) as i64)))
     }
 
-    /// Resolve a surface binding identity only through the structural-result
+    /// Resolve a surface binding identity only through the nested-result
     /// association gate. Unlike `surface_var`, this cannot return an ordinary
     /// source term or expose an arbitrary hidden method binder.
-    fn structural_result(&self, index: usize) -> Option<(Term, Term)> {
+    fn selected_recursive_result(&self, index: usize) -> Option<(Term, Term)> {
         let mut remaining = index;
         for position in (0..self.ctx.len()).rev() {
             if self.hidden_positions.contains(&position) {
@@ -2791,17 +2791,52 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
 
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
-        RExpr::RStructuralResult {
+        RExpr::RRecursiveResult {
+            selector,
             index,
             name: _,
             binding_span,
             span,
-        } => cx
-            .structural_result(*index)
-            .ok_or_else(|| ElabError::StructuralResultOutOfScope {
+        } => {
+            let (result, result_type) = cx
+                .selected_recursive_result(*index)
+                .ok_or_else(|| ElabError::StructuralResultOutOfScope {
                 selector_span: span.clone(),
                 binding_span: binding_span.clone(),
-            }),
+            })?;
+            let classifier = kernel_infer(cx.env, &cx.ctx, &result_type)
+                .map_err(|error| ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                })?;
+            let classifier = whnf(cx.env, &cx.ctx, &classifier);
+            let (actual, required) = match classifier {
+                Term::Type(level) => (
+                    RecursiveResultSort::Type(level),
+                    RecursiveResultSelector::RecursiveResult,
+                ),
+                Term::Omega(level) => (
+                    RecursiveResultSort::Omega(level),
+                    RecursiveResultSelector::InductionHypothesis,
+                ),
+                other => return Err(ElabError::KernelRejected {
+                    error: KernelError::TypeMismatch {
+                        expected: Box::new(Term::Type(Level::Var(LevelVar(0)))),
+                        found: Box::new(other),
+                    },
+                    span: span.clone(),
+                }),
+            };
+            if *selector != required {
+                return Err(ElabError::RecursiveResultSortMismatch {
+                    selector_span: span.clone(),
+                    binding_span: binding_span.clone(),
+                    actual_classifier: actual,
+                    required_spelling: required.spelling(),
+                });
+            }
+            Ok((result, result_type))
+        }
         RExpr::RVar(i, _, _) => {
             // An installed index refinement (constructor injectivity
             // / sibling convoy) replaces the bare `Var` with its `Cast`-
@@ -4336,7 +4371,7 @@ fn infer_expr_row_type(
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(_, _, _)
         | RExpr::RCell(_, _, _)
-        | RExpr::RStructuralResult { .. }
+        | RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
         | RExpr::RStr(_, _) => crate::effects::RowType::empty(),
@@ -5696,7 +5731,7 @@ fn first_old_span(expr: &RExpr) -> Option<Span> {
         | RExpr::RCell(..)
         | RExpr::RNumLit(..)
         | RExpr::RStr(..)
-        | RExpr::RStructuralResult { .. }
+        | RExpr::RRecursiveResult { .. }
         | RExpr::RAttachedProofRef { .. } => None,
     }
 }
@@ -6343,7 +6378,7 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RCon(n, _) => n == name,
         RExpr::RVar(_, _, _)
         | RExpr::RCell(_, _, _)
-        | RExpr::RStructuralResult { .. }
+        | RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
         | RExpr::RStr(_, _) => false,
@@ -7797,8 +7832,13 @@ pub fn elaborate_rexpr(
 
 #[cfg(test)]
 mod nested_lift_association_tests {
-    use crate::{parser::parse_expr, resolve::{resolve_expr_standalone, RExpr}, ElabEnv};
-    use ken_kernel::{Level, Term};
+    use crate::{
+        error::RecursiveResultSort,
+        parser::parse_expr,
+        resolve::{resolve_expr_standalone, RExpr},
+        ElabEnv,
+    };
+    use ken_kernel::{KernelError, Level, LevelVar, Term};
 
     use super::{
         infer, lift_association_error, validate_lift_associations, ElabCtx, ElabError, GlobalId,
@@ -7950,12 +7990,12 @@ mod nested_lift_association_tests {
     fn anonymous_u_to_r_association_selects_r_and_rejects_when_deleted() {
         // Resolve the literal surface selector first. Its spelling is arbitrary:
         // the binding identity is index 0, not a carrier/ctor/field/motive name.
-        let parsed = parse_expr("let u : Type = Type in structural result of u").unwrap();
+        let parsed = parse_expr("let u : Type = Type in recursive result for u").unwrap();
         let RExpr::RLet(_, _, _, selector, _) = resolve_expr_standalone(&parsed).unwrap() else {
             panic!("expected the source selector under its ordinary let binding");
         };
-        let RExpr::RStructuralResult { index, binding_span, span, .. } = &*selector else {
-            panic!("expected resolved structural-result selector");
+        let RExpr::RRecursiveResult { index, binding_span, span, .. } = &*selector else {
+            panic!("expected resolved recursive-result selector");
         };
         assert_eq!(*index, 0);
 
@@ -7989,5 +8029,152 @@ mod nested_lift_association_tests {
                 binding_span: got_binding,
             }) if selector_span == *span && got_binding == *binding_span
         ));
+    }
+
+    fn resolved_selector(source: &str) -> RExpr {
+        let parsed = parse_expr(source).unwrap();
+        let RExpr::RLet(_, _, _, selector, _) = resolve_expr_standalone(&parsed).unwrap() else {
+            panic!("expected selector beneath its source binding");
+        };
+        *selector
+    }
+
+    #[test]
+    fn selected_result_sort_accepts_type_spelling_and_rejects_inverse() {
+        // Promise class: durable invariant. The Type classifier and its
+        // inverse spelling must remain a discriminating pair.
+        let recursive = resolved_selector("let u : Type = Type in recursive result for u");
+        let inverse =
+            resolved_selector("let u : Type = Type in induction hypothesis for u");
+        let mut env = ElabEnv::new().unwrap();
+        let mut selected = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "type-result-selector",
+        );
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.hidden_positions.extend([1, 2]);
+        selected
+            .lift_bindings
+            .insert(0, binding(1, Some(2), None));
+
+        assert!(infer(&mut selected, &recursive).is_ok());
+        assert!(matches!(
+            infer(&mut selected, &inverse),
+            Err(ElabError::RecursiveResultSortMismatch {
+                actual_classifier: RecursiveResultSort::Type(_),
+                required_spelling: "recursive result for",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn type_resident_support_does_not_override_omega_result_sort() {
+        // Promise class: durable invariant. Support residence never selects
+        // the spelling; only the selected result classifier does.
+        let induction =
+            resolved_selector("let u : Type = Type in induction hypothesis for u");
+        let inverse = resolved_selector("let u : Type = Type in recursive result for u");
+        let mut env = ElabEnv::new().unwrap();
+        let mut selected = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "omega-result-selector",
+        );
+        // u : Type; S : Type; support : S; P : Omega; result : P.
+        // The evidence is Type-resident, while only the selected result type P
+        // is Omega-classified. The selector must inspect P, never S.
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::var(0));
+        selected.ctx.push(Term::Omega(Level::Zero));
+        selected.ctx.push(Term::var(0));
+        selected.hidden_positions.extend([1, 2, 3, 4]);
+        selected
+            .lift_bindings
+            .insert(0, binding(2, Some(4), Some(GlobalId(42))));
+
+        assert!(infer(&mut selected, &induction).is_ok());
+        assert!(matches!(
+            infer(&mut selected, &inverse),
+            Err(ElabError::RecursiveResultSortMismatch {
+                actual_classifier: RecursiveResultSort::Omega(_),
+                required_spelling: "induction hypothesis for",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn proof_relevant_type_result_uses_recursive_result_spelling() {
+        // Promise class: durable invariant. Programmer intent cannot override
+        // the selected result's Type classifier.
+        let selector = resolved_selector("let u : Type = Type in recursive result for u");
+        let mut env = ElabEnv::new().unwrap();
+        let mut selected = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "proof-relevant-type-result",
+        );
+        // u : Type; Witness : Type; result : Witness. The suggestive name and
+        // use are irrelevant: Witness is Type-classified.
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::var(0));
+        selected.hidden_positions.extend([1, 2]);
+        selected
+            .lift_bindings
+            .insert(0, binding(1, Some(2), None));
+        assert!(infer(&mut selected, &selector).is_ok());
+    }
+
+    #[test]
+    fn unclassifiable_result_rejects_both_selectors_without_defaulting() {
+        // Promise class: durable invariant. Both spellings preserve the same
+        // underlying classification failure, so neither can become a default.
+        let recursive = resolved_selector("let u : Type = Type in recursive result for u");
+        let induction =
+            resolved_selector("let u : Type = Type in induction hypothesis for u");
+        let mut env = ElabEnv::new().unwrap();
+        let int_type = env.env.int_lit_type().expect("prelude registers Int literals");
+        let mut selected = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "unclassifiable-result-selector",
+        );
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        // A checked-telescope invariant violation: this is a well-typed Int
+        // value where a result TYPE is required. Classification must preserve
+        // the kernel TypeMismatch instead of inventing a selector diagnostic.
+        selected
+            .ctx
+            .push(Term::IntLit(num_bigint::BigInt::from(0)));
+        selected.hidden_positions.extend([1, 2]);
+        selected
+            .lift_bindings
+            .insert(0, binding(1, Some(2), None));
+
+        for selector in [&recursive, &induction] {
+            assert!(matches!(
+                infer(&mut selected, selector),
+                Err(ElabError::KernelRejected {
+                    error: KernelError::TypeMismatch { expected, found },
+                    ..
+                }) if *expected == Term::Type(Level::Var(LevelVar(0)))
+                    && *found == Term::const_(int_type, Vec::new())
+            ));
+        }
     }
 }

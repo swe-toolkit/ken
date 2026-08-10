@@ -5,7 +5,7 @@ use ken_elaborator::{
     error::ElabError,
     parser::parse_expr,
     resolve::{resolve_expr_standalone, RExpr},
-    ElabEnv, Expr,
+    ElabEnv, Expr, RecursiveResultSelector,
 };
 use ken_kernel::{AllSupportSort, Term};
 
@@ -21,8 +21,8 @@ const STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
       LiftNode b |-> match b { \
         Empty |-> Zero ; \
         One x |-> size x ; \
-        Join xs ys |-> add (structural result of xs) \
-                            (structural result of ys) \
+        Join xs ys |-> add (recursive result for xs) \
+                            (recursive result for ys) \
       } \
     }\n\
     const result : Nat = size \
@@ -32,7 +32,7 @@ const STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
 
 const WSTYLE_OUT_OF_SCOPE_SOURCE: &str = "data WBag (a : Type) : Type where { WEmpty : WBag a ; WBranch : (Bool -> a) -> WBag a }\n\
 data WRose = WLeaf | WNode (WBag WRose)\n\
-fn wsize (r : WRose) : Nat = match r { WLeaf |-> Suc Zero ; WNode b |-> match b { WEmpty |-> Zero ; WBranch k |-> (structural result of k) True } }";
+fn wsize (r : WRose) : Nat = match r { WLeaf |-> Suc Zero ; WNode b |-> match b { WEmpty |-> Zero ; WBranch k |-> (recursive result for k) True } }";
 
 const DEEP_STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
       Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a \
@@ -45,8 +45,8 @@ const DEEP_STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
       LiftLeaf |-> Suc Zero ; \
       LiftNode b |-> match b { \
         Empty |-> Zero ; One x |-> size x ; \
-        Join xs ys |-> add (structural result of xs) \
-                            (structural result of ys) \
+        Join xs ys |-> add (recursive result for xs) \
+                            (recursive result for ys) \
       } \
     }\n\
     const deep_result : Nat = size (LiftNode (Join LiftRose \
@@ -72,8 +72,8 @@ const MIXED_REACHING_SOURCE: &str = "data Bag (a : Type) : Type where { \
       Nested b |-> match b { \
         Empty |-> Zero ; \
         One x |-> size x ; \
-        Join xs ys |-> add (structural result of xs) \
-                            (structural result of ys) \
+        Join xs ys |-> add (recursive result for xs) \
+                            (recursive result for ys) \
       } \
     }\n\
     fn direct_size (d : Direct) : Nat = match d { \
@@ -124,27 +124,51 @@ fn selector_is_contextual_and_resolves_the_surface_binding_identity() {
     // CLAIMED: the selector is contextual and identity-based.
     // THE GAP: elaboration must use that identity only through a validated
     // branch association; the positive and out-of-scope tests below cover it.
-    let parsed = parse_expr("let x : Nat = Zero in structural result of x").unwrap();
+    let parsed = parse_expr("let x : Nat = Zero in recursive result for x").unwrap();
     let resolved = resolve_expr_standalone(&parsed).unwrap();
     let RExpr::RLet(_, _, _, body, _) = resolved else {
         panic!("expected a resolved let expression");
     };
     assert!(matches!(
         *body,
-        RExpr::RStructuralResult {
+        RExpr::RRecursiveResult {
+            selector: RecursiveResultSelector::RecursiveResult,
             index: 0,
             ref name,
             ..
         } if name == "x"
     ));
 
-    let ordinary = parse_expr("structural result").unwrap();
+    let induction =
+        parse_expr("let x : Nat = Zero in induction hypothesis for x").unwrap();
+    let resolved = resolve_expr_standalone(&induction).unwrap();
+    assert!(matches!(
+        resolved,
+        RExpr::RLet(_, _, _, body, _)
+            if matches!(*body, RExpr::RRecursiveResult {
+                selector: RecursiveResultSelector::InductionHypothesis,
+                index: 0,
+                ..
+            })
+    ));
+
+    let ordinary = parse_expr("recursive result").unwrap();
     assert!(matches!(
         ordinary,
         Expr::EApp(f, a, _)
-            if matches!(*f, Expr::EVar(ref name, _) if name == "structural")
+            if matches!(*f, Expr::EVar(ref name, _) if name == "recursive")
                 && matches!(*a, Expr::EVar(ref name, _) if name == "result")
     ));
+}
+
+#[test]
+fn retired_selector_spelling_is_a_parse_error() {
+    // Promise class: normative compatibility vector. The retired four-token
+    // production is deliberately absent; changing that is a surface decision.
+    // Construct the retired phrase so the crate sweep can prove that no source
+    // or fixture still contains it while behavior still rejects it.
+    let retired = ["structural", "result", "of", "x"].join(" ");
+    assert!(matches!(parse_expr(&retired), Err(ElabError::ParseError { .. })));
 }
 
 #[test]
@@ -153,7 +177,7 @@ fn unbound_operand_remains_unbound_name() {
     // CLAIMED: the selector does not invent or publish a hidden source name.
     // THE GAP: generated-support names are a broader resolution property and
     // belong to D2; this pin is deliberately limited to the D1 operand rule.
-    let parsed = parse_expr("structural result of absent").unwrap();
+    let parsed = parse_expr("recursive result for absent").unwrap();
     assert!(matches!(
         resolve_expr_standalone(&parsed),
         Err(ElabError::UnboundName { ref name, .. }) if name == "absent"
@@ -171,7 +195,7 @@ fn resolved_binding_without_association_is_out_of_scope() {
     assert!(matches!(
         env.elaborate_expr(
             "resolved_binding_without_association_is_out_of_scope",
-            "let x : Nat = Zero in structural result of x",
+            "let x : Nat = Zero in recursive result for x",
         ),
         Err(ElabError::StructuralResultOutOfScope { .. })
     ));
@@ -204,21 +228,38 @@ fn ordinary_let_binding_inside_lifted_arm_is_exactly_out_of_scope() {
     assert!(positive_env.globals.contains_key("result"));
 
     let source = STRUCTURAL_SIZE_SOURCE.replace(
-        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
-        "Join xs ys |-> add (structural result of xs) \
-         (let _ : Nat = Zero in structural result of _)",
+        "Join xs ys |-> add (recursive result for xs) (recursive result for ys)",
+        "Join xs ys |-> add (recursive result for xs) \
+         (let _ : Nat = Zero in recursive result for _)",
     );
     assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
+
+    let selector_text = "recursive result for _";
+    let selector_start = source
+        .find(selector_text)
+        .expect("mutated source contains the ordinary-binding selector");
+    let selector_span = ken_elaborator::error::Span::new(
+        selector_start,
+        selector_start + selector_text.len(),
+    );
+    let binding_start = source
+        .find("let _ :")
+        .expect("mutated source contains the ordinary wildcard binding")
+        + "let ".len();
+    let binding_span = ken_elaborator::error::Span::new(binding_start, binding_start + 1);
 
     let mut env = ElabEnv::new().unwrap();
     assert!(matches!(
         env.elaborate_file(&source),
-        Err(ElabError::StructuralResultOutOfScope { .. })
+        Err(ElabError::StructuralResultOutOfScope {
+            selector_span: got_selector,
+            binding_span: got_binding,
+        }) if got_selector == selector_span && got_binding == binding_span
     ));
 }
 
 #[test]
-fn wildcard_slot_is_not_a_surface_addressable_structural_result_operand() {
+fn wildcard_slot_is_not_a_surface_addressable_recursive_result_operand() {
     // Promise class: durable invariant. `_` remains a discard under extensions
     // that preserve the pattern-binding contract.
     // MEASURED: a wildcard still occupying the first Join field's pattern slot
@@ -227,8 +268,8 @@ fn wildcard_slot_is_not_a_surface_addressable_structural_result_operand() {
     // becoming surface bindings. THE GAP: this rejection alone could come from
     // dropping the slot; the named-field control below pins retained alignment.
     let source = STRUCTURAL_SIZE_SOURCE.replace(
-        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
-        "Join _ ys |-> add (structural result of _) (structural result of ys)",
+        "Join xs ys |-> add (recursive result for xs) (recursive result for ys)",
+        "Join _ ys |-> add (recursive result for _) (recursive result for ys)",
     );
     assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
     let mut env = ElabEnv::new().unwrap();
@@ -239,7 +280,7 @@ fn wildcard_slot_is_not_a_surface_addressable_structural_result_operand() {
 }
 
 #[test]
-fn wildcard_slot_preserves_named_field_structural_result_alignment() {
+fn wildcard_slot_preserves_named_field_recursive_result_alignment() {
     // Promise class: durable invariant. Anonymous slots remain part of method
     // alignment while named siblings retain their source identity.
     // MEASURED: with the first Join field discarded, the second named field
@@ -248,8 +289,8 @@ fn wildcard_slot_preserves_named_field_structural_result_alignment() {
     // method arity. THE GAP: the all-wildcard control below rules out a later
     // wildcard becoming selectable through shadowing.
     let source = STRUCTURAL_SIZE_SOURCE.replace(
-        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
-        "Join _ ys |-> structural result of ys",
+        "Join xs ys |-> add (recursive result for xs) (recursive result for ys)",
+        "Join _ ys |-> recursive result for ys",
     );
     assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
     let mut env = ElabEnv::new().unwrap();
@@ -266,8 +307,8 @@ fn multiple_wildcard_slots_never_publish_a_latest_surface_binding() {
     // THE GAP: named pattern variables remain visible through the positive
     // controls above; this pin is deliberately limited to wildcard slots.
     let source = STRUCTURAL_SIZE_SOURCE.replace(
-        "Join xs ys |-> add (structural result of xs) (structural result of ys)",
-        "Join _ _ |-> structural result of _",
+        "Join xs ys |-> add (recursive result for xs) (recursive result for ys)",
+        "Join _ _ |-> recursive result for _",
     );
     assert_ne!(source, STRUCTURAL_SIZE_SOURCE);
     let mut env = ElabEnv::new().unwrap();

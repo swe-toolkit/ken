@@ -597,7 +597,7 @@ fn collect_expr_spans(expr: &Expr, out: &mut Vec<Span>) {
         | Expr::ENumLit(_, _)
         | Expr::EStr(_, _)
         | Expr::EAttachedProofRef { .. }
-        | Expr::EStructuralResult { .. } => {}
+        | Expr::ERecursiveResult { .. } => {}
     }
 }
 
