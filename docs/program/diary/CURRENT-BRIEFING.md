@@ -38,122 +38,133 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~10:1xZ. `main` = `b654d33a`.
+> ### RESUME HERE — state at 2026-08-10 ~11:0xZ. `main` = `cf3b77b7`.
 >
-> **Three rings turning, nothing waiting on me, no framing debt.** The whole
-> federation is now downstream of two events: the enclave node landing, and the
-> operator returning at 11:30Z.
+> **One merge landed, one publishing, one waiting only on you.**
 >
-> | ring | state | who owes the next move |
+> | what | exact | state |
 > |---|---|---|
-> | spec enclave | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS`, anchor `evt_7eynqwrcxx5ft` | CV authoring + measuring. **This is the critical path** |
-> | Verify | `CI-ROW-CLAIM-NAMESPACE` exact `76121c51`, **QA APPROVED**, branch free | held on the enclave node; Architect review routed in parallel at `evt_6262gq416kz2` |
-> | Runtime | `RT-DYNAMIC-ARM-SCALAR-MERGE` c1 exact `3ee539bb`, base `b654d33a` | runtime-qa reviewing, then leader Decision, then **the operator** |
+> | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | `fad92a1b` | **MERGED**, PR #1792, tree `279a0de7`. M6-M9 done |
+> | `CI-ROW-CLAIM-NAMESPACE` | `76121c51` | **PUBLISHING**, PR #1793, task `bt18g4zxb` |
+> | `RT-DYNAMIC-ARM-SCALAR-MERGE` c1 | `7bfc8ae5` | **APPROVED AND WAITING ONLY ON THE OPERATOR** |
 >
-> #### THE ONE GATE I MUST NOT DROP, and it is wider than one WP
+> #### THE ONE DECISION THAT IS YOURS, and it now holds two rings
 >
-> **Runtime c1's MERGE waits on the OPERATOR.** The Architect's own ruling
-> `evt_m763kh1qmez8` calls it *"an explicit but bounded native supported-subset/
-> TCB change"*. TCB growth is operator-forward (`steward.md §3`); an Architect
-> approval does **not** substitute. Runtime builds and reviews normally — only
-> the publish is gated. **Do not publish c1 before the operator sees it.**
+> Runtime's c1 recut is **done and fully approved**: `dec_7mb1n11dp1mt9` read
+> `resolved` APPROVE from the object at 10:38:47Z, QA `evt_7qgbkh3d61zyy`,
+> Architect `evt_6k4grea0fjqh0`, range `b654d33a...7bfc8ae5` = 11 commits, 17
+> paths, `+3076/-477`. runtime-leader is correctly holding it.
 >
-> **New this window: that gate also holds Kernel.** `KERNEL-NESTED-IND`'s
-> `AC-K12` is blocked exactly at `RT-DYNAMIC-ARM-SCALAR-MERGE`, and Kernel's
-> `D6`/`D7` — the two deliverables native lowering does not gate — are both
-> **done and merged**. So Kernel's two idle seats are not framing debt and not a
-> stall; they are behind this one operator decision. Verified against the node,
-> not inferred from the idleness.
+> **It waits on you because the Architect characterized its own ruling
+> (`evt_m763kh1qmez8`) as "an explicit but bounded native supported-subset/TCB
+> change."** TCB growth is operator-forward under `steward.md §3` and an
+> Architect vote does not substitute. I let the build proceed and gated only the
+> merge, which is the single point where the widening reaches `main`.
 >
-> #### CORRECTION, mine, recorded because I made the exact error the node warns about
+> **The cost of the gate is now measurable: `KERNEL-NESTED-IND`'s `AC-K12`
+> blocks exactly here, and Kernel's `D6` and `D7` — the two deliverables native
+> lowering does not gate — are both merged.** So two Kernel seats are idle
+> behind this, not behind framing debt. Verified against the node.
 >
-> I swept the 13 `ready` Runtime nodes for missing frames by testing whether
-> `docs/program/wp/<id>.md` exists, and concluded six were unframed. **That is
-> wrong and every one of the 13 is framed.** Frames live under non-matching
-> filenames (`RT-EFFECT-DIFF` → `wp/RT-EFFECT-DIFF-observation-boundary.md`,
-> `RT-FNSPLIT-B2O-CHECK` → `wp/RT-FNSPLIT-B2O-CHECK-advertised-vs-enforced.md`)
-> or in the node body itself (`RT-CENSUS-CAVEAT-GUARD`,
-> `RT-CALL-EDGE-EXECUTABILITY-AXIS`, `RT-TERMINAL-ALL-ELIM-AUTHORITY`).
+> **Separately, and not part of this decision:** runtime-implementer flagged that
+> the **runtime-IR evaluator** carries a structurally identical blanket trust
+> refusal for a *different* subset. It did not touch it and says moving it is a
+> separate ruling. It is right.
 >
-> **`RT-CENSUS-CAVEAT-GUARD` records a previous Steward making this identical
-> mistake against this identical node** and reverting it: *"The flip came from
-> testing for a FILE and concluding about READINESS."* The right test is
-> `grep -rl <node-id> docs/program/wp/` **then read the node body** — frame
-> content anywhere, not a path that resolves.
+> #### WHAT I CAUGHT, because it is the item worth your attention
 >
-> ⇒ **There is no framing debt and `§4e` is satisfied.** Runtime is four framed
-> nodes deep. `RT-MATCH-RECURSOR-CONSUMERS`'s two successors are `ready` with
-> frames. The only `ready` node whose dependency is still active is
-> `RT-TERMINAL-ALL-ELIM-AUTHORITY` (behind `KERNEL-NESTED-IND`), and it is
-> framed in-body at 337 lines. **Do not re-sweep this; do not file a node for
-> it.**
+> **The Architect was reviewing candidates as `<SHA>^ <SHA>` — the last commit
+> only.** It reported Verify's candidate as `+115/-5`; the true range from the
+> merge-base is `+187/-19`.
 >
-> #### WHEN THE ENCLAVE NODE LANDS — the exact sequence
+> **The prescribed cross-check agreed with the wrong range.** Both commits touch
+> the same two files, so the path count is 2 either way and the reviewer's scope
+> sentence — "only the two declared scripts" — is true of the partial range and
+> true of the full one. Nothing disagreed while a third of the diff went unread.
 >
-> spec-author's disposition (`10:04Z`) is per-claim, which is what the frame
-> demanded rather than a blanket authoring: **AUTHOR** `requires-on-first-param-
-> of-two` and `requires-on-middle-param-of-three`; **CORRECT**
-> `requires-on-final-param-unaffected` to the existing
-> `requires-elaborates-to-pi-proof-arg`; **REMOVE**
-> `old-fails-closed-without-pre-state` (it is a staged implementation fence, not
-> a language contract, and a row requiring rejection would contradict the
-> existing acceptance row). CV is authoring and measuring.
+> **It mattered on the sibling candidate.** Runtime's c1 is 10 commits: 17 paths
+> full, 7 last-only. I flagged it before the vote; the Architect stopped,
+> re-read both from their declared bases, recast Verify's approval, and cast
+> **REQUEST CHANGES** on Runtime — `checked_native_trusted_base_v1` declares *"a
+> missing id is an error, never a skipped entry"* and then silently drops any
+> captured id absent from the symbol map. **A silent trust-roster shrink.**
 >
-> 1. Publish the enclave node. It touches `conformance/` **and** `crates/`
->    (`v1_acceptance.rs`), so it pulls **both** a Spec vote and the Architect.
-> 2. Tell verify-leader to re-run the widened checker on `76121c51` and route.
->    Predicted census **73 attached / 73 resolving / 0 unresolved** — require it
->    **measured**, not carried from the prediction.
-> 3. Publish `CI-ROW-CLAIM-NAMESPACE`.
+> **`compiler_driver.rs` is in the full range and NOT in the 7-path window**,
+> measured both ways rather than inferred. So the defect was structurally
+> invisible to the first reading, and on the partial range the candidate
+> approves — inside a WP whose entire subject is a bounded TCB widening. The
+> recut fixes it and is what `7bfc8ae5` now carries.
 >
-> **Order matters mechanically, not cautiously.** `verify_row_claims` raises on
-> any unresolved claim, `main()` returns 2, and the `ignored-row-sweep` step runs
-> under `bash -e`. Merging the widening first reds `main` and blocks **every**
-> ring's publisher. The job's name says "findings non-blocking" — true of
-> findings, false of instrument failures.
+> Lesson filed at `agent/memory/fleet/a-review-range-of-sha-caret-to-sha-reads-only-the-last-commit-and-the-scope-check-agrees.md`.
 >
-> #### QUEUED FOR THE OPERATOR AT 11:30Z
+> #### THE ENCLAVE NODE, and the one call no measurement could check
 >
-> 0. **Runtime c1's bounded TCB widening** — gates its merge and Kernel's ring.
->    Also: runtime-implementer flagged that the **runtime-IR evaluator** carries
->    a structurally identical blanket trust refusal for a *different* subset. It
->    did not touch it and says moving it is a separate ruling. It is right.
-> 1. **Architect strands on inbound mentions, 8x today.** It is the hub, so its
->    latency multiplies by the number of lanes waiting.
+> Verify's namespace widening surfaced four `v1_acceptance` tests claiming
+> `verify/spec-syntax` rows that were never authored. The enclave disposed of
+> them **per claim**: two rows authored, one claim redirected, one **removed**.
+>
+> Authoring all four was the path that greens the census fastest, which is
+> exactly why it was excluded as a default — **removal and authoring green it
+> identically, so the census cannot distinguish a correct removal from a deleted
+> contract.** The removal rested on reading `21 §6.4`. I checked it myself at
+> `spec/20-verification/21-spec-syntax.md:544-555` rather than accept two
+> agreeing reviewers, and flagged to the Adversary that three readings of one
+> section are not three discriminators.
+>
+> **The Adversary then supplied a fourth corroborator that is not a reading of
+> §6.4:** `resolve.rs:1604-1610` implements exactly that discrimination at
+> `PropCtx::SpaceOpEnsures`. The removal is confirmed correct.
+>
+> **And it found the real residual, which I filed as
+> `CONF-VERIFY-OLD-ROW-UNSATISFIABLE`** (`spec-enclave`, S, `ready`). The seed's
+> only unclaimed row says `expect: accepts` while the landed elaborator refuses
+> unconditionally under a deliberate `OQ-Space` deferral. Defect in the **row**,
+> not the elaborator and not the merge; over-claim direction, not soundness.
+> **The frame that missed it was mine** — its `AC-2` fixed the census direction
+> as claim-to-heading and never asked heading-to-claim, though the mirror query
+> is one `comm` over populations the node had already assembled.
+>
+> #### QUEUED FOR YOU
+>
+> 1. **Architect strands on inbound mentions, 11 times today.** It is the hub, so
+>    its latency multiplies by the number of lanes. Two distinct failure shapes,
+>    needing opposite keys — see the instrument note below.
 > 2. **Release `KERNEL-RECURSIVE-RESULT-SURFACE`** — three-way not four.
 >    Foundation is idle behind it.
-> 3. **`SEC1-IFC-R3` needs an SMT backend**; `z3` is absent, and a Z3-free
->    widening is vacuous. This is Verify's **only** unframed-and-unstarted node,
->    so Verify idles the moment `CI-ROW-CLAIM-NAMESPACE` merges.
-> 4. **Close PR #365** (integrator: green on head `befc2dc4`, exact-head review
->    stale after prior blocked heads) **and abandoned PR #1785** — an abandoned
->    PR ages into a revert. `gh` is not authenticated in my shell.
-> 5. **Which teams does the 2026-07-28 wind-down still bind?** Six idle seats.
->    Runtime has 13 framed ready nodes behind one ring while Verify, Kernel,
->    Language, Ergo, Foundation and doc sit idle. Reassignment is topology and
->    therefore the operator's call, not mine — but it is the single largest
->    throughput fact in the federation right now.
+> 3. **`SEC1-IFC-R3` needs an SMT backend**; `z3` is absent and a Z3-free
+>    widening is vacuous. It is Verify's **only** unstarted node, so Verify idles
+>    the moment `76121c51` merges.
+> 4. **Close PR #365** (green on head `befc2dc4`, exact-head review stale) **and
+>    abandoned PR #1785** — an abandoned PR ages into a revert. `gh` is not
+>    authenticated in my shell.
+> 5. **Does the 2026-07-28 wind-down still bind?** Six idle seats. Runtime has 13
+>    framed ready nodes behind one ring while Verify, Kernel, Language, Ergo,
+>    Foundation and doc sit idle. Reassignment is topology and therefore yours,
+>    not mine — but it is the largest throughput fact in the federation.
 >
-> #### INSTRUMENT FINDINGS, both cost real time
+> #### NO FRAMING DEBT — and a correction of mine
 >
-> - **`moot compact` can report "Sent" and land nothing** on a Claude Code pane
->   (Adversary: ctx stayed 60%, composer empty). Fall back to
->   `tmux send-keys -l '/compact'` then a **separate** `Enter`. Every Codex seat
->   leaves `/compact` unsubmitted and needs its own `Enter`.
-> - **A leftover scratchpad file will be read by a splice script that runs before
->   you write it.** I spliced a stale `~09:3xZ` block into this file that
->   described two already-merged PRs as "in the pipe". Caught by reading the
->   diff, reverted. Write the block, *then* splice; do not assume a scratch path
->   is empty.
+> I swept the 13 `ready` Runtime nodes by testing whether
+> `docs/program/wp/<id>.md` exists and concluded six were unframed. **All 13 are
+> framed** — some under non-matching filenames, some in the node body.
+> `RT-CENSUS-CAVEAT-GUARD` records a previous Steward making that identical
+> error against that identical node. **Do not re-run that sweep.**
 >
-> #### DISK, unchanged and still worth knowing
+> #### INSTRUMENT NOTES
 >
-> `/workspaces/ken` is `/dev/nvme0n1p6`; `/` is an unrelated overlay that reports
-> a steady figure while the repo volume fills. `ld: No space left on device` and
-> a linker `SIGBUS` are the tells. Reclaim order: `.moot/truncate-logs.sh` →
-> `tmp/ken-*` `-type d -mmin +30` → `target/` (costs a cold rebuild under the
-> machine-wide `ken-cargo` flock). **Another seat's `target/` is the Steward's
-> call, never the seat's.** Filed at `agent/memory/fleet/`.
+> - **Strand shape (a):** `[Pasted Content N chars]` in the composer. Clear with
+>   a bare `Enter`, but **only after the turn ends**.
+> - **Strand shape (b), new today:** `"Messages to be submitted after next tool
+>   call"` while the seat is idle — the delivery gate is a *subsequent* tool call
+>   an idle seat never makes. Clear with **`Escape`**, only when idle. **A
+>   `Working` footer does not mean it will flush**; a turn ending without another
+>   tool call strands it anyway. Seen 3 times today, all on hub seats; one was
+>   holding my own range warning to the Architect.
+> - **`moot compact` can report "Sent" and land nothing.** Fall back to
+>   `send-keys -l '/compact'` then a separate `Enter`.
+> - **A splice script reads a leftover scratchpad file written before it.** I put
+>   a stale block describing two already-merged PRs into this file that way;
+>   caught in the diff and reverted. Write the block, then splice.
 >
 > ### RESUME HERE — earlier state at 2026-08-10 ~07:4xZ. `main` = `bebe1a79`.
 >
