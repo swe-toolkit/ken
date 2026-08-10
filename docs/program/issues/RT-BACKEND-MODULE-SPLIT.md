@@ -104,6 +104,22 @@ returns for a semantic ruling**; it is not repaired inside a "pure move."
 - Scoped local checks plus CI's workspace gate — **never** a local workspace
   run.
 
+## Seating — this phase runs T2, and only this phase
+
+**Operator, 2026-08-10:** the refactoring work is much more mechanical than the
+initial implementation and discovery, so `runtime-implementer` switches to a
+**T2** model for #8's slices. Recorded with its boundary and its trigger in
+`agent/MODELS.md` — read it there before flipping anything.
+
+Two things that block the obvious mistakes:
+
+- **The switch happens at the phase boundary**, when the first slice is
+  released. Not before. The seat is on `#6d` `D2b`'s closed-projection work,
+  which is what Runtime's standing T1 exception exists for.
+- **It covers #8 only.** `RT-RECURSOR-TRANSPORT`, `RT-FNUNIT-RESULT-TOKEN` and
+  `RT-DESCENT-RETIRE` precede this phase and **stay T1**; so does the semantic
+  arc deferred after #8 closure.
+
 ## Ownership map — accepted with amendments
 
 Modules own **semantic lifecycles**, not line counts or campaign names. The
