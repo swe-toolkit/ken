@@ -629,6 +629,13 @@ pub enum Expr {
         proof_name: String,
         span: Span,
     },
+    /// `structural result of x` — select the validated hidden recursive
+    /// method result associated with the surface binding `x`.
+    EStructuralResult {
+        operand: String,
+        operand_span: Span,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -648,6 +655,7 @@ impl Expr {
             | Expr::EPi(_, _, _, s)
             | Expr::EArrow(_, _, s)
             | Expr::EAttachedProofRef { span: s, .. }
+            | Expr::EStructuralResult { span: s, .. }
             | Expr::EBinOp(_, _, _, s)
             | Expr::EProj(_, _, s) => s,
             Expr::EMatch { span, .. } => span,

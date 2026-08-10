@@ -254,6 +254,14 @@ pub enum RExpr {
         proof_name: String,
         span: Span,
     },
+    /// Resolved `structural result of x`. The index identifies one surface
+    /// binding; elaboration consults that binding's branch-local association.
+    RStructuralResult {
+        index: usize,
+        name: String,
+        binding_span: Span,
+        span: Span,
+    },
 }
 
 impl RExpr {
@@ -275,6 +283,7 @@ impl RExpr {
             | RExpr::RPi(_, _, _, s)
             | RExpr::RArrow(_, _, s)
             | RExpr::RAttachedProofRef { span: s, .. }
+            | RExpr::RStructuralResult { span: s, .. }
             | RExpr::RBinOp(_, _, _, s) => s,
             RExpr::RMatch { span, .. } => span,
         }
@@ -317,7 +326,7 @@ impl RType {
 
 #[derive(Clone)]
 struct Scope {
-    bindings: Vec<Vec<String>>,
+    bindings: Vec<(Vec<String>, Span)>,
     /// Dictionary names on a def path resolve as elaborator-local constants,
     /// rather than core binders. This keeps existing definition telescopes
     /// unchanged while letting the shared constraints scope over contracts and
@@ -336,15 +345,23 @@ impl Scope {
     }
 
     fn push(&mut self, name: &str) {
-        self.bindings.push(vec![name.to_string()]);
+        self.push_spanned(name, Span::zero());
+    }
+
+    fn push_spanned(&mut self, name: &str, span: Span) {
+        self.bindings.push((vec![name.to_string()], span));
+    }
+
+    fn push_anonymous(&mut self, span: Span) {
+        self.bindings.push((Vec::new(), span));
     }
 
     fn push_alias(&mut self, alias: &str, name: &str) {
-        if let Some(names) = self
+        if let Some((names, _)) = self
             .bindings
             .iter_mut()
             .rev()
-            .find(|names| names.iter().any(|n| n == name))
+            .find(|(names, _)| names.iter().any(|n| n == name))
         {
             names.push(alias.to_string());
         }
@@ -358,7 +375,16 @@ impl Scope {
         self.bindings
             .iter()
             .rev()
-            .position(|names| names.iter().any(|n| n == name))
+            .position(|(names, _)| names.iter().any(|n| n == name))
+    }
+
+    fn resolve_binding(&self, name: &str) -> Option<(usize, Span)> {
+        self.bindings
+            .iter()
+            .rev()
+            .enumerate()
+            .find(|(_, (names, _))| names.iter().any(|candidate| candidate == name))
+            .map(|(index, (_, span))| (index, span.clone()))
     }
 
     fn depth(&self) -> usize {
@@ -539,7 +565,8 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EBinOp(..)
         | Expr::EMatch { .. }
         | Expr::EProj(..)
-        | Expr::EAttachedProofRef { .. } => Err(unsupported_constructor_type_expr(expr)),
+        | Expr::EAttachedProofRef { .. }
+        | Expr::EStructuralResult { .. } => Err(unsupported_constructor_type_expr(expr)),
     }
 }
 
@@ -1578,7 +1605,7 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
                         resolved_value,
                         binding.span.clone(),
                     ));
-                    scope.push(&binding.name);
+                    scope.push_spanned(&binding.name, binding.name_span.clone());
                 }
                 let mut resolved_body = resolve_expr_ctx(scope, body, ctx)?;
                 for (name, ty, value, binding_span) in resolved.into_iter().rev() {
@@ -1677,6 +1704,26 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             span: span.clone(),
         }),
 
+        Expr::EStructuralResult {
+            operand,
+            operand_span,
+            span,
+        } => {
+            let (index, binding_span) =
+                scope
+                    .resolve_binding(operand)
+                    .ok_or_else(|| ElabError::UnboundName {
+                        name: operand.clone(),
+                        span: operand_span.clone(),
+                    })?;
+            Ok(RExpr::RStructuralResult {
+                index,
+                name: operand.clone(),
+                binding_span,
+                span: span.clone(),
+            })
+        }
+
         Expr::EMatch {
             scrut,
             equation,
@@ -1688,8 +1735,12 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             for arm in arms {
                 let (rpat, bound_names) = resolve_pattern(&arm.pat)?;
                 let depth_before = scope.depth();
-                for n in &bound_names {
-                    scope.push(n);
+                for (name, binding_span) in &bound_names {
+                    if name == "_" {
+                        scope.push_anonymous(binding_span.clone());
+                    } else {
+                        scope.push_spanned(name, binding_span.clone());
+                    }
                 }
                 if let Some(equation) = equation {
                     scope.push(equation);
@@ -1720,7 +1771,9 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
 
 /// Resolve a pattern, returning the resolved pattern and the list of names
 /// bound by it in left-to-right order (for scope introduction).
-fn resolve_pattern(pat: &crate::ast::Pattern) -> Result<(RPattern, Vec<String>), ElabError> {
+fn resolve_pattern(
+    pat: &crate::ast::Pattern,
+) -> Result<(RPattern, Vec<(String, Span)>), ElabError> {
     match &pat.kind {
         // Wild patterns consume one de Bruijn slot so outer vars remain consistent
         // with the method lambda structure (which binds ALL ctor args, not just named ones).
@@ -1729,14 +1782,14 @@ fn resolve_pattern(pat: &crate::ast::Pattern) -> Result<(RPattern, Vec<String>),
                 kind: RPatKind::Wild,
                 span: pat.span.clone(),
             },
-            vec!["_".to_string()],
+            vec![("_".to_string(), pat.span.clone())],
         )),
         PatKind::Var(name) => Ok((
             RPattern {
                 kind: RPatKind::Var(name.clone()),
                 span: pat.span.clone(),
             },
-            vec![name.clone()],
+            vec![(name.clone(), pat.span.clone())],
         )),
         PatKind::Ctor(name, subs) => {
             let mut rsubs = Vec::new();

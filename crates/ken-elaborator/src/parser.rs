@@ -2236,6 +2236,21 @@ impl Parser {
             }
             Token::Ident(s) => {
                 let span = self.peek_span().clone();
+                if s == "structural"
+                    && matches!(self.lookahead(1), Token::Ident(word) if word == "result")
+                    && matches!(self.lookahead(2), Token::Ident(word) if word == "of")
+                    && matches!(self.lookahead(3), Token::Ident(_))
+                {
+                    self.advance();
+                    self.expect_contextual_ident("result")?;
+                    self.expect_contextual_ident("of")?;
+                    let (operand, operand_span) = self.expect_ident()?;
+                    return Ok(Expr::EStructuralResult {
+                        operand,
+                        span: Span::new(span.start, operand_span.end),
+                        operand_span,
+                    });
+                }
                 self.advance();
                 if matches!(self.peek(), Token::DoubleColon) {
                     self.advance();
@@ -2350,6 +2365,15 @@ impl Parser {
                         } => Expr::EAttachedProofRef {
                             subject,
                             proof_name,
+                            span,
+                        },
+                        Expr::EStructuralResult {
+                            operand,
+                            operand_span,
+                            ..
+                        } => Expr::EStructuralResult {
+                            operand,
+                            operand_span,
                             span,
                         },
                     },

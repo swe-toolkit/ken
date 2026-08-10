@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use ken_kernel::{KernelError, Level};
+use ken_kernel::{GlobalId, KernelError, Level};
 
 /// A source span (byte offsets, 0-based).
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
@@ -52,6 +52,33 @@ pub enum ElabError {
     MissingCapability { effect: String, span: Span },
     /// An unresolved name at the name-resolution stage (`39 §5.3`).
     UnboundName { name: String, span: Span },
+    /// A structural-result selector resolved its operand, but that exact
+    /// surface binding has no validated result association in this branch.
+    StructuralResultOutOfScope {
+        selector_span: Span,
+        binding_span: Span,
+    },
+    /// A required field/evidence/result triple could not be derived.
+    StructuralResultAssociationMissing { match_span: Span, field_span: Span },
+    /// A field, evidence term, or result term participates in more than one
+    /// candidate association.
+    StructuralResultAssociationDuplicate {
+        match_span: Span,
+        field_spans: Vec<Span>,
+    },
+    /// Local evidence/result terms are crossed between source fields.
+    StructuralResultAssociationSwapped {
+        match_span: Span,
+        first_field_span: Span,
+        second_field_span: Span,
+    },
+    /// An association crosses generated-support provenance.
+    StructuralResultAssociationForeign {
+        match_span: Span,
+        field_span: Span,
+        expected_support: Option<GlobalId>,
+        actual_support: Option<GlobalId>,
+    },
     /// `old` reached elaboration in a space-operation `ensures`, but the
     /// reachable surface has no pre-state binding yet (`36 §4.3`).
     OldPreStateUnsupported { span: Span },
@@ -210,6 +237,59 @@ impl fmt::Display for ElabError {
             ElabError::UnboundName { name, span } => {
                 write!(f, "unbound name '{}' at {}-{}", name, span.start, span.end)
             }
+            ElabError::StructuralResultOutOfScope {
+                selector_span,
+                binding_span,
+            } => write!(
+                f,
+                "StructuralResultOutOfScope at {}-{} for binding at {}-{}",
+                selector_span.start, selector_span.end, binding_span.start, binding_span.end,
+            ),
+            ElabError::StructuralResultAssociationMissing {
+                match_span,
+                field_span,
+            } => write!(
+                f,
+                "StructuralResultAssociationMissing in match {}-{} for field {}-{}",
+                match_span.start, match_span.end, field_span.start, field_span.end,
+            ),
+            ElabError::StructuralResultAssociationDuplicate {
+                match_span,
+                field_spans,
+            } => write!(
+                f,
+                "StructuralResultAssociationDuplicate in match {}-{} for fields {:?}",
+                match_span.start, match_span.end, field_spans,
+            ),
+            ElabError::StructuralResultAssociationSwapped {
+                match_span,
+                first_field_span,
+                second_field_span,
+            } => write!(
+                f,
+                "StructuralResultAssociationSwapped in match {}-{} for fields {}-{} and {}-{}",
+                match_span.start,
+                match_span.end,
+                first_field_span.start,
+                first_field_span.end,
+                second_field_span.start,
+                second_field_span.end,
+            ),
+            ElabError::StructuralResultAssociationForeign {
+                match_span,
+                field_span,
+                expected_support,
+                actual_support,
+            } => write!(
+                f,
+                "StructuralResultAssociationForeign in match {}-{} for field {}-{}: expected {:?}, found {:?}",
+                match_span.start,
+                match_span.end,
+                field_span.start,
+                field_span.end,
+                expected_support,
+                actual_support,
+            ),
             ElabError::OldPreStateUnsupported { span } => write!(
                 f,
                 "`old` in a space-operation ensures is not yet supported: \

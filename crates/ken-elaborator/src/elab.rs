@@ -402,6 +402,27 @@ impl<'e> ElabCtx<'e> {
         Some((Term::var(index), weaken(stored, (index + 1) as i64)))
     }
 
+    /// Resolve a surface binding identity only through the structural-result
+    /// association gate. Unlike `surface_var`, this cannot return an ordinary
+    /// source term or expose an arbitrary hidden method binder.
+    fn structural_result(&self, index: usize) -> Option<(Term, Term)> {
+        let mut remaining = index;
+        for position in (0..self.ctx.len()).rev() {
+            if self.hidden_positions.contains(&position) {
+                continue;
+            }
+            if remaining == 0 {
+                let result_position = self
+                    .lift_bindings
+                    .get(&position)?
+                    .recursive_result_position?;
+                return self.binding_term(result_position);
+            }
+            remaining -= 1;
+        }
+        None
+    }
+
     fn with_classes(mut self, class_env: &'e ClassEnv) -> Self {
         self.class_env = Some(class_env);
         self
@@ -420,26 +441,128 @@ impl<'e> ElabCtx<'e> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct LiftBinding {
     evidence_position: usize,
+    recursive_result_position: Option<usize>,
     support: Option<GlobalId>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum LiftAssociationFailure {
+    Missing {
+        source: usize,
+    },
+    Duplicate {
+        sources: Vec<usize>,
+    },
+    Swapped {
+        first: usize,
+        second: usize,
+    },
+    Foreign {
+        source: usize,
+        expected: Option<GlobalId>,
+        actual: Option<GlobalId>,
+    },
 }
 
 fn validate_lift_associations(
     installed: &HashMap<usize, LiftBinding>,
     expected: &[(usize, LiftBinding)],
-) -> Result<(), &'static str> {
+) -> Result<(), LiftAssociationFailure> {
+    let mut installed_entries = installed.iter().collect::<Vec<_>>();
+    installed_entries.sort_by_key(|(source, _)| **source);
+    for (index, (source, binding)) in installed_entries.iter().enumerate() {
+        for (other_source, other) in installed_entries.iter().skip(index + 1) {
+            let duplicate_result = binding
+                .recursive_result_position
+                .zip(other.recursive_result_position)
+                .is_some_and(|(left, right)| left == right);
+            if binding.evidence_position == other.evidence_position || duplicate_result {
+                return Err(LiftAssociationFailure::Duplicate {
+                    sources: vec![**source, **other_source],
+                });
+            }
+        }
+    }
     for (source, binding) in expected {
         match installed.get(source) {
-            None => return Err("missing generated lift association"),
-            Some(actual) if actual.evidence_position != binding.evidence_position => {
-                return Err("swapped generated lift association")
-            }
+            None => return Err(LiftAssociationFailure::Missing { source: *source }),
             Some(actual) if actual.support != binding.support => {
-                return Err("foreign generated lift association")
+                return Err(LiftAssociationFailure::Foreign {
+                    source: *source,
+                    expected: binding.support,
+                    actual: actual.support,
+                })
+            }
+            Some(actual)
+                if actual.evidence_position != binding.evidence_position
+                    || actual.recursive_result_position != binding.recursive_result_position =>
+            {
+                let second = expected
+                    .iter()
+                    .find(|(candidate_source, candidate)| {
+                        candidate_source != source
+                            && (candidate.evidence_position == actual.evidence_position
+                                || candidate
+                                    .recursive_result_position
+                                    .zip(actual.recursive_result_position)
+                                    .is_some_and(|(left, right)| left == right))
+                    })
+                    .map(|(candidate_source, _)| *candidate_source)
+                    .unwrap_or(*source);
+                return Err(LiftAssociationFailure::Swapped {
+                    first: *source,
+                    second,
+                });
             }
             Some(_) => {}
         }
     }
     Ok(())
+}
+
+fn lift_association_error(
+    failure: LiftAssociationFailure,
+    match_span: &Span,
+    field_spans: &[(usize, Span)],
+) -> ElabError {
+    let field_span = |source: usize| {
+        field_spans
+            .iter()
+            .find(|(candidate, _)| *candidate == source)
+            .map(|(_, span)| span.clone())
+            .unwrap_or_else(|| match_span.clone())
+    };
+    match failure {
+        LiftAssociationFailure::Missing { source } => {
+            ElabError::StructuralResultAssociationMissing {
+                match_span: match_span.clone(),
+                field_span: field_span(source),
+            }
+        }
+        LiftAssociationFailure::Duplicate { sources } => {
+            ElabError::StructuralResultAssociationDuplicate {
+                match_span: match_span.clone(),
+                field_spans: sources.into_iter().map(field_span).collect(),
+            }
+        }
+        LiftAssociationFailure::Swapped { first, second } => {
+            ElabError::StructuralResultAssociationSwapped {
+                match_span: match_span.clone(),
+                first_field_span: field_span(first),
+                second_field_span: field_span(second),
+            }
+        }
+        LiftAssociationFailure::Foreign {
+            source,
+            expected,
+            actual,
+        } => ElabError::StructuralResultAssociationForeign {
+            match_span: match_span.clone(),
+            field_span: field_span(source),
+            expected_support: expected,
+            actual_support: actual,
+        },
+    }
 }
 
 // ----- type elaboration -----
@@ -981,6 +1104,7 @@ fn install_lift_binding(
     cx: &mut ElabCtx,
     source_position: usize,
     evidence_position: usize,
+    recursive_result_position: Option<usize>,
 ) -> Result<LiftBinding, ElabError> {
     let (_, evidence_ty) = cx.binding_term(evidence_position).ok_or_else(|| {
         ElabError::Internal("generated lift evidence escaped its method context".into())
@@ -988,6 +1112,7 @@ fn install_lift_binding(
     let support = support_head(cx.env, &cx.ctx, &evidence_ty);
     let binding = LiftBinding {
         evidence_position,
+        recursive_result_position,
         support,
     };
     cx.lift_bindings.insert(source_position, binding);
@@ -1130,10 +1255,21 @@ fn check_match_with_lift(
             span: arm.span.clone(),
         })?;
         let (raw_domains, _) = peel_pi(&method_ty);
-        if raw_domains.len() != support_ctor.args.len() {
-            return Err(ElabError::Internal(
-                "generated support method has an unexpected recursive binder".into(),
-            ));
+        let support_shapes = recursive_shapes(
+            cx.env,
+            support_ctor,
+            support_decl.id,
+            support_decl.params.len(),
+        )
+        .map_err(|error| ElabError::KernelRejected {
+            error,
+            span: arm.span.clone(),
+        })?;
+        if raw_domains.len() != support_ctor.args.len() + support_shapes.len() {
+            return Err(ElabError::StructuralResultAssociationMissing {
+                match_span: span.clone(),
+                field_span: arm.pat.span.clone(),
+            });
         }
         let base = cx.ctx.len();
         let mut domains = Vec::with_capacity(raw_domains.len());
@@ -1152,18 +1288,49 @@ fn check_match_with_lift(
                     span: arm.span.clone(),
                 }
             })?;
+        if support_ctor.args.len() != host_ctor.args.len() + evidence_positions.len()
+            || evidence_positions
+                .iter()
+                .any(|source_field| *source_field >= host_ctor.args.len())
+        {
+            return Err(ElabError::StructuralResultAssociationMissing {
+                match_span: span.clone(),
+                field_span: arm.pat.span.clone(),
+            });
+        }
+        if support_shapes.iter().any(|shape| {
+            shape.position < host_ctor.args.len()
+                || shape.position >= host_ctor.args.len() + evidence_positions.len()
+        }) {
+            return Err(ElabError::StructuralResultAssociationForeign {
+                match_span: span.clone(),
+                field_span: arm.pat.span.clone(),
+                expected_support: Some(support),
+                actual_support: None,
+            });
+        }
         let mut expected_bindings = Vec::with_capacity(evidence_positions.len());
         for (evidence_ordinal, source_field) in evidence_positions.iter().enumerate() {
             let source_position = base + source_field;
+            let evidence_argument = host_ctor.args.len() + evidence_ordinal;
+            let result_ordinal = support_shapes
+                .iter()
+                .position(|shape| shape.position == evidence_argument);
             let installed = install_lift_binding(
                 cx,
                 source_position,
-                base + host_ctor.args.len() + evidence_ordinal,
+                base + evidence_argument,
+                result_ordinal.map(|ordinal| base + support_ctor.args.len() + ordinal),
             )?;
             expected_bindings.push((source_position, installed));
         }
+        let field_spans = sub_pats
+            .iter()
+            .enumerate()
+            .map(|(source_field, pattern)| (base + source_field, pattern.span.clone()))
+            .collect::<Vec<_>>();
         validate_lift_associations(&cx.lift_bindings, &expected_bindings)
-            .map_err(|message| ElabError::Internal(message.into()))?;
+            .map_err(|failure| lift_association_error(failure, span, &field_spans))?;
 
         let total = domains.len();
         let mut concrete = Term::Constructor {
@@ -1258,9 +1425,10 @@ fn check_structured_constructor_method(
     let (raw_domains, _) = peel_pi(&method_ty);
     let field_count = constructor.args.len();
     if raw_domains.len() != field_count + shapes.len() {
-        return Err(ElabError::Internal(
-            "kernel method telescope and recursive-shape producer disagree".into(),
-        ));
+        return Err(ElabError::StructuralResultAssociationMissing {
+            match_span: arm.span.clone(),
+            field_span: arm.pat.span.clone(),
+        });
     }
     let base = cx.ctx.len();
     let mut domains = Vec::with_capacity(raw_domains.len());
@@ -1279,11 +1447,22 @@ fn check_structured_constructor_method(
             cx,
             source_position,
             base + field_count + evidence_ordinal,
+            None,
         )?;
         expected_bindings.push((source_position, installed));
     }
+    let field_spans = match &arm.pat.kind {
+        RPatKind::Ctor(_, fields) => fields
+            .iter()
+            .enumerate()
+            .map(|(source_field, pattern)| (base + source_field, pattern.span.clone()))
+            .collect::<Vec<_>>(),
+        _ => (0..field_count)
+            .map(|source_field| (base + source_field, arm.pat.span.clone()))
+            .collect(),
+    };
     validate_lift_associations(&cx.lift_bindings, &expected_bindings)
-        .map_err(|message| ElabError::Internal(message.into()))?;
+        .map_err(|failure| lift_association_error(failure, &arm.span, &field_spans))?;
 
     let total = domains.len();
     let mut concrete = Term::Constructor {
@@ -2612,6 +2791,17 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
 
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
+        RExpr::RStructuralResult {
+            index,
+            name: _,
+            binding_span,
+            span,
+        } => cx
+            .structural_result(*index)
+            .ok_or_else(|| ElabError::StructuralResultOutOfScope {
+                selector_span: span.clone(),
+                binding_span: binding_span.clone(),
+            }),
         RExpr::RVar(i, _, _) => {
             // An installed index refinement (constructor injectivity
             // / sibling convoy) replaces the bare `Var` with its `Cast`-
@@ -4146,6 +4336,7 @@ fn infer_expr_row_type(
             .unwrap_or_else(crate::effects::RowType::empty),
         RExpr::RVar(_, _, _)
         | RExpr::RCell(_, _, _)
+        | RExpr::RStructuralResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
         | RExpr::RStr(_, _) => crate::effects::RowType::empty(),
@@ -5505,6 +5696,7 @@ fn first_old_span(expr: &RExpr) -> Option<Span> {
         | RExpr::RCell(..)
         | RExpr::RNumLit(..)
         | RExpr::RStr(..)
+        | RExpr::RStructuralResult { .. }
         | RExpr::RAttachedProofRef { .. } => None,
     }
 }
@@ -6151,6 +6343,7 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RCon(n, _) => n == name,
         RExpr::RVar(_, _, _)
         | RExpr::RCell(_, _, _)
+        | RExpr::RStructuralResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
         | RExpr::RStr(_, _) => false,
@@ -7604,11 +7797,22 @@ pub fn elaborate_rexpr(
 
 #[cfg(test)]
 mod nested_lift_association_tests {
-    use super::{validate_lift_associations, GlobalId, HashMap, LiftBinding};
+    use crate::{parser::parse_expr, resolve::{resolve_expr_standalone, RExpr}, ElabEnv};
+    use ken_kernel::{Level, Term};
 
-    fn binding(position: usize, support: Option<GlobalId>) -> LiftBinding {
+    use super::{
+        infer, lift_association_error, validate_lift_associations, ElabCtx, ElabError, GlobalId,
+        HashMap, LiftAssociationFailure, LiftBinding, Span,
+    };
+
+    fn binding(
+        evidence_position: usize,
+        recursive_result_position: Option<usize>,
+        support: Option<GlobalId>,
+    ) -> LiftBinding {
         LiftBinding {
-            evidence_position: position,
+            evidence_position,
+            recursive_result_position,
             support,
         }
     }
@@ -7617,29 +7821,173 @@ mod nested_lift_association_tests {
     fn missing_lift_association_mutation_rejects() {
         let installed = HashMap::new();
         assert_eq!(
-            validate_lift_associations(&installed, &[(3, binding(7, None))]),
-            Err("missing generated lift association")
+            validate_lift_associations(&installed, &[(3, binding(7, Some(9), None))]),
+            Err(LiftAssociationFailure::Missing { source: 3 })
         );
     }
 
     #[test]
     fn swapped_lift_association_mutation_rejects() {
-        let installed = HashMap::from([(3, binding(8, None)), (4, binding(7, None))]);
+        let installed = HashMap::from([
+            (3, binding(8, Some(10), None)),
+            (4, binding(7, Some(9), None)),
+        ]);
         assert_eq!(
             validate_lift_associations(
                 &installed,
-                &[(3, binding(7, None)), (4, binding(8, None))],
+                &[
+                    (3, binding(7, Some(9), None)),
+                    (4, binding(8, Some(10), None)),
+                ],
             ),
-            Err("swapped generated lift association")
+            Err(LiftAssociationFailure::Swapped {
+                first: 3,
+                second: 4,
+            })
+        );
+    }
+
+    #[test]
+    fn duplicate_lift_association_reverse_injectivity_rejects() {
+        let duplicate = binding(7, Some(9), Some(GlobalId(42)));
+        let installed = HashMap::from([(3, duplicate), (4, duplicate)]);
+        assert_eq!(
+            validate_lift_associations(&installed, &[(3, duplicate), (4, duplicate)],),
+            Err(LiftAssociationFailure::Duplicate {
+                sources: vec![3, 4],
+            })
         );
     }
 
     #[test]
     fn foreign_lift_association_mutation_rejects() {
-        let installed = HashMap::from([(3, binding(7, Some(GlobalId(99))))]);
+        let installed = HashMap::from([(3, binding(7, Some(9), Some(GlobalId(99))))]);
         assert_eq!(
-            validate_lift_associations(&installed, &[(3, binding(7, Some(GlobalId(42))))]),
-            Err("foreign generated lift association")
+            validate_lift_associations(&installed, &[(3, binding(7, Some(9), Some(GlobalId(42))))],),
+            Err(LiftAssociationFailure::Foreign {
+                source: 3,
+                expected: Some(GlobalId(42)),
+                actual: Some(GlobalId(99)),
+            })
         );
+    }
+
+    #[test]
+    fn anonymous_association_requires_a_distinct_result_and_rejects_when_deleted() {
+        // No carrier/name/constructor special case: `None` support is the
+        // anonymous association class.  The exact source/evidence/result
+        // triple is admissible, while deleting it is the named fail-closed
+        // Missing arm.
+        let association = binding(3, Some(5), None);
+        let installed = HashMap::from([(1, association)]);
+        assert_eq!(
+            validate_lift_associations(&installed, &[(1, association)]),
+            Ok(())
+        );
+        assert_eq!(
+            validate_lift_associations(&HashMap::new(), &[(1, association)]),
+            Err(LiftAssociationFailure::Missing { source: 1 })
+        );
+    }
+
+    #[test]
+    fn validator_failures_map_to_named_structural_diagnostics_with_field_spans() {
+        let match_span = Span::new(100, 200);
+        let first = Span::new(10, 11);
+        let second = Span::new(20, 21);
+        let fields = vec![(3, first.clone()), (4, second.clone())];
+
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Missing { source: 3 },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationMissing { match_span: got_match, field_span }
+                if got_match == match_span && field_span == first
+        ));
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Duplicate { sources: vec![3, 4] },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationDuplicate { match_span: got_match, field_spans }
+                if got_match == match_span && field_spans == vec![first.clone(), second.clone()]
+        ));
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Swapped { first: 3, second: 4 },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationSwapped {
+                match_span: got_match,
+                first_field_span,
+                second_field_span,
+            } if got_match == match_span && first_field_span == first && second_field_span == second
+        ));
+        assert!(matches!(
+            lift_association_error(
+                LiftAssociationFailure::Foreign {
+                    source: 4,
+                    expected: Some(GlobalId(42)),
+                    actual: Some(GlobalId(99)),
+                },
+                &match_span,
+                &fields,
+            ),
+            ElabError::StructuralResultAssociationForeign {
+                match_span: got_match,
+                field_span,
+                expected_support: Some(GlobalId(42)),
+                actual_support: Some(GlobalId(99)),
+            } if got_match == match_span && field_span == second
+        ));
+    }
+
+    #[test]
+    fn anonymous_u_to_r_association_selects_r_and_rejects_when_deleted() {
+        // Resolve the literal surface selector first. Its spelling is arbitrary:
+        // the binding identity is index 0, not a carrier/ctor/field/motive name.
+        let parsed = parse_expr("let u : Type = Type in structural result of u").unwrap();
+        let RExpr::RLet(_, _, _, selector, _) = resolve_expr_standalone(&parsed).unwrap() else {
+            panic!("expected the source selector under its ordinary let binding");
+        };
+        let RExpr::RStructuralResult { index, binding_span, span, .. } = &*selector else {
+            panic!("expected resolved structural-result selector");
+        };
+        assert_eq!(*index, 0);
+
+        let mut env = ElabEnv::new().unwrap();
+        let mut selected = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "anonymous-u-to-r",
+        );
+        // Branch telescope: source u, hidden evidence, distinct hidden result r.
+        // `None` support is the anonymous class: no carrier/constructor name is
+        // available to the association or selector gate.
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.hidden_positions.extend([1, 2]);
+        selected
+            .lift_bindings
+            .insert(0, binding(1, Some(2), None));
+
+        let (term, _) = infer(&mut selected, &selector).unwrap();
+        assert_eq!(term, Term::var(0), "selector must choose trailing r, not evidence");
+
+        selected.lift_bindings.clear();
+        assert!(matches!(
+            infer(&mut selected, &selector),
+            Err(ElabError::StructuralResultOutOfScope {
+                selector_span,
+                binding_span: got_binding,
+            }) if selector_span == *span && got_binding == *binding_span
+        ));
     }
 }
