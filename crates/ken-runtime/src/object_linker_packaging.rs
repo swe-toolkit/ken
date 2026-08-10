@@ -542,9 +542,7 @@ pub fn package_starter_executable_artifact_with_options(
     // `D1b-role-c1`: full admission, not authority alone -- the packaging lane
     // must not admit a program whose trust fails to close against its own
     // pre-source roster.
-    let authority = crate::native_program_admission(program)
-        .map(|admission| admission.authority().clone())
-        .map_err(|err| {
+    let admission = crate::native_program_admission(program).map_err(|err| {
         packaging_error(
             ObjectLinkerPackagingStage::NativeComparison,
             "checked_role_authority",
@@ -560,7 +558,7 @@ pub fn package_starter_executable_artifact_with_options(
         output_dir,
         producer,
         options,
-        &authority,
+        admission.compilation(),
     )
 }
 
@@ -591,7 +589,7 @@ pub(crate) fn package_synthetic_starter_executable_artifact_with_profile(
         output_dir,
         producer,
         &ObjectLinkerPackagingOptions::starter_host_with_profile(profile),
-        authority,
+        crate::synthetic_admitted_compilation(authority),
     )
 }
 
@@ -623,7 +621,7 @@ pub(crate) fn package_synthetic_starter_executable_artifact(
         output_dir,
         producer,
         options,
-        authority,
+        crate::synthetic_admitted_compilation(authority),
     )
 }
 
@@ -637,7 +635,7 @@ fn package_starter_executable_artifact_with_authority(
     output_dir: impl AsRef<Path>,
     producer: impl Into<String>,
     options: &ObjectLinkerPackagingOptions,
-    authority: &crate::NativeProcessSymbols,
+    admitted: crate::AdmittedNativeCompilation<'_>,
 ) -> Result<ObjectLinkerExecutablePackage, ObjectLinkerPackagingError> {
     validate_options(options)?;
     validate_entrypoint_package(program, entrypoint_package)?;
@@ -645,7 +643,7 @@ fn package_starter_executable_artifact_with_authority(
     validate_runtime_ir_run_report(program, entrypoint_package, run_report)?;
 
     let native_comparison =
-        run_runtime_ir_report_with_authority(program, run_report.clone(), env, authority);
+        run_runtime_ir_report_with_authority(program, run_report.clone(), env, admitted);
     match &native_comparison.verdict {
         NativeRuntimeIrComparisonVerdict::RuntimeIrNativeAgreement {
             stage: NativeDifferentialStage::RuntimeIrNativeCompare,
@@ -674,7 +672,7 @@ fn package_starter_executable_artifact_with_authority(
         run_report,
         env,
         STARTER_ENTRY_SYMBOL,
-        authority,
+        admitted,
     )
     .map_err(|err| {
         packaging_error(

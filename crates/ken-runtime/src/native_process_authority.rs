@@ -225,6 +225,90 @@ impl NativeProgramAdmission {
     pub fn admitted_trust(&self) -> &std::collections::BTreeSet<RuntimeSymbol> {
         &self.admitted_trust
     }
+
+    /// The pair the lowering entrypoints actually consume.
+    pub(crate) fn compilation(&self) -> AdmittedNativeCompilation<'_> {
+        AdmittedNativeCompilation {
+            authority: &self.authority,
+            admitted_trust: &self.admitted_trust,
+        }
+    }
+}
+
+/// The empty admitted-trust set a synthetic program rests on.
+///
+/// ⛔ A synthetic program was never admitted, so it has **no** admitted trust —
+/// that is a statement about it, not a missing value. Giving the synthetic lane
+/// its own named constant is what keeps `Option` out of the seam.
+#[cfg(test)]
+static NO_ADMITTED_TRUST: std::collections::BTreeSet<RuntimeSymbol> =
+    std::collections::BTreeSet::new();
+
+/// The authority and the admitted trust, travelling as **one** value.
+///
+/// ⛔ This exists so a lowering entrypoint cannot be handed an authority while
+/// the admitted trust is silently dropped: the shared bodies take this pair and
+/// there is no way to name the authority alone at those seams. A required
+/// second parameter would have proven only that a value was *supplied*; making
+/// the pair indivisible is what removes the "forgot to thread it" failure mode
+/// from the type, and the report control below is what proves it is *consumed*.
+///
+/// Exactly two producers: `NativeProgramAdmission::compilation` in production,
+/// which is reachable only through the fail-closed `native_program_admission`;
+/// and `synthetic_admitted_compilation`, which is `#[cfg(test)]` and therefore
+/// absent from a production build.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AdmittedNativeCompilation<'a> {
+    authority: &'a NativeProcessSymbols,
+    admitted_trust: &'a std::collections::BTreeSet<RuntimeSymbol>,
+}
+
+impl<'a> AdmittedNativeCompilation<'a> {
+    pub(crate) fn authority(&self) -> &'a NativeProcessSymbols {
+        self.authority
+    }
+
+    /// The assumption identities that must reach the emitted trust report.
+    pub(crate) fn admitted_trust(&self) -> &'a std::collections::BTreeSet<RuntimeSymbol> {
+        self.admitted_trust
+    }
+}
+
+/// The synthetic lane's compilation pair. ⛔ `#[cfg(test)]`; see
+/// `AdmittedNativeCompilation`.
+#[cfg(test)]
+pub(crate) fn synthetic_admitted_compilation(
+    authority: &NativeProcessSymbols,
+) -> AdmittedNativeCompilation<'_> {
+    AdmittedNativeCompilation {
+        authority,
+        admitted_trust: &NO_ADMITTED_TRUST,
+    }
+}
+
+/// A synthetic compilation pair carrying an **explicit** admitted-trust set.
+///
+/// ⛔ `#[cfg(test)]`, and it exists for one reason: the report-propagation
+/// control needs a *non-empty* admitted set at the report seam, and no
+/// production program can currently supply one. `reject_program_blockers`
+/// refuses any package whose `assumptions` are non-empty, and the admitted set
+/// **is** those assumption keys — so on every path that actually produces a
+/// report today the set is empty and the union below is vacuous.
+///
+/// That makes this the only way to prove the union is real rather than
+/// decorative. It is not a fabricated record: it does not claim a program was
+/// admitted, it supplies the pair the seam consumes so the seam's behaviour can
+/// be measured. See the vacuity control in the elaborator provenance suite,
+/// which measures the refusal that makes production paths empty.
+#[cfg(test)]
+pub(crate) fn synthetic_admitted_compilation_with_trust<'a>(
+    authority: &'a NativeProcessSymbols,
+    admitted_trust: &'a std::collections::BTreeSet<RuntimeSymbol>,
+) -> AdmittedNativeCompilation<'a> {
+    AdmittedNativeCompilation {
+        authority,
+        admitted_trust,
+    }
 }
 
 /// The canonical assumption identity for a trust target.

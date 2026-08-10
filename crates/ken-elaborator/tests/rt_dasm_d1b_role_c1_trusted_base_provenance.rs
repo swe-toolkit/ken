@@ -295,3 +295,60 @@ fn c1_a_package_without_a_roster_is_refused() {
         "a missing roster must be refused as a missing roster, got: {rendered}"
     );
 }
+
+/// THE VACUITY CONTROL — why report propagation carries nothing today.
+///
+/// ⛔ MEASURED: the clean carrier is **admitted**, its admitted trust is
+/// **non-empty**, and `reject_program_blockers` **refuses** it. CLAIMED:
+/// therefore no production path can currently produce a report carrying a
+/// non-empty admitted-trust set, because every report-producing path runs that
+/// refusal on the same package. THE GAP: this measures one carrier, not the
+/// whole reachable population — it establishes that the refusal fires on the
+/// canonical case, not that no exotic package escapes it.
+///
+/// This exists so the propagation wiring in `ken-runtime` is not read as
+/// something it is not. That wiring is real and its seam is proven by the A/B
+/// control beside it, but end to end it is **currently vacuous**, and a reader
+/// who assumed otherwise would over-trust an emitted artifact's assumption set.
+///
+/// PROMISE CLASS: transition sentinel. It goes red — deliberately — when the
+/// native supported subset is widened to admit packages carrying trusted-base
+/// assumptions, which is exactly the event that makes propagation live and the
+/// moment this note must be re-read rather than silently kept.
+#[test]
+fn c1_an_admitted_package_still_cannot_reach_a_report_so_propagation_is_vacuous_today() {
+    let program = erased(CLEAN_SOURCE);
+
+    let admission = ken_runtime::native_program_admission(&program)
+        .expect("the clean carrier is admitted -- established by the control above");
+    let admitted = admission.admitted_trust();
+    assert!(
+        !admitted.is_empty(),
+        "the admitted trust is empty, so this control cannot distinguish 'nothing to propagate' \
+         from 'propagation blocked'"
+    );
+
+    // The admitted set IS the package's assumption keys, which is precisely the
+    // lane the blocker refuses.
+    let assumption_keys: BTreeSet<String> = program
+        .erased_core
+        .metadata
+        .assumptions
+        .keys()
+        .cloned()
+        .collect();
+    assert_eq!(
+        *admitted, assumption_keys,
+        "the admitted trust is no longer the package's assumption keys, so the refusal below no \
+         longer explains the vacuity"
+    );
+
+    let refusal = ken_runtime::reject_program_blockers(&program)
+        .expect_err("a package carrying trusted-base assumptions is outside the native subset");
+    let rendered = refusal.to_string();
+    assert!(
+        rendered.contains("trust metadata"),
+        "the refusal must be the trust-metadata blocker, or the vacuity has a different cause \
+         than this control claims, got: {rendered}"
+    );
+}
