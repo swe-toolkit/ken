@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-10 12:41:33Z — from 201 issue file(s) in `docs/program/issues/`.
+2026-08-10 12:47:22Z — from 201 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -141,7 +141,7 @@ the committed file matches the generator's output.
 | `RT-AGG-COMPOSE` | escaping two Resources into one aggregate (Prod (Resource _) (Resource _)) fails at erasure — checked endpoints do not compose | draft | runtime | TBD | none | — |
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
-| `RT-CALL-EDGE-EXECUTABILITY-AXIS` | executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error | merged | runtime | S | none | — |
+| `RT-CALL-EDGE-EXECUTABILITY-AXIS` | executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error | ready | runtime | S | none | — |
 | `RT-CANDIDATE-LEDGER-RESIDUALS` | Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed | ready | runtime | S | none | — |
 | `RT-CARRIED-CONTINUATION-RESUME` | A carried scrutinee reaching a continuation frame has no resume path — the carried elimination does not implement the Carried x {PendingLet, Active} arm | merged | runtime | M | none | — |
 | `RT-CARRIED-ORDINARY-COMPOSITION` | Carried ordinary elimination consumes exactly one frame — a composed suffix behind an ordinary carried eliminator is refused rather than continued | merged | runtime | M | none | — |
@@ -245,6 +245,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
 - `RT-CENSUS-CAVEAT-GUARD` — The identifier-census caveat's staleness guard is an existence check standing in for a count check, so it cannot detect the drift it was written to catch
