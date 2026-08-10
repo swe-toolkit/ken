@@ -1,14 +1,10 @@
-//! L1 numeric tower acceptance tests (`conformance/surface/numbers/seed-numbers.md`).
+//! `l1_acceptance.rs` holds L1 numeric tower acceptance tests.
 //!
-//! Currently executing conformance cover checks integer exactness; literal-type
-//! distinction and expected-type override; overflow obligations; explicit wrap
-//! versus no silent wrap; no implicit cross-type coercion; Decimal versus Float
-//! behavior; literal reduction; and proposition-versus-reduction behavior.
-//!
-//! Three retained ignored placeholders are explicitly not conformance cover:
-//! partial explicit conversion awaits L-classes, division-by-zero obligations
-//! await integer division op registration, and Char exclusion awaits Char
-//! literal syntax.
+//! `CI-ASSERTIONLESS-L1` establishes only that AC-2 now has its production-fed
+//! witness and that the three named ignored placeholders are honestly marked
+//! as non-cover. The machine-checked exemption artifact and its readmission
+//! conditions live in `.github/ignored-test-exemptions.toml`. This header makes
+//! no claim about any other row's conformance-cover status.
 
 use ken_elaborator::{ElabEnv, NumericLitVal, ObligationKind};
 use ken_elaborator::extract::{v2_extract, ProvKind};
