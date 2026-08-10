@@ -23,6 +23,7 @@ POPULATION_PATHS = (
     "crates/ken-interp",
 )
 ALLOWED_CLASSES = {"policy-cost", "placeholder-no-assertions"}
+FILE_PATH_ROOTS = {"conformance", "spec"}
 SUMMARY_RE = re.compile(
     r"\b(?P<total>\d+) tests? run:\s+(?P<passed>\d+) passed\b"
 )
@@ -33,8 +34,7 @@ PASS_PREFIX_RE = re.compile(r"^\s*PASS(?:\s|$)")
 COUNTER_RE = re.compile(
     r"^\((?P<index>\d+)/(?P<total>\d+)\)\s+(?P<identity>.+)$"
 )
-ROW_CLAIM_RE = re.compile(r"^\s*//(?:/)?\s+(?P<row>surface/\S+)")
-ROW_HEADING_RE = re.compile(r"^###\s+(?P<row>surface/\S+)(?:\s.*)?$")
+LEVEL_THREE_HEADING_RE = re.compile(r"^###\s+(?P<token>\S+)(?:\s.*)?$")
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*#\[test\]\s*$")
 ATTRIBUTE_OR_COMMENT_RE = re.compile(r"^\s*(?:#\[|//)")
 TEST_FN_RE = re.compile(r"^\s*fn\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(")
@@ -44,7 +44,55 @@ class SweepError(RuntimeError):
     """The sweep instrument could not establish its claimed measurement."""
 
 
-def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
+def conformance_namespaces(root: Path) -> tuple[str, ...]:
+    namespaces = tuple(
+        sorted(path.name for path in root.iterdir() if path.is_dir())
+    )
+    if not namespaces:
+        raise SweepError(f"{root} contains no conformance namespace directories")
+    collisions = FILE_PATH_ROOTS.intersection(namespaces)
+    if collisions:
+        raise SweepError(
+            "conformance namespaces collide with file-path citation roots: "
+            + ", ".join(sorted(collisions))
+        )
+    return namespaces
+
+
+def conformance_row_patterns(
+    root: Path,
+) -> tuple[re.Pattern[str], re.Pattern[str]]:
+    namespaces = conformance_namespaces(root)
+    namespace = "|".join(re.escape(name) for name in namespaces)
+    row = rf"(?P<row>(?:{namespace})/\S+)"
+    return (
+        re.compile(rf"^\s*//(?:/)?\s+{row}"),
+        re.compile(rf"^###\s+{row}(?:\s.*)?$"),
+    )
+
+
+def assert_row_tokens_are_row_ids(
+    tokens: set[str], namespaces: set[str], source: str
+) -> None:
+    outside_namespaces = sorted(
+        token for token in tokens if token.partition("/")[0] not in namespaces
+    )
+    if outside_namespaces:
+        raise SweepError(
+            f"{source} matched tokens outside conformance namespaces: "
+            + ", ".join(outside_namespaces)
+        )
+    file_paths = sorted(token for token in tokens if token.endswith(".md"))
+    if file_paths:
+        raise SweepError(
+            f"{source} matched file-path citations as conformance row ids: "
+            + ", ".join(file_paths)
+        )
+
+
+def rust_test_row_claims(
+    root: Path, row_claim_re: re.Pattern[str]
+) -> list[tuple[str, int, str, str]]:
     claims: list[tuple[str, int, str, str]] = []
     for path in sorted(root.rglob("*.rs")):
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -60,7 +108,7 @@ def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
             if not any(TEST_ATTRIBUTE_RE.match(candidate) for _, candidate in prefix):
                 continue
             for claim_index, candidate in reversed(prefix):
-                claim = ROW_CLAIM_RE.match(candidate)
+                claim = row_claim_re.match(candidate)
                 if claim is not None:
                     claims.append(
                         (
@@ -73,25 +121,46 @@ def rust_test_row_claims(root: Path) -> list[tuple[str, int, str, str]]:
     return claims
 
 
-def conformance_row_headings(root: Path) -> dict[str, list[tuple[str, int]]]:
+def conformance_row_headings(
+    root: Path, row_heading_re: re.Pattern[str]
+) -> dict[str, list[tuple[str, int]]]:
     headings: dict[str, list[tuple[str, int]]] = {}
+    level_three_tokens: set[str] = set()
     for path in sorted(root.rglob("*.md")):
         for line_number, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), start=1
         ):
-            heading = ROW_HEADING_RE.match(line)
+            level_three = LEVEL_THREE_HEADING_RE.match(line)
+            if level_three is not None:
+                level_three_tokens.add(level_three.group("token"))
+            heading = row_heading_re.match(line)
             if heading is not None:
                 headings.setdefault(heading.group("row"), []).append(
                     (str(path.relative_to(ROOT)), line_number)
                 )
+    file_paths = sorted(
+        token for token in level_three_tokens if token.endswith(".md")
+    )
+    if file_paths:
+        raise SweepError(
+            "level-three conformance headings contain markdown file paths: "
+            + ", ".join(file_paths)
+        )
     return headings
 
 
 def verify_row_claims(rust_root: Path, conformance_root: Path) -> int:
-    claims = rust_test_row_claims(rust_root)
+    namespaces = set(conformance_namespaces(conformance_root))
+    row_claim_re, row_heading_re = conformance_row_patterns(conformance_root)
+    claims = rust_test_row_claims(rust_root, row_claim_re)
     if not claims:
         raise SweepError("Rust test row-claim census resolved zero claims")
-    headings = conformance_row_headings(conformance_root)
+    claim_tokens = {row for _, _, _, row in claims}
+    assert_row_tokens_are_row_ids(claim_tokens, namespaces, "Rust test claims")
+    headings = conformance_row_headings(conformance_root, row_heading_re)
+    assert_row_tokens_are_row_ids(
+        set(headings), namespaces, "conformance headings"
+    )
     errors: list[str] = []
     for path, line, test, row in claims:
         matches = headings.get(row, [])
@@ -106,7 +175,7 @@ def verify_row_claims(rust_root: Path, conformance_root: Path) -> int:
         raise SweepError("row-claim resolution failed:\n" + "\n".join(errors))
     print(
         f"conformance row claims: {len(claims)} Rust test claims resolved "
-        "to exactly one heading"
+        f"to exactly one heading ({len(claim_tokens)} distinct row tokens)"
     )
     return len(claims)
 

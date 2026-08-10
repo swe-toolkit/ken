@@ -92,7 +92,10 @@ class IgnoredSweepTests(unittest.TestCase):
             rust_root = root / "crates"
             conformance_root = root / "conformance"
             rust_root.mkdir()
-            conformance_root.mkdir()
+            surface_root = conformance_root / "surface"
+            runtime_root = conformance_root / "runtime"
+            surface_root.mkdir(parents=True)
+            runtime_root.mkdir()
             (rust_root / "rows.rs").write_text(
                 "// surface/example/ignored-documentation\n"
                 "fn helper() {}\n\n"
@@ -104,17 +107,24 @@ class IgnoredSweepTests(unittest.TestCase):
                 "// surface/example/comment-covered\n"
                 "// explanatory continuation\n"
                 "#[test]\n"
-                "fn comment_covered_test() {}\n",
+                "fn comment_covered_test() {}\n\n"
+                "/// runtime/example/runtime-covered\n"
+                "#[test]\n"
+                "fn runtime_covered_test() {}\n",
                 encoding="utf-8",
             )
-            (conformance_root / "seed.md").write_text(
+            (surface_root / "seed.md").write_text(
                 "### surface/example/doc-covered (soundness)\n"
                 "### surface/example/comment-covered [NODE]\n",
                 encoding="utf-8",
             )
+            (runtime_root / "seed.md").write_text(
+                "### runtime/example/runtime-covered (property)\n",
+                encoding="utf-8",
+            )
 
             self.assertEqual(
-                SWEEP.verify_row_claims(rust_root, conformance_root), 2
+                SWEEP.verify_row_claims(rust_root, conformance_root), 3
             )
 
     def test_row_claim_resolution_names_missing_and_duplicate_claims(self) -> None:
@@ -123,10 +133,11 @@ class IgnoredSweepTests(unittest.TestCase):
             rust_root = root / "crates"
             conformance_root = root / "conformance"
             rust_root.mkdir()
-            conformance_root.mkdir()
+            runtime_root = conformance_root / "runtime"
+            runtime_root.mkdir(parents=True)
             rust = rust_root / "rows.rs"
             rust.write_text(
-                "// surface/example/fabricated-row\n"
+                "// runtime/example/fabricated-row\n"
                 "#[test]\n"
                 "fn fabricated_test() {}\n",
                 encoding="utf-8",
@@ -135,16 +146,104 @@ class IgnoredSweepTests(unittest.TestCase):
             with self.assertRaises(SWEEP.SweepError) as missing:
                 SWEEP.verify_row_claims(rust_root, conformance_root)
             self.assertIn("fabricated_test", str(missing.exception))
-            self.assertIn("surface/example/fabricated-row", str(missing.exception))
+            self.assertIn(
+                "runtime/example/fabricated-row", str(missing.exception)
+            )
             self.assertIn("resolves to 0", str(missing.exception))
 
-            first = conformance_root / "first.md"
-            second = conformance_root / "second.md"
-            heading = "### surface/example/fabricated-row\n"
+            first = runtime_root / "first.md"
+            second = runtime_root / "second.md"
+            heading = "### runtime/example/fabricated-row\n"
             first.write_text(heading, encoding="utf-8")
             second.write_text(heading, encoding="utf-8")
             with self.assertRaisesRegex(SWEEP.SweepError, "resolves to 2"):
                 SWEEP.verify_row_claims(rust_root, conformance_root)
+
+    def test_row_namespaces_come_from_directories_and_exclude_file_citations(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(dir=SWEEP.ROOT) as directory:
+            root = Path(directory)
+            rust_root = root / "crates"
+            conformance_root = root / "conformance"
+            added_root = conformance_root / "new-namespace"
+            rust_root.mkdir()
+            added_root.mkdir(parents=True)
+            (rust_root / "rows.rs").write_text(
+                "/// conformance/surface/numbers/seed-numbers.md\n"
+                "/// spec/30-surface/35-numbers.md\n"
+                "// new-namespace/example/derived\n"
+                "#[test]\n"
+                "fn derived_namespace_test() {}\n",
+                encoding="utf-8",
+            )
+            (added_root / "seed.md").write_text(
+                "### new-namespace/example/derived\n"
+                "### surface/example/not-in-a-derived-namespace\n",
+                encoding="utf-8",
+            )
+
+            namespaces = set(SWEEP.conformance_namespaces(conformance_root))
+            self.assertEqual(namespaces, {"new-namespace"})
+            self.assertTrue(namespaces.isdisjoint({"conformance", "spec"}))
+            claim_re, _ = SWEEP.conformance_row_patterns(conformance_root)
+            claims = SWEEP.rust_test_row_claims(rust_root, claim_re)
+            tokens = {row for _, _, _, row in claims}
+            self.assertEqual(tokens, {"new-namespace/example/derived"})
+            SWEEP.assert_row_tokens_are_row_ids(
+                tokens, namespaces, "fixture claims"
+            )
+            self.assertEqual(
+                SWEEP.verify_row_claims(rust_root, conformance_root), 1
+            )
+
+    def test_row_claims_and_headings_reject_markdown_file_paths(self) -> None:
+        with tempfile.TemporaryDirectory(dir=SWEEP.ROOT) as directory:
+            root = Path(directory)
+            rust_root = root / "crates"
+            conformance_root = root / "conformance"
+            surface_root = conformance_root / "surface"
+            rust_root.mkdir()
+            surface_root.mkdir(parents=True)
+            rust = rust_root / "rows.rs"
+            heading = surface_root / "seed.md"
+            rust.write_text(
+                "/// surface/numbers/seed-numbers.md\n"
+                "#[test]\n"
+                "fn namespace_relative_file_path() {}\n",
+                encoding="utf-8",
+            )
+            heading.write_text(
+                "### surface/numbers/ordinary-row\n", encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(SWEEP.SweepError, "file-path citations"):
+                SWEEP.verify_row_claims(rust_root, conformance_root)
+
+            rust.write_text(
+                "/// surface/numbers/ordinary-row\n"
+                "#[test]\n"
+                "fn ordinary_row() {}\n",
+                encoding="utf-8",
+            )
+            heading.write_text(
+                "### surface/numbers/ordinary-row\n"
+                "### surface/numbers/seed-numbers.md\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                SWEEP.SweepError, "headings contain markdown file paths"
+            ):
+                SWEEP.verify_row_claims(rust_root, conformance_root)
+
+    def test_file_path_roots_cannot_be_conformance_namespaces(self) -> None:
+        with tempfile.TemporaryDirectory(dir=SWEEP.ROOT) as directory:
+            conformance_root = Path(directory) / "conformance"
+            (conformance_root / "surface").mkdir(parents=True)
+            (conformance_root / "spec").mkdir()
+
+            with self.assertRaisesRegex(SWEEP.SweepError, "citation roots: spec"):
+                SWEEP.conformance_namespaces(conformance_root)
 
     def test_checked_in_registry_has_one_cost_and_three_placeholders(self) -> None:
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
