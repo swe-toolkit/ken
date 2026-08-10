@@ -8,7 +8,7 @@ gate: none
 depends_on: [RT-MATCH-RECURSOR-CONSUMERS]
 blocks: [RT-RECURSOR-TRANSPORT]
 github: null
-origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT hard stop 4, narrowed to rows 1-5 by the re-rule evt_3r4j14fv1jtj2 on the nine-expression census evt_16cmej481q7ns. Campaign docs/program/16-recursive-descent-retirement.md node #6c. Steward-filed (agents cannot create tracked work per COORDINATION §2).
+origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT hard stop 4, narrowed to rows 1-5 by the re-rule evt_3r4j14fv1jtj2 on the nine-expression census evt_16cmej481q7ns. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
 > # THIS NODE IS ROWS 1-5 ONLY. ROW 6 IS NOT ITS WORK.
