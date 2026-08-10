@@ -1,7 +1,7 @@
 ---
 id: LANG-SELECTOR-SORT-SPLIT-ELAB
 title: "Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates"
-status: ready
+status: merged
 owner: language
 size: L
 gate: none
