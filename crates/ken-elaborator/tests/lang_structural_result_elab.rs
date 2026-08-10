@@ -34,6 +34,30 @@ const WSTYLE_OUT_OF_SCOPE_SOURCE: &str = "data WBag (a : Type) : Type where { WE
 data WRose = WLeaf | WNode (WBag WRose)\n\
 fn wsize (r : WRose) : Nat = match r { WLeaf |-> Suc Zero ; WNode b |-> match b { WEmpty |-> Zero ; WBranch k |-> (structural result of k) True } }";
 
+const DEEP_STRUCTURAL_SIZE_SOURCE: &str = "data Bag (a : Type) : Type where { \
+      Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a \
+    }\n\
+    data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)\n\
+    fn add (x : Nat) (y : Nat) : Nat = match x { \
+      Zero |-> y ; Suc x2 |-> Suc (add x2 y) \
+    }\n\
+    fn size (r : LiftRose) : Nat = match r { \
+      LiftLeaf |-> Suc Zero ; \
+      LiftNode b |-> match b { \
+        Empty |-> Zero ; One x |-> size x ; \
+        Join xs ys |-> add (structural result of xs) \
+                            (structural result of ys) \
+      } \
+    }\n\
+    const deep_result : Nat = size (LiftNode (Join LiftRose \
+      (One LiftRose (LiftNode (Join LiftRose \
+        (One LiftRose (LiftNode (Join LiftRose \
+          (One LiftRose (LiftNode (Join LiftRose \
+            (One LiftRose LiftLeaf) (Empty LiftRose)))) \
+          (Empty LiftRose)))) \
+        (Empty LiftRose)))) \
+      (Empty LiftRose)))";
+
 const MIXED_REACHING_SOURCE: &str = "data Bag (a : Type) : Type where { \
       Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a \
     }\n\
@@ -74,6 +98,22 @@ fn elimination_family(env: &ElabEnv, name: &str) -> ken_kernel::GlobalId {
     match body {
         Term::Elim { fam, .. } => fam,
         other => panic!("expected {name} to retain a match elimination, got {other:?}"),
+    }
+}
+
+fn strip_lambdas(mut term: Term) -> Term {
+    while let Term::Lam(_, body) = term {
+        term = *body;
+    }
+    term
+}
+
+fn vars(term: &Term, found: &mut Vec<usize>) {
+    if let Term::Var(index) = term {
+        found.push(*index);
+    }
+    for child in term.children() {
+        vars(child, found);
     }
 }
 
@@ -175,4 +215,36 @@ fn d2_mixed_direct_wstyle_and_nested_structural_paths_reach_and_retain_behavior(
     assert_eq!(elimination_family(&env, "wsize"), env.globals["WTree"]);
     assert_eq!(elimination_family(&env, "size"), env.globals["Rose"]);
     assert!(env.env.transparent_body(env.globals["mixed_result"]).is_some());
+}
+
+#[test]
+fn d2_nested_join_method_selects_each_exact_trailing_result_binder() {
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_file(STRUCTURAL_SIZE_SOURCE).unwrap();
+    let (_, size_body) = env.env.transparent_body(env.globals["size"]).unwrap();
+    let Term::Elim { methods, .. } = strip_lambdas(size_body) else {
+        panic!("size must emit its outer LiftRose elimination");
+    };
+    let Term::Elim { methods, .. } = strip_lambdas(methods[1].clone()) else {
+        panic!("LiftNode method must emit its nested generated-support elimination");
+    };
+    let join_body = strip_lambdas(methods[2].clone());
+    let mut references = Vec::new();
+    vars(&join_body, &mut references);
+
+    // Join has two source fields, two hidden evidence fields, and then two
+    // distinct trailing recursive results. At the method body, those results
+    // are de Bruijn 1 and 0; evidence is 3 and 2. Both selectors must use the
+    // trailing result pair, not a hidden evidence binder.
+    assert!(references.contains(&0));
+    assert!(references.contains(&1));
+    assert!(!references.contains(&2));
+    assert!(!references.contains(&3));
+}
+
+#[test]
+fn d2_deep_nested_associations_elaborate_and_kernel_check() {
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_file(DEEP_STRUCTURAL_SIZE_SOURCE).unwrap();
+    assert!(env.globals.contains_key("deep_result"));
 }
