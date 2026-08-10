@@ -1,14 +1,19 @@
 # Capability.Parsing.Decoder
 
-`Capability.Parsing.Decoder` supplies progress-safe parser combinators over an explicit
-`CursorOps`. Its result and error carriers remain generic in the cursor's
-location type, keeping downstream source and argument diagnostics separate.
+`Capability.Parsing.Decoder` supplies progress-safe parser combinators over
+an explicit `CursorOps`. Its result and error carriers remain generic in the
+cursor's location type, keeping downstream source and argument diagnostics
+separate.
 
 ## 1. Definition
 
 Ordinary rejection is backtrackable. Zero progress and impossible fuel
 exhaustion are named, non-backtrackable failures so repetition cannot silently
 loop or truncate.
+
+decoder combinators preserve the supplied instance location opaquely; errors
+from different `CursorOps` instances are not position-comparable without an
+explicit conversion chosen by the caller.
 
 ```ken
 data DecoderError loc = DecoderRejected loc | DecoderZeroProgress loc | DecoderFuelExhausted loc
