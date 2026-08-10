@@ -17,12 +17,13 @@ Ken-owned objects and first principles; no reference implementation or
 Cases marked `[KERNEL-NESTED-IND]` remain design-locked and
 implementation-gated. Seven D6 cases now execute un-gated: DS-9 and fresh-carrier
 admission; negative-under-positive and Pair-negative rejection; unknown-head and
-nonpositive rejection; and unchanged direct/W-style behavior. Both
-`nested-size-uses-lift` and `nested-dependent-motive-uses-lift` remain gated on
-`KERNEL-RECURSIVE-RESULT-SURFACE`. Independently gated non-D6 residual cases
-remain marked below. The existing direct and W-style controls remain live
-throughout, so staging the residual completeness class does not suspend the
-positivity posture.
+nonpositive rejection; and unchanged direct/W-style behavior.
+`nested-size-uses-lift` now also executes un-gated through the named full-pipeline
+witnesses below. `nested-dependent-motive-uses-lift` remains gated on
+`KERNEL-RECURSIVE-RESULT-SURFACE`. Independently gated non-D6 residual cases remain
+marked below. The existing direct and W-style controls remain live throughout,
+so staging the residual completeness class does not suspend the positivity
+posture.
 
 The custom positive carrier used below is deliberately not a standard-library
 name:
@@ -135,16 +136,15 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
   `Rose` method, or passing `b` unchanged yields a different reduct. This pins
   reduction without over-specifying an internal runtime representation.
 
-### kernel/inductive/nested-size-uses-lift [KERNEL-NESTED-IND]
+### kernel/inductive/nested-size-uses-lift
 
-Status: blocked on `KERNEL-RECURSIVE-RESULT-SURFACE`. The current implementation
-cannot yet elaborate or execute the specified selector. This D1 entry records
-the future binding contract only: finite-depth topology controls do not
-discharge the all-leaf fold, no executing result is claimed here, and the marker
-remains gated.
+Status: executing binding established. The named kernel structured-IH/iota
+witness and both full-pipeline surface witnesses below execute the selector and
+its residual recursive `Bag.join` topology. The positive result is `3`; the
+dropped-fold control reaches `1`.
 
 - spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1.1`; `39 §2.3`, `§4`; `43 §1`
-- given (future binding, gated): define `size : Rose -> Nat` by the generated
+- given: define `size : Rose -> Nat` by the generated
   eliminator. The `leaf` method returns `1`; the `node` method folds the
   supplied `All^Type_{Bag,0} (λ_. Nat) b` inhabitant and adds `1`. In a
   `Bag.join xs ys` branch, combine `recursive result for xs` with
@@ -154,27 +154,26 @@ remains gated.
   one-to-one in both directions, in range, and from that same method and support
   provenance. Evaluate
   `size (node (join (one leaf) (one (node empty))))`
-- expect (future binding, gated): **reduces-to `3`** after surface elaboration,
+- expect: **reduces-to `3`** after surface elaboration,
   kernel checking, erasure, and interpretation. The two contained children
   contribute `1` each, and the outer node contributes `1`. The selector emits
   each exact associated hidden result; it does not expose a hidden binder,
   change constructor-pattern arity, coerce an ordinary field reference, or
   reinterpret an owner self-call
-- fail-closed boundary (future binding, gated): a missing, duplicate, swapped,
+- fail-closed boundary: a missing, duplicate, swapped,
   or foreign association rejects with the corresponding
   `StructuralResultAssociationMissing`, `...Duplicate`, `...Swapped`, or
   `...Foreign` diagnostic. Shadowing, copying, projecting, or merely reusing a
   spelling does not transfer an association. An ordinary resolved binding with
   no association rejects with `StructuralResultOutOfScope`; an unresolved
   operand rejects with `UnboundName`
-- sort boundary (future binding, gated): the selected hidden Nat result is
+- sort boundary: the selected hidden Nat result is
   classified by `Type`, so `induction hypothesis for xs` rejects with
   `RecursiveResultSortMismatch` naming `recursive result for xs` as the exact
   required spelling. If metavariables leave the selected result ambiguous
   between `Type` and `Omega`, `RecursiveResultSortAmbiguous` rejects without a
   guessed or default selector
-- executing-binding requirement (future only): the eventual row binding must
-  name the kernel structured-IH/iota witness
+- executing binding: the kernel structured-IH/iota witness is
   `production_nested_lift_is_consumed_and_iota_computes` and executing surface
   witnesses
   `nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_three`
@@ -182,10 +181,23 @@ remains gated.
   `nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three`. Those
   surface witnesses must use the selector through the full pipeline for both
   the Nat-3 `Bag`/`Rose` computation above and a deeper residual `Bag.join`
-  topology. A finite unroll, a depth-three snapshot that never consumes a
-  residual recursive result, or a header naming only one side does not bind
-  this row. These names are requirements for the future binding, not claims
-  that the tests exist or execute now
+  topology. The source methods consume generated recursive results rather than
+  finite-unrolling nested matches; the deeper witness requires those residual
+  results rather than observing a non-consuming depth snapshot; and the `join`
+  branch names and combines the independently associated results for both `xs`
+  and `ys`, ruling out a one-sided header
+- discriminating binding:
+  `nested_recursive_bag_dropped_join_fold_reaches_nat_one` replaces the `join`
+  fold by `Zero` while preserving the recursive constructor and well-typed
+  lifted method; the full pipeline then observes `1`, so the two required
+  `3`-result witnesses red under that fold mutation
+- sort binding:
+  `nested_recursive_bag_type_result_rejects_induction_hypothesis_spelling`
+  reaches `RecursiveResultSortMismatch` and requires `recursive result for`.
+  `RecursiveResultSortAmbiguous` has no production witness: `MetaCtx` solves
+  levels only, zonking preserves the `Term::Type` versus `Term::Omega`
+  constructor, and the reserved diagnostic has zero production construction
+  sites
 - why: this is the load-bearing value flip. With the correct lifted IH the
   result is `3`; a guard-deletion-only implementation that admits `Rose` but
   supplies no lift cannot type-check the definition, and an implementation that
@@ -258,11 +270,11 @@ by result sort; they do not introduce a second topology or association rule.
   the correlated lift cannot construct the branch proof. This pins that the
   feature is induction, not merely a constant-result fold.
 
-Future binding census, not current discharge: once the implementation successor
-executes and both rows are validly bound, the seed-local population of headings
-marked `[KERNEL-NESTED-IND]` changes from **14 to 12**, and the corpus-wide
-population of the same heading markers changes from **15 to 13**. Until then,
-both headings and both markers remain present.
+Current binding census: un-gating `nested-size-uses-lift` changes the seed-local
+population of headings marked `[KERNEL-NESTED-IND]` from **14 to 13**, and the
+corpus-wide population from **15 to 14**. The
+`nested-dependent-motive-uses-lift` heading and marker remain present; its
+eventual valid binding would change those populations to **12** and **13**.
 
 ---
 
@@ -554,10 +566,11 @@ Spec: `14 §8.6`; `§3`, `§3.1`, `§7.3`, `§7.7`, `§8.4`.
   nonpositive rejection; and unchanged direct/W-style behavior. Their paired
   positive controls admit while each exact negative/unknown mutation flips the
   verdict.
-- `nested-size-uses-lift` and `nested-dependent-motive-uses-lift` remain gated
-  on `KERNEL-RECURSIVE-RESULT-SURFACE`. D1 states their future selector,
-  association, fail-closed, and executing-binding contracts without claiming
-  current execution or removing either marker. Their future binding changes
-  the seed-local marker population from 14 to 12 and the corpus-wide population
-  from 15 to 13. Independently gated non-D6 residual rows remain marked;
-  blanket nested rejection is no longer the live boundary.
+- `nested-size-uses-lift` executes un-gated through the named kernel and
+  full-pipeline witnesses, including the deeper residual-`Bag.join` fold and its
+  `3`-versus-`1` discriminator. `nested-dependent-motive-uses-lift` remains
+  gated on `KERNEL-RECURSIVE-RESULT-SURFACE`; its future selector, association,
+  fail-closed, and executing-binding contract remains stated without claiming
+  current execution or removing its marker. Independently gated non-D6
+  residual rows remain marked; blanket nested rejection is no longer the live
+  boundary.
