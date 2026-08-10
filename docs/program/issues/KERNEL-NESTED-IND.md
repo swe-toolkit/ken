@@ -776,6 +776,47 @@ containers, which is the allow-list the ruling forbids.
   Heading census `19 → 14`, re-measured on `main` after the merge with the size
   row's marker still present. ⚠ The node stays `active`: `D7` and `AC-K12` are
   open, and `D6` closing is **not** `AC-K12` progress.
+
+> ### COUNTING THE GATE MARKERS IN `seed-nested.md`: use the FORM, never the word
+>
+> **Recorded 2026-08-10 from Adversary `evt_1dj98k67j19mt`, measured on `main`
+> `aab04044`. The next person to census this file is the audience.**
+>
+> `D9` un-gated `nested-size-uses-lift` across **eight sites**, and its sibling
+> `nested-dependent-motive-uses-lift` — which stays gated — carries a
+> near-identical `Status:` paragraph and its own four identical qualifiers. The
+> control on that edit is a **count**, so the count has to be reproducible.
+>
+> **The status marker is the parenthesised form `(future binding, gated)`, not
+> the word `gated`.** Measured on `aab04044`:
+>
+> | keyed on | count |
+> |---|---|
+> | `(future binding, gated)` | **4** — all in the dependent-motive row |
+> | bare `gated` | **15** |
+>
+> The gap is not noise. The file uses `gated` in a **mechanism** sense too —
+> `gated erasure admitting the generated support Elim …` sits eleven lines from
+> the qualifiers, **inside the same row's region** — alongside `executes
+> un-gated`, `implementation-gated` and `Independently gated`.
+>
+> ⇒ **`D9`'s census was correct because the qualifier happens to have a
+> distinctive parenthesised form, not because `gated` is unambiguous here.**
+> Re-deriving it from the bare word over-counts by nearly four times, and a
+> qualifier later spelled without the parenthetical merges the two senses.
+> **The failure direction is the bad one: a row that silently loses its gate
+> reds nothing in CI.**
+>
+> **When the dependent-motive row is eventually un-gated, state the marker form
+> in `seed-nested.md` itself** — that file carries the counting claim and this
+> node does not. I am recording it here rather than editing `conformance/`,
+> which is not mine to touch unilaterally.
+>
+> **Why this is worth a paragraph at all:** the Adversary reproduced every
+> figure by deriving the file's gating vocabulary independently rather than
+> searching the three tokens I handed it — a token-keyed sweep verified by a
+> token-keyed check agree for free. That is the method the next census needs,
+> and it is what surfaced the ambiguity the count had been surviving by luck.
 - **`D7`** — the `trusted_base()` delta, **in two parts with two different
   kinds of answer.** Metric ruled by the Steward 2026-08-10; see the ruling
   block below the AC table, which supersedes the withdrawn "not a zero" wording
