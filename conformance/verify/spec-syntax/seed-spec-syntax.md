@@ -68,6 +68,32 @@ rests on (`21 §5.4`) and must never regress.
   `sort_pi` on the **domain** (→ Ω), changes the emitted type — green-vs-red on
   the core shape.
 
+### verify/spec-syntax/requires-on-first-param-of-two
+- spec: `21 §6.3` (preconditions become proof parameters), `39 §5.3`
+  (parameter binding and scope)
+- given: `fn f (n : Nat) (d : Nat) : Nat requires Positive n = d`
+- expect: **accepts**; the elaborated type is equivalent up to binder names to
+  `(n : Nat) → (d : Nat) → (_ : Positive n) → Nat`, and the elaborated body
+  is equivalent to `λ n. λ d. λ _. d`. The `requires`-only declaration
+  emits no definition-site obligation holes.
+- why: inserting the precondition proof parameter must preserve both source
+  bindings: `Positive` still applies to the first parameter `n`, while the
+  body still returns the later parameter `d`. This is the minimal non-final
+  positional case and is structural rather than acceptance-only.
+
+### verify/spec-syntax/requires-on-middle-param-of-three
+- spec: `21 §6.3` (preconditions become proof parameters), `39 §5.3`
+  (parameter binding and scope)
+- given: `fn g (a : Nat) (b : Nat) (c : Nat) : Nat requires MidPred b = a`
+- expect: **accepts**; the elaborated type is equivalent up to binder names to
+  `(a : Nat) → (b : Nat) → (c : Nat) → (_ : MidPred b) → Nat`, and the
+  elaborated body is equivalent to `λ a. λ b. λ c. λ _. a`. The
+  `requires`-only declaration emits no definition-site obligation holes.
+- why: this independently covers an interior parameter with neighbours on both
+  sides. The proof domain must keep referring to `b`, and the body must keep
+  referring to the earlier `a`, after the proof parameter is introduced.
+  The first-of-two case does not cover that interior-telescope shape.
+
 ### verify/spec-syntax/ensures-emits-obligation-not-sigma
 - spec: `21 §6.3` (postcondition → obligation), `§2` (carrier-plus-obligation),
   `§6.5`
