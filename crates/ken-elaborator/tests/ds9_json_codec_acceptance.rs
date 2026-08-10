@@ -1,8 +1,10 @@
-//! DS-9 (`Json` codec) D1-D2 acceptance.
+//! DS-9 (`Json` codec) D1-D2 acceptance plus the bounded D3 decoder probe.
 //!
 //! AC-1 binds the ordinary nested-inductive `Json` signature. AC-2 binds the
 //! structural `List Char` cursor dictionary, its concrete behavior, its four
-//! transparent proof witnesses, and a zero-`trusted_base()` delta.
+//! transparent proof witnesses, and a zero-`trusted_base()` delta. The D3 probe
+//! measures only whether a real recursive decoder can construct both nested
+//! list result shapes; it makes no production codec or theorem claim.
 
 use std::collections::BTreeSet;
 
@@ -20,6 +22,8 @@ const DIAGNOSTIC_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Diagnostics/Core.ken.md");
 const CURSOR_KEN_MD: &str =
     include_str!("../../../catalog/packages/Capability/Parsing/Cursor.ken.md");
+const DECODER_KEN_MD: &str =
+    include_str!("../../../catalog/packages/Capability/Parsing/Decoder.ken.md");
 const JSON_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Serialization/Json.ken.md");
 
 fn dependency_env() -> ElabEnv {
@@ -30,11 +34,20 @@ fn dependency_env() -> ElabEnv {
         ("Core.Classes.LawfulClasses", LAWFUL_CLASSES_KEN_MD),
         ("Capability.Diagnostics.Core", DIAGNOSTIC_KEN_MD),
         ("Capability.Parsing.Cursor", CURSOR_KEN_MD),
+        ("Capability.Parsing.Decoder", DECODER_KEN_MD),
     ] {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|error| panic!("{name} dependency must elaborate: {error:?}"));
     }
     env
+}
+
+fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
+    let expected = env.globals[name];
+    match value {
+        EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
+        other => panic!("expected `{name}`, got {other:?}"),
+    }
 }
 
 fn assert_transparent_global(env: &ElabEnv, name: &str) {
@@ -108,6 +121,16 @@ fn list_char_codepoints(env: &ElabEnv, value: &EvalVal) -> Vec<u32> {
             }
             other => panic!("expected List Char, got {other:?}"),
         }
+    }
+}
+
+fn list_count(env: &ElabEnv, value: &EvalVal) -> u64 {
+    match value {
+        EvalVal::Ctor { id, .. } if *id == env.globals["Nil"] => 0,
+        EvalVal::Ctor { id, args, .. } if *id == env.globals["Cons"] && args.len() >= 3 => {
+            1 + list_count(env, &args[2])
+        }
+        other => panic!("expected List, got {other:?}"),
     }
 }
 
@@ -312,5 +335,223 @@ fn json_and_all_six_constructors_are_real_globals() {
             &eval_global(&env, &mut store, "ds9_cursor_empty_advance_result")
         ),
         Vec::<u32>::new()
+    );
+}
+
+#[test]
+fn decoder_recursive_reaches_array_and_object_many_branches() {
+    let mut env = dependency_env();
+    env.elaborate_ken_md_file(JSON_KEN_MD)
+        .expect("Data/Serialization/Json.ken.md must elaborate");
+
+    // Transition sentinel (D3-probe; retire when the full DS-9 decoder lands):
+    // this is a real recursive decoder over explicit List Char input. Its
+    // array and object paths each build and execute decoder_many at the nested
+    // Json result type; neither path is a source-only or unreachable stub.
+    env.elaborate_file(
+        r#"
+        fn ds9_probe_token (code : Int) : Decoder (List Char) Nat Char =
+          decoder_satisfy
+            (List Char)
+            Char
+            Nat
+            char_cursor_ops
+            (\actual. eq_int actual code)
+
+        const ds9_probe_null_decoder : Decoder (List Char) Nat Json =
+          decoder_map
+            (List Char)
+            Nat
+            Char
+            Json
+            (\ignored. JsonNull)
+            (ds9_probe_token (110 : Int))
+
+        fn ds9_probe_array_decoder
+              (recur : Decoder (List Char) Nat Json)
+            : Decoder (List Char) Nat Json =
+          \cur.
+            match ds9_probe_token (91 : Int) cur {
+              DecoderFailed err ↦ DecoderFailed (List Char) Nat Json err;
+              Decoded open after_open ↦
+                match decoder_many
+                  (List Char)
+                  Char
+                  Nat
+                  Json
+                  char_cursor_ops
+                  recur
+                  after_open {
+                  DecoderFailed err ↦ DecoderFailed (List Char) Nat Json err;
+                  Decoded values before_close ↦
+                    match ds9_probe_token (93 : Int) before_close {
+                      DecoderFailed err ↦ DecoderFailed (List Char) Nat Json err;
+                      Decoded close after_close ↦
+                        Decoded (List Char) Nat Json (JsonArray values) after_close
+                    }
+                }
+            }
+
+        fn ds9_probe_object_member_decoder
+              (recur : Decoder (List Char) Nat Json)
+            : Decoder (List Char) Nat (Pair String Json) =
+          \cur.
+            match ds9_probe_token (34 : Int) cur {
+              DecoderFailed err ↦
+                DecoderFailed (List Char) Nat (Pair String Json) err;
+              Decoded open_quote after_open_quote ↦
+                match ds9_probe_token (107 : Int) after_open_quote {
+                  DecoderFailed err ↦
+                    DecoderFailed (List Char) Nat (Pair String Json) err;
+                  Decoded key after_key ↦
+                    match ds9_probe_token (34 : Int) after_key {
+                      DecoderFailed err ↦
+                        DecoderFailed (List Char) Nat (Pair String Json) err;
+                      Decoded close_quote after_close_quote ↦
+                        match ds9_probe_token (58 : Int) after_close_quote {
+                          DecoderFailed err ↦
+                            DecoderFailed (List Char) Nat (Pair String Json) err;
+                          Decoded colon after_colon ↦
+                            match recur after_colon {
+                              DecoderFailed err ↦
+                                DecoderFailed (List Char) Nat (Pair String Json) err;
+                              Decoded value after_value ↦
+                                Decoded
+                                  (List Char)
+                                  Nat
+                                  (Pair String Json)
+                                  (mk_pair String Json "k" value)
+                                  after_value
+                            }
+                        }
+                    }
+                }
+            }
+
+        fn ds9_probe_object_decoder
+              (recur : Decoder (List Char) Nat Json)
+            : Decoder (List Char) Nat Json =
+          \cur.
+            match ds9_probe_token (123 : Int) cur {
+              DecoderFailed err ↦ DecoderFailed (List Char) Nat Json err;
+              Decoded open after_open ↦
+                match decoder_many
+                  (List Char)
+                  Char
+                  Nat
+                  (Pair String Json)
+                  char_cursor_ops
+                  (ds9_probe_object_member_decoder recur)
+                  after_open {
+                  DecoderFailed err ↦ DecoderFailed (List Char) Nat Json err;
+                  Decoded members before_close ↦
+                    match ds9_probe_token (125 : Int) before_close {
+                      DecoderFailed err ↦ DecoderFailed (List Char) Nat Json err;
+                      Decoded close after_close ↦
+                        Decoded (List Char) Nat Json (JsonObject members) after_close
+                    }
+                }
+            }
+
+        fn ds9_probe_decoder_layer
+              (recur : Decoder (List Char) Nat Json)
+            : Decoder (List Char) Nat Json =
+          decoder_alt
+            (List Char)
+            Nat
+            Json
+            ds9_probe_null_decoder
+            (decoder_alt
+              (List Char)
+              Nat
+              Json
+              (ds9_probe_array_decoder recur)
+              (ds9_probe_object_decoder recur))
+
+        const ds9_probe_decoder : Decoder (List Char) Nat Json =
+          decoder_recursive
+            (List Char)
+            Char
+            Nat
+            Json
+            char_cursor_ops
+            ds9_probe_decoder_layer
+
+        const ds9_probe_array_input : List Char =
+          Cons
+            Char
+            (91 : Int)
+            (Cons Char (110 : Int) (Cons Char (93 : Int) (Nil Char)))
+        const ds9_probe_array_result : DecoderResult (List Char) Nat Json =
+          ds9_probe_decoder ds9_probe_array_input
+
+        const ds9_probe_object_input : List Char =
+          Cons
+            Char
+            (123 : Int)
+            (Cons
+              Char
+              (34 : Int)
+              (Cons
+                Char
+                (107 : Int)
+                (Cons
+                  Char
+                  (34 : Int)
+                  (Cons
+                    Char
+                    (58 : Int)
+                    (Cons Char (110 : Int) (Cons Char (125 : Int) (Nil Char)))))))
+        const ds9_probe_object_result : DecoderResult (List Char) Nat Json =
+          ds9_probe_decoder ds9_probe_object_input
+        "#,
+    )
+    .expect("real recursive array/object decoder probe must elaborate");
+
+    for name in [
+        "ds9_probe_array_decoder",
+        "ds9_probe_object_member_decoder",
+        "ds9_probe_object_decoder",
+        "ds9_probe_decoder_layer",
+        "ds9_probe_decoder",
+    ] {
+        assert_transparent_global(&env, name);
+    }
+
+    let mut store = make_store(&env);
+    let array_result = eval_global(&env, &mut store, "ds9_probe_array_result");
+    let array_decoded = ctor_args(&env, &array_result, "Decoded");
+    assert!(
+        matches!(&array_decoded[3], EvalVal::Ctor { id, .. } if *id == env.globals["JsonArray"]),
+        "array fixture must reach the JsonArray decoder_many branch"
+    );
+    let array_value = ctor_args(&env, &array_decoded[3], "JsonArray");
+    assert_eq!(
+        list_count(&env, &array_value[0]),
+        1,
+        "array decoder_many must construct one recursive Json element"
+    );
+    assert_eq!(
+        list_char_codepoints(&env, &array_decoded[4]),
+        Vec::<u32>::new(),
+        "array fixture must consume its complete input"
+    );
+
+    let object_result = eval_global(&env, &mut store, "ds9_probe_object_result");
+    let object_decoded = ctor_args(&env, &object_result, "Decoded");
+    assert!(
+        matches!(&object_decoded[3], EvalVal::Ctor { id, .. } if *id == env.globals["JsonObject"]),
+        "object fixture must reach the JsonObject decoder_many branch"
+    );
+    let object_value = ctor_args(&env, &object_decoded[3], "JsonObject");
+    assert_eq!(
+        list_count(&env, &object_value[0]),
+        1,
+        "object decoder_many must construct one recursive key/value member"
+    );
+    assert_eq!(
+        list_char_codepoints(&env, &object_decoded[4]),
+        Vec::<u32>::new(),
+        "object fixture must consume its complete input"
     );
 }

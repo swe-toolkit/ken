@@ -83,9 +83,8 @@ origin: Phase 3 of the catalog data-structures enrichment program (docs/program/
 >
 > **Two disclosed residuals, non-blocking and not to be re-litigated at the
 > next merge:** `JsonNumber : Int` excludes fractional and exponent forms; and
-> a formatter corruption observed against the package is held as an Ergo
-> finding. If the latter reproduces against the landed file it wants a `D7`
-> Finding with an exact repro, not a prose note.
+> the attached-proof spelling cannot name the nullary `char_cursor_ops`
+> constant. Both are recorded precisely in D7 below.
 >
 > ## STILL BLOCKED, BUT NOT FOR THE REASON BELOW — corrected 2026-08-09
 >
@@ -308,6 +307,54 @@ sugar or abstraction candidate → **Ergo**; abstraction kept in-catalog →
 Foundation. ⛔ A DS-9 that lands clean and files nothing has written a codec
 without running the acceptance test. `AC-10` exists so that "clean" and "never
 looked" cannot read identically.
+
+### D7 findings — recursive-result boundary and decoder probe
+
+Initially measured on `wp/DS-9-json-codec-d3-probe` from
+`origin/main = 0daf7170`, then re-anchored and revalidated from
+`origin/main = 5df141ba`:
+
+1. **The decoder-only construction probe succeeds.** A minimal real
+   `decoder_recursive` over the explicit `List Char` cursor elaborates and
+   executes with both required nested result paths. Its array path applies
+   `decoder_many` at `Json` and returns `JsonArray (List Json)`; its object path
+   applies `decoder_many` at `Pair String Json` and returns
+   `JsonObject (List (Pair String Json))`. The discriminating fixtures `[n]`
+   and `{"k":n}` reach those two paths respectively and consume all input;
+   `n` is deliberately the probe's one-character null atom, not a claim that
+   the production JSON grammar is complete. This demonstrates that constructing
+   recursive values while consuming explicit `List Char` input does not itself
+   require a kernel-supplied nested-host fold result. It is measurement evidence,
+   not the framed production `decode`.
+2. **The decoder probe does not alter the top-level
+   `KERNEL-RECURSIVE-RESULT-SURFACE` ruling.** It constructs nested values from
+   the explicit input cursor; it does not perform the unbounded `List Json` or
+   `List (Pair String Json)` folds that the ruling identifies as blocked. The
+   framed encoder and array/object round-trip proof therefore remain blocked.
+3. **The numeric domain remains intentionally integral.** `JsonNumber : Int`
+   excludes JSON fractional and exponent forms. Any future codec theorem is
+   scoped to the stated integral-number subset until that residual is separately
+   designed and discharged.
+4. **Nullary attached-proof spelling remains an Ergo finding.** The attempted
+   `proof ... for char_cursor_ops` form was rejected with
+   `attached proof for 'char_cursor_ops' must mention that subject applied in
+   its claim`: the validator requires an application headed by the subject,
+   which a nullary `const` cannot form. D2 retained the complete proof as
+   ordinary transparent theorems, so no obligation was weakened and no trust
+   was added.
+
+The probe's rejection paths use `decoder_satisfy`, and therefore transport the
+current cursor's `cursor_locate` value. For this DS-9 instance that value is the
+remaining suffix length. The Architect has ruled that locations are
+instance-defined and carry no cross-instance coordinate meaning; this does not
+affect the recursive-tail measurement, and the generic cursor/decoder disclosure
+is a separately routed `Capability.Parsing` prose fix rather than a DS-9
+redesign.
+
+**Finite-depth unrolling or a different `Json` representation is not a
+discharge.** The Architect permits finite unrolling only as a discriminator,
+and the ordinary six-constructor carrier remains fixed. No encoder, theorem,
+fuel lemma, shell, or D6 acceptance claim is introduced by this probe.
 
 ## Contention
 
