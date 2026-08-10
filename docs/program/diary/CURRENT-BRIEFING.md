@@ -96,6 +96,47 @@
 > it within minutes. Gate steps 2/5/7 already passed; **all three enclave seats
 > are compacted and holding** — the kick is the second half of that act.
 >
+> #### OPERATOR QUEUE for 11:30Z — do not decide these
+>
+> **0. The Architect seat strands on inbound mentions and needs a fix.** Six
+> times in under four hours, each time holding a Decision or a ruling, while
+> every other Codex seat stayed responsive. Mitigated by pairing every
+> Architect-directed post with a `tmux send-keys Enter`, which is cheap and
+> idempotent — but that is a workaround in the Steward's loop, not a fix, and it
+> fails whenever no one is watching. Hub latency multiplies by the number of
+> lanes routed through it.
+>
+> **1. Release `KERNEL-RECURSIVE-RESULT-SURFACE`.** Three-way blocker, size `M`,
+> content complete in the node. **The case got stronger today, but NOT in the
+> way I first thought.** I asked the Architect whether DS-9's fuel-theorem stop
+> was the same obstruction; the answer (`evt_fb8zzbsk46ag`) is **no**, so it
+> does **not** gain a fourth dependent and I am not claiming one. What actually
+> strengthens it: **Foundation goes idle behind it** once `D3a` merges — DS-9
+> `D3`+ is gated on it, the fuel lemma is stopped, the decode shell is deferred,
+> and Foundation's other three nodes are all `draft` with unmet deps.
+> **Caveat: releasing it needs a spec-enclave seat, and the enclave is now
+> running `CONF-EVAL`** — so this is a genuine priority call against a lane, not
+> a free release.
+>
+> **2. `SEC1-IFC-R3` needs an SMT backend.** `z3` is not a workspace dependency
+> and the Z3-free widening is vacuous — a gate that cannot refuse anything.
+> Verify is not idle on this (they have `CI-DOCTEST-UNEXECUTED`), so it is no
+> longer urgent, but the node stays unreleasable until this is answered.
+>
+> **3. Close PR #365 unmerged.**
+>
+> **4. WHICH TEAMS does the 2026-07-28 ABI wind-down still bind?** It parked
+> **Language and the spec enclave**. The enclave is demonstrably working today,
+> so the ruling is at least partly superseded — but Language (3 seats) and Ergo
+> (3 seats, and **zero** open nodes) are still idle under it. **This is not
+> framing debt and un-parking is not a Steward call.** Six idle seats turn on
+> this one answer.
+>
+> **5. Informational, not a request:** the checked-artifact format gains a
+> record inside `core_semantic_hash` under the authorized Runtime recut. I
+> judged it within my authority and did not gate on it, but it is
+> compatibility-affecting and the operator should know it happened.
+>
 > ### RESUME HERE — earlier state at 2026-08-10 ~07:4xZ. `main` = `bebe1a79`.
 >
 > **BOTH open Architect questions are ANSWERED. Nothing is waiting on the
