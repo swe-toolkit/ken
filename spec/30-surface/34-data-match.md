@@ -622,7 +622,7 @@ ctor`, not `Bool`, is the natural boundary.
 `trusted_base()` delta.** For scrutinee `e : T`:
 
 1. **Generalize** the occurrences of `e` in the **expected goal** `G` to a fresh
-   `v : T` (higher-order pattern abstraction, `§3.2`, `39 §2.3`), and form the
+   `v : T` (higher-order pattern abstraction, `§3.2`, `39 §2` item 3), and form the
    scrutinee's own eliminator with a motive that **returns a function over the
    branch equation**: `M := λ (v : T). Equal T e v → G[e := v]`.
 2. **Check each branch** for constructor `Cₖ` as a `λ` binding the `eqn:` name
