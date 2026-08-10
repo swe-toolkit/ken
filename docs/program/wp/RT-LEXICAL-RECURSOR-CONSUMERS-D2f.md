@@ -145,9 +145,18 @@ and the exact re-derivation validator were all still unbuilt. Under the operator
 accepted-partial policy a WP branch merges **repeatedly** by construction, so a
 release condition keyed on a merge *event* is early by default, not by accident.
 
-⇒ **Do not start until `AC-1`..`AC-6` and `AC-8`..`AC-10` of `D2e` are
-discharged and its identity plane is landed.** I will release this then; if you
-receive it earlier the kickoff is my error.
+⇒ **Do not start until the identity plane is landed.** I will release this
+then; if you receive it earlier the kickoff is my error.
+
+**RE-CUT 2026-08-10 — the gate now names `D2h`, not `D2e`.** `D2e` stopped
+short three times without starting key work, so its remaining scope was re-cut
+into [[RT-LEXICAL-RECURSOR-CONSUMERS-D2g]] (the checked transport twin) and
+[[RT-LEXICAL-RECURSOR-CONSUMERS-D2h]] (the key plane). **The identity plane is
+`D2h`'s `AC-1`..`AC-5` discharged and landed**, on the twin `D2g` supplies.
+`D2e` is closed and retained as the record of what landed.
+
+The substance of the gate is unchanged: **the identity must exist before an
+emitter is built against it**, and the identity is the soundness-bearing half.
 
 ## Sizing and validation
 
