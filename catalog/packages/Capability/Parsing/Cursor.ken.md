@@ -1,13 +1,21 @@
 # Capability.Parsing.Cursor
 
-`Capability.Parsing.Cursor` is the carrier-neutral parsing floor. It exposes an explicit
-operations dictionary, plain validity predicates, and a byte-structural
+`Capability.Parsing.Cursor` is the carrier-neutral parsing floor. It exposes an
+explicit operations dictionary, plain validity predicates, and a byte-structural
 argument cursor.
 
 ## 1. Definition
 
 `CursorOps` keeps element and location types explicit. Argument bytes remain
 plain `Bytes`; lengths and elements come from the total `List UInt8` view.
+
+`cursor_locate` reports the current cursor position in the instance's own
+location type and coordinate system. `CursorOps` and `CursorLaws` impose no
+cross-instance orientation, monotonicity, or relation between `cursor_locate`
+and `cursor_remaining`. Location values are comparable only under the semantics
+of the same cursor instance. A consumer that needs a shared diagnostic
+coordinate must use an explicit instance-specific conversion, such as
+`arg_location_origin` or `span_origin`, rather than infer one from `CursorOps`.
 
 ```ken
 data CursorOps c el loc = MkCursorOps (c → Nat) (c → Option el) (c → c) (c → loc)
