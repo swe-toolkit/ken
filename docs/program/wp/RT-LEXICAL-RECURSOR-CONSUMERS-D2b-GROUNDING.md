@@ -24,13 +24,29 @@ byte-identical.**
 | coordinate | exact | moves? |
 |---|---|---|
 | **measurement base** — the tree every figure was taken on | `a6186741` | **no.** A commit on `main` |
-| **candidate merge-base** — where this candidate sits | `c3162c99` | **yes.** Every re-anchor moves it; it was `a6186741` before this one |
+| **candidate merge-base** — where this candidate sits | `3ecd15bc` | **yes**, and it moves when EITHER ref moves — see below |
 
 ⛔ **They no longer coincide, and every figure below is a statement about
 `a6186741`.** They did coincide when this record was written; the re-anchor onto
-`c3162c99` separated them, and the sentence that said *"they coincide today"*
+a re-anchor separated them, and the sentence that said *"they coincide today"*
 survived the table row it depended on — which is the same defect, one field
 lower, that the two rows exist to prevent.
+
+⛔ **A MERGE-BASE IS A RELATION BETWEEN TWO MOVING REFS, NOT A CAPTURED FACT.**
+This record named `c3162c99` for several revisions, and it was **one commit
+behind** the true base. I derived it once at a re-anchor and then repeated it,
+in the record and in every handback.
+
+**It went stale without this branch moving at all.** `main` advanced past
+`c3162c99` to `3ecd15bc`, which this branch already contained, so the best
+common ancestor moved **forward** while my recorded coordinate stood still.
+
+⇒ The "moves?" column above used to say *"every re-anchor moves it"* — true, and
+**insufficient**. It moves when **either** ref moves. The only sound form is to
+**re-derive `git merge-base` at the moment of writing**, which is what
+`3ecd15bc` is. Both coordinates were ancestors of the candidate throughout and
+the merge tree stayed clean, so nothing downstream was wrong — which is exactly
+why it survived: a stale base is invisible to every check except deriving it.
 
 ⛔ **Path-disjointness is NOT promoted into provenance.** The re-anchor touched
 no path these measurements concern, which is why the evidence remains
