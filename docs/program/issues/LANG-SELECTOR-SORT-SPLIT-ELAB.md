@@ -125,10 +125,63 @@ directions, because a checker that always accepts passes either one alone.
 backwards**, so it is the one control that must exist by construction rather
 than by intent.
 
-**AC-5 — ambiguity rejects.** A metavariable-ambiguous classification raises
-the ambiguity diagnostic. The control must show the same source **accepting**
-once the metavariable is resolved, so the rejection is attributable to
-ambiguity rather than to any other defect in the fixture.
+**AC-5 — REWRITTEN 2026-08-10. The original is unsatisfiable and the defect was
+mine.** It read:
+
+> ~~A metavariable-ambiguous classification raises the ambiguity diagnostic. The
+> control must show the same source **accepting** once the metavariable is
+> resolved, so the rejection is attributable to ambiguity rather than to any
+> other defect in the fixture.~~
+
+**That AC assumed a sort-ambiguous state is constructible. Language measured
+that it is not**, at `evt_7w2ctbaswz58j`: `MetaCtx` holds `Vec<Option<Level>>`,
+`fresh()` mints only `Level::Var`, `solve()` accepts only a `Level`, core `Term`
+carries no term or sort metavariable, `zonk_term` preserves the `Term::Type`
+versus `Term::Omega` constructor, and kernel `classify` matches on that WHNF
+constructor. **A level solution changes the payload, never which constructor is
+present.** So no meta can leave the same selected result term undecided between
+`Type` and `Omega` and later decide it — which is exactly the reject-then-accept
+pair the old AC demanded. I wrote it against an assumption I did not verify.
+
+**The landed spec is NOT violated, and this is why the WP does not wait on a
+ruling.** `39-elaboration.md:256` and `34-data-match.md:351` state the clause
+**conditionally** — *"**If** unsolved metavariables leave the result type
+ambiguous between `Type` and `Omega`, the selector rejects with
+`RecursiveResultSortAmbiguous`"*. The operative guarantee is the sentence beside
+it: *"the elaborator never defaults from programmer intent, proof relevance, or
+the support type."* **A conditional whose antecedent cannot currently arise is
+satisfied, not breached.** The spec never asserts the ambiguous state is
+reachable.
+
+Deliver instead:
+
+1. **Delete the over-broad syntactic `LevelVar` fallback.** Turning any
+   non-`Type`/`Omega` inference failure into `RecursiveResultSortAmbiguous`
+   because a `LevelVar` occurs syntactically is a **false diagnostic** — it
+   proves neither that a meta is unsolved nor that it caused the failure. A
+   genuine inference failure must surface its own error.
+2. **Keep `RecursiveResultSortAmbiguous` defined, spec-pinned, and with no
+   production raise site**, carrying a comment that states why it is currently
+   unreachable and names the capability that would make it reachable. **A
+   deliberate unreachable that says so is honest; a silent one reads as dead
+   code somebody forgot.**
+3. **Prove the non-defaulting guarantee, which is the part that is testable
+   today.** A result the elaborator cannot classify as `Type` or `Omega`
+   **rejects** — it never picks a spelling. Show both spellings rejected on such
+   a shape, because a checker that always rejects one direction passes either
+   case alone.
+
+**Do not fabricate an ambiguous input.** The rejected control built
+`Term::app(Term::Type(Level::Var(LevelVar(7))), Term::var(0))`, which is
+permanently malformed — application inference requires a `Pi` and `Type l`
+always infers `Type (suc l)` for every solution of `l`. Replacing one fabricated
+control with another is worse than an honest gap.
+
+**The sort-meta capability question is real and it is NOT this node's.** It is
+[[LANG-SORT-META-CAPABILITY]] — filed, and deliberately not `ready`, because it
+needs a ruling before it can be framed. Under **both** live readings of the spec
+disposition, the code required here is identical: no raise site, no fabricated
+control. That is why this WP proceeds now.
 
 **AC-6 — the repaired identity control attributes.** The assertion binds the
 span of the `_` occurrence. Show it by mutation: a fixture drift or a boundary
@@ -153,6 +206,12 @@ split would require touching the association mechanism.
 
 **Not a stop condition:** the five `StructuralResult*` identifiers surviving the
 respell. That is ruled in deliverable 3 and needs no escalation.
+
+**Also not a stop condition, as of 2026-08-10: the sort-ambiguity boundary.**
+Language measured it and stopped correctly under the AC as it then stood — the
+stop was right and the AC was wrong. `AC-5` above is rewritten to the measured
+representation and the work is unblocked. Do not hold for the Architect or Spec
+rulings; they govern [[LANG-SORT-META-CAPABILITY]], not this candidate.
 
 ## Contention and validation
 
