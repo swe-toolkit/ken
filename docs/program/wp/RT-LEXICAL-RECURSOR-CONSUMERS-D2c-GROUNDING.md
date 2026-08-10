@@ -1,6 +1,10 @@
 # RT-LEXICAL-RECURSOR-CONSUMERS — `D2c` (R3 before-hole) grounding
 
-**Evidence only: no repair, no control, `crates/` byte-identical.**
+**No production repair.** The candidate's only `crates/` change is the `D2a`
+test-only `NonZeroUsize` durability rider in
+`lowering/core/tests/control.rs`, which `D2c` did not author and does not
+modify. `D2c` itself is evidence only: this record and the differential below
+add **no further control** and no production code.
 
 ## 0. Provenance — two coordinates, derived at the moment of writing
 
@@ -148,7 +152,9 @@ at the boundary rather than choosing.
 
 ## 6. Scope
 
-No repair, no control, no enum change, no `R4`, no `D3`, no retirement or lane
-deletion, no tracker `status:` change, and the approved `D2a` rider and `D2b`
-mechanism are untouched. Probes were temporary and are removed —
+No repair, no new control, no enum change, no `R4`, no `D3`, no retirement or
+lane deletion, and no tracker `status:` change. The approved `D2a` rider and
+the `D2b` mechanism are unchanged in mechanism: the icon strip removed one
+decorative glyph from the rider's comment and altered nothing else in it.
+Probes were temporary and are removed —
 `lowering/mod.rs` sha256 begins `36121e14`, matching the measurement base.
