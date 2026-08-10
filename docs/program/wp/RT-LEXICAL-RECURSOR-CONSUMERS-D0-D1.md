@@ -243,7 +243,7 @@ also the only probe the campaign has for that guard.
 |---|---|---|
 | population materially above 16 compiles | **no** | exactly 16, the sibling's figure |
 | authorities materially distinct | **YES** | three owners, four classes, one non-refusal boundary |
-| shares an exact production root with `RT-MATCH-RECURSOR-CONSUMERS` | **no** | row 6 refuses on `RecursiveBackedge`; no class here does. No subsumption proposal is owed |
+| shares an exact production root with `RT-MATCH-RECURSOR-CONSUMERS` | **no** — but see the correction below | ruled by the Architect, not inferred here |
 
 **⇒ The partition is returned and `D2` is not begun.** Sizing is the Steward's
 call: `M` was a scoping figure from a symptom count, and the symptom count was
@@ -258,3 +258,31 @@ different phase from the other three.
 - **Rows 1 and 4 beyond their first activated compile** — 3 compiles unmeasured
   under activation, stated in §2.2 rather than assumed harmless.
 - **The two population bounds in §1.8**, neither of which this node closes.
+
+## 4. CORRECTION — the shared-root verdict, re-derived on measurement
+
+⛔ **§2.6's original wording was wrong, and this section supersedes it.** It read
+*"row 6 refuses on `RecursiveBackedge`; no class here does"* — a verdict keyed on
+the refusal **string**. A later probe measured the R1 operand itself:
+
+```
+kind=RecursiveBackedge  actual_constructor=None  route=DirectScrutinee  frame=None
+```
+
+⇒ **R1's refused value IS `RecursiveBackedge`.** The strings differ because the
+two sites report different things about the same protocol value, which is
+exactly why a string-keyed comparison was the wrong instrument. The original
+sentence was false as written.
+
+**The verdict itself survives, but on different grounds, and they are the
+Architect's rather than mine** (`evt_k64pjherb9x0`): the two share a **protocol
+representation**, not a repair root. `#6c`'s owner is `carried_join_arm`, which
+R1 **never traverses**; R1's first missing owner is source-machine
+`SourceContinuation::ComputationalMatchScrutinee` on the `DirectScrutinee` route
+with no frame. **Same marker, distinct first missing owner and route ⇒ no shared
+repair root**, and no subsumption proposal is owed.
+
+**The lesson worth carrying past this node:** a shared-root question is about the
+**value and its owner**, and a refusal string is a rendering of neither. I
+reported "no shared root" from the strings and had to correct it from the
+operand.

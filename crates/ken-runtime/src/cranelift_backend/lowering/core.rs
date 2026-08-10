@@ -348,6 +348,15 @@ thread_local! {
     /// `D3`'s mutation: restore the old joint refusal for `Active`, which must
     /// recreate the exact attributed refusal on both measured rows.
     static CCR_D2_SUPPRESS_ACTIVE_ROUTE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` — backedge markers that ARRIVED at
+    /// `ComputationalMatchScrutinee`. The denominator: without it, "the forward
+    /// happened" and "the marker never reached this continuation" are the two
+    /// readings a green row cannot separate.
+    static LRC_D2A_BACKEDGE_ARRIVALS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Arrivals actually forwarded by the new seat.
+    static LRC_D2A_BACKEDGE_FORWARDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// `D3`'s mutation: suppress the forward, restoring the pre-`D2a` refusal.
+    static LRC_D2A_SUPPRESS_FORWARD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[cfg(test)]
@@ -364,6 +373,29 @@ pub(in crate::cranelift_backend) fn ccr_d2_active_routes() -> usize {
 pub(in crate::cranelift_backend) fn reset_ccr_d2_counts() {
     CCR_D2_ACTIVE_ARRIVALS.with(|count| count.set(0));
     CCR_D2_ACTIVE_ROUTES.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn lrc_d2a_backedge_arrivals() -> usize {
+    LRC_D2A_BACKEDGE_ARRIVALS.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn lrc_d2a_backedge_forwards() -> usize {
+    LRC_D2A_BACKEDGE_FORWARDS.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_lrc_d2a_counts() {
+    LRC_D2A_BACKEDGE_ARRIVALS.with(|count| count.set(0));
+    LRC_D2A_BACKEDGE_FORWARDS.with(|count| count.set(0));
+}
+
+/// `D3`'s mutation seat: suppress the `D2a` forward so the pre-repair refusal
+/// is producible again. ⛔ Test-only, and never set in production.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_lrc_d2a_suppress_forward(suppress: bool) {
+    LRC_D2A_SUPPRESS_FORWARD.with(|cell| cell.set(suppress));
 }
 
 #[cfg(test)]
@@ -6617,6 +6649,63 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             answer_route,
                             next,
                         } => 'computational_scrutinee: {
+                            // ⭐⭐ `RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` — THE
+                            // BACKEDGE MARKER IS FORWARDED, NOT ELIMINATED.
+                            //
+                            // `RecursiveBackedge` is a **protocol marker**, not a
+                            // value: there is nothing to eliminate and no case to
+                            // select. Reaching the specialized selection below it
+                            // met `"source scrutinee is not a constructor value"`
+                            // — the same shape the `Carried` arm beneath already
+                            // names as *a true sentence about the wrong thing*.
+                            // The guard is right; the question was.
+                            //
+                            // ⛔ Taken BEFORE `enter_source_occurrence_plan`, so
+                            // this seat consumes no occurrence plan, mints no
+                            // authority, selects and dispositions no case, and
+                            // constructs no value. It sets the continuation to
+                            // `next` and hands the SAME marker onward.
+                            //
+                            // ⛔ `incoming_route` is carried, not reset. This
+                            // FORWARDS an operand rather than producing a new
+                            // one, and the `D6a` contract above is explicit that
+                            // resetting a forward to `DirectScrutinee` is a
+                            // silent erasure — the compile stays green while the
+                            // checked answer quietly takes the closed default.
+                            //
+                            // ⛔ Neither guard is weakened. A genuine
+                            // non-constructor scrutinee still reaches the
+                            // selection below and is still refused; only the
+                            // marker, which was never a scrutinee value, is
+                            // routed past it.
+                            if matches!(
+                                &value,
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
+                            ) {
+                                #[cfg(test)]
+                                LRC_D2A_BACKEDGE_ARRIVALS.with(|count| {
+                                    count.set(count.get().saturating_add(1))
+                                });
+                                #[cfg(test)]
+                                let suppressed =
+                                    LRC_D2A_SUPPRESS_FORWARD.with(std::cell::Cell::get);
+                                #[cfg(not(test))]
+                                let suppressed = false;
+                                if !suppressed {
+                                    #[cfg(test)]
+                                    LRC_D2A_BACKEDGE_FORWARDS.with(|count| {
+                                        count.set(count.get().saturating_add(1))
+                                    });
+                                    control.continuation = *next;
+                                    break 'computational_scrutinee SourceMachineState::Value {
+                                        value: RoutedAnswer {
+                                            value,
+                                            route: incoming_route,
+                                        },
+                                        control,
+                                    };
+                                }
+                            }
                             self.enter_source_occurrence_plan(static_origin)?;
                             #[cfg(test)]
                             d5a_trace(format!(
