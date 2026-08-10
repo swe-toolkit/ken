@@ -6315,3 +6315,144 @@ mod tests {
         assert!(!plan.matches_transport_hash(stale_hash));
     }
 }
+
+#[cfg(test)]
+mod d1b_role_c1_roster_identity {
+    use super::*;
+
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — every emitted role symbol
+    /// is the exact canonical `GlobalId` projection.
+    ///
+    /// **This is the sibling-substitution detector**, and it lives here because
+    /// this is the only place both operands exist: the canonical roster
+    /// (`CanonicalRuntimeRoles::all()`) and the exact `stable_symbols_for_env`
+    /// table. Erasure has neither — it holds no `GlobalId` and no symbol table —
+    /// so the comparison cannot be made decode-side, and the decode-side
+    /// protection is the semantic-fingerprint integrity check instead.
+    ///
+    /// ⚠ **The coverage division, because neither half covers the other.** This
+    /// catches a **producer bug**: a role wired to the wrong canonical id,
+    /// including a same-family sibling such as `IOError.PermissionDenied`
+    /// standing in the `NotFound` role, which every arity, family-uniqueness and
+    /// existence check accepts because the sibling is a perfectly valid nullary
+    /// constructor of the right family. It runs in CI and **cannot** see a stale
+    /// or tampered record inside a running process; the fingerprint check owns
+    /// that direction.
+    ///
+    /// ⛔ Not a source scan and not a bare-name check. Each assertion compares a
+    /// full `StableSymbol` against `exact_table[canonical_role_global_id]`.
+    #[test]
+    fn every_emitted_role_equals_its_canonical_global_id_projection() {
+        let mut env = ElabEnv::new().expect("prelude env");
+        env.elaborate_file("const two : Nat = Suc (Suc Zero)\n")
+            .expect("package source elaborates");
+
+        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false);
+        let record = checked_runtime_symbols_v1(&env.prelude_env, &symbols)
+            .expect("the record builds from the canonical roster");
+
+        // The canonical expectation: role field -> exact_table[canonical id].
+        let canonical: BTreeMap<&'static str, StableSymbol> = env
+            .prelude_env
+            .runtime_roles
+            .all()
+            .into_iter()
+            .map(|(field, id)| {
+                let symbol = symbols
+                    .get(&id)
+                    .unwrap_or_else(|| panic!("canonical role {field} has no stable symbol"))
+                    .clone();
+                (field, symbol)
+            })
+            .collect();
+
+        let emitted: Vec<(&'static str, StableSymbol)> = vec![
+            ("ret", record.spine.ret.clone()),
+            ("vis", record.spine.vis.clone()),
+            ("in_l", record.spine.in_l.clone()),
+            ("in_r", record.spine.in_r.clone()),
+            ("fs_family", record.spine.fs_family.clone()),
+            ("console_family", record.spine.console_family.clone()),
+            ("clock_family", record.spine.clock_family.clone()),
+            ("entropy_family", record.spine.entropy_family.clone()),
+            ("capability", record.spine.capability.clone()),
+            ("result_err", record.spine.result_err.clone()),
+            ("result_ok", record.spine.result_ok.clone()),
+            ("option_some", record.spine.option_some.clone()),
+            ("file_error", record.spine.file_error.clone()),
+            ("file_operation_read", record.spine.file_operation_read.clone()),
+            ("file_operation_write", record.spine.file_operation_write.clone()),
+            ("file_operation_change_mode", record.spine.file_operation_change_mode.clone()),
+            ("resource_kind_mismatch", record.spine.resource_kind_mismatch.clone()),
+            ("resource_buffer_limit", record.spine.resource_buffer_limit.clone()),
+            ("resource_allocation_failed", record.spine.resource_allocation_failed.clone()),
+            ("resource_invalid_offset", record.spine.resource_invalid_offset.clone()),
+            ("resource_invalid_bounds", record.spine.resource_invalid_bounds.clone()),
+            ("resource_no_progress", record.spine.resource_no_progress.clone()),
+            ("resource_kind_buffer", record.spine.resource_kind_buffer.clone()),
+            ("read_some", record.spine.read_some.clone()),
+            ("read_eof", record.spine.read_eof.clone()),
+            ("wrote", record.spine.wrote.clone()),
+            ("unit", record.spine.unit.clone()),
+            ("bool_false", record.spine.bool_false.clone()),
+            ("bool_true", record.spine.bool_true.clone()),
+            ("io_error_not_found", record.spine.io_errors[0].clone()),
+            ("io_error_permission_denied", record.spine.io_errors[1].clone()),
+            ("io_error_capability_denied", record.spine.io_errors[2].clone()),
+            ("io_error_broken_pipe", record.spine.io_errors[3].clone()),
+            ("io_error_interrupted", record.spine.io_errors[4].clone()),
+            ("io_error_already_exists", record.spine.io_errors[5].clone()),
+            ("io_error_invalid_input", record.spine.io_errors[6].clone()),
+            ("io_error_is_directory", record.spine.io_errors[7].clone()),
+            ("io_error_not_directory", record.spine.io_errors[8].clone()),
+            ("io_error_not_empty", record.spine.io_errors[9].clone()),
+            ("io_error_unsupported", record.spine.io_errors[10].clone()),
+            ("io_error_other", record.spine.io_errors[11].clone()),
+            ("process_input", record.process_input.clone()),
+            ("list_nil", record.list_nil.clone()),
+            ("list_cons", record.list_cons.clone()),
+            ("prod", record.prod.clone()),
+            ("exit_success", record.exit_success.clone()),
+            ("exit_failure", record.exit_failure.clone()),
+        ];
+
+        for (field, symbol) in &emitted {
+            let expected = canonical
+                .get(field)
+                .unwrap_or_else(|| panic!("no canonical roster entry named {field}"));
+            assert_eq!(
+                symbol, expected,
+                "emitted role {field} is {symbol} but the canonical GlobalId projects to \
+                 {expected} -- the producer wired this role to the wrong id. A same-family \
+                 sibling passes every arity, family and existence check, so THIS is the \
+                 assertion that catches it."
+            );
+        }
+
+        // Operations are keyed by symbol rather than positional, so each
+        // canonical operation symbol must be a KEY of the emitted map.
+        for field in ["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"] {
+            let expected = canonical
+                .get(field)
+                .unwrap_or_else(|| panic!("no canonical roster entry named {field}"));
+            assert!(
+                record.spine.operations.contains_key(expected),
+                "emitted operations map has no entry for canonical role {field} ({expected})"
+            );
+        }
+
+        // COMPLETENESS, so the loops above cannot go quietly partial: every
+        // canonical role is covered by one of the three checks.
+        let mut covered: BTreeSet<&'static str> =
+            emitted.iter().map(|(field, _)| *field).collect();
+        covered.extend(["op_console_read", "op_console_write", "op_console_flush", "op_console_is_terminal", "op_clock_wall_now", "op_clock_monotonic_now", "op_clock_sleep_until", "op_entropy_random_bytes", "op_fs_read_file", "op_fs_write_file", "op_fs_append_file", "op_fs_metadata", "op_fs_read_directory", "op_fs_create_directory", "op_fs_remove_file", "op_fs_remove_directory", "op_fs_rename", "op_fs_change_mode"]);
+        let uncovered: Vec<&&'static str> = canonical
+            .keys()
+            .filter(|field| !covered.contains(*field))
+            .collect();
+        assert!(
+            uncovered.is_empty(),
+            "these canonical roles are asserted by nothing above: {uncovered:?}"
+        );
+    }
+}
