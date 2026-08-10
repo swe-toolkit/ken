@@ -128,6 +128,29 @@ pub struct RuntimeCheckedCoreMetadata {
     /// and item 6 removes the `Option` at the lowerer boundary; neither is in
     /// scope here. ⛔ Do not read absence as "no roles needed".
     pub runtime_symbols: Option<RuntimeCheckedRoleSymbolsV1>,
+    /// The pre-source trusted-base roster, decoded and validated at erasure.
+    ///
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. Captured at the end of
+    /// prelude registration — **before any package source is elaborated** — and
+    /// projected through the package's own stable-symbol table.
+    ///
+    /// ⚠ `Option` is a fact about the **representation boundary**, not a
+    /// permission. The seed/synthetic lane carries no roster, so absence is a
+    /// real state here. ⛔ Package-backed `native_program_admission` **requires**
+    /// it and has no fallback: absence there is a refusal, never a default.
+    ///
+    /// Why a roster and not a property of the tuples themselves: nothing
+    /// inspectable in a finished package distinguishes a prelude postulate from
+    /// one the package's own source introduced with identical shape and
+    /// canonical identity. Only *when* it entered `Σ` separates them, and this
+    /// is the only record of that instant.
+    pub native_trusted_base: Option<RuntimeCheckedNativeTrustedBaseV1>,
+}
+
+/// The decoded pre-source trusted-base roster (`D1b-role-c1`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RuntimeCheckedNativeTrustedBaseV1 {
+    pub targets: std::collections::BTreeSet<RuntimeSymbol>,
 }
 
 /// Declares the host-spine half of the role record and the order its symbols

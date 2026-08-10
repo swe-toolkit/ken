@@ -210,6 +210,22 @@ impl ElabEnv {
         bytes::register_safe_bytes_ops(&mut elab.env, &mut elab.globals, &mut elab.bytes_env)?;
         // Lc typeclass env: pre-declare RecordNil + record_nil_val (`33 §5`).
         elab.class_env = elab::init_class_env(&mut elab.env, &mut elab.globals)?;
+        // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — capture the immutable
+        // pre-source trusted base HERE, at the prelude floor.
+        //
+        // This is the last instant at which every entry in `Σ`'s trusted base
+        // is compiler-owned: the three stages above (`register_prelude`,
+        // `register_safe_bytes_ops`, `init_class_env`) are all prelude, and no
+        // package source has been elaborated. Anything a package's own source
+        // later postulates enters strictly after this line and is therefore
+        // absent from the roster -- whatever identity that source gives it.
+        //
+        // ⚠ Capturing at the end of `register_prelude` instead is WRONG and was
+        // measured: it misses the 9 targets the two later prelude stages
+        // declare (`bytes_at`, `bytes_decode`, `bytes_list_roundtrip`,
+        // `RecordNil`, ...), so a clean package's 107 tuples would face a
+        // 98-entry roster and every real package would be refused.
+        elab.prelude_env.native_trusted_base = elab.env.trusted_base().into_iter().collect();
         elab.module_state.install_prelude_floor();
         Ok(elab)
     }

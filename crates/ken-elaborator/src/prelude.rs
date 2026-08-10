@@ -190,6 +190,7 @@ pub fn empty_prelude_env() -> PreludeEnv {
     let z = GlobalId(0);
     PreludeEnv {
         runtime_roles: CanonicalRuntimeRoles::zeroed(),
+        native_trusted_base: std::collections::BTreeSet::new(),
         nat_id: z,
         zero_id: z,
         suc_id: z,
@@ -277,6 +278,21 @@ pub struct PreludeEnv {
     /// from (`RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`). Captured at
     /// registration, before package source elaboration can shadow a spelling.
     pub runtime_roles: CanonicalRuntimeRoles,
+    /// The immutable **pre-source trusted base** — the exact set of postulates
+    /// and real primitives `Σ` held when the prelude finished registering and
+    /// **before one line of package source was elaborated**
+    /// (`RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`).
+    ///
+    /// ⛔ This is the whole provenance mechanism. Native admission compares a
+    /// package's trust tuples against *this* roster, so a user postulate
+    /// introduced by package source is **not** in it and cannot be admitted —
+    /// no matter what identity the source gives it, because the roster was
+    /// closed before that source existed.
+    ///
+    /// It is captured, never reconstructed. Rebuilding it later from
+    /// `globals`, a fresh prelude, source names, package prefixes, or a name
+    /// whitelist would re-admit exactly what it exists to refuse.
+    pub native_trusted_base: std::collections::BTreeSet<GlobalId>,
     // `Nat` (Peano) — the `unfoldUpTo` fuel.
     pub nat_id: GlobalId,
     pub zero_id: GlobalId,
@@ -2494,8 +2510,23 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // survive any later shadowing declaration, which is the whole point.
     let runtime_roles = CanonicalRuntimeRoles::capture(&elab.globals)?;
 
+    // `D1b-role-c1`. ⛔ The trusted-base roster is deliberately NOT captured
+    // here, even though this is where the sibling role roster is captured.
+    //
+    // MEASURED: capturing at this line yields 98 targets while a clean package
+    // emits 107 trust tuples -- `register_safe_bytes_ops` and `init_class_env`
+    // run in `ElabEnv::empty()` AFTER this function returns, and they declare
+    // `bytes_at`, `bytes_decode`, `bytes_list_roundtrip`, `RecordNil` and the
+    // rest. Those are compiler-owned prelude stages, not package source, so
+    // their postulates belong to the pre-source base; a roster captured here
+    // would refuse every real package for entries the user never wrote.
+    //
+    // The capture therefore sits at `install_prelude_floor()` in `lib.rs` --
+    // the actual boundary between compiler-owned prelude and user source, and
+    // the one the "before source elaboration" requirement means.
     Ok(PreludeEnv {
         runtime_roles,
+        native_trusted_base: std::collections::BTreeSet::new(),
         nat_id,
         zero_id,
         suc_id,

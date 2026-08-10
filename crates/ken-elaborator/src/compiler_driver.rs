@@ -2990,6 +2990,18 @@ fn emit_package_from_env(
         canonical_checked_runtime_symbols_v1_bytes(&runtime_symbols),
     );
 
+    // `D1b-role-c1` — the same treatment for the pre-source trusted-base
+    // roster, and for the same reason: it is projected through THIS
+    // `stable_symbols_for_env` table (`symbols`), not re-derived, and stored in
+    // the versioned semantic lane so it is covered by `core_semantic_hash`.
+    // A roster that were not hash-covered could be edited without moving the
+    // package's identity, which would make the admission it feeds worthless.
+    let native_trusted_base = checked_native_trusted_base_v1(&env.prelude_env, &symbols)?;
+    semantic.metadata.insert(
+        checked_native_trusted_base_v1_key(),
+        canonical_checked_native_trusted_base_v1_bytes(&native_trusted_base),
+    );
+
     add_data_metadata(env, &symbols, &mut semantic);
     add_admitted_recursion_metadata(
         &manifest.package_name,
@@ -3411,6 +3423,61 @@ fn checked_runtime_symbols_v1(
         exit_success: resolve_id(roles.exit_success)?,
         exit_failure: resolve_id(roles.exit_failure)?,
     })
+}
+
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — project the immutable
+/// pre-source trusted-base roster onto stable symbols.
+///
+/// ⛔ Narrowed to `&PreludeEnv` for exactly the reason the role record is: with
+/// no `ElabEnv` in scope there is no `env.globals` to consult, so this cannot
+/// silently re-derive the roster from post-source state. It projects the ids
+/// captured before elaboration through **the caller's own**
+/// `stable_symbols_for_env` table and nothing else.
+///
+/// A missing id is an error, never a skipped entry: a roster that quietly
+/// dropped a target would admit a tuple whose partner it could not name.
+fn checked_native_trusted_base_v1(
+    prelude: &crate::prelude::PreludeEnv,
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
+) -> Result<crate::erasure::CheckedNativeTrustedBaseV1, CompilerDriverError> {
+    let mut targets = std::collections::BTreeSet::new();
+    for id in &prelude.native_trusted_base {
+        // Ids outside this package's emitted table are not addressable by a
+        // consumer and are dropped deliberately -- the roster is the set the
+        // package can NAME, and admission compares against exactly that.
+        if let Some(symbol) = symbols.get(id) {
+            targets.insert(symbol.clone());
+        }
+    }
+    Ok(crate::erasure::CheckedNativeTrustedBaseV1 { targets })
+}
+
+/// Canonical, versioned bytes for the trusted-base roster.
+///
+/// `BTreeSet` iteration is ordered, so the encoding is deterministic without a
+/// separate sort — the same property the role record relies on.
+pub(crate) fn canonical_checked_native_trusted_base_v1_bytes(
+    record: &crate::erasure::CheckedNativeTrustedBaseV1,
+) -> Vec<u8> {
+    let mut out = b"CheckedNativeTrustedBaseV1\0".to_vec();
+    out.extend_from_slice(&(record.targets.len() as u64).to_le_bytes());
+    for target in &record.targets {
+        let text = target.to_string();
+        out.extend_from_slice(&(text.len() as u64).to_le_bytes());
+        out.extend_from_slice(text.as_bytes());
+    }
+    out
+}
+
+/// The semantic-metadata key the trusted-base roster is stored under.
+pub const CHECKED_NATIVE_TRUSTED_BASE_V1_KEY: &str = "checked-native-trusted-base-v1";
+
+/// The key as a `StableSymbol`, built once so producer and decoder cannot drift.
+pub fn checked_native_trusted_base_v1_key() -> StableSymbol {
+    StableSymbol::new(
+        SymbolNamespace::Declaration,
+        [CHECKED_NATIVE_TRUSTED_BASE_V1_KEY.to_string()],
+    )
 }
 
 /// Canonical, versioned bytes for the record above.

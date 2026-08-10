@@ -566,6 +566,21 @@ pub(crate) struct CheckedRuntimeSymbolsV1 {
     pub exit_failure: StableSymbol,
 }
 
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — the pre-source trusted-base
+/// roster, as emitted.
+///
+/// This is the **provenance** record. It answers one question that no amount of
+/// inspection of a finished package can otherwise answer: *was this target
+/// already trusted before the package's own source was elaborated?* The roster
+/// is captured at the end of prelude registration and projected through the
+/// package's own stable-symbol table, so a postulate the source introduces is
+/// necessarily absent from it — whatever identity, namespace, or spelling the
+/// source gives that postulate.
+#[derive(Clone, Debug)]
+pub(crate) struct CheckedNativeTrustedBaseV1 {
+    pub targets: std::collections::BTreeSet<StableSymbol>,
+}
+
 #[derive(Clone)]
 pub(crate) struct CheckedJoinAnswerSymbols {
     pub int: StableSymbol,
@@ -6002,6 +6017,9 @@ fn checked_core_metadata(
         // is the only caller that can report a validation failure. Building it
         // here would have to swallow one.
         runtime_symbols: None,
+        // Both typed projections are filled by `checked_core_metadata_with_roles`
+        // on the package-backed path; this base builder leaves them absent.
+        native_trusted_base: None,
     }
 }
 
@@ -6028,7 +6046,58 @@ fn checked_core_metadata_with_roles(
     let record = decode_checked_runtime_symbols_v1(bytes)?;
     validate_runtime_role_symbols(&record, semantic)?;
     audit.runtime_symbols = Some(record);
+    audit.native_trusted_base = decode_native_trusted_base_if_present(semantic)?;
     Ok(audit)
+}
+
+/// Decode the pre-source trusted-base roster, if the package carries one.
+///
+/// ⛔ Absence is passed through as `None` **here only**, because this same
+/// function serves the seed representation boundary. The refusal for a
+/// package-backed compile lives in `native_program_admission`, which requires
+/// the roster. Nothing in this function may be read as admitting a program.
+///
+/// A roster that is *present but malformed* is a hard error, not a `None`:
+/// silently degrading a corrupt roster to "absent" would hand the admission the
+/// one input it treats as a lawful seed program.
+fn decode_native_trusted_base_if_present(
+    semantic: &checked_core::CheckedCoreSemanticInputs,
+) -> Result<Option<ken_runtime::RuntimeCheckedNativeTrustedBaseV1>, ErasureError> {
+    let key = crate::compiler_driver::checked_native_trusted_base_v1_key();
+    let Some(bytes) = semantic.metadata.get(&key) else {
+        return Ok(None);
+    };
+    const HEADER: &[u8] = b"CheckedNativeTrustedBaseV1\0";
+    if !bytes.starts_with(HEADER) {
+        return Err(role_record_error(
+            "the trusted-base roster does not carry its version header",
+        ));
+    }
+    let mut offset = HEADER.len();
+    let count = read_role_count(bytes, &mut offset)?;
+    let mut targets = std::collections::BTreeSet::new();
+    for _ in 0..count {
+        let target = read_role_symbol(bytes, &mut offset)?;
+        if target.trim().is_empty() {
+            return Err(role_record_error("the roster carries an empty target"));
+        }
+        // A duplicate cannot survive a `BTreeSet`, so it would silently shrink
+        // the roster rather than being noticed. Catch it on the way in.
+        if !targets.insert(target.clone()) {
+            return Err(role_record_error(&format!(
+                "the roster carries {target} twice; a set cannot represent that, so the encoded \
+                 count and the decoded roster disagree"
+            )));
+        }
+    }
+    if offset != bytes.len() {
+        return Err(role_record_error(
+            "the trusted-base roster has trailing bytes after its declared targets",
+        ));
+    }
+    Ok(Some(ken_runtime::RuntimeCheckedNativeTrustedBaseV1 {
+        targets,
+    }))
 }
 
 /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — decode-side integrity.
