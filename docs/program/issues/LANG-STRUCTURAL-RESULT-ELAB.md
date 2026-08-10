@@ -1,7 +1,7 @@
 ---
 id: LANG-STRUCTURAL-RESULT-ELAB
 title: "Implement the structural-result selector in the elaborator -- derive the field/evidence/result association from the kernel method telescope and elaborate `structural result of x` to the hidden recursive method result"
-status: ready
+status: merged
 owner: language
 size: L
 gate: none
