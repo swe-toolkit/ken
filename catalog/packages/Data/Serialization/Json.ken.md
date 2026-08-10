@@ -1,7 +1,8 @@
-# `Json` — JSON values
+# `Json` — integral-number JSON values
 
-`Json` is the ordinary six-constructor value model used by Ken's JSON codec.
-Arrays and objects preserve their source order as lists.
+`Json` is the ordinary six-constructor value model for DS-9's accepted
+integral-number JSON subset. Arrays and objects preserve their source order as
+lists.
 
 ## Contents
 
@@ -15,10 +16,10 @@ Arrays and objects preserve their source order as lists.
 
 ## 1. Motivation
 
-A JSON codec needs a value carrier that represents every structural case
-directly. `Json` keeps null, Boolean, number, string, array, and object values
-distinct, so later encoders and decoders can cover the format by ordinary
-structural recursion.
+A codec for the accepted integral-number JSON subset needs a value carrier that
+represents every structural case directly. `Json` keeps null, Boolean, number,
+string, array, and object values distinct, so later encoders and decoders can
+cover that subset by ordinary structural recursion.
 
 ## 2. Definition
 
