@@ -66,6 +66,21 @@ pane — the same self-match as
 Discount your own seat, or the detector fires on every clean sweep and you learn
 to ignore it. That habituation is the real cost.
 
+## It recurred on the Architect nine minutes later, and that sets the cadence
+
+**~10:2xZ `spec-leader`, then ~10:3xZ `architect`.** The second instance held a
+message telling the Architect to **stop and widen its review range before voting
+on a 10-commit candidate** — a warning whose whole value was arriving before the
+vote, queued behind a tool call that was never going to happen.
+
+⇒ **Both instances landed on a hub seat**, which is where the cost concentrates:
+a stranded hub presents as N correct-looking waits
+([[a-stranded-hub-seat-presents-as-n-correct-looking-waits]]). Two occurrences
+in nine minutes on the two busiest seats means this is **not rare enough to
+check only when something looks wrong** — sweep for it every watchdog tick,
+alongside the `[Pasted Content]` check, and note that the two need **opposite**
+keys (`Enter` versus `Escape`).
+
 ## Why it is worth a standing check
 
 **Only the Steward sweeps panes.** Team leaders watchdog their rings through
