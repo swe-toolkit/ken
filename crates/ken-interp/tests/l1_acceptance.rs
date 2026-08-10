@@ -9,7 +9,8 @@
 use ken_elaborator::{ElabEnv, NumericLitVal, ObligationKind};
 use ken_elaborator::extract::{v2_extract, ProvKind};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_kernel::env::Context;
+use ken_kernel::{convert, Decl, GlobalId, Term};
 
 // ── test infrastructure ──────────────────────────────────────────────────────
 
@@ -351,18 +352,44 @@ fn sec61_literal_reduces_in_kernel() {
 #[test]
 fn sec62_abstract_add_is_neutral() {
     let mut env = ElabEnv::new().unwrap();
-    // With abstract a, b : Int, the expression `a + b` is a Neutral term.
-    // We can't easily drive this without the kernel conversion API, but we can
-    // verify that a concrete non-commutative-looking case doesn't silently commute.
-    // For now: verify the elaborator accepts the terms without kernel-inserting commutativity.
     let result_ab = env.elaborate_decl_v1(
         "fn add_ab (a : Int) (b : Int) : Int = a + b"
     ).unwrap();
     let result_ba = env.elaborate_decl_v1(
         "fn add_ba (a : Int) (b : Int) : Int = b + a"
     ).unwrap();
-    // Both elaborate without error; they are NOT the same term by construction.
-    assert_ne!(result_ab.def_id, result_ba.def_id, "a+b and b+a are distinct definitions");
+
+    let body_ab = env
+        .env
+        .transparent_body(result_ab.def_id)
+        .expect("add_ab must be a transparent definition")
+        .1;
+    let body_ba = env
+        .env
+        .transparent_body(result_ba.def_id)
+        .expect("add_ba must be a transparent definition")
+        .1;
+    let Term::Lam(_, body_ab) = body_ab else {
+        panic!("add_ab must bind abstract operand a")
+    };
+    let Term::Lam(_, body_ab) = *body_ab else {
+        panic!("add_ab must bind abstract operand b")
+    };
+    let Term::Lam(_, body_ba) = body_ba else {
+        panic!("add_ba must bind abstract operand a")
+    };
+    let Term::Lam(_, body_ba) = *body_ba else {
+        panic!("add_ba must bind abstract operand b")
+    };
+
+    let int_ty = Term::const_(env.numeric_env.int_id, vec![]);
+    let mut ctx = Context::new();
+    ctx.push(int_ty.clone()); // a : Int (Var 1 after the next push)
+    ctx.push(int_ty.clone()); // b : Int (Var 0)
+    assert!(
+        !convert(&env.env, &ctx, &int_ty, &body_ab, &body_ba),
+        "kernel conversion must reject abstract a + b ≟ b + a"
+    );
 }
 
 // ── §2.4: Char excludes surrogates ──────────────────────────────────────────
