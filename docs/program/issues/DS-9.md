@@ -11,6 +11,30 @@ github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
 
+> ## D1 MERGED 2026-08-10 as an accepted partial — the node stays `active`
+>
+> Exact `6675ff54`, PR #1770, CI green, `main` `258336bf`. Both paths
+> blob-verified: `catalog/packages/Data/Serialization/Json.ken.md` and
+> `crates/ken-elaborator/tests/ds9_json_codec_acceptance.rs`, `+188/-0`.
+> Authorized by resolved Decision `dec_3xk75veggzhjm` (Architect APPROVE).
+>
+> **The declaration this node was stood down for on 2026-07-27 is now on
+> `main`.** The ordinary six-constructor `Json` with `JsonArray (List Json)`
+> elaborates on top of the lifted nested-inductive restriction, which is the
+> whole point of the Architect's option-B ruling.
+>
+> **Merged is not closed.** `D2`-`D7` still form this WP and are in flight on
+> `wp/DS-9-json-codec`. `D1` landed under `merge-policy.md`'s accepted-partial
+> rule because the ring had already started building `D2` on top of it, which
+> made it the floor rather than a candidate. It was a straight-ancestor cut:
+> zero rebase, no verdict transfer.
+>
+> **Two disclosed residuals, non-blocking and not to be re-litigated at the
+> next merge:** `JsonNumber : Int` excludes fractional and exponent forms; and
+> a formatter corruption observed against the package is held as an Ergo
+> finding. If the latter reproduces against the landed file it wants a `D7`
+> Finding with an exact repro, not a prose note.
+>
 > ## STILL BLOCKED, BUT NOT FOR THE REASON BELOW — corrected 2026-08-09
 >
 > **Steward verification against the code on `origin/main` `c34317f3`.** The
