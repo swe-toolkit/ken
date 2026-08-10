@@ -1,5 +1,34 @@
 # RT-LEXICAL-RECURSOR-CONSUMERS — `D0`/`D1` checkpoint
 
+> # ⛔ HISTORICAL. THIS DOCUMENT IS FROZEN AT THE `D0`/`D1` COMMIT.
+>
+> **Every statement below is as of the `D0`/`D1` checkpoint commit** — the one
+> whose subject is *"`D0`/`D1`: re-measure at the candidate's actual base, and
+> fix the record's identity"* (`4d64045f` at the time of writing) —
+> and several were made false by `D2a` landing afterwards. `D2a` is recorded in
+> `RT-LEXICAL-RECURSOR-CONSUMERS-D2a.md`, which supersedes this file wherever
+> they disagree.
+>
+> ⛔ **Named by SUBJECT, not by SHA, on purpose.** Re-anchoring this branch
+> rewrites every SHA on it — this banner has already outlived one such rewrite.
+> A frozen-at coordinate that only a SHA can express goes stale on the next
+> rebase, which is the same defect this banner exists to correct.
+>
+> **The claims this file makes that are NO LONGER TRUE**, each superseded in
+> place below so a reader arriving mid-document is not misled:
+>
+> | claim here | status |
+> |---|---|
+> | *"`D2` is not begun"* (§2.6) | **false since `D2a`** |
+> | *"No repair, no control, no fixture change"* (§3) | **false since `D2a`** |
+> | *"`crates/` is byte-identical"* (§1.2, §3) | **false since `D2a`**; true at the `D0`/`D1` record commit |
+> | *"this candidate is this document"* (§3) | **false since `D2a`** |
+>
+> ⛔ **The MEASUREMENTS are not affected and are not being withdrawn.** The
+> census, the denominators, the distribution and the causal partition were taken
+> at `9adeb30f` and stand. What went stale is this file's description of the
+> *candidate*, not of the *runtime*.
+
 Node: `docs/program/issues/RT-LEXICAL-RECURSOR-CONSUMERS.md` (rows 1-5 only).
 Frame: `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS.md`.
 
@@ -66,9 +95,14 @@ thread name, one `write_all` of a pre-formatted buffer — the sibling node
 measured that `writeln!` issues a syscall per fragment and lets concurrent test
 threads interleave mid-record. **Malformed rows in the run below: 0.**
 
-The instrument was temporary and is **not** in this candidate; the tree is
-byte-identical to `9adeb30f` (`core.rs` sha256 `d75c2f09…a4f3`). The measurement
-is the durable artifact.
+The instrument was temporary and is **not** in this candidate. At the `D0`/`D1`
+record commit the tree was byte-identical to `9adeb30f` (`core.rs` sha256
+`d75c2f09…a4f3`).
+The measurement is the durable artifact.
+
+> **SUPERSEDED as a statement about the current branch.** `D2a` has since
+> modified `core.rs`; that hash identifies the tree the census ran on, not the
+> tree today.
 
 ### 1.3 Denominators, `ken-runtime --lib`, measured at `9adeb30f`
 
@@ -245,7 +279,14 @@ also the only probe the campaign has for that guard.
 | authorities materially distinct | **YES** | three owners, four classes, one non-refusal boundary |
 | shares an exact production root with `RT-MATCH-RECURSOR-CONSUMERS` | **no** — but see the correction below | ruled by the Architect, not inferred here |
 
-**⇒ The partition is returned and `D2` is not begun.** Sizing is the Steward's
+**⇒ The partition is returned and `D2` is not begun.**
+
+> **SUPERSEDED.** True at the `D0`/`D1` record commit. `D2a` was subsequently
+> authorised by Architect ruling `evt_k64pjherb9x0` and has landed for **R1
+> only**; see
+> `RT-LEXICAL-RECURSOR-CONSUMERS-D2a.md`. `R2`, `R3` and `R4` remain unstarted.
+
+Sizing is the Steward's
 call: `M` was a scoping figure from a symptom count, and the symptom count was
 five while the causal count is four across three authorities — with R4 in a
 different phase from the other three.
@@ -254,6 +295,10 @@ different phase from the other three.
 
 - **No repair, no control, no fixture change.** `crates/` is byte-identical to
   `9adeb30f`; this candidate is this document.
+
+  > **SUPERSEDED.** True of the `D0`/`D1` record commit only. The branch now
+  > carries `D2a`'s production arm in
+  > `lowering/core.rs` and its control in `lowering/core/tests/control.rs`.
 - **Row 6 and the `MatchScrutineeRecursor` population** — not touched.
 - **Rows 1 and 4 beyond their first activated compile** — 3 compiles unmeasured
   under activation, stated in §2.2 rather than assumed harmless.
