@@ -65,7 +65,7 @@ emission is **required, not optional**.)
 result-indices (`infer_match` already builds `Term::Elim{indices:[]}` for them, so
 `34 §3.2`'s "generalized over scrutinee **and indices**" is trivial here — zero
 indices). Full **indexed-family (GADT)** dependent match additionally needs index
-generalization + higher-order pattern unification (`39 §2.3`) +
+generalization + higher-order pattern unification (`39 §2` item 3) +
 impossible-branch/forced-arg refinement — a **distinct, materially harder
 mechanism, a separate later WP.** Map / `map-verified-laws` do **not** need it; the
 old "including indexed families" downstream line (below) **over-scoped** and is
@@ -115,7 +115,7 @@ comparison-dependent `map-verified-laws` proofs.
 `34 §3.2`: `elim_D` takes a motive `M : (Δ_i) → D Δ_p Δ_i → Type ℓ'`; for a
 **dependent** match the elaborator recovers `M` as the expected type
 **generalized over the scrutinee `x : D Δ_p ī` and the indices `ī`**, solved by
-higher-order pattern unification against the expected type (`39 §2.3`) — *"genuine
+higher-order pattern unification against the expected type (`39 §2` item 3) — *"genuine
 ambiguity is a surface error, never a guess"* (`39 §3`). `34 §3.3`: in the `cₖ`
 arm the scrutinee is **definitionally** `cₖ field̄` by the ι-rule, and the
 verification layer adds the **scrutinee equation** `(_ : Eq A s (cₖ field̄))` to

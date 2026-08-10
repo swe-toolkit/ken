@@ -1,7 +1,7 @@
 ---
 id: KERNEL-RECURSIVE-RESULT-SURFACE
 title: "A source term that denotes the kernel-supplied recursive method result for a lifted recursive field -- the missing surface capability that makes an unbounded residual-All fold expressible"
-status: ready
+status: merged
 owner: spec-enclave
 size: M
 gate: none
@@ -10,6 +10,31 @@ blocks: [DS-9]
 github: null
 origin: Architect ruling evt_2s6gmzqvaj5mr (2026-08-10), issued after the conformance-validator rejected three KERNEL-NESTED-IND D6 candidates (dec_7d46tfm6pp3mq, dec_1r4sxfr3j2gs7, dec_8pyjkfs3qv7m) and kernel-implementer grounded the exact source-level obstruction at evt_7bx469t75cd2y. The ruling directs that D6 be recut to seven cases with nested-size-uses-lift gated, and that this capability become a separate node. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # MERGED. THE CONTRACT IS LANDED SPEC; THE CAPABILITY IS NOT BUILT.
+>
+> `D0` and `D1` merged at exact
+> `f9572c271c795956e7731085ba1c4118272bac91` (PR #1800), Decision
+> `dec_1zvm81f1c4ps9`. Both this node's deliverables are discharged, which is
+> what `merged` records here.
+>
+> ⛔ **`AC-1` … `AC-5` below are NOT discharged.** The frame states they are
+> the *capability's* acceptance, inherited by the implementation successor.
+> That successor now exists: **`LANG-STRUCTURAL-RESULT-ELAB`**, owned by
+> Language, which carries `AC-1` … `AC-5` verbatim plus an `AC-6` the landed
+> spec adds. Read this node's obstruction, approved shape, and prohibitions
+> from there.
+>
+> **The spelling is no longer open.** `recursive-result` throughout the text
+> below is the metanotation the Architect refused to fix; the landed form is
+> **`structural result of x`**, a contextual primary with a
+> `structural_result` production (`spec/30-surface/32-grammar.md §3`,
+> `34-data-match.md §3.1.1`, `39-elaboration.md §2.3`/`§4`). Where the two
+> disagree, the spec wins.
+>
+> Both gated `seed-nested.md` rows remain gated. Binding them is a
+> `KERNEL-NESTED-IND` `D6` successor with fresh review; no verdict from the
+> four spent `D6` candidates transfers.
 
 > # THIS NODE IS A SPEC CONTRACT FIRST. IT IS NOT AN IMPLEMENTATION TICKET.
 >

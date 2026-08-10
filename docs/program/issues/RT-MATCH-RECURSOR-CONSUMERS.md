@@ -1,14 +1,14 @@
 ---
 id: RT-MATCH-RECURSOR-CONSUMERS
 title: "Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-CARRIED-CONTINUATION-RESUME, RT-CARRIED-ORDINARY-COMPOSITION, RT-SPECIALIZED-ACTIVE-RESUME, RT-CONTINUATION-CALL-DISCHARGE, RT-CONTINUATION-EDGE-DISPOSITION]
 blocks: [RT-RECURSOR-TRANSPORT]
 github: null
-origin: Architect re-rule evt_3r4j14fv1jtj2 (2026-08-08) on the nine-expression census evt_16cmej481q7ns, partitioning RT-RECURSOR-TRANSPORT hard stop 4 by measured residual population. Row 6 (d8d) is a D2 completeness defect in Position A, not a lexical-successor row. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
+origin: Architect re-rule evt_3r4j14fv1jtj2 (2026-08-08) on the nine-expression census evt_16cmej481q7ns, partitioning RT-RECURSOR-TRANSPORT hard stop 4 by measured residual population. Row 6 (d8d) is a D2 completeness defect in Position A, not a lexical-successor row. Campaign docs/program/16-recursive-descent-retirement.md node #6c. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
 > # `D9` — ADDED 2026-08-09. `D8`'s PIN READS 3 OF 8 WORKSPACE MEMBERS.
