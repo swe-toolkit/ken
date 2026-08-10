@@ -29482,9 +29482,16 @@ fn d2b_capability_gate_the_two_position_shape_refuses_before_its_case_body() {
     for mode in [LrcD2bLetDisposition::Exact, LrcD2bLetDisposition::Suppress] {
         let observed = run(mode);
 
-        // THE BODY RAN. Non-empty entry and a reached static-worker edge are the
-        // positive evidence; without them every "nothing was dispositioned"
-        // below would hold because nothing happened at all.
+        // ⛔ SOME source occurrence was entered -- NOT the body's, and this
+        // comment says so because an earlier revision of it said "THE BODY
+        // RAN", which is false on this shape and contradicted the very next
+        // block.
+        //
+        // This is a NON-VACUITY clause and nothing more: without it, every
+        // "nothing was dispositioned" below would hold because the compile did
+        // nothing at all. It establishes that lowering happened, not that the
+        // case body was reached -- Row B is the row that reaches a body, and it
+        // asserts entry of the ARM-REPORTED origin rather than a non-empty set.
         assert!(
             !observed.entered.is_empty(),
             "{mode:?}: no source occurrence was entered, so this row measures nothing"
