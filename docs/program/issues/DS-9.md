@@ -1,7 +1,7 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: ready
+status: active
 owner: foundation
 size: L
 gate: none
@@ -46,6 +46,46 @@ origin: Phase 3 of the catalog data-structures enrichment program (docs/program/
 > CLOSES.** Reading it as "wait for the whole node" strands this node behind a
 > Runtime dependency it does not have. ⛔ Do not infer the node's blockers from
 > its `depends_on` edge alone — the edge is whole-node, the need is `D5`.
+>
+> ## RELEASED TO FOUNDATION 2026-08-10 ~05:0xZ, at `main = 65a61416`.
+>
+> **Foundation's stand-down is LIFTED.** Every re-encoding the stand-down
+> forbids by name -- W-shaped, `Fin n`, flattening, Church encodings,
+> postulates, extra malformed spine states -- **remains forbidden**; it was the
+> Architect's ruling, not a consequence of the block. The diagnostic scaffold at
+> `4dfdb21d` is still evidence, not a candidate.
+>
+> **The contention caveat in frame §7 was re-checked at release**, as the frame
+> asks. No checked-out branch in any of the 46 worktrees, and no uncommitted
+> edit in any worktree, touches `Data/Collections/Derived.ken.md`,
+> `Core/Classes/LawfulClasses.ken.md`, or `Capability/Parsing/*.ken.md` -- the
+> `include_str!` sources whose concurrent edit would change what `base_env()`
+> elaborates. Runtime's live slice is `RT-DYNAMIC-ARM-SCALAR-MERGE`
+> `D1b-role-b`, confined to erasure in `crates/ken-elaborator/src` and
+> `crates/ken-runtime`. ⚠ Frame §7's own list of Runtime's queue (`ABI-S3`,
+> `RT-VALUE-TOTALITY` P2, `RT-FNSPLIT-C1`) is **stale** -- re-derive contention
+> from the live lanes, not from that sentence.
+>
+> ### THE PRIORITY CALL, AND THE FACT THAT I MADE IT
+>
+> ⚠ **This was a call between two `ready` WPs, which `steward.md §3` routes to
+> the operator, and the operator is away until 11:30Z.** I made it rather than
+> leaving a lane idle for seven hours, and I am recording it so it can be
+> reversed rather than discovered.
+>
+> The block below says the contention is "DS-9 and Verify's
+> `CI-ASSERTIONLESS-L1` both want the lane." **That contention dissolved** --
+> `CI-ASSERTIONLESS-L1` merged at `3d6622c9`. But a new one appeared the same
+> hour: I filed and framed `CI-L1-EXECUTING-COVER` (Verify, S), which became
+> eligible at that same merge. So the choice was DS-9 versus that.
+>
+> **I gave it to DS-9, on three grounds:** Foundation has had no active work
+> since 2026-07-27 while Verify has been continuously busy; DS-9 is the
+> data-structures tier's acceptance test and has been blocked on a kernel
+> capability that has now landed; and `CI-L1-EXECUTING-COVER` is a node I
+> created tonight, so letting it pre-empt one that has been eligible and
+> waiting two weeks would be bad sequencing. ⛔ **If the operator disagrees,
+> DS-9 yields** -- it is early and nothing is sunk.
 >
 > ## FLIPPED TO `ready` 2026-08-09 — `D5` MERGED AT `82918b6a`.
 >

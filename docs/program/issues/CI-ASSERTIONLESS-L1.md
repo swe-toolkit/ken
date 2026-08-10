@@ -1,7 +1,7 @@
 ---
 id: CI-ASSERTIONLESS-L1
 title: "Four registered conformance claims whose only cover does not check them — l1_acceptance.rs, three ignored and one live, green, and counted as cover"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none
