@@ -814,7 +814,7 @@ Each names its positive control.
 | `AC-K11` | ⭐ `D1a`'s recorded polarity is **populated at admission and read by the positivity check** — not recorded-then-ignored. | perturb the **recorded** value for one parameter → admittance must change. ⛔ If it does not, the check recomputes and the record is inert — the `ConstructorDecl.recursive_positions` failure repeated (frame §2e) |
 | `AC-K14` | ⛔⛔ **`D3b` and `D4` land in ONE commit, and the pair is kernel-checked.** No commit exists in which a generated method binder carries a structured lift that `iota_reduct` does not construct. | ⚠ **`Σ (_ : D). D` is the control, because it is admitted on `main` TODAY with zero IHs** (`inductive.rs:91` checks both Sigma components at the same polarity; `:90` flips only `Pi`'s domain). Exercise the eliminator on it: the method binder's lift and ι's constructed term must agree, and the kernel must check the pair. ⛔ A `method_type` change without the matching ι is a **subject-reduction defect**, not an incomplete step. Architect `dec_351mz4r239398` |
 | `AC-K13` | ⭐ **The polarity producer is TOTAL over every accepted constructor field type** — every such field yields a polarity record or a rejection, ⛔ **never a panic** (`18 §4`). | ⚠ **Enumerate by `Term` form, not by example.** For each form the fallback traverses, exercise a field of that form that mentions the parameter. Two named controls, both from Architect rejections: (a) `Term::Let { ty: Bool, val: false, body: pi(var(1), Bool) }` — an accepted field reducing to `A -> Bool`, which must record `NonPositive`; its `body` binds index 0, so a fallback that traverses children at one depth reads `A` at the wrong index. (b) index selection must be non-panicking for an out-of-range relative index — ⛔ `bool::then_some` evaluates its argument **eagerly**, so `(r < n).then_some(n - 1 - r)` underflows *before* the condition can yield `None`; `then(\|\| …)` is the lazy form |
-| `AC-K12` | A nested-IH constructor **lowers and evaluates**, not just type-checks. | the evaluator and native-lowering paths **re-derive** recursive positions (frame §2d, §2f) and one lowering site computes binder arity as `argument_binders + recursive_positions.len()`. Control: a recursive computation over `JsonArray` evaluates, and the built-artifact suite is green |
+| `AC-K12` | A nested-IH constructor **lowers and evaluates**, not just type-checks. | the evaluator and native-lowering paths **re-derive** recursive positions (frame §2d, §2f) and one lowering site computes binder arity as `argument_binders + recursive_positions.len()`. Control: a recursive computation over `JsonArray` evaluates, and the built-artifact suite is green. ⛔ **AND the carried control `liftrose_synthetic_witness_closes_owner_two_required_joins` RUNS** — it is `#[ignore]`d in `crates/ken-runtime/.../planning/static_transition.rs`, and this criterion is the tracked owner of its release condition. **Do not report `AC-K12` green while it is still `#[ignore]`d.** Full rider below in this node; it is stated here because a discharge check reads this row and not the prose |
 
 ### `AC-K10` METRIC RULING — the "not a zero" clause is withdrawn
 
@@ -983,6 +983,28 @@ condition has now been corrected three times, and each correction restated it
 somewhere with no owner to re-read it. A fourth wording would repeat that. The
 condition belongs in a tracked node that a status check can see, which is what
 this block makes it.
+
+> **This block was not enough on its own, and the gap is worth keeping.**
+> Adversary `evt_51haf6m1p83b0` (2026-08-10, confirmed and repaired the same
+> hour): a status check reads the **`AC-K12` row**, which is the criteria
+> table's **last** row — and that row said nothing about this obligation, with
+> no forward pointer across the ~150 lines between them. So the chain ran
+> *code comment → "tracked at `AC-K12`" → the row → silence*, and the
+> obligation sat at neither end of the last hop. The rider is now **in the
+> row's control column**; this block remains the full statement.
+>
+> **The direction is what makes it worse than the usual version.** Elsewhere
+> the loose summary sits in the operative text and the precise sentence in the
+> prose, which fails toward a confusing red. Here the precise obligation was
+> in the prose and the **operative row was silent**, which fails toward
+> **green** — a discharge check would have passed `AC-K12` with the control
+> still `#[ignore]`d. `RT-DYNAMIC-ARM-SCALAR-MERGE` `c1` merged at `7bfc8ae5`
+> the same day, retiring this criterion's stated blocker, so that check was
+> imminent rather than hypothetical.
+>
+> ⇒ **The rule that covers both directions: the operative artifact — the row,
+> the assertion message, the AC — carries the claim, whichever pass wrote it.**
+> Prose beside it is elaboration, never the only statement.
 
 ⛔ **`AC-K3` and `AC-K8` are the pair that matters.** `AC-K3` proves the new
 capability is *usable*; `AC-K8` proves the old capability is *undamaged*. A node
