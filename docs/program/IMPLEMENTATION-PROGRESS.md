@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-10 19:26:58Z — from 207 issue file(s) in `docs/program/issues/`.
+2026-08-10 19:32:55Z — from 208 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -234,6 +234,7 @@ the committed file matches the generator's output.
 | `SPEC-IDENT-BLESSED` | Settle the identifier character set: 31-lexical promises a bounded blessed-Unicode-letter table that does not exist, cites a security chapter that carries no such claim, and states a confusable gate the landed lexer does not implement | merged | spec-enclave | M | none | https://github.com/swe-toolkit/ken/pull/1147 |
 | `SPEC-MISSION-GROUNDING` | Ground the spec as a whole against the mission — audit every retained constraint for which mission property fails without it, and relax the ones where nothing does | draft | spec | L | none | — |
 | `SPEC-NESTED-IND` | un-defer nested strictly-positive inductives in 14 §8.5 — state structural positivity through declared strictly-positive type-parameter positions, the lifted induction hypotheses, and the iota rules, WITHOUT mutual families | merged | spec-enclave | M | none | — |
+| `SPEC-SELECTOR-SORT-SPLIT` | split the recursive-result selector by motive sort -- `recursive result for x` when Type-classified, `induction hypothesis for x` when Omega-classified -- and remove `structural result of x` | ready | spec | M | none | — |
 | `SPEC-STATUS-RECONCILE` | the spec's two status vocabularies do not correspond — define the correspondence (or replace the ladder), then apply it | merged | spec-enclave | M | none | — |
 | `SPEC-STORE-SPLIT` | Split durable canonical bytes from in-process maximal sharing: demote the store mechanism to private, retarget the conformance rows that assert it, and re-cut the runtime program against the relaxed contract | merged | spec-enclave | L | none | — |
 | `SRC-ATTEST` | squash-stable whole-source attestation + fresh merge-result authorization | merged | doc | M | none | — |
@@ -263,6 +264,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-LEXICAL-RECURSOR-CONSUMERS` — Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SPEC-ERRATUM-39-2-3-CITATION` — Erratum: 34-data-match.md:625 still cites `39 §2.3` for higher-order pattern abstraction, a coordinate the structural-result merge reassigned to Structural-result association
+- `SPEC-SELECTOR-SORT-SPLIT` — split the recursive-result selector by motive sort -- `recursive result for x` when Type-classified, `induction hypothesis for x` when Omega-classified -- and remove `structural result of x`
 
 ## Blockers
 
