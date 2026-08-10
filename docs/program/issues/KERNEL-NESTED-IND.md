@@ -770,7 +770,12 @@ containers, which is the allow-list the ruling forbids.
   eliminator rather than trusting it.
 - **`D5`** — surface consumability: matching, elaboration, and
   structural-recursion/termination checking accept the lifted hypotheses.
-- **`D6`** — the four conformance rows of contract point 4.
+- **`D6`** — the four conformance rows of contract point 4. **MERGED 2026-08-10**
+  as `d9b1d5b1` (PR #1753), `main` `276d5ae4`, both blobs verified. **Seven cases
+  bound; `nested-size-uses-lift` gated** on [[KERNEL-RECURSIVE-RESULT-SURFACE]].
+  Heading census `19 → 14`, re-measured on `main` after the merge with the size
+  row's marker still present. ⚠ The node stays `active`: `D7` and `AC-K12` are
+  open, and `D6` closing is **not** `AC-K12` progress.
 - **`D7`** — a **`trusted_base()` delta report**, stated as a number with what
   grew and why. ⚠ This node *does* grow the TCB; the deliverable is an honest
   accounting, ⛔ not a zero.
