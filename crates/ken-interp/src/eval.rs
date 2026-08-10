@@ -644,17 +644,27 @@ fn lift_recursive_value(
     store: &mut EvalStore,
 ) -> EvalVal {
     match shape {
-        RecursiveShape::Direct { .. } => elim_reduce(
-            env,
-            fam,
-            level_args,
-            params,
-            motive,
-            methods,
-            value,
-            globals,
-            store,
-        ),
+        RecursiveShape::Direct { .. } => {
+            if let EvalVal::Ctor { id, .. } = &value {
+                let Some((host, _)) = globals.constructor(*id) else {
+                    return EvalVal::Neutral;
+                };
+                if host.id != fam {
+                    return EvalVal::Neutral;
+                }
+            }
+            elim_reduce(
+                env,
+                fam,
+                level_args,
+                params,
+                motive,
+                methods,
+                value,
+                globals,
+                store,
+            )
+        }
         RecursiveShape::Pi { domains, body } => {
             if matches!(body.as_ref(), RecursiveShape::Direct { .. }) {
                 EvalVal::IhClosure {
@@ -748,6 +758,14 @@ fn lift_recursive_value(
                 let Some(support_ctor) = support_decl.constructors.get(ordinal) else {
                     return EvalVal::Neutral;
                 };
+                let Ok(host_recursive) = recursive_shapes(
+                    globals,
+                    &host.constructors[ordinal],
+                    *former,
+                    host.params.len(),
+                ) else {
+                    return EvalVal::Neutral;
+                };
                 let Ok(evidence_positions) =
                     all_support_evidence_positions(globals, support, ordinal)
                 else {
@@ -759,9 +777,21 @@ fn lift_recursive_value(
                     let Some(field) = source_fields.get(position) else {
                         return EvalVal::Neutral;
                     };
+                    let evidence_shape = match host_recursive
+                        .iter()
+                        .find(|recursive| recursive.position == position)
+                    {
+                        Some(recursive)
+                            if matches!(&recursive.shape, RecursiveShape::Direct { .. }) =>
+                        {
+                            shape
+                        }
+                        Some(_) => return EvalVal::Neutral,
+                        None => argument_shape,
+                    };
                     support_args.push(lift_recursive_value(
                         env,
-                        argument_shape,
+                        evidence_shape,
                         field.clone(),
                         fam,
                         level_args,
@@ -785,6 +815,90 @@ fn lift_recursive_value(
                 _ => EvalVal::Neutral,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod nested_lift_coordinate_tests {
+    use super::*;
+    use ken_kernel::{declare_inductive, CtorSpec, InductiveSpec};
+
+    fn one_constructor_family(env: &mut GlobalEnv, parameterized: bool) -> GlobalId {
+        declare_inductive(env, |_| InductiveSpec {
+            level_params: vec![],
+            params: if parameterized {
+                vec![Term::Type(Level::zero())]
+            } else {
+                vec![]
+            },
+            indices: vec![],
+            level: Level::zero(),
+            constructors: vec![CtorSpec {
+                args: if parameterized {
+                    vec![Term::var(0)]
+                } else {
+                    vec![]
+                },
+                target_indices: vec![],
+            }],
+        })
+        .expect("one-constructor family")
+    }
+
+    #[test]
+    fn direct_lift_refuses_mismatched_parameterized_host_before_method_type() {
+        // Promise class: durable invariant. MEASURED: the positive constructor
+        // reaches the selected method, while a parameterized foreign host at
+        // the same Direct seam becomes Neutral. CLAIMED: a host/family
+        // mismatch cannot forward wrong parameters to method_type. THE GAP:
+        // the NC14 recursive-Bag witness separately proves that a valid Former
+        // recursion does not get mistaken for this mismatch.
+        let mut globals = GlobalEnv::new();
+        let guest = one_constructor_family(&mut globals, false);
+        let foreign = one_constructor_family(&mut globals, true);
+        let guest_ctor = globals.inductive(guest).unwrap().constructors[0].id;
+        let foreign_ctor = globals.inductive(foreign).unwrap().constructors[0].id;
+        let guest_type = Term::indformer(guest, vec![]);
+        let motive = Term::lam(guest_type.clone(), guest_type);
+        let methods = vec![Term::constructor(guest_ctor, vec![])];
+        let shape = RecursiveShape::Direct {
+            index_exprs: vec![],
+        };
+        let mut store = EvalStore::new();
+
+        let positive = lift_recursive_value(
+            &[],
+            &shape,
+            make_ctor(guest_ctor, vec![], &mut store),
+            guest,
+            &[],
+            &[],
+            &motive,
+            &methods,
+            None,
+            &globals,
+            &mut store,
+        );
+        assert!(matches!(positive, EvalVal::Ctor { id, .. } if id == guest_ctor));
+
+        let negative = lift_recursive_value(
+            &[],
+            &shape,
+            make_ctor(
+                foreign_ctor,
+                vec![EvalVal::Unknown, EvalVal::Unknown],
+                &mut store,
+            ),
+            guest,
+            &[],
+            &[],
+            &motive,
+            &methods,
+            None,
+            &globals,
+            &mut store,
+        );
+        assert_eq!(negative, EvalVal::Neutral);
     }
 }
 

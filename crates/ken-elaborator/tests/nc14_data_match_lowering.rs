@@ -332,8 +332,8 @@ fn duplicate_nested_lift_arm_is_reachability_error() {
     // as the ordinary dependent-match path does. Keep the accepted fixture as
     // the positive side, and change only one duplicate-arm axis here.
     let source = NESTED_LIFT_NAT_THREE_SOURCE.replacen(
-        "Empty |-> Suc Zero ; ",
-        "Empty |-> Suc Zero ; Empty |-> Suc Zero ; ",
+        "Empty |-> Zero ; ",
+        "Empty |-> Zero ; Empty |-> Zero ; ",
         1,
     );
     assert_ne!(
