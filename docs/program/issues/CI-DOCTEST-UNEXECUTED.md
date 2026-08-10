@@ -1,7 +1,7 @@
 ---
 id: CI-DOCTEST-UNEXECUTED
 title: "CI runs no --doc step on a premise that is false -- doctests are collected but never executed, and the positive control for a 20-block compile_fail set is among the dead ones"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none
