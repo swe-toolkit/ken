@@ -1,5 +1,41 @@
 # RT-LEXICAL-RECURSOR-CONSUMERS D2e — the identity plane, planner-only
 
+> ### SCOPE RE-CUT 2026-08-10. This frame is CLOSED; its remaining scope moved.
+>
+> **`D2e` landed three partials and then stopped short three times. Three
+> budget-bound stops on one deliverable means the sizing was the defect, and
+> the cut is mine rather than the ring's.** No key or ABI work was ever begun,
+> so nothing is half-built.
+>
+> | landed | where |
+> |---|---|
+> | `AC-1` binder role, `AC-7` denominator operand | `main` `f37ecd13` |
+> | `AC-2`/`AC-3` threading, `AC-9`/`AC-10` | `main` `f2959dfc` |
+> | `AC-6` retained, `AC-8` satisfied | across both |
+>
+> **Remaining scope is re-cut into two deliverables**, on the implementer's own
+> recommendation and the Architect's required-transport ruling:
+>
+> - **[[RT-LEXICAL-RECURSOR-CONSUMERS-D2g]] — the checked transport twin.** The
+>   plan-threading capture helper, a complete oriented plan, and the checked
+>   `R3`-shaped twin that reaches the same producer to IH-consumer relation.
+> - **[[RT-LEXICAL-RECURSOR-CONSUMERS-D2h]] — the key plane.**
+>   `StaticContinuationFusionId`, the whole key, interning, the exact
+>   re-derivation validator, and `AC-4`/`AC-5`, built against the landed twin.
+>
+> **`AC-4` and `AC-5` are `D2h`'s and are not discharged here.** `D2f`, the
+> emission plane, now gates on `D2h` rather than on this frame.
+>
+> **Everything below is retained as the durable record** of what landed and why,
+> and as the source both successors inherit. The fixed-input reconciliation and
+> the Architect's ruling below are binding on both.
+>
+> **One coordinate statement, sharper than my own wording and taken from the
+> implementer's competing frame candidate `5760efcc`:** the unmarked `R3`
+> witness's `StaticOriginId(5/12/18/23)`, its owners and its edge are
+> coordinates **of that witness** and are **not the coordinates of any fusion**.
+> That forecloses reuse everywhere, not only in the twin.
+
 Owner: runtime. Size: M. Node: [[RT-LEXICAL-RECURSOR-CONSUMERS]] (`#6d`).
 Architect rulings `evt_2wwh9yamyhs7p` (the mechanism) and `evt_6sk3czsbcr85r`
 (the `StaticContinuationFusion` class). Fixed inputs measured at `main`
