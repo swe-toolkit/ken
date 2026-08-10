@@ -7797,9 +7797,12 @@ pub fn elaborate_rexpr(
 
 #[cfg(test)]
 mod nested_lift_association_tests {
+    use crate::{parser::parse_expr, resolve::{resolve_expr_standalone, RExpr}, ElabEnv};
+    use ken_kernel::{Level, Term};
+
     use super::{
-        lift_association_error, validate_lift_associations, ElabError, GlobalId, HashMap,
-        LiftAssociationFailure, LiftBinding, Span,
+        infer, lift_association_error, validate_lift_associations, ElabCtx, ElabError, GlobalId,
+        HashMap, LiftAssociationFailure, LiftBinding, Span,
     };
 
     fn binding(
@@ -7940,6 +7943,51 @@ mod nested_lift_association_tests {
                 expected_support: Some(GlobalId(42)),
                 actual_support: Some(GlobalId(99)),
             } if got_match == match_span && field_span == second
+        ));
+    }
+
+    #[test]
+    fn anonymous_u_to_r_association_selects_r_and_rejects_when_deleted() {
+        // Resolve the literal surface selector first. Its spelling is arbitrary:
+        // the binding identity is index 0, not a carrier/ctor/field/motive name.
+        let parsed = parse_expr("let u : Type = Type in structural result of u").unwrap();
+        let RExpr::RLet(_, _, _, selector, _) = resolve_expr_standalone(&parsed).unwrap() else {
+            panic!("expected the source selector under its ordinary let binding");
+        };
+        let RExpr::RStructuralResult { index, binding_span, span, .. } = &*selector else {
+            panic!("expected resolved structural-result selector");
+        };
+        assert_eq!(*index, 0);
+
+        let mut env = ElabEnv::new().unwrap();
+        let mut selected = ElabCtx::new(
+            &mut env.env,
+            &env.globals,
+            &mut env.num_values,
+            &env.numeric_env,
+            "anonymous-u-to-r",
+        );
+        // Branch telescope: source u, hidden evidence, distinct hidden result r.
+        // `None` support is the anonymous class: no carrier/constructor name is
+        // available to the association or selector gate.
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.ctx.push(Term::Type(Level::Zero));
+        selected.hidden_positions.extend([1, 2]);
+        selected
+            .lift_bindings
+            .insert(0, binding(1, Some(2), None));
+
+        let (term, _) = infer(&mut selected, &selector).unwrap();
+        assert_eq!(term, Term::var(0), "selector must choose trailing r, not evidence");
+
+        selected.lift_bindings.clear();
+        assert!(matches!(
+            infer(&mut selected, &selector),
+            Err(ElabError::StructuralResultOutOfScope {
+                selector_span,
+                binding_span: got_binding,
+            }) if selector_span == *span && got_binding == *binding_span
         ));
     }
 }
