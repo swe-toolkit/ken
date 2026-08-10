@@ -289,6 +289,69 @@ without this branch context is not a valid lowering. This surface path remains
 gated on `KERNEL-NESTED-IND` until the kernel can generate and check the lifted
 method type and its ι.
 
+#### 3.1.1 The structural result of a nested recursive field
+
+The surface form
+
+```ken
+structural result of xs
+```
+
+selects the kernel-supplied recursive method result associated with the resolved
+surface binding `xs`. It is the `structural_result` primary expression of
+`32 §3`. It is not an application of a function named `structural` or `result`,
+does not invoke the enclosing definition, and does not introduce general
+recursion.
+
+The validity rule is positive and exhaustive. The form is valid if and only if
+its operand resolves to a surface variable whose current branch environment
+carries exactly one validated structural-result association. Such an
+association exists precisely while compiling a nested strictly-positive match
+method in which:
+
+1. the source pattern binds an enclosing recursive field;
+2. the checked method telescope supplies the structural support evidence and
+   recursive method result for that same field and structural occurrence; and
+3. those three components form a one-to-one, in-range association with the same
+   support provenance.
+
+The association begins in the branch body where the field is bound and remains
+available in lexically nested expressions until that binding is shadowed or the
+branch ends. It is attached to the resolved binding identity, not its spelling:
+copying the field into a `let`, projecting from it, or introducing another
+variable with the same text does not copy the association. The rule is
+structural and does not recognize a carrier, constructor, field name, or motive
+by name. Consequently, for an arbitrary branch binding `u` and an otherwise
+unnamed validated association `u ↦ r`, `structural result of u` is valid and
+selects `r`; removing that association makes the same form invalid without any
+new case in this specification.
+
+Elaboration replaces the selector with the exact hidden recursive method result
+from the association. Its type is the type assigned to that result in the
+checked method telescope, including a `Type`-valued or `Omega`-valued motive as
+appropriate. No generated support identifier or hidden method binder enters
+source scope, and constructor-pattern arity is unchanged. The ordinary field
+expression `xs` retains its declared source type; neither it nor an owner
+self-call is reinterpreted as the recursive result. Missing, duplicate, swapped,
+and foreign associations reject fail-closed under `39 §2.3`/`§4`.
+
+Schematic nested support methods may therefore consume whole-field results
+without a finite source unroll:
+
+```ken
+Join xs ys ↦ combine
+  (structural result of xs)
+  (structural result of ys)
+```
+
+This addition does not alter ordinary direct or W-style matching. A direct
+recursive field continues to use the existing exact-motive self-call rewrite,
+and a W-style field continues to use its existing Pi-abstracted induction
+hypothesis. Neither form receives a structural-result association merely by
+being recursive. In a match that contains no `structural_result`, pattern
+arity, bound variables, branch types, termination routing, diagnostics, and
+emitted core behaviour for direct and W-style cases are normatively unchanged.
+
 ### 3.2 Dependent-motive recovery
 
 `elim_D` takes a **motive** `M : (Δ_i) → D Δ_p Δ_i → Type ℓ'` (`14 §3`).
@@ -304,7 +367,8 @@ abstracting it over the scrutinee and its indices:
   the scrutinee `x : D Δ_p ī` and the indices `ī`. Recovering this dependency is
   what lets a branch refine the result type (essential for `§2` indexed families
   and for `22 §4`'s inductive postconditions). The elaborator solves the motive
-  by higher-order pattern unification against the expected type (`39 §2.3`);
+  by higher-order pattern unification against the expected type (`39 §2` item
+  3);
   genuine ambiguity is a surface error, never a guess (`39 §3`).
 
 #### 3.2.1 Peeled-field injectivity, sibling convoy, and goal refinement

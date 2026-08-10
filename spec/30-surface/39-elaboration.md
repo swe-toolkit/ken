@@ -225,6 +225,36 @@ The required elaboration contract is:
   The CAT-5 `Source` surface remains governed by the existing CAT-5 contract and
   the immediate unblocker remains `KM-sigma-projection-execution`.
 
+### 2.3 Structural-result association
+
+When match compilation creates the branch environment described by `34
+§3.1.1`, it derives each structural-result association from the checked method
+telescope. It does not infer an association from source names, constructor
+names, a field's ordinary type alone, or an owner self-call.
+
+For every nested structural occurrence that supplies a recursive method result,
+the elaborator must establish one relation among the resolved source-field
+binding, its structural support evidence, and that exact recursive method result.
+The relation is valid only when all three belong to the same enclosing method
+and support instance, designate the same structural occurrence, are in range,
+and are one-to-one in both directions. A result or evidence term cannot serve
+two fields, and a field cannot select two results. Validation precedes branch-
+body elaboration; failure rejects the enclosing `match` without a guessed,
+positional, or name-derived fallback.
+
+For `structural result of x`, name resolution first resolves `x` to one surface
+binding. The form elaborates only when that binding has exactly one validated
+association in the current branch environment, and then emits the associated
+hidden result term directly. The elaborator never publishes the hidden term's
+name, adds a constructor-pattern field, changes the type of `x`, or rewrites an
+ordinary call to obtain it. An arbitrary association satisfying the rule is
+accepted without appearing in a carrier or constructor allow-list.
+
+Direct recursive and W-style fields do not acquire this association from their
+existing direct/abstracted induction hypotheses. Their established match and
+self-call elaboration is unchanged, including when they occur in the same
+program as a nested structural field.
+
 ## 3. What elaboration must guarantee
 
 - **Well-typed output.** Every emitted core term `check`s in the kernel; if it
@@ -253,6 +283,24 @@ The required elaboration contract is:
   the LSP), but its *accepted* output is always kernel-checked. Partial programs
   with verification holes still elaborate (the holes are obligations, `22`);
   programs with *type* errors do not (they have no well-typed core image).
+
+Structural-result failures are L1 surface errors and fail closed before a
+branch body is emitted. Their stable diagnostic names and payloads are:
+
+| Diagnostic | Raised when | Carries |
+|---|---|---|
+| **`StructuralResultOutOfScope`** | the operand of `structural result of x` resolves, but that binding has no exact structural-result association in the current branch | the selector span and resolved binding span |
+| **`StructuralResultAssociationMissing`** | a nested structural occurrence requires an association, but no complete field/evidence/result triple can be derived | the enclosing match and source-field spans |
+| **`StructuralResultAssociationDuplicate`** | a field, support-evidence term, or result term participates in more than one candidate association | the enclosing match span and every implicated source-field span |
+| **`StructuralResultAssociationSwapped`** | otherwise local evidence/result terms are paired with different source fields or structural occurrences within the same support instance | the enclosing match span and both crossed field spans |
+| **`StructuralResultAssociationForeign`** | an evidence or result term comes from another method, support instance, or enclosing match | the selector or enclosing-match span, the source-field span, and both provenance identities |
+
+`UnboundName` remains the diagnostic when the operand identifier itself does not
+resolve. None of the five structural-result diagnostics may recover by exposing
+a hidden binder, extending a pattern, treating the ordinary field value as its
+result, or synthesizing an owner self-call. Missing, duplicate, swapped, and
+foreign associations reject the enclosing match even when a guessed pairing
+would happen to type-check.
 
 ## 5. V0 — the minimal elaborator (Phase 1)
 
