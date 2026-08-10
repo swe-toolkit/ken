@@ -7680,3 +7680,163 @@ mod px7l_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod d1b_role_b_decoder_alignment {
+    use super::*;
+
+    /// A symbol whose spelling names the field it was placed in.
+    fn sentinel(field: &str) -> StableSymbol {
+        StableSymbol::declaration("roundtrip", &[], field)
+    }
+
+    /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-b` — the decoder reads every
+    /// field into the field the encoder wrote it from.
+    ///
+    /// **Why this exists.** The wire format is positional and the two orders are
+    /// written by hand in different crates: the encoder's array in
+    /// `compiler_driver`, the decoder's list in `ken_runtime`'s macro. A
+    /// misalignment binds each role to its neighbour's symbol and still produces
+    /// a structurally perfect record.
+    ///
+    /// Control 2 cannot see that for most roles. It checks the Nat pair exactly,
+    /// and erasure's validation would reject a misaligned Nat on arity or
+    /// family — but two roles of the same shape (`read_some`/`read_eof`, two IO
+    /// errors) would swap invisibly. Here each field carries a sentinel naming
+    /// itself, so any permutation is caught by name.
+    #[test]
+    fn every_role_decodes_into_the_field_it_was_encoded_from() {
+        let spine = CheckedHostSpineV1 {
+            ret: sentinel("ret"),
+            vis: sentinel("vis"),
+            in_l: sentinel("in_l"),
+            in_r: sentinel("in_r"),
+            fs_family: sentinel("fs_family"),
+            console_family: sentinel("console_family"),
+            clock_family: sentinel("clock_family"),
+            entropy_family: sentinel("entropy_family"),
+            capability: sentinel("capability"),
+            result_err: sentinel("result_err"),
+            result_ok: sentinel("result_ok"),
+            option_some: sentinel("option_some"),
+            file_error: sentinel("file_error"),
+            file_operation_read: sentinel("file_operation_read"),
+            file_operation_write: sentinel("file_operation_write"),
+            file_operation_change_mode: sentinel("file_operation_change_mode"),
+            resource_host_io: sentinel("resource_host_io"),
+            resource_closed: sentinel("resource_closed"),
+            resource_malformed: sentinel("resource_malformed"),
+            resource_right_not_held: sentinel("resource_right_not_held"),
+            resource_release_failed: sentinel("resource_release_failed"),
+            resource_kind_mismatch: sentinel("resource_kind_mismatch"),
+            resource_buffer_limit: sentinel("resource_buffer_limit"),
+            resource_allocation_failed: sentinel("resource_allocation_failed"),
+            resource_invalid_offset: sentinel("resource_invalid_offset"),
+            resource_invalid_bounds: sentinel("resource_invalid_bounds"),
+            resource_no_progress: sentinel("resource_no_progress"),
+            resource_kind_fs_handle: sentinel("resource_kind_fs_handle"),
+            resource_kind_buffer: sentinel("resource_kind_buffer"),
+            resource_trace_identity: sentinel("resource_trace_identity"),
+            nat_zero: sentinel("nat_zero"),
+            nat_suc: sentinel("nat_suc"),
+            private_buffer_span: sentinel("private_buffer_span"),
+            private_transfer_count: sentinel("private_transfer_count"),
+            read_some: sentinel("read_some"),
+            read_eof: sentinel("read_eof"),
+            wrote: sentinel("wrote"),
+            unit: sentinel("unit"),
+            bool_false: sentinel("bool_false"),
+            bool_true: sentinel("bool_true"),
+            io_errors: (0..12).map(|i| sentinel(&format!("io_error_{i}"))).collect(),
+            operations: [(sentinel("operation_zero"), ken_host::HostOpV1::ConsoleRead)]
+                .into_iter()
+                .collect(),
+        };
+        let record = CheckedRuntimeSymbolsV1 {
+            spine,
+            process_input: sentinel("process_input"),
+            list_nil: sentinel("list_nil"),
+            list_cons: sentinel("list_cons"),
+            prod: sentinel("prod"),
+            exit_success: sentinel("exit_success"),
+            exit_failure: sentinel("exit_failure"),
+        };
+
+        let bytes = crate::compiler_driver::canonical_checked_runtime_symbols_v1_bytes(&record);
+        let decoded = decode_checked_runtime_symbols_v1(&bytes)
+            .expect("a record this encoder produced must decode");
+
+        let spine = &decoded.spine;
+        let pairs: Vec<(&str, &str)> = vec![
+        (spine.ret.as_str(), "ret"),
+        (spine.vis.as_str(), "vis"),
+        (spine.in_l.as_str(), "in_l"),
+        (spine.in_r.as_str(), "in_r"),
+        (spine.fs_family.as_str(), "fs_family"),
+        (spine.console_family.as_str(), "console_family"),
+        (spine.clock_family.as_str(), "clock_family"),
+        (spine.entropy_family.as_str(), "entropy_family"),
+        (spine.capability.as_str(), "capability"),
+        (spine.result_err.as_str(), "result_err"),
+        (spine.result_ok.as_str(), "result_ok"),
+        (spine.option_some.as_str(), "option_some"),
+        (spine.file_error.as_str(), "file_error"),
+        (spine.file_operation_read.as_str(), "file_operation_read"),
+        (spine.file_operation_write.as_str(), "file_operation_write"),
+        (spine.file_operation_change_mode.as_str(), "file_operation_change_mode"),
+        (spine.resource_host_io.as_str(), "resource_host_io"),
+        (spine.resource_closed.as_str(), "resource_closed"),
+        (spine.resource_malformed.as_str(), "resource_malformed"),
+        (spine.resource_right_not_held.as_str(), "resource_right_not_held"),
+        (spine.resource_release_failed.as_str(), "resource_release_failed"),
+        (spine.resource_kind_mismatch.as_str(), "resource_kind_mismatch"),
+        (spine.resource_buffer_limit.as_str(), "resource_buffer_limit"),
+        (spine.resource_allocation_failed.as_str(), "resource_allocation_failed"),
+        (spine.resource_invalid_offset.as_str(), "resource_invalid_offset"),
+        (spine.resource_invalid_bounds.as_str(), "resource_invalid_bounds"),
+        (spine.resource_no_progress.as_str(), "resource_no_progress"),
+        (spine.resource_kind_fs_handle.as_str(), "resource_kind_fs_handle"),
+        (spine.resource_kind_buffer.as_str(), "resource_kind_buffer"),
+        (spine.resource_trace_identity.as_str(), "resource_trace_identity"),
+        (spine.nat_zero.as_str(), "nat_zero"),
+        (spine.nat_suc.as_str(), "nat_suc"),
+        (spine.private_buffer_span.as_str(), "private_buffer_span"),
+        (spine.private_transfer_count.as_str(), "private_transfer_count"),
+        (spine.read_some.as_str(), "read_some"),
+        (spine.read_eof.as_str(), "read_eof"),
+        (spine.wrote.as_str(), "wrote"),
+        (spine.unit.as_str(), "unit"),
+        (spine.bool_false.as_str(), "bool_false"),
+        (spine.bool_true.as_str(), "bool_true"),
+        ];
+        for (decoded_symbol, field) in pairs {
+            assert_eq!(
+                decoded_symbol,
+                sentinel(field).to_string(),
+                "field {field} decoded to {decoded_symbol}, which is another field's sentinel \
+                 -- the encoder's order and this decoder's order have drifted apart"
+            );
+        }
+        for (index, symbol) in spine.io_errors.iter().enumerate() {
+            assert_eq!(*symbol, sentinel(&format!("io_error_{index}")).to_string());
+        }
+        assert_eq!(
+            spine.operations,
+            vec![(
+                sentinel("operation_zero").to_string(),
+                ken_host::HostOpV1::ConsoleRead as u16,
+            )],
+            "the operation tag or its symbol did not survive the round trip"
+        );
+        for (field, symbol) in [
+            ("process_input", &decoded.process_input),
+            ("list_nil", &decoded.list_nil),
+            ("list_cons", &decoded.list_cons),
+            ("prod", &decoded.prod),
+            ("exit_success", &decoded.exit_success),
+            ("exit_failure", &decoded.exit_failure),
+        ] {
+            assert_eq!(*symbol, sentinel(field).to_string(), "field {field} misaligned");
+        }
+    }
+}

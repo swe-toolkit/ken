@@ -3418,7 +3418,7 @@ fn checked_runtime_symbols_v1(
 /// The header carries the version so a decoder can reject an unknown or
 /// corrupted record rather than read it short — the same discipline as the
 /// spine encoding below.
-fn canonical_checked_runtime_symbols_v1_bytes(
+pub(crate) fn canonical_checked_runtime_symbols_v1_bytes(
     record: &crate::erasure::CheckedRuntimeSymbolsV1,
 ) -> Vec<u8> {
     let mut out = b"CheckedRuntimeSymbolsV1\0".to_vec();
