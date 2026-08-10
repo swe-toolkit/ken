@@ -121,13 +121,11 @@ jobs:
           cargo nextest run --workspace --locked
           --partition count:${{ matrix.shard }}/4
           -E 'not (binary(rt_parity_native) or binary(px8f_buffer_native) or binary(px8f_write_partition))'
-      # No `cargo test --workspace --doc --locked` step: nextest does not run
-      # doctests, but this workspace has none to lose. Every ``` fence inside
-      # a `///`/`//!` doc comment under crates/ is opened ```text (rustdoc's
-      # explicit non-Rust marker), so `cargo test --doc` collects zero tests
-      # today (checked via `grep -rn '```' crates/ --include=*.rs` — every
-      # opening fence is `text`). If a real ```rust doctest is ever added,
-      # add a `cargo test --workspace --doc --locked` step back here.
+      # nextest does not execute rustdoc tests, so run the workspace doctest
+      # population once rather than once per shard.
+      - name: Doctests
+        if: matrix.shard == 1
+        run: cargo test --workspace --doc --locked
 
   # Findings exit zero and route without blocking. Instrument failures exit
   # nonzero and are enforced by build-test's needs/result gate below because no

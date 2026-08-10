@@ -9248,8 +9248,8 @@ fn d4_a_seat_whose_need_is_not_a_byte_span_is_refused() {
 /// and `Lowered` is crate-internal, so the fence would fail with a
 /// privacy/resolution error at the `use` line — green for a reason that has
 /// nothing to do with the mechanism, and it would stay green if the fields
-/// became `pub` tomorrow. It would also contribute no CI signal at all: CI runs
-/// nextest, which does not run doctests (`values.rs` records this).
+/// became `pub` tomorrow. CI's doctest lane would execute that misleading
+/// fence; the `cfg` probe instead runs in the sharded nextest lane.
 ///
 /// **This probe covers the SPELLING only; its production sibling covers the
 /// rest of the CONSTRUCTION SURFACE.** Refusing the braced literal here says

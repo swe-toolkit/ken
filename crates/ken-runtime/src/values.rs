@@ -60,12 +60,11 @@ use std::fmt;
 /// `PartialEq::eq(a, b)`, or an inherent method, because the only way to make
 /// it compile is to supply the impl — which *is* the forbidden capability.
 ///
-/// ⚠ **Execution inventory:** all four `AC-V4` `compile_fail` fences below
-/// (`Value::Closure` cannot be named, and no `PartialEq`, `Ord`, or `Hash`) are
-/// **not executed by CI**. CI runs nextest, which does not run rustdoc
-/// doctests. The fences and their compiling sibling are local documentation
-/// probes, not mechanized acceptance evidence; if a forbidden variant or impl
-/// became available, these fences would contribute no CI-red signal.
+/// **Execution inventory:** CI executes all four `AC-V4` `compile_fail` fences
+/// below (`Value::Closure` cannot be named, and no `PartialEq`, `Ord`, or
+/// `Hash`) together with their compiling sibling through the workspace doctest
+/// gate. The sibling is the positive control that keeps malformed fixtures from
+/// silently greening the negative fences.
 ///
 /// ⛔ **The `EXXXX` codes below are DOCUMENTATION, not a check — measured, not
 /// assumed.** Rewriting one block's `compile_fail,E0277` to `compile_fail,E0308`
@@ -126,7 +125,7 @@ use std::fmt;
 /// the sealed witness. It also **runs**, so the capability is shown to be
 /// genuinely available rather than merely well-typed:
 ///
-/// ```
+/// ```rust
 /// use ken_runtime::Value;
 /// use ken_runtime::canonical::CanonicalWitness;
 /// fn requires_eq<T: PartialEq>(_: &T) {}
