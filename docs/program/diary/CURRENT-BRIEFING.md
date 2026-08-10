@@ -151,6 +151,77 @@
 > the original bug — it returns the wrong branch where the original left a
 > visible stuck term, so `can-no-stuck-closed-ground` would miss it too.
 >
+> #### HELD FOR THE DECODE-SLICE CUT — `cursor_locate` has no law
+>
+> Adversary finding `evt_1fgajt680tv01` on `0daf7170`, corroborated against the
+> artifact. **`cursor_locate` is a `CursorOps` member that no `CursorLaws`
+> clause constrains** — all three clauses quantify over `cursor_remaining` only
+> (`Capability/Parsing/Cursor.ken.md:215-253`). The two instances orient it
+> **oppositely**: `arg_cursor_locate` (`:194`) increases on advance,
+> `char_cursor_locate = char_cursor_remaining` decreases. **A generic consumer
+> is already on `main`:** `Decoder.ken.md:33`'s `decoder_fail` builds
+> `DecoderRejected loc (cursor_locate ...)` over any `CursorOps`, so a
+> rejection's location means "how far in" under one instance and "how much
+> left" under the other, with no law to distinguish them.
+>
+> **PRE-EXISTING and NOT DS-9's.** `CursorLaws` omitted `locate` before the
+> merge; DS-9 is the second instance and the first to make the divergence
+> observable, and it disclosed its choice in its own §3. **`ee6773b0` is sound
+> as delivered and this is not a defect in it.**
+>
+> **Nothing is broken today** — DS-9's decoder does not exist because `D3` is
+> blocked. **It goes live the moment the decode-only slice lands**, because
+> `decoder_fail` is exactly what that slice reports rejections with.
+>
+> Disposition put to the **Architect** at `evt_493mms9rgtvbf` as a binary: add a
+> `locate` clause to `CursorLaws`, or state that `locate` is instance-defined
+> with no cross-instance meaning. **One of those changes an existing
+> instance**, which is why it is not being decided inside a measurement turn.
+> Foundation told at `evt_4vd8a0pq2ha8j` to leave it alone if the probe reaches
+> `decoder_fail`.
+>
+> **RULED 2026-08-10 07:45Z, `evt_4sz1pseqbswhh` — disposition 2.**
+> `cursor_locate` is **instance-defined and carries no cross-instance
+> coordinate meaning.** The Architect's reasoning is that the type already
+> expresses this: `CursorOps c el loc` leaves `loc` abstract, `DecoderError loc`
+> and `decoder_error_location` only transport values of that same `loc`, and
+> **the generic decoder never orders, subtracts, or compares them.**
+>
+> **There are THREE coordinate systems, not two orientations** — the Adversary's
+> table was one instance short, which strengthens rather than weakens the
+> finding:
+>
+> | instance | location | orientation |
+> |---|---|---|
+> | `ArgCursor -> ArgLocation` | argument index + byte offset | forward |
+> | `ByteCursor -> Span` | zero-width source byte span at current position | forward |
+> | `List Char -> Nat` | remaining suffix length | reverse |
+>
+> A cross-instance law cannot be stated from the present interface without
+> adding structure `loc` deliberately lacks — an order/step relation, a
+> projection to a shared coordinate, and for source locations the external
+> origin/length to interpret it. **Forcing a relation to `cursor_remaining`
+> would privilege one coordinate system and distort the others.**
+>
+> **The fix is DOC-ONLY catalog prose, and the exact text is in the ruling.**
+> Place the contract in `Capability.Parsing.Cursor`; state the consumer-side
+> consequence beside `DecoderError` in `Capability.Parsing.Decoder`. **No
+> `CursorLaws` member changes, neither existing instance changes, DS-9 `D2` is
+> not reopened.**
+>
+> **Sequencing CORRECTED: this must land REGARDLESS of the probe's outcome.**
+> My earlier note said to fold it into the decode-only slice and, if the probe
+> failed, to leave it latent. **The ruling makes it independent of the probe** —
+> it changes nothing the probe depends on and the disclosure gap exists on
+> `main` today across all three instances. Cut it with Foundation's next turn
+> either way; it is catalog prose with the text already written, not a design
+> task. **Still not DS-9 scope** — attribute it as a `Capability.Parsing` fix.
+>
+> If the decode-only slice does happen, its rejection positions **may remain
+> suffix lengths**, but that slice must **disclose the instance-defined
+> coordinate at the generic-decoder boundary** rather than describe it as a
+> universal offset.
+>
 > #### Still owed to me
 >
 > Runtime `c2` returns **before** assignment stating its `AC-K12` relationship
