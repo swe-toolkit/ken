@@ -1835,9 +1835,17 @@ impl<'plan> ContinuationUnitView<'plan> {
                 planner_error("the producer constructor's field count overflows the envelope")
             })?;
         // ⛔ The range refusal is REQUIRED, not defensive: a selected position
-        // at or past the field count would leave the loop below emitting `N + 1`
-        // roles for `N` slots, and the slot reconciliation would then report a
-        // length disagreement that says nothing about the real fault.
+        // at or past the field count means the loop below cannot omit it, so it
+        // emits one role MORE than the envelope has slots -- the whole field run
+        // minus a projected position that is not in it. The slot reconciliation
+        // would then report a length disagreement that says nothing about the
+        // real fault.
+        //
+        // ⛔ The surplus is stated as "one more than the slots", not as
+        // `N + 1` vs `N`: the roles are `N + |recursive_positions|` fields with
+        // the projection omitted, and quoting the singular arithmetic here is
+        // what made this guard's rationale describe a model the method no
+        // longer implements.
         if self.key.recursive_position >= field_count {
             return Err(planner_error(
                 "a continuation selects a recursive position outside its producer constructor's \
@@ -1858,9 +1866,17 @@ impl<'plan> ContinuationUnitView<'plan> {
         #[cfg(not(test))]
         let selected = self.key.recursive_position;
         // ⛔ The range refusal is REQUIRED, not defensive: a selected position
-        // at or past the field count would leave the loop below emitting `N + 1`
-        // roles for `N` slots, and the slot reconciliation would then report a
-        // length disagreement that says nothing about the real fault.
+        // at or past the field count means the loop below cannot omit it, so it
+        // emits one role MORE than the envelope has slots -- the whole field run
+        // minus a projected position that is not in it. The slot reconciliation
+        // would then report a length disagreement that says nothing about the
+        // real fault.
+        //
+        // ⛔ The surplus is stated as "one more than the slots", not as
+        // `N + 1` vs `N`: the roles are `N + |recursive_positions|` fields with
+        // the projection omitted, and quoting the singular arithmetic here is
+        // what made this guard's rationale describe a model the method no
+        // longer implements.
         if selected >= field_count {
             return Err(planner_error(
                 "a continuation selects a recursive position outside its producer constructor's \
