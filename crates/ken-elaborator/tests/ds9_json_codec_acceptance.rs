@@ -244,8 +244,15 @@ fn json_and_all_six_constructors_are_real_globals() {
           cursor_peek (List Char) Char Nat char_cursor_ops ds9_cursor_input
         const ds9_cursor_advance_result : List Char =
           cursor_advance (List Char) Char Nat char_cursor_ops ds9_cursor_input
+        const ds9_cursor_empty : List Char = Nil Char
+        const ds9_cursor_empty_remaining_result : Nat =
+          cursor_remaining (List Char) Char Nat char_cursor_ops ds9_cursor_empty
+        const ds9_cursor_empty_location_result : Nat =
+          cursor_locate (List Char) Char Nat char_cursor_ops ds9_cursor_empty
         const ds9_cursor_empty_peek_result : Option Char =
-          cursor_peek (List Char) Char Nat char_cursor_ops (Nil Char)
+          cursor_peek (List Char) Char Nat char_cursor_ops ds9_cursor_empty
+        const ds9_cursor_empty_advance_result : List Char =
+          cursor_advance (List Char) Char Nat char_cursor_ops ds9_cursor_empty
         "#,
     )
     .expect("cursor behavior fixtures must elaborate");
@@ -280,9 +287,30 @@ fn json_and_all_six_constructors_are_real_globals() {
         ),
         vec![66]
     );
+    assert_eq!(
+        nat_count(
+            &env,
+            &eval_global(&env, &mut store, "ds9_cursor_empty_remaining_result")
+        ),
+        0
+    );
+    assert_eq!(
+        nat_count(
+            &env,
+            &eval_global(&env, &mut store, "ds9_cursor_empty_location_result")
+        ),
+        0
+    );
     let empty_peek = eval_global(&env, &mut store, "ds9_cursor_empty_peek_result");
     assert!(
         matches!(empty_peek, EvalVal::Ctor { id, .. } if id == env.globals["None"]),
         "empty cursor must peek `None`, got {empty_peek:?}"
+    );
+    assert_eq!(
+        list_char_codepoints(
+            &env,
+            &eval_global(&env, &mut store, "ds9_cursor_empty_advance_result")
+        ),
+        Vec::<u32>::new()
     );
 }
