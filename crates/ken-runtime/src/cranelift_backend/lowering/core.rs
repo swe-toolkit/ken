@@ -1668,6 +1668,14 @@ pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
     native_join_plan: Option<crate::NativeJoinPlanV1>,
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
 ) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    // `D1b-role-c1` — the SEED lane. `None` here means "no checked package
+    // supplied an authority", which is lawful only because seed IR is minted in
+    // the legacy namespace deliberately. ⛔ Package-backed compiles do NOT come
+    // through here: they call the `*_program_*` entries below, which take a
+    // resolved authority and cannot express absence.
+    let resolved = process_symbols
+        .cloned()
+        .unwrap_or_else(seed_only_legacy_authority);
     compile_expr_into_module_with_root_projection(
         module,
         function_name,
@@ -1677,7 +1685,7 @@ pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
         declarations,
         staged_process_input,
         process_mode,
-        process_symbols,
+        &resolved,
         native_join_plan,
         oriented_subcontinuation_plan,
         false,
@@ -1698,6 +1706,92 @@ pub(in crate::cranelift_backend) fn compile_expr_into_object_module<'a, M: Modul
     staged_process_input: Option<&RuntimeValue>,
     process_mode: bool,
     process_symbols: Option<&crate::NativeProcessSymbols>,
+    native_join_plan: Option<crate::NativeJoinPlanV1>,
+    oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    // `D1b-role-c1` — the SEED lane. `None` here means "no checked package
+    // supplied an authority", which is lawful only because seed IR is minted in
+    // the legacy namespace deliberately. ⛔ Package-backed compiles do NOT come
+    // through here: they call the `*_program_*` entries below, which take a
+    // resolved authority and cannot express absence.
+    let resolved = process_symbols
+        .cloned()
+        .unwrap_or_else(seed_only_legacy_authority);
+    compile_expr_into_module_with_root_projection(
+        module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        declarations,
+        staged_process_input,
+        process_mode,
+        &resolved,
+        native_join_plan,
+        oriented_subcontinuation_plan,
+        !process_mode,
+        process_mode,
+    )
+}
+
+/// The legacy prelude authority, named for the one lane entitled to it.
+///
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. Seed IR is minted in the
+/// `prelude::` namespace on purpose, so lowering it against legacy spellings is
+/// correct rather than a fallback. ⛔ Nothing package-backed may call this: the
+/// program entries below take a resolved authority and have no `None` to fill.
+fn seed_only_legacy_authority() -> crate::NativeProcessSymbols {
+    crate::NativeProcessSymbols::legacy_prelude()
+}
+
+/// Package-backed JIT compilation, against an authority the caller resolved.
+///
+/// ⛔ Non-`Option` on purpose. There is no path from here to
+/// `seed_only_legacy_authority` -- a package that cannot produce an authority is
+/// refused by the validation lane before reaching this function.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::cranelift_backend) fn compile_program_expr_into_module<'a, M: Module>(
+    module: M,
+    function_name: &str,
+    linkage: Linkage,
+    expr: &'a RuntimeExpr,
+    seed_env: &'a NativeSeedEnvironment,
+    declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
+    staged_process_input: Option<&RuntimeValue>,
+    process_mode: bool,
+    process_symbols: &crate::NativeProcessSymbols,
+    native_join_plan: Option<crate::NativeJoinPlanV1>,
+    oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+) -> Result<CompiledModule<M>, CraneliftBackendError> {
+    compile_expr_into_module_with_root_projection(
+        module,
+        function_name,
+        linkage,
+        expr,
+        seed_env,
+        declarations,
+        staged_process_input,
+        process_mode,
+        process_symbols,
+        native_join_plan,
+        oriented_subcontinuation_plan,
+        false,
+        false,
+    )
+}
+
+/// Package-backed object compilation, against a resolved authority. See above.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::cranelift_backend) fn compile_program_expr_into_object_module<'a, M: Module>(
+    module: M,
+    function_name: &str,
+    linkage: Linkage,
+    expr: &'a RuntimeExpr,
+    seed_env: &'a NativeSeedEnvironment,
+    declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
+    staged_process_input: Option<&RuntimeValue>,
+    process_mode: bool,
+    process_symbols: &crate::NativeProcessSymbols,
     native_join_plan: Option<crate::NativeJoinPlanV1>,
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
 ) -> Result<CompiledModule<M>, CraneliftBackendError> {
@@ -1728,7 +1822,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     declarations: BTreeMap<&'a str, &'a RuntimeDeclaration>,
     staged_process_input: Option<&RuntimeValue>,
     process_mode: bool,
-    process_symbols: Option<&crate::NativeProcessSymbols>,
+    process_symbols: &crate::NativeProcessSymbols,
     native_join_plan: Option<crate::NativeJoinPlanV1>,
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
     project_public_scalar_root: bool,
@@ -1778,13 +1872,17 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // occurrence BY REFERENCE, because a retained closure body is now selected by
     // its origin rather than carried as a clone. The emitter is otherwise
     // unchanged, and nothing borrowed reaches `CompiledModule`.
-    let process_symbols = process_symbols
-        .cloned()
-        .unwrap_or_else(crate::NativeProcessSymbols::legacy_prelude);
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1`. The authority arrives
+    // resolved. ⛔ The `unwrap_or_else(legacy_prelude)` that used to stand here
+    // is GONE, not relocated: a package-backed compile reaches this function
+    // only through `compile_program_expr`/`compile_program_expr_object`, both of
+    // which derive their authority through the fail-closed validation lane, so
+    // there is no longer any path by which a package silently lowers against
+    // prelude spellings its own checked package never recorded.
     let static_transition_plan = plan_static_transition_graph_with_symbols(
         expr,
         &declarations,
-        &process_symbols,
+        process_symbols,
         if process_mode {
             AbiRootIngress::Process
         } else {
@@ -2002,7 +2100,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         unsupported: Vec::new(),
         body_emission_authority,
         process_object: process_mode,
-        process_symbols,
+        process_symbols: process_symbols.clone(),
         #[cfg(test)]
         native_int_mutation: NATIVE_INT_LOWERING_MUTATION.with(std::cell::Cell::get),
         #[cfg(test)]

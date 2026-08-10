@@ -44,6 +44,7 @@ mod native_int_clif;
 
 #[doc(hidden)]
 pub mod native_join_plan;
+pub mod native_process_authority;
 pub mod native_process_entrypoint;
 pub mod object_linker_packaging;
 #[doc(hidden)]
@@ -79,6 +80,7 @@ pub use native_execution_differential::*;
 pub use native_int::*;
 #[doc(hidden)]
 pub use native_join_plan::*;
+pub use native_process_authority::*;
 pub use native_process_entrypoint::*;
 pub use object_linker_packaging::*;
 #[doc(hidden)]
