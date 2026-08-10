@@ -33,19 +33,14 @@
 > advertised themselves as authoritative were WRONG** (see *Corrections*), and a
 > hand-maintained list of 6 preserved refs when origin held **26**.
 
-## LIVE — 2026-08-10 ~00:1xZ · D6 RECUT TO SEVEN; RUNTIME ON THE WIDENED ROSTER
+## LIVE
 
-> ### POWER LOSS ~20:0xZ WAS RECOVERED WITH NOTHING LOST.
+> **Re-arm the watchdog on every resume** — it is process-local and dies with
+> every MCP restart. Builds allowed, targeted only, never `--workspace`.
+
+> ### RESUME HERE — state at 2026-08-10 ~05:4xZ. `main` = `129ff353`.
 >
-> All 28 seats restarted 20:04-20:17 with fresh contexts; worktrees and
-> branches survived. `main` was at the last landed commit, no publish was
-> interrupted, no orphaned PRs. **Re-arm the watchdog on every resume** — it
-> is process-local and dies with every MCP restart.
-
-**`main` = `69b1504b`.** Worktree clean, publisher queue EMPTY, nothing
-unpublished. Builds allowed, targeted only.
-
-> ### RESUME HERE — state at 2026-08-10 ~05:1xZ. `main` = `2ace237f`.
+> Worktree clean, publisher queue EMPTY, nothing unpublished.
 >
 > **`CI-ASSERTIONLESS-L1` MERGED** at exact `3d6622c9` (PR #1765), all three
 > blobs verified. Four SHAs, three rejections, every one on the file header's
@@ -60,6 +55,26 @@ unpublished. Builds allowed, targeted only.
 > named re-encoding prohibitions still bind. Frame §7 contention caveat
 > re-checked at release and clear.
 >
+> ### `CI-L1-EXECUTING-COVER` WIDENED — PR #1768, still ready, still NOT released
+>
+> Adversary finding `evt_34q2zm16a48pz` on `65a61416` gave the node a **third
+> row**: `ac5_no_implicit_cross_type_coercion` has zero cover -- its `is_err()`
+> is satisfied by `elaborate_decl_v1`'s inability to elaborate an un-annotated
+> `fn`, which the matching-type positive control fails identically. Worse than
+> `sec62`, which at least reaches its mechanism. **Ken's behaviour is correct;
+> the defect is entirely in the instrument.**
+>
+> **Verifying it found a fourth defect that was in MY frame.** `sec61` claims
+> `surface/numbers/literal-reduces-in-kernel` -- **a row id in no markdown file
+> in the repo** -- while the real seed row it should serve has zero claims
+> anywhere in the code tree. My §3d had supplied that mapping itself and called
+> it "covers half a row". The artifact makes no such mapping.
+>
+> Also fixed: the §6 guardrail wrote the first `CI-ASSERTIONLESS-L1` row as a
+> bare `ac5_` prefix, **forbidding the only discharge of the criterion the same
+> change adds**. `D5` now buys the decidable machine check (every `///
+> surface/...` id resolves to a seed heading). Re-sized S to M.
+>
 > **FOR THE OPERATOR, FIRST THING: I made a priority call that is yours.**
 > Releasing DS-9 ahead of Verify's `CI-L1-EXECUTING-COVER` was a choice between
 > two `ready` WPs, which `steward.md §3` routes to you. I made it to avoid a
@@ -73,13 +88,19 @@ unpublished. Builds allowed, targeted only.
 > Publisher queue empty. Verify is free and its successor
 > `CI-L1-EXECUTING-COVER` is framed, `ready`, and deliberately NOT released.
 >
-> ### TONIGHT'S MERGES: 1763, 1764, 1765, 1766, plus the three before compaction
+> ### TONIGHT'S MERGES: 1763-1768, plus the three before compaction
 >
 > ### STILL QUEUED FOR 11:30Z
 >
 > 1. The DS-9 priority call above -- reverse it or confirm it.
-> 2. Releasing draft `KERNEL-RECURSIVE-RESULT-SURFACE`.
-> 3. **Promoting WS-L into the tracked frontier.** Language has 7 tracked nodes:
+> 2. **Close PR #365 unmerged.** The integrator was parked on it awaiting
+>    routing. Head `befc2dc4` is dated **2026-07-08**, is **not an ancestor of
+>    `main`**, and its content (`scripts/scripted-pr-automerge.sh`) landed by
+>    another route. Merging it now would revert a month. Closing needs GitHub
+>    write, which no agent has and the publisher path does not do. Integrator
+>    told to drop it (`evt_3gtny7w70wxny`).
+> 3. Releasing draft `KERNEL-RECURSIVE-RESULT-SURFACE`.
+> 4. **Promoting WS-L into the tracked frontier.** Language has 7 tracked nodes:
 >    5 merged, 1 closed, 1 draft, **zero `ready`**, while three Language seats
 >    sit idle. The three severed `CI-ASSERTIONLESS-L1` capability links
 >    (`Int.toInt64` on L-classes, integer-division op registration, Char literal
@@ -88,7 +109,7 @@ unpublished. Builds allowed, targeted only.
 >    CI-enumerated exemption registry -- but **none is a tracked issue node**. I
 >    did not file L1-L8 unilaterally because promoting a stream into the
 >    frontier is direction, not sequencing.
-> 4. Spec-enclave lane cap; scope forks; TCB growth; CPU trades.
+> 5. Spec-enclave lane cap; scope forks; TCB growth; CPU trades.
 >
 > ### OWED ITEM 2, unchanged
 >
