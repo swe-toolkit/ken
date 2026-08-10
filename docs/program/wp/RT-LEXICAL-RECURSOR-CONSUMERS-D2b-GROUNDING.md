@@ -26,9 +26,17 @@ byte-identical.**
 | **measurement base** — the tree every figure was taken on | `a6186741` | **no.** A commit on `main` |
 | **candidate merge-base** — where this candidate sits | `c3162c99` | **yes.** Every re-anchor moves it; it was `a6186741` before this one |
 
-They coincide **today**. They are still recorded separately, because one of them
-is not stable and this lane has been blocked three times for collapsing them
-into one sentence.
+⛔ **They no longer coincide, and every figure below is a statement about
+`a6186741`.** They did coincide when this record was written; the re-anchor onto
+`c3162c99` separated them, and the sentence that said *"they coincide today"*
+survived the table row it depended on — which is the same defect, one field
+lower, that the two rows exist to prevent.
+
+⛔ **Path-disjointness is NOT promoted into provenance.** The re-anchor touched
+no path these measurements concern, which is why the evidence remains
+*applicable* at the candidate base. It is **not** a reason to say the figures
+were taken there. "Still applicable" and "taken here" are different claims, and
+only re-measuring buys the second.
 
 > # THE GATING CONDITION PASSES. `D2b` IS NOT BLOCKED.
 >
@@ -137,7 +145,9 @@ No repair, no control, no `D2c`/`R3` traversal, no closure-transferability
 change, no new `Lowered`/ABI/capture lane, no `StaticWorkerBinding`
 successor-wall work, no `D3`, no `R4`, no tracker `status:` change, no
 retirement. The probes were temporary and are removed —
-`planning/static_transition.rs` sha256 `609e5bec…869f` matches base.
+`planning/static_transition.rs` sha256 `609e5bec…869f` matched the MEASUREMENT
+base `a6186741` when the probes were removed. ⛔ It does not describe this
+candidate: the planner partial has since modified that file.
 
 ## 6. ACCEPTED PARTIAL — the planner plane landed after this checkpoint
 
