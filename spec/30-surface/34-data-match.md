@@ -289,25 +289,26 @@ without this branch context is not a valid lowering. This surface path remains
 gated on `KERNEL-NESTED-IND` until the kernel can generate and check the lifted
 method type and its ι.
 
-#### 3.1.1 The structural result of a nested recursive field
+#### 3.1.1 Recursive results and induction hypotheses for nested fields
 
-The surface form
+The two contextual surface forms are:
 
 ```ken
-structural result of xs
+recursive result for xs
+induction hypothesis for xs
 ```
 
-selects the kernel-supplied recursive method result associated with the resolved
-surface binding `xs`. It is the `structural_result` primary expression of
-`32 §3`. It is not an application of a function named `structural` or `result`,
-does not invoke the enclosing definition, and does not introduce general
-recursion.
+Each selects the kernel-supplied recursive method result associated with the
+resolved surface binding `xs`. They are the `recursive_result` and
+`induction_hypothesis` primary expressions of `32 §3`. Neither is function
+application, an invocation of the enclosing definition, a generated identifier,
+or a general-recursion construct.
 
-The validity rule is positive and exhaustive. The form is valid if and only if
-its operand resolves to a surface variable whose current branch environment
-carries exactly one validated structural-result association. Such an
-association exists precisely while compiling a nested strictly-positive match
-method in which:
+The validity rule is positive and exhaustive. One of the two forms is valid if
+and only if its operand resolves to a surface variable whose current branch
+environment carries exactly one validated structural-result association and the
+form agrees with the selected result's classifier. Such an association exists
+precisely while compiling a nested strictly-positive match method in which:
 
 1. the source pattern binds an enclosing recursive field;
 2. the checked method telescope supplies the structural support evidence and
@@ -319,38 +320,75 @@ The association begins in the branch body where the field is bound and remains
 available in lexically nested expressions until that binding is shadowed or the
 branch ends. It is attached to the resolved binding identity, not its spelling:
 copying the field into a `let`, projecting from it, or introducing another
-variable with the same text does not copy the association. The rule is
-structural and does not recognize a carrier, constructor, field name, or motive
-by name. Consequently, for an arbitrary branch binding `u` and an otherwise
-unnamed validated association `u ↦ r`, `structural result of u` is valid and
-selects `r`; removing that association makes the same form invalid without any
-new case in this specification.
+variable with the same text does not copy the association. This is why the
+selectors say **`for`**, not possessive `of`: the hidden result is associated
+with this binding in this branch, not an intrinsic projection from the field
+value. The rule is structural and does not recognize a carrier, constructor,
+field name, or motive by name.
 
-Elaboration replaces the selector with the exact hidden recursive method result
-from the association. Its type is the type assigned to that result in the
-checked method telescope, including a `Type`-valued or `Omega`-valued motive as
-appropriate. No generated support identifier or hidden method binder enters
-source scope, and constructor-pattern arity is unchanged. The ordinary field
-expression `xs` retains its declared source type; neither it nor an owner
-self-call is reinterpreted as the recursive result. Missing, duplicate, swapped,
-and foreign associations reject fail-closed under `39 §2.3`/`§4`.
+After validating the association, elaboration classifies the type assigned to
+its hidden result by the checked method telescope:
+
+- if that result type is classified by `Type l`, only
+  `recursive result for xs` is valid;
+- if that result type is classified by `Omega l`, only
+  `induction hypothesis for xs` is valid.
+
+The classification is of the **selected result**, never its structural support
+evidence. In particular, a topology-carrying `All^Omega` support application may
+itself inhabit `Type` while the associated recursive result is an `Omega`-valued
+proof; that result still requires `induction hypothesis for xs`. Conversely, a
+proof-relevant witness whose type is classified by `Type` requires
+`recursive result for xs`, regardless of the programmer's proof intent. The
+split follows the result sort, not terminology inferred from its use.
+
+The names use the settled vocabulary for those two roles rather than one
+Ken-local umbrella term: a `Type`-classified recursive method result is a
+**recursive result**, while an `Omega`-classified one is an **induction
+hypothesis**. They are not aliases, and no sort-agnostic selector remains. If
+the written form disagrees with the classifier, elaboration rejects with
+`RecursiveResultSortMismatch` and names the exact form required at that
+occurrence. If unsolved metavariables leave the classifier ambiguous between
+`Type` and `Omega`, elaboration rejects with `RecursiveResultSortAmbiguous`; it
+does not guess or default either spelling.
+
+Consequently, for an arbitrary branch binding `u` and an otherwise unnamed
+validated association `u ↦ r`, `recursive result for u` selects `r` when the
+type of `r` is `Type`-classified, and `induction hypothesis for u` selects `r`
+when it is `Omega`-classified. Removing that association makes the corresponding
+form invalid without any new case in this specification.
+
+Elaboration replaces either selector with the exact hidden recursive method
+result from the association. No generated support identifier or hidden method
+binder enters source scope, and constructor-pattern arity is unchanged. The
+ordinary field expression `xs` retains its declared source type; neither it nor
+an owner self-call is reinterpreted as the recursive result. Missing, duplicate,
+swapped, and foreign associations reject fail-closed under `39 §2.3`/`§4`.
 
 Schematic nested support methods may therefore consume whole-field results
-without a finite source unroll:
+without a finite source unroll. Under a `Type`-classified motive:
 
 ```ken
 Join xs ys ↦ combine
-  (structural result of xs)
-  (structural result of ys)
+  (recursive result for xs)
+  (recursive result for ys)
+```
+
+Under an `Omega`-classified motive, the same constructor branch instead uses:
+
+```ken
+Join xs ys ↦ combineProof
+  (induction hypothesis for xs)
+  (induction hypothesis for ys)
 ```
 
 This addition does not alter ordinary direct or W-style matching. A direct
 recursive field continues to use the existing exact-motive self-call rewrite,
 and a W-style field continues to use its existing Pi-abstracted induction
 hypothesis. Neither form receives a structural-result association merely by
-being recursive. In a match that contains no `structural_result`, pattern
-arity, bound variables, branch types, termination routing, diagnostics, and
-emitted core behaviour for direct and W-style cases are normatively unchanged.
+being recursive. In a match that contains neither selector, pattern arity, bound
+variables, branch types, termination routing, diagnostics, and emitted core
+behaviour for direct and W-style cases are normatively unchanged.
 
 ### 3.2 Dependent-motive recovery
 

@@ -225,7 +225,7 @@ The required elaboration contract is:
   The CAT-5 `Source` surface remains governed by the existing CAT-5 contract and
   the immediate unblocker remains `KM-sigma-projection-execution`.
 
-### 2.3 Structural-result association
+### 2.3 Nested-result association and selector classification
 
 When match compilation creates the branch environment described by `34
 §3.1.1`, it derives each structural-result association from the checked method
@@ -242,13 +242,26 @@ two fields, and a field cannot select two results. Validation precedes branch-
 body elaboration; failure rejects the enclosing `match` without a guessed,
 positional, or name-derived fallback.
 
-For `structural result of x`, name resolution first resolves `x` to one surface
-binding. The form elaborates only when that binding has exactly one validated
-association in the current branch environment, and then emits the associated
-hidden result term directly. The elaborator never publishes the hidden term's
-name, adds a constructor-pattern field, changes the type of `x`, or rewrites an
-ordinary call to obtain it. An arbitrary association satisfying the rule is
-accepted without appearing in a carrier or constructor allow-list.
+For `recursive result for x` or `induction hypothesis for x`, name resolution
+first resolves `x` to one surface binding. Either form proceeds only when that
+binding has exactly one validated association in the current branch environment.
+The elaborator then classifies the type assigned to the associated hidden result
+by the checked method telescope. A `Type l` classifier requires
+`recursive result for x`; an `Omega l` classifier requires
+`induction hypothesis for x`. This classification never examines the sort of
+the support-evidence term: that evidence may inhabit `Type` even when the hidden
+result's type is classified by `Omega`.
+
+A selector whose spelling disagrees with the result classifier rejects with
+`RecursiveResultSortMismatch`, naming the exact required spelling. If unsolved
+metavariables leave the result type ambiguous between `Type` and `Omega`, the
+selector rejects with `RecursiveResultSortAmbiguous`; the elaborator never
+defaults from programmer intent, proof relevance, or the support type. After
+these checks it emits the associated hidden result term directly. It never
+publishes the hidden term's name, adds a constructor-pattern field, changes the
+type of `x`, or rewrites an ordinary call to obtain it. An arbitrary association
+satisfying the rule is accepted without appearing in a carrier or constructor
+allow-list.
 
 Direct recursive and W-style fields do not acquire this association from their
 existing direct/abstracted induction hypotheses. Their established match and
@@ -284,23 +297,27 @@ program as a nested structural field.
   with verification holes still elaborate (the holes are obligations, `22`);
   programs with *type* errors do not (they have no well-typed core image).
 
-Structural-result failures are L1 surface errors and fail closed before a
-branch body is emitted. Their stable diagnostic names and payloads are:
+Nested-result selector and association failures are L1 surface errors and fail
+closed before a branch body is emitted. Their stable diagnostic names and
+payloads are:
 
 | Diagnostic | Raised when | Carries |
 |---|---|---|
-| **`StructuralResultOutOfScope`** | the operand of `structural result of x` resolves, but that binding has no exact structural-result association in the current branch | the selector span and resolved binding span |
+| **`StructuralResultOutOfScope`** | the operand of either selector resolves, but that binding has no exact structural-result association in the current branch | the selector span and resolved binding span |
 | **`StructuralResultAssociationMissing`** | a nested structural occurrence requires an association, but no complete field/evidence/result triple can be derived | the enclosing match and source-field spans |
 | **`StructuralResultAssociationDuplicate`** | a field, support-evidence term, or result term participates in more than one candidate association | the enclosing match span and every implicated source-field span |
 | **`StructuralResultAssociationSwapped`** | otherwise local evidence/result terms are paired with different source fields or structural occurrences within the same support instance | the enclosing match span and both crossed field spans |
 | **`StructuralResultAssociationForeign`** | an evidence or result term comes from another method, support instance, or enclosing match | the selector or enclosing-match span, the source-field span, and both provenance identities |
+| **`RecursiveResultSortMismatch`** | the selected hidden result has a determined `Type l` or `Omega l` classifier, but the source uses the other classifier's selector | the selector and binding spans, the actual classifier, and the exact required spelling |
+| **`RecursiveResultSortAmbiguous`** | the associated hidden result's type cannot yet be classified as `Type l` or `Omega l` because metavariables remain unsolved | the selector and binding spans, the unresolved result type, and implicated metavariables |
 
 `UnboundName` remains the diagnostic when the operand identifier itself does not
-resolve. None of the five structural-result diagnostics may recover by exposing
-a hidden binder, extending a pattern, treating the ordinary field value as its
-result, or synthesizing an owner self-call. Missing, duplicate, swapped, and
-foreign associations reject the enclosing match even when a guessed pairing
-would happen to type-check.
+resolve. None of these seven diagnostics may recover by exposing a hidden
+binder, extending a pattern, treating the ordinary field value as its result,
+or synthesizing an owner self-call. Missing, duplicate, swapped, and foreign
+associations reject the enclosing match even when a guessed pairing would happen
+to type-check; ambiguous result classification likewise never selects a spelling
+by guess.
 
 ## 5. V0 — the minimal elaborator (Phase 1)
 

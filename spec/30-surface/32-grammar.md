@@ -205,7 +205,8 @@ expr ::=
   | expr "." ident | expr ".1" | expr ".2"  -- field / projection
   | path "::" ident  -- canonical attached-proof path
   | proof_ref  -- attached-proof selector atom
-  | structural_result  -- exact nested structural result (34 §3.1.1)
+  | recursive_result  -- Type-classified nested method result (34 §3.1.1)
+  | induction_hypothesis  -- Omega-classified nested method result (34 §3.1.1)
   | "(" expr ("," expr)* ")"  -- tuple / pair / grouping
   | "{" field_assign ("," field_assign)* "}"  -- record literal
   | "temporal" "{" expr "}"  -- temporal obligation → Temporal data (72) [OQ-syntax]
@@ -217,7 +218,8 @@ match_expr ::= "match" expr ("eqn:" ident)? ("," expr)*
                "{" arm (";" arm)* ";"? "}"
 arm  ::= pattern ("if" expr)? ("↦" | "|->") expr  -- guard optional
 proof_ref ::= "proof" ident "for" path
-structural_result ::= "structural" "result" "of" ident
+recursive_result ::= "recursive" "result" "for" ident
+induction_hypothesis ::= "induction" "hypothesis" "for" ident
 field_assign ::= ident "=" expr | ident  -- punning allowed
 ```
 
@@ -267,16 +269,17 @@ produce the identical `Expr::EAttachedProofRef { subject, proof_name }` and
 desugar to the same `subject::ident` global, where `ident` is stored as
 `proof_name`; parentheses are optional grouping.
 
-`structural_result` is likewise a primary expression atom. Its operand is
-exactly one surface `ident`, not a path or an arbitrary expression. Thus
-`f (structural result of xs)` passes the selected structural result to `f`, and
-an application following an unparenthesized structural-result atom applies the
-selected result rather than extending the selector's operand. The four-word
-sequence is contextual: it commits to this production only at a
+`recursive_result` and `induction_hypothesis` are likewise primary expression
+atoms. Each operand is exactly one surface `ident`, not a path or an arbitrary
+expression. Thus `f (recursive result for xs)` and
+`g (induction hypothesis for xs)` pass the selected hidden result to `f` or
+`g`, and an application following either unparenthesized selector atom applies
+the selected result rather than extending the selector's operand. Each
+four-word sequence is contextual: it commits to its production only at a
 primary-expression boundary; otherwise its words remain ordinary identifier
-tokens (`31 §4`). The form is a scoped selector, not function application, a
-generated identifier, or a general-recursion construct. Its validity and
-meaning are fixed by `34 §3.1.1` and `39 §2.3`.
+tokens (`31 §4`). The forms are scoped selectors, not function application,
+generated identifiers, or general-recursion constructs. Their sort-selected
+validity and meaning are fixed by `34 §3.1.1` and `39 §2.3`.
 
 Several decided constructs need **no special expression syntax** — they are
 ordinary terms over stdlib/library values (spelling still `OQ-syntax`):
