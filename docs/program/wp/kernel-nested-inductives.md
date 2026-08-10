@@ -322,7 +322,7 @@ Node text is authoritative; this is the slicing view.
 | `D4` | the matching iota reductions; the kernel **checks** the generated eliminator | ⛔⛔ **ATOMIC WITH `D3b`.** *"Generated method binders and the terms supplied by ι are one semantic unit."* Both land before `D1b` |
 | `D5` | surface consumability: matching, elaboration, structural-recursion/termination | ⚠ §2d — the elaborator delegates, `sct.rs` and the evaluator do not |
 | `D6` | the four conformance rows of contract point 4 | |
-| `D7` | `trusted_base()` delta as a **number**, with what grew and why | ⛔ not a zero — this node grows the TCB |
+| `D7` | `trusted_base()` delta as an asserted **before/after `GlobalId` set**, plus a named unnumbered enumeration of the kernel code that grew | **The expected answer is the EMPTY delta with set identity**, and that is a result. ⛔ The former *"not a zero"* wording is **WITHDRAWN** — Steward metric ruling 2026-08-10, in the node under `AC-K10`. `trusted_base()` counts postulates and real primitives, which `AC-K9` forbids adding, so a nonzero delta would fail `AC-K9` |
 
 ### `D1b`/`D2` GATE — DISCHARGED 2026-08-09. The producer is fail-CLOSED.
 
@@ -582,7 +582,8 @@ serialize yourself silently, and ⛔ do not rebase over another ring's branch.
 Report to `kernel-leader` with: the exact SHA, the deliverables closed, and
 `AC-K1`–`AC-K12` **row by row** with each control's result. For each control,
 say what you **mutated** and that it **fired** — ⛔ an assertion that passes is
-not evidence a control can fail. State the `D7` number.
+not evidence a control can fail. State the `D7` delta as the before/after set,
+not as a count.
 
 ⭐ **If the polarity design turns out differently than §2b implies, say so.**
 The substrate was measured by the Steward, not by the kernel ring; a correction

@@ -162,6 +162,32 @@ citing a count must name which.
 > apart: correcting a number at its source does not sweep the artifacts that
 > already copied it.
 
+## OPEN QUESTION, routed to the Architect: does a SECOND row share this blocker?
+
+**Adversary `evt_2zzy9q33cetm1`, item 4. Routed 2026-08-10; not ruled here.**
+
+`nested-dependent-motive-uses-lift` (`seed-nested.md:158`) may share
+`nested-size-uses-lift`'s exact obstruction, and nothing in the seed
+distinguishes them. Both consume the kernel-supplied inhabitant — size folds
+`All^Type_{Bag,0}`'s leaves; the motive row consumes the motive instance
+attached to each exposed child from `All^Omega_{Bag,0}`. There are exactly two
+`blocked on KERNEL-RECURSIVE-RESULT-SURFACE` mentions in the seed (`:139`,
+`:465`) and **both are about size**, so the motive row carries only the generic
+node marker.
+
+**The refutation the Adversary could not close, and it is the whole question:**
+size needs a **source term to denote** the supplied result, whereas lockstep
+matching may be supplied by `check_match_with_lift` **implicitly, needing no
+name** — in which case the rows genuinely differ and the motive row's marker is
+right as it stands.
+
+⇒ **Expressibility is the Architect's call.** The disposition either way is one
+line on that row: name its real blocker, or say why it differs from size.
+Nothing is red today; the cost lands when [[KERNEL-NESTED-IND]] closes and
+someone un-gates the row. Corroborating tension, not proof: `D5`'s notification
+records that erasure admits the generated support `Elim` *"with arbitrary
+dependent motives still rejecting"*, and this row expects an accept.
+
 ## Sequencing and contention
 
 **Not released, and not sequenced against a lane yet.** `depends_on` names

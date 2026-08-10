@@ -55,22 +55,36 @@
 > for the freeze (1800s, minimal, forbidden from nudging a build) and
 > **re-arming the normal 900s sweep is part of the all-clear.**
 >
-> ### I OWE A RULING: `AC-K10`'s METRIC. `D7` IS STOPPED ON IT.
+> ### `AC-K10` METRIC RULING — ISSUED 2026-08-10. `D7` CAN AUTHOR.
 >
-> **My frame pre-ruled the outcome and the measurement contradicts it.** The node
-> says the `trusted_base()` delta is *"not a zero"*, and I repeated that in the
-> `D7` kick. Kernel then grounded that `GlobalEnv::trusted_base()` counts only
-> non-prelude `Opaque` and non-literal `Primitive` `GlobalId`s, while the support
-> families are checked `Inductive`s ⇒ **its real delta is `+0 GlobalId`, with set
-> identity.** The node supplies no alternate unit, so `AC-K10` as written cannot
-> be discharged honestly.
+> **The ruling is in `KERNEL-NESTED-IND.md` under the AC table**, with the `D7`
+> deliverable line and the `AC-K10` row rewritten, and the frame's `D7` row and
+> §8 reporting line swept to match. Summary:
 >
-> ⇒ **This is the same error shape as the census and the `D6` framing: I asserted
-> an outcome I had not measured and made it binding.** The ruling owed is the
-> *unit* — `trusted_base()` is the wrong instrument for "audited kernel TCB code
-> grew", and `+0` against it is a true measurement, not a failure to find growth.
-> Rule the metric before Kernel authors anything. `D7` is also freeze-blocked, so
-> there is no rush, but do not let the ruling be inferred from either fact.
+> - **`+0` with set identity is the CORRECT answer, and the "not a zero" clause
+>   is WITHDRAWN.** `AC-K9`, two rows above it, forbids adding any postulate or
+>   trusted escape — which is exactly what `trusted_base()` counts — so a
+>   nonzero delta would **fail `AC-K9`**. The AC table had already answered this
+>   in the opposite direction, and the node's own still-binding list requires
+>   *"zero `trusted_base()` delta with audited generator/transaction/iota TCB"*.
+> - **`AC-K10` gains a mechanical control** rather than losing one. The idiom is
+>   in-tree (`ds6c_intlit_elaborator_emission.rs:184`,
+>   `either_catalog_package_acceptance.rs:69`): `BTreeSet` before/after in one
+>   `ElabEnv`. Set identity, not `len()` — a swap reads as zero under a count.
+>   An executed assertion is what makes "measured, empty" and "never measured"
+>   different objects; the old row tried to do that with prose.
+> - **The baseline question dissolved** — the idiom measures within one run, so
+>   none of the three candidate historical SHAs is needed.
+> - **The audited-code half is named, not numbered.** Enumerate the kernel paths
+>   by `file:line`; ⛔ do not invent an LOC/function/file metric.
+>
+> ⇒ **The error shape was the census and the `D6` framing again: an unmeasured
+> assertion of mine written into a frame becomes binding on the ring.** Third
+> instance this session. The ring refused to fit a number to it, which is why it
+> cost one stopped turn instead of a candidate.
+>
+> ⚠ `D7` remains **freeze-blocked for execution** — Kernel may author the test
+> and the enumeration, and may not run them.
 >
 > **`D6` retros in** (no action, recorded per §1 — retros do not gate): impl
 > `evt_362prpf1v9vth`, QA `evt_5zhsx9zv12qqy`, leader `evt_5f18ba3jgwr1e`

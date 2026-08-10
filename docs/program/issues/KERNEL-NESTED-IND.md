@@ -92,7 +92,7 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > | deliverable | gated on native? | why |
 > |---|---|---|
 > | `D6` — the four conformance rows of contract point 4 | **no** | every row is admission, rejection, or reduction; the one computation row says *reduces-to `3`*, which is the evaluator, not codegen |
-> | `D7` — the `trusted_base()` delta report (`AC-K10`) | **no** | an accounting number over the declaration ledger |
+> | `D7` — the `trusted_base()` delta report (`AC-K10`) | **no** | a set-valued accounting over the declaration ledger — see the `AC-K10` metric ruling |
 >
 > ⇒ **Do not release a lane on the strength of `AC-K12` being blocked.** Verify
 > stays held on the two-lane cap; Kernel goes `D5`-partial → `D6` → `D7`.
@@ -776,9 +776,24 @@ containers, which is the allow-list the ruling forbids.
   Heading census `19 → 14`, re-measured on `main` after the merge with the size
   row's marker still present. ⚠ The node stays `active`: `D7` and `AC-K12` are
   open, and `D6` closing is **not** `AC-K12` progress.
-- **`D7`** — a **`trusted_base()` delta report**, stated as a number with what
-  grew and why. ⚠ This node *does* grow the TCB; the deliverable is an honest
-  accounting, ⛔ not a zero.
+- **`D7`** — the `trusted_base()` delta, **in two parts with two different
+  kinds of answer.** Metric ruled by the Steward 2026-08-10; see the ruling
+  block below the AC table, which supersedes the withdrawn "not a zero" wording
+  this line used to carry.
+  1. **The measurement, and it is set-valued.** `GlobalEnv::trusted_base()`
+     (`crates/ken-kernel/src/env.rs:568`) is the unchecked-assumption ledger of
+     spec `18 §5` — non-prelude `Opaque` plus non-literal `Primitive`
+     `GlobalId`s. The expected and correct answer is the **empty delta with set
+     identity**. Baseline is **within one run**: `before`/`after` around the
+     nested elaboration in a single `ElabEnv`, so no historical SHA is a
+     baseline and none has to be chosen.
+  2. **The audited-code half, named and not numbered.** Enumerate by
+     `file:line` the kernel paths that became load-bearing for nested-inductive
+     admission — the support generator, the atomic host-plus-support
+     admission/rollback transaction, and iota. Citations and prose. **Do not
+     invent an LOC, function, or file count**; the repository's kernel audit
+     lists trusted-vs-test LOC accounting as an unwired follow-on, so a number
+     here would have no instrument and no baseline behind it.
 
 ## Acceptance criteria
 
@@ -795,11 +810,66 @@ Each names its positive control.
 | `AC-K7` | Rejection through a **non-positive** parameter retained. | as `AC-K6` with a declared-negative position |
 | `AC-K8` | Direct and existing **W-style** inductives unchanged. | the K1.5 Π-bound suite (`(Nat → D) → D`, §2.1) runs green **untouched**; ⛔ a diff to those tests is itself a finding |
 | `AC-K9` | ⛔ **Zero** new axiom, postulate, trusted escape, or library-side representation workaround. | grep the diff for `Axiom`/`postulate`/`sorry`/`unsafe` additions; a hit fails the row |
-| `AC-K10` | `trusted_base()` delta reported **as a number**, with what grew. | ⚠ no mechanical control — discharged by the report. Listed so "grew by 0" and "never measured" cannot read identically |
+| `AC-K10` | The `trusted_base()` delta is **empty with set identity** — asserted as the before/after `GlobalId` sets, never as a cardinality. Plus a named, unnumbered enumeration of the kernel code that became load-bearing (`D7` part 2). | **Mechanical, and the idiom already exists in-tree.** `BTreeSet` before/after around the nested elaboration in one `ElabEnv`, as in `ds6c_intlit_elaborator_emission.rs:184` (`trusted_base_delta_is_exactly_empty_not_a_shrink`) and `either_catalog_package_acceptance.rs:69`. Set identity, not `len()`, is the point: a swap reads as zero under a count. An **executed** identity assertion is what makes "measured, empty" and "never measured" different objects — prose cannot do that |
 | `AC-K11` | ⭐ `D1a`'s recorded polarity is **populated at admission and read by the positivity check** — not recorded-then-ignored. | perturb the **recorded** value for one parameter → admittance must change. ⛔ If it does not, the check recomputes and the record is inert — the `ConstructorDecl.recursive_positions` failure repeated (frame §2e) |
 | `AC-K14` | ⛔⛔ **`D3b` and `D4` land in ONE commit, and the pair is kernel-checked.** No commit exists in which a generated method binder carries a structured lift that `iota_reduct` does not construct. | ⚠ **`Σ (_ : D). D` is the control, because it is admitted on `main` TODAY with zero IHs** (`inductive.rs:91` checks both Sigma components at the same polarity; `:90` flips only `Pi`'s domain). Exercise the eliminator on it: the method binder's lift and ι's constructed term must agree, and the kernel must check the pair. ⛔ A `method_type` change without the matching ι is a **subject-reduction defect**, not an incomplete step. Architect `dec_351mz4r239398` |
 | `AC-K13` | ⭐ **The polarity producer is TOTAL over every accepted constructor field type** — every such field yields a polarity record or a rejection, ⛔ **never a panic** (`18 §4`). | ⚠ **Enumerate by `Term` form, not by example.** For each form the fallback traverses, exercise a field of that form that mentions the parameter. Two named controls, both from Architect rejections: (a) `Term::Let { ty: Bool, val: false, body: pi(var(1), Bool) }` — an accepted field reducing to `A -> Bool`, which must record `NonPositive`; its `body` binds index 0, so a fallback that traverses children at one depth reads `A` at the wrong index. (b) index selection must be non-panicking for an out-of-range relative index — ⛔ `bool::then_some` evaluates its argument **eagerly**, so `(r < n).then_some(n - 1 - r)` underflows *before* the condition can yield `None`; `then(\|\| …)` is the lazy form |
 | `AC-K12` | A nested-IH constructor **lowers and evaluates**, not just type-checks. | the evaluator and native-lowering paths **re-derive** recursive positions (frame §2d, §2f) and one lowering site computes binder arity as `argument_binders + recursive_positions.len()`. Control: a recursive computation over `JsonArray` evaluates, and the built-artifact suite is green |
+
+### `AC-K10` METRIC RULING — the "not a zero" clause is withdrawn
+
+**Steward, 2026-08-10.** `D7` stopped here rather than authoring, which was the
+right call. `kernel-implementer`'s `D7` hard-stop post in `thr_14s3` grounded
+that `GlobalEnv::trusted_base()` counts only non-prelude `Opaque` and
+non-literal `Primitive` `GlobalId`s, while the nested support families are
+checked `Inductive`s, so its real delta is `+0` with set identity — and `D7`
+simultaneously ruled that the outcome is not zero. Both cannot hold.
+
+**The ruling: `+0` with set identity is the correct answer, and the withdrawn
+clause was the defect.** Three independent groundings, none of them new
+judgment:
+
+1. **`AC-K9`, two rows up, forbids exactly what a nonzero delta would
+   report.** It requires zero new axiom, postulate, or trusted escape, with a
+   grep control. `trusted_base()` counts postulates (`Opaque`) and real
+   primitives. A nonzero `trusted_base()` delta therefore **fails `AC-K9`**.
+   The AC table already answered this question in the opposite direction.
+2. **This node's own still-binding constraint list says so.** The "Still
+   binding, none of it discharged by the merge" list under the RE-RELEASED
+   2026-08-09 block (Spec representation contract, exact `c7f8913c`, PR #1678)
+   requires *"zero `trusted_base()` delta with audited
+   generator/transaction/iota TCB"* — zero on the ledger, audited on the code,
+   as two separate obligations. `D7` part 2 above is that second obligation
+   restated where the deliverable can see it.
+3. **The in-tree idiom expects empty and says why.** `ds6c`'s test carries
+   Architect-corrected wording — *"assert the honest claim, not an over-claimed
+   shrink."* The same discipline in the other direction is what `AC-K10`
+   needed.
+
+**What is genuinely true is that the audited kernel code grew, and that is not
+the same object as the ledger.** `trusted_base()` measures declarations trusted
+*without* kernel proof; the nested mechanism adds none, because the support
+families are checked. The checker that does the checking did grow. Reporting
+`+0` on the first and naming the second is the honest accounting the node asked
+for — not a weaker version of it.
+
+**Refused, and the implementer was right to refuse it first:** substituting net
+LOC, changed functions, files, or "semantic mechanisms" for the ledger unit to
+make some number nonzero. That is fitting the measurement to a frame assertion.
+
+**The baseline question dissolves.** It was only hard because a historical unit
+was assumed. The in-tree idiom takes `before`/`after` around the elaboration in
+one `ElabEnv`, so none of the three candidate SHAs (`10b2f56a`, `b5c448d1`, or
+a sum over the landed production objects) is needed or wanted.
+
+**Report location:** the executed assertion is the authoritative artifact; the
+prose half lands as a `D7` block in this node. No separate report file.
+
+**Origin of the defect, recorded because it has already been copied once:** the
+"not a zero" clause was a Steward assertion made without checking that
+`trusted_base()` was the right instrument, then repeated in the `D7` kick, at
+which point it bound the ring. Anyone reading a downstream artifact that still
+says the delta is nonzero is reading the withdrawn clause.
 
 ### `AC-K12` ACQUIRED A RIDER — it now owns a carried Runtime control
 
