@@ -1834,18 +1834,20 @@ impl<'plan> ContinuationUnitView<'plan> {
             .ok_or_else(|| {
                 planner_error("the producer constructor's field count overflows the envelope")
             })?;
-        // ⛔ The range refusal is REQUIRED, not defensive: a selected position
-        // at or past the field count means the loop below cannot omit it, so it
-        // emits one role MORE than the envelope has slots -- the whole field run
-        // minus a projected position that is not in it. The slot reconciliation
-        // would then report a length disagreement that says nothing about the
-        // real fault.
+        // ⛔ The range refusal is REQUIRED, not defensive, and its reason is an
+        // IMPOSSIBLE KEY STATE rather than any arity consequence: a selected
+        // position at or past the field count names a field the producer
+        // construct does not have, so this unit's identity does not identify
+        // anything in the run it claims to specialize.
         //
-        // ⛔ The surplus is stated as "one more than the slots", not as
-        // `N + 1` vs `N`: the roles are `N + |recursive_positions|` fields with
-        // the projection omitted, and quoting the singular arithmetic here is
-        // what made this guard's rationale describe a model the method no
-        // longer implements.
+        // ⛔ It does NOT cause a surplus role or a slot-length mismatch, and
+        // saying so would be false under the repaired model. The loop below
+        // filters on the CLOSED PROJECTION, which removes every real recursive
+        // position whatever `selected` is; an out-of-range `selected` simply
+        // matches nothing, and the emitted roles remain the normal nonrecursive
+        // run. That consequence belonged to the singular model, where `selected`
+        // was the only thing omitted -- it does not survive the plural one, and
+        // it is not this guard's rationale.
         if self.key.recursive_position >= field_count {
             return Err(planner_error(
                 "a continuation selects a recursive position outside its producer constructor's \
@@ -1865,18 +1867,20 @@ impl<'plan> ContinuationUnitView<'plan> {
         };
         #[cfg(not(test))]
         let selected = self.key.recursive_position;
-        // ⛔ The range refusal is REQUIRED, not defensive: a selected position
-        // at or past the field count means the loop below cannot omit it, so it
-        // emits one role MORE than the envelope has slots -- the whole field run
-        // minus a projected position that is not in it. The slot reconciliation
-        // would then report a length disagreement that says nothing about the
-        // real fault.
+        // ⛔ The range refusal is REQUIRED, not defensive, and its reason is an
+        // IMPOSSIBLE KEY STATE rather than any arity consequence: a selected
+        // position at or past the field count names a field the producer
+        // construct does not have, so this unit's identity does not identify
+        // anything in the run it claims to specialize.
         //
-        // ⛔ The surplus is stated as "one more than the slots", not as
-        // `N + 1` vs `N`: the roles are `N + |recursive_positions|` fields with
-        // the projection omitted, and quoting the singular arithmetic here is
-        // what made this guard's rationale describe a model the method no
-        // longer implements.
+        // ⛔ It does NOT cause a surplus role or a slot-length mismatch, and
+        // saying so would be false under the repaired model. The loop below
+        // filters on the CLOSED PROJECTION, which removes every real recursive
+        // position whatever `selected` is; an out-of-range `selected` simply
+        // matches nothing, and the emitted roles remain the normal nonrecursive
+        // run. That consequence belonged to the singular model, where `selected`
+        // was the only thing omitted -- it does not survive the plural one, and
+        // it is not this guard's rationale.
         if selected >= field_count {
             return Err(planner_error(
                 "a continuation selects a recursive position outside its producer constructor's \
