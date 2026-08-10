@@ -713,7 +713,7 @@ fn lift_recursive_value(
                 _ => EvalVal::Neutral,
             }
         }
-        shape @ RecursiveShape::Former {
+        RecursiveShape::Former {
             former, arguments, ..
         } => {
             let Some(sort) = support_sort else {
@@ -753,34 +753,15 @@ fn lift_recursive_value(
                 else {
                     return EvalVal::Neutral;
                 };
-                let Ok(host_recursive) = recursive_shapes(
-                    globals,
-                    &host.constructors[ordinal],
-                    host.id,
-                    host.params.len(),
-                ) else {
-                    return EvalVal::Neutral;
-                };
                 let mut support_args = vec![EvalVal::Neutral; support_decl.params.len()];
                 support_args.extend(source_fields.iter().cloned());
                 for position in evidence_positions {
                     let Some(field) = source_fields.get(position) else {
                         return EvalVal::Neutral;
                     };
-                    // A recursive host field contains another host value, so
-                    // build its support with the whole Former topology. Direct
-                    // guest fields instead recurse through the argument shape.
-                    let evidence_shape = if host_recursive
-                        .iter()
-                        .any(|recursive| recursive.position == position)
-                    {
-                        shape
-                    } else {
-                        argument_shape
-                    };
                     support_args.push(lift_recursive_value(
                         env,
-                        evidence_shape,
+                        argument_shape,
                         field.clone(),
                         fam,
                         level_args,

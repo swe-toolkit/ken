@@ -131,7 +131,7 @@ Spec: `14 §3.2`, `§7.8`, `§9.5`; `34 §3.1`; `39 §2.2`; `43 §1`.
   `Rose` method, or passing `b` unchanged yields a different reduct. This pins
   reduction without over-specifying an internal runtime representation.
 
-### kernel/inductive/nested-size-uses-lift
+### kernel/inductive/nested-size-uses-lift [KERNEL-NESTED-IND]
 
 - spec: `14 §3.2`, `§7.8`, `§9.5`; `39 §2.2`; `43 §1`
 - given: define `size : Rose -> Nat` by the generated eliminator. The `leaf`

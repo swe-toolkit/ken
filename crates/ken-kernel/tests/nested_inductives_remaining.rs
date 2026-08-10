@@ -2,20 +2,17 @@
 //!
 //! Binds exactly these cases from
 //! `conformance/kernel/inductive/seed-nested.md`:
-//! - `nested-size-uses-lift`, `nested-ds9-shapes-admitted`, and
-//!   `nested-fresh-carrier-admitted` (AC-K1–AC-K4);
+//! - `nested-ds9-shapes-admitted` and `nested-fresh-carrier-admitted`;
 //! - `nested-negative-under-positive` and
 //!   `nested-negative-existing-pair-control` (AC-K5);
 //! - `nested-unknown-head-rejected` and `nested-nonpositive-rejected`
 //!   (AC-K6–AC-K7);
 //! - `nested-direct-and-wstyle-controls-unchanged` (AC-K8).
 //!
+//! `nested-size-uses-lift` remains `[KERNEL-NESTED-IND]`-gated on
+//! `KERNEL-RECURSIVE-RESULT-SURFACE`; no finite topology control discharges it.
+//!
 //! Exact executing bindings:
-//! - `nested-size-uses-lift` ->
-//!   `production_nested_lift_is_consumed_and_iota_computes` and
-//!   `nc14_data_match_lowering.rs` tests
-//!   `nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_three`
-//!   and `nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three`;
 //! - `nested-ds9-shapes-admitted` ->
 //!   `declared_positive_paths_admit_list_pair_and_fresh_container_nesting`;
 //! - `nested-fresh-carrier-admitted` ->
