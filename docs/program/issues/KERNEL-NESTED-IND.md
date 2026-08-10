@@ -135,12 +135,47 @@ origin: Architect ruling evt_55k9f9efvd8jk, Decision dec_13af1mercv2m0 resolved.
 > |---|---|
 > | bind **seven** cases | the contract-point-4 subset minus `nested-size-uses-lift` |
 > | **restore** `[KERNEL-NESTED-IND]` on `nested-size-uses-lift` | and **remove its claimed exact executing binding**. It is blocked on the recursive-result surface node, and the seed row must say so |
-> | seed marker census **14 → 15** | the restored gate is a marker. ⛔ A candidate reporting 14 has not done the recut |
+> | seed marker census **19 → 14** | ⚠ **corrected 2026-08-10, see the block below — an earlier version of this row said `14 → 15` and was wrong in both direction and target.** `nested-size-uses-lift` keeps the marker it always had; nothing is restored |
 > | the shallow and finite-depth controls | **may remain, only if labelled partial topology/association regressions.** ⛔ They may not be cited as the unbounded fold, nor as discharge of `nested-size-uses-lift` |
 > | the other seven bindings and their evidence | preserved, but **only after fresh scope/QA/review** — no prior verdict transfers |
 >
 > ⛔ **`dec_8pyjkfs3qv7m` and its whole lineage are spent.** No QA, Architect,
 > or conformance-validator vote from any earlier `D6` SHA transfers.
+>
+> ### THE CENSUS NUMBER WAS WRONG. `14` IS CORRECT. Measured 2026-08-10.
+>
+> **This row blocked a correct candidate**, so read it before using any count
+> from this node as a check.
+>
+> | object | `^### .*[KERNEL-NESTED-IND]` in `seed-nested.md` |
+> |---|---|
+> | `main` `d2da54f8`, the true baseline | **19** |
+> | correct post-recut census | **14** |
+>
+> Of the eight contract-point-4 cases, only **six** ever carried a heading
+> marker — `nested-negative-existing-pair-control` and
+> `nested-direct-and-wstyle-controls-unchanged` were unmarked before any `D6`
+> work. Un-gating seven therefore removes **five** markers, and
+> `nested-size-uses-lift` keeps the sixth. 19 − 5 = **14**.
+>
+> **Where `14 → 15` came from.** The ruling's arithmetic assumed the earlier
+> candidates had *removed* size's heading marker, so restoring it would add one
+> back. **They never removed it** — they bound the row with an executing test
+> while leaving the marker in place, which is why they reported 14 from a
+> baseline of **19**, not from a baseline of 14. The baseline was misidentified,
+> so both the direction and the target were wrong. Nothing is restored; size
+> stays gated because it never stopped being gated.
+>
+> ⇒ **A candidate reporting `14` HAS done the recut.** The earlier text here said
+> the opposite and was used as a closure check, which is how it blocked
+> `d9b1d5b1` on its one correct property.
+>
+> **The lesson, stated where it will be read rather than in a retro:** the
+> Steward asserted this number without measuring it and then wrote it in as *"the
+> cheapest single check for whether this landed correctly."* **Promoting an
+> unmeasured number to a gate makes it authoritative against the artifact.**
+> Verify a count against the object before any node states it as a criterion —
+> the check is worth exactly as much as the measurement behind it.
 >
 > ⛔ **Do NOT widen `D6` to invent the missing surface.** Two repairs are
 > specifically prohibited: making hidden binders visible through `surface_var` or
