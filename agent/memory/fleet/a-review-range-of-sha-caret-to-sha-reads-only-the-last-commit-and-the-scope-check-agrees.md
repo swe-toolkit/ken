@@ -46,6 +46,32 @@ partial range actually shrinks; a ring that hands back `+187/-19` and a reviewer
 who reports `+115/-5` have measured different objects, and that disagreement is
 visible even when the path sets coincide.
 
+## WHAT THE PARTIAL RANGE WAS ABOUT TO MISS, measured
+
+Same morning, sibling candidate `3ee539bb` (`RT-DYNAMIC-ARM-SCALAR-MERGE` c1):
+10 commits, **17 paths** full versus **7** last-only. The Architect re-read the
+full range before voting and cast **REQUEST CHANGES** — a blocker at
+`crates/ken-elaborator/src/compiler_driver.rs:3437-3451`, where
+`checked_native_trusted_base_v1` declares *"A missing id is an error, never a
+skipped entry"* and the loop instead does `if let Some(symbol) =
+symbols.get(id)`, **silently shrinking the trust roster at the producer
+boundary.**
+
+**`compiler_driver.rs` is in the full range and NOT in the 7-path window.**
+Measured, not inferred:
+
+```sh
+git diff --name-only <SHA>^ <SHA>        | grep -c compiler_driver.rs   # 0
+git diff --name-only <BASE>...<SHA>      | grep -c compiler_driver.rs   # 1
+```
+
+⇒ **The defect was structurally invisible to the first reading.** On the partial
+range the candidate approves. And the WP's whole subject was a **bounded TCB
+widening** — so the range error would have shipped a silent trust-roster shrink
+inside the one change class that most needs a full read. **The cost of this trap
+is not proportional to the fraction of the diff skipped; it is proportional to
+what happens to be in the skipped part.**
+
 ## The rule
 
 ```sh
