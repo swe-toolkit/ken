@@ -1,15 +1,77 @@
 ---
 id: RT-DYNAMIC-ARM-SCALAR-MERGE
 title: "A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair"
-status: ready
+status: active
 owner: runtime
-size: TBD
+size: M
 gate: none
 depends_on: []
 blocks: []
 github: null
 origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 2026-08-09). Kernel reached the native boundary after interpreter Nat-3 and provenance-gated erasure both passed, and stopped without Runtime edits exactly as the durable D5 ruling at main 46c12adb requires. Steward-filed (agents cannot create tracked work per COORDINATION §2). Steward owns the frame and AC/control placement.
 ---
+
+> # `c1` SCOPE AMENDED IN PLACE 2026-08-10 ~08:3xZ — Steward `evt_28pvpc4rpyvyx`
+>
+> **Candidate `dfea0f38` was REJECTED by the Architect (REQUEST CHANGES in
+> thread `thr_1wn4ydb4kjqxt`, 2026-08-10 08:13Z, on Decision
+> `dec_6qgvd1v626s62`) and every verdict bound to that SHA is spent.** The
+> production boundary was right; the *consumer* edge was not closed.
+>
+> **The rejection's finding was incomplete, and the implementer's sweep is the
+> durable part.** The Architect named 2 cases; the real population is **5 cases
+> in 3 files** — `ken-interp/tests/nc7_differential_trust_report.rs` (2),
+> `ken-interp/tests/nc9_proof_erasure_boundary_checker.rs` (1), and
+> `ken-elaborator/src/erasure.rs` px7l (2). `ken-cli/tests/px4b_native_production.rs`
+> is green; its uses are compile-probe strings, not calls.
+>
+> **Both offered repairs were blocked by causes that predate `c1`:**
+>
+> - *Rebuild from a real erased checked package* clears the authority gate and
+>   then dies on `reject_program_blockers`, which refuses any non-empty
+>   `assumptions` map — and **every** driver-compiled package carries prelude
+>   trusted-base assumptions.
+> - *Relocate into `ken-runtime` unit tests* cannot preserve NC7's claim:
+>   `ken-runtime` cannot reach `ken-interp` without a dependency cycle, so it
+>   would **delete** the oracle-provenance claim rather than move it.
+>
+> ⇒ **Nothing had ever run a real package through the native lane.** It had only
+> ever seen synthetic programs, which is precisely why this stayed invisible
+> until `c1` made absence fatal.
+>
+> ## What is now authorized, and why it is a fold rather than a new node
+>
+> Architect ruling `evt_7gwz3dnthfxyh` supplies a **bounded native-subset
+> admission**: one private `NativeProgramAdmission` validating only closed,
+> hash-covered, compiler-origin, supported-primitive trust tuples, run after the
+> `c1` role authority and before the existing blockers, with admitted trust
+> propagated honestly into `CraneliftRunReport.trust.assumptions` and
+> `CraneliftObjectArtifact.assumptions`.
+>
+> **This does NOT grow the TCB, which is the axis that would have made it the
+> operator's call.** `spec/60-security/64-trust-model.md §4.3` already holds the
+> native runtime and `foreign` postulates as trust assumptions, "minimised and
+> listed, but not proven". The ruled tuple requires the target to already sit in
+> `metadata.trusted_base_delta`, so an admitted assumption is one **already
+> declared** in `trusted_base()`; the propagation requirement is §4.3's "listed"
+> discipline made mechanical. The trusted base is unchanged — the native lane
+> merely stops refusing to *execute* programs whose trust was already listed.
+>
+> **Folded, not cut as a new node**, because the admission is the only remaining
+> discharge path for `c1`'s own consumer edge, not scope pursued on its merits.
+> The set of WPs is unchanged, so `thr_1wn4ydb4kjqxt` remains the anchor.
+>
+> **Lands as one unit.** Slicing the mechanism out first would put five red
+> cross-crate tests on `main` — a mechanical publisher blocker for the whole
+> fleet, not the "a working path would go red" intuition the no-users ruling
+> retired. Semantic atomicity is met.
+>
+> **Size revised TBD → `M`**; expected to exceed one turn. Standing instruction
+> to the ring: if the admission validator alone consumes a turn, hard-stop with a
+> measured population rather than pushing into the consumer migrations.
+>
+> **`c2` remains unauthorized** and returns to the Steward before assignment
+> with its `AC-K12` relationship stated. `AC-K12` is not claimed or advanced here.
 
 > # `D1b-role-b` MERGED 2026-08-10. SLICE `c` IS CUT IN TWO. START AT `c1`.
 >

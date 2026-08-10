@@ -38,7 +38,65 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~07:4xZ. `main` = `bebe1a79`.
+> ### RESUME HERE — state at 2026-08-10 ~08:4xZ. `main` = `f57b3c8e`.
+>
+> #### CORRECTION to the carried plan: Runtime `c1` was REJECTED, not approved
+>
+> The pre-compaction note said *"`dec_6qgvd1v626s62` has left the proposed list
+> — confirm resolved by id, then merge exact `dfea0f38`."* **It left the list
+> because the Architect REQUESTED CHANGES.** Merging it would have landed a
+> rejected candidate. **This is why the rule is "read the Decision from the
+> object," not "infer from absence"** — absence from the proposed list is
+> consistent with approve *and* reject, and the carried note recorded only the
+> shape it expected.
+>
+> **Runtime is now at a genuine HARD STOP that is above the implementer's
+> seat.** The Architect's finding named 2 cases; the implementer swept and found
+> **5 cases in 3 files**, then showed **both** offered repair shapes are blocked
+> by causes predating `c1`:
+>
+> - "rebuild from a real erased checked package" — gets past the authority gate
+>   and dies on `reject_program_blockers`, which unconditionally refuses any
+>   program with non-empty `assumptions`, and **every** driver-compiled package
+>   carries prelude trusted-base assumptions.
+> - "relocate into `ken-runtime` unit tests" — `ken-runtime` cannot reach
+>   `ken-interp` without a dependency cycle, so it would **delete** NC7's
+>   oracle-provenance claim rather than move it.
+>
+> **The finding underneath is the valuable one: nothing has ever run a real
+> package through this lane.** It has only ever seen synthetic programs, which
+> is exactly why this stayed invisible until `c1` made absence fatal. The
+> unblocking call — admit prelude trusted-base assumptions in
+> `reject_program_blockers` — is a native-subset admission question, Architect's,
+> and strictly larger than `c1`. Routed at `evt_` (runtime-leader, 08:25Z).
+> **Do not infer permission from `c1`.**
+>
+> #### The Architect stranded a FOURTH time (~08:26Z) holding exactly that question
+>
+> `[Pasted Content 2748 chars]` unsubmitted. Cleared with one `Enter`. Four
+> strands in under three hours, every other Codex seat responsive throughout —
+> it is a property of that seat. **First action every tick: check that pane.**
+>
+> #### Language and the spec enclave were BOTH parked by the same wind-down
+>
+> `SURF-SPACE-CELLS` and `SPEC-IDENT-BLESSED` both cite the operator's ABI
+> wind-down of 2026-07-28. **The enclave is demonstrably working today** (D6
+> Spec approval, the computed-Bool judgment), so that ruling is at least partly
+> superseded — but **which teams it still binds is not derivable from the repo**,
+> and un-parking Language is not a Steward call. Sharpened for the 11:30Z queue.
+> Ergo has **zero** open nodes; its three are all `merged`/`closed`. Six idle
+> seats total, and the reason is a standing operator ruling, not framing debt.
+>
+> #### CONF-EVAL release is deliberately sequenced BEHIND the CI-ROW-CLAIM merge
+>
+> `CI-ROW-CLAIM-COMMENT-FORM` changes the resolved-claim count CONF-EVAL's
+> `AC-1` measures — the delivered checker reports **30**, not the 29 the frame
+> was written against, and the extractor now admits `//` as well as `///`.
+> Releasing from `f57b3c8e` would hand the enclave a base that goes stale under
+> it within minutes. Gate steps 2/5/7 already passed; **all three enclave seats
+> are compacted and holding** — the kick is the second half of that act.
+>
+> ### RESUME HERE — earlier state at 2026-08-10 ~07:4xZ. `main` = `bebe1a79`.
 >
 > **BOTH open Architect questions are ANSWERED. Nothing is waiting on the
 > Architect. The two things they gated are now mine and are DONE below.**
