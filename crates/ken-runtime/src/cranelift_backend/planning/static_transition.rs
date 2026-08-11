@@ -18642,10 +18642,18 @@ mod tests {
         // First install on a genuinely zero-region plan SUCCEEDS. Under the old
         // emptiness sentinel this was indistinguishable from never having run.
         let first_install = empty_a.install_fusion_owned_bodies(&mut ledger).is_ok();
-        // Second install on the SAME plan must reject. This is the row that
-        // pins the plan's flag: the map is still empty, so nothing but the flag
-        // can refuse.
-        let second_install_rejects = empty_a.install_fusion_owned_bodies(&mut ledger).is_err();
+        // Second install on the SAME plan must reject — with a **FRESH** ledger.
+        //
+        // The fresh ledger is the whole point of this row and it was wrong on
+        // the first cut. Reusing `ledger` here rejects on the LEDGER's flag,
+        // which is set, so the row passed even with the plan's flag reverted to
+        // an emptiness sentinel — a check that could not fail, in a control
+        // written specifically to prove it could. A ledger that has never
+        // recorded leaves the plan's own flag as the only thing able to refuse.
+        let mut second_ledger = FusionRegionClaimLedger::preflight(&empty_a).expect("claims");
+        let second_install_rejects = empty_a
+            .install_fusion_owned_bodies(&mut second_ledger)
+            .is_err();
 
         // The recorded empty ledger against an EQUIVALENT empty plan: rejected,
         // and B unchanged. This is the row that pins the ledger's flag, and it
