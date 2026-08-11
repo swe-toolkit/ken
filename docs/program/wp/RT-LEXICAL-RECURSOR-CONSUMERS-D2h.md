@@ -169,14 +169,21 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 > discharged has read it wrong, and this sentence exists so that reading is not
 > available.
 >
-> ### The six `AC-2` refusals — measure, do not assume
+> ### The `AC-2` refusals — measure, do not assume
 >
-> The frame, selected slot, invocation, exact suffix, call identity, and
-> segment-owner refusals relocate **only where the landed
+> **They are FIVE, not six. Corrected 2026-08-11 by Architect ruling
+> `evt_cnwn4y5xykg1`** — frame, selected slot, invocation, exact suffix, and
+> call identity. **The segment owner is NOT a sixth refusal**; a coherent
+> re-home determines a different complete key and is not rejected for it. It is
+> a positive provenance/non-aliasing comparator (`D2j` `AC-3a`, `D2f` `AC-6b`).
+> An *incoherent* owner is this node's landed interner/validator work, which is
+> a different thing from a relocated refusal.
+>
+> Those refusals relocate **only where the landed
 > `CONTINUATION_PRODUCTION_MUTATION` harness cannot express them on the current
 > witness.** That harness exists and already carries transplant-shaped variants.
-> **Report a verdict per cause.** Whatever the harness reaches stays here. Six
-> refusals must not leave this node silently because one of them is expensive.
+> **Report a verdict per cause.** Whatever the harness reaches stays here. A
+> refusal must not leave this node silently because it is expensive.
 >
 > ### Two sizing facts, because the estimate that produced the stop conflates
 > ### two different jobs
