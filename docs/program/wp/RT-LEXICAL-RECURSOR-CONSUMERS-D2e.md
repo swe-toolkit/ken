@@ -236,8 +236,26 @@ checked coordinate counts as three classes, not one:**
 **AC-5 — fail-closed, and this is the soundness-bearing control.** A producer
 **lacking** the exact consuming suffix yields **no fusion and the ordinary
 existing refusal** — never a fallback to the unspecialized result-returning unit.
-Independently transplant (a) the call identity and (b) the segment owner; **both
-must reject, and reject before any definition is created.**
+Independently transplant the **call identity**; it **must reject, and reject
+before any definition is created.**
+
+> **STRUCK 2026-08-11 — *"(b) the segment owner; both must reject."*** Corrected
+> by Architect ruling `evt_cnwn4y5xykg1`, reaffirmed at `evt_1jmng1vr3dw3k`.
+> **A coherently re-homed source determines a different complete key and is NOT
+> rejected for it**; demanding a refusal would force a second owner-rejection
+> mechanism production does not have and should not have. The segment owner is a
+> **positive provenance/non-aliasing comparator** — see `D2j`'s `AC-3a` and
+> `D2f`'s `AC-6b`.
+>
+> **This sentence is where the error propagated**, and that is why it is struck
+> here rather than only downstream. `D2f`'s `AC-6` inherited it *by citing this
+> frame* — "`D2e`'s transplant controls, call identity and segment owner,
+> independently, still reject" — and so demanded a control the Architect had
+> already forbidden. An implementer caught it at grounding.
+>
+> ⇒ **A superseded frame is not inert.** Later slices cite it as the source of
+> their own controls, so a voided requirement keeps being inherited until it is
+> struck at the origin.
 
 **This is `D2d`'s `AC-4` and it is why the ruling forbids "the only
 continuation."** An identity that happens to be unique in the measured
@@ -251,8 +269,10 @@ or definition is created:**
   ordinary refusal;
 - **independently** remove or transplant the **frame**, the **selected slot**,
   and the **invocation** marker/plan relation — each rejects on its own;
-- the already-required **missing exact consuming suffix**, **call-identity
-  transplant**, and **segment-owner transplant** controls are retained.
+- the already-required **missing exact consuming suffix** and **call-identity
+  transplant** controls are retained. **STRUCK — *"and segment-owner
+  transplant"*,** per the strike on `AC-5` above: that one is a positive
+  comparator, not a refusal.
 
 **Marker absence does not substitute for those soundness controls.** The
 unmarked `R3` witness now refuses for a *transport* reason, which would mask a
