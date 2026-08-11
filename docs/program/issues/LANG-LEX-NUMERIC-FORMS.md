@@ -118,6 +118,24 @@ review record.**
 `FloatLit(10.0)`. **A sign is not a digit, and a length test on a buffer that
 already contains the sign cannot say so.**
 
+## Accepted limitation — exponent plus a `d`/`f32` suffix is refused
+
+`3.14e5f32` and `1e2d` are **refused with a span**, by an explicit guard
+(`lexer.rs:609-616`) that fires before both suffix branches. This is why the
+`f32` construction legitimately omits `exp_str` — it is only ever entered with
+that buffer empty.
+
+**This is deliberate and it is a limitation, not a defect.** The alternative on
+the table was the pre-existing behaviour, which dropped the exponent silently
+and returned `DecimalLit(1,0)` or `Float32Lit(1.0)`. **A refusal beats a wrong
+answer**, and adding correct suffix-exponent semantics was explicitly out of
+the cut.
+
+It is spec-consistent today: `31-lexical` and `35-numbers` give the `Float32`
+row as `1.5f32`, with no exponent. **If either table ever gives an exponent on
+a suffixed float, that guard is the thing to revisit** — recorded here so the
+refusal is not re-filed as a defect.
+
 ## What is still not established
 
 **`1e-9`'s post-repair value was never executed on the review record.** AC-1
