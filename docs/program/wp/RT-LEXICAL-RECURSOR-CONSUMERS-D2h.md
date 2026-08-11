@@ -71,7 +71,11 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 > matrix, labelled as such, with every mutation **submitted to the interner**
 > rather than looked up.
 >
-> ### What relocates to a successor
+> ### What relocates to a successor — [[RT-LEXICAL-RECURSOR-CONSUMERS-D2j]]
+>
+> **The successor is written and it is `D2j`.** It gates `#6d`'s closure and it
+> is startable only once this frame's plane is on `main` and reachable from a
+> non-test build.
 >
 > **Per-member derivation correctness** — a provenance matrix, **not** twenty
 > pairwise planner-valid programs. For every key member the successor states
