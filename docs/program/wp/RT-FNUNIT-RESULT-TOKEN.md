@@ -110,37 +110,68 @@ historical.
 record-returning probe failed on both arms with a *different* error
 (`BoundaryCarrier` unsupported). It does not attribute this stop.
 
-## 3. FIRST DELIVERABLE IS A SCOPING ANSWER, AND IT MAY RESIZE OR RECUT THIS NODE
+## 3. THE SCOPING ANSWER — `D1` IS DISCHARGED, AND IT FALSIFIED THIS SECTION
 
-**Do not start repairing before `D1` answers this.**
+> ### `D1` ANSWERED AT `be54d47f` AND THE STEWARD'S PREMISE WAS WRONG.
+> ### `M` STANDS. Proceed to `D2`.
+>
+> **Read this section as the corrected state.** The three claims it used to
+> make are struck below with what replaced them, because two of them were
+> load-bearing on `AC-2` and a reader who skipped to the ACs would still be
+> working from them.
 
-**Measured on the closing merge:** `nc22` is a **single composite program**, not a
+**What survives, unchanged.** `nc22` is a **single composite program**, not a
 loop over shapes — one nested `Let` / `Call{callee: Closure}` / `Match` /
 `Construct` / `Record` / `If` tree, where "broad starter shapes" names breadth
-*within* one program. And **it is the only one of 21 `nc` fixtures carrying a
-`Call` whose callee is a `Closure` or `LexicalClosure`.**
+*within* one program. It remains live and still reproduces
+`NativeResultDecode` token `265`.
 
-⇒ **Two consequences, both binding:**
+### The three struck claims
 
-1. **Family width is UNESTABLISHABLE from this corpus.** It holds exactly one
-   instance of the failing shape. Answering "one shape or a family?" **requires
-   authoring fixtures that do not exist.**
-2. **The corpus currently has ZERO live coverage of this shape in either
-   direction.** Nothing in it will observe the wall move — **not a repair, and
-   not a regression.** Un-skipping `nc22` is the only thing that restores an
-   oracle.
+**STRUCK — *"it is the only one of 21 `nc` fixtures carrying a `Call` whose
+callee is a `Closure` or `LexicalClosure`."*** False. `nc5_seed_examples`
+carries `closure-capture-application` with `callee: RuntimeExpr::Closure` and
+`captures: ["decl:fixture::Local::y"]` at `crates/ken-runtime/src/ir.rs:1084`.
+It is a `pub fn` in `ir.rs` — **production, not a test fixture.**
 
-**So the sizing question is scoping, not measurement.** `M` was set for a repair
-against one known fixture. **If authoring the missing coverage belongs in this
-node, `M` is wrong — report that and it comes back to the Steward for a re-cut.**
-Do not silently absorb it.
+**The specific defect was scope, not staleness.** The claim was true *within*
+`crates/ken-runtime/src/cranelift_backend/artifact/api/tests.rs`, which still
+holds exactly one `callee: Closure` at `:106`. **One file was measured and
+"the corpus" was written.** A scoped measurement stated at unscoped width reads
+as a far stronger claim than it is, and this one carried two false conclusions
+out of it.
+
+**STRUCK — *"family width is UNESTABLISHABLE from this corpus."*** False. There
+are two instances of the closure-call shape, and comparing them establishes the
+axis without authoring anything.
+
+**STRUCK — *"the corpus has ZERO live coverage of this shape in either
+direction."*** False as stated. `nc5` is green on `FunctionizedUnits` under two
+existing committed corpus controls. **See `AC-1a` — this one is struck
+conditionally, and the condition is not yet discharged.**
+
+### The axis is RETURN SHAPE, and the closure call was never the wall
+
+| fixture | returns | on `FunctionizedUnits` |
+|---|---|---|
+| `nc5` closure-capture-application | `Int 7` | **green** |
+| `nc22` | `Record { ok: Bool(true), value: Int(7) }` | fails, token `265` |
+
+⇒ **The node is sharper, not bigger.** `D2` identifies `nc22`'s actual
+`ResultDecoder` arm; only then does `AC-2` decide whether the uninstantiated
+Bool / bare-constructor / Boundary cells need authored fixtures or a report.
+**No re-cut. `M` stands.**
+
+**`D1` did its job.** It was written as a gate that could resize the node, and
+it returned "the sizing survives, for a reason nobody had." That is a better
+outcome than agreement, and it is why the deliverable exists.
 
 ## 4. Deliverables
 
-- **`D1` — the scoping answer, and it gates everything else.** Establish whether
-  the failure is one shape or a family, and state **what authoring that answer
-  cost or would cost.** Report before building. **A `D1` that concludes the node
-  is mis-sized is a success.**
+- **`D1` — DISCHARGED at `be54d47f`.** Evidence-only, `+195/-0`, one new record
+  path, crates untouched. It falsified this frame's corpus premise and
+  established the return-shape axis; see §3. `M` stands and no re-cut is owed.
+  **Its residual is `AC-1a`, which is `D2`'s to discharge.**
 - **`D2` — locate the gap.** Which of the **eight** `compiled.rs` producers
   raises it for `nc22`, and **whether the gap is the token's PRODUCTION or its
   REGISTRATION** — those route differently and the answer determines `D3`'s
@@ -170,9 +201,30 @@ Do not silently absorb it.
   the owner reference removed. **Seen to fail before it passes** — this row has
   been dark, so a green with no demonstrated red is not evidence the repair did
   anything.
-- **`AC-2` — the coverage gap is closed or explicitly reported.** If `D1` found a
-  family, every member is covered or named with its measured cause. **A repair
-  that fixes `nc22` alone while a family exists must say so.**
+- **`AC-1a` — establish that `nc5` REACHES NATIVE EMISSION, at `file:line`, or
+  record that it does not.** Added by the Steward 2026-08-11 on `D1`'s own
+  caveat, promoted from a note because it is load-bearing: **the residual
+  census `D1` ran observes IR only.**
+
+  Everything `nc5` contributes rests on it being **green on
+  `FunctionizedUnits`**. If it never reaches native emission, it is green for a
+  reason that has nothing to do with the lane, and three things follow: it is
+  **not** a control on the functionized lane; §3's third struck claim becomes
+  substantially true again; and `AC-2`'s coverage decision would be taken
+  against a fixture that cannot observe the wall move in **either** direction.
+
+  ⇒ **A control that passes because the path was never reached is worse than an
+  absent one, because it reads as coverage.** Either answer discharges this AC.
+  **If `nc5` does not reach native emission, stop and return to the Steward** —
+  that changes what `AC-2` is deciding, and the coverage call may not rest on
+  it.
+
+- **`AC-2` — the coverage gap is closed or explicitly reported.** `D1` found a
+  second instance of the closure-call shape, so the axis is **return shape**
+  (`nc5` returns `Int`; `nc22` returns a `Record`). Every uninstantiated cell —
+  Bool, bare-constructor, Boundary — is covered or named with its measured
+  cause. **A repair that fixes `nc22` alone while a family exists must say so.**
+  **This AC is gated on `AC-1a`.**
 - **`AC-3` (no-regression).** Workspace green **in CI** — never a local
   `--workspace` run (`COORDINATION §12`).
 - **`AC-4` — the decode surface stays fail-closed, on the arm the repair
@@ -195,8 +247,11 @@ Do not silently absorb it.
 - **Weakening the `NativeResultDecode` refusal.** See `AC-4`.
 - **Retiring any residual class or touching the selector or the
   `RecursiveDescent` lane** — those are the campaign's nodes.
-- **Absorbing a re-scope.** If `D1` says the node is mis-sized, that is a Steward
-  recut, not something to work through.
+- **Absorbing a re-scope.** `D1` has answered and the node is **not** mis-sized,
+  so this is no longer about `D1`. It still binds: if `AC-1a` comes back saying
+  `nc5` does not reach native emission, or `D2` finds the coverage question is
+  wider than the return-shape axis, that is a Steward recut and not something
+  to work through.
 
 ## 7. Hard stop
 

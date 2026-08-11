@@ -82,18 +82,45 @@ compile.
    one nested `Let` / `Call{callee: Closure}` / `Match` / `Construct` / `Record`
    / `If` tree — "broad starter shapes" names breadth *within* one program. The
    skip suppresses **one row**, not a corpus.
-2. **`nc22` is the ONLY one of 21 `nc` fixtures carrying a `Call` whose callee
-   is a `Closure` or `LexicalClosure`.** It is alone.
+2. **STRUCK — *"`nc22` is the ONLY one of 21 `nc` fixtures carrying a `Call`
+   whose callee is a `Closure` or `LexicalClosure`. It is alone."*** Falsified
+   by `D1` at `be54d47f`, 2026-08-11.
 
-⇒ **The family-width question is not merely unmeasured — it is
-UNESTABLISHABLE from this corpus**, which holds exactly one instance of the
-failing shape. Answering it **requires authoring fixtures that do not exist.**
+   `nc5_seed_examples` carries `closure-capture-application` with `callee:
+   RuntimeExpr::Closure` at `crates/ken-runtime/src/ir.rs:1084` — a `pub fn`,
+   **production, not a test fixture.**
 
-⇒ **And the skip's consequence is wider than one lost row: this corpus now has
-ZERO live coverage of that shape in either direction.** Nothing in it will
-observe the wall move — **not a repair, and not a regression.**
+   **The defect was scope, not staleness.** The claim held *within*
+   `cranelift_backend/artifact/api/tests.rs`, which does contain exactly one
+   `callee: Closure`, at `:106`. **One file was measured and "the corpus" was
+   written.** Everything below followed from that width.
 
-**So the open question for whoever picks this up is scoping, not measurement:**
-is authoring the missing fixtures inside the `M`, or was `M` sized for a repair
-against one known fixture? **Answer that before starting.** If it is the
-latter, the node is mis-sized and comes back to the Steward.
+⇒ **STRUCK — the family-width question is NOT unestablishable.** Two instances
+of the closure-call shape exist, and comparing them establishes the axis with
+nothing authored.
+
+⇒ **STRUCK — the corpus does NOT have zero live coverage of that shape.** `nc5`
+is green on `FunctionizedUnits` under two existing committed controls. **This
+one is struck conditionally:** `D1`'s census observes IR only, so whether `nc5`
+reaches native emission is not yet established. The frame's `AC-1a` owns that,
+and if the answer is no, this claim becomes substantially true again.
+
+## What `D1` established instead — the axis is RETURN SHAPE
+
+| fixture | returns | on `FunctionizedUnits` |
+|---|---|---|
+| `nc5` closure-capture-application | `Int 7` | green |
+| `nc22` | `Record { ok: Bool(true), value: Int(7) }` | fails, `NativeResultDecode` token `265` |
+
+**The closure call was never the wall.** `nc22` remains live and still
+reproduces the failure.
+
+**`M` stands and no re-cut is owed** (Steward ruling 2026-08-11,
+`evt_6y341v6jsqwe3`). The node's structure is unchanged: `D2` identifies
+`nc22`'s actual `ResultDecoder` arm, and only then does `AC-2` decide whether
+the uninstantiated Bool / bare-constructor / Boundary cells need authored
+fixtures or a report.
+
+**`D1` worked as designed.** It was written as a gate that could resize the
+node and it returned "the sizing survives, for a reason nobody had" — which is
+a better outcome than agreement, and the reason the deliverable was a gate.
