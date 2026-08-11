@@ -460,6 +460,72 @@ the adversary's point (`evt_2kn8jtgn64d9s`) was that a one-command conversion
 from argument to measurement should never be left as a caveat, and that a decent
 prior on the answer is a reason to expect the empty result, not to skip it.
 
+## `D2f` Deliverable 5 — the complete-key redirect selector, MERGED 2026-08-11
+
+**Exact `e89de6674f283b80184acd4228ca8a6ae506f6fb`, PR #1915.** Decision
+`dec_svd7p853crep` resolved: Architect `evt_7ey1xa79ef22t`, QA
+`evt_1nt2vy2rdh14h`. One non-merge commit from declared merge-base `16d7e467`,
+one path — `cranelift_backend/planning/static_transition.rs` — `+198/-0`, clean
+`diff --check`. M6 blob identity **1/1 MATCH**, path count equal to declared
+scope. Current-main path intersection empty, so no rebase was owed.
+
+**The node stays `active`, and this is the sixth merge on `#6d`.** It creates no
+ABI arena, definition, emitter, or redirection, and credits **no emitter AC**.
+
+**This is the emitter turn's first partial, and the split was the ring's own
+call.** The turn was released whole; the implementer declined to start it on
+capacity, and after a fresh turn the leader cut the selector out and shipped it
+rather than stretch the turn or leave a half-built ABI class. **The ABI/emitter
+class remains unstarted by construction, so more partials are expected before
+`D2f` completes.**
+
+### What it establishes
+
+`fusion_redirect_target` selects the redirect edge **once, from the complete
+key** — `invocation_caller`, `invocation_callee`, `invocation_callee_entry` —
+and from nothing else. The `StaticBody` edge kind is validated **on the
+survivor**, not used to pre-filter. Zero matches and more-than-one are
+separately named errors.
+
+**That ordering is the substantive design call.** Pre-filtering by edge kind
+applies a criterion the key does not contain: redundant if the three members
+already determine one edge, and silently resolving an ambiguity a redirection
+may not have if they do not.
+
+### The coordinate this deliverable used to require
+
+The frame previously required redirecting a literal `StaticBody` edge
+`0 -> 2`. **No edge of that shape exists on the checked twin** — its invocation
+is caller 3, callee 2, and unit 0 is a `SchedulingEntry` that invokes nothing.
+`0 -> 2` was measured on the retired `px8j` witness. The frame was amended to
+state the derivation (PR #1913), and the candidate writes **no coordinate into
+the derivation**: `3 -> 2` lives only in the control, where it is a measurement.
+The Architect's resolution confirms it is kept control-only.
+
+⇒ **The general form, since this node will cut more slices:** pin a frame
+against the derivation, never against the number the derivation produced on
+whichever witness was current. A number outlives its witness and stays
+syntactically valid after it stops being true — nothing goes red.
+
+**The scope loss was local to `D2f`.** `D2d-GROUNDING` records the coordinate
+under "measured coordinate on this witness" and `D2e` says "do not re-derive
+those coordinates; derive the mechanism that produces them". Both upstream
+sources were correct; one restatement dropped the qualifier. No sibling frame
+edit is owed — checked, not assumed.
+
+### Non-vacuity, and the bound
+
+The control's discriminator is written **before** its positive and is **per
+member**: each invocation member is independently repointed at another identity
+the same plan really contains — unit 2 a real caller, unit 1 a real callee,
+origin 34 a real callee entry — and each repointing must refuse. That is the
+right shape for a selector, because one matching on a **subset** of the key
+would still pass a whole-key positive.
+
+**Unverified outside the ring:** whether the three members are jointly
+sufficient on any witness other than this one. The fail-closed zero/multiple
+errors bound the damage if they are not.
+
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
 **DISCHARGED 2026-08-11** by the `D2f` ABI-class partial above, which carries
