@@ -92,12 +92,53 @@ cannot lex a large literal has moved the defect, not closed it.
 > for this deliverable**. Widen them with the rest, or state plainly that one
 > carrier remains and which programs still truncate.
 >
-> **Do not widen the fixed-width branch.** `int_lit_val`'s `int8_id` through
+> ~~**Do not widen the fixed-width branch.** `int_lit_val`'s `int8_id` through
 > `uint64_id` arms deliberately wrap to a width; that is correct fixed-width
-> semantics, not the defect. **Only the `Int` branch and the parameter feeding
-> it are at issue.** If widening the parameter forces a decision about how the
-> fixed-width arms accept a `BigInt`, that is a design fork and a stop — not
-> something to work around with a cast back to `i128`.
+> semantics, not the defect.~~ **STRUCK — the claim is false.** Architect
+> ruling `evt_3zj3z2x1get7p`, 2026-08-11: `35 §1:43-45` states fixed-width
+> partiality is marked and never silent, `§3.2:182-200` confines modular
+> behaviour to the explicitly named wrapping class, and `§5:275-295` makes a
+> narrowing move that may not fit partial. **The `as` casts are an
+> implementation defect, not an established literal policy**, and this frame
+> asserted the opposite. See the guard section below, which replaces this
+> paragraph.
+
+**2a. The fixed-width representability guard — ADDED 2026-08-11 by Architect
+ruling `evt_3zj3z2x1get7p`, atomically part of this node.**
+
+> **Why this is here and not in a successor, because the Steward first ruled it
+> out and was wrong.** My scope ruling `evt_1c5r66yh63vfc` held that the silent
+> fixed-width wrap is a pre-existing defect this node inherits rather than
+> creates. **That premise is false for exactly the inputs this node adds.**
+> Today `const x : UInt8 = 2^128` never reaches the wrap — `lexer.rs:575`
+> refuses it, because the value is not representable in `i128`. **Widening the
+> carrier removes that refusal, and the value then flows to `(n as u8)` and
+> silently becomes `0`.** The node does not inherit the counterexample; it
+> **newly admits** it. A node that widens an acceptance surface owns the values
+> it newly accepts.
+
+The lawful boundary, and it is a component boundary rather than a suggestion:
+
+1. **Keep the source integer as the mathematical `BigInt` through target
+   selection.** Do not narrow first.
+2. For a fixed-width expected type, consult **one declaration-owned descriptor**
+   `(type id, min, max)` and decide `min <= n <= max` **before** creating the
+   literal primitive or inserting a `NumericLitVal`.
+3. **In range:** store and transport the exact same mathematical value.
+   **Out of range:** a span-bearing elaboration error naming the literal, the
+   target type, and the representable interval.
+4. **Do not emit an overflow VC and do not defer to a runtime check.** This is a
+   closed constant whose representability is decidable at elaboration.
+
+**Forbidden outright**: calling the raw narrowing primitive, reducing modulo,
+reinterpreting a high bit, clamping, or casting back to `i128`. **The
+cast-back is specifically the workaround an earlier Steward instruction
+suggested; it is not available.**
+
+**This is a bounded literal-representability companion — NOT fixed-width
+arithmetic or overflow work.** No `OQ-1a` VC, no wrapping-literal syntax, no
+conversion API change, no arithmetic-op change, no `spec/` edit. If the guard
+pulls any of those in, that is a stop.
 
 **3. The consumer sites reconciled.** `elab.rs:3614`, `:3662`, `:3669`,
 `:3757`, and `resolve.rs:560-562`, **plus `numbers.rs:564` and
@@ -136,6 +177,20 @@ this criterion.**
 fails if `resolve.rs:560-562` stops recognizing `0` and `1`. This is the
 regression a payload change causes and nothing else would catch.
 
+**AC-4a — the representability guard, on the Architect's discriminators.**
+Added 2026-08-11 (`evt_3zj3z2x1get7p`). Each pair is a boundary, so an
+off-by-one guard fails one side:
+
+- `255 : UInt8` accepts as **exactly** 255; `256 : UInt8` rejects.
+- `127 : Int8` accepts as **exactly** 127; `128 : Int8` rejects.
+- `18446744073709551615 : UInt64` accepts exactly; the next integer rejects.
+- the `2^128 : UInt8` probe rejects **by the same range boundary** — not by a
+  leftover width refusal further up. **This is the input the widening newly
+  admits, so a guard that rejects it for the wrong reason has not been tested.**
+- **a causal mutation of the guard admits at least one rejected source** (or
+  otherwise flips its verdict), and restoration rejects. **Not a test-only
+  oracle** — mutate the guard the compiler runs.
+
 **AC-5 — `trusted_base()` is unchanged.** No kernel or TCB delta; the target
 already exists.
 
@@ -145,9 +200,14 @@ that is a stop.
 ## Excluded scope
 
 - **No numeric tower work.** `Decimal(i64, i32)`'s bounded mantissa is a real
-  and separate gap — **do not fold it in.** File it with me if you measure it.
+  and separate gap and is now framed as [[LANG-SURFACE-DECIMAL-PRECISION]] —
+  **do not fold it in.**
 - **No `Float`/`Float32` change**, no overflow-obligation work (`OQ-1a`), no
-  native `Int8…Int64`/`UInt8…UInt64` types.
+  native `Int8…Int64`/`UInt8…UInt64` types. **The `OQ-1a` exclusion survives
+  the guard added at 2a**: literal representability is decidable at
+  elaboration and is not overflow work. Deciding a closed constant fits its
+  target is in scope; anything that emits a VC or defers to a runtime check is
+  not.
 - **No performance work.** No small-value fast path, no benchmark.
 - **No new surface production.**
 
@@ -156,6 +216,10 @@ that is a stop.
 - **The spec appears to disagree** with arbitrary-precision `Int`.
 - **A consumer genuinely requires fixed width** — that is a design fork for the
   Architect, not something to work around with a cast.
+- **The guard cannot be placed before the literal primitive is created.** The
+  ruling requires the range decision to happen *before* `NumericLitVal`
+  insertion; if the code shape forces it after, say so rather than moving the
+  decision.
 - **`Decimal`'s bounded mantissa blocks a deliverable here.** That is the
   sibling node and it is mine to frame.
 
