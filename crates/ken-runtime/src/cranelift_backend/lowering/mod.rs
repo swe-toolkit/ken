@@ -72,6 +72,13 @@ pub(in crate::cranelift_backend) use crate::{
 // (Architect `evt_8vhe6rd6r80c`; the landed §10.3 line said support -> surface
 // only, which these four imports and two production bodies refute.)
 pub(in crate::cranelift_backend) use super::compiled::{CompiledModule, ResultDecoder};
+/// `D2f` Deliverable 0 — the plane observation types and THE shared checked
+/// fixture, reaching the full-compile gate in `core`'s controls.
+#[cfg(test)]
+pub(in crate::cranelift_backend) use super::planning::{
+    d2j_checked_fixture_under, D2jCause, D2J_DECLARATION,
+    StaticContinuationFusionDescriptor, StaticContinuationFusionKey,
+};
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
     build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,

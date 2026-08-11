@@ -451,6 +451,71 @@ pub(in crate::cranelift_backend) fn d2f_production_fusion_planes_take() -> Vec<u
     D2F_PRODUCTION_FUSION_PLANES.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
 }
 
+/// `D2f` Deliverable 0 — one production builder arrival, and WHAT it resolved.
+///
+/// The `D2f` wiring partial records only a size, which answers "did production
+/// reach the builder" and nothing else. The applied-root gate distinguishes
+/// **phases** its rows reach, so it needs more than a size:
+///
+/// - **whether an oriented plan was present at all** — the old seed witness's
+///   row is defined by that absence;
+/// - **the resolved key and descriptor themselves**, because "exactly one
+///   key/ID/descriptor" and "the production path resolved the same key the
+///   planner controls derive" are claims a count cannot carry;
+/// - **the generated-definition population**, so a resolved plane at definition
+///   zero is distinguishable from emission having happened.
+///
+/// **No row count is stated here, deliberately.** An earlier revision said
+/// "the gate's three rows", and the gate then grew a `ReHomed` positive and the
+/// `AC-6a` phase split while this sentence stayed put — a false premise sitting
+/// above the very type the live gate consumes. **What this observation owes its
+/// consumer is a list of facts, not a census of who reads them**, and the count
+/// was never load-bearing.
+///
+/// **Additive. The existing `planes` observation is deliberately left
+/// alone.** It carries the landed arrival control's whole claim, and this
+/// observation answers different questions beside it rather than replacing it.
+///
+/// **There is no resolved-count field**, on purpose: it would be `keys.len()`
+/// read a second time, and an assertion comparing the two would restate one
+/// read rather than check anything.
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub(in crate::cranelift_backend) struct D2fGateArrival {
+    /// Whether the production compile carried an oriented plan into the builder.
+    pub(in crate::cranelift_backend) oriented_present: bool,
+    /// The keys this compile interned. Empty is lawful: an unmarked witness
+    /// resolves nothing.
+    pub(in crate::cranelift_backend) keys: Vec<StaticContinuationFusionKey>,
+    /// The descriptors minted alongside them, each carrying its own id.
+    pub(in crate::cranelift_backend) descriptors: Vec<StaticContinuationFusionDescriptor>,
+    /// The generated-definition population, read from the ABI plane and not
+    /// from the fusion plane above it. **Zero until the emitter exists**; the
+    /// gate pins that zero beside a resolved plane so the later `0 -> 1` is a
+    /// statement about emission.
+    pub(in crate::cranelift_backend) fusion_definitions: usize,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2F_GATE_ARRIVALS: std::cell::RefCell<Vec<D2fGateArrival>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn d2f_gate_note_arrival(arrival: D2fGateArrival) {
+    D2F_GATE_ARRIVALS.with(|cell| cell.borrow_mut().push(arrival));
+}
+
+/// Drains every production fusion-builder arrival on this thread since the last
+/// take. **An empty vector means the builder was never reached** — which is a
+/// different fact from reaching it and resolving nothing, and the gate's
+/// validator-refusal row is exactly the former.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d2f_gate_arrivals_take() -> Vec<D2fGateArrival> {
+    D2F_GATE_ARRIVALS.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn reset_lrc_d2a_counts() {
     LRC_D2A_BACKEDGE_ARRIVALS.with(|count| count.set(0));
@@ -2055,6 +2120,17 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // real one; until then the observation IS the consumer.
     #[cfg(test)]
     d2f_note_production_fusion_plane(static_continuation_fusion_plan.len());
+    // `D2f` Deliverable 0 — the gate's own observation, alongside the wiring
+    // partial's size rather than replacing it.
+    #[cfg(test)]
+    d2f_gate_note_arrival(D2fGateArrival {
+        oriented_present: oriented_subcontinuation_plan.is_some(),
+        keys: static_continuation_fusion_plan.observed_keys().to_vec(),
+        descriptors: static_continuation_fusion_plan
+            .observed_descriptors()
+            .to_vec(),
+        fusion_definitions: static_transition_plan.observed_fusion_definition_count(),
+    });
     #[cfg(not(test))]
     let _ = &static_continuation_fusion_plan;
     #[cfg(test)]
