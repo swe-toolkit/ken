@@ -437,6 +437,9 @@ impl<'s> Lexer<'s> {
                 || self.src[self.pos..].starts_with("0o")
                 || self.src[self.pos..].starts_with("0O")
             {
+                if self.src[self.pos + 2..].chars().any(|c| c == '.' || c == 'p' || c == 'P') {
+                    return self.lex_hex_float(start);
+                }
                 return self.lex_radix_integer(start);
             }
             return self.lex_numeric(start);
@@ -702,6 +705,25 @@ impl<'s> Lexer<'s> {
         }
         let n = BigInt::parse_bytes(digits.as_bytes(), radix).ok_or_else(|| ElabError::ParseError { msg: "invalid radix integer".into(), span: Span::new(start, self.pos) })?;
         if let Ok(nat) = n.to_string().parse::<u32>() { Ok((Token::Nat(nat), Span::new(start, self.pos))) } else { Ok((Token::IntLit(n), Span::new(start, self.pos))) }
+    }
+
+    fn lex_hex_float(&mut self, start: usize) -> Result<(Token, Span), ElabError> {
+        self.advance(); self.advance();
+        let mut digits = String::new();
+        let mut frac = 0i32;
+        let mut after_dot = false;
+        while let Some(c) = self.cur() {
+            if c == '.' { if after_dot { break; } after_dot = true; self.advance(); continue; }
+            if c == '_' { self.advance(); if digits.is_empty() || !self.cur().map(|n| n.is_ascii_hexdigit()).unwrap_or(false) { return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) }); } continue; }
+            if let Some(_) = c.to_digit(16) { self.advance(); digits.push(c); if after_dot { frac += 1; } } else { break; }
+        }
+        if digits.is_empty() || self.cur().map(|c| c == 'p' || c == 'P').unwrap_or(false) == false { return Err(ElabError::ParseError { msg: "hex float requires p exponent".into(), span: Span::new(start, self.pos) }); }
+        self.advance(); let mut sign = 1i32; if self.cur() == Some('+') { self.advance(); } else if self.cur() == Some('-') { sign = -1; self.advance(); }
+        let mut exp = String::new(); while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) { let c=self.advance().unwrap(); if c=='_' { if exp.is_empty() || !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false) { return Err(ElabError::ParseError { msg:"digit separator must occur between digits".into(), span:Span::new(start,self.pos)}); } } else { exp.push(c); } }
+        if exp.is_empty() { return Err(ElabError::ParseError { msg:"hex float exponent requires digits".into(), span:Span::new(start,self.pos)}); }
+        let mant = BigInt::parse_bytes(digits.as_bytes(),16).unwrap();
+        let value = mant.to_string().parse::<f64>().unwrap_or(f64::INFINITY) * 2f64.powi(sign * exp.parse::<i32>().unwrap() - 4 * frac);
+        Ok((Token::FloatLit(value), Span::new(start,self.pos)))
     }
 
     /// Lex the entire source into a token+span list (including the `Eof`
