@@ -6,6 +6,40 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
+> ## LANDED — `30efb016`, PR #1869, Decision `dec_5af3avgb27vf1`.
+>
+> Merged 2026-08-11 from declared base `0a5c77fb`; one path,
+> `crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs`,
+> `+730/-27`, blob-identical to the reviewed `6ae4e0bb`.
+>
+> **`#6d` DOES NOT CLOSE ON THIS MERGE.** [[RT-LEXICAL-RECURSOR-CONSUMERS-D2j]]
+> owns the planner-valid derivation-provenance matrix, the mandatory non-empty
+> ordered-input witness, and the six relocated refusals. The node stays
+> `active`.
+>
+> **`D2j`'s gate is satisfied and verified on the landed tree**, so it is
+> startable. `StaticContinuationFusionId` (`:8509`),
+> `StaticContinuationFusionPlan` (`:8746`) and
+> `build_static_continuation_fusion_plan` (`:8823`) all carry
+> `#[cfg_attr(not(test), allow(dead_code))]` — **not `#[cfg(test)]`.** They are
+> compiled into a non-test build; the attribute only suppresses the dead-code
+> lint because their consumer is `D2f`, which does not exist yet. That is
+> precisely the state this frame's first deliverable required: production
+> planner state serving as `D2f`'s fixed input.
+>
+> **What discharged the two Architect blocks**, recorded because both were
+> about instruments rather than mechanisms. `StaticContinuationFusionPlan::intern`
+> is the production seam over whole-key derived equality; the 22 non-noop
+> one-member mutations are **submitted** to it rather than looked up, each
+> minting a pairwise-distinct ID and round-tripping key→ID→key with a
+> descriptor, and equal resubmission reuses ID 0 without growth. The validator
+> now **establishes** admitted-ledger membership, construct membership in that
+> root's result population, a case derived from constructor identity, and a
+> declaration-owned recursive position, instead of copying them from the
+> primary key — and a primary-only admitted-root mutation is refused at ledger
+> establishment. The empty ordered-input class is left to `D2j` rather than
+> reported as exercised.
+
 > ## SCOPE RULING — Steward, 2026-08-11. THIS FRAME IS NOW SPLIT.
 >
 > Steward ruling `evt_2vfgg71s847ns`; Architect correction `evt_4psbpktt6tv75`.

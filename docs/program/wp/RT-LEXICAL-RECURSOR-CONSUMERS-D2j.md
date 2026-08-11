@@ -7,19 +7,25 @@ scope ruling `evt_2vfgg71s847ns` as corrected by Architect ruling
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
-> ## GATE — `D2h` must be on `main` first, and this one is a hard dependency
+> ## GATE — SATISFIED. `D2h` landed at `30efb016`; this frame is startable.
 >
-> **Every deliverable here drives the landed key plane.** There is no interner
-> to derive against, no descriptor to compare, and no re-derivation to agree
-> with until `D2h`'s production plane merges. **Do not start against a `D2h`
-> branch**; re-derive your merge-base from `origin/main` and confirm
-> `StaticContinuationFusionId` and `build_static_continuation_fusion_plan` are
-> reachable from a **non-test** build before writing anything.
+> **Verified by the Steward on the landed tree, 2026-08-11**, so you do not
+> repeat it: `StaticContinuationFusionId` (`static_transition.rs:8509`),
+> `StaticContinuationFusionPlan` (`:8746`) and
+> `build_static_continuation_fusion_plan` (`:8823`) each carry
+> `#[cfg_attr(not(test), allow(dead_code))]` — **not `#[cfg(test)]`.** They are
+> compiled into a non-test build. The `allow` suppresses the dead-code lint
+> only because their consumer is `D2f`, which does not exist yet; that is the
+> designed state, not a shortfall.
 >
-> If they are behind `#[cfg(test)]`, `D2h` did not discharge its own first
-> deliverable and this frame is not startable. **Stop and tell me** rather than
-> working around it — a plane you have to re-productionize here is `D2h` work
-> arriving under the wrong node.
+> **Do not treat `allow(dead_code)` as test-only gating** and do not
+> "re-productionize" anything — the plane is already production planner state
+> and is `D2f`'s fixed input. Re-derive your merge-base from `origin/main`
+> (currently `30efb016` or later); **do not start against a `D2h` branch.**
+>
+> The original stop still stands in one form: if you find the plane behind
+> `#[cfg(test)]` on the tree you actually build, **stop and tell me** rather
+> than working around it.
 
 ## Why this node exists
 
