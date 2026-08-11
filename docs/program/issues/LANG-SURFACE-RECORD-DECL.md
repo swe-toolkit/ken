@@ -215,15 +215,51 @@ closure gate below, not this slice.
 
 ### What it moved, measured on both trees
 
-Direct `.classes()` call sites across `crates/ken-elaborator`:
+Direct `.classes()` **call sites** across `crates/ken-elaborator` — comment
+matches excluded, which is the correction below:
 
-| tree | total | in `src/` |
+| tree | real call sites | in `src/` |
 |---|---|---|
-| base `ee67040f` | 31 | 9 |
-| merged `a87068be` | **3** | **1** |
+| base `ee67040f` | 29 | 9 |
+| merged `a87068be` | **2** | **1** |
 
-**28 of 31 consumers migrated** onto the borrowed exact-key views. Re-measured
-on `main` after the merge, not carried from the handback: **3**.
+**27 of 29 consumers migrated** onto the borrowed exact-key views. Re-measured
+on `main` after the merge, not carried from the handback.
+
+> **CORRECTED. This first read "31 → 3, 28 of 31", and a bare `.classes()` grep
+> is not a call-site census** — it matches the token inside comments too.
+>
+> At base, 31 raw matches were **29 calls plus 2 comments**
+> (`tests/lc_acceptance.rs:178` and the `//!` block at
+> `tests/seal2_support/mod.rs:12`). On `main`, 3 raw matches are **2 calls plus
+> 1 comment** (that same `//!` line). The `src/` column was unaffected — no
+> comment matches there — which is why the 9 → 1 figure stood while both totals
+> were wrong.
+>
+> **The adversary caught the numerator and inherited the denominator**
+> (`evt_5s0j5633597ah`): it corrected `3` to `2` by naming the doc comment, then
+> stated the result as "31 → 2", carrying my uncontested base figure. So the
+> corrected count was still wrong until the base was re-measured the same way.
+> **A correction inherits every premise it does not itself re-derive.** That is
+> the same defect the correction was fixing, one layer down and inside the fix.
+
+### The two survivors, named — and one is not residual progress
+
+| site | what it is |
+|---|---|
+| `src/elab.rs:3524` | the **sole production survivor**; `S3` migrates exactly this one via `infer_proj` |
+| `tests/seal2_support/mod.rs:149` | `for (class_name, info) in class_env.classes().iter()` — **whole-map iteration** |
+
+**The second is unmigratable by the keyed view, by construction.** You cannot
+key into a map you are enumerating, so it is neither deferred nor missed — it
+is outside what the replacement can express, and it will still be there after
+the storage flip.
+
+⇒ **This bears directly on the closure gate below.** `classes()` cannot be
+deleted while a consumer needs whole-map iteration: either that consumer
+changes, or the view grows an iteration form. **A residual count cannot show
+this and an enumeration can**, which is why the census is now named rather than
+counted (adversary, `evt_5s0j5633597ah`).
 
 The Architect approved the borrowed exact-key view boundary, the complete
 authorized keyed-reader migration, the residual census, and the pre-sentinel
@@ -292,11 +328,18 @@ was **31 call sites — 9 in `src/elab.rs`, 22 across seven test files** when it
 was taken, and migrating them to the storage-independent views is the gate's
 real content.
 
-> **UPDATED after `S2` merged (`a87068be`). Measured on `main`: 3 call sites
-> remain, 1 of them in `src/`.** `S2` moved 28 of the 31. The figure above is
-> retained as the original scope, **not** as current state — the live number is
-> **3**, and `S3..Sn` plus the storage flip are what close the rest before the
-> accessor can be deleted.
+> **UPDATED after `S2` merged (`a87068be`).** The original "31" was a raw grep
+> that counted 2 comment matches as call sites; the real base was **29 calls**.
+> **Measured on `main`: 2 call sites remain, 1 of them in `src/`** — `S2` moved
+> 27 of 29. The figure above is retained as the original scope, **not** as
+> current state.
+>
+> **The live residual is an enumeration, not a number**, and it is in the `S2`
+> section: `src/elab.rs:3524` (sole production survivor, `S3` migrates it) and
+> `tests/seal2_support/mod.rs:149` (whole-map iteration, **unmigratable by the
+> keyed view**). The second is why a count misleads here — it is not residual
+> progress, and the accessor cannot be deleted while a consumer needs
+> whole-map iteration.
 
 **Two doc comments still name the private field as the access path**, and both
 sit in test files that can no longer compile such an expression:
