@@ -75,9 +75,7 @@ fn wide_decimal_reaches_kernel_carrier_and_evaluation_exactly() {
 #[test]
 fn decimal_eq_decides_wide_exactness_through_target() {
     let result = eval_view(
-        "const equal = decimalEq \
-         (MkDecimalPair 9223372036854775808 1) \
-         (MkDecimalPair 92233720368547758080 0)",
+        "const equal = (9223372036854775808d + 1d) == 9223372036854775809d",
     );
     assert_eq!(result, EvalVal::Bool(true));
 }
