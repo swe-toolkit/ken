@@ -118,11 +118,16 @@ pub enum Token {
 pub struct Lexer<'s> {
     src: &'s str,
     pos: usize,
+    previous_token_was_dot: bool,
 }
 
 impl<'s> Lexer<'s> {
     pub fn new(src: &'s str) -> Self {
-        Self { src, pos: 0 }
+        Self {
+            src,
+            pos: 0,
+            previous_token_was_dot: false,
+        }
     }
 
     fn cur(&self) -> Option<char> {
@@ -155,6 +160,12 @@ impl<'s> Lexer<'s> {
     }
 
     pub fn next_token(&mut self) -> Result<(Token, Span), ElabError> {
+        let result = self.next_token_inner()?;
+        self.previous_token_was_dot = matches!(&result.0, Token::Dot);
+        Ok(result)
+    }
+
+    fn next_token_inner(&mut self) -> Result<(Token, Span), ElabError> {
         self.skip_ws_comments();
         let start = self.pos;
 
@@ -517,11 +528,12 @@ impl<'s> Lexer<'s> {
         let mut has_dot = false;
         let mut frac_str = String::new();
         let mut frac_places: i32 = 0;
-        // A digit immediately following `.` is a positional-projection index,
-        // not the integer part of a float. Keeping this decision in the lexer
-        // preserves both halves of the lexical contract: `p.1.2` is two
-        // projections, while an ordinary `3.14` remains one float literal.
-        let follows_dot = self.src[..start].chars().next_back() == Some('.');
+        // A numeric token after an emitted `.` is a positional-projection
+        // index, even when whitespace or a comment separates the two tokens.
+        // Keeping this decision in the lexer preserves both halves of the
+        // lexical contract: `p.1.2` is two projections, while an ordinary
+        // `3.14` remains one float literal.
+        let follows_dot = self.previous_token_was_dot;
         if !follows_dot
             && self.cur() == Some('.')
             && self.src[self.pos + 1..]
