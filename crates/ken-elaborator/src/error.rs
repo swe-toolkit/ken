@@ -59,6 +59,8 @@ pub enum ElabError {
     MissingCapability { effect: String, span: Span },
     /// An unresolved name at the name-resolution stage (`39 §5.3`).
     UnboundName { name: String, span: Span },
+    /// A surface conditional's condition did not check against `Bool`.
+    IfConditionNotBool { span: Span },
     /// A structural-result selector resolved its operand, but that exact
     /// surface binding has no validated result association in this branch.
     StructuralResultOutOfScope {
@@ -266,6 +268,11 @@ impl fmt::Display for ElabError {
             ElabError::UnboundName { name, span } => {
                 write!(f, "unbound name '{}' at {}-{}", name, span.start, span.end)
             }
+            ElabError::IfConditionNotBool { span } => write!(
+                f,
+                "conditional condition at {}-{} must have type Bool",
+                span.start, span.end,
+            ),
             ElabError::StructuralResultOutOfScope {
                 selector_span,
                 binding_span,

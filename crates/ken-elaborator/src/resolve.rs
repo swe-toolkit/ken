@@ -239,6 +239,12 @@ pub enum RExpr {
         arms: Vec<RMatchArm>,
         span: Span,
     },
+    RIf {
+        condition: Box<RExpr>,
+        then_branch: Box<RExpr>,
+        else_branch: Box<RExpr>,
+        span: Span,
+    },
     /// `e.field` — Σ-record field projection (`33 §5.2` η).
     RProj(Box<RExpr>, String, Span),
     /// `(x : A) -> B` — dependent function type, expr position (VAL2 #4).
@@ -286,7 +292,7 @@ impl RExpr {
             | RExpr::RAttachedProofRef { span: s, .. }
             | RExpr::RRecursiveResult { span: s, .. }
             | RExpr::RBinOp(_, _, _, s) => s,
-            RExpr::RMatch { span, .. } => span,
+            RExpr::RMatch { span, .. } | RExpr::RIf { span, .. } => span,
         }
     }
 }
@@ -565,6 +571,7 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EStr(..)
         | Expr::EBinOp(..)
         | Expr::EMatch { .. }
+        | Expr::EIf { .. }
         | Expr::EProj(..)
         | Expr::EAttachedProofRef { .. }
         | Expr::ERecursiveResult { .. } => Err(unsupported_constructor_type_expr(expr)),
@@ -1726,6 +1733,18 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
                 span: span.clone(),
             })
         }
+
+        Expr::EIf {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        } => Ok(RExpr::RIf {
+            condition: Box::new(resolve_expr_ctx(scope, condition, ctx)?),
+            then_branch: Box::new(resolve_expr_ctx(scope, then_branch, ctx)?),
+            else_branch: Box::new(resolve_expr_ctx(scope, else_branch, ctx)?),
+            span: span.clone(),
+        }),
 
         Expr::EMatch {
             scrut,

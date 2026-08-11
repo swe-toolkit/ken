@@ -1929,6 +1929,7 @@ impl Parser {
             Token::Lambda => self.parse_lambda(),
             Token::KwLet => self.parse_let_expr(),
             Token::KwMatch => self.parse_match_expr(),
+            Token::KwIf => self.parse_if_expr(),
             _ => {
                 let mut f = self.parse_atom_expr()?;
                 loop {
@@ -1963,6 +1964,7 @@ impl Parser {
                 | Token::KwType
                 | Token::LParen
                 | Token::KwOld
+                | Token::KwIf
                 | Token::Nat(_)
                 | Token::IntLit(_)
                 | Token::FloatLit(_)
@@ -1970,6 +1972,23 @@ impl Parser {
                 | Token::Float32Lit(_)
                 | Token::Str(_)
         )
+    }
+
+    fn parse_if_expr(&mut self) -> Result<Expr, ElabError> {
+        let start = self.peek_span().start;
+        self.advance(); // consume `if`
+        let condition = self.parse_expr()?;
+        self.expect(&Token::KwThen)?;
+        let then_branch = self.parse_expr()?;
+        self.expect(&Token::KwElse)?;
+        let else_branch = self.parse_expr()?;
+        let span = Span::new(start, else_branch.span().end);
+        Ok(Expr::EIf {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch: Box::new(else_branch),
+            span,
+        })
     }
 
     fn parse_lambda(&mut self) -> Result<Expr, ElabError> {
@@ -2209,6 +2228,7 @@ impl Parser {
         use crate::ast::NumLit;
         let start = self.peek_span().start;
         match self.peek().clone() {
+            Token::KwIf => self.parse_if_expr(),
             Token::Nat(n) => {
                 let span = self.peek_span().clone();
                 self.advance();
@@ -2381,6 +2401,17 @@ impl Parser {
                             scrut,
                             equation,
                             arms,
+                            span,
+                        },
+                        Expr::EIf {
+                            condition,
+                            then_branch,
+                            else_branch,
+                            ..
+                        } => Expr::EIf {
+                            condition,
+                            then_branch,
+                            else_branch,
                             span,
                         },
                         Expr::EProj(e, field, _) => Expr::EProj(e, field, span),
