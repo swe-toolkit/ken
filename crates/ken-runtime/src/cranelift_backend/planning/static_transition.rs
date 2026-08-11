@@ -7883,6 +7883,7 @@ thread_local! {
     static WEAKEN_CONTINUATION_DECREASING_MEASURE: Cell<bool> = const { Cell::new(false) };
     static SUPPRESS_POST_SPECIALIZATION_DESCENT: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_STATIC_BODY_TRIPLE: Cell<bool> = const { Cell::new(false) };
+    static MUTATE_PRIMARY_FUSION_KEY_DERIVATION: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -7952,6 +7953,13 @@ fn envelope_defect() -> EnvelopeDefect {
 /// is gone and not because discovery stopped.
 /// `D2i` `AC-3` — present a second matching `StaticBody` edge to the uniqueness
 /// decision, and change nothing else.
+/// `D2h` — perturb the PRIMARY key derivation, so the independent re-derivation
+/// has something to catch.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_primary_fusion_key_derivation_mutated(armed: bool) {
+    MUTATE_PRIMARY_FUSION_KEY_DERIVATION.with(|cell| cell.set(armed));
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn set_static_body_triple_duplicated(armed: bool) {
     DUPLICATE_STATIC_BODY_TRIPLE.with(|cell| cell.set(armed));
@@ -8492,13 +8500,301 @@ fn build_checked_ih_bindings(
 /// `build_continuation_specialization_plan` admitted, returned from that same
 /// call.
 #[cfg_attr(not(test), allow(dead_code))]
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2h` — dense identity of one interned
+/// static continuation fusion.**
+///
+/// A fourth id domain, never cast into any of the other three. It is not a
+/// `PredeclaredFunctionId` (it has no source occurrence of its own), not a
+/// `ContinuationSpecializationId` (that class is defined over a real static
+/// worker and this one has none), and not a `ContinuationContextId`.
+///
+/// Assigned from the complete key and from nothing else. There is no
+/// constructor from an integer, so nothing can mint one and have it read as
+/// planner-issued.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct StaticContinuationFusionId(u32);
+
+/// **The complete immutable identity of one static continuation fusion.**
+///
+/// Exactly the Architect's seven facts, in their order. Every member is a
+/// planner-issued identity: none is a constructor spelling, a type, a row
+/// number, a runtime tag, "the only continuation", or "the only marker".
+/// **Distinct in any member means a distinct fusion.**
+///
+/// `checked_transport` is **required and is never an `Option`**. Absence does
+/// not denote a smaller-but-valid identity: a producer whose transport cannot
+/// be resolved from all three wrapper authorities is not a candidate, so it
+/// never reaches a key.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StaticContinuationFusionKey {
+    admitted: AdmittedContinuationDiscovery,
+    producer_construct_origin: StaticOriginId,
+    producer_owner: PredeclaredFunctionId,
+    producer_alternative: u32,
+    recursive_position: u32,
+    producer_argument_origin: StaticOriginId,
+    producer_argument_binding: CheckedIhBinding,
+    selected_case_body: StaticOriginId,
+    consuming_call: StaticOriginId,
+    consuming_callee: StaticOriginId,
+    consumer_binding: CheckedIhBinding,
+    checked_transport: CheckedTransportCoordinate,
+    invocation_caller: PredeclaredFunctionId,
+    invocation_callee: PredeclaredFunctionId,
+    invocation_callee_entry: StaticOriginId,
+    consumer_owner: PredeclaredFunctionId,
+    continuation_inputs: Vec<ContinuationSourceSlotAuthority>,
+}
+
+/// The PRIMARY derivation: the key a candidate determines.
+///
+/// Total, because a candidate has already passed every gate.
+#[cfg_attr(not(test), allow(dead_code))]
+fn primary_fusion_key(candidate: &StaticContinuationFusionCandidate) -> StaticContinuationFusionKey {
+    let mut key = StaticContinuationFusionKey {
+        admitted: candidate.admitted,
+        producer_construct_origin: candidate.producer_construct_origin,
+        producer_owner: candidate.producer_owner,
+        producer_alternative: candidate.producer_alternative,
+        recursive_position: candidate.recursive_position,
+        producer_argument_origin: candidate.producer_argument_origin,
+        producer_argument_binding: candidate.producer_argument_binding,
+        selected_case_body: candidate.selected_case_body,
+        consuming_call: candidate.consuming_call,
+        consuming_callee: candidate.consuming_callee,
+        consumer_binding: candidate.consumer_binding,
+        checked_transport: candidate.checked_transport.clone(),
+        invocation_caller: candidate.invocation_caller,
+        invocation_callee: candidate.invocation_callee,
+        invocation_callee_entry: candidate.invocation_callee_entry,
+        consumer_owner: candidate.consumer_owner,
+        continuation_inputs: candidate.continuation_inputs.clone(),
+    };
+    // The mutation the independent re-derivation must catch. It perturbs the
+    // PRIMARY derivation only; the second route below re-reads planner facts and
+    // is untouched by it, which is what makes the comparison a real check rather
+    // than a function agreeing with itself.
+    #[cfg(test)]
+    if MUTATE_PRIMARY_FUSION_KEY_DERIVATION.with(Cell::get) {
+        key.consuming_callee = StaticOriginId(key.consuming_callee.0 + 1);
+    }
+    key
+}
+
+/// The INDEPENDENT re-derivation: rebuild every member from planner facts,
+/// reached by a second route.
+///
+/// This does not re-run the enumerator and does not read the candidate. It
+/// takes the admitted discovery -- the one thing the ledger issues -- and
+/// re-resolves the rest: the case's own declaration for the alternative and
+/// position, the semantic child inventory for the argument and the case body,
+/// the checked-IH authority for both bindings, the transport map for the
+/// coordinate, the `StaticBody` edges for the triple, and the producer
+/// environment for the ordered projection.
+///
+/// A disagreement with [`primary_fusion_key`] is a planner error, not a smaller
+/// population: two routes to one identity must not differ.
+#[cfg_attr(not(test), allow(dead_code))]
+fn rederive_fusion_key(
+    plan: &StaticTransitionPlan<'_>,
+    oriented: &crate::OrientedSubcontinuationPlanV1,
+    key: &StaticContinuationFusionKey,
+) -> Result<StaticContinuationFusionKey, CraneliftBackendError> {
+    let transport = build_checked_transport(plan, oriented)?;
+    let ih_bindings = build_checked_ih_bindings(plan)?;
+    let continuation_origin = key.admitted.continuation_origin;
+
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(continuation_origin)?
+    else {
+        return Err(planner_error("a fusion key names a non-computational consumer"));
+    };
+    let alternative = key.producer_alternative as usize;
+    let case = cases
+        .get(alternative)
+        .ok_or_else(|| planner_error("a fusion key names an absent consumer alternative"))?;
+    let position = *case
+        .recursive_positions
+        .iter()
+        .find(|position| **position == key.recursive_position as usize)
+        .ok_or_else(|| planner_error("a fusion key names an undeclared recursive position"))?;
+
+    let selected_case_body = plan
+        .semantic
+        .child_origin(continuation_origin, 1 + alternative)?;
+    let consuming_call = fusion_through_checked_wrappers(plan, selected_case_body)?;
+    let consuming_callee = plan.semantic.child_origin(consuming_call, 0)?;
+    let producer_argument_origin = plan
+        .semantic
+        .child_origins(key.producer_construct_origin)?
+        .get(position)
+        .copied()
+        .ok_or_else(|| planner_error("a fusion key names an absent producer argument"))?;
+
+    let producer_argument_binding = ih_bindings
+        .get(&producer_argument_origin)
+        .copied()
+        .ok_or_else(|| planner_error("a fusion key's producer argument is not a hypothesis"))?;
+    let consumer_binding = ih_bindings
+        .get(&consuming_callee)
+        .copied()
+        .ok_or_else(|| planner_error("a fusion key's consuming callee is not a hypothesis"))?;
+    let checked_transport = transport
+        .get(&consuming_call)
+        .cloned()
+        .ok_or_else(|| planner_error("a fusion key's transport does not re-resolve"))?;
+
+    let producer_owner = occurrence_authority(plan, key.producer_construct_origin)?.owner;
+    let consumer_owner = occurrence_authority(plan, continuation_origin)?.owner;
+    let (invocation_caller, invocation_callee, invocation_callee_entry) =
+        fusion_unique_static_body_triple(plan, producer_owner)?
+            .ok_or_else(|| planner_error("a fusion key's invocation edge does not re-resolve"))?;
+    let environment = exact_continuation_source_environment(
+        plan,
+        producer_owner,
+        key.admitted.result_root,
+        key.producer_construct_origin,
+        consumer_owner,
+        continuation_origin,
+    )?
+    .ok_or_else(|| planner_error("a fusion key's input projection does not re-resolve"))?;
+
+    Ok(StaticContinuationFusionKey {
+        admitted: key.admitted,
+        producer_construct_origin: key.producer_construct_origin,
+        producer_owner,
+        producer_alternative: key.producer_alternative,
+        recursive_position: key.recursive_position,
+        producer_argument_origin,
+        producer_argument_binding,
+        selected_case_body,
+        consuming_call,
+        consuming_callee,
+        consumer_binding,
+        checked_transport,
+        invocation_caller,
+        invocation_callee,
+        invocation_callee_entry,
+        consumer_owner,
+        continuation_inputs: environment.inputs.clone(),
+    })
+}
+
+/// The planner-side descriptor, and the third leg of the bijection.
+///
+/// Deliberately **not** an `AbiUnitDefinition` arm and not an emission
+/// descriptor -- those are `D2f`. It records only what the identity determines.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StaticContinuationFusionDescriptor {
+    id: StaticContinuationFusionId,
+    continuation_inputs: usize,
+    recursive_position: u32,
+    consumer_owner: PredeclaredFunctionId,
+    producer_owner: PredeclaredFunctionId,
+}
+
+/// The interned fusion population: production planner state, and `D2f`'s fixed
+/// input.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StaticContinuationFusionPlan {
+    keys: Vec<StaticContinuationFusionKey>,
+    descriptors: Vec<StaticContinuationFusionDescriptor>,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl StaticContinuationFusionPlan {
+    /// key -> ID, on WHOLE-key equality: a key differing in any member is a
+    /// different key.
+    fn id_for(&self, key: &StaticContinuationFusionKey) -> Option<StaticContinuationFusionId> {
+        self.keys
+            .iter()
+            .position(|candidate| candidate == key)
+            .and_then(|index| u32::try_from(index).ok())
+            .map(StaticContinuationFusionId)
+    }
+
+    /// ID -> key.
+    fn key_for(&self, id: StaticContinuationFusionId) -> Option<&StaticContinuationFusionKey> {
+        self.keys.get(id.0 as usize)
+    }
+
+    /// ID -> descriptor.
+    fn descriptor_for(
+        &self,
+        id: StaticContinuationFusionId,
+    ) -> Option<&StaticContinuationFusionDescriptor> {
+        self.descriptors.iter().find(|entry| entry.id == id)
+    }
+
+    fn len(&self) -> usize {
+        self.keys.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
+}
+
+/// **`D2h` — build the fusion identity plane, in the ruled fail-closed order.**
+///
+/// Steps 1 to 3 are [`enumerate_live_fusion_candidates`]. Step 4 derives each
+/// key twice by two routes -- [`primary_fusion_key`] from the candidate, and
+/// [`rederive_fusion_key`] from planner facts -- and requires them equal. Step 5
+/// interns, and **only then** does an id or descriptor exist.
+#[cfg_attr(not(test), allow(dead_code))]
+fn build_static_continuation_fusion_plan(
+    plan: &StaticTransitionPlan<'_>,
+    entry: &RuntimeExpr,
+    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    oriented: Option<&crate::OrientedSubcontinuationPlanV1>,
+) -> Result<StaticContinuationFusionPlan, CraneliftBackendError> {
+    let candidates = enumerate_live_fusion_candidates(plan, entry, declarations, oriented)?;
+    let Some(oriented) = oriented else {
+        return Ok(StaticContinuationFusionPlan::default());
+    };
+
+    let mut fusion = StaticContinuationFusionPlan::default();
+    for candidate in &candidates {
+        let key = primary_fusion_key(candidate);
+        let rederived = rederive_fusion_key(plan, oriented, &key)?;
+        if rederived != key {
+            return Err(planner_error(
+                "a static continuation fusion key does not re-derive exactly from planner facts",
+            ));
+        }
+        if fusion.id_for(&key).is_some() {
+            continue;
+        }
+        let id = StaticContinuationFusionId(u32::try_from(fusion.keys.len()).map_err(|_| {
+            planner_capacity_error("static continuation fusion identity exhausted")
+        })?);
+        fusion.descriptors.push(StaticContinuationFusionDescriptor {
+            id,
+            continuation_inputs: key.continuation_inputs.len(),
+            recursive_position: key.recursive_position,
+            consumer_owner: key.consumer_owner,
+            producer_owner: key.producer_owner,
+        });
+        fusion.keys.push(key);
+    }
+    Ok(fusion)
+}
+
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — one fusion CANDIDATE, established
 /// and not interned.**
 ///
 /// Carries only facts from the Architect's closed seven. There is no id, no
 /// descriptor, no key and no interning here, and none may be added: those are
 /// `D2h`.
-#[cfg(test)]
+///
+/// PRODUCTION planner state. It survives a non-test Runtime build because
+/// `D2f` consumes it as a fixed input; the `allow` records that its consumer
+/// does not exist yet, not that the type is test scaffolding.
+#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct StaticContinuationFusionCandidate {
     /// 1. the admitted discovery context, taken whole from the ledger.
@@ -8608,7 +8904,9 @@ fn fusion_through_checked_wrappers(
 /// Every fact comes from the Architect's closed seven. If a gate ever needs a
 /// fact outside them, that is a closed-contract failure to report rather than
 /// plumbing to add.
-#[cfg(test)]
+///
+/// PRODUCTION planner state, for the same reason as the candidate it builds.
+#[cfg_attr(not(test), allow(dead_code))]
 fn enumerate_live_fusion_candidates(
     plan: &StaticTransitionPlan<'_>,
     entry: &RuntimeExpr,
@@ -14965,6 +15263,170 @@ mod tests {
         assert!(
             format!("{absent:?}").contains("checked subcontinuation markers have no checked plan"),
             "and it must refuse for the transport reason: {absent:?}"
+        );
+    }
+
+    #[cfg(test)]
+    fn d2h_plane_fixture() -> (
+        RuntimeDeclaration,
+        RuntimeExpr,
+        crate::OrientedSubcontinuationPlanV1,
+    ) {
+        (d2g_declaration(true), d2g_entry(), d2g_oriented_plan())
+    }
+
+    /// `D2h` — the bijection round-trips on production planner state.
+    ///
+    /// key -> ID -> key returns the same key, ID -> descriptor resolves, and the
+    /// descriptor's members are checked against the key rather than merely being
+    /// present, so a descriptor paired with the wrong id would fail.
+    #[test]
+    fn d2h_the_key_id_descriptor_bijection_round_trips() {
+        let (declaration, entry, oriented) = d2h_plane_fixture();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+
+        let fusion =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the plane builds");
+        assert_eq!(fusion.len(), 1, "the gate measured exactly one candidate");
+
+        let id = StaticContinuationFusionId(0);
+        let key = fusion.key_for(id).expect("ID -> key").clone();
+        assert_eq!(fusion.id_for(&key), Some(id), "key -> ID -> key round-trips");
+
+        let descriptor = fusion.descriptor_for(id).expect("ID -> descriptor");
+        assert_eq!(descriptor.id, id);
+        assert_eq!(descriptor.recursive_position, key.recursive_position);
+        assert_eq!(descriptor.consumer_owner, key.consumer_owner);
+        assert_eq!(descriptor.producer_owner, key.producer_owner);
+        assert_eq!(
+            descriptor.continuation_inputs,
+            key.continuation_inputs.len(),
+            "the descriptor's shape is the key's, not an independent number"
+        );
+        assert_ne!(
+            key.producer_owner, key.consumer_owner,
+            "and the interned identity is the cross-unit one the fusion exists for"
+        );
+    }
+
+    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary
+    /// derivation.
+    ///
+    /// The two routes are genuinely different: the primary builds the key from
+    /// the candidate, and the re-derivation rebuilds every member from planner
+    /// facts -- the case declaration, the semantic child inventory, the
+    /// checked-IH authority, the transport map, the `StaticBody` edges and the
+    /// producer environment -- without reading the candidate.
+    ///
+    /// Perturbing only the primary must therefore be caught. An earlier revision
+    /// compared two identical enumerator runs, which agree by construction and
+    /// proved only determinism; this control is what distinguishes the two
+    /// designs.
+    #[test]
+    fn d2h_the_independent_rederivation_catches_a_mutated_primary_derivation() {
+        struct Restore;
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                set_primary_fusion_key_derivation_mutated(false);
+            }
+        }
+
+        let (declaration, entry, oriented) = d2h_plane_fixture();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+
+        let baseline =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the unmutated plane builds");
+        assert_eq!(baseline.len(), 1, "the baseline mints one identity");
+
+        let _restore = Restore;
+        set_primary_fusion_key_derivation_mutated(true);
+        let caught =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect_err("a mutated primary derivation must be caught");
+        assert!(
+            format!("{caught:?}").contains("does not re-derive exactly from planner facts"),
+            "and caught by the re-derivation comparison specifically: {caught:?}"
+        );
+    }
+
+    /// `D2h` `AC-2` — the three expressible refusals, each before any ID or
+    /// descriptor exists.
+    ///
+    /// Checked at the PLANE, where an id and a descriptor would exist if
+    /// anything had been minted: an empty plane is the operational meaning of
+    /// "before interning", because there is no id to inspect.
+    ///
+    /// The baseline mints one identity first, so each zero is a change and not
+    /// the fixture's resting state. The other six `AC-2` causes are not here:
+    /// `ContinuationProductionMutation` cannot express any of them, which was
+    /// measured, and they relocate rather than being silently dropped.
+    #[test]
+    fn d2h_ac2_the_three_expressible_refusals_mint_nothing() {
+        struct Restore;
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                set_post_specialization_descent_suppressed(false);
+                set_static_body_triple_duplicated(false);
+            }
+        }
+
+        let (declaration, entry, oriented) = d2h_plane_fixture();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+
+        let baseline =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the plane builds");
+        assert_eq!(baseline.len(), 1);
+        assert!(baseline
+            .descriptor_for(StaticContinuationFusionId(0))
+            .is_some());
+
+        // 1. Stripped transport.
+        let stripped = build_static_continuation_fusion_plan(&plan, &entry, &declarations, None)
+            .expect_err("markers with no plan must refuse");
+        assert!(
+            format!("{stripped:?}")
+                .contains("checked subcontinuation markers have no checked plan"),
+            "at the TRANSPORT gate: {stripped:?}"
+        );
+
+        let _restore = Restore;
+
+        // 2. Suppressed post-specialization descent.
+        set_post_specialization_descent_suppressed(true);
+        let no_descent =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("builds with nothing to intern");
+        assert!(
+            no_descent.is_empty(),
+            "no key, id or descriptor without the descent root: {no_descent:?}"
+        );
+        assert_eq!(
+            no_descent.descriptor_for(StaticContinuationFusionId(0)),
+            None
+        );
+        set_post_specialization_descent_suppressed(false);
+
+        // 3. A duplicated actual StaticBody edge.
+        set_static_body_triple_duplicated(true);
+        let ambiguous =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("builds with nothing to intern");
+        assert!(
+            ambiguous.is_empty(),
+            "a second matching StaticBody edge must mint nothing: {ambiguous:?}"
+        );
+        assert_eq!(
+            ambiguous.descriptor_for(StaticContinuationFusionId(0)),
+            None
         );
     }
 
