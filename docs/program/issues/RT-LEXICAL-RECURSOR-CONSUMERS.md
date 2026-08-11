@@ -738,16 +738,69 @@ planned-vs-defined set equality. Each moved exactly one field of the expected
 output. **That discriminates which rule is load-bearing** rather than only
 showing that something fails.
 
-### The located seam, and why it is not a re-cut
+### The located seam — WITHDRAWN 2026-08-11, and what replaces it
 
-The `Exact` path still reaches `boundary_transfer_admissibility`'s
-`ComputationalRecursorClosure` refusal, so the takeover must be located **before
-that refusal**. The ruling puts the takeover at the producer-call return; this
-says the ordinary path refuses upstream of it.
+**The coordinate below was wrong about which unit raises the refusal, and it is
+withdrawn.** It is kept as written because the next turn was told to inherit it,
+and a reader who acts on it must be able to see that it was retracted rather
+than merely absent.
 
-⇒ **Incomplete about where, not contradicted.** The Steward re-cut condition is
-contradiction of the ruling's shape, and this does not meet it. It is a located
-coordinate the next turn inherits rather than rediscovers.
+> The `Exact` path still reaches `boundary_transfer_admissibility`'s
+> `ComputationalRecursorClosure` refusal, so the takeover must be located
+> **before that refusal**. The ruling puts the takeover at the producer-call
+> return; this says the ordinary path refuses upstream of it. ⇒ Incomplete
+> about where, not contradicted.
+
+The Runtime leader measured it (`evt_1xjz1y6qgznv7`): on applied `Exact`,
+`transfer_into_carrier` sees **one** refusal at origin 31, and it is raised by
+**unit 2's own body**, which constructs `Node{ComputationalRecursorClosure}` and
+transfers it across unit 2's own boundary. The claimed edge `3 -> 2 @37` is unit
+2's sole incoming invocation, but `plan.executable_units()` returns `[0,1,2,3]`
+with entries `[5,41]` — so redirecting the call and taking over the consumer
+continuation leaves unit 2 declared, defined, and still refusing.
+
+⇒ **The takeover does not reach this refusal at all.** The seam named above is
+real for the double-execution problem the Architect ruling addresses; it is not
+the seam for this one. Do not spend a turn making it fit.
+
+### The producer-suppression question — scope ruled, mechanism to the Architect
+
+Steward classification `evt_1qprfdz1h97ys`, in reply to `evt_1xjz1y6qgznv7`.
+
+**Scope: bounded completion of `D2f`. No re-cut, no new node, `#6d` stays
+`active`.** The fused definition subsuming both bodies is the deliverable. A
+fusion that leaves the producer's body defined and refusing has not fused
+anything, so *"after fusion, unit 2 must not receive an independent body"* is
+inside the ruled outcome rather than beyond it.
+
+**Mechanism: the Architect's, routed by the ring directly** (`COORDINATION §14`,
+any team to Architect for component design). The suppressed-origin prohibition
+at `:654` above is the Architect's own sentence, and narrowing another lane's
+prohibition is not available from the scope lane; and the answer changes what
+gets emitted.
+
+**The question must not be asked on the axis the leader first proposed.** *"May
+a producer with a sole claimed emittable invocation cease standalone emission"*
+keys the predicate on **call edges**, and the landed code refuses that axis in
+writing. Coordinates measured on `28bed66a`, doc-only over `cf1b36b4`:
+
+| coordinate | what is there |
+|---|---|
+| `static_transition.rs:12783` | `executable_units` already narrows `emittable_units` by `template_only_worker_bodies` (`:12690`), probing `unit.body_occurrence()` |
+| `static_transition.rs:12813` | *"reading it here would ask an executability question with a call-identity key ... executability is a function of the body alone"* |
+
+These are cited, **not ruled to cover the case** — that measurement is the
+ring's. They fix the shape of the question: ask on the **body axis**, and ask
+whether a landed narrowing already spans this case or a new one is needed.
+
+That distinction is also what separates the need from the prohibition. What was
+ruled out is a **generic** suppressed-origin or AST-excision facility, which is
+the larger thing the implementer had been sizing. Using or extending an existing
+ruled narrowing is a different object. Whether it is *this* narrowing is the
+Architect's to say, and the ask should surface **the need with the vehicle left
+open** — a bundled mechanism anchors the owner, and its rejection then reads as
+"the need cannot be met" when the owner can usually meet it more cheaply from
+inside their own lane.
 
 ### The completeness premise is now VERIFIED, not just asserted
 
