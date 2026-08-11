@@ -6,12 +6,148 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
+> ## SCOPE RULING — Steward, 2026-08-11. THIS FRAME IS NOW SPLIT.
+>
+> Steward ruling `evt_2vfgg71s847ns`; Architect correction `evt_4psbpktt6tv75`.
+>
+> **Everything below this block that says "scope is unchanged" is superseded by
+> this block.** Those sentences were true when written, and both are corrected
+> in place where they appear.
+>
+> Architect block `evt_1ef33yr2xxdad` rejected candidate `a77ba94a` on four
+> grounds. Three are bounded repairs. The fourth — `AC-1`'s demand for two
+> complete **planner-valid** keys per distinguishable identity class, including
+> a non-empty ordered input projection — is fixture construction, not a control
+> edit, and it resizes the node rather than the candidate.
+>
+> ### What `D2h` now is
+>
+> The **production key plane**, and only that:
+>
+> 1. `StaticContinuationFusionId`, the complete immutable seven-fact key, the
+>    descriptor, the interner, and `build_static_continuation_fusion_plan` as
+>    **production planner state**. Not `#[cfg(test)]`. This is the half that
+>    makes it `D2f`'s fixed input, and a plane erased from a non-test build is
+>    not that input.
+> 2. An **independent exact re-derivation** of the whole key from planner facts
+>    before interning. **`a77ba94a`'s defect was not a weak check — it was a
+>    check that measured nothing**: two identical runs of one enumerator agree
+>    by construction, so the comparison could only detect nondeterminism. The
+>    control that earns the word *independent* is a mutation of the primary
+>    derivation that the validator catches, not a second call to it.
+> 3. The key↔ID↔descriptor bijection round-trip.
+> 4. The `AC-2` refusals the landed witness already expresses: stripped
+>    transport, suppressed descent, duplicated actual `StaticBody` edge.
+>
+> #### ARCHITECT RULING `evt_4psbpktt6tv75` — `AC-1` carried TWO obligations
+>
+> The Architect answered the proportionality question and **corrected the
+> proportional part of the block.** The blanket *"two planner-valid keys per
+> member"* conflated an interner-algebra property with a derivation property,
+> and the two take different instruments. An earlier draft of this ruling
+> relocated the whole per-class matrix; that was superseded before this frame
+> was published, and the split below is the ruling as issued.
+>
+> **Collision is interner algebra, and a synthetic mutation IS a valid net for
+> it** — provided the mutated key is **actually submitted to the interner and
+> receives a distinct ID.** `a77ba94a`'s defect was asking a one-element lookup
+> and getting `None`, which is not an interning test at all. **Planner validity
+> is an upstream precondition here**, so demanding a real program per field is
+> disproportionate to the map property.
+>
+> **A production requirement follows, and it is structural, not conventional:**
+> the map is keyed by the **complete key type under its full derived
+> equality/order** — no hand-written projection, no subset comparator. Then
+> same-key reuse, unequal-key distinct mint, and both round-trips are the whole
+> collision net.
+>
+> **Label it for what it is.** That per-member matrix is an **interner-unit**
+> matrix. It must not be reported as planner-derivation evidence. Conflating
+> the two is what produced the block.
+>
+> ### What stays here after the correction
+>
+> `AC-1`'s per-member mutation matrix stays in `D2h` as an interner-unit
+> matrix, labelled as such, with every mutation **submitted to the interner**
+> rather than looked up.
+>
+> ### What relocates to a successor
+>
+> **Per-member derivation correctness** — a provenance matrix, **not** twenty
+> pairwise planner-valid programs. For every key member the successor states
+> the exact authoritative planner fact it comes from; a reaching positive
+> witness on which that fact is **non-degenerate**; an independent source-side
+> mutation or transplant that either changes the re-derived member or refuses
+> before interning; and agreement between the primary derivation and the
+> independently authored re-derivation.
+>
+> **One real witness may discharge many rows.** Additional `d2g_declaration`
+> knob variants are owed only where the existing witness plus the
+> production-mutation harness cannot make a member's source causal. A **pair**
+> of planner-valid programs is owed only for a member whose derivation could
+> otherwise alias or normalize two genuinely distinct planner facts — never as
+> a blanket condition on every field.
+>
+> **The non-empty ordered-input witness is mandatory**, not optional scope: the
+> current witness cannot discharge ordered-input derivation at all, because its
+> vector is empty.
+>
+> **RELOCATION IS NOT RETIREMENT.** The `#6d` node does not close on this
+> frame's merge. A reader who takes the narrowed merge as the whole obligation
+> discharged has read it wrong, and this sentence exists so that reading is not
+> available.
+>
+> ### The six `AC-2` refusals — measure, do not assume
+>
+> The frame, selected slot, invocation, exact suffix, call identity, and
+> segment-owner refusals relocate **only where the landed
+> `CONTINUATION_PRODUCTION_MUTATION` harness cannot express them on the current
+> witness.** That harness exists and already carries transplant-shaped variants.
+> **Report a verdict per cause.** Whatever the harness reaches stays here. Six
+> refusals must not leave this node silently because one of them is expensive.
+>
+> ### Two sizing facts, because the estimate that produced the stop conflates
+> ### two different jobs
+>
+> **The empty projection has a locatable cause, and it is the program, not the
+> mechanism.** `intrinsic_environment_floor` is `entry_sources.len()`
+> (`crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs:6947`),
+> and `required_input_count` rises above it only when a case body needs a longer
+> surrounding prefix (`:6948` onward). This consumer has neither. So the
+> non-empty-inputs witness is a consumer function that takes entry values —
+> **one structurally different program**, not one of twenty.
+>
+> **The fixture builder is already parameterized** — `d2g_declaration(true)` at
+> `:14874`, fed through a real `plan_static_transition_graph` run. Nineteen knob
+> variants on an existing builder plus one new program shape is a different
+> estimate from *"roughly twenty fixtures"*, and it may change how the successor
+> is cut.
+>
+> ### Open with the Architect; the plane does not wait on it
+>
+> Whether `AC-1` guards **collision** or **the correct derivation of each key
+> member from planner facts**. A clone mutation proves the map is keyed on a
+> field; it cannot prove the planner can *produce* two fusions differing only
+> there — but if the planner cannot, including that member is harmless
+> over-specification rather than a collision hazard. The second reading is the
+> one this plane visibly lacks: **the ordered-inputs member's derivation has
+> never run non-trivially on any witness**, so nothing has checked it is derived
+> correctly, independent of whether two keys can differ in it. If the answer is
+> derivation correctness, the successor is framed that way rather than as twenty
+> discrimination pairs.
+>
+> The closed seven facts are unchanged, `continuation_result_origins` is
+> unchanged, and no eighth fact is licensed. If a gate needs one, stop.
+
 > ## RELEASED 2026-08-11 — the gate below is discharged. `D2i` is on `main`.
 >
 > **`D2i` merged at `f01e63a1`** (`c1725317`, the live enumerator reading the
 > admitted ledger; the ledger half landed earlier at `b7142fe5`). The gate at
 > the foot of this block said *"resume unchanged once `D2i` is on `main`"*, and
-> it is. **Scope is unchanged. Resume.**
+> it is. ~~Scope is unchanged. Resume.~~ **Scope WAS unchanged when this block
+> was written and is no longer** — the resumed turn produced `a77ba94a`, which
+> the Architect blocked, and the SCOPE RULING above splits the frame. Read that
+> block for the current scope; this one is retained for the `D2i` gate history.
 >
 > **But read how the gate was satisfied, because it is not how it was written.**
 > The gate expected a *new* productive checked twin. The `D2i` scope ruling
@@ -38,9 +174,13 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 > `evt_1dgwdvxhnabg4`). If presenting the pair appears to require widening it,
 > that is the stop above, not a licence.
 >
-> **This frame's scope is unchanged and still correct. It was blocked, not
-> mis-scoped**, so it was respun rather than split and its existing thread stays
-> its spine — there is no fresh `D2h` kick.
+> ~~**This frame's scope is unchanged and still correct. It was blocked, not
+> mis-scoped**, so it was respun rather than split~~ — **that held for the two
+> earlier holds and no longer holds.** The 2026-08-11 block found the frame
+> genuinely mis-sized on `AC-1`, and the SCOPE RULING above splits it. **The
+> existing thread `thr_2htr4r28a64c1` still stays its spine** — `D2h` narrows
+> rather than dissolving, so there is still no fresh `D2h` kick; the relocated
+> successor gets its own kick and its own thread when I release it.
 >
 > **The key plane interns zero fusions on the landed `D2g` twin.** Production
 > discovery walks `continuation_result_origins` by result positions and treats
@@ -155,20 +295,40 @@ spelling, a type, a row number, a runtime tag, "the only continuation", or
 
 ## Acceptance criteria
 
-**AC-1 — the bijection holds, and the checked coordinate is three classes.**
-key↔ID↔descriptor round-trips. Exercise **one member per identity class**
-rather than one representative — a bijection test on a single member says
-nothing about the others. The Architect specified the set:
+**AC-1 — SPLIT by the 2026-08-11 scope ruling. Read this before executing it.**
 
-- the same complete valid key interns to the same id and round-trips;
-- two complete valid keys differing in the **checked frame** member intern
-  distinctly;
-- likewise for the **selected slot-template** identity and path;
-- likewise for the **invocation-template** identity and path;
-- the ordinary one-member controls cover every other key identity class;
-- **malformed transplants are validator refusals, not "distinct valid key"
-  evidence.** Counting a refusal as a distinguished key would make the
-  bijection look total while proving nothing.
+**The half that stays here** is the bijection on the production plane: the same
+complete valid key interns to the same id, `key→ID→key` and `ID→descriptor`
+round-trip, and exactly one identity is minted from production planner facts on
+the landed witness.
+
+**AC-1a — the independent re-derivation, and this is now the load-bearing
+control of this node.** The whole key is re-derived from planner facts by a
+second route and compared before interning. **A second call to the same
+enumerator does not satisfy this** — that is what `a77ba94a` shipped, and two
+identical runs of one function agree by construction, so it detects only
+nondeterminism. The evidence is a **mutation of the primary derivation that the
+validator catches**; a passing validator with no such mutation is assertionless.
+
+**The half that RELOCATED to the successor** — do not attempt it here, and do
+not report the node complete on the strength of the half above:
+
+- two complete valid keys differing in the **checked frame** member interning
+  distinctly, and likewise per remaining identity class;
+- the **non-empty ordered input projection** witness. The landed witness's
+  projection is empty for a program reason, not a mechanism reason
+  (`static_transition.rs:6947` — the floor is `entry_sources.len()`), so **no
+  test-side work produces it.**
+
+**Both halves keep this rule:** malformed transplants are validator refusals,
+not "distinct valid key" evidence. Counting a refusal as a distinguished key
+would make the bijection look total while proving nothing.
+
+**And the failure that made the split necessary is worth carrying forward:**
+`a77ba94a`'s `AC-1` mutated **clones** of the interned key and called `id_for`,
+which is a lookup in a one-element vector. A miss proves the map is keyed on
+that field. It does not prove the planner can issue two valid keys that differ
+there — which is the claim the criterion was written to establish.
 
 **AC-2 — fail-closed, and this is the soundness-bearing control.** A producer
 **lacking** the exact consuming suffix yields **no fusion and the ordinary
@@ -176,14 +336,30 @@ existing refusal** — never a fallback to the unspecialized result-returning
 unit.
 
 **Every one of these fires BEFORE any id, descriptor or definition is
-created:**
+created.** The split below is settled by measurement, not estimate — Runtime
+enumerated `ContinuationProductionMutation` on exact `1139e0be` and found its
+complete variant set to be `Exact`, `ResultLifetimeProxy`,
+`ConstructorFieldCountPrefix`, `DescriptorOrdinalSources`, and
+`DescriptorInputCountTruncation`. **It expresses none of the six member
+transplants**, so the per-cause verdict is unanimous rather than mixed:
+
+**Retained in `D2h`** — the landed witness expresses all three:
 
 - **strip the checked transport from the twin** — no fusion, ordinary refusal;
-- **independently** remove or transplant the **frame**, the **selected slot**,
-  and the **invocation** marker/plan relation — each rejects on its own;
+- **suppressed descent** — no pair presented, nothing minted;
+- **a second matching `StaticBody` edge** — refuses rather than selecting.
+
+**RELOCATED to the successor**, all six, because no landed harness reaches
+them and each needs a planner-valid transplant fixture:
+
+- the **frame**, the **selected slot**, and the **invocation** marker/plan
+  relation, each rejecting on its own;
 - the **missing exact consuming suffix**, **call-identity transplant**, and
-  **segment-owner transplant** controls are retained and still reject
-  independently.
+  **segment-owner transplant** controls.
+
+**These six are the `D2b`/`D2d` inheritance and they are the reason the
+successor is not optional.** They are what separates an identity from a value
+that happens to be unique in the measured population.
 
 **Marker absence must not substitute for those soundness controls.** The
 unmarked `R3` witness now refuses for a **transport** reason, which would mask
