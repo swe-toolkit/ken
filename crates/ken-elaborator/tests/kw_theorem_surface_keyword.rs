@@ -51,7 +51,7 @@ fn theorem_elaborates_and_formats_while_retired_spelling_is_an_identifier() {
                 msg,
                 "expected 'view', 'const', 'fn', 'proc', 'let', 'prove', 'prop', \
                  'theorem', 'proof', 'law', 'data', 'def', 'foreign', 'temporal', \
-                 'class', 'instance', 'derive', 'module', 'import', 'export', \
+                 'record', 'class', 'instance', 'derive', 'module', 'import', 'export', \
                  'pub', 'program', 'package', or 'space proc', found Ident(\"lemma\")"
             );
             assert_eq!(span, Span::new(0, 5));

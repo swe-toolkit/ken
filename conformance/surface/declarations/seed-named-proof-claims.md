@@ -44,9 +44,9 @@ attached-proof references.
   ```
 - expect-negative: rejects with span `0..5` and exactly
   `expected 'view', 'const', 'fn', 'proc', 'let', 'prove', 'prop', 'theorem',
-  'proof', 'law', 'data', 'def', 'foreign', 'temporal', 'class', 'instance',
-  'derive', 'module', 'import', 'export', 'pub', 'program', 'package', or
-  'space proc', found Ident("lemma")`.
+  'proof', 'law', 'data', 'def', 'foreign', 'temporal', 'record', 'class',
+  'instance', 'derive', 'module', 'import', 'export', 'pub', 'program',
+  'package', or 'space proc', found Ident("lemma")`.
 - why: this is an AC-2(d) intentional residual and AC-4 negative control.
   `lemma` lexes as an ordinary identifier after the hard rename; it is neither
   an alias nor a migration diagnostic. The paired positive and negative run

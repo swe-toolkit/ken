@@ -60,7 +60,7 @@ vs. free -- all of that requires the real elaborator.
         'data', 'match', 'def', 'type',
         'foreign',
         'temporal',
-        'class', 'instance', 'derive', 'where',
+        'record', 'class', 'instance', 'derive', 'where',
         'module', 'import', 'use', 'pub',
         'prop', 'theorem', 'proof'
       ]

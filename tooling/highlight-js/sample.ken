@@ -60,7 +60,12 @@ def PosInt = { n : Int | Equal Bool (leq_int 0 n) True }
 
 const five : PosInt = 5
 
--- ── class / instance, lambda + Unicode operators ────────────────────────
+-- ── record / class / instance, lambda + Unicode operators ───────────────
+
+record Point {
+  x : Int ;
+  y : Int
+}
 
 class Eq a {
   eq   : a → a → Bool ;

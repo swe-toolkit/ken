@@ -198,6 +198,41 @@ fn class_entry_view_preserves_the_seal2_producer_population() {
     );
 }
 
+/// Durable invariant.
+///
+/// MEASURED: filtering the complete producer enumeration to its class-field
+/// namespace yields exactly the sole field declared by this one-field class.
+/// CLAIMED: class-entry enumeration neither drops nor invents owners or fields
+/// at the minimum non-empty population.
+/// THE GAP: the fixture must keep the globals namespace live independently;
+/// otherwise an empty or misclassified census could mimic the singleton.
+#[test]
+fn one_field_class_has_the_exact_singleton_owner_field_population() {
+    let mut env = ElabEnv::empty().expect("prelude");
+    env.elaborate_decl("class SingletonProbe A { only : A → BufferSpan }")
+        .expect("single-field census class elaborates");
+
+    let producers = enumerate_producer_types(&env);
+    let class_fields = producers
+        .iter()
+        .filter(|producer| producer.namespace == "class_field")
+        .map(|producer| producer.name.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        class_fields,
+        BTreeSet::from(["SingletonProbe.only"]),
+        "one declared class field must yield the exact singleton owner.field population"
+    );
+    assert!(
+        producers
+            .iter()
+            .any(|producer| {
+                producer.namespace == "globals" && producer.name == "SingletonProbe"
+            }),
+        "the independent globals producer population must remain live"
+    );
+}
+
 /// A class field `unbox : A → BufferSpan` produces the carrier by projection,
 /// but lives behind `class_env.class_entries()`, never in `globals`. The
 /// head-only oracle (globals-only) cannot see it at all; the closed oracle's
