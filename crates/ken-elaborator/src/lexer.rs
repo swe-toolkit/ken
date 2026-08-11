@@ -722,9 +722,25 @@ impl<'s> Lexer<'s> {
         let mut exp = String::new(); while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) { let c=self.advance().unwrap(); if c=='_' { if exp.is_empty() || !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false) { return Err(ElabError::ParseError { msg:"digit separator must occur between digits".into(), span:Span::new(start,self.pos)}); } } else { exp.push(c); } }
         if exp.is_empty() { return Err(ElabError::ParseError { msg:"hex float exponent requires digits".into(), span:Span::new(start,self.pos)}); }
         let mant = BigInt::parse_bytes(digits.as_bytes(),16).unwrap();
-        let value = mant.to_string().parse::<f64>().unwrap_or(f64::INFINITY) * 2f64.powi(sign * exp.parse::<i32>().unwrap() - 4 * frac);
+        let binary_exp = sign.checked_mul(exp.parse::<i32>().map_err(|_| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?).and_then(|e| e.checked_sub(4 * frac)).ok_or_else(|| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?;
+        let value = hex_mantissa_to_f64(&mant, binary_exp).ok_or_else(|| ElabError::ParseError { msg:"hex float out of range".into(), span:Span::new(start,self.pos) })?;
         Ok((Token::FloatLit(value), Span::new(start,self.pos)))
     }
+
+fn hex_mantissa_to_f64(m: &BigInt, shift: i32) -> Option<f64> {
+    let k = m.bits() as i32; if k == 0 { return Some(0.0); }
+    let mut e = k - 1 + shift; if e > 1023 { return Some(f64::INFINITY); }
+    if e < -1022 { return Some(0.0); }
+    let keep = if k > 53 { m >> (k - 53) } else { m << (53 - k) };
+    let mut q: u64 = keep.to_string().parse().ok()?;
+    if k > 53 {
+        let r = m - (&keep << (k - 53)); let half = BigInt::from(1) << (k - 54);
+        if r > half || (r == half && (q & 1) == 1) { q += 1; }
+        if q == (1u64 << 53) { q >>= 1; e += 1; }
+    }
+    if e > 1023 { return Some(f64::INFINITY); }
+    Some(f64::from_bits(((e + 1023) as u64 << 52) | (q & ((1u64 << 52) - 1))))
+}
 
     /// Lex the entire source into a token+span list (including the `Eof`
     /// sentinel).
