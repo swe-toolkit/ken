@@ -1938,6 +1938,11 @@ impl Parser {
                     {
                         break;
                     }
+                    if self.is_contextual_ident("visits")
+                        && matches!(self.lookahead(1), Token::LBracket)
+                    {
+                        break;
+                    }
                     if !self.can_start_atom_expr() {
                         break;
                     }

@@ -4,7 +4,7 @@ use ken_elaborator::{
     effects::RowType, parser::parse_decls, Decl as SurfaceDecl, ElabEnv, ElabError, NumericLitVal,
 };
 use ken_interp::eval::{eval, EvalStore, EvalVal};
-use ken_kernel::{Decl, GlobalId, Term};
+use ken_kernel::{whnf, Context, Decl, GlobalEnv, GlobalId, Term};
 
 const COUNTER_EXAMPLE: &str = r#"
 space Counter {
@@ -134,6 +134,19 @@ fn peel_apps(term: &Term) -> (&Term, Vec<&Term>) {
     }
     args.reverse();
     (head, args)
+}
+
+fn refl_certificate(env: &GlobalEnv, ctx: &mut Context, goal: &Term) -> Term {
+    match whnf(env, ctx, goal) {
+        Term::Pi(domain, codomain) => {
+            ctx.push(domain.as_ref().clone());
+            let body = refl_certificate(env, ctx, &codomain);
+            ctx.pop();
+            Term::lam(domain.as_ref().clone(), body)
+        }
+        Term::Eq(_, left, _) => Term::Refl(left),
+        other => panic!("expected a closed Pi-chain ending in equality, got {other:?}"),
+    }
 }
 
 #[test]
@@ -456,22 +469,67 @@ fn ac_s6_becomes_outside_space_is_a_specific_error_with_a_span() {
 }
 
 #[test]
-fn ac_s7_old_in_space_preserves_the_specific_fence() {
+// Promise class: durable invariant. MEASURED: one mutating transformer emits
+// pre/post and root-old obligations that Refl discharges, while a +2 mutation
+// does not. CLAIMED: requires uses pre-state, bare cells use post-state, and
+// old uses pre-state. THE GAP: run_state must reduce to the exact payload used
+// by clause substitution; the false postcondition is the causal comparator.
+fn ac_s7_old_in_space_uses_the_bound_pre_state() {
     let mut env = ElabEnv::new().expect("prelude");
-    let space_error = env
-        .elaborate_file(
+    let trusted_before: std::collections::BTreeSet<_> =
+        env.env.trusted_base().into_iter().collect();
+    let results = env
+        .elaborate_file_v1(
             "space OldFence { \
                mut n : Int = 0 \
-               proc read () : Int ensures Equal Int result (old n) = n \
+               proc inc () : Unit \
+                 requires Equal Int n n \
+                 ensures Equal Int n ((old n) + 1) \
+                 ensures Equal Int ((old n) + 1) n \
+                 ensures old (Equal Int n n) \
+                 visits [OldFence] = n becomes n + 1 \
+               proc guarded (limit : Int) : Int \
+                 requires Equal Int n limit \
+                 visits [OldFence] = n \
              }",
         )
-        .expect_err("old in a space operation still fails closed");
+        .expect("block-space contracts elaborate against the state transformer");
+    let inc = results
+        .iter()
+        .find(|result| result.name == "OldFence.inc")
+        .expect("inc result");
+    assert_eq!(inc.obligations.len(), 3);
+    for obligation in &inc.obligations {
+        let certificate = refl_certificate(&env.env, &mut Context::new(), &obligation.goal_closed);
+        assert!(
+            env.discharge_hole(obligation, certificate),
+            "state-transformer obligation was not reflexive: {:?}",
+            obligation.goal_closed
+        );
+    }
+    let trusted_after: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    assert_eq!(trusted_after, trusted_before);
+
+    let mut wrong = ElabEnv::new().expect("prelude");
+    let wrong_results = wrong
+        .elaborate_file_v1(
+            "space WrongPost { \
+               mut n : Int = 0 \
+               proc inc () : Unit \
+                 ensures Equal Int n ((old n) + 2) \
+                 visits [WrongPost] = n becomes n + 1 \
+             }",
+        )
+        .expect("a false contract emits an open obligation");
+    let wrong_obligation = &wrong_results[1].obligations[0];
+    let wrong_certificate = refl_certificate(
+        &wrong.env,
+        &mut Context::new(),
+        &wrong_obligation.goal_closed,
+    );
     assert!(
-        matches!(
-            space_error,
-            ElabError::OldPreStateUnsupported { ref span } if span.end > span.start
-        ),
-        "space `old` fence changed: {space_error:?}"
+        !wrong.discharge_hole(wrong_obligation, wrong_certificate),
+        "changing only the promised increment must make Refl fail"
     );
 }
 

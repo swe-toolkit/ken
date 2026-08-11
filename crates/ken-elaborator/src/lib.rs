@@ -312,6 +312,13 @@ impl ElabEnv {
         Ok(results.into_iter().map(|r| r.def_id).collect())
     }
 
+    /// Elaborate a file while retaining verification obligations, including
+    /// those emitted by block-space operation contracts.
+    pub fn elaborate_file_v1(&mut self, src: &str) -> Result<Vec<ElabResult>, ElabError> {
+        let decls = parser::parse_decls(src)?;
+        modules::expand_and_elaborate(self, &decls)
+    }
+
     /// Elaborate the in-repo compilation unit named by `entry` under the
     /// plural catalog-root input (`33 §3.2`, ADR 0014 MRES-1/2/3a).
     ///
