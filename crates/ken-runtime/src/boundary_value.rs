@@ -3874,12 +3874,103 @@ mod invocation_aggregate_decode_tests {
             );
         }
 
-        // span: the word names a node that does not exist.
+        // span, ABSENT ROOT: the word names a node that does not exist. This
+        // one refuses at the very first field read, so it says nothing about
+        // the node-local spans below -- which is exactly why they are separate
+        // rows.
         let arena = BoundaryArenaV1::default();
         assert_eq!(
             decode_invocation_ground(&arena, &mut store, aggregate_word(3)),
             Err(BOUNDARY_ERR_BOUNDS),
-            "span"
+            "absent root"
+        );
+    }
+
+    /// **The node-local spans, on a PRESENT and otherwise-valid node.**
+    ///
+    /// These are the rows the absent-root case cannot stand in for. The
+    /// traversal loops read `fields_at .. fields_at + field_count` directly, so
+    /// what keeps them in range is `InvocationAggregateNode::validate`'s
+    /// `checked_add` and its per-word and per-name probe -- and a suite that
+    /// only ever names a missing root stays green if that validation is
+    /// weakened or deleted.
+    ///
+    /// Each row starts from a node the decoder accepts, then breaks exactly one
+    /// span.
+    #[test]
+    fn a_malformed_node_local_span_refuses() {
+        let mut store = store();
+
+        // 1. FIELD SPAN OVERSTATED: the node claims more children than the word
+        //    table holds.
+        let mut arena = BoundaryArenaV1::default();
+        let word = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[int_word(1)],
+            &[],
+        );
+        assert!(
+            decode_invocation_ground(&arena, &mut store, word).is_ok(),
+            "the node must be accepted BEFORE its span is broken, or the row \
+             proves nothing about the span"
+        );
+        let base = 0usize * NODE_WORDS;
+        arena.0.nodes[base + NodeField::FieldCount as usize] = 2;
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, word),
+            Err(BOUNDARY_ERR_BOUNDS),
+            "an overstated field count must refuse"
+        );
+
+        // 2. FIELD SPAN WRAPS: `fields_at + field_count` overflows, which a
+        //    plain `+` would wrap into a low, in-range index.
+        let mut arena = BoundaryArenaV1::default();
+        let word = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[int_word(1)],
+            &[],
+        );
+        arena.0.nodes[NodeField::FieldsAt as usize] = u64::MAX;
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, word),
+            Err(BOUNDARY_ERR_BOUNDS),
+            "a span whose end wraps must refuse rather than index low"
+        );
+
+        // 3. RECORD NAME SPAN: the parallel name table is short, so a field has
+        //    a child word and no name. The child span is untouched.
+        let mut arena = BoundaryArenaV1::default();
+        let word = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Record,
+            NULL_SLOT,
+            0,
+            &[bool_word(true), int_word(7)],
+            &[OK_ID, VALUE_ID],
+        );
+        assert!(
+            decode_invocation_ground(&arena, &mut store, word).is_ok(),
+            "accepted before the name span is broken"
+        );
+        arena.0.names.truncate(1);
+        assert_eq!(
+            arena.0.word_at(1).map(|w| w.0),
+            Some(int_word(7).0),
+            "the CHILD span is still whole, so this row is about names only"
+        );
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, word),
+            Err(BOUNDARY_ERR_BOUNDS),
+            "a short record name span must refuse"
         );
     }
 
