@@ -3520,17 +3520,15 @@ fn infer_proj(
         span: span.clone(),
         reason: "`.field` projection is unavailable in this elaboration context".into(),
     })?;
-    let (field_names, field_types) = class_env
-        .classes()
-        .values()
-        .find(|ci| ci.type_id == class_type_id)
-        .map(|ci| (ci.field_names.clone(), ci.field_types.clone()))
+    let projection = class_env
+        .projection_by_type_id(class_type_id)
         .ok_or_else(|| ElabError::TypeMismatch {
             span: span.clone(),
             reason: "projection base's type is not a known class dictionary".into(),
         })?;
     let idx =
-        field_names
+        projection
+            .field_names
             .iter()
             .position(|n| n == field)
             .ok_or_else(|| ElabError::UnresolvedCon {
@@ -3559,7 +3557,7 @@ fn infer_proj(
     }
     let val = Term::proj1(val);
 
-    let expected_ty = ken_kernel::subst::subst_tel(&field_types[idx], &args);
+    let expected_ty = ken_kernel::subst::subst_tel(&projection.field_types[idx], &args);
     Ok((val, expected_ty))
 }
 

@@ -2,9 +2,54 @@
 //! fields, enforced through the real parser -> resolver -> elaborator path.
 
 use ken_elaborator::{ClassKind, ElabEnv, ElabError};
+use ken_kernel::GlobalId;
 
 fn err_text<T: std::fmt::Debug>(res: Result<T, ElabError>) -> String {
     format!("{:?}", res.expect_err("expected elaboration to reject"))
+}
+
+/// Durable invariant: the type-ID adapter returns the same borrowed projection
+/// metadata as the independently keyed class view, and `infer_proj` uses it for
+/// both a successful field and an exact unknown-field refusal.
+#[test]
+fn type_id_projection_view_and_infer_route_are_live() {
+    let mut env = ElabEnv::new().expect("base env");
+    env.elaborate_file(
+        "class LookupProbe A {
+             first : A ;
+             second : Bool
+         }
+         instance LookupProbe Bool { first = True ; second = False }",
+    )
+    .expect("lookup fixture must elaborate");
+
+    let type_id = env.globals["LookupProbe"];
+    let keyed = env
+        .class_env
+        .class("LookupProbe")
+        .expect("keyed class view must exist");
+    let by_id = env
+        .class_env
+        .projection_by_type_id(type_id)
+        .expect("type-ID projection view must exist");
+    assert_eq!(by_id.owner_name, "LookupProbe");
+    assert_eq!(by_id.type_id, type_id);
+    assert_eq!(by_id.head_param, Some("A"));
+    assert_eq!(by_id.field_names, ["first", "second"]);
+    assert_eq!(by_id.field_types, keyed.projection.field_types);
+    assert!(env
+        .class_env
+        .projection_by_type_id(GlobalId(u32::MAX))
+        .is_none());
+
+    env.elaborate_decl("let projected_second : Bool = (LookupProbe_instance_Bool).second")
+        .expect("known class projection must remain live through infer_proj");
+    let missing =
+        env.elaborate_decl("let missing_projection : Bool = (LookupProbe_instance_Bool).missing");
+    assert!(matches!(
+        missing,
+        Err(ElabError::UnresolvedCon { ref name, .. }) if name == "missing"
+    ));
 }
 
 #[test]
