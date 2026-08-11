@@ -1,7 +1,7 @@
 ---
 id: RT-FNUNIT-RESULT-TOKEN
 title: "Broad starter shapes fail the result-token table on the FunctionizedUnits lane — pre-existing, unmasked by retiring SeedClosureCall"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none

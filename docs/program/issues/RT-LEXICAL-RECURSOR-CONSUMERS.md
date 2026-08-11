@@ -163,3 +163,53 @@ the failure this lane has already had twice.
 
 Severity is **control durability, not correctness.** `D2a` merged correctly at
 `41b75c7c`; this reopens nothing.
+
+## Carried rider — `D2j`'s non-degeneracy: two groups assert it, five claim it
+
+**Adversary finding `evt_99agje0m3rx1`, measured on `22fb3a61` after `D2j`
+merged. Confirmed. It does not reopen `e2907c5e`.**
+
+`D2j`'s matrix closed seven member groups, and `D2j`'s own `AC-1` requires each
+row to rest on a **reaching non-degenerate witness** — "an empty vector, a
+single-element set, a `None`, or a value that coincides with its neighbour is
+degenerate, and a row resting on one is not discharged."
+
+**Measured across the 72 added assertions: two groups assert a non-degeneracy;
+five state one in prose.** Of six cardinality pins, four are `len() == 1`
+uniqueness pins, which are a different property. The two real guards are
+`:438` (`ih.len() == 2`, "so neither lookup is forced") and `:639`
+(`widened_args.len() == 2`), and **those are precisely the two rows where a
+degeneracy was already caught** — the IH lookup, and the one-child producer
+construct the Architect found.
+
+⇒ **The population was the class and the repair took the instances.** All seven
+groups share one witness, so a cardinality that collapses a distinction for one
+row can collapse it for another. Nothing about either fix generalises to the
+five groups nobody looked at. The prose claim for those five is the exact state
+the producer-construct row was in until the Architect caught it.
+
+### This is one read per group, not five assertions
+
+**The Adversary's bound is carried and is load-bearing:** it searched for
+cardinality pins only. A group could establish non-degeneracy by an
+`assert_ne!` between two candidate positions or by a distinctness check, and
+that search would not see it; and a member whose authoritative fact does not
+depend on cardinality needs no such guard at all. So the honest claim is *five
+groups carry no cardinality assertion*, **not** *five groups are unguarded*.
+
+| finding for a group | action |
+|---|---|
+| no non-degeneracy established, and the fact is cardinality-sensitive | add the guard in `:438`'s form — the count **plus** what it buys |
+| established by a different instrument | record where, and the group is done |
+| the fact does not depend on cardinality | say why, and the group is done |
+
+**Adding an assertion to a group in the third case is worse than the gap** — it
+is a control that cannot fail, which is the failure this lane has now filed
+against itself twice.
+
+**`:438` is the model to copy:** assert the count *and* state the reason in the
+message. A bare `len() == 2` with no reason is the next thing to rot.
+
+Severity is **evidence completeness, not correctness.** `D2j` merged correctly
+and its three deliverables are discharged; this is inherited by the next `#6d`
+slice frame.
