@@ -430,18 +430,14 @@ impl<'s> Lexer<'s> {
 
         // Numeric literals: starts with a digit
         if c.is_ascii_digit() {
-            if self.src[self.pos..].starts_with("0x")
-                || self.src[self.pos..].starts_with("0X")
-                || self.src[self.pos..].starts_with("0b")
-                || self.src[self.pos..].starts_with("0B")
-                || self.src[self.pos..].starts_with("0o")
-                || self.src[self.pos..].starts_with("0O")
-            {
-                if self.src[self.pos + 2..].chars().any(|c| c == '.' || c == 'p' || c == 'P') {
+            if self.src[self.pos..].starts_with("0x") || self.src[self.pos..].starts_with("0X") {
+                let token_tail = self.src[self.pos + 2..].split(|c: char| c.is_whitespace() || "+-*/=()[]{};,".contains(c)).next().unwrap_or("");
+                if token_tail.chars().any(|c| c == '.' || c == 'p' || c == 'P') {
                     return self.lex_hex_float(start);
                 }
                 return self.lex_radix_integer(start);
             }
+            if self.src[self.pos..].starts_with("0b") || self.src[self.pos..].starts_with("0B") || self.src[self.pos..].starts_with("0o") || self.src[self.pos..].starts_with("0O") { return self.lex_radix_integer(start); }
             return self.lex_numeric(start);
         }
 
@@ -714,7 +710,7 @@ impl<'s> Lexer<'s> {
         let mut after_dot = false;
         while let Some(c) = self.cur() {
             if c == '.' { if after_dot { break; } after_dot = true; self.advance(); continue; }
-            if c == '_' { self.advance(); if digits.is_empty() || !self.cur().map(|n| n.is_ascii_hexdigit()).unwrap_or(false) { return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) }); } continue; }
+            if c == '_' { self.advance(); if digits.is_empty() || !self.src[..self.pos - 1].chars().last().map(|p| p.is_ascii_hexdigit()).unwrap_or(false) || !self.cur().map(|n| n.is_ascii_hexdigit()).unwrap_or(false) { return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) }); } continue; }
             if let Some(_) = c.to_digit(16) { self.advance(); digits.push(c); if after_dot { frac += 1; } } else { break; }
         }
         if digits.is_empty() || self.cur().map(|c| c == 'p' || c == 'P').unwrap_or(false) == false { return Err(ElabError::ParseError { msg: "hex float requires p exponent".into(), span: Span::new(start, self.pos) }); }

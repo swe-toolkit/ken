@@ -13,7 +13,13 @@ fn hex_float_values_and_boundaries() {
     assert_eq!(t("0x1p-1023"), Token::FloatLit(f64::from_bits(0x0008_0000_0000_0000)));
     assert_eq!(t("0x1p-1075"), Token::FloatLit(0.0));
     assert_eq!(t("0x1p+1_0"), Token::FloatLit(1024.0));
+    assert!(Lexer::lex("0x1._8p0").is_err());
+    let huge = format!("0x1{}p-1024", "0".repeat(256));
+    assert_eq!(t(&huge), Token::FloatLit(1.0));
     for bad in ["0x1.8", "0x1p", "0x1p+_3", "0x1p-_3", "0x1p1__0", "0xG.p1"] {
         assert!(Lexer::lex(bad).is_err(), "{bad}");
     }
+    assert!(matches!(Lexer::lex("0xFF + p").unwrap()[0].0, Token::Nat(255)));
+    assert!(matches!(Lexer::lex("0b10 + p").unwrap()[0].0, Token::Nat(2)));
+    assert!(matches!(Lexer::lex("0o7 + p").unwrap()[0].0, Token::Nat(7)));
 }
