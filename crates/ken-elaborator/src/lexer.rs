@@ -719,7 +719,7 @@ impl<'s> Lexer<'s> {
         }
         if digits.is_empty() || self.cur().map(|c| c == 'p' || c == 'P').unwrap_or(false) == false { return Err(ElabError::ParseError { msg: "hex float requires p exponent".into(), span: Span::new(start, self.pos) }); }
         self.advance(); let mut sign = 1i32; if self.cur() == Some('+') { self.advance(); } else if self.cur() == Some('-') { sign = -1; self.advance(); }
-        let mut exp = String::new(); while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) { let c=self.advance().unwrap(); if c=='_' { if exp.is_empty() || !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false) { return Err(ElabError::ParseError { msg:"digit separator must occur between digits".into(), span:Span::new(start,self.pos)}); } } else { exp.push(c); } }
+        let mut exp = String::new(); while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) { let c=self.advance().unwrap(); if c=='_' { if exp.is_empty() || !exp.chars().last().unwrap().is_ascii_digit() || !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false) { return Err(ElabError::ParseError { msg:"digit separator must occur between digits".into(), span:Span::new(start,self.pos)}); } } else { exp.push(c); } }
         if exp.is_empty() { return Err(ElabError::ParseError { msg:"hex float exponent requires digits".into(), span:Span::new(start,self.pos)}); }
         let mant = BigInt::parse_bytes(digits.as_bytes(),16).unwrap();
         let binary_exp = sign.checked_mul(exp.parse::<i32>().map_err(|_| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?).and_then(|e| e.checked_sub(4 * frac)).ok_or_else(|| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?;
@@ -730,7 +730,14 @@ impl<'s> Lexer<'s> {
 fn hex_mantissa_to_f64(m: &BigInt, shift: i32) -> Option<f64> {
     let k = m.bits() as i32; if k == 0 { return Some(0.0); }
     let mut e = k - 1 + shift; if e > 1023 { return Some(f64::INFINITY); }
-    if e < -1022 { return Some(0.0); }
+    if e < -1022 {
+        let s = shift + 1074;
+        let q = if s >= 0 { m << s } else {
+            let n = -s; let mut q = m >> n; let r = m - (&q << n); let half = BigInt::from(1) << (n - 1);
+            if r > half || (r == half && q.to_string().parse::<u64>().ok().is_some_and(|v| v & 1 == 1)) { q += 1; } q
+        };
+        let bits: u64 = q.to_string().parse().ok()?; return Some(f64::from_bits(bits));
+    }
     let keep = if k > 53 { m >> (k - 53) } else { m << (53 - k) };
     let mut q: u64 = keep.to_string().parse().ok()?;
     if k > 53 {
