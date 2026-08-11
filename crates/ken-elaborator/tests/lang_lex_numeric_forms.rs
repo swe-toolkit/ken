@@ -23,7 +23,8 @@ fn exponent_values_are_not_zeroed() {
     assert_eq!(tokens("3.14e5"), vec![Token::FloatLit(314000.0), Token::Eof]);
     assert_eq!(tokens("1e-9"), vec![Token::FloatLit(1e-9), Token::Eof]);
     assert_eq!(tokens("3.14E-2"), vec![Token::FloatLit(0.0314), Token::Eof]);
-    for bad in ["1e", "1e+", "1e-"] { assert!(Lexer::lex(bad).is_err(), "{bad}"); }
+    assert_eq!(tokens("1e1_0"), vec![Token::FloatLit(1e10), Token::Eof]);
+    for bad in ["1e", "1e+", "1e-", "1e1_", "1e1__0"] { assert!(Lexer::lex(bad).is_err(), "{bad}"); }
 }
 
 #[test]

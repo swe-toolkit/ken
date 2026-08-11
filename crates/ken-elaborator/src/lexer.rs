@@ -583,8 +583,20 @@ impl<'s> Lexer<'s> {
             if self.cur() == Some('+') || self.cur() == Some('-') {
                 exp_str.push(self.advance().unwrap());
             }
-            while self.cur().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                exp_str.push(self.advance().unwrap());
+            while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) {
+                let c = self.advance().unwrap();
+                if c == '_' {
+                    if !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false)
+                        || exp_str.len() <= 1
+                    {
+                        return Err(ElabError::ParseError {
+                            msg: "digit separator must occur between digits".into(),
+                            span: Span::new(start, self.pos),
+                        });
+                    }
+                } else {
+                    exp_str.push(c);
+                }
             }
             if exp_str.len() == 1 || (exp_str.len() == 2 && matches!(exp_str.as_bytes()[1], b'+' | b'-')) {
                 return Err(ElabError::ParseError {
