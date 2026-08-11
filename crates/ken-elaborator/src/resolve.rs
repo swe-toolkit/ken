@@ -256,6 +256,11 @@ pub enum RExpr {
         span: Span,
     },
     RPair(Vec<RExpr>, Span),
+    RRecord {
+        base: Option<Box<RExpr>>,
+        fields: Vec<(String, RExpr, Span)>,
+        span: Span,
+    },
     /// `e.field` — Σ-record field projection (`33 §5.2` η).
     RProj(Box<RExpr>, String, Span),
     RPosProj(Box<RExpr>, u8, Span),
@@ -299,6 +304,7 @@ impl RExpr {
             | RExpr::RNumLit(_, s)
             | RExpr::RStr(_, s)
             | RExpr::RPair(_, s)
+            | RExpr::RRecord { span: s, .. }
             | RExpr::RProj(_, _, s)
             | RExpr::RPosProj(_, _, s)
             | RExpr::RPi(_, _, _, s)
@@ -592,6 +598,7 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EMatch { .. }
         | Expr::EIf { .. }
         | Expr::EPair(..)
+        | Expr::ERecord { .. }
         | Expr::EProj(..)
         | Expr::EPosProj(..)
         | Expr::EAttachedProofRef { .. }
@@ -1743,6 +1750,23 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
                 .collect::<Result<Vec<_>, _>>()?,
             span.clone(),
         )),
+        Expr::ERecord { base, fields, span } => Ok(RExpr::RRecord {
+            base: base
+                .as_ref()
+                .map(|base| resolve_expr_ctx(scope, base, ctx).map(Box::new))
+                .transpose()?,
+            fields: fields
+                .iter()
+                .map(|field| {
+                    Ok((
+                        field.name.clone(),
+                        resolve_expr_ctx(scope, &field.value, ctx)?,
+                        field.name_span.clone(),
+                    ))
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
+            span: span.clone(),
+        }),
 
         Expr::EPi(x, a, b, span) => {
             let ra = resolve_type(scope, a)?;

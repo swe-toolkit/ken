@@ -11,6 +11,7 @@ fn hex_float_values_and_boundaries() {
     assert_eq!(t("0x1p0"), Token::FloatLit(1.0));
     assert_eq!(t("0x100000000000008p-56"), Token::FloatLit(1.0));
     assert_eq!(t("0x100000000000009p-56"), Token::FloatLit(1.0000000000000002));
+    assert_eq!(t("0x100000000000018p-56"), Token::FloatLit(1.0000000000000004));
     assert_eq!(t("0x1p-1022"), Token::FloatLit(f64::from_bits(0x0010_0000_0000_0000)));
     assert_eq!(t("0x1p-1023"), Token::FloatLit(f64::from_bits(0x0008_0000_0000_0000)));
     assert_eq!(t("0x1p-1075"), Token::FloatLit(0.0));

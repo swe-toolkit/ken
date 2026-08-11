@@ -651,6 +651,14 @@ pub fn type_names_in_expr(e: &Expr, out: &mut BTreeSet<String>) {
                 type_names_in_expr(component, out);
             }
         }
+        Expr::ERecord { base, fields, .. } => {
+            if let Some(base) = base {
+                type_names_in_expr(base, out);
+            }
+            for field in fields {
+                type_names_in_expr(&field.value, out);
+            }
+        }
         Expr::EAsc(inner, ty, _) => {
             type_names_in_expr(inner, out);
             type_names_in_type(ty, out);
