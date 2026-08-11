@@ -193,13 +193,15 @@ rests on (`21 §5.4`) and must never regress.
   With the same `old(…)` syntax in a block-space operation postcondition, the
   operation **accepts** and resolves `old` to its pre-state cell projection.
   The landed relation is therefore a true **reject/accept verdict flip**.
-- why: the discriminating guard is the cell environment, not the spelling of
-  `old`. Pure code has no cell environment and rejects `old` as unbound; a
-  block-space operation installs the pre-state binding and accepts it. Dropping
-  that guard would make the pure case accept, so the pair discriminates the
-  intended scope boundary. Modifier-form `space proc` is not the accepting
-  side: it has no cells or state environment and still refuses `old` with
-  `OldPreStateUnsupported`.
+- why: spelling alone is not the guard. Pure code is resolver-rejected as
+  `UnboundName("old")`; modifier-form `space proc` passes resolution but has no
+  `space_pre_state`, so elaboration refuses it as `OldPreStateUnsupported`; a
+  block-space operation passes resolution and installs the pre-state cell
+  environment, so its contract accepts. Acceptance therefore requires both an
+  admitting resolver scope and an installed block-space pre-state environment.
+  The pure rejection proves the resolver scope remains live, while the modifier
+  control proves declaration kind alone is insufficient. The pure/block pair
+  retains the true reject/accept verdict flip.
 
 ---
 
