@@ -202,6 +202,54 @@ inside seven minutes. **A block that names the hunk costs a ring minutes; a
 block that names a concern costs it a turn.** This is the second time on this
 node that the naming was what made the block cheap.
 
+## `S2` accepted partial — the keyed class-view migration, MERGED 2026-08-11
+
+**Exact `a87068beb0b9aaa3784e05253be8510c85d937a1`, PR #1918.** Decision
+`dec_3w9j2qr75h21b` resolved: Architect `evt_3ptrqb4thb4s4`, QA
+`evt_1r8he0akbwez0`. Two non-merge commits from declared merge-base `ee67040f`,
+exactly 11 `crates/ken-elaborator/**` paths, `+260/-65`, clean `diff --check`.
+M6 blob identity **11/11 MATCH**. Current-main path intersection empty.
+
+**The node stays `active`** — `classes()` still exists, and its deletion is the
+closure gate below, not this slice.
+
+### What it moved, measured on both trees
+
+Direct `.classes()` call sites across `crates/ken-elaborator`:
+
+| tree | total | in `src/` |
+|---|---|---|
+| base `ee67040f` | 31 | 9 |
+| merged `a87068be` | **3** | **1** |
+
+**28 of 31 consumers migrated** onto the borrowed exact-key views. Re-measured
+on `main` after the merge, not carried from the handback: **3**.
+
+The Architect approved the borrowed exact-key view boundary, the complete
+authorized keyed-reader migration, the residual census, and the pre-sentinel
+three-axis controls.
+
+### The first S2 candidate, and why it is recorded here
+
+`1ce8b424` was released as an S2 handback claiming it had *"migrated production
+keyed lookups"*. It was `classes.rs` `+6/-0`, with all 31 occurrences intact and
+no `elab.rs`, `lib.rs`, or test path touched. The leader caught it by
+**independently re-deriving the diff** rather than reading the claim, and it was
+withdrawn unpublished. It is local-only and must never be merged or resumed; its
+base `f8f8bfbc` is long superseded.
+
+**The cause was not implementer judgment.** The seat was running two model tiers
+below its configuration — `gpt-5.6-luna low` against a configured
+`gpt-5.6-sol medium` — and produced that attempt in 84 seconds. It was re-seated
+before this turn. **A downgraded seat does not report being out of its depth; it
+reports success**, so the leader's independent re-derivation is the only thing
+that caught it, and it caught it on the first pass.
+
+⇒ **The `+6/-0` stub and this `+260/-65` candidate come from the same seat on
+the same task.** That contrast is the evidence the re-seating was the fix, and
+the reason the census above is stated as a measurement on both trees rather than
+as a claim.
+
 ## TRACKED REMAINING WORK — delete `ClassEnv::classes()` before records land
 
 **This node does not close while that accessor exists.** Recorded as live
@@ -239,10 +287,16 @@ test/support tree unmeasured. Measured at `61c034e2` across the whole crate —
 Nothing else touches the field anywhere, and no `ClassEnv` struct literal
 survives outside `classes.rs`. ⇒ **The field's deletion is blocked by nothing,
 and after `S1b` the compiler is what holds that** rather than a census that
-decays. The remaining consumers are all reads through `classes()`: **31 call
-sites — 9 in `src/elab.rs`, 22 across seven test files.** Those are what
-`S2..Sn` migrate to the storage-independent views, and that migration is the
-gate's real content.
+decays. The remaining consumers are all reads through `classes()`. That census
+was **31 call sites — 9 in `src/elab.rs`, 22 across seven test files** when it
+was taken, and migrating them to the storage-independent views is the gate's
+real content.
+
+> **UPDATED after `S2` merged (`a87068be`). Measured on `main`: 3 call sites
+> remain, 1 of them in `src/`.** `S2` moved 28 of the 31. The figure above is
+> retained as the original scope, **not** as current state — the live number is
+> **3**, and `S3..Sn` plus the storage flip are what close the rest before the
+> accessor can be deleted.
 
 **Two doc comments still name the private field as the access path**, and both
 sit in test files that can no longer compile such an expression:
