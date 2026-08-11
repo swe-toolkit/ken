@@ -286,6 +286,54 @@ the same task.** That contrast is the evidence the re-seating was the fix, and
 the reason the census above is stated as a measurement on both trees rather than
 as a claim.
 
+## `S3` accepted partial — the type-ID projection view, MERGED 2026-08-11
+
+Exact `370b233d`, merge-base `548405c0`, `origin/main` now `10d5eda9`, PR #1923.
+Three `ken-elaborator` paths, `+56/-7`: `src/classes.rs`, `src/elab.rs`,
+`tests/class_field_purity.rs`. Blob identity 3/3 against the declared base.
+Decision `dec_1j1b1pfjw1ezf`, QA `evt_35pk0afyybges`, Architect
+`evt_3yrk4b6n9x5b3`.
+
+A public `projection_by_type_id(GlobalId) -> Option<ProjectionView>` that scans
+the sole private class registry and builds its result through the existing
+private `ClassInfo::view` using the registry's actual stored key. It adds no
+public `ClassInfo`, no raw or mutable map surface, no cloned telescope, and no
+second index or cache. `infer_proj` now takes names, field types, and
+substitution from that borrowed view.
+
+**What was deliberately preserved is the interesting half.** `infer_proj` keeps
+its pre-existing un-normalized base-type identity rule — it still inspects the
+elaborated `base_ty` without `whnf` and accepts only the same `App(Const, head)`
+or bare `Const` shapes — and both its span-bearing refusals, unknown-dictionary
+`TypeMismatch` and unknown-field `UnresolvedCon`. Field position, earlier-field
+self-projections, substitution order, and the separate positional-pair path are
+unchanged. The only replacement is the raw-map scan and its cloned vectors.
+
+QA forced the adapter predicate false, and separately redirected only
+`infer_proj` to a foreign `GlobalId`; each unchanged control reddened at its own
+boundary and was restored byte-for-byte. Two mutations at two distinct sites,
+not one repeated.
+
+### The last production raw-map reader is gone, and the residual is NOT progress
+
+`src/elab.rs:3524`, the sole production survivor named in the `S2` record, is
+the site this slice migrated. **What remains is entirely inside SEAL-2:** one
+`//!` explanatory comment, and `tests/seal2_support/mod.rs:149` —
+`for (class_name, info) in class_env.classes().iter()`.
+
+⇒ **That last one is whole-map iteration, and a keyed exact-key view cannot
+express it by construction** — you cannot key into a map you are enumerating.
+So the count going to one understates the situation rather than overstating it:
+this is not a deferred site awaiting its turn in the `S`-series. It is a shape
+the new boundary does not cover, and it **gates the deletion of `classes()`**
+recorded below. Closing it needs either an iteration form on the view or a
+change to that consumer — a decision, not a migration.
+
+**Read the count with that in mind.** The census across this node has gone
+29 real call sites → 2 → 1, and every step of that sequence is real work; but
+the remaining 1 is the one the migration mechanism was never able to reach, so
+the trend line does not predict its closure.
+
 ## TRACKED REMAINING WORK — delete `ClassEnv::classes()` before records land
 
 **This node does not close while that accessor exists.** Recorded as live
