@@ -2163,12 +2163,34 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // guarded on `is_empty()` — a guard would make the zero case take a
     // different path from the one the non-zero case exercises.
     //
-    // **THE PLANE IS NOT INSTALLED, AND THIS ONE LINE IS THE WHOLE
-    // ARMING SWITCH.** Everything downstream of it — the fourth bundle map, the
-    // fused definition pass, the redirect, the takeover and the closeout — is
-    // built, compiled and reachable, and every one of them is inert because
-    // `continuation_fusions()` is empty on a plan with no installed plane. Set
-    // `D2F_EMITTER_ARMED` to `true` and the chain runs.
+    // **THE PLANE IS NOT INSTALLED. THE CONSTANT GATES THE INSTALLER, AND
+    // NOTHING ELSE — read its extent, not its value.** The `if` below closes
+    // around exactly one call. `preflight`, `install_fusion_owned_bodies` (which
+    // is `?`-propagated) and `define_static_continuation_fusion_bodies` all run
+    // unconditionally on every production compile, as do the bundle map, the
+    // redirect and the takeover. They are inert because
+    // `continuation_fusions()` is empty on a plan with no installed plane —
+    // **inert by empty population, not by the gate.** Arming therefore changes
+    // those stages' DATA, not their reachability.
+    //
+    // ⇒ Do not read `D2F_EMITTER_ARMED: false` as "the chain is absent". It is
+    // present and running on nothing. Confirming the constant is `false` is not
+    // the same as confirming what it covers, and an earlier description of this
+    // very block made exactly that substitution.
+    //
+    // **MEASURED, on the empty population, because "inert" was asserted before
+    // it was tested.** Skipping all three stages outright leaves `-p ken-runtime
+    // --lib` at 893 passed / 0 failed, identical to running them. By inspection
+    // of the residual: `preflight` mutates nothing and cannot fail (its loop
+    // body is unreachable and `continuation_fusions()` compares 0 against 0);
+    // `install_fusion_owned_bodies` writes an empty map plus its once-only flag,
+    // whose only readers are a second install and `body_dispositions`, where an
+    // empty map is the identity. `define_static_continuation_fusion_bodies` is
+    // the one that is **not literally a no-op**: it computes
+    // `resolve_worker_targets` before its empty loop and discards the result.
+    // That is wasted work but adds no reachable refusal — `define_unit_bodies`
+    // makes the identical unconditional call in this same block on every
+    // compile, so this pass only changes which caller would raise it first.
     //
     // **This is a labelled un-wired partial, and the label is not a
     // formality.** The wired form was built and measured on the `Exact` witness;
