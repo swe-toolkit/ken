@@ -873,6 +873,58 @@ nothing marks that transition. **The wiring turn is the first `D2f` increment
 that changes production behaviour, and it is reviewed on its own terms.**
 Neither this partial nor `6e60b3bf` is evidence about the wired tree.
 
+## `D2f` producer-side atomicity partial — MERGED 2026-08-11, PR #1933
+
+Exact `a656fca1`, declared merge-base `cf1b36b4`, `origin/main` now `62f2931b`.
+Four non-merge commits, three paths, `+733/-26`, **blob identity 3/3** enumerated
+from the declared base. Decision `dec_231jk98fca7kb` verified `resolved` at merge
+time by reading the object. Architect `evt_4rq7d58nckemc`, QA
+`evt_34465chdhpkyf`. Steward scope ruling `evt_4p4zbdwd34976`.
+
+It implements the Architect's body-axis ruling `evt_6qnwm7qz1a16t`: typed body
+ownership keeping `ContinuationTemplate` and `FusionOwned` distinct, atomic
+exact-once installation through an affine ledger, and zero-region controls. Two
+of the three paths are re-export plumbing only — five inserted lines total
+carrying the new types up to the backend module.
+
+### The ruling was on a DIFFERENT SHA, and the premise was re-taken
+
+**The scope ruling `evt_4p4zbdwd34976` was cut against `21455ec4` at `+474/-26`.
+What published is `a656fca1` at `+733/-26` across four commits.** The reasoning
+transfers — same producer-side body-axis machinery, still un-wired — but the
+ruling's load-bearing premise is a claim about a *tree*, so it was re-measured
+rather than carried.
+
+Measured at the merged SHA and again on `main`: `install_fusion_owned_bodies` is
+defined at `:13726` with **eleven** call sites, `:18168` through `:18689`, and
+`mod tests` opens at `:16097`. Every call site is after the boundary. **Zero
+production callers, so nothing populates the ownership map.**
+
+### The acceptance property CHANGED shape, and this is the trap for the next reader
+
+The `877fd731` claim-facility partial rested on *"nothing consults this"* — an
+inert addition no production path reads. **That is not the property here, and
+citing it would be wrong.** The executable-unit population **does** consult the
+disposition map on production paths. What makes this cut inert is only that the
+map is never populated, so the filter is the identity.
+
+⇒ **The right question for this partial is "empty map, filter is identity,
+behaviour unchanged", not "zero production callers of the consumer".** A caller
+census on the *reader* side answers the wrong question and passes. The census
+above is on the *writer* side, which is the one that decides.
+
+### Third un-wired partial, and the expectation set for the next one
+
+`6e60b3bf`, `877fd731` and now `a656fca1` have all landed without changing
+behaviour. Each was individually right and none is reversed. **The Steward
+expectation, stated at `evt_4p4zbdwd34976`, is that the next `#6d` candidate is
+behaviour-changing**; a fourth un-wired cut brings its reason to the Steward
+*before* the candidate, because that is a sizing question about the node rather
+than a scope question about the cut.
+
+The wired shape is measured and its gap is named — see the producer-suppression
+section above. Node stays `active`; no emitter AC credited.
+
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
 **DISCHARGED 2026-08-11** by the `D2f` ABI-class partial above, which carries
