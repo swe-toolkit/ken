@@ -1352,12 +1352,7 @@ fn check_match_with_lift(
         &weaken(scrut_core, motive_depth as i64),
         &source_index,
     );
-    let motive_ctx = motive_context_at(
-        &cx.ctx,
-        &support_decl,
-        &support_params,
-        &level_args,
-    );
+    let motive_ctx = motive_context_at(&cx.ctx, &support_decl, &support_params, &level_args);
     let motive_sort = kernel_infer(cx.env, &motive_ctx, &motive_body).map_err(|error| {
         ElabError::KernelRejected {
             error,
@@ -1561,7 +1556,9 @@ fn check_match_with_lift(
     };
     let zonked = cx.metas.zonk_term(&elim);
     kernel_infer(cx.env, &cx.ctx, &zonked).map_err(|error| {
-        ElabError::Internal(format!("completed generated All eliminator failed kernel re-check: {error}"))
+        ElabError::Internal(format!(
+            "completed generated All eliminator failed kernel re-check: {error}"
+        ))
     })?;
     Ok(elim)
 }
@@ -1585,12 +1582,13 @@ fn check_structured_constructor_method(
             "nested lifted methods for indexed hosts are not yet surface-supported".into(),
         ));
     }
-    let method_ty = method_type(cx.env, ind, ordinal, motive, params, level_args).map_err(
-        |error| ElabError::KernelRejected {
-            error,
-            span: arm.span.clone(),
-        },
-    )?;
+    let method_ty =
+        method_type(cx.env, ind, ordinal, motive, params, level_args).map_err(|error| {
+            ElabError::KernelRejected {
+                error,
+                span: arm.span.clone(),
+            }
+        })?;
     let (raw_domains, _) = peel_pi(&method_ty);
     let field_count = constructor.args.len();
     if raw_domains.len() != field_count + shapes.len() {
@@ -1669,7 +1667,9 @@ fn check_structured_constructor_method(
     let zonked_method = cx.metas.zonk_term(&method);
     let zonked_ty = cx.metas.zonk_term(&method_ty);
     kernel_check(cx.env, &cx.ctx, &zonked_method, &zonked_ty).map_err(|error| {
-        ElabError::Internal(format!("structured host method failed kernel re-check: {error}"))
+        ElabError::Internal(format!(
+            "structured host method failed kernel re-check: {error}"
+        ))
     })?;
     Ok(method)
 }
@@ -2224,12 +2224,7 @@ fn motive_context_at(
             level_args,
         ));
     }
-    ctx.push(indexed_scrutinee_type_at(
-        ind,
-        ind.id,
-        params,
-        level_args,
-    ));
+    ctx.push(indexed_scrutinee_type_at(ind, ind.id, params, level_args));
     ctx
 }
 
@@ -2973,17 +2968,18 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             binding_span,
             span,
         } => {
-            let (result, result_type) = cx
-                .selected_recursive_result(*index)
-                .ok_or_else(|| ElabError::StructuralResultOutOfScope {
-                selector_span: span.clone(),
-                binding_span: binding_span.clone(),
+            let (result, result_type) = cx.selected_recursive_result(*index).ok_or_else(|| {
+                ElabError::StructuralResultOutOfScope {
+                    selector_span: span.clone(),
+                    binding_span: binding_span.clone(),
+                }
             })?;
-            let classifier = kernel_infer(cx.env, &cx.ctx, &result_type)
-                .map_err(|error| ElabError::KernelRejected {
+            let classifier = kernel_infer(cx.env, &cx.ctx, &result_type).map_err(|error| {
+                ElabError::KernelRejected {
                     error,
                     span: span.clone(),
-                })?;
+                }
+            })?;
             let classifier = whnf(cx.env, &cx.ctx, &classifier);
             let (actual, required) = match classifier {
                 Term::Type(level) => (
@@ -3525,7 +3521,7 @@ fn infer_proj(
         reason: "`.field` projection is unavailable in this elaboration context".into(),
     })?;
     let (field_names, field_types) = class_env
-        .classes
+        .classes()
         .values()
         .find(|ci| ci.type_id == class_type_id)
         .map(|ci| (ci.field_names.clone(), ci.field_types.clone()))
@@ -3667,9 +3663,7 @@ fn elab_num_lit_checked(
 
         let val_opt: Option<NumericLitVal> = match lit {
             NumLit::Int(n) => {
-                if let Some((target, min, max)) =
-                    nenv.fixed_int_literal_descriptor(ty_id)
-                {
+                if let Some((target, min, max)) = nenv.fixed_int_literal_descriptor(ty_id) {
                     if n < min || n > max {
                         return Err(ElabError::FixedWidthLiteralOutOfRange {
                             literal: n.clone(),
@@ -3686,7 +3680,10 @@ fn elab_num_lit_checked(
             }
             NumLit::Float(f) if ty_id == nenv.float_id => Some(NumericLitVal::Float(*f)),
             NumLit::Decimal(c, e) if ty_id == nenv.decimal_id || ty_id == nenv.decimalpair_id => {
-                Some(NumericLitVal::Decimal { coeff: c.clone(), exp: *e })
+                Some(NumericLitVal::Decimal {
+                    coeff: c.clone(),
+                    exp: *e,
+                })
             }
             NumLit::Float32(f) if ty_id == nenv.float32_id => Some(NumericLitVal::Float32(*f)),
             _ => None,
@@ -3755,7 +3752,10 @@ fn num_lit_default_type(lit: &NumLit, nenv: &NumericEnv) -> (NumericLitVal, Glob
         NumLit::Int(n) => (NumericLitVal::Int(n.clone()), nenv.int_id),
         NumLit::Float(f) => (NumericLitVal::Float(*f), nenv.float_id),
         NumLit::Decimal(c, e) => (
-            NumericLitVal::Decimal { coeff: c.clone(), exp: *e },
+            NumericLitVal::Decimal {
+                coeff: c.clone(),
+                exp: *e,
+            },
             nenv.decimal_id,
         ),
         NumLit::Float32(f) => (NumericLitVal::Float32(*f), nenv.float32_id),
@@ -4510,7 +4510,7 @@ fn projected_field_row_type(
     let Some(class_name) = instance_class_for_global(ctx.class_env, instance_id) else {
         return crate::effects::RowType::empty();
     };
-    let Some(class_info) = ctx.class_env.classes.get(class_name) else {
+    let Some(class_info) = ctx.class_env.classes().get(class_name) else {
         return crate::effects::RowType::empty();
     };
     let Some(idx) = class_info.field_names.iter().position(|n| n == field) else {
@@ -4540,7 +4540,7 @@ fn projected_class_field_row_type(
     class_name: &str,
     field: &str,
 ) -> crate::effects::RowType {
-    let Some(class_info) = class_env.classes.get(class_name) else {
+    let Some(class_info) = class_env.classes().get(class_name) else {
         return crate::effects::RowType::empty();
     };
     let Some(idx) = class_info.field_names.iter().position(|n| n == field) else {
@@ -4557,7 +4557,7 @@ fn projected_class_field_row_type(
 
 fn class_name_for_dictionary_type(class_env: &ClassEnv, ty: &RType) -> Option<String> {
     let head = rtype_head_name(ty);
-    class_env.classes.contains_key(&head).then_some(head)
+    class_env.classes().contains_key(&head).then_some(head)
 }
 
 fn collect_bound_dictionary_params(
@@ -5278,7 +5278,7 @@ fn compute_ordered_field_values(
 ) -> Result<(Vec<Term>, Vec<crate::effects::RowType>), ElabError> {
     let (field_names, field_types, field_purities, has_param) = {
         let ci = class_env
-            .classes
+            .classes()
             .get(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
@@ -5425,7 +5425,7 @@ fn elab_instance_decl(
     // ---- look up class ---------------------------------------------------
     let (class_module, class_type_id, class_kind) = {
         let ci = class_env
-            .classes
+            .classes()
             .get(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
@@ -5480,7 +5480,7 @@ fn elab_instance_decl(
     // ---- build instance type --------------------------------------------
     // App(class_type, head) if parameterized, else class_type directly.
     let instance_ty = if class_env
-        .classes
+        .classes()
         .get(class_name)
         .map(|ci| ci.param.is_some())
         .unwrap_or(false)
@@ -5502,7 +5502,7 @@ fn elab_instance_decl(
             .iter()
             .map(|constraint| {
                 let class = class_env
-                    .classes
+                    .classes()
                     .get(&constraint.class_name)
                     .ok_or_else(|| ElabError::UnresolvedCon {
                         name: constraint.class_name.clone(),
@@ -5711,7 +5711,7 @@ fn elab_derive(
 
     let (class_type_id, has_param) = {
         let ci = class_env
-            .classes
+            .classes()
             .get(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
@@ -8332,7 +8332,13 @@ mod nested_lift_association_tests {
         let RExpr::RLet(_, _, _, selector, _) = resolve_expr_standalone(&parsed).unwrap() else {
             panic!("expected the source selector under its ordinary let binding");
         };
-        let RExpr::RRecursiveResult { index, binding_span, span, .. } = &*selector else {
+        let RExpr::RRecursiveResult {
+            index,
+            binding_span,
+            span,
+            ..
+        } = &*selector
+        else {
             panic!("expected resolved recursive-result selector");
         };
         assert_eq!(*index, 0);
@@ -8352,12 +8358,14 @@ mod nested_lift_association_tests {
         selected.ctx.push(Term::Type(Level::Zero));
         selected.ctx.push(Term::Type(Level::Zero));
         selected.hidden_positions.extend([1, 2]);
-        selected
-            .lift_bindings
-            .insert(0, binding(1, Some(2), None));
+        selected.lift_bindings.insert(0, binding(1, Some(2), None));
 
         let (term, _) = infer(&mut selected, &selector).unwrap();
-        assert_eq!(term, Term::var(0), "selector must choose trailing r, not evidence");
+        assert_eq!(
+            term,
+            Term::var(0),
+            "selector must choose trailing r, not evidence"
+        );
 
         selected.lift_bindings.clear();
         assert!(matches!(
@@ -8382,8 +8390,7 @@ mod nested_lift_association_tests {
         // Promise class: durable invariant. The Type classifier and its
         // inverse spelling must remain a discriminating pair.
         let recursive = resolved_selector("let u : Type = Type in recursive result for u");
-        let inverse =
-            resolved_selector("let u : Type = Type in induction hypothesis for u");
+        let inverse = resolved_selector("let u : Type = Type in induction hypothesis for u");
         let mut env = ElabEnv::new().unwrap();
         let mut selected = ElabCtx::new(
             &mut env.env,
@@ -8396,9 +8403,7 @@ mod nested_lift_association_tests {
         selected.ctx.push(Term::Type(Level::Zero));
         selected.ctx.push(Term::Type(Level::Zero));
         selected.hidden_positions.extend([1, 2]);
-        selected
-            .lift_bindings
-            .insert(0, binding(1, Some(2), None));
+        selected.lift_bindings.insert(0, binding(1, Some(2), None));
 
         assert!(infer(&mut selected, &recursive).is_ok());
         assert!(matches!(
@@ -8415,8 +8420,7 @@ mod nested_lift_association_tests {
     fn type_resident_support_does_not_override_omega_result_sort() {
         // Promise class: durable invariant. Support residence never selects
         // the spelling; only the selected result classifier does.
-        let induction =
-            resolved_selector("let u : Type = Type in induction hypothesis for u");
+        let induction = resolved_selector("let u : Type = Type in induction hypothesis for u");
         let inverse = resolved_selector("let u : Type = Type in recursive result for u");
         let mut env = ElabEnv::new().unwrap();
         let mut selected = ElabCtx::new(
@@ -8469,9 +8473,7 @@ mod nested_lift_association_tests {
         selected.ctx.push(Term::Type(Level::Zero));
         selected.ctx.push(Term::var(0));
         selected.hidden_positions.extend([1, 2]);
-        selected
-            .lift_bindings
-            .insert(0, binding(1, Some(2), None));
+        selected.lift_bindings.insert(0, binding(1, Some(2), None));
         assert!(infer(&mut selected, &selector).is_ok());
     }
 
@@ -8483,8 +8485,7 @@ mod nested_lift_association_tests {
         // attributed. Both selector spellings refuse the former, so neither
         // can become a default.
         let recursive = resolved_selector("let u : Type = Type in recursive result for u");
-        let induction =
-            resolved_selector("let u : Type = Type in induction hypothesis for u");
+        let induction = resolved_selector("let u : Type = Type in induction hypothesis for u");
         let mut env = ElabEnv::new().unwrap();
         let mut selected = ElabCtx::new(
             &mut env.env,
@@ -8498,13 +8499,9 @@ mod nested_lift_association_tests {
         // This is a well-typed Int value, not a fabricated malformed term.
         // Its successful inference produces a non-universe classifier; putting
         // the value in a result-type slot models the defensive invariant arm.
-        selected
-            .ctx
-            .push(Term::IntLit(num_bigint::BigInt::from(0)));
+        selected.ctx.push(Term::IntLit(num_bigint::BigInt::from(0)));
         selected.hidden_positions.extend([1, 2]);
-        selected
-            .lift_bindings
-            .insert(0, binding(1, Some(2), None));
+        selected.lift_bindings.insert(0, binding(1, Some(2), None));
 
         for selector in [&recursive, &induction] {
             let RExpr::RRecursiveResult {

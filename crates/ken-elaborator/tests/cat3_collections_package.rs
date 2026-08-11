@@ -297,12 +297,12 @@ fn cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs() {
         "SetoidMorphism",
     ] {
         assert!(
-            env.class_env.classes.contains_key(class_name),
+            env.class_env.classes().contains_key(class_name),
             "{class_name} should be registered as an ordinary class/record"
         );
     }
     assert!(
-        env.class_env.classes["SetoidMorphism"]
+        env.class_env.classes()["SetoidMorphism"]
             .field_names
             .iter()
             .any(|name| name == "project"),

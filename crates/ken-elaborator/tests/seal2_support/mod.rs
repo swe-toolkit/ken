@@ -9,7 +9,7 @@
 //! it carries, along three independent axes:
 //!
 //!   * **namespace** — it iterates `env.globals` only. A class field
-//!     (`class_env.classes[C].field_types`) is source-reachable by projection
+//!     (`class_env.classes()[C].field_types`) is source-reachable by projection
 //!     yet never enters `globals`, so it is invisible.
 //!   * **position** — it matches only the *head* of a result type. A
 //!     `Result E BufferSpan` producer has the carrier off-head, so it is skipped.
@@ -146,7 +146,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
     // NAMESPACE — class field types, source-reachable by projection `d.field`.
     // These never enter `globals` (the S1-family-B blind spot the head-only
     // oracle inherited).
-    for (class_name, info) in class_env.classes.iter() {
+    for (class_name, info) in class_env.classes().iter() {
         for (field_name, field_ty) in info.field_names.iter().zip(info.field_types.iter()) {
             producers.push(Producer {
                 namespace: "class_field",
