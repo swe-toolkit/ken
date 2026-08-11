@@ -7881,6 +7881,7 @@ struct ContinuationDiscovery {
 #[cfg(test)]
 thread_local! {
     static WEAKEN_CONTINUATION_DECREASING_MEASURE: Cell<bool> = const { Cell::new(false) };
+    static SUPPRESS_POST_SPECIALIZATION_DESCENT: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -7943,6 +7944,16 @@ fn envelope_defect() -> EnvelopeDefect {
 /// a function of its source coordinates. Arming this hook removes precisely that
 /// disjointness — nothing else — which is what makes the resulting refusal
 /// attributable to the owner and not to some other damage.
+/// `D2i` `AC-2` — suppress ONLY the post-ordinary-specialization descent.
+///
+/// Nothing else changes: the initial frontier is still seeded and admitted, so
+/// a candidate that vanishes under this hook vanished because the descent root
+/// is gone and not because discovery stopped.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_post_specialization_descent_suppressed(armed: bool) {
+    SUPPRESS_POST_SPECIALIZATION_DESCENT.with(|cell| cell.set(armed));
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn set_continuation_descent_owner_duplication(armed: bool) {
     DUPLICATE_DESCENT_AS_TOP_LEVEL.with(|cell| cell.set(armed));
@@ -9049,11 +9060,21 @@ fn build_continuation_specialization_plan(
                         // context, and the raw worker body's own owner cannot
                         // reach them. Dropping it here is exactly the defect
                         // `evt_609am4v7cdt5b` ruled on.
-                        pending.push(ContinuationDiscovery {
-                            continuation_origin: discovery.continuation_origin,
-                            result_root: worker.body_origin,
-                            enclosing_specialization: Some(target),
-                        });
+                        // `D2i` `AC-2` causal control: suppressing ONLY this
+                        // descent must take the fusion candidate count 1 -> 0
+                        // while the initial terminal root stays admitted. See
+                        // `set_continuation_post_specialization_descent_suppressed`.
+                        #[cfg(test)]
+                        let descend = !SUPPRESS_POST_SPECIALIZATION_DESCENT.with(Cell::get);
+                        #[cfg(not(test))]
+                        let descend = true;
+                        if descend {
+                            pending.push(ContinuationDiscovery {
+                                continuation_origin: discovery.continuation_origin,
+                                result_root: worker.body_origin,
+                                enclosing_specialization: Some(target),
+                            });
+                        }
                         // `D8a` — the same descent, as though it were top level.
                         // See `set_continuation_descent_owner_duplication`.
                         #[cfg(test)]
@@ -14899,6 +14920,72 @@ mod tests {
         assert!(
             format!("{absent:?}").contains("checked subcontinuation markers have no checked plan"),
             "and it must refuse for the transport reason: {absent:?}"
+        );
+    }
+
+    /// `D2i` `AC-2` — suppressing ONLY the post-specialization descent takes the
+    /// candidate count 1 to 0, and the initial terminal root survives.
+    ///
+    /// This is the causal control for the finding. The candidate exists because
+    /// the ledger carries a descent root; removing exactly that push must remove
+    /// exactly that candidate. Both halves are asserted, because a count going
+    /// to zero would also be produced by discovery collapsing entirely -- and
+    /// that would prove nothing about the descent.
+    #[test]
+    fn d2i_ac2_suppressing_only_the_descent_takes_the_candidate_to_zero() {
+        struct Restore;
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                set_post_specialization_descent_suppressed(false);
+            }
+        }
+
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2g_oriented_plan();
+
+        let before = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+        assert_eq!(before, 1, "the unsuppressed baseline is one candidate");
+        let seed_root = plan
+            .semantic
+            .child_origin(
+                fusion_root_source_for_future_enumerator(&plan).expect("roots")[0]
+                    .continuation_origin,
+                0,
+            )
+            .expect("scrutinee");
+
+        let _restore = Restore;
+        set_post_specialization_descent_suppressed(true);
+        let after = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+        let suppressed_roots =
+            fusion_root_source_for_future_enumerator(&plan).expect("roots under suppression");
+
+        assert_eq!(
+            after, 0,
+            "suppressing only the descent must remove exactly the candidate it fed"
+        );
+        assert!(
+            suppressed_roots
+                .iter()
+                .any(|root| root.result_root == seed_root),
+            "and the initial terminal root must still be admitted, or the count fell \
+             because discovery collapsed rather than because the descent went: \
+             {suppressed_roots:?}"
+        );
+        assert!(
+            suppressed_roots
+                .iter()
+                .all(|root| root.enclosing_specialization.is_none()),
+            "with no descent admitted, no admitted root carries an enclosing \
+             specialization: {suppressed_roots:?}"
         );
     }
 
