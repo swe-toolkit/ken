@@ -36,6 +36,73 @@ One committed control carrying these four results **side by side**:
 | checked exact `D2j` positive | exactly one builder arrival, `oriented_present=true`, resolved plane `1`, exactly **one** key / ID / descriptor, closed seven facts matching that fixture's independently re-derived planner facts |
 | strip or relocate **one** checked marker, plan held fixed | exact **validator refusal**, before any key / ID / descriptor / definition |
 
+> ### THE POSITIVE IS THE ABI-APPLIED ENTRY, NOT THE BARE REFERENCE
+>
+> **Architect ruling `evt_6907h4rv5kq1a`, 2026-08-11.** The gate exact
+> `e4531318` is a **sound identity-plane partial and merges**, but **its
+> bare-root observation does not carry across this correction.**
+>
+> **The governing invariant is one end-to-end PROGRAM, not one declaration
+> body.** The complete fusion key contains positional and provenance facts
+> derived from the **planned program**, so *"the applied form was derived from
+> the same bare declaration"* **does not** prove the emitter observed the
+> identity the planner controls established.
+>
+> **The bare `DeclarationRef` cannot state the emission contract at all** —
+> root projection stops at `Unsupported(Closure)`. **A shape that cannot reach
+> the claimed definition movement cannot be the canonical positive.**
+>
+> **Fix at the sole fixture authority, never at callers.** `d2j_entry()` itself
+> returns the applied root:
+>
+> ```rust
+> RuntimeExpr::Call {
+>     callee: Box::new(RuntimeExpr::DeclarationRef {
+>         symbol: D2J_DECLARATION.to_string(),
+>     }),
+>     args: vec![unit(), unit()],
+> }
+> ```
+>
+> The two arguments correspond exactly to the declaration's `params: ["a","b"]`;
+> they are closed ordinary `Unit` values and the witness body takes no authority
+> from them. `d2j_checked_fixture_under(cause)` remains the **only** exported
+> constructor. **No caller may re-wrap it, construct a second entry, or retain a
+> planner-only bare-entry helper.**
+>
+> A bare `DeclarationRef` may remain **only** as an explicitly named
+> root-projection **negative** comparator. **It is not the `D2f` positive and it
+> discharges no emitter AC.**
+>
+> **REBASELINE; DO NOT TRANSPORT LITERALS.** The outer `Call` can shift planned
+> origins, so **every `D2j` planner control runs on the new `d2j_entry()`** and
+> **freshly re-derives** the closed-seven coordinates, complete key, descriptor,
+> and refusal coordinates. **If any seven-fact member or non-degeneracy control
+> stops holding, STOP and report** — do not copy the bare-root key and do not
+> add an origin translation.
+
+### The causal chain, committed in this order
+
+1. The shared constructor yields **one** applied entry / declaration / plan
+   triple.
+2. The **planner** control independently derives exactly one complete key and
+   descriptor from that triple.
+3. `compile_expr_into_object_module` on the **same triple** independently
+   reaches one production key and descriptor, and **exact equality with the
+   planner observations is asserted.**
+4. The future emitter consumes **only that production plane in the same
+   compile**, bound to that compilation-local key ↔ ID ↔ descriptor. **It never
+   reads the planner comparator.**
+5. **Before emission**, the same applied root reaches the twin's exact ordinary
+   `ComputationalMatch` refusal with plane `1` and definition count `0`.
+6. **With emission enabled**, the same root retains plane `1` and moves the
+   independently observed generated-definition / redirection population
+   **`0 → 1`**.
+7. **Fusion-only suppression** leaves builder arrival and plane `1` intact,
+   moves definition/redirection **`1 → 0`**, and restores that same ordinary
+   refusal. **The plane and definition populations must be operands of ONE
+   assertion**, so suppression cannot pass on a resting zero.
+
 **No emitter AC may be credited until the positive row is non-zero.** That is the
 whole point of ordering this first: every emitter criterion in this frame
 discharges **vacuously** against a permanently empty plane, and a no-activation
@@ -120,12 +187,19 @@ obligation.
 > fusion-positive.
 
 **AC-1 — the positive full-pipeline baseline is the CHECKED `R3`-shaped `D2j`
-exact witness.** Reuse the landed `D2g`/`D2j` checked fixture and its complete,
-independently authored `OrientedSubcontinuationPlanV1`. **Do not duplicate it and
-do not re-hand-wrap it** — hoist or re-export one `#[cfg(test)]` fixture
-constructor from the existing `D2g`/`D2j` builder so the planner tests and this
-full-compile control consume the **same** entry, transparent declaration, and
-plan.
+exact witness, in its ABI-APPLIED form.** Reuse the landed `D2g`/`D2j` checked
+fixture and its complete, independently authored `OrientedSubcontinuationPlanV1`.
+**Do not duplicate it and do not re-hand-wrap it** — `d2j_checked_fixture_under`
+`(cause)` is the one exported constructor, and `d2j_entry()` itself returns the
+**applied root** (`Call { callee: DeclarationRef(D2J_DECLARATION), args: [unit(),
+unit()] }`), so the planner tests and this full-compile control consume the
+**same** entry, transparent declaration, and plan.
+
+**The bare `DeclarationRef` is NOT this baseline** (Architect
+`evt_6907h4rv5kq1a`) — root projection stops at `Unsupported(Closure)`, so it
+cannot state the emission contract or reach the claimed definition movement. It
+survives only as an explicitly named root-projection negative comparator and
+**discharges no emitter AC.**
 
 On that witness, the inner `Node` recursor closure and its exact activation and
 cursor are produced and consumed by the downstream call **in the same specialized
@@ -140,10 +214,14 @@ interning, and later emission. **It must not call the fusion builder or the
 emitter directly** — a control that bypasses the planner cannot see the path
 these criteria are about.
 
-**AC-2 — the A/B witness, bound to the TWIN's own coordinates.** Suppressing
-**only** the continuation fusion restores that twin's **own ordinary refusal**,
-at its **freshly derived planner coordinates**. Suppressing anything else does
-not count.
+**AC-2 — the A/B witness, bound to the APPLIED ROOT's own coordinates.**
+Suppressing **only** the continuation fusion restores the applied root's **own
+ordinary `ComputationalMatch` refusal**, at its **freshly derived** planner
+coordinates. Suppressing anything else does not count.
+
+**Re-derive those coordinates; do not transport them.** The outer `Call` can
+shift planned origins, so every coordinate in this criterion comes from the
+applied root's own planning run.
 
 > **STRUCK — *"restores the measured origin-23 refusal."*** Origin 23 is the old
 > `px8j` coordinate. **The checked twin's origins, owners, and edge are its own
@@ -193,13 +271,33 @@ resolve.
 > validators already own that refusal. **`D2f` must not add a second
 > owner-rejection path.**
 
-**AC-6a — the five refusals still refuse, and reach nothing.** Checked frame,
-selected slot, invocation template, exact suffix, and **call identity**. Start
-each from the **same positive full-pipeline baseline** that resolves one
-key/ID/descriptor and creates exactly one `Fusion` definition, then apply one
-source-side cause independently, with the matching independently authored
-oriented plan where applicable. Each negative must yield **no key, no `Fusion`
-ID, no descriptor, no generated definition, and no redirected edge.**
+**AC-6a — the five causes still reach nothing, and they DO NOT all refuse at the
+same phase.** Checked frame, selected slot, invocation template, exact suffix,
+and **call identity**. Start each from the **same positive full-pipeline
+baseline** that resolves one key/ID/descriptor and creates exactly one `Fusion`
+definition, then apply one source-side cause independently, with the matching
+independently authored oriented plan where applicable. Each negative must yield
+**no key, no `Fusion` ID, no descriptor, no generated definition, and no
+redirected edge.**
+
+> **THE PHASE SPLIT IS MEASURED AND MUST BE PRESERVED.** Architect
+> `evt_6907h4rv5kq1a`, correcting wording the Steward introduced earlier the
+> same day.
+>
+> | cause | where it stops |
+> |---|---|
+> | checked frame, selected slot, invocation template | **refuse BEFORE builder arrival** |
+> | exact suffix, call identity | **reach the builder and resolve ZERO** |
+>
+> **STRUCK — *"the five refusals"* as a single class.** Calling all five
+> "validator refusals" asserts a phase that two of them do not have, so a
+> control written to that description would look for a refusal where the
+> measured behaviour is arrival-then-empty — and would either fail on correct
+> code or be weakened until it passed.
+>
+> **All five still owe the same end state** — no key, ID, descriptor,
+> definition, or redirection. **What differs is where each stops**, and the
+> frame must not flatten that.
 
 - **The definition/edge population must be an operand of the assertion**, with
   the positive baseline present. **A refusal control asserted against a resting
