@@ -71,6 +71,40 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 > matrix, labelled as such, with every mutation **submitted to the interner**
 > rather than looked up.
 >
+> #### THERE ARE TWO PER-MEMBER MATRICES. ONE STAYS, ONE RELOCATES.
+>
+> **Added 2026-08-11 after this conflation caused a SECOND block**
+> (`evt_65215jy0tx6b`, on `2b2632c7`, whose Decision text stated the `AC-1`
+> paired-key matrix was relocated — it is not). The distinction above is
+> carried by an adjective, and an adjective does not survive a skim. **Read
+> this table before writing either one.**
+>
+> | | **interner-unit matrix** | **derivation-provenance matrix** |
+> |---|---|---|
+> | **node** | **`D2h` — HERE** | **`D2j` — relocated** |
+> | property | the map is a function of the whole structural key | each member equals the planner fact it claims to record |
+> | instrument | a **synthetic** one-member mutation, **submitted to the interner** | a **source-side** transplant of the declaration or plan input |
+> | passes when | the mutated key mints a **distinct ID** and round-trips; same key reuses | the re-derived member changes, or the plan refuses before interning |
+> | needs planner-valid programs | **no** — planner validity is an upstream precondition | **yes** — a synthetic key cannot reach it |
+>
+> **The word "per-member" belongs to both and disambiguates neither.** If you
+> find yourself deciding which node a matrix belongs to by the phrase
+> "per-member matrix", you are reading the one word that is common to both.
+>
+> **Two things that follow, and each is one of the two blocks so far.**
+>
+> **A read-only `id_for` lookup returning `None` is neither matrix.** It is not
+> interner-unit evidence, because nothing was interned; and it is not
+> derivation evidence, because a clone is not something the planner produced.
+> That was `a77ba94a`'s defect and it is still the fastest way to build
+> something that looks like coverage and is not.
+>
+> **Relocating the interner-unit matrix to `D2j` does not narrow this node —
+> it empties it.** With the collision property gone, what remains is a plane
+> nothing proves is keyed correctly. If a candidate's Decision text says the
+> `AC-1` matrix relocated, the candidate is under-scoped and the Decision is
+> wrong about this frame, not about the split.
+>
 > ### What relocates to a successor — [[RT-LEXICAL-RECURSOR-CONSUMERS-D2j]]
 >
 > **The successor is written and it is `D2j`.** It gates `#6d`'s closure and it
