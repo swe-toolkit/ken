@@ -2185,8 +2185,11 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     //      — the fused body lowers, and the producer's causal refs need
     //      declaring in it. Closed by declaring under `causal_owner`.
     //   4. `a continuation call token was claimed by a context that is not its
-    //      emission owner` — the ambient emission owner must be the body's own
-    //      predeclared owner per phase, not `Fusion(id)`.
+    //      emission owner` — the ambient authority must be a `Predeclared`
+    //      owner, never `Fusion(id)`, because the planner issues no
+    //      `Fusion`-owned causal tokens. What this cut binds is
+    //      `Predeclared(producer_owner)` across the WHOLE combined lowering; the
+    //      ruled per-body switch is excluded and is named at the bind site.
     //   5. `OrientedSubcontinuationPlanV1: computational IH slot marker is
     //      detached from its checked frame` — **where it stops.** The fused
     //      `Function` opens its own `CheckedFrameFunctionScope`, and the IH slot
@@ -4777,6 +4780,12 @@ impl<'a> Lowering<'a> {
     /// result reaches this eliminator inside one frame, not as a checked answer
     /// returned across a specialization boundary, so raising the route would
     /// claim a check no call performed.
+    ///
+    /// **This seat switches no authority.** The caller holds one ambient
+    /// authority across the whole call, so the consumer's case bodies below are
+    /// lowered under whatever the caller bound — today the *producer's*. The
+    /// per-body switch is excluded, later Architect-ruled wiring; if it lands it
+    /// belongs to the caller's bind, not here.
     pub(super) fn lower_fused_producer_through_suffix(
         &mut self,
         builder: &mut FunctionBuilder<'_>,

@@ -2876,13 +2876,27 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — define one `Function` per installed
 /// fused region: the producer's body and the consumer's suffix, in one frame.**
 ///
-/// **The two phases are lowered under TWO authorities, and that is the whole
-/// deliverable.** Phase 1 lowers the producer's body under the producer's
-/// source-body authority over the frame's `Parameter` run; phase 2 eliminates
-/// that result under the *consumer's* authority over the frame's `Capture` run.
-/// Binding one authority for both would lower the consumer's case bodies against
-/// the producer's source occurrences, which is a wrong program rather than a
-/// missing one — the binders would resolve, to the wrong terms.
+/// **What this actually binds, and it is PROVISIONAL: one authority, the
+/// producer's, around the whole combined lowering.** The single
+/// `AmbientBodyAuthority::bind` below takes
+/// `Predeclared(producer_owner)`/`producer_owner` and spans the producer's body
+/// *and* the consumer's suffix together. There is no consumer-phase switch in
+/// this function.
+///
+/// **That is a known gap, not the design, and it is EXCLUDED from this cut.**
+/// The consumer's case bodies are therefore lowered against the producer's
+/// source-lookup authority. It is inert here only because the emitter is
+/// un-wired (`D2F_EMITTER_ARMED`), so this function defines zero bodies on every
+/// compile; armed and left this way it would be a wrong program rather than a
+/// missing one, because the binders would resolve — to the wrong terms.
+///
+/// **The excluded repair, named so it is not re-derived:** the ambient authority
+/// must move `Predeclared(producer) -> Predeclared(consumer) -> producer` across
+/// the suffix, and the fused region needs its own checked-frame adoption,
+/// because a `CheckedFrameFunctionScope` is a per-`Function` transaction while a
+/// fused region's frame spans the producer's body and the consumer's suffix
+/// across one. Both are later Architect-ruled wiring. Do not read the paragraph
+/// above as a statement that either exists.
 ///
 /// **The suffix is run ONCE, here.** Node `:650` measured that redirecting the
 /// producer invocation alone leaves the consumer's own suffix live and executes
@@ -2890,7 +2904,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
 /// are one irreducible core: any two of the three, without the third, is a wrong
 /// artifact and not a partial one.
 ///
-/// **No new elimination machinery.** Phase 2 is
+/// **No new elimination machinery.** The elimination is
 /// `lower_computational_producer_expr` with a single-frame eliminator stack — the
 /// same entry the producer dispatcher's own fallback arm uses. It handles the
 /// carried and the specialized phase already, so nothing here re-derives case
@@ -3031,22 +3045,25 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             &compiler.static_transition_plan,
             bundle,
         )?;
-        // This region's own causal call refs, selected by the EMISSION owner —
-        // which is `Fusion(id)` and neither of the two predeclared units. The
-        // fused region is a third thing that owns itself.
-        let emission_owner = ContinuationEmissionOwner::Fusion(fusion.id);
-        // The causal refs declared here are the **PRODUCER's**, and that is a
-        // different question from who this body emits AS.
+        // The causal call refs declared here are the **PRODUCER's**, under
+        // `Predeclared(producer_owner)`.
         //
-        // `emission_owner` above is `Fusion(id)`: the fused region owns itself,
-        // and that is what the ambient authority binds. But the causal call
-        // tokens the planner issued for the producer's body were issued under
-        // `Predeclared(producer)`, and installing body ownership removed the
-        // producer's standalone `Function` — so this is now the only `Function`
-        // that lowers that body, and therefore the only one that can declare its
-        // refs. Asking for `Fusion(id)`-owned tokens instead returns the empty
-        // set, and the producer's first causal call then refuses with *"the
-        // claimed continuation target was not declared into this function"*.
+        // The planner issues causal tokens for the producer's body under that
+        // owner, and installing body ownership removed the producer's standalone
+        // `Function` — so this is now the only `Function` that lowers that body,
+        // and therefore the only one that can declare its refs.
+        //
+        // **There is deliberately no `Fusion(id)` owner in this function.** An
+        // earlier cut minted `ContinuationEmissionOwner::Fusion(fusion.id)` here
+        // and described it as the ambient authority. It was never bound to
+        // anything: the sole `AmbientBodyAuthority::bind` below takes
+        // `causal_owner`, and the planner issues no `Fusion`-owned tokens, so
+        // asking for them returns the empty set and the producer's first causal
+        // call refuses with *"the claimed continuation target was not declared
+        // into this function"*. Whether the fused region ever becomes a causal
+        // emission owner in its own right is later Architect-ruled wiring and is
+        // excluded here; **it is not the case today, and this variable must not
+        // be reintroduced to suggest otherwise.**
         //
         // NOT the union with the consumer's tokens. The consumer's own
         // `Function` still exists and still declares them; declaring them here
@@ -3119,8 +3136,13 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
 
             // The two runs, walked once and kept SEPARATE. The context pass
             // concatenates them because one body binds both; here they are two
-            // environments for two authorities, and concatenating would hand the
-            // producer the consumer's captures.
+            // environments for two BODIES — the producer's and the consumer's
+            // suffix — and concatenating would hand the producer the consumer's
+            // captures.
+            //
+            // Separate ENVIRONMENTS, not separate authorities. The single
+            // ambient authority below spans both; see the bind for what is
+            // provisional about that.
             let mut parameters = Vec::new();
             let mut captures = Vec::new();
             for (slot, offset) in slots.iter().zip(offsets) {
@@ -3160,6 +3182,18 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             // consumer's suffix with no intermediate activation materialized.
             // This is the same entry the dispatcher's own nested arm uses to
             // fuse an inner eliminator ahead of an outer stack.
+            //
+            // **ONE authority spans BOTH, and that is provisional.** The bind
+            // below is `Predeclared(producer_owner)`/`producer_owner` and it is
+            // held across the whole combined lowering, so the consumer's case
+            // bodies are lowered under the producer's source-lookup authority.
+            // The ruled shape moves it
+            // `Predeclared(producer) -> Predeclared(consumer) -> producer` across
+            // the suffix; that switch, and the fused region's own checked-frame
+            // adoption, are later Architect-ruled wiring and are **excluded from
+            // this cut**. Fusing the two lowering steps is what removed the seam
+            // the switch used to sit at, so it has to be reintroduced
+            // deliberately rather than restored.
             let lowered = {
                 let ambient =
                     AmbientBodyAuthority::bind(compiler, causal_owner, fusion.producer_owner);
