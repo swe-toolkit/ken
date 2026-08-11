@@ -749,6 +749,57 @@ says the ordinary path refuses upstream of it.
 contradiction of the ruling's shape, and this does not meet it. It is a located
 coordinate the next turn inherits rather than rediscovers.
 
+### The completeness premise is now VERIFIED, not just asserted
+
+The adversary (`evt_4nyse2f1rs30k`) re-measured un-wired-ness rather than
+carrying the `6e60b3bf` verdict, and **the evidence moved even though the
+conclusion held**: installer occurrences 2 → 3, call sites 1 → 2 (`:17732`,
+`:17843`), and the `mod tests` boundary shifted `:15223` → `:15785`. Both call
+sites are inside the test module. **A carried verdict would have asserted "one
+test call" about a tree with two.**
+
+It then named the load-bearing gap correctly: **the completeness half is the
+actual premise of the Steward ruling, and nobody had tested it.** Measured on
+`cf1b36b4`:
+
+`FusionClaimRefusal` declares **eight** variants. Seven are constructed in
+`fn preflight` (`Identity` at three sites, plus `InvocationTriple`,
+`SelfRedirection`, `BinderAgreement`, `InputAvailability`, `ResultLane`,
+`OverlappingClaim`). Each ruled row maps to an applied gate.
+
+**`SelectorEdge` is the eighth and production never constructs it** — which is
+the "stated but not applied" shape, and it is not that. The preflight delegates:
+
+```rust
+// `redirect_target` raises its own absent/ambiguous/declaration-kind refusals
+let redirect = view.redirect_target(plan)?;
+```
+
+The ruled row — one unique landed `StaticBody` edge — **is enforced**, by the
+`D2f` Deliverable 5 selector that landed at `e89de667`, which already refuses on
+zero and on multiple. `SelectorEdge` is a **reporting label for a delegated
+family**, and both the production comment and the test helper say so.
+
+**The control keys on production's real messages, not on a name production never
+emits.** The helper matches `"no edge to redirect"`, `"selects more than one
+emittable"`, and `"rather than a static body edge"` — three actual
+`fusion_redirect_target` messages — and normalizes them to the label. So it is
+not a control whose answer its own helper supplies.
+
+⇒ **No declared-but-unapplied join. The facility is complete, and the ruling's
+premise is measured rather than inherited.**
+
+**One residual, direction stated:** that normalization is keyed on message
+substrings from another function's prose. If `fusion_redirect_target`'s wording
+changes, the helper falls through to `"other planner invariant: {message}"` and
+the control **reds**. That is the safe direction — a false negative that shouts,
+not a false positive that hides — so it is recorded, not filed as work.
+
+**Still unhunted by everyone:** the individual correctness of the preflight
+joins, and whether each refusal names a real identity. Whether
+planned/defined/redirected/consumed are the four sets that matter cannot be
+settled until the emitter exists, because `consumed` has no content before then.
+
 ### This acceptance is NOT precedent for the emitter cut
 
 Un-wired-ness ends at the first production call anywhere in the module tree, and
