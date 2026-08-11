@@ -663,6 +663,99 @@ unit 2's `body_occurrence`. So the ruling's load-bearing
 constraint it fails — which is the difference between a preflight written
 against a passing witness and one written defensively against a failing one.
 
+## `D2f` claim-facility accepted partial — MERGED 2026-08-11, PR #1925
+
+Exact `877fd731`, merge-base `10d5eda9`, `origin/main` now `cf1b36b4`. Two
+paths, `+843/-1`, blob identity 2/2. Decision `dec_6js0bxbx5mqf7`, QA
+`evt_609ejeyhcrnw`, Architect `evt_56kx6cvzk5yav`. Steward scope ruling
+`evt_2pzeff27crgpz`.
+
+The complete `FusionRegionClaim` facility ruled at `evt_79v3kj4nk2t3g`:
+pre-definition preflight, affine ledger, set-equality closeout, controls. The
+claim is non-`Clone`/non-`Copy`/non-`PartialEq` and derives only from the
+complete production key and immutable static plan.
+
+### The ruling: un-wired is a DIFFERENT AXIS from partial
+
+The leader held before QA because the turn was authorized as *atomic
+ABI/emitter construction* and this is not that deliverable — and because its own
+release said *"do not leave a partial claim facility."* Both checks were right
+to run.
+
+**The instruction guards against a half-built mechanism** — a preflight without
+a ledger, a ledger without a closeout, refusal rules present for some rows and
+absent for others. What landed has all four pieces. **What is absent is the
+wiring, and completeness and wiring are different axes.** This cut is the first
+without being the second.
+
+⇒ Landed as a labelled claim-facility accepted partial. Had the facility been
+missing a refusal row, the answer would have been hold.
+
+### The un-wired property is carried by DIFF SHAPE, not by a green suite
+
+Three hunks, and only one touches pre-existing code:
+
+| hunk | what |
+|---|---|
+| `+562` after `fusion_redirect_target` | the facility, contiguous, **zero deletions** |
+| `+276` in `mod tests` | the controls |
+| `abi.rs:1292` | `fn` → `pub(super) fn` on `fusion_input_carrier_admissibility`, plus a doc comment |
+
+`FusionRegionClaim` occurs **7 times, all 7 inside its own definition block.**
+
+⇒ **Because no existing code path changed, the checked applied `Exact` twin's
+behaviour is unchanged by construction.** That is stronger than a green suite,
+which is equally consistent with a behaviour change nothing observes. **The
+reasoning is only as good as the hunk enumeration**, which is why the
+enumeration is recorded here rather than the conclusion alone.
+
+### The `pub(super)` widening is deliberate, and not scope creep
+
+The installer applies the carrier gate before a slot is inserted; the preflight
+applies the identical gate before any definition exists. **Two readings of one
+function, never two spellings of one rule.** A second copy that drifts from the
+first is a defect class this node has already produced. If a later turn needs a
+variant, that is a scope question — not a second copy.
+
+### Two things worth keeping
+
+**Closeout is set equality across planned/defined/redirected/consumed, not
+counts.** Counts hold vacuously at zero and also survive a swap.
+
+**The preflight deliberately omits `producer_argument_binding.frame_origin ==
+consumer_binding.frame_origin`.** It is false by design — 25 vs 10 — and
+asserting it would refuse the canonical positive. Recorded as a **deliberate
+omission** so a later reader does not "fix" it into a refusal of the very
+witness the node is built on. It survived a compaction and a full review cycle
+only because it was restated at every handoff.
+
+### QA's evidence was a grid, not a count
+
+Three mutations at three distinct sites, each preserving compilation, each
+reddening a **different** control, each restored byte-identically: the
+`caller == consumer_owner` conjunct, the three-domain overlap refusal, and the
+planned-vs-defined set equality. Each moved exactly one field of the expected
+output. **That discriminates which rule is load-bearing** rather than only
+showing that something fails.
+
+### The located seam, and why it is not a re-cut
+
+The `Exact` path still reaches `boundary_transfer_admissibility`'s
+`ComputationalRecursorClosure` refusal, so the takeover must be located **before
+that refusal**. The ruling puts the takeover at the producer-call return; this
+says the ordinary path refuses upstream of it.
+
+⇒ **Incomplete about where, not contradicted.** The Steward re-cut condition is
+contradiction of the ruling's shape, and this does not meet it. It is a located
+coordinate the next turn inherits rather than rediscovers.
+
+### This acceptance is NOT precedent for the emitter cut
+
+Un-wired-ness ends at the first production call anywhere in the module tree, and
+nothing marks that transition. **The wiring turn is the first `D2f` increment
+that changes production behaviour, and it is reviewed on its own terms.**
+Neither this partial nor `6e60b3bf` is evidence about the wired tree.
+
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
 **DISCHARGED 2026-08-11** by the `D2f` ABI-class partial above, which carries
