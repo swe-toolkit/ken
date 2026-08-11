@@ -978,7 +978,46 @@ another turn of the same kind, and therefore rots when it is kept. This chain
 cannot be regenerated that way, and it is the instrument that makes the open
 question askable at all.
 
-Arming is one line — `const D2F_EMITTER_ARMED: bool = false` at
+> ### THE GATE COVERS ONE STAGE, NOT THE CHAIN. Corrected 2026-08-11.
+>
+> **This section said "arming is one line" and that the ordinary production
+> path is behaviourally unchanged. Both overstate what the constant does**, and
+> the sentence is the Steward's. Adversary `evt_7v8j1ntwv7rz2`, verified from
+> the object at `98702040`.
+>
+> The `if` at `:2210` **closes at `:2213`.** Running unconditionally on every
+> production compile, outside it:
+> `FusionRegionClaimLedger::preflight` (`:2214`),
+> `install_fusion_owned_bodies` (`:2215`, **`?`-propagated**), and
+> `define_static_continuation_fusion_bodies` (`:2486`). There is exactly **one**
+> non-comment read of `D2F_EMITTER_ARMED` in the file and it guards the
+> installer alone.
+>
+> ⇒ **The chain is inert by EMPTY INPUT, not by the gate.** The later stages
+> execute and iterate nothing, because the one gated call is what would
+> populate them.
+>
+> **This is the same substitution this node refused one cut earlier**, at the
+> `a656fca1` acceptance: inertness resting only on a map never being populated
+> makes the filter the identity — a weaker guarantee answering a different
+> question. It recurred one layer up, and **the presence of a `false` const
+> made it read as the stronger guarantee.** Reading the constant is not reading
+> its extent.
+>
+> **Two consequences for the wiring turn, which owns the repair.** Refusal
+> paths that were unreachable before this merge are now reachable on every
+> production compile and merely do not fire — `:2215` can fail a compile. And
+> arming does **not** move `main` from "chain absent" to "chain present"; it
+> moves it from "chain running on empty input" to "chain running on real
+> input", changing those stages' *data* rather than their *reachability*.
+> **Extend the gate to cover `:2214`, `:2215` and `:2486`.**
+>
+> **Still unverified, and cheap:** that the three stages are observable no-ops
+> on empty input. CI green on the corpus is not that proof. If they are not,
+> this stops being a description defect and becomes a behaviour one — that is a
+> stop, and it returns to the Steward.
+
+The arming constant is `const D2F_EMITTER_ARMED: bool = false` at
 `lowering/core.rs:2209`, guarding the `if` at `:2210`, with the instruction to
 flip it at `:2171`; the control at `lowering/core/tests/control.rs:4075` names
 the inertness in place. **Those coordinates are read from `origin/main` at
