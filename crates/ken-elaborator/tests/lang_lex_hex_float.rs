@@ -20,6 +20,8 @@ fn hex_float_values_and_boundaries() {
         assert!(Lexer::lex(bad).is_err(), "{bad}");
     }
     assert!(matches!(Lexer::lex("0xFF + p").unwrap()[0].0, Token::Nat(255)));
+    assert!(matches!(Lexer::lex("0xFF:p").unwrap()[0].0, Token::Nat(255)));
+    assert!(matches!(Lexer::lex("0xFF:x.1").unwrap()[0].0, Token::Nat(255)));
     assert!(matches!(Lexer::lex("0b10 + p").unwrap()[0].0, Token::Nat(2)));
     assert!(matches!(Lexer::lex("0o7 + p").unwrap()[0].0, Token::Nat(7)));
 }

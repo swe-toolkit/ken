@@ -431,7 +431,10 @@ impl<'s> Lexer<'s> {
         // Numeric literals: starts with a digit
         if c.is_ascii_digit() {
             if self.src[self.pos..].starts_with("0x") || self.src[self.pos..].starts_with("0X") {
-                let token_tail = self.src[self.pos + 2..].split(|c: char| c.is_whitespace() || "+-*/=()[]{};,".contains(c)).next().unwrap_or("");
+                let token_tail: String = self.src[self.pos + 2..]
+                    .chars()
+                    .take_while(|c| c.is_ascii_hexdigit() || matches!(c, '_' | '.' | 'p' | 'P' | '+' | '-'))
+                    .collect();
                 if token_tail.chars().any(|c| c == '.' || c == 'p' || c == 'P') {
                     return self.lex_hex_float(start);
                 }
