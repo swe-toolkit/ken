@@ -8607,8 +8607,18 @@ fn rederive_fusion_key(
     // `admitted`, the construct origin, the alternative and the position from
     // the primary key and re-derived only what hangs off them -- so a
     // correlated primary error in a selector reproduced itself one layer up and
-    // the comparison agreed. Each of the four is now independently justified
-    // against production authority before anything downstream is derived.
+    // the comparison agreed.
+    //
+    // THREE of the four are now independently justified against production
+    // authority before anything downstream is derived: the admitted discovery
+    // against the ledger, the construct origin against that root's result
+    // population, and the alternative against constructor identity.
+    //
+    // THE POSITION IS THE EXCEPTION and is qualified at its own site below. It
+    // is checked against the case's declaration but starts from a value read off
+    // the key, so its independence is conditional on `consumer_binding` being
+    // re-established and compared. Saying "each of the four" would overstate it,
+    // and this comment did.
     let admitted = fusion_root_source_for_future_enumerator(plan)?
         .into_iter()
         .find(|entry| *entry == key.admitted)
@@ -8653,8 +8663,18 @@ fn rederive_fusion_key(
         .get(alternative)
         .ok_or_else(|| planner_error("a fusion key names an absent consumer alternative"))?;
 
-    // The position is derived from the case's own declaration, and must be the
-    // one the consuming binding names -- not the one the key asserts.
+    // WHAT THIS ESTABLISHES, AND WHAT IT DOES NOT. It checks that the position
+    // the key's consumer binding names is DECLARED ON THE CASE. It does not
+    // establish that position independently of the key, because the value it
+    // starts from is read off `key.consumer_binding` before that binding has
+    // itself been rebuilt below.
+    //
+    // Independence for this member is CONDITIONAL: it comes from
+    // `consumer_binding` being re-established from `ih_bindings` further down
+    // and then compared in the caller's final whole-key equality. Reading this
+    // check alone as an independent derivation is the overclaim -- an earlier
+    // revision of this comment said "derived ... not the one the key asserts",
+    // which is exactly the reading the conditionality rules out.
     let consuming_binding_position = key.consumer_binding.recursive_position as usize;
     let position = *case
         .recursive_positions
