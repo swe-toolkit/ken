@@ -1,14 +1,24 @@
 # LANG-SURFACE-RECORD-LITERAL — record literals, punning, and functional update
 
 Owner: language. Size: M. Node: [[LANG-SURFACE-RECORD-LITERAL]].
-Fixed inputs measured at `origin/main` = **`a6438b76`**. Re-derive your
+Fixed inputs originally measured at `origin/main` = `a6438b76`, and **re-pinned
+2026-08-11 against `e55dc44d`** — the record declaration form. Re-derive your
 merge-base from `origin/main`; **do not take a SHA from this frame.**
 
-**Depends on [[LANG-SURFACE-RECORD-DECL]]**, which is in flight. It delivers the
-record declaration, the registry, and the extended `infer_proj` lookup. **Do
-not start the record half of this node against a tree where that has not
-landed** — you would be building against a registry whose shape is still being
-decided. `D0` below is independent of it and can be done first.
+**Depends on [[LANG-SURFACE-RECORD-DECL]], which has LANDED** — the declaration
+form, the registry, and the extended `infer_proj` lookup are on `main`. The
+dependency is discharged and the record half of this node is unblocked. `D0`
+below is independent of it and can still be done first.
+
+> ### The re-pin, and what it changed
+>
+> This frame's design judgment was measured before the declaration form
+> existed. Re-checked against `e55dc44d`: **the judgment survives unchanged and
+> every cited coordinate moved by exactly `+30`** — the declaration form added
+> thirty lines to `parser.rs` above line 1650. The coordinates in the next
+> section are the re-pinned ones. **A stale line range does not error; it
+> silently repoints at unrelated real code**, which is why they are restated
+> rather than left to the reader.
 
 **Seat tier: T2 build ring.** Architect votes at merge. **No Spec vote** if your
 diff stays in `crates/`.
@@ -33,13 +43,16 @@ builds.
 **The brace fork you were warned about does not exist here, and I measured it
 rather than assuming it.** [[LANG-SURFACE-RECORD-DECL]]'s excluded-scope
 section said these forms "open a brace fork this node does not need", citing
-`31-lexical.md:194`'s pairing of "record/refinement braces". At `a6438b76`:
+`31-lexical.md:194`'s pairing of "record/refinement braces". Re-measured at
+`e55dc44d`, the SHA that landed the declaration form:
 
-- `parse_atom_expr_base` (`crates/ken-elaborator/src/parser.rs:2246`) has **no
-  `Token::LBrace` arm at all**. Expression-position `{` is free.
+- `parse_atom_expr_base` (`crates/ken-elaborator/src/parser.rs:2276`) has **no
+  `Token::LBrace` arm at all**. Expression-position `{` is free. **The
+  declaration form did not change this** — `record` is a declaration keyword,
+  so it never reached expression position.
 - The refinement brace `{ x : A | φ }` is parsed by `parse_type`
-  (`parser.rs:1650`, refinement at `:1654-1656`), and `parse_type` and
-  `parse_expr` (`:1811`) are **separate entry points**.
+  (`parser.rs:1680`, refinement at `:1684-1686`), and `parse_type` and
+  `parse_expr` (`:1841`) are **separate entry points**.
 
 ⇒ The lexer pairs the two braces in its vocabulary; the parsers never contend
 for the same position. **That makes this node smaller than its sibling
@@ -211,8 +224,9 @@ node.**
 ## Stop conditions — return to me, do not decide
 
 - **You need to backtrack** to tell the three forms apart.
-- **The registry does not expose field names in declaration order**, so
-  name-directed placement cannot be implemented against it.
+- ~~**The registry does not expose field names in declaration order**, so
+  name-directed placement cannot be implemented against it.~~ **RESOLVED at the
+  re-pin — this stop cannot fire. See the registry fixed input below.**
 - **Functional update cannot be built from projections and `Pair`** without a
   new kernel term.
 - **The `D0` assertion fails.**
@@ -233,6 +247,28 @@ candidate time** — a merge-base goes stale without your branch moving.
 `scripts/ken-cargo test -p ken-elaborator` plus your focused suite.
 **Never `--workspace`**; that is CI's gate.
 
-Read `LANG-SURFACE-RECORD-DECL`'s landed registry choice before estimating —
-its `D2` was required to state which registry it chose and why, and **that
-answer is this node's fixed input.**
+## The registry fixed input — measured, not deferred
+
+This frame used to tell you to go read `LANG-SURFACE-RECORD-DECL`'s registry
+choice before estimating. **It has landed, so the answer is stated here
+instead**, measured at `e55dc44d` in `crates/ken-elaborator/src/classes.rs`.
+
+One private `named_field_owners: HashMap<String, NamedFieldInfo>` (`:195`),
+**keyed by owner name** — the record or class name, not the field name. Each
+entry pairs a `ProjectionInfo` with a closed `NamedFieldKind` of
+`Class(ClassOnlyInfo) | Record` (`:133-141`). `class()` and `class_entries()`
+return `None` on the `Record` arm; `projection_by_type_id` reaches both.
+
+**The part that decides `AC-1` and kills a stop condition.**
+`register_record` (`:263`) takes `field_names: Vec<String>` and
+`field_types: Vec<Term>`, and `ProjectionInfo` stores them as ordered vectors.
+**Declaration order is preserved.** So given a record's type id,
+`projection_by_type_id` yields the ordered field names, and name-directed
+placement is implemented by looking up each written field's index in that
+vector. **You do not need a registry change, and the stop condition above
+cannot fire.**
+
+One thing to notice rather than fix: `projection_by_type_id` (`:255`) is a
+linear scan over the map. That is fine at present sizes and **is not this
+node's problem** — if a literal-heavy program makes it matter, that is a
+finding to report, not an optimization to land here.
