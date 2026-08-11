@@ -575,6 +575,72 @@ per-member table repointing `invocation_caller` at `PredeclaredFunctionId(2)`,
 origin 34, each required to refuse. **Confirmed, and it was worth confirming**;
 agreement among readers who share a premise is not corroboration of it.
 
+## `D2f` ABI-only accepted partial — the fusion arena, MERGED 2026-08-11, PR #1922
+
+Exact `6e60b3bf`, merge-base `14d410cd`, `origin/main` now `41cd949e`. Two
+paths, `+739/-14`: `planning/static_transition.rs` and its new
+`planning/static_transition/abi.rs`. Blob identity 2/2 against the declared
+base. Decision `dec_3h20vrv3ngmsa`, QA `evt_477w8qsw9560s`, Architect
+`evt_5g5d5mz5tmwbm`.
+
+A separate fusion ABI arena and installer, the observable population repointed
+to that arena, and the `AC-4` projected-input carrier gate.
+
+### The ruling that let it land: un-wired is not half-wired
+
+The ring asked whether this should go to QA or be held as WIP, and the question
+was fair — both the implementer and I had previously named *a half-built ABI
+class* as the outcome to avoid. **The hazard we named was a half-wired tree**: a
+descriptor without an emitter, an owner without a redirected edge, a state where
+some paths believe the fusion exists and others do not.
+
+This cut is not that. It has **no production installer caller, no emitted
+definition or body, no source authority, and no redirected edge**, and the
+checked applied `Exact` twin still reaches its ordinary `ComputationalMatch`
+refusal unchanged. An inert addition cannot create the inconsistent intermediate
+state, because nothing consults it. ⇒ Routed to QA as a labelled accepted
+partial.
+
+**The second reason, which is the one that decides close calls:** landing it now
+puts the `AC-4` carrier gate on `main` **before the emitter exists**. The
+implementer's own argument for the ordering — a gate written after a working
+emitter can be shaped to fit it, and this one cannot be.
+
+### What it deliberately does NOT do — a handover, not a defect
+
+`install_static_continuation_fusions` reads the producer's declared operand run
+via `key.producer_owner` and **enforces none of the three preflight
+equalities**. Under the Architect's ruling those belong in the pre-definition
+preflight, which is the emitter turn's scope.
+
+The implementer flagged this itself (`evt_42y21cg6655k5`) rather than leaving it
+to be found. **Recorded here so the next pass does not spend a turn deciding
+whether it inherited a defect.** It did not.
+
+### The emitter mechanism is ruled and unbuilt
+
+Architect ruling `evt_79v3kj4nk2t3g`: an affine, compiler-only, move-only
+`FusionRegionClaim` per installed fusion, derived from the complete production
+key and immutable static plan — **never from witness coordinates**, which is the
+same discipline Deliverable 5 above was amended to state.
+
+The stop that produced it was real and is worth preserving: redirecting the
+producer edge alone leaves the consumer suffix live and **executes it twice**,
+because unit 3 has already installed the consumer `ComputationalMatchScrutinee`
+continuation when it emits the producer call. The resolution is bounded — swap a
+checked continuation prefix for its stored `next`, consumed once at the one call
+seat. **A generic suppressed-origin or AST-excision facility is explicitly
+out.** The implementer had been sizing that larger facility, and it was never
+authorized.
+
+**The three equalities hold on the canonical positive**, measured through the
+production planner: `invocation_caller` 3 = `consumer_owner` 3,
+`invocation_callee` 2 = `producer_owner` 2, `invocation_callee_entry` 37 =
+unit 2's `body_occurrence`. So the ruling's load-bearing
+`invocation_caller == consumer_owner` is a property this witness **has**, not a
+constraint it fails — which is the difference between a preflight written
+against a passing witness and one written defensively against a failing one.
+
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
 **DISCHARGED 2026-08-11** by the `D2f` ABI-class partial above, which carries
