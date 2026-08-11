@@ -334,9 +334,60 @@ change to that consumer — a decision, not a migration.
 the remaining 1 is the one the migration mechanism was never able to reach, so
 the trend line does not predict its closure.
 
+## `S4` accepted partial — the raw accessor is deleted, MERGED 2026-08-11, PR #1930
+
+Exact `411ca71f`, declared merge-base `8fd3a893`, `origin/main` now `413444ba`.
+Four paths, `+51/-13`, **blob identity 4/4** enumerated from the declared base.
+Decision `dec_1bdc50wespjd0` verified `resolved` at merge time by reading the
+object, not by carrying the handoff's claim. Architect `evt_4hsqgm863bp6a`, QA
+`evt_xn0d3xcwq591`. The Architect independently computed merge tree `c3ea648b`
+and the publisher's landed tree was `c3ea648b`.
+
+It delivered borrowed class-entry enumeration, migrated the isolated SEAL-2
+whole-class-field census, deleted the raw `classes()` accessor with its callers
+and comments, and committed a non-vacuous population control.
+
+**Measured on `origin/main` after the merge:** `fn classes(` has **zero**
+definitions and `.classes()` has **zero** callers anywhere in `ken-elaborator`.
+
+### What closed here was the GATE, and the node's own deliverable is untouched
+
+The `S3` record named `tests/seal2_support/mod.rs:149` as the single residual —
+whole-map iteration that the keyed view could not serve — and said plainly that
+it was not deferred progress, because the accessor could not be deleted while
+any consumer needed whole-map iteration. `S4` is the slice that answered it, so
+the census reads 29 → 2 → 1 → 0 and the deletion gate is discharged.
+
+**That is a prerequisite falling, not the node advancing toward its objective.**
+Nothing in `S1a`, `S1b`, `S2`, `S3` or `S4` has touched the record declaration
+form. Measured on `main` at the merge: `KwRecord` has **zero** occurrences in
+`crates/ken-elaborator/src/lexer.rs`, and so does the string `"record"`. The
+node still delivers exactly what `## The gap` says it does, and none of it is
+built.
+
+⇒ **Node stays `active`. `LANG-SURFACE-RECORD-LITERAL` stays blocked**, and its
+`depends_on` edge is correct as written.
+
+**The reading hazard this creates is recorded in the section below**, because
+discharging a gate makes its prose read as a finished node.
+
 ## TRACKED REMAINING WORK — delete `ClassEnv::classes()` before records land
 
-**This node does not close while that accessor exists.** Recorded as live
+> ### DISCHARGED by `S4`. This was a GATE, never the node's deliverable.
+>
+> `classes()` is deleted and its caller census is zero — see the `S4` section
+> below. **Everything in this section is now a record of a closed obligation.**
+>
+> **Do not read its discharge as the node closing.** The sentence below says
+> the node *does not close while the accessor exists*, which is a necessary
+> condition and reads, once satisfied, exactly like a sufficient one. It is not.
+> `LANG-SURFACE-RECORD-DECL` delivers the `record Point { x : Int, y : Int }`
+> declaration form, and at the merged `S4` tree the lexer still has **zero**
+> `KwRecord` and **zero** `"record"` occurrences. **The headline deliverable is
+> unbuilt.** The gap it closes is described at `## The gap`, some 300 lines
+> above this section, which is the distance that makes this misreadable.
+
+Recorded as live
 remaining work rather than only as prose, on an adversary finding
 (`evt_cfzgvy0512yw`) that named the structural reason:
 
