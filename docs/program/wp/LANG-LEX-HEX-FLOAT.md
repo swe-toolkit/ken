@@ -91,6 +91,34 @@ but if you decide the other way, that is a stop**, because permitting `0x1.8`
 puts a `.` fork inside a hex literal and I want to see that reasoning before
 it lands, not after.
 
+## Separators, and the boundary that has already bitten the sibling
+
+[[LANG-LEX-NUMERIC-FORMS]] lands digit separators under the rule **separators
+only between digits**. The spec says only *"underscores are digit separators
+and are ignored"* (`31 §3`) and does not say whether that reaches a hex
+mantissa or a binary exponent. **`0x1_0p-3` and `0x1p-1_0` are yours to
+settle.**
+
+**Measured on the sibling, 2026-08-11, before you start.** Its first two
+candidates got the unsigned exponent right and were blocked on the **signed**
+one: `1e+_1` and `1e-_1` were accepted as `FloatLit(10.0)`. After consuming
+`e+`, `exp_str.len() == 2`, and the underscore guard only rejected
+`exp_str.len() <= 1` — so a separator immediately after the sign passed a
+check meant to require a preceding digit.
+
+⇒ **A sign is not a digit, and a length test on a buffer that already contains
+the sign will not say so.** Your `p` exponent has the same sign position and
+the same trap. **If you permit separators here, `0x1p+_3` and `0x1p-_3` are
+rejections, and you owe both as controls** — not because they are likely, but
+because the sibling proves the guard people actually write accepts them.
+
+**Recommendation: permit separators between hex digits and between exponent
+digits, matching the sibling's rule exactly.** Diverging from it would give one
+lexer two separator rules, which is the proliferation `docs/PRINCIPLES.md`
+warns about. If you decide hex floats take no separators at all, that is
+defensible — **say so in one sentence and control the rejection**, rather than
+leaving it to fall out of the implementation.
+
 ## Acceptance criteria
 
 **AC-1 — the motivating forms have exact values.** `0x1p-3` is `0.125`,
@@ -116,6 +144,12 @@ digits, and a non-hex digit in the mantissa.
 
 **AC-5 — the A/B.** Disable your branch and show `0x1p-3` fails; restore and
 it passes.
+
+**AC-5a — the separator rule you chose is controlled at the sign boundary.**
+Whatever you decide, `0x1p+_3` and `0x1p-_3` have explicit controls. If you
+permit separators, they are rejections; if you forbid them entirely, so is
+`0x1_0p3`. **The sibling was blocked twice on exactly this position**, so an
+uncontrolled sign boundary is a known gap here, not a hypothetical one.
 
 **AC-6 — the existing forms and the projection seam are unchanged.** `3.14`,
 `1e-9` and `3.14e5` as the sibling leaves them, `1.2d`, `1.5f32`, `42`, and
