@@ -782,12 +782,25 @@ gets emitted.
 **The question must not be asked on the axis the leader first proposed.** *"May
 a producer with a sole claimed emittable invocation cease standalone emission"*
 keys the predicate on **call edges**, and the landed code refuses that axis in
-writing. Coordinates measured on `28bed66a`, doc-only over `cf1b36b4`:
+writing.
+
+Coordinates below are in `crates/ken-runtime/src/cranelift_backend/planning/`
+`static_transition.rs`, read from the **git object**, not a worktree.
+`cf1b36b4` and `28bed66a` carry the identical blob `7ba173e7` for that file, so
+one set serves the ring's branch and `main` alike.
 
 | coordinate | what is there |
 |---|---|
-| `static_transition.rs:12783` | `executable_units` already narrows `emittable_units` by `template_only_worker_bodies` (`:12690`), probing `unit.body_occurrence()` |
-| `static_transition.rs:12813` | *"reading it here would ask an executability question with a call-identity key ... executability is a function of the body alone"* |
+| `:13566` | `executable_units` already narrows `emittable_units` by `template_only_worker_bodies` (`:13473`), probing `unit.body_occurrence()` |
+| `:13596` | *"reading it here would ask an executability question with a call-identity key ... executability is a function of the body alone"* — restated at `:14251` |
+
+**Two wrong coordinate sets were published before these, and both resolve to
+real unrelated code** (`evt_e6q5z241x98v` corrects them). The Steward's set was
+read from the main repo checkout at `f8f8bfbc` and then labelled as measured on
+`28bed66a` — a tree qualifier that named neither the tree read nor the reader's.
+The leader's set was the `10d5eda9` base, exactly 562 lower, which is the `+562`
+D2f hunk. Nothing errored in either case; that is the hazard. **Read a
+coordinate from `git show <sha>:<path>`, and state the SHA you actually read.**
 
 These are cited, **not ruled to cover the case** — that measurement is the
 ring's. They fix the shape of the question: ask on the **body axis**, and ask
