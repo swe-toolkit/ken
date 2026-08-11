@@ -8899,6 +8899,65 @@ impl StaticContinuationFusionPlan {
     }
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` Deliverable 5 — the ONE producer
+/// invocation edge a fusion may redirect, selected by the complete key.**
+///
+/// The frame's wording is *"redirect only the exact original producer
+/// invocation ... not every edge to that callee, and not a search for a
+/// plausible one"*. That is a statement about **how the edge is chosen**, so the
+/// choosing is done here, once, from key members and from nothing else:
+/// `invocation_caller`, `invocation_callee`, and `invocation_callee_entry`.
+///
+/// **Selection is by the key; the edge kind is VALIDATED, never selected on.**
+/// Filtering the population by [`EmittableCallKind::StaticBody`] first would be
+/// a criterion the key does not contain. If the three key members already
+/// determine one edge, the filter is redundant; if they do not, the filter
+/// silently resolves an ambiguity that a redirection is not allowed to have. So
+/// the population is narrowed by the key alone, the count is required to be
+/// exactly one, and the kind is then checked on the survivor.
+///
+/// **Both failure directions are named.** Zero matches means the key describes
+/// an invocation this plan does not contain; more than one means the key does
+/// not identify an invocation at all. Neither is recoverable by picking, and a
+/// redirection built on either would move a call the source never made.
+///
+/// **No coordinate is written into this derivation.** An earlier statement of
+/// this deliverable named the edge `0 -> 2`; that is the retired `px8j`
+/// witness's coordinate and no edge of that shape exists on the checked twin,
+/// whose invocation is `3 -> 2`. Naming either here would make the selector
+/// agree with one witness by construction. The observed coordinate belongs in a
+/// control, where it is a measurement.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(in crate::cranelift_backend) fn fusion_redirect_target(
+    plan: &StaticTransitionPlan<'_>,
+    key: &StaticContinuationFusionKey,
+) -> Result<EmittableCallEdge, CraneliftBackendError> {
+    let mut matched = plan.executable_call_edges()?.into_iter().filter(|edge| {
+        edge.caller() == key.invocation_caller
+            && edge.callee() == key.invocation_callee
+            && edge.callee_origin() == key.invocation_callee_entry
+    });
+    let selected = matched.next().ok_or_else(|| {
+        planner_error(
+            "the fusion key names a producer invocation this plan does not emit, so there is \
+             no edge to redirect",
+        )
+    })?;
+    if matched.next().is_some() {
+        return Err(planner_error(
+            "the fusion key's producer invocation identity selects more than one emittable \
+             call edge, so it does not identify the invocation to redirect",
+        ));
+    }
+    if selected.kind() != EmittableCallKind::StaticBody {
+        return Err(planner_error(
+            "the fusion key's producer invocation resolves to a declaration call rather than a \
+             static body edge, which is not a producer invocation",
+        ));
+    }
+    Ok(selected)
+}
+
 /// **`D2h` — build the fusion identity plane, in the ruled fail-closed order.**
 ///
 /// Steps 1 to 3 are [`enumerate_live_fusion_candidates`]. Step 4 derives each
@@ -16804,6 +16863,145 @@ mod tests {
     /// The earlier generic census (2360 projections across the corpus) is
     /// negative evidence only: it showed the machinery yields non-empty runs and
     /// is **not** promoted to a fusion witness here.
+    /// **`D2f` Deliverable 5 — the redirect target is DERIVED from the complete
+    /// key, and every invocation member of that key is load-bearing.**
+    ///
+    /// The deliverable's own words are that the redirection names the exact
+    /// original producer invocation and is *"not a search for a plausible
+    /// one"*. A control that only showed the right edge coming out would be
+    /// satisfied by a selector that returned the sole `StaticBody` edge, or the
+    /// first one, or the one whose callee happens to match — so the discriminator
+    /// is written first and it is per member: each of the three invocation
+    /// members is independently repointed at **another identity this same plan
+    /// really contains**, and each repointing must refuse.
+    ///
+    /// Repointing at a real sibling rather than an invented id is what makes
+    /// each row say "this member is consulted" instead of "an unknown id is not
+    /// found" — a selector that ignored a member entirely would still find its
+    /// edge under that member's mutation.
+    ///
+    /// **MEASURED:** on the checked applied `Exact` witness the key's invocation
+    /// triple selects exactly one of the three emittable call edges, it is
+    /// `3 -> 2` entering origin `37`, and each of three sibling repointings
+    /// selects none.
+    /// **CLAIMED:** the edge a fusion redirects is determined by the key.
+    /// **THE GAP:** this pins **selection**. It pins no emission: nothing here
+    /// redirects anything, and the fused region does not exist. `3 -> 2` is an
+    /// observed coordinate of this witness and is deliberately absent from
+    /// [`fusion_redirect_target`], which reads key members only.
+    #[test]
+    fn d2f_5_the_redirect_target_is_selected_by_the_complete_key() {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let fusion =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the plane builds");
+        let key = fusion
+            .key_for(StaticContinuationFusionId(0))
+            .expect("the witness resolves one key")
+            .clone();
+
+        let selected = fusion_redirect_target(&plan, &key).expect("the key selects its edge");
+
+        // The population the selection discriminates WITHIN is an operand, not a
+        // message argument. Selecting one of one would be a restatement of the
+        // plan's shape; selecting one of three is a discrimination.
+        let population = plan.executable_call_edges().expect("edges").len();
+        assert_eq!(
+            (
+                population,
+                selected.caller(),
+                selected.callee(),
+                selected.callee_origin(),
+                selected.kind(),
+            ),
+            (
+                3,
+                key.invocation_caller,
+                key.invocation_callee,
+                key.invocation_callee_entry,
+                EmittableCallKind::StaticBody,
+            ),
+            "the key must pick exactly its own invocation out of a population that \
+             contains alternatives: {:?}",
+            plan.executable_call_edges().expect("edges"),
+        );
+        // Restated once against the measured coordinates, so a future plan whose
+        // numbering moves is caught here rather than silently agreeing with a key
+        // that moved with it. These literals are this witness's, never the
+        // selector's.
+        assert_eq!(
+            (
+                selected.caller().0,
+                selected.callee().0,
+                selected.callee_origin().0
+            ),
+            (3, 2, 37),
+            "the checked twin's producer invocation is 3 -> 2 entering origin 37; the retired \
+             px8j coordinate 0 -> 2 is not an edge of this plan"
+        );
+
+        // ---- the discriminator, one row per invocation member.
+        //
+        // Each repointing names an identity this plan really has: unit 2 is a
+        // real caller, unit 1 is a real callee, and origin 34 is a real callee
+        // entry -- they simply are not THIS invocation's.
+        let repointings: [(&str, &dyn Fn(&mut StaticContinuationFusionKey)); 3] = [
+            ("invocation_caller", &|key| {
+                key.invocation_caller = PredeclaredFunctionId(2);
+            }),
+            ("invocation_callee", &|key| {
+                key.invocation_callee = PredeclaredFunctionId(1);
+            }),
+            ("invocation_callee_entry", &|key| {
+                key.invocation_callee_entry = StaticOriginId(34);
+            }),
+        ];
+        let refused: Vec<(&str, bool)> = repointings
+            .iter()
+            .map(|(member, repoint)| {
+                let mut moved = key.clone();
+                repoint(&mut moved);
+                assert_ne!(
+                    moved, key,
+                    "{member}: the repointing must actually change the key"
+                );
+                (*member, fusion_redirect_target(&plan, &moved).is_err())
+            })
+            .collect();
+        assert_eq!(
+            refused,
+            vec![
+                ("invocation_caller", true),
+                ("invocation_callee", true),
+                ("invocation_callee_entry", true),
+            ],
+            "every invocation member must be consulted: a member the selector ignored would \
+             still find this edge after that member was repointed at a real sibling"
+        );
+
+        // ---- the kind is VALIDATED, not selected on.
+        //
+        // Repointed at the plan's declaration call edge, the triple matches --
+        // so this row reaches the survivor and is refused for its kind. Without
+        // it, a selector that pre-filtered on `StaticBody` would be
+        // indistinguishable from one that checks afterwards, and the difference
+        // is whether an ambiguity can be silently resolved.
+        let mut declaration_call = key.clone();
+        declaration_call.invocation_caller = PredeclaredFunctionId(0);
+        declaration_call.invocation_callee = PredeclaredFunctionId(3);
+        declaration_call.invocation_callee_entry = StaticOriginId(40);
+        let error = fusion_redirect_target(&plan, &declaration_call)
+            .expect_err("a declaration call is not a producer invocation");
+        assert!(
+            format!("{error:?}").contains("declaration call"),
+            "the survivor must be refused for its KIND, which is a different failure from \
+             matching nothing: {error:?}"
+        );
+    }
+
     #[test]
     fn d2j_the_witness_projects_a_non_empty_ordered_input_run() {
         // The bare witness: a fusion candidate, and an empty projection.
