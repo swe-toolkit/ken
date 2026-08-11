@@ -2674,6 +2674,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// arena together so the two-sided identity join below cannot see one
     /// without the other.
     static_continuation_fusions: StaticContinuationFusionPlan,
+    /// `D2f` — producer bodies lowered inside a fused definition rather than by
+    /// a standalone unit. Empty until `install_fusion_owned_bodies` moves a
+    /// fully validated scratch map in; there is deliberately no other writer.
+    fusion_owned_bodies: BTreeMap<StaticOriginId, FusionOwnedBody>,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One ownership record per aggregate producer
     /// occurrence. ⭐ Unlike its two dormant siblings above, this population
     /// HAS a lowering accessor — the allocation lane is unreadable at the
@@ -9060,6 +9064,51 @@ pub(in crate::cranelift_backend) fn fusion_redirect_target(
     Ok(selected)
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — why one body receives no
+/// standalone `Function`, as a closed typed reason rather than membership of
+/// a bare origin set.**
+///
+/// The two reasons are **not interchangeable and must never merge**. A
+/// continuation template's body is superseded by a *generated context* that
+/// lowers the same body under a different environment; a fusion-owned body
+/// is lowered inside a *fused definition* under the producer's own source
+/// authority alongside a second unit's suffix. They differ in who lowers the
+/// body, in what replaces the incoming edge, and in what a closeout must
+/// biject against. Collapsing them into one `BTreeSet<StaticOriginId>` would
+/// make "why is this body absent" unanswerable at exactly the point a
+/// closeout has to answer it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum BodyEmissionDisposition {
+    /// `D5a` — every selecting specialization retargeted to a generated
+    /// context, so the raw worker body survives as a template only.
+    ContinuationTemplate,
+    /// `D2f` — this body is lowered inside the named fused definition. The
+    /// identity is carried so the closeout can biject fusion-owned bodies
+    /// against installed fusions rather than merely counting them.
+    FusionOwned(StaticContinuationFusionId),
+}
+
+/// One fusion-owned body's installed record.
+///
+/// Keyed in the plan by the **producer body origin**; the producer function
+/// is carried beside the identity so a consumer never has to re-derive which
+/// unit the body belonged to from a call edge.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct FusionOwnedBody {
+    producer: PredeclaredFunctionId,
+    fusion: StaticContinuationFusionId,
+}
+
+impl FusionOwnedBody {
+    pub(in crate::cranelift_backend) fn producer(self) -> PredeclaredFunctionId {
+        self.producer
+    }
+
+    pub(in crate::cranelift_backend) fn fusion(self) -> StaticContinuationFusionId {
+        self.fusion
+    }
+}
+
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — one preflighted, move-only claim on
 /// exactly one fused source region.**
 ///
@@ -9313,6 +9362,10 @@ pub(in crate::cranelift_backend) struct FusionRegionClaimLedger {
     defined: BTreeSet<StaticContinuationFusionId>,
     /// The regions whose named invocation was actually redirected.
     redirected: BTreeSet<StaticContinuationFusionId>,
+    /// `D2f` producer side — the regions whose producer body the plan now says
+    /// a fused definition owns. Recorded by the atomic install and by nothing
+    /// else, so the closeout bijects against a fact the plan actually holds.
+    body_owned: BTreeSet<StaticContinuationFusionId>,
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -9490,6 +9543,7 @@ impl FusionRegionClaimLedger {
             consumed: BTreeMap::new(),
             defined: BTreeSet::new(),
             redirected: BTreeSet::new(),
+            body_owned: BTreeSet::new(),
         })
     }
 
@@ -9581,8 +9635,32 @@ impl FusionRegionClaimLedger {
         Ok(())
     }
 
-    /// **The ruled closeout bijection: installed ↔ definition ↔ redirect ↔
-    /// consumed claim.**
+    /// Record, in one move, the regions whose producer body the plan now owns.
+    ///
+    /// Called only by `StaticTransitionPlan::install_fusion_owned_bodies`, and
+    /// only after that method has validated its whole scratch map. Taking the
+    /// set rather than one identity at a time is what keeps the ledger's view
+    /// and the plan's map the same atomic fact.
+    fn record_body_owned(
+        &mut self,
+        owned: BTreeSet<StaticContinuationFusionId>,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.body_owned.is_empty() {
+            return Err(planner_error(
+                "static continuation fusion body ownership was recorded twice",
+            ));
+        }
+        if !owned.is_subset(&self.planned) {
+            return Err(planner_error(
+                "a fusion-owned producer body names a region this compile never preflighted",
+            ));
+        }
+        self.body_owned = owned;
+        Ok(())
+    }
+
+    /// **The ruled closeout bijection: installed ↔ fusion-owned body ↔
+    /// definition ↔ redirect ↔ consumed claim.**
     ///
     /// Written as four set equalities against `planned`, **not** as four counts.
     /// Equal counts hold vacuously at zero and hold wrongly when one region is
@@ -9601,6 +9679,11 @@ impl FusionRegionClaimLedger {
         }
         let consumed: BTreeSet<StaticContinuationFusionId> =
             self.consumed.keys().copied().collect();
+        if self.body_owned != self.planned {
+            return Err(planner_error(
+                "the fusion-owned producer bodies are not exactly the installed fused regions: a                  producer whose body was taken over with no fused region, or a region whose                  producer still emits its own definition, is not a takeover",
+            ));
+        }
         if self.defined != self.planned {
             return Err(planner_error(
                 "the emitted static continuation fusion definitions are not exactly the installed \
@@ -10749,6 +10832,9 @@ impl<'src> Planner<'src> {
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
                 static_continuation_fusions: StaticContinuationFusionPlan::default(),
+                // Empty by construction: body ownership is installed only from
+                // validated claims, which cannot exist before the plan does.
+                fusion_owned_bodies: BTreeMap::new(),
             },
             store_interner: BTreeMap::new(),
             next_source: 0,
@@ -13554,26 +13640,196 @@ impl<'src> StaticTransitionPlan<'src> {
         Ok(template_only)
     }
 
+    /// **`D2f` — the closed body-emission disposition, keyed by body occurrence.**
+    ///
+    /// The single authority every downstream projection reads: declarations,
+    /// definitions, the worker-target projection and the surviving-call-edge
+    /// projection. Keyed **exactly** by `unit.body_occurrence()` and never by a
+    /// call identity or a callee entry — `executable_call_edges` states at
+    /// length why those are a different axis that merely coincides on most
+    /// fixtures.
+    ///
+    /// A body claimed by both reasons refuses here rather than letting whichever
+    /// insert ran second win silently.
+    pub(in crate::cranelift_backend) fn body_dispositions(
+        &self,
+    ) -> Result<BTreeMap<StaticOriginId, BodyEmissionDisposition>, CraneliftBackendError> {
+        let mut dispositions = BTreeMap::new();
+        for body in self.template_only_worker_bodies()? {
+            dispositions.insert(body, BodyEmissionDisposition::ContinuationTemplate);
+        }
+        for (body, owned) in &self.fusion_owned_bodies {
+            if dispositions
+                .insert(*body, BodyEmissionDisposition::FusionOwned(owned.fusion))
+                .is_some()
+            {
+                return Err(planner_error(
+                    "one body is claimed by both a continuation template and a static \
+                     continuation fusion, so which definition lowers it is undetermined",
+                ));
+            }
+        }
+        Ok(dispositions)
+    }
+
+    /// The installed fusion-owned bodies, for the closeout's bijection.
+    pub(in crate::cranelift_backend) fn fusion_owned_bodies(
+        &self,
+    ) -> &BTreeMap<StaticOriginId, FusionOwnedBody> {
+        &self.fusion_owned_bodies
+    }
+
+    /// **`D2f` — install body ownership for every successfully claimed fused
+    /// region, atomically, before any unit is declared or defined.**
+    ///
+    /// **The ordering is the mechanism, not a convenience.** Every row below is
+    /// validated against the executable population *as it stands with no fusion
+    /// ownership installed* — the complete one. Validating against a population
+    /// already narrowed by a partial install would let the second row's
+    /// "leaves no standalone route" become true *because the first row removed
+    /// the route*, which is a self-fulfilling check. The scratch map is
+    /// therefore built and validated in full, and only then moved into the plan.
+    ///
+    /// The redirect is the one **already validated by preflight and carried on
+    /// the claim**. `fusion_redirect_target` is deliberately not re-run: after
+    /// installation it would search a narrowed edge population and could not
+    /// find the very edge whose supersession is the reason the population
+    /// narrowed.
+    pub(in crate::cranelift_backend) fn install_fusion_owned_bodies(
+        &mut self,
+        ledger: &mut FusionRegionClaimLedger,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.fusion_owned_bodies.is_empty() {
+            return Err(planner_error(
+                "static continuation fusion body ownership may be installed exactly once",
+            ));
+        }
+        let units = self.executable_units()?;
+        let template_only = self.template_only_worker_bodies()?;
+        let edges = self.emittable_call_edges()?;
+        let mut scratch: BTreeMap<StaticOriginId, FusionOwnedBody> = BTreeMap::new();
+        let mut owned = BTreeSet::new();
+
+        for fusion in ledger.planned().iter().copied() {
+            // Solely from a SUCCESSFUL claim. A planned identity whose claim was
+            // refused or already consumed has no validated redirect, and
+            // deriving ownership from it would take a body out of the emitted
+            // population on the strength of a region nobody may take over.
+            let claim = ledger.claim(fusion).ok_or_else(|| {
+                planner_error(
+                    "static continuation fusion body ownership was derived from an identity with \
+                     no outstanding claim, so no validated redirect authorizes it",
+                )
+            })?;
+            let body = claim.producer_body();
+            let producer = claim.producer_owner();
+
+            // Exactly one emittable unit matches BOTH the producer function and
+            // the producer body. Matching on either alone would let a unit that
+            // shares a body with another, or another unit of the same function,
+            // stand in for the one whose body is being taken over.
+            let mut matching = units
+                .iter()
+                .filter(|unit| unit.function() == producer && unit.body_occurrence() == body);
+            let Some(unit) = matching.next() else {
+                return Err(planner_error(
+                    "a static continuation fusion claims a producer body that no executable unit \
+                     of that producer declares",
+                ));
+            };
+            if matching.next().is_some() {
+                return Err(planner_error(
+                    "two executable units declare one static continuation fusion's producer body \
+                     and function, so the body being taken over is ambiguous",
+                ));
+            }
+
+            // A retained closure body, and nothing else. This is also what
+            // refuses the scheduling-entry route: `SchedulingEntry` and
+            // `CallableDeclaration` are distinct arms of the same closed enum,
+            // so an entry unit cannot pass here and no second branch restating
+            // that could ever fire.
+            if !matches!(unit.definition(), AbiUnitDefinition::ClosureBody { .. }) {
+                return Err(planner_error(
+                    "a static continuation fusion's producer body is not a retained closure body, \
+                     so it is a scheduling entry or callable declaration whose standalone \
+                     definition nothing replaces",
+                ));
+            }
+
+            // No continuation-template disposition already owns it.
+            if template_only.contains(&body) {
+                return Err(planner_error(
+                    "a static continuation fusion claims a producer body a generated continuation \
+                     context already supersedes",
+                ));
+            }
+
+            // Exactly one claim owns this body and producer.
+            if scratch
+                .insert(body, FusionOwnedBody { producer, fusion })
+                .is_some()
+            {
+                return Err(planner_error(
+                    "two static continuation fusion claims own one producer body, so which fused \
+                     definition lowers it is undetermined",
+                ));
+            }
+            owned.insert(fusion);
+
+            // Treating the claim's already-validated redirect as superseded must
+            // leave NO standalone route into this producer. A surviving second
+            // static-body edge, an ordinary declaration call, an unretargeted
+            // raw-worker route, or an entry route all mean the body still has a
+            // caller that the fused definition does not serve, and removing its
+            // standalone definition would leave that caller unresolvable.
+            let redirect = claim.redirect();
+            let surviving = edges.iter().any(|edge| {
+                edge.callee() == producer
+                    && !(edge.caller() == redirect.caller()
+                        && edge.callee() == redirect.callee()
+                        && edge.callee_origin() == redirect.callee_origin()
+                        && edge.call_site_origin() == redirect.call_site_origin()
+                        && edge.kind() == redirect.kind())
+            });
+            if surviving {
+                return Err(planner_error(
+                    "a static continuation fusion's producer keeps a standalone route after its \
+                     claimed invocation is superseded, so removing the producer's own definition \
+                     would leave that route unresolvable",
+                ));
+            }
+        }
+
+        // Validated in full above; installed here in one move.
+        self.fusion_owned_bodies = scratch;
+        ledger.record_body_owned(owned)?;
+        Ok(())
+    }
+
     /// **`D5a` checkpoint 1 — the units that receive a declared and defined
     /// `Function`.**
     ///
     /// [`Self::emittable_units`] stays the **descriptor / provenance / template**
-    /// population and is unchanged; this is the **executable** subset. ⛔ The two
-    /// must not be conflated in the other direction either: declaring from here
-    /// and defining from `emittable_units` (or the reverse) is exactly the
+    /// population and is unchanged — `D2f` keeps it complete, so a fusion-owned
+    /// producer remains the source, ABI and template authority for the body its
+    /// fused definition lowers. This is the **executable** subset. The two must
+    /// not be conflated in the other direction either: declaring from here and
+    /// defining from `emittable_units` (or the reverse) is exactly the
     /// undefined-phantom the ruling forbids, so both the declaration pass and the
     /// definition pass read this one method.
     pub(in crate::cranelift_backend) fn executable_units(
         &self,
     ) -> Result<Vec<EmittableUnit<'_>>, CraneliftBackendError> {
-        let template_only = self.template_only_worker_bodies()?;
+        let dispositions = self.body_dispositions()?;
         Ok(self
             .emittable_units()?
             .into_iter()
-            // `template_only` is a set of worker BODY origins — its candidates
-            // come from `context.worker_body_origin()` — so the membership test
-            // names the body axis.
-            .filter(|unit| !template_only.contains(&unit.body_occurrence()))
+            // The disposition map is keyed by BODY origin — `D5a`'s candidates
+            // come from `context.worker_body_origin()` and `D2f`'s from
+            // `claim.producer_body()` — so the membership test names the body
+            // axis, exactly as `unit.body_occurrence()` does.
+            .filter(|unit| !dispositions.contains_key(&unit.body_occurrence()))
             .collect())
     }
 
@@ -13597,7 +13853,7 @@ impl<'src> StaticTransitionPlan<'src> {
     pub(in crate::cranelift_backend) fn executable_call_edges(
         &self,
     ) -> Result<Vec<EmittableCallEdge>, CraneliftBackendError> {
-        let template_only = self.template_only_worker_bodies()?;
+        let dispositions = self.body_dispositions()?;
         let body_axis: BTreeMap<PredeclaredFunctionId, StaticOriginId> = self
             .emittable_units()?
             .into_iter()
@@ -13607,7 +13863,7 @@ impl<'src> StaticTransitionPlan<'src> {
             .emittable_call_edges()?
             .into_iter()
             .filter(|edge| match body_axis.get(&edge.callee()) {
-                Some(body) => !template_only.contains(body),
+                Some(body) => !dispositions.contains_key(body),
                 // A callee with no descriptor is a planner contradiction this
                 // filter does not own. Retaining the edge hands it downstream
                 // for rejection rather than silently suppressing it here.
@@ -14255,15 +14511,29 @@ impl<'src> StaticTransitionPlan<'src> {
         // the raw route has no `Function` to reach — but a body that a minted
         // raw-target requirement retains is no longer superseded, so the same
         // question now gets a different, and correct, answer.
-        if self
-            .template_only_worker_bodies()?
-            .contains(&answer.body_origin)
-        {
-            return Err(planner_error(
-                "the composed selector's raw worker body is template-only: every specialization \
-                 selecting it retargeted, so it keeps its descriptor and leaves the executable \
-                 population, and the raw route this view projects has no Function to reach",
-            ));
+        // `D2f`: the disposition map, not the `D5a` set alone. A fusion-owned
+        // body leaves the executable population for a different reason and the
+        // raw route it projects is equally unreachable, so the refusal names
+        // whichever disposition actually applies rather than reporting the one
+        // reason it happens to know about.
+        match self.body_dispositions()?.get(&answer.body_origin) {
+            None => {}
+            Some(BodyEmissionDisposition::ContinuationTemplate) => {
+                return Err(planner_error(
+                    "the composed selector's raw worker body is template-only: every \
+                     specialization selecting it retargeted, so it keeps its descriptor and \
+                     leaves the executable population, and the raw route this view projects has \
+                     no Function to reach",
+                ));
+            }
+            Some(BodyEmissionDisposition::FusionOwned(_)) => {
+                return Err(planner_error(
+                    "the composed selector's raw worker body is owned by a static continuation \
+                     fusion: it is lowered inside that fused definition, so it leaves the \
+                     executable population and the raw route this view projects has no Function \
+                     to reach",
+                ));
+            }
         }
         Ok(answer)
     }
@@ -17827,6 +18097,16 @@ mod tests {
     fn d2f_preflight_exact(
         perturb: impl FnOnce(&mut Vec<StaticContinuationFusionKey>),
     ) -> Result<FusionRegionClaimLedger, CraneliftBackendError> {
+        d2f_preflight_exact_owned(perturb, false)
+    }
+
+    /// As above, optionally taking the ruled producer-side body ownership as
+    /// well — which is the state a production compile is actually in.
+    #[cfg(test)]
+    fn d2f_preflight_exact_owned(
+        perturb: impl FnOnce(&mut Vec<StaticContinuationFusionKey>),
+        own_bodies: bool,
+    ) -> Result<FusionRegionClaimLedger, CraneliftBackendError> {
         let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
         let mut declarations = BTreeMap::new();
         declarations.insert(D2J_DECLARATION, &declaration);
@@ -17841,7 +18121,11 @@ mod tests {
             plane.intern(key)?;
         }
         plan.install_static_continuation_fusions(plane)?;
-        FusionRegionClaimLedger::preflight(&plan)
+        let mut ledger = FusionRegionClaimLedger::preflight(&plan)?;
+        if own_bodies {
+            plan.install_fusion_owned_bodies(&mut ledger)?;
+        }
+        Ok(ledger)
     }
 
     /// Which ruled preflight rule a refusal reached, by its own message.
@@ -18005,6 +18289,165 @@ mod tests {
         );
     }
 
+    /// **`D2f` producer side — the claimed producer's body leaves the executable
+    /// population, and only that body and only that edge.**
+    ///
+    /// **MEASURED** on the checked applied `Exact` witness: body 37 of unit 2
+    /// becomes `FusionOwned(0)`; unit 2 stays in `emittable_units` as the source,
+    /// ABI and template authority while leaving `executable_units`; the claimed
+    /// incoming edge `3 -> 2 @37` leaves `executable_call_edges` while the
+    /// producer's own outgoing `2 -> 1 @34` survives; a second install refuses;
+    /// and ownership derived from an identity whose claim is no longer
+    /// outstanding refuses.
+    /// **CLAIMED:** body ownership removes exactly the producer's standalone
+    /// definition and exactly its claimed invocation, leaving every other route
+    /// and every other unit alone.
+    /// **THE GAP:** un-wired. No production compile installs ownership, so this
+    /// says nothing about a real compile; and the axis row below is measured
+    /// degenerate on this witness -- see its own comment.
+    #[test]
+    fn d2f_4_the_claimed_producer_body_leaves_the_executable_population() {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let plane =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("plane");
+        plan.install_static_continuation_fusions(plane)
+            .expect("installs");
+        let mut ledger = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+
+        // BEFORE: the population is complete, which is the denominator every row
+        // below is measured against. A "unit 2 is absent" that was already true
+        // would carry nothing.
+        let before_units: Vec<PredeclaredFunctionId> = plan
+            .executable_units()
+            .expect("units")
+            .iter()
+            .map(|unit| unit.function())
+            .collect();
+        let before_edges = plan.executable_call_edges().expect("edges").len();
+
+        plan.install_fusion_owned_bodies(&mut ledger)
+            .expect("ownership installs");
+
+        let disposition = plan
+            .body_dispositions()
+            .expect("dispositions")
+            .get(&StaticOriginId(37))
+            .copied();
+        let after_units: Vec<PredeclaredFunctionId> = plan
+            .executable_units()
+            .expect("units")
+            .iter()
+            .map(|unit| unit.function())
+            .collect();
+        // `emittable_units` must be UNCHANGED: the ruling keeps the producer as
+        // the source/ABI/template authority for the body its fused definition
+        // lowers, so a row that let it shrink would be the AST excision the
+        // Architect forbade rather than the bounded disposition.
+        let emittable_intact = plan
+            .emittable_units()
+            .expect("emittable")
+            .iter()
+            .any(|unit| unit.function() == PredeclaredFunctionId(2));
+        let after_edges: Vec<(u32, u32, u32)> = plan
+            .executable_call_edges()
+            .expect("edges")
+            .iter()
+            .map(|edge| (edge.caller().0, edge.callee().0, edge.callee_origin().0))
+            .collect();
+
+        // A second install refuses rather than overwriting.
+        let second_install = plan.install_fusion_owned_bodies(&mut ledger).is_err();
+
+        // Ownership derived from an identity with no outstanding claim refuses:
+        // a consumed claim has already spent its takeover, so nothing
+        // authorizes removing the producer's definition on its behalf.
+        let mut spent = d2f_preflight_exact(|_| ()).expect("claims");
+        let only = *spent.planned().iter().next().expect("identity");
+        let seat = spent.claim(only).expect("outstanding").seat();
+        spent.consume(only, seat).expect("consumed");
+        let mut fresh_plan = {
+            let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let plane =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("plane");
+            let mut plan = plan;
+            plan.install_static_continuation_fusions(plane).expect("installs");
+            plan
+        };
+        let consumed_claim_refuses = fresh_plan.install_fusion_owned_bodies(&mut spent).is_err();
+
+        assert_eq!(
+            (
+                before_units,
+                before_edges,
+                disposition,
+                after_units,
+                emittable_intact,
+                after_edges,
+                second_install,
+                consumed_claim_refuses,
+            ),
+            (
+                vec![
+                    PredeclaredFunctionId(0),
+                    PredeclaredFunctionId(1),
+                    PredeclaredFunctionId(2),
+                    PredeclaredFunctionId(3),
+                ],
+                // MEASURED, not chosen: three emittable edges before, and the
+                // third is what makes "only the claimed one left" a real
+                // statement rather than "the only edge left".
+                3,
+                Some(BodyEmissionDisposition::FusionOwned(
+                    StaticContinuationFusionId(0)
+                )),
+                vec![
+                    PredeclaredFunctionId(0),
+                    PredeclaredFunctionId(1),
+                    PredeclaredFunctionId(3),
+                ],
+                true,
+                // The producer's own outgoing edge AND the root's call into the
+                // consumer both survive; exactly `3 -> 2 @37` is gone.
+                vec![(2, 1, 34), (0, 3, 40)],
+                true,
+                true,
+            ),
+            "installing ownership removes exactly unit 2's standalone definition and exactly its \
+             claimed incoming edge 3 -> 2 @37, leaves the producer's own outgoing 2 -> 1 @34 and \
+             the root's 0 -> 3 @40 and every other unit alone, keeps unit 2 emittable as the source/ABI/template authority, \
+             and refuses both a second install and an install derived from a spent claim"
+        );
+
+        // THE AXIS ROW, AND IT IS MEASURED DEGENERATE HERE -- stated rather than
+        // written as a passing check. The ruling asks for a control proving the
+        // disposition is keyed by `body_occurrence()` and not by a call
+        // identity. On this witness unit 2's `entry_origin()` and
+        // `body_occurrence()` are BOTH 37, because `resolve_call_edges` enforces
+        // `unit.entry_origin() == edge.callee_origin()` and the claimed edge's
+        // callee origin is 37. So substituting either axis for the other selects
+        // the same body and no assertion over this fixture can tell them apart.
+        // A row asserting "keyed by the body" would pass for the wrong reason.
+        // The discriminating witness is a unit whose body schedules something
+        // before itself, which this family does not contain.
+        let unit_two = plan
+            .emittable_units()
+            .expect("emittable")
+            .into_iter()
+            .find(|unit| unit.function() == PredeclaredFunctionId(2))
+            .expect("unit 2");
+        assert_eq!(
+            (unit_two.entry_origin(), unit_two.body_occurrence()),
+            (StaticOriginId(37), StaticOriginId(37)),
+            "the two axes COINCIDE on this witness, so the body-vs-call-identity row is \
+             degenerate here and is deliberately not asserted as if it discriminated"
+        );
+    }
+
     /// **`D2f` — the claim is AFFINE and the closeout bijects.**
     ///
     /// Separate from the preflight control because it is a different question:
@@ -18030,7 +18473,7 @@ mod tests {
         };
 
         // Wrong seat: refuses, and the claim SURVIVES.
-        let mut ledger = d2f_preflight_exact(|_| ()).expect("claim");
+        let mut ledger = d2f_preflight_exact_owned(|_| (), true).expect("claim");
         let id = id_of(&ledger);
         let seat = ledger.claim(id).expect("outstanding").seat();
         let wrong_seat = ledger
@@ -18050,7 +18493,7 @@ mod tests {
         let bijects = ledger.close().expect("the closeout bijects");
 
         // Closeout with the claim never consumed: fails on the unconsumed claim.
-        let mut unconsumed = d2f_preflight_exact(|_| ()).expect("claim");
+        let mut unconsumed = d2f_preflight_exact_owned(|_| (), true).expect("claim");
         let other = id_of(&unconsumed);
         unconsumed.record_defined(other).expect("one definition");
         unconsumed.record_redirected(other).expect("one redirect");
@@ -18060,7 +18503,7 @@ mod tests {
         // the definition set, not on the claim. A separate row because these are
         // two different halves of the bijection and a single "close errored"
         // could be satisfied by either.
-        let mut undefined = d2f_preflight_exact(|_| ()).expect("claim");
+        let mut undefined = d2f_preflight_exact_owned(|_| (), true).expect("claim");
         let third = id_of(&undefined);
         let third_seat = undefined.claim(third).expect("outstanding").seat();
         undefined.consume(third, third_seat).expect("consumed");
@@ -18069,7 +18512,7 @@ mod tests {
 
         // A second definition for one region refuses at the recorder rather than
         // at the closeout, so the double emission is caught where it happens.
-        let mut twice = d2f_preflight_exact(|_| ()).expect("claim");
+        let mut twice = d2f_preflight_exact_owned(|_| (), true).expect("claim");
         let fourth = id_of(&twice);
         twice.record_defined(fourth).expect("one definition");
         let second_definition_refuses = twice.record_defined(fourth).is_err();

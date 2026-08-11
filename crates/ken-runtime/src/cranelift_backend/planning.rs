@@ -14,6 +14,10 @@ use crate::{RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeProg
 mod static_transition;
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
+pub(in crate::cranelift_backend) use static_transition::{
+    BodyEmissionDisposition, FusionClaimRefusal, FusionOwnedBody, FusionRegionClaim,
+    FusionRegionClaimLedger,
+};
 /// `D2f` Deliverable 0 — the resolved plane's observation types, so a control
 /// downstream of a production compile can state which key resolved.
 #[cfg(test)]
