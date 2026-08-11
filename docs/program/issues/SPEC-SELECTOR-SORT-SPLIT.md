@@ -82,6 +82,31 @@ gates; they are blocked on [[LANG-NESTED-MATCH-LIFT-ALIGNMENT]] and on their own
 separate unmeasured blocker respectively. **This node changes their spelling and
 nothing about their status.**
 
+> ## `wp/SPEC-SELECTOR-SORT-SPLIT` IS SUPERSEDED. Do not re-anchor or publish it.
+>
+> **Recorded 2026-08-11 so the next reader does not re-find a missing piece —
+> because one did.** The Steward found `e8445a12` ("conformance: split nested
+> selectors by sort") sitting on a released branch, **not an ancestor of
+> `main`**, under a node already marked `merged`, and raised it as a possibly
+> dropped deliverable (`evt_4a223ea8re76b`).
+>
+> **It is not dropped. It is incorporated.** spec-leader re-derived it
+> (`evt_1vyjv5cpdjwxa`): the four D0 spec blobs are **byte-identical** between
+> `e8445a12` and current `main`, and the merged commit `d232d45d` carries the D1
+> seed blob **exactly equal** to `e8445a12`'s (`fbdcf922`). `D9` later changed
+> that same seed legitimately.
+>
+> **The branch is also unmergeable as it stands** — its base is stale enough
+> that its diff against `main` would delete the `D2f`, `D2g`, `D2h` and `D2i`
+> frames, roughly 8,800 deletions.
+>
+> **The instrument is the point, and it is the one this program keeps
+> relearning: ancestry answered the wrong question and blob identity answered
+> the right one.** *"`e8445a12` is not an ancestor of `main`"* is true and
+> means nothing here; a squash-merged SHA never becomes an ancestor. **What
+> settles it is whether the content landed**, which is exactly the M6 check the
+> merge procedure runs on every candidate.
+
 ## A control defect, routed to the successor
 
 **This is no longer this node's work.** spec-leader ruled at the D0 scope
