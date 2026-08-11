@@ -4,6 +4,8 @@ fn t(s: &str) -> Token { Lexer::lex(s).unwrap().into_iter().next().unwrap().0 }
 
 #[test]
 fn hex_float_values_and_boundaries() {
+    assert_eq!(t("1e-9"), Token::FloatLit(1e-9));
+    assert_eq!(t("3.14e5"), Token::FloatLit(314000.0));
     assert_eq!(t("0x1p-3"), Token::FloatLit(0.125));
     assert_eq!(t("0x1.8p3"), Token::FloatLit(12.0));
     assert_eq!(t("0x1p0"), Token::FloatLit(1.0));

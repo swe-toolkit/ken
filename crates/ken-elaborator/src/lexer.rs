@@ -106,7 +106,7 @@ pub enum Token {
     MapsTo, // `|->` / `↦` — match arm separator
     // L1 numeric literal tokens
     IntLit(BigInt),       // integer literal too large for u32
-    FloatLit(f64),        // decimal-point float: `3.14`, `1e-9`
+    FloatLit(f64),        // decimal or hexadecimal f64: `3.14`, `1e-9`, `0x1p-3`
     DecimalLit(BigInt, i32), // `d`-suffix: coeff × 10^exp; e.g. `0.1d` → (1,-1)
     Float32Lit(f32),      // `f32`-suffix: `1.5f32`
     // Atoms
