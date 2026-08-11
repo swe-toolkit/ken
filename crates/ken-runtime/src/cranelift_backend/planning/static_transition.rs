@@ -7881,6 +7881,8 @@ struct ContinuationDiscovery {
 #[cfg(test)]
 thread_local! {
     static WEAKEN_CONTINUATION_DECREASING_MEASURE: Cell<bool> = const { Cell::new(false) };
+    static SUPPRESS_POST_SPECIALIZATION_DESCENT: Cell<bool> = const { Cell::new(false) };
+    static DUPLICATE_STATIC_BODY_TRIPLE: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -7943,6 +7945,23 @@ fn envelope_defect() -> EnvelopeDefect {
 /// a function of its source coordinates. Arming this hook removes precisely that
 /// disjointness — nothing else — which is what makes the resulting refusal
 /// attributable to the owner and not to some other damage.
+/// `D2i` `AC-2` — suppress ONLY the post-ordinary-specialization descent.
+///
+/// Nothing else changes: the initial frontier is still seeded and admitted, so
+/// a candidate that vanishes under this hook vanished because the descent root
+/// is gone and not because discovery stopped.
+/// `D2i` `AC-3` — present a second matching `StaticBody` edge to the uniqueness
+/// decision, and change nothing else.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_static_body_triple_duplicated(armed: bool) {
+    DUPLICATE_STATIC_BODY_TRIPLE.with(|cell| cell.set(armed));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_post_specialization_descent_suppressed(armed: bool) {
+    SUPPRESS_POST_SPECIALIZATION_DESCENT.with(|cell| cell.set(armed));
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn set_continuation_descent_owner_duplication(armed: bool) {
     DUPLICATE_DESCENT_AS_TOP_LEVEL.with(|cell| cell.set(armed));
@@ -8473,14 +8492,264 @@ fn build_checked_ih_bindings(
 /// `build_continuation_specialization_plan` admitted, returned from that same
 /// call.
 #[cfg_attr(not(test), allow(dead_code))]
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — one fusion CANDIDATE, established
+/// and not interned.**
+///
+/// Carries only facts from the Architect's closed seven. There is no id, no
+/// descriptor, no key and no interning here, and none may be added: those are
+/// `D2h`.
+#[cfg(test)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StaticContinuationFusionCandidate {
+    /// 1. the admitted discovery context, taken whole from the ledger.
+    admitted: AdmittedContinuationDiscovery,
+    /// 2. the producer.
+    producer_construct_origin: StaticOriginId,
+    producer_owner: PredeclaredFunctionId,
+    producer_alternative: u32,
+    recursive_position: u32,
+    producer_argument_origin: StaticOriginId,
+    producer_argument_binding: CheckedIhBinding,
+    /// 3. the selected case body and its exact consuming call.
+    selected_case_body: StaticOriginId,
+    consuming_call: StaticOriginId,
+    consuming_callee: StaticOriginId,
+    consumer_binding: CheckedIhBinding,
+    /// 4. the required transport coordinate.
+    checked_transport: CheckedTransportCoordinate,
+    /// 5. the unique `StaticBody` triple.
+    invocation_caller: PredeclaredFunctionId,
+    invocation_callee: PredeclaredFunctionId,
+    invocation_callee_entry: StaticOriginId,
+    /// 6. the owner split.
+    consumer_owner: PredeclaredFunctionId,
+    /// 7. the complete ordered input projection.
+    continuation_inputs: Vec<ContinuationSourceSlotAuthority>,
+}
+
+/// The exact producer invocation edge, or a refusal.
+///
+/// Requires **exactly one** `StaticBody` call edge into the producer unit.
+/// Absence and multiplicity are both refusals: "the only edge" would be an
+/// existential and choosing among several would be a guess.
+fn fusion_unique_static_body_triple(
+    plan: &StaticTransitionPlan<'_>,
+    producer_owner: PredeclaredFunctionId,
+) -> Result<
+    Option<(PredeclaredFunctionId, PredeclaredFunctionId, StaticOriginId)>,
+    CraneliftBackendError,
+> {
+    let mut matching = Vec::new();
+    for edge in plan.semantic.static_body_call_edges(&plan.edges)? {
+        if edge.1 == producer_owner {
+            matching.push(edge);
+        }
+    }
+    // `D2i` `AC-3` multiplicity control. Arming this presents a SECOND matching
+    // edge to the uniqueness decision and changes nothing else: the transport
+    // gate, the bindings, the exact consuming suffix and the input projection
+    // have all already been satisfied by the time this runs, so a candidate that
+    // disappears here disappeared at the uniqueness gate specifically.
+    #[cfg(test)]
+    if DUPLICATE_STATIC_BODY_TRIPLE.with(Cell::get) {
+        if let Some(first) = matching.first().copied() {
+            matching.push(first);
+        }
+    }
+    if matching.len() != 1 {
+        // Absence and multiplicity are both refusals: "the only edge" would be
+        // an existential and choosing among several would be a guess.
+        return Ok(None);
+    }
+    Ok(matching.into_iter().next())
+}
+
+/// Descend the checked wrappers to the occurrence they carry.
+fn fusion_through_checked_wrappers(
+    plan: &StaticTransitionPlan<'_>,
+    mut origin: StaticOriginId,
+) -> Result<StaticOriginId, CraneliftBackendError> {
+    loop {
+        match plan.planned_occurrence_expr(origin)? {
+            RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedComputationalIHSlots { .. }
+            | RuntimeExpr::CheckedComputationalIHInvocation { .. }
+            | RuntimeExpr::CheckedRecursiveInvocation { .. }
+            | RuntimeExpr::CheckedJoinSite { .. } => {
+                origin = plan.semantic.child_origin(origin, 0)?;
+            }
+            _ => return Ok(origin),
+        }
+    }
+}
+
+/// **`D2i` — the first LIVE fusion enumerator.**
+///
+/// ## What it now does
+///
+/// It consumes [`fusion_root_source_for_future_enumerator`], so the roots are
+/// the production-admitted ledger with its complete identity. Nothing here
+/// reconstructs a seed, scans a worker body, runs a parallel fixed point, or
+/// changes terminal traversal.
+///
+/// ## What is still absent
+///
+/// **No production caller.** The intended consumer is `D2h`'s key plane, which
+/// does not exist; this is reached by its control and by nothing else, and it
+/// is `#[cfg(test)]` so it cannot read as compiled-in.
+///
+/// **It mints nothing.** There is no id, no descriptor, no key and no
+/// interning -- those are `D2h`, and a candidate here is established evidence
+/// rather than an identity. **No emission, ABI or edge redirection exists**, and
+/// no `R3` row is claimed green.
+///
+/// ## The gates, each declining rather than guessing
+///
+/// Every fact comes from the Architect's closed seven. If a gate ever needs a
+/// fact outside them, that is a closed-contract failure to report rather than
+/// plumbing to add.
+#[cfg(test)]
+fn enumerate_live_fusion_candidates(
+    plan: &StaticTransitionPlan<'_>,
+    entry: &RuntimeExpr,
+    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    oriented: Option<&crate::OrientedSubcontinuationPlanV1>,
+) -> Result<Vec<StaticContinuationFusionCandidate>, CraneliftBackendError> {
+    crate::cranelift_backend::planning::validate_oriented_subcontinuation_transport(
+        entry,
+        declarations,
+        oriented,
+    )?;
+    let Some(oriented) = oriented else {
+        return Ok(Vec::new());
+    };
+    let transport = build_checked_transport(plan, oriented)?;
+    let ih_bindings = build_checked_ih_bindings(plan)?;
+    let mut candidates = Vec::new();
+
+    for admitted in fusion_root_source_for_future_enumerator(plan)? {
+        let continuation_origin = admitted.continuation_origin;
+        let RuntimeExpr::ComputationalMatch { cases, .. } =
+            plan.planned_occurrence_expr(continuation_origin)?
+        else {
+            continue;
+        };
+        let consumer_owner = occurrence_authority(plan, continuation_origin)?.owner;
+
+        for producer_construct_origin in continuation_result_origins(plan, admitted.result_root)? {
+            let producer = plan.planned_occurrence_expr(producer_construct_origin)?;
+            let RuntimeExpr::Construct { args, .. } = producer else {
+                continue;
+            };
+            let identity = plan.constructor_symbol_identity(producer_construct_origin)?;
+            let producer_owner = occurrence_authority(plan, producer_construct_origin)?.owner;
+
+            for (alternative, case) in cases.iter().enumerate() {
+                if plan.case_constructor_identity(continuation_origin, alternative)? != identity {
+                    continue;
+                }
+                let producer_alternative = u32::try_from(alternative)
+                    .map_err(|_| planner_capacity_error("fusion alternative exhausted"))?;
+
+                for position in case.recursive_positions.iter().copied() {
+                    let recursive_position = u32::try_from(position)
+                        .map_err(|_| planner_capacity_error("fusion position exhausted"))?;
+                    if args.get(position).is_none() {
+                        continue;
+                    }
+                    let Some(producer_argument_origin) = plan
+                        .semantic
+                        .child_origins(producer_construct_origin)?
+                        .get(position)
+                        .copied()
+                    else {
+                        continue;
+                    };
+                    let Some(producer_argument_binding) =
+                        ih_bindings.get(&producer_argument_origin).copied()
+                    else {
+                        continue;
+                    };
+
+                    let selected_case_body = plan
+                        .semantic
+                        .child_origin(continuation_origin, 1 + alternative)?;
+                    let consuming_call =
+                        fusion_through_checked_wrappers(plan, selected_case_body)?;
+                    if !matches!(
+                        plan.planned_occurrence_expr(consuming_call)?,
+                        RuntimeExpr::Call { .. }
+                    ) {
+                        continue;
+                    }
+                    let consuming_callee = plan.semantic.child_origin(consuming_call, 0)?;
+                    let expected = CheckedIhBinding {
+                        frame_origin: continuation_origin,
+                        recursive_position,
+                    };
+                    let Some(consumer_binding) = ih_bindings.get(&consuming_callee).copied() else {
+                        continue;
+                    };
+                    if consumer_binding != expected {
+                        continue;
+                    }
+                    let Some(checked_transport) = transport.get(&consuming_call).cloned() else {
+                        continue;
+                    };
+                    let Some((invocation_caller, invocation_callee, invocation_callee_entry)) =
+                        fusion_unique_static_body_triple(plan, producer_owner)?
+                    else {
+                        continue;
+                    };
+                    let Some(environment) = exact_continuation_source_environment(
+                        plan,
+                        producer_owner,
+                        admitted.result_root,
+                        producer_construct_origin,
+                        consumer_owner,
+                        continuation_origin,
+                    )?
+                    else {
+                        continue;
+                    };
+
+                    candidates.push(StaticContinuationFusionCandidate {
+                        admitted,
+                        producer_construct_origin,
+                        producer_owner,
+                        producer_alternative,
+                        recursive_position,
+                        producer_argument_origin,
+                        producer_argument_binding,
+                        selected_case_body,
+                        consuming_call,
+                        consuming_callee,
+                        consumer_binding,
+                        checked_transport,
+                        invocation_caller,
+                        invocation_callee,
+                        invocation_callee_entry,
+                        consumer_owner,
+                        continuation_inputs: environment.inputs.clone(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(candidates)
+}
+
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the root source a future fusion
 /// enumerator MUST consume.**
 ///
-/// NOTHING CONSUMES THIS YET. There is no live fusion enumerator and no
-/// production consumer; this helper is referenced by its own definition and its
-/// control and by nothing else. No seed-only path has been removed, because no
-/// such path exists on this branch to remove -- the seed frontier is excluded
-/// here by construction rather than deleted from live code.
+/// [`enumerate_live_fusion_candidates`] consumes this, and is exercised by a
+/// committed reaching control. What is still absent is a PRODUCTION caller: the
+/// intended one is `D2h`'s key plane, which does not exist yet, so nothing on a
+/// compiled path reads this today.
+///
+/// No seed-only path has been removed, because no such path exists on this
+/// branch to remove -- the seed frontier is excluded here by construction
+/// rather than deleted from live code.
 ///
 /// What it fixes in advance is the root source. The alternative -- rebuilding
 /// `child(consumer, 0)` over every planned `ComputationalMatch` -- reconstructs
@@ -8811,11 +9080,21 @@ fn build_continuation_specialization_plan(
                         // context, and the raw worker body's own owner cannot
                         // reach them. Dropping it here is exactly the defect
                         // `evt_609am4v7cdt5b` ruled on.
-                        pending.push(ContinuationDiscovery {
-                            continuation_origin: discovery.continuation_origin,
-                            result_root: worker.body_origin,
-                            enclosing_specialization: Some(target),
-                        });
+                        // `D2i` `AC-2` causal control: suppressing ONLY this
+                        // descent must take the fusion candidate count 1 -> 0
+                        // while the initial terminal root stays admitted. See
+                        // `set_continuation_post_specialization_descent_suppressed`.
+                        #[cfg(test)]
+                        let descend = !SUPPRESS_POST_SPECIALIZATION_DESCENT.with(Cell::get);
+                        #[cfg(not(test))]
+                        let descend = true;
+                        if descend {
+                            pending.push(ContinuationDiscovery {
+                                continuation_origin: discovery.continuation_origin,
+                                result_root: worker.body_origin,
+                                enclosing_specialization: Some(target),
+                            });
+                        }
                         // `D8a` — the same descent, as though it were top level.
                         // See `set_continuation_descent_owner_duplication`.
                         #[cfg(test)]
@@ -14570,13 +14849,258 @@ mod tests {
         }
     }
 
+    /// `D2i` — the enumerator is REACHED, and on ledger roots the terminal twin
+    /// yields EXACTLY ONE candidate.
+    ///
+    /// MEASURED, and it is not what the earlier seed-keyed reading concluded.
+    /// `D2h` reported that this fixture could present no producer/consumer pair,
+    /// and that was true of the SEED root `child(consumer, 0)` only. The
+    /// admitted ledger also carries a DESCENT root -- one the fixed point
+    /// admitted with `Some(enclosing_specialization)`, which no seed
+    /// reconstruction can name -- and from that root the walk reaches the
+    /// producer.
+    ///
+    /// So consuming the ledger is what makes the fixture productive. Every gate
+    /// then passes on facts inside the Architect's seven: the producer's
+    /// argument binds a hypothesis, the selected case body's exact `Call`
+    /// resolves to this consumer frame at this position, the transport
+    /// coordinate resolves, the `StaticBody` triple is unique, and the owners
+    /// split.
+    ///
+    /// The candidate's members are pinned rather than counted, because a count
+    /// would pass on a candidate assembled from the wrong root.
+    #[test]
+    fn d2i_the_enumerator_is_reached_and_yields_one_candidate_from_a_descent_root() {
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2g_oriented_plan();
+
+        let roots = fusion_root_source_for_future_enumerator(&plan).expect("root source");
+        assert!(
+            !roots.is_empty(),
+            "the enumerator must have had roots to walk"
+        );
+
+        let candidates =
+            enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the enumerator runs to completion");
+        assert_eq!(
+            candidates.len(),
+            1,
+            "exactly one candidate, and multiplicity would be a refusal rather than a \
+             selection: {candidates:?}"
+        );
+        let candidate = &candidates[0];
+
+        // THE LOAD-BEARING MEMBER: the root is a descent, not the seed. A seed
+        // reconstruction carries `None` here by construction, so this member is
+        // what shows the ledger is why the fixture is productive at all.
+        assert!(
+            candidate.admitted.enclosing_specialization.is_some(),
+            "the candidate must come from an admitted DESCENT root, which no seed \
+             reconstruction can name: {:?}",
+            candidate.admitted
+        );
+        assert_ne!(
+            candidate.admitted.result_root,
+            plan.semantic
+                .child_origin(candidate.admitted.continuation_origin, 0)
+                .expect("scrutinee"),
+            "and that root must differ from the consumer's own seed root"
+        );
+
+        // The consumer binding names this frame and position, not merely some
+        // hypothesis.
+        assert_eq!(
+            candidate.consumer_binding,
+            CheckedIhBinding {
+                frame_origin: candidate.admitted.continuation_origin,
+                recursive_position: candidate.recursive_position,
+            },
+            "the consuming Call's callee resolves to THIS consumer frame and position"
+        );
+        assert_ne!(
+            candidate.producer_owner, candidate.consumer_owner,
+            "producer and consumer are in different units, which is the split the \
+             fusion exists to close"
+        );
+        // The COMPLETE triple, not just its callee. Pinning one member leaves the
+        // other two free to be anything, and the caller is the emission owner the
+        // redirection in `D2f` will belong to.
+        assert_eq!(
+            candidate.invocation_caller,
+            PredeclaredFunctionId(1),
+            "the measured emission owner of the producer invocation"
+        );
+        assert_eq!(
+            candidate.invocation_callee, candidate.producer_owner,
+            "the triple's callee is the producer's own unit"
+        );
+        assert_eq!(
+            candidate.invocation_callee,
+            PredeclaredFunctionId(3),
+            "and that unit is the measured one"
+        );
+        // Tied to the candidate's own admitted root rather than to a literal:
+        // the entry the invocation enters IS the root the descent admitted, and
+        // stating it as `== 33` alone would still hold if the two drifted apart.
+        assert_eq!(
+            candidate.invocation_callee_entry, candidate.admitted.result_root,
+            "the invocation's callee entry is the candidate's admitted root"
+        );
+        assert_eq!(
+            candidate.invocation_callee_entry,
+            StaticOriginId(33),
+            "and that root is the measured one"
+        );
+
+        // The converse direction, so one candidate is not the only outcome this
+        // control can produce: with no oriented plan the required transport
+        // member cannot resolve and the enumerator refuses at that gate.
+        let absent = enumerate_live_fusion_candidates(&plan, &entry, &declarations, None)
+            .expect_err("markers present with no plan must refuse at the transport gate");
+        assert!(
+            format!("{absent:?}").contains("checked subcontinuation markers have no checked plan"),
+            "and it must refuse for the transport reason: {absent:?}"
+        );
+    }
+
+    /// `D2i` `AC-3` — MULTIPLICITY is refused, and it is executed rather than
+    /// claimed.
+    ///
+    /// The previous candidate asserted only that "multiplicity would be a
+    /// refusal" in a message. `fusion_unique_static_body_triple` declines on a
+    /// second matching edge, but nothing reached that branch, so the claim was
+    /// unexecuted.
+    ///
+    /// Arming the control presents a second matching edge at the uniqueness
+    /// decision and changes nothing else. Every earlier gate has already been
+    /// satisfied by the time it runs -- the transport coordinate still resolves
+    /// and the admitted roots are unchanged, both asserted below -- so the
+    /// candidate that disappears did so at the uniqueness gate specifically and
+    /// not because something upstream broke.
+    #[test]
+    fn d2i_ac3_a_second_matching_static_body_edge_is_refused() {
+        struct Restore;
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                set_static_body_triple_duplicated(false);
+            }
+        }
+
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2g_oriented_plan();
+
+        let before = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+        assert_eq!(before, 1, "the unsuppressed baseline is one candidate");
+        let roots_before = fusion_root_source_for_future_enumerator(&plan).expect("roots");
+        let transport_before = build_checked_transport(&plan, &oriented).expect("transport");
+
+        let _restore = Restore;
+        set_static_body_triple_duplicated(true);
+        let after = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+
+        assert_eq!(
+            after, 0,
+            "a second matching StaticBody edge must refuse rather than select among them"
+        );
+        assert_eq!(
+            fusion_root_source_for_future_enumerator(&plan).expect("roots"),
+            roots_before,
+            "and the admitted roots are untouched, so discovery did not change"
+        );
+        assert_eq!(
+            build_checked_transport(&plan, &oriented).expect("transport"),
+            transport_before,
+            "and the transport coordinates still resolve, so the earlier gates still pass"
+        );
+    }
+
+    /// `D2i` `AC-2` — suppressing ONLY the post-specialization descent takes the
+    /// candidate count 1 to 0, and the initial terminal root survives.
+    ///
+    /// This is the causal control for the finding. The candidate exists because
+    /// the ledger carries a descent root; removing exactly that push must remove
+    /// exactly that candidate. Both halves are asserted, because a count going
+    /// to zero would also be produced by discovery collapsing entirely -- and
+    /// that would prove nothing about the descent.
+    #[test]
+    fn d2i_ac2_suppressing_only_the_descent_takes_the_candidate_to_zero() {
+        struct Restore;
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                set_post_specialization_descent_suppressed(false);
+            }
+        }
+
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2g_oriented_plan();
+
+        let before = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+        assert_eq!(before, 1, "the unsuppressed baseline is one candidate");
+        let seed_root = plan
+            .semantic
+            .child_origin(
+                fusion_root_source_for_future_enumerator(&plan).expect("roots")[0]
+                    .continuation_origin,
+                0,
+            )
+            .expect("scrutinee");
+
+        let _restore = Restore;
+        set_post_specialization_descent_suppressed(true);
+        let after = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+        let suppressed_roots =
+            fusion_root_source_for_future_enumerator(&plan).expect("roots under suppression");
+
+        assert_eq!(
+            after, 0,
+            "suppressing only the descent must remove exactly the candidate it fed"
+        );
+        assert!(
+            suppressed_roots
+                .iter()
+                .any(|root| root.result_root == seed_root),
+            "and the initial terminal root must still be admitted, or the count fell \
+             because discovery collapsed rather than because the descent went: \
+             {suppressed_roots:?}"
+        );
+        assert!(
+            suppressed_roots
+                .iter()
+                .all(|root| root.enclosing_specialization.is_none()),
+            "with no descent admitted, no admitted root carries an enclosing \
+             specialization: {suppressed_roots:?}"
+        );
+    }
+
     /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the
     /// admitted ledger, and it is strictly richer than the seed frontier.
     ///
-    /// NO LIVE ENUMERATOR CONSUMES THIS. Nothing in production reads the helper,
-    /// no seed-only path has been removed, and no candidate population is
-    /// claimed. What is established is which roots an enumerator will have to
-    /// walk when it is written, and why the obvious alternative is wrong.
+    /// [`enumerate_live_fusion_candidates`] consumes this helper and is reached
+    /// by its own control below. Nothing in PRODUCTION reads either yet -- the
+    /// intended caller is `D2h`'s key plane -- and no seed-only path has been
+    /// removed. What is established here is which roots the enumerator walks,
+    /// and why the obvious alternative is wrong.
     ///
     /// The equality below is an ALIAS OBSERVATION, not a causal control: the
     /// helper is defined as the ledger, so it can only agree with it. It is kept
@@ -14628,11 +15152,34 @@ mod tests {
                 });
             }
         }
+        // CARDINALITY IS NOT CONTAINMENT. `len() >` alone permits a ledger that
+        // LOSES seed pairs while gaining unrelated roots, which is a strictly
+        // worse failure than the one the count was meant to catch.
+        //
+        // The containment claim belongs on `(continuation_origin, result_root)`,
+        // because a reconstructed seed carries `None` for its enclosing
+        // specialization while the admitted entry for the same syntactic pair
+        // may carry one -- so full-identity containment would fail for a reason
+        // that is not a defect. Strict extension stays on the full identity.
+        let projection = |set: &BTreeSet<AdmittedContinuationDiscovery>| {
+            set.iter()
+                .map(|entry| (entry.continuation_origin, entry.result_root))
+                .collect::<BTreeSet<_>>()
+        };
+        let seed_pairs = projection(&seeds);
+        let admitted_pairs = projection(&root_source);
+        assert!(
+            seed_pairs.is_subset(&admitted_pairs),
+            "every independently reconstructed syntactic seed pair must occur in the \
+             admitted projection, or the ledger has dropped a root the frontier names: \
+             missing={:?}",
+            seed_pairs.difference(&admitted_pairs).collect::<Vec<_>>()
+        );
         assert!(
             root_source.len() > seeds.len(),
-            "the admitted population must exceed what the seed frontier can name, or \
-             fixing this root source in advance buys a future enumerator nothing: \
-             root_source={root_source:?} seeds={seeds:?}"
+            "and the admitted population must strictly extend the seed frontier on the \
+             FULL identity, or fixing this root source in advance buys a future \
+             enumerator nothing: root_source={root_source:?} seeds={seeds:?}"
         );
         assert!(
             root_source
