@@ -108,6 +108,28 @@ field and the record type. Not a panic, not a silent `Proj1`.
 projection, `p.1.2`, and `p. 1.2` behave as `LANG-SURFACE-PAIR` and
 `LANG-LEX-PROJECTION-ADJACENCY` left them.
 
+**AC-6a — enumerate the neighbours this form must not capture, and control
+each.** Not a sentence in your handback: a list, with a control per entry.
+Minimum set — `class C (A) { … }`, `instance C T { … }`, `module M { … }`, and
+the refinement type `{ n : Int | n ≥ 0 }`, each still parsing unchanged in a
+program that also declares a record.
+
+**Why this AC exists, from the sibling that just paid for it.**
+`LANG-LEX-HEX-FLOAT` took **four Architect rejections, every one of them on the
+scanner** — classification running past the current token, the colon boundary,
+and `0xFF+p` sign termination — while its genuinely intricate half, the
+correctly-rounded conversion, was right in round one. **A new surface form is
+risky in proportion to how many neighbouring constructs it sits beside, not to
+how intricate its own internals are.**
+
+**You are better placed than that sibling was**, and it is worth knowing why:
+`record` is **keyword-led**, so the fork is decided at the first token, whereas
+a hex float had to be told apart from `0xFF`, `0b10`, `0o7`, `0x[…]`, and
+ordinary operator and identifier syntax with no keyword to help. **Expect this
+AC to be cheap. If it is not cheap, that is the finding** — it would mean the
+declaration form is ambiguous against something, and I want to hear it before
+it lands.
+
 **AC-7 — the A/B.** Disable the record declaration branch and show
 `record Point { … }` fails to parse; restore and the AC-1 program elaborates.
 
