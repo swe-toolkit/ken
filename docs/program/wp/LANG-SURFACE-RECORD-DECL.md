@@ -1,10 +1,18 @@
 # LANG-SURFACE-RECORD-DECL — the `record` declaration and `.field` on it
 
 Owner: language. Size: M. Node: [[LANG-SURFACE-RECORD-DECL]].
-Fixed inputs measured at `origin/main` = **`24933da4`**. Re-derive your
-merge-base from `origin/main`; **do not take a SHA from this frame.**
-[[LANG-LEX-NUMERIC-FORMS]] lands on top of that measurement and touches only
-numeric scanning in `lex_numeric`, so nothing below moves under it.
+Fixed inputs first measured at `origin/main` = `24933da4`, **re-derived at
+`a28a7a33`** after [[LANG-LEX-NUMERIC-FORMS]] and [[LANG-LEX-HEX-FLOAT]]
+landed. Re-derive your merge-base from `origin/main`; **do not take a SHA from
+this frame.**
+
+**What moved between those two measurements, and what it means for you.**
+Exactly three files: `lexer.rs`, and the two numeric test files. **Every code
+anchor this frame cites was re-checked at `a28a7a33` and still holds** —
+`infer_proj` at `elab.rs:3490`, `EProj` at `resolve.rs:1693`,
+`elab_class_decl` at `elab.rs:5144`, `sort_sigma` at
+`ken-kernel/src/check.rs:198`. Both sibling nodes are **merged**, so they are
+`main` rather than contention.
 
 **Seat tier: T2 build ring.** Architect votes at merge. **No Spec vote** if
 your diff stays in `crates/`.
@@ -23,10 +31,20 @@ form for a thing the elaborator already builds.
 
 **`class` already does the elaboration you need.** `ast.rs:342` records that
 `ClassDecl` elaborates to a record type — a Σ-chain whose kernel sort is
-decided by `sort_sigma` (`check.rs:198`). Read `elab_class_decl` before you
-write anything. **The question this node answers is not "how do I build a
-Σ-chain from fields" — that code exists — but "what does a record register as,
-so that projection finds it."**
+decided by `sort_sigma`, which lives in **`crates/ken-kernel/src/check.rs:198`**
+and **not** in the elaborator. Read `elab_class_decl`
+(`crates/ken-elaborator/src/elab.rs:5144`) before you write anything.
+
+**Two things that citation is telling you.** There is a second, unrelated
+`check.rs` at `crates/ken-elaborator/src/effects/check.rs`, so a bare
+`check.rs:198` resolves to the wrong file — always take the crate-qualified
+path. And the sort rule you are inheriting is **kernel-side**: that is why
+AC-8's "no new kernel term" is a real constraint rather than a formality. You
+are reusing a kernel rule, not adding one.
+
+**The question this node answers is not "how do I build a Σ-chain from fields"
+— that code exists — but "what does a record register as, so that projection
+finds it."**
 
 **`p.x` already parses and resolves.** `parse_atom_expr` builds
 `Expr::EProj(base, field, span)`, and `resolve.rs:1693` forwards the field name
@@ -168,11 +186,13 @@ kernel already has one.
 
 `crates/ken-elaborator/` — `lexer.rs` (one keyword), `parser.rs`, `elab.rs`
 (`infer_proj` and the class-decl neighbourhood), `classes.rs`. **Language's own
-lane only**; Runtime is in `crates/ken-runtime/`. The lexer touch is a keyword
-token and does not meet `lex_numeric`, so it does not contend with
-[[LANG-LEX-NUMERIC-FORMS]] or [[LANG-LEX-HEX-FLOAT]]. **Re-derive the
-intersection at candidate time** — a merge-base goes stale without your branch
-moving.
+lane only**; Runtime is in `crates/ken-runtime/`.
+
+**Nothing contends with this node as released.** [[LANG-LEX-NUMERIC-FORMS]] and
+[[LANG-LEX-HEX-FLOAT]] are both merged at `a28a7a33`, so their `lexer.rs`
+changes are your base, not a concurrent edit. Your own lexer touch is one
+keyword token and does not meet `lex_numeric`. **Re-derive the intersection at
+candidate time anyway** — a merge-base goes stale without your branch moving.
 
 ## Sizing and validation
 
