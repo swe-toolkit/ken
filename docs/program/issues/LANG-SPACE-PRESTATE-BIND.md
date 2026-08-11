@@ -1,13 +1,13 @@
 ---
 id: LANG-SPACE-PRESTATE-BIND
 title: "`old` in a block-space operation's `ensures` still fails closed, though the cell environment it was waiting for now exists -- bind s_pre/s_post and elaborate the Hoare pair against the state transformer"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: [SURF-SPACE-CELLS]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/1848
 origin: Steward measurement 2026-08-11 at origin/main=26b3d2c5, taken while running the stay-one-release-ahead check as LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC entered the publisher. This is Shape A of EFF-SPACE-ENSURES-PRESTATE, which closed as Shape B (fail closed) precisely because no cell environment existed to elaborate against. SURF-SPACE-CELLS-P1 built that environment, so the successor its own closure block named as "framable once cells exist" is now framable.
 ---
 
