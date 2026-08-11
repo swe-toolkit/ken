@@ -7835,16 +7835,26 @@ fn intern_specialization(
 /// Recorded only after `visited.insert` accepts the item, and returned from the
 /// same `build_continuation_specialization_plan` invocation that produced it.
 ///
-/// This exists because reconstructing the roots from `child(consumer, 0)` is a
-/// SEED reconstruction, not the discovery: the fixed point descends and admits
-/// further `(consumer, root)` pairs that no seed scan can name. A consumer
-/// therefore has one seed and may have several admitted roots, and only the
-/// admitted set is the production population.
+/// Production does derive the INITIAL frontier as `child(consumer, 0)` over
+/// every planned `ComputationalMatch`. What it must not do is mistake that
+/// frontier for the complete admitted population: the fixed point descends into
+/// selected worker bodies and admits further discoveries that no seed scan can
+/// name.
+///
+/// All THREE identity fields are carried. `enclosing_specialization` is the
+/// immediate emission context, and it **cannot be reconstructed downstream** --
+/// a worker body's raw occurrence owner does not name the specialization that
+/// selected and invoked it, which is the conflation `D5a` removed. Projecting it
+/// away would collapse two genuinely distinct admitted discoveries into one
+/// entry, so it is copied straight off the discovery at the moment of
+/// admission.
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) struct AdmittedContinuationDiscovery {
     continuation_origin: StaticOriginId,
     result_root: StaticOriginId,
+    /// Copied from the admitted discovery, never re-derived.
+    enclosing_specialization: Option<ContinuationSpecializationId>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -8537,6 +8547,7 @@ fn build_continuation_specialization_plan(
         admitted.push(AdmittedContinuationDiscovery {
             continuation_origin: discovery.continuation_origin,
             result_root: discovery.result_root,
+            enclosing_specialization: discovery.enclosing_specialization,
         });
 
         let continuation = plan.planned_occurrence_expr(discovery.continuation_origin)?;
@@ -14535,15 +14546,26 @@ mod tests {
     /// `D2i` — the discovery LEDGER is what the production fixed point admitted,
     /// and it is not reconstructible from the seeds.
     ///
-    /// The seed set is one root per planned `ComputationalMatch`,
-    /// `child(consumer, 0)`. The fixed point then descends and admits further
-    /// `(consumer, root)` pairs. A consumer can therefore appear more than once,
-    /// with roots no seed scan can name -- which is exactly why an enumerator
-    /// keyed on the seed sees a different population from the production one.
+    /// Production does derive the initial frontier as `child(consumer, 0)` over
+    /// every planned `ComputationalMatch`; a **reconstructed top-level seed
+    /// carries `None`** for its enclosing specialization, because a top-level
+    /// computational frame has no enclosing generated context. The fixed point
+    /// then descends into selected worker bodies and admits discoveries that do
+    /// carry one.
     ///
-    /// Both directions are asserted: the ledger contains every seed, and it
-    /// contains at least one admitted pair that is **not** a seed. Containment
-    /// alone would pass on a ledger that merely echoed the seeds.
+    /// Three claims, and the third is the one that matters:
+    ///
+    /// 1. every reconstructed seed is admitted;
+    /// 2. the ledger is a strict extension of them;
+    /// 3. **at least one admitted entry is a descent** -- it carries
+    ///    `Some(enclosing_specialization)`.
+    ///
+    /// A count-only extra pair would satisfy (2) and prove nothing: two entries
+    /// differing only in a field the ledger projected away would look like an
+    /// extension while actually being the same discovery recorded twice.
+    /// Requiring a `Some` positively is what shows the ledger carries the
+    /// emission context, which cannot be reconstructed downstream from a worker
+    /// body's raw occurrence owner.
     #[test]
     fn d2i_the_discovery_ledger_is_richer_than_the_seed_reconstruction() {
         let declaration = d2g_declaration(true);
@@ -14555,8 +14577,8 @@ mod tests {
         let ledger = admitted_continuation_discoveries(&plan).expect("ledger");
         assert!(!ledger.is_empty(), "the fixed point admitted nothing at all");
 
-        // The seed reconstruction, spelled out here only so the two can be
-        // compared. Nothing in production derives roots this way any more.
+        // The seed reconstruction, spelled out only so the two can be compared.
+        // Nothing in production derives the admitted population this way.
         let mut seeds = BTreeSet::new();
         for occurrence in plan.source_occurrences.iter().flatten() {
             if matches!(occurrence.expr, RuntimeExpr::ComputationalMatch { .. }) {
@@ -14566,6 +14588,9 @@ mod tests {
                         .semantic
                         .child_origin(occurrence.static_origin, 0)
                         .expect("scrutinee"),
+                    // A top-level computational frame has no enclosing
+                    // generated context.
+                    enclosing_specialization: None,
                 });
             }
         }
@@ -14573,13 +14598,22 @@ mod tests {
 
         assert!(
             seeds.is_subset(&admitted),
-            "every seed must be admitted, or the ledger is missing the frontier it \
-             started from: seeds={seeds:?} admitted={admitted:?}"
+            "every reconstructed seed must be admitted, or the ledger is missing the \
+             frontier it started from: seeds={seeds:?} admitted={admitted:?}"
         );
         assert!(
             admitted.len() > seeds.len(),
-            "the ledger must admit at least one pair the seeds cannot name, or reading \
-             it buys nothing over reconstructing them: seeds={seeds:?} admitted={admitted:?}"
+            "the ledger must admit pairs the seeds cannot name: seeds={seeds:?} \
+             admitted={admitted:?}"
+        );
+        assert!(
+            admitted
+                .iter()
+                .any(|entry| entry.enclosing_specialization.is_some()),
+            "at least one admitted entry must be a DESCENT carrying its enclosing \
+             specialization. Without this the extension could be a pair distinguished \
+             only by a field the ledger dropped, which is the defect this field exists \
+             to close: admitted={admitted:?}"
         );
     }
 
