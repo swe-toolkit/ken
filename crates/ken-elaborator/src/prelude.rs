@@ -183,9 +183,9 @@ canonical_runtime_roles! {
     exit_failure => "Failure",
 }
 
-/// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction; overwritten by
-/// `register_prelude` before the env is returned. The `GlobalId(0)` values are
-/// never observed (no real declaration has id 0).
+/// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction. `GlobalId(0)`
+/// is a real declaration, so `register_prelude` overwrites every placeholder
+/// before `ElabEnv::empty()` returns the environment to a caller.
 pub fn empty_prelude_env() -> PreludeEnv {
     let z = GlobalId(0);
     PreludeEnv {

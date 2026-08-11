@@ -295,6 +295,35 @@ fn shadow_outer_not_captured() {
     );
 }
 
+/// Durable invariant: the legacy declaration entry point refuses class
+/// machinery before its sentinel can alias a real kernel declaration.
+#[test]
+fn class_declaration_requires_initialized_class_env_without_mutation() {
+    let decls = parse_decls("class Minimal { marker : Type }").expect("parse class fixture");
+    let rdecl = resolve_decl(&decls[0]).expect("resolve class fixture");
+    let mut env = mk_env();
+    let kernel_len_before = env.env.decls().count();
+    let globals_len_before = env.globals.len();
+    let numerics_len_before = env.num_values.len();
+
+    let result = elaborate_rdecl(
+        &mut env.env,
+        &mut env.globals,
+        &mut env.num_values,
+        &env.numeric_env,
+        &rdecl,
+    );
+
+    assert!(matches!(
+        result,
+        Err(ElabError::TypeMismatch { ref reason, .. })
+            if reason == "class-dependent declarations require `elaborate_rdecl_v1` with an initialized `ClassEnv`"
+    ));
+    assert_eq!(env.env.decls().count(), kernel_len_before);
+    assert_eq!(env.globals.len(), globals_len_before);
+    assert_eq!(env.num_values.len(), numerics_len_before);
+}
+
 /// `surface/elaboration/shadow-resolver-emits-outer-index` (oracle)
 ///
 /// Structural assertion: the resolver emits Var(1) for `x`, independent of

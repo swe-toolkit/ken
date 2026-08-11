@@ -181,9 +181,10 @@ fn zero_sort_delta_class_record_kind_unchanged_by_pure_instance_registration() {
     env.elaborate_file(TRAVERSABLE_CLASSES)
         .expect("Traversable class family must elaborate");
 
-    let kind_before = env.class_env.classes()["Traversable"].kind.clone();
-    let field_types_len_before = env.class_env.classes()["Traversable"].field_types.len();
-    let type_id_before = env.class_env.classes()["Traversable"].type_id;
+    let traversable_before = env.class_env.class("Traversable").unwrap();
+    let kind_before = traversable_before.kind.clone();
+    let field_types_len_before = traversable_before.projection.field_types.len();
+    let type_id_before = traversable_before.projection.type_id;
     assert_eq!(
         kind_before,
         ClassKind::Structure,
@@ -219,19 +220,19 @@ fn zero_sort_delta_class_record_kind_unchanged_by_pure_instance_registration() {
     )
     .expect("the pure Traversable Option instance (DS-8b) must elaborate");
 
-    let class_after = &env.class_env.classes()["Traversable"];
+    let class_after = env.class_env.class("Traversable").unwrap();
     assert_eq!(
-        class_after.kind, kind_before,
+        class_after.kind, &kind_before,
         "zero sort delta: registering a pure instance for the proc traverse \
          field must not change the class-record's Type/Ω sort discriminant"
     );
     assert_eq!(
-        class_after.field_types.len(),
+        class_after.projection.field_types.len(),
         field_types_len_before,
         "zero sort delta: the Sigma-telescope field-type count is unchanged"
     );
     assert_eq!(
-        class_after.type_id, type_id_before,
+        class_after.projection.type_id, type_id_before,
         "zero sort delta: the class's own kernel GlobalId is unchanged \
          (registering an instance never re-declares the class)"
     );

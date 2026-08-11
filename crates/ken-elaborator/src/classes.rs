@@ -53,6 +53,42 @@ pub struct ClassInfo {
     pub module_id: u32,
 }
 
+#[derive(Clone, Copy)]
+pub struct ProjectionView<'a> {
+    pub owner_name: &'a str,
+    pub type_id: GlobalId,
+    pub head_param: Option<&'a str>,
+    pub field_names: &'a [String],
+    pub field_types: &'a [Term],
+}
+
+#[derive(Clone, Copy)]
+pub struct ClassView<'a> {
+    pub projection: ProjectionView<'a>,
+    pub param_kind: Option<&'a Term>,
+    pub field_purities: &'a [Option<DefKeyword>],
+    pub kind: &'a ClassKind,
+    pub module_id: u32,
+}
+
+impl ClassInfo {
+    fn view<'a>(&'a self, owner_name: &'a str) -> ClassView<'a> {
+        ClassView {
+            projection: ProjectionView {
+                owner_name,
+                type_id: self.type_id,
+                head_param: self.param.as_deref(),
+                field_names: &self.field_names,
+                field_types: &self.field_types,
+            },
+            param_kind: self.param_kind.as_ref(),
+            field_purities: &self.field_purities,
+            kind: &self.kind,
+            module_id: self.module_id,
+        }
+    }
+}
+
 /// Per-instance metadata.
 #[derive(Clone)]
 pub struct InstanceInfo {
@@ -143,6 +179,13 @@ impl ClassEnv {
     pub fn classes(&self) -> &HashMap<String, ClassInfo> {
         &self.classes
     }
+
+    pub fn class(&self, name: &str) -> Option<ClassView<'_>> {
+        self.classes
+            .get_key_value(name)
+            .map(|(owner_name, info)| info.view(owner_name))
+    }
+
     pub fn register_class(&mut self, name: String, info: ClassInfo) {
         self.classes.insert(name, info);
     }
@@ -162,10 +205,11 @@ impl ClassEnv {
             resolution_provenance: Vec::new(),
         }
     }
-    /// Create a sentinel `ClassEnv` with placeholder IDs. Use only when the
-    /// class machinery is not needed (non-class elaboration paths). The real
-    /// `ClassEnv` is created by `elab::init_class_env` which pre-declares the
-    /// structural postulates in the kernel.
+    /// Create a sentinel `ClassEnv` for non-class elaboration paths. Its
+    /// `GlobalId(0)` aliases a real declaration, so `elaborate_rdecl` rejects
+    /// every class-dependent form before this environment is constructed. The
+    /// real `ClassEnv` is created by `elab::init_class_env`, which pre-declares
+    /// the structural postulates in the kernel.
     pub fn sentinel() -> Self {
         ClassEnv {
             classes: HashMap::new(),

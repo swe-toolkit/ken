@@ -563,7 +563,7 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
     // read straight from the class registry, not grepped from a field-name
     // substring. A 4th field (a cached length carrier) would show up here.
     assert_eq!(
-        env.class_env.classes()["Source"].field_names,
+        env.class_env.class("Source").unwrap().projection.field_names,
         vec!["source_id_field", "source_bytes_field", "source_utf8_field"],
         "Source must carry exactly id/bytes/utf8-proof, no cached length field"
     );

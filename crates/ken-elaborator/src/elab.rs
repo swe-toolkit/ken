@@ -3907,6 +3907,20 @@ pub fn elaborate_rdecl(
     numeric_env: &NumericEnv,
     rdecl: &RDecl,
 ) -> Result<GlobalId, ElabError> {
+    let class_dependent = match &rdecl.kind {
+        RDeclKind::ClassDecl { .. }
+        | RDeclKind::InstanceDecl { .. }
+        | RDeclKind::DeriveDecl { .. } => true,
+        RDeclKind::View { constraints, .. } => !constraints.is_empty(),
+        _ => false,
+    };
+    if class_dependent {
+        return Err(ElabError::TypeMismatch {
+            span: rdecl.span.clone(),
+            reason: "class-dependent declarations require `elaborate_rdecl_v1` with an initialized `ClassEnv`"
+                .into(),
+        });
+    }
     let mut sentinel = ClassEnv::sentinel();
     let result = elaborate_rdecl_v1(env, globals, num_values, numeric_env, &mut sentinel, rdecl)?;
     Ok(result.def_id)
@@ -4510,10 +4524,15 @@ fn projected_field_row_type(
     let Some(class_name) = instance_class_for_global(ctx.class_env, instance_id) else {
         return crate::effects::RowType::empty();
     };
-    let Some(class_info) = ctx.class_env.classes().get(class_name) else {
+    let Some(class_info) = ctx.class_env.class(class_name) else {
         return crate::effects::RowType::empty();
     };
-    let Some(idx) = class_info.field_names.iter().position(|n| n == field) else {
+    let Some(idx) = class_info
+        .projection
+        .field_names
+        .iter()
+        .position(|n| n == field)
+    else {
         return crate::effects::RowType::empty();
     };
     if let Some(row) = ctx
@@ -4540,10 +4559,15 @@ fn projected_class_field_row_type(
     class_name: &str,
     field: &str,
 ) -> crate::effects::RowType {
-    let Some(class_info) = class_env.classes().get(class_name) else {
+    let Some(class_info) = class_env.class(class_name) else {
         return crate::effects::RowType::empty();
     };
-    let Some(idx) = class_info.field_names.iter().position(|n| n == field) else {
+    let Some(idx) = class_info
+        .projection
+        .field_names
+        .iter()
+        .position(|n| n == field)
+    else {
         return crate::effects::RowType::empty();
     };
     match class_info.field_purities.get(idx).copied().flatten() {
@@ -4557,7 +4581,7 @@ fn projected_class_field_row_type(
 
 fn class_name_for_dictionary_type(class_env: &ClassEnv, ty: &RType) -> Option<String> {
     let head = rtype_head_name(ty);
-    class_env.classes().contains_key(&head).then_some(head)
+    class_env.class(&head).is_some().then_some(head)
 }
 
 fn collect_bound_dictionary_params(
@@ -5265,17 +5289,16 @@ fn compute_ordered_field_values(
 ) -> Result<(Vec<Term>, Vec<crate::effects::RowType>), ElabError> {
     let (field_names, field_types, field_purities, has_param) = {
         let ci = class_env
-            .classes()
-            .get(class_name)
+            .class(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
                 span: span.clone(),
             })?;
         (
-            ci.field_names.clone(),
-            ci.field_types.clone(),
-            ci.field_purities.clone(),
-            ci.param.is_some(),
+            ci.projection.field_names.to_vec(),
+            ci.projection.field_types.to_vec(),
+            ci.field_purities.to_vec(),
+            ci.projection.head_param.is_some(),
         )
     };
     let mut values: Vec<Term> = Vec::new();
@@ -5412,13 +5435,12 @@ fn elab_instance_decl(
     // ---- look up class ---------------------------------------------------
     let (class_module, class_type_id, class_kind) = {
         let ci = class_env
-            .classes()
-            .get(class_name)
+            .class(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
                 span: span.clone(),
             })?;
-        (ci.module_id, ci.type_id, ci.kind.clone())
+        (ci.module_id, ci.projection.type_id, ci.kind.clone())
     };
 
     let head_name = head_type_name(head_type);
@@ -5467,9 +5489,8 @@ fn elab_instance_decl(
     // ---- build instance type --------------------------------------------
     // App(class_type, head) if parameterized, else class_type directly.
     let instance_ty = if class_env
-        .classes()
-        .get(class_name)
-        .map(|ci| ci.param.is_some())
+        .class(class_name)
+        .map(|ci| ci.projection.head_param.is_some())
         .unwrap_or(false)
     {
         Term::app(Term::const_(class_type_id, vec![]), head_core.clone())
@@ -5489,17 +5510,16 @@ fn elab_instance_decl(
             .iter()
             .map(|constraint| {
                 let class = class_env
-                    .classes()
-                    .get(&constraint.class_name)
+                    .class(&constraint.class_name)
                     .ok_or_else(|| ElabError::UnresolvedCon {
                         name: constraint.class_name.clone(),
                         span: span.clone(),
                     })?;
                 let head = elab_type(&mut cx, &constraint.head_type)?;
-                Ok(if class.param.is_some() {
-                    Term::app(Term::const_(class.type_id, vec![]), head)
+                Ok(if class.projection.head_param.is_some() {
+                    Term::app(Term::const_(class.projection.type_id, vec![]), head)
                 } else {
-                    Term::const_(class.type_id, vec![])
+                    Term::const_(class.projection.type_id, vec![])
                 })
             })
             .collect::<Result<Vec<_>, _>>()?
@@ -5698,13 +5718,12 @@ fn elab_derive(
 
     let (class_type_id, has_param) = {
         let ci = class_env
-            .classes()
-            .get(class_name)
+            .class(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
                 span: span.clone(),
             })?;
-        (ci.type_id, ci.param.is_some())
+        (ci.projection.type_id, ci.projection.head_param.is_some())
     };
 
     let data_id = globals
