@@ -172,6 +172,15 @@ stop** — it is one of the spec's own three float examples.
 **AC-7 — no `spec/` edit, no new surface production, `trusted_base()`
 unchanged.**
 
+**AC-8 — one carried comment correction.** `lexer.rs:109` reads
+`FloatLit(f64),  // decimal-point float: '3.14', '1e-9'`. **That label became
+wrong when the sibling removed the `has_dot` gate** — the category is no longer
+"decimal-point", and one of its own two examples has no decimal point. It is
+the type definition a reader consults first. Correct the label to cover
+exponent forms, and include the hex form you are adding. **This is a comment
+fix carried here rather than given its own node** (Adversary
+`evt_1ssmxm2smp0sb`); do not grow it into a doc pass.
+
 ## Excluded scope
 
 - **`0x[deadbeef]` byte literals.** `38-ffi-io`'s, not a numeric form.
