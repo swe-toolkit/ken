@@ -15578,6 +15578,155 @@ mod tests {
 
     const D2J_DECLARATION: &str = "decl:fixture::d2j";
 
+    /// `D2j` — the six source-side causes, each a variant of ONE witness family.
+    ///
+    /// Six fixtures would be one per member; this is one builder with a cause
+    /// selector, so the family stays a single witness and the sizing stop does
+    /// not fire.
+    #[cfg(test)]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum D2jCause {
+        Exact,
+        /// The frame marker's identity no longer matches the plan's frame.
+        Frame,
+        /// The selected slot template no longer matches the plan's slot.
+        SelectedSlot,
+        /// The invocation template no longer matches the plan's call.
+        Invocation,
+        /// The selected case body is no longer the IH-consuming `Call`.
+        ExactSuffix,
+        /// The consuming `Call` calls the ordinary child instead of the
+        /// hypothesis.
+        CallIdentity,
+        /// The outer parameterisation is removed. MEASURED NOT to be a
+        /// segment-owner cause: the producer still sits behind the inner
+        /// closure, so the owner split survives and a candidate is still
+        /// formed -- with an empty projection. Retained as that measurement.
+        WrapperRemoved,
+    }
+
+    /// The witness body under one cause. `Exact` is the reviewed witness.
+    #[cfg(test)]
+    fn d2j_witness_body_under(cause: D2jCause) -> RuntimeExpr {
+        let inner = d2g_declaration_body(true);
+        let mutated = match cause {
+            D2jCause::Exact
+            | D2jCause::WrapperRemoved
+            | D2jCause::ExactSuffix
+            | D2jCause::CallIdentity
+            | D2jCause::Frame
+            | D2jCause::SelectedSlot
+            | D2jCause::Invocation => d2j_rewrite_body(inner, cause),
+        };
+        if cause == D2jCause::WrapperRemoved {
+            // No wrapper: the producer stops being behind a closure, so the two
+            // sides collapse toward one unit and the split the fusion exists to
+            // close is gone.
+            mutated
+        } else {
+            RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["a".to_string(), "b".to_string()],
+                body: Box::new(mutated),
+            }
+        }
+    }
+
+    /// Apply one source-side cause to the checked body.
+    #[cfg(test)]
+    fn d2j_rewrite_body(expr: RuntimeExpr, cause: D2jCause) -> RuntimeExpr {
+        match expr {
+            RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
+                let frame_id = if cause == D2jCause::Frame && frame_id == D2G_OUTER_FRAME {
+                    frame_id + 90
+                } else {
+                    frame_id
+                };
+                RuntimeExpr::CheckedSubcontinuationFrame {
+                    frame_id,
+                    body: Box::new(d2j_rewrite_body(*body, cause)),
+                }
+            }
+            RuntimeExpr::CheckedComputationalIHSlots {
+                slot_template_ids,
+                checked_occurrence_paths,
+                body,
+            } => RuntimeExpr::CheckedComputationalIHSlots {
+                slot_template_ids: slot_template_ids
+                    .into_iter()
+                    .map(|id| {
+                        if cause == D2jCause::SelectedSlot && id == D2G_OUTER_SLOT {
+                            id + 90
+                        } else {
+                            id
+                        }
+                    })
+                    .collect(),
+                checked_occurrence_paths,
+                body: Box::new(d2j_rewrite_body(*body, cause)),
+            },
+            RuntimeExpr::CheckedComputationalIHInvocation {
+                call_template_id,
+                checked_occurrence_path,
+                body,
+            } => RuntimeExpr::CheckedComputationalIHInvocation {
+                call_template_id: if cause == D2jCause::Invocation {
+                    call_template_id + 90
+                } else {
+                    call_template_id
+                },
+                checked_occurrence_path,
+                body: Box::new(d2j_rewrite_body(*body, cause)),
+            },
+            RuntimeExpr::ComputationalMatch {
+                scrutinee,
+                cases,
+                default,
+            } => RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(d2j_rewrite_body(*scrutinee, cause)),
+                cases: cases
+                    .into_iter()
+                    .map(|case| crate::RuntimeComputationalMatchCase {
+                        body: d2j_rewrite_body(case.body, cause),
+                        ..case
+                    })
+                    .collect(),
+                default,
+            },
+            RuntimeExpr::Construct { constructor, args } => RuntimeExpr::Construct {
+                constructor,
+                args: args
+                    .into_iter()
+                    .map(|arg| d2j_rewrite_body(arg, cause))
+                    .collect(),
+            },
+            RuntimeExpr::LexicalClosure {
+                captures,
+                params,
+                body,
+            } => RuntimeExpr::LexicalClosure {
+                captures,
+                params,
+                body: Box::new(d2j_rewrite_body(*body, cause)),
+            },
+            RuntimeExpr::Call { callee, args } => match cause {
+                // The selected case body stops being the consuming Call.
+                D2jCause::ExactSuffix => RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+                    args: Vec::new(),
+                },
+                // The Call remains, and calls the ordinary child binder instead
+                // of the hypothesis.
+                D2jCause::CallIdentity => RuntimeExpr::Call {
+                    callee: Box::new(RuntimeExpr::Var(1)),
+                    args,
+                },
+                _ => RuntimeExpr::Call { callee, args },
+            },
+            other => other,
+        }
+    }
+
     #[cfg(test)]
     fn d2j_witness_body(checked: bool) -> RuntimeExpr {
         RuntimeExpr::LexicalClosure {
@@ -15589,6 +15738,21 @@ mod tests {
 
     #[cfg(test)]
     fn d2j_prefixed(path: Vec<u64>) -> Vec<u64> {
+        d2j_prefixed_under(D2jCause::Exact, path)
+    }
+
+    /// The marker locations for one cause's actual shape.
+    ///
+    /// `SegmentOwner` removes the wrapper, so its markers sit one edge
+    /// shallower. Giving it a plan that matches means its refusal is
+    /// attributable to the owner split rather than to marker paths having moved
+    /// -- which is what it refused on before, and would have made the row
+    /// evidence about the wrong thing.
+    #[cfg(test)]
+    fn d2j_prefixed_under(cause: D2jCause, path: Vec<u64>) -> Vec<u64> {
+        if cause == D2jCause::WrapperRemoved {
+            return path;
+        }
         let mut prefixed = vec![3];
         prefixed.extend(path);
         prefixed
@@ -15625,7 +15789,16 @@ mod tests {
 
     #[cfg(test)]
     fn d2j_oriented_plan() -> crate::OrientedSubcontinuationPlanV1 {
-        let body = d2j_witness_body(true);
+        d2j_oriented_plan_under(D2jCause::Exact)
+    }
+
+    #[cfg(test)]
+    fn d2j_oriented_plan_under(cause: D2jCause) -> crate::OrientedSubcontinuationPlanV1 {
+        // Fingerprints always come from the EXACT body. The plan is the correct
+        // description; a cause mutates the SOURCE and the two then disagree.
+        // Deriving them from the mutated body would move the description along
+        // with the artifact and there would be nothing left to catch.
+        let body = d2j_witness_body_under(D2jCause::Exact);
         let location = |path: Vec<u64>| crate::CheckedRuntimeMarkerLocationV1 {
             declaration: D2J_DECLARATION.to_string(),
             runtime_path: path,
@@ -15661,14 +15834,14 @@ mod tests {
                 D2G_OUTER_SLOT,
                 D2G_OUTER_FRAME,
                 vec![20u64, 0],
-                d2j_prefixed(d2g_outer_slot_location()),
+                d2j_prefixed_under(cause, d2g_outer_slot_location()),
                 D2G_OUTER_SLOT_CONSTRUCTOR,
             ),
             (
                 D2G_INNER_SLOT,
                 D2G_INNER_FRAME,
                 vec![20u64, 1],
-                d2j_prefixed(d2g_inner_slot_location()),
+                d2j_prefixed_under(cause, d2g_inner_slot_location()),
                 D2G_INNER_SLOT_CONSTRUCTOR,
             ),
         ] {
@@ -15708,7 +15881,7 @@ mod tests {
             parent_frame_template_id: Some(D2G_OUTER_FRAME),
             parent_segment_site_id: Some(9),
             caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
-            runtime_marker_locations: vec![location(d2j_prefixed(d2g_call_location()))],
+            runtime_marker_locations: vec![location(d2j_prefixed_under(cause, d2g_call_location()))],
             occurrence_binding_fingerprint: 0,
         };
         call.occurrence_binding_fingerprint =
@@ -15724,7 +15897,305 @@ mod tests {
         }
     }
 
-    /// `D2j` — a fusion-reaching witness with a genuinely NON-EMPTY ordered
+    #[cfg(test)]
+    fn d2j_declaration_under(cause: D2jCause) -> RuntimeDeclaration {
+        RuntimeDeclaration {
+            symbol: D2J_DECLARATION.to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: d2j_witness_body_under(cause),
+            },
+            metadata: crate::RuntimeSymbolMetadata {
+                obligations: Default::default(),
+                obligation_metadata: Default::default(),
+                assumptions: Default::default(),
+                assumption_trust_metadata: Default::default(),
+                trusted_base_delta: Default::default(),
+                lowerability: None,
+                unsupported: None,
+                runtime_checks: Default::default(),
+                capabilities: Default::default(),
+                effects: Default::default(),
+            },
+        }
+    }
+
+    /// `D2j` — the per-member provenance matrix, one executable assertion per
+    /// row.
+    ///
+    /// Each closed-seven member is checked against its authoritative planner
+    /// fact on the non-empty witness. These are assertions, not a table in a
+    /// record: a row that stopped holding would red here.
+    ///
+    /// `recursive_position` is the one row that is NOT an independent
+    /// derivation, and it is tested as exactly what it is -- see below.
+    #[test]
+    fn d2j_every_member_matches_its_authoritative_planner_fact() {
+        let declaration = d2j_declaration(true);
+        let entry = d2j_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2j_oriented_plan();
+        let candidates =
+            enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+                .expect("enumerates");
+        assert_eq!(candidates.len(), 1);
+        let c = &candidates[0];
+
+        // 1. admitted discovery context -> the production ledger.
+        assert!(
+            fusion_root_source_for_future_enumerator(&plan)
+                .expect("ledger")
+                .contains(&c.admitted),
+            "the admitted context must be an entry of the production ledger"
+        );
+
+        // 2. producer construct -> the admitted root's result population.
+        assert!(
+            continuation_result_origins(&plan, c.admitted.result_root)
+                .expect("results")
+                .contains(&c.producer_construct_origin),
+            "the producer construct must lie in its admitted root's result population"
+        );
+        // producer owner -> occurrence authority.
+        assert_eq!(
+            c.producer_owner,
+            occurrence_authority(&plan, c.producer_construct_origin)
+                .expect("authority")
+                .owner
+        );
+        // alternative -> constructor identity, and exactly one case matches.
+        let identity = plan
+            .constructor_symbol_identity(c.producer_construct_origin)
+            .expect("identity");
+        let matching: Vec<usize> = {
+            let RuntimeExpr::ComputationalMatch { cases, .. } = plan
+                .planned_occurrence_expr(c.admitted.continuation_origin)
+                .expect("consumer")
+            else {
+                panic!("the consumer is not a computational match")
+            };
+            (0..cases.len())
+                .filter(|alternative| {
+                    plan.case_constructor_identity(c.admitted.continuation_origin, *alternative)
+                        .expect("case identity")
+                        == identity
+                })
+                .collect()
+        };
+        assert_eq!(
+            matching,
+            vec![c.producer_alternative as usize],
+            "the alternative is the unique case the producer's constructor selects"
+        );
+        // producer argument -> the semantic child inventory at that position.
+        assert_eq!(
+            c.producer_argument_origin,
+            plan.semantic
+                .child_origins(c.producer_construct_origin)
+                .expect("children")[c.recursive_position as usize],
+            "the argument is the construct's child at the recursive position"
+        );
+        // both bindings -> the checked-IH authority.
+        let ih = build_checked_ih_bindings(&plan).expect("bindings");
+        assert_eq!(ih.get(&c.producer_argument_origin), Some(&c.producer_argument_binding));
+        assert_eq!(ih.get(&c.consuming_callee), Some(&c.consumer_binding));
+
+        // RECURSIVE POSITION -- the conditional row, tested as conditional.
+        //
+        // Membership is SELECTED FROM `key.consumer_binding`: the position is
+        // checked to be declared on the case, starting from a value the key
+        // carries. That is all this row establishes on its own.
+        let RuntimeExpr::ComputationalMatch { cases, .. } = plan
+            .planned_occurrence_expr(c.admitted.continuation_origin)
+            .expect("consumer")
+        else {
+            panic!("the consumer is not a computational match")
+        };
+        assert!(
+            cases[c.producer_alternative as usize]
+                .recursive_positions
+                .contains(&(c.consumer_binding.recursive_position as usize)),
+            "the position the consumer binding names is DECLARED on the case"
+        );
+        // Independence arrives only through the consumer binding being rebuilt
+        // from the plan and compared in the final whole-key equality, which is
+        // asserted here as the two together rather than claimed of the row.
+        assert_eq!(
+            ih.get(&c.consuming_callee).map(|b| b.recursive_position),
+            Some(c.recursive_position),
+            "and the rebuilt consumer binding independently names that position"
+        );
+
+        // 3. selected case body, consuming Call and callee.
+        assert_eq!(
+            c.selected_case_body,
+            plan.semantic
+                .child_origin(c.admitted.continuation_origin, 1 + c.producer_alternative as usize)
+                .expect("case body")
+        );
+        assert_eq!(
+            c.consuming_call,
+            fusion_through_checked_wrappers(&plan, c.selected_case_body).expect("call")
+        );
+        assert_eq!(
+            c.consuming_callee,
+            plan.semantic.child_origin(c.consuming_call, 0).expect("callee")
+        );
+        assert_eq!(
+            c.consumer_binding,
+            CheckedIhBinding {
+                frame_origin: c.admitted.continuation_origin,
+                recursive_position: c.recursive_position,
+            },
+            "the consumer binding names THIS frame and position"
+        );
+
+        // 4. transport -> the resolved coordinate at that exact Call.
+        assert_eq!(
+            build_checked_transport(&plan, &oriented)
+                .expect("transport")
+                .get(&c.consuming_call),
+            Some(&c.checked_transport)
+        );
+
+        // 5. the unique StaticBody triple.
+        assert_eq!(
+            fusion_unique_static_body_triple(&plan, c.producer_owner).expect("triple"),
+            Some((c.invocation_caller, c.invocation_callee, c.invocation_callee_entry)),
+            "the triple is the unique StaticBody edge into the producer's unit"
+        );
+
+        // 6. the owner split.
+        assert_eq!(
+            c.consumer_owner,
+            occurrence_authority(&plan, c.admitted.continuation_origin)
+                .expect("authority")
+                .owner
+        );
+        assert_ne!(c.producer_owner, c.consumer_owner, "and the owners differ");
+
+        // 7. the ordered input projection.
+        assert_eq!(
+            exact_continuation_source_environment(
+                &plan,
+                c.producer_owner,
+                c.admitted.result_root,
+                c.producer_construct_origin,
+                c.consumer_owner,
+                c.admitted.continuation_origin,
+            )
+            .expect("projection")
+            .map(|environment| environment.inputs),
+            Some(c.continuation_inputs.clone()),
+            "the projection is the producer environment's own ordered inputs"
+        );
+    }
+
+    /// `D2j` — five source-side causes, each refusing before any ID or
+    /// descriptor exists.
+    ///
+    /// Every row is an executable assertion at the PLANE, where an id and a
+    /// descriptor would exist if anything had been minted. The baseline mints
+    /// exactly one first, so each refusal is a change and not the family's
+    /// resting state.
+    ///
+    /// Each cause mutates the SOURCE and leaves the plan alone -- the plan is
+    /// the correct description, and deriving it from the mutated body would move
+    /// the description along with the artifact and leave nothing to catch.
+    ///
+    /// The refusals are attributed, not merely counted: each is required to name
+    /// its own gate, so a cause that happened to break something upstream would
+    /// fail rather than pass as coverage.
+    #[test]
+    fn d2j_the_source_side_causes_refuse_before_any_id_exists() {
+        let baseline = d2j_plane_under(D2jCause::Exact).expect("the exact witness builds");
+        assert_eq!(baseline.len(), 1, "the baseline mints exactly one identity");
+        assert!(baseline
+            .descriptor_for(StaticContinuationFusionId(0))
+            .is_some());
+
+        // Causes that refuse at the transport boundary, each naming its own
+        // authority.
+        for (cause, expected) in [
+            (D2jCause::Frame, "checked plan frame marker is missing or transplanted"),
+            (
+                D2jCause::SelectedSlot,
+                "checked computational-IH slot Runtime occurrences differ",
+            ),
+            (
+                D2jCause::Invocation,
+                "checked computational-IH call Runtime occurrences differ",
+            ),
+        ] {
+            let refusal = d2j_plane_under(cause).expect_err("{cause:?} must refuse");
+            assert!(
+                format!("{refusal:?}").contains(expected),
+                "{cause:?} must refuse at its OWN authority, not merely refuse: {refusal:?}"
+            );
+        }
+
+        // Causes that form no candidate at all: nothing is minted, and there is
+        // no id to inspect because none was created.
+        for cause in [D2jCause::ExactSuffix, D2jCause::CallIdentity] {
+            let plane = d2j_plane_under(cause).expect("still builds, with nothing to intern");
+            assert!(
+                plane.is_empty(),
+                "{cause:?} must mint no key, id or descriptor: {plane:?}"
+            );
+            assert_eq!(plane.descriptor_for(StaticContinuationFusionId(0)), None);
+        }
+    }
+
+    /// `D2j` — removing the outer parameterisation does NOT collapse the owner
+    /// split, and this is recorded as a measurement rather than shipped as a
+    /// refusal.
+    ///
+    /// I built this variant intending a segment-owner cause. It is not one: the
+    /// producer still sits behind the inner closure, so the split survives, a
+    /// candidate is still formed, and only the projection goes empty -- which is
+    /// the landed `D2h` situation.
+    ///
+    /// Asserting what it actually does keeps it from being counted as the sixth
+    /// refusal. **The segment-owner row is therefore NOT delivered**, and saying
+    /// so here is the point of the test.
+    #[test]
+    fn d2j_removing_the_wrapper_is_not_a_segment_owner_cause() {
+        let plane = d2j_plane_under(D2jCause::WrapperRemoved)
+            .expect("it still builds; nothing about transport changed");
+        assert_eq!(
+            plane.len(),
+            1,
+            "the candidate SURVIVES, so this cannot stand in for an owner refusal"
+        );
+        let key = plane
+            .key_for(StaticContinuationFusionId(0))
+            .expect("key");
+        assert_ne!(
+            key.producer_owner, key.consumer_owner,
+            "and the owner split is intact, which is exactly why it is not that cause"
+        );
+        assert!(
+            key.continuation_inputs.is_empty(),
+            "only the projection collapses, which is the landed D2h situation"
+        );
+    }
+
+    /// Build the plane for one cause: mutated source, correct plan.
+    #[cfg(test)]
+    fn d2j_plane_under(
+        cause: D2jCause,
+    ) -> Result<StaticContinuationFusionPlan, CraneliftBackendError> {
+        let declaration = d2j_declaration_under(cause);
+        let entry = d2j_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2j_oriented_plan_under(cause);
+        build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+    }
+
+    /// `D2j` — a fusion-reaching witness with a genuinely NON-EMPTY ordered    /// `D2j` — a fusion-reaching witness with a genuinely NON-EMPTY ordered
     /// input projection, and its count.
     ///
     /// `D2h`'s witness reaches a fusion candidate and projects **zero** ordered
