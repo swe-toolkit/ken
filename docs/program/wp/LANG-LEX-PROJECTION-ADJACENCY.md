@@ -110,6 +110,23 @@ was real rather than a test that passes because the parser was special-cased.
 **AC-5 — no other surface production changes.** This node states an existing
 decision; it does not extend the surface.
 
+**AC-6 — canonicalization does not cross the accept/reject boundary.** Added
+2026-08-11 (`evt_3yktja0yw62nw`) on Language's Deliverable-3 measurement, which
+surfaced a case the frame did not anticipate.
+
+kenfmt canonicalizes `p. 1` to `p.1`. Under the whitespace-insensitive answer
+that is free — both spellings stay valid and the canonical form still parses.
+**Under the rejection answer it is not.** If `p. 1` becomes ungrammatical, then
+canonicalizing it to `p.1` is **a formatter turning a program the grammar
+rejects into one it accepts** — a worse object than the asymmetry this node
+exists to remove, and a defect the fix would have introduced.
+
+So: whichever answer you return, control that kenfmt's canonical output of a
+spaced projection parses, and that canonicalization does not cross the boundary
+in **either** direction. **Under the rejection answer this is the criterion that
+should decide whether to return that answer at all**; if it does decide it, say
+so in the candidate rather than presenting the design call as a preference.
+
 ## Excluded scope
 
 - **No new syntax.** No projections past `.2`, no named-field positional
@@ -123,9 +140,17 @@ decision; it does not extend the surface.
 ## Stop conditions — return to me, do not decide
 
 - **AC-1 refutes the severity** — a silent mis-parse rather than a refusal.
-- **The formatter can emit the spacing.** That crosses from surface wart to
-  meaning-changing reformat and I will re-sequence rather than let it ride on an
-  `S`.
+- ~~**The formatter can emit the spacing.**~~ **DISCHARGED, NOT TRIGGERED —
+  Steward ruling `evt_3yktja0yw62nw`, 2026-08-11. The original wording was
+  "emit or preserve a space", and that was mis-worded: the hazard is a
+  formatter that PRODUCES the failing spelling `p. 1.2`, not one that
+  preserves a valid spaced form.** Language measured both tools: lossless
+  preserves `p.1 .2`, `p. 1 .2` and `p. 1` byte-exactly — all of which parse,
+  so nothing about that changes a program's meaning — and kenfmt canonicalizes
+  them to `p.1.2` / `p.1`. **Neither can produce `p. 1.2`**, so the
+  meaning-changing-reformat class is empty and this stop does not fire.
+  **The live form of the stop:** a formatter path that can *produce* exact
+  `p. 1.2`.
 - **Either predicate turns out to need a parser change.** The fork above is
   lexical on purpose; a fix that reaches into `parser.rs` means the decision
   boundary is not where this frame assumes.
