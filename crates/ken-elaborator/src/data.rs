@@ -686,6 +686,12 @@ fn rtype_to_kernel_checked(
             Ok(Term::pi(a_k, b_k))
         }
 
+        RType::RSigma(_, a, b, _) => {
+            let a_k = rtype_to_kernel_checked(a, d_name, d_id, globals, ind_id_set, ctor_id_set)?;
+            let b_k = rtype_to_kernel_checked(b, d_name, d_id, globals, ind_id_set, ctor_id_set)?;
+            Ok(Term::sigma(a_k, b_k))
+        }
+
         RType::RApp(f, a, _) => {
             let f_k = rtype_to_kernel_checked(f, d_name, d_id, globals, ind_id_set, ctor_id_set)?;
             let a_k = rtype_to_kernel_checked(a, d_name, d_id, globals, ind_id_set, ctor_id_set)?;

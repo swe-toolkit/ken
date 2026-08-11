@@ -613,12 +613,17 @@ pub enum Expr {
         else_branch: Box<Expr>,
         span: Span,
     },
+    /// `(a, b, c)` — a pair literal retaining its written arity. Elaboration
+    /// right-nests the components into binary kernel `Pair` terms.
+    EPair(Vec<Expr>, Span),
     /// `e.field` — Σ-record field projection (`33 §5.2` η) on a class
     /// instance/dictionary value. Postfix, lowest-binding-atom precedence;
     /// only fires on a non-`ConId`-headed base (a `ConId`-headed dotted
     /// chain is a module-qualified reference, `33 §3.2`, joined at parse
     /// time instead).
     EProj(Box<Expr>, String, Span),
+    /// `e.1` / `e.2` — positional Σ projection.
+    EPosProj(Box<Expr>, u8, Span),
     /// `(x : A) -> B` — dependent function type, expr position (VAL2 #4,
     /// `32 §3`). Domain is a `type` (mirrors the type-position `Pi`);
     /// codomain is an expr binding `x`. Elaborates to the existing kernel
@@ -666,7 +671,9 @@ impl Expr {
             | Expr::ERecursiveResult { span: s, .. }
             | Expr::EBinOp(_, _, _, s)
             | Expr::EIf { span: s, .. }
-            | Expr::EProj(_, _, s) => s,
+            | Expr::EPair(_, s)
+            | Expr::EProj(_, _, s)
+            | Expr::EPosProj(_, _, s) => s,
             Expr::EMatch { span, .. } => span,
         }
     }
@@ -693,6 +700,8 @@ impl RecursiveResultSelector {
 pub enum Type {
     /// `(x : A) -> B` — dependent function type (Π).
     TPi(String, Box<Type>, Box<Type>, Span),
+    /// `(x : A) × B` — dependent pair type (Σ), right-associative.
+    TSigma(String, Box<Type>, Box<Type>, Span),
     /// `A -> B` — non-dependent arrow.
     TArr(Box<Type>, Box<Type>, Span),
     /// `A ->[ρ] B` — latent-effect arrow. The row is surface metadata for
@@ -714,6 +723,7 @@ impl Type {
     pub fn span(&self) -> &Span {
         match self {
             Type::TPi(_, _, _, s)
+            | Type::TSigma(_, _, _, s)
             | Type::TArr(_, _, s)
             | Type::TEffectArr(_, _, _, s)
             | Type::TUniv(_, s)

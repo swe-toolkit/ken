@@ -245,8 +245,10 @@ pub enum RExpr {
         else_branch: Box<RExpr>,
         span: Span,
     },
+    RPair(Vec<RExpr>, Span),
     /// `e.field` — Σ-record field projection (`33 §5.2` η).
     RProj(Box<RExpr>, String, Span),
+    RPosProj(Box<RExpr>, u8, Span),
     /// `(x : A) -> B` — dependent function type, expr position (VAL2 #4).
     /// Domain resolved as a `type` (mirrors type-position `Pi`); codomain
     /// resolved as an expr with `x` bound.
@@ -286,7 +288,9 @@ impl RExpr {
             | RExpr::RBecomes(_, _, _, s)
             | RExpr::RNumLit(_, s)
             | RExpr::RStr(_, s)
+            | RExpr::RPair(_, s)
             | RExpr::RProj(_, _, s)
+            | RExpr::RPosProj(_, _, s)
             | RExpr::RPi(_, _, _, s)
             | RExpr::RArrow(_, _, s)
             | RExpr::RAttachedProofRef { span: s, .. }
@@ -301,6 +305,7 @@ impl RExpr {
 #[derive(Clone, Debug)]
 pub enum RType {
     RPi(String, Box<RType>, Box<RType>, Span),
+    RSigma(String, Box<RType>, Box<RType>, Span),
     RArr(Box<RType>, Box<RType>, Span),
     /// `A ->[ρ] B` — latent-effect arrow, erased to the same kernel Π as
     /// `RArr` after class-field purity has inspected the row.
@@ -318,6 +323,7 @@ impl RType {
     pub fn span(&self) -> &Span {
         match self {
             RType::RPi(_, _, _, s)
+            | RType::RSigma(_, _, _, s)
             | RType::RArr(_, _, s)
             | RType::REffectArr(_, _, _, s)
             | RType::RUniv(_, s)
@@ -495,6 +501,7 @@ fn collect_instance_head_params(ty: &Type, out: &mut Vec<String>) {
             }
         }
         Type::TPi(_, a, b, _)
+        | Type::TSigma(_, a, b, _)
         | Type::TArr(a, b, _)
         | Type::TEffectArr(a, _, b, _)
         | Type::TApp(a, b, _) => {
@@ -572,7 +579,9 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EBinOp(..)
         | Expr::EMatch { .. }
         | Expr::EIf { .. }
+        | Expr::EPair(..)
         | Expr::EProj(..)
+        | Expr::EPosProj(..)
         | Expr::EAttachedProofRef { .. }
         | Expr::ERecursiveResult { .. } => Err(unsupported_constructor_type_expr(expr)),
     }
@@ -1683,6 +1692,19 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             Ok(RExpr::RProj(Box::new(re), field.clone(), span.clone()))
         }
 
+        Expr::EPosProj(e, index, span) => {
+            let re = resolve_expr_ctx(scope, e, ctx)?;
+            Ok(RExpr::RPosProj(Box::new(re), *index, span.clone()))
+        }
+
+        Expr::EPair(components, span) => Ok(RExpr::RPair(
+            components
+                .iter()
+                .map(|component| resolve_expr_ctx(scope, component, ctx))
+                .collect::<Result<Vec<_>, _>>()?,
+            span.clone(),
+        )),
+
         Expr::EPi(x, a, b, span) => {
             let ra = resolve_type(scope, a)?;
             scope.push(x);
@@ -1868,6 +1890,19 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
             let rb = resolve_type(scope, b)?;
             scope.pop();
             Ok(RType::RPi(
+                x.clone(),
+                Box::new(ra),
+                Box::new(rb),
+                span.clone(),
+            ))
+        }
+
+        Type::TSigma(x, a, b, span) => {
+            let ra = resolve_type(scope, a)?;
+            scope.push(x);
+            let rb = resolve_type(scope, b)?;
+            scope.pop();
+            Ok(RType::RSigma(
                 x.clone(),
                 Box::new(ra),
                 Box::new(rb),

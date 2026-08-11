@@ -582,7 +582,7 @@ pub fn type_names_in_type(ty: &SurfaceType, out: &mut BTreeSet<String>) {
             out.insert(name.clone());
         }
         SurfaceType::TUniv(_, _) => {}
-        SurfaceType::TPi(_binder, dom, cod, _) => {
+        SurfaceType::TPi(_binder, dom, cod, _) | SurfaceType::TSigma(_binder, dom, cod, _) => {
             type_names_in_type(dom, out);
             type_names_in_type(cod, out);
         }
@@ -635,8 +635,16 @@ pub fn type_names_in_expr(e: &Expr, out: &mut BTreeSet<String>) {
             type_names_in_expr(a, out);
             type_names_in_expr(b, out);
         }
-        Expr::ELam(_, body, _) | Expr::EOld(body, _) | Expr::EProj(body, _, _) => {
+        Expr::ELam(_, body, _)
+        | Expr::EOld(body, _)
+        | Expr::EProj(body, _, _)
+        | Expr::EPosProj(body, _, _) => {
             type_names_in_expr(body, out);
+        }
+        Expr::EPair(components, _) => {
+            for component in components {
+                type_names_in_expr(component, out);
+            }
         }
         Expr::EAsc(inner, ty, _) => {
             type_names_in_expr(inner, out);

@@ -661,6 +661,14 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             Ok(Term::pi(a_core, b_core))
         }
 
+        RType::RSigma(_, a, b, _) => {
+            let a_core = elab_type(cx, a)?;
+            cx.ctx.push(a_core.clone());
+            let b_core = elab_type(cx, b)?;
+            cx.ctx.pop();
+            Ok(Term::sigma(a_core, b_core))
+        }
+
         // Refinement lowers to the carrier type (`21 §6.3`): `{x:A|φ}` → `A`.
         // The predicate φ is tracked separately; obligation emitted at introduction.
         RType::RRefine(_, carrier, _phi, _) => elab_type(cx, carrier),
@@ -786,8 +794,53 @@ fn infer_if(
     Ok((core, result_ty))
 }
 
+fn check_pair(
+    cx: &mut ElabCtx<'_>,
+    components: &[RExpr],
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    debug_assert!(components.len() >= 2);
+    let expected_wh = whnf(cx.env, &cx.ctx, expected);
+    let Term::Sigma(domain, codomain) = expected_wh else {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "pair literal requires an expected pair type".into(),
+        });
+    };
+    let first = check(cx, &components[0], &domain, components[0].span())?;
+    let tail_expected = subst0(&codomain, &first);
+    let tail = if components.len() == 2 {
+        check(cx, &components[1], &tail_expected, components[1].span())?
+    } else {
+        check_pair(cx, &components[1..], &tail_expected, span)?
+    };
+    Ok(Term::pair(first, tail))
+}
+
+fn infer_pair(
+    cx: &mut ElabCtx<'_>,
+    components: &[RExpr],
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    debug_assert!(components.len() >= 2);
+    let (first, first_ty) = infer(cx, &components[0])?;
+    let (tail, tail_ty) = if components.len() == 2 {
+        infer(cx, &components[1])?
+    } else {
+        infer_pair(cx, &components[1..], span)?
+    };
+    let ty = Term::sigma(first_ty, weaken(&tail_ty, 1));
+    // A pair is an introduction form, so its inferred type must travel in the
+    // core term when the pair is later consumed by an inference-only form such
+    // as projection. The kernel erases `Ascript` after checking it.
+    let pair = Term::pair(first, tail);
+    Ok((Term::Ascript(Box::new(pair), Box::new(ty.clone())), ty))
+}
+
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
     match expr {
+        RExpr::RPair(components, span) => check_pair(cx, components, expected, span),
         RExpr::RIf {
             condition,
             then_branch,
@@ -3177,6 +3230,12 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RProj(base, field, span) => infer_proj(cx, base, field, span),
 
+        RExpr::RPosProj(base, projection, span) => {
+            infer_positional_proj(cx, base, *projection, span)
+        }
+
+        RExpr::RPair(components, span) => infer_pair(cx, components, span),
+
         RExpr::RPi(_, a, b, span) => infer_pi(cx, a, b, span),
 
         RExpr::RArrow(a, b, span) => infer_arrow(cx, a, b, span),
@@ -3506,6 +3565,36 @@ fn infer_proj(
 
     let expected_ty = ken_kernel::subst::subst_tel(&field_types[idx], &args);
     Ok((val, expected_ty))
+}
+
+fn infer_positional_proj(
+    cx: &mut ElabCtx<'_>,
+    base: &RExpr,
+    projection: u8,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (base_core, base_ty) = infer(cx, base)?;
+    let base_ty_wh = whnf(cx.env, &cx.ctx, &base_ty);
+    let Term::Sigma(domain, codomain) = base_ty_wh else {
+        return Err(ElabError::PositionalProjectionNotPair {
+            projection,
+            span: span.clone(),
+        });
+    };
+    // Projection is inference-only in the kernel. Preserve the elaborator's
+    // inferred type on an introduction-form base (including an explicitly
+    // ascribed pair) so the kernel can infer through the projection.
+    let base_core = Term::Ascript(Box::new(base_core), Box::new(base_ty));
+    match projection {
+        1 => Ok((Term::proj1(base_core), *domain)),
+        2 => {
+            let first = Term::proj1(base_core.clone());
+            Ok((Term::proj2(base_core), subst0(&codomain, &first)))
+        }
+        _ => Err(ElabError::Internal(format!(
+            "unsupported positional projection .{projection}"
+        ))),
+    }
 }
 
 // ----- numeric literal helpers -----
@@ -4176,7 +4265,9 @@ fn explicit_value_param_count_from_field_type(ty: &RType) -> usize {
 fn type_contains_effect_row(ty: &RType) -> bool {
     match ty {
         RType::REffectArr(_, _, _, _) => true,
-        RType::RPi(_, domain, codomain, _) | RType::RArr(domain, codomain, _) => {
+        RType::RPi(_, domain, codomain, _)
+        | RType::RSigma(_, domain, codomain, _)
+        | RType::RArr(domain, codomain, _) => {
             type_contains_effect_row(domain) || type_contains_effect_row(codomain)
         }
         RType::RApp(f, a, _) => type_contains_effect_row(f) || type_contains_effect_row(a),
@@ -4520,6 +4611,12 @@ fn infer_expr_row_type(
         RExpr::RAsc(e, _, _) | RExpr::ROld(e, _) | RExpr::RBecomes(_, _, e, _) => {
             infer_expr_row_type(e, effect_rows, projection_ctx)
         }
+        RExpr::RPair(components, _) => components
+            .iter()
+            .fold(crate::effects::RowType::empty(), |row, component| {
+                row.join(infer_expr_row_type(component, effect_rows, projection_ctx))
+            }),
+        RExpr::RPosProj(e, _, _) => infer_expr_row_type(e, effect_rows, projection_ctx),
         RExpr::RProj(e, field, _) => infer_expr_row_type(e, effect_rows, projection_ctx)
             .join(projected_field_row_type(e, field, projection_ctx)),
         RExpr::RBinOp(_, l, r, _) => infer_expr_row_type(l, effect_rows, projection_ctx)
@@ -5035,6 +5132,7 @@ fn head_type_name(ty: &RType) -> String {
         RType::RArr(_, _, _) | RType::REffectArr(_, _, _, _) | RType::RPi(_, _, _, _) => {
             "->".to_string()
         }
+        RType::RSigma(_, _, _, _) => "×".to_string(),
         RType::RRefine(_, inner, _, _) => head_type_name(inner),
     }
 }
@@ -6632,6 +6730,10 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
                 || rexpr_mentions_name(then_branch, name)
                 || rexpr_mentions_name(else_branch, name)
         }
+        RExpr::RPair(components, _) => components
+            .iter()
+            .any(|component| rexpr_mentions_name(component, name)),
+        RExpr::RPosProj(e, _, _) => rexpr_mentions_name(e, name),
         RExpr::RProj(e, _, _) => rexpr_mentions_name(e, name),
         // The domain is a `type`, not an `RExpr` — a mutual-recursion call
         // graph only cares about VALUE-level (expr) references, so only
@@ -6649,6 +6751,7 @@ pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
     match ty {
         RType::RCon(n, _) => n == name,
         RType::RPi(_, domain, codomain, _)
+        | RType::RSigma(_, domain, codomain, _)
         | RType::RArr(domain, codomain, _)
         | RType::REffectArr(domain, _, codomain, _)
         | RType::RApp(domain, codomain, _) => {

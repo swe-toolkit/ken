@@ -561,9 +561,13 @@ fn collect_expr_spans(expr: &Expr, out: &mut Vec<Span>) {
             collect_expr_spans(function, out);
             collect_expr_spans(argument, out);
         }
-        Expr::ELam(_, body, _) | Expr::EOld(body, _) | Expr::EProj(body, _, _) => {
-            collect_expr_spans(body, out)
-        }
+        Expr::ELam(_, body, _)
+        | Expr::EOld(body, _)
+        | Expr::EProj(body, _, _)
+        | Expr::EPosProj(body, _, _) => collect_expr_spans(body, out),
+        Expr::EPair(components, _) => components
+            .iter()
+            .for_each(|component| collect_expr_spans(component, out)),
         Expr::ELet(bindings, body, _) => {
             for binding in bindings {
                 out.push(binding.span.clone());
@@ -615,6 +619,7 @@ fn collect_type_spans(ty: &Type, out: &mut Vec<Span>) {
     out.push(ty.span().clone());
     match ty {
         Type::TPi(_, domain, codomain, _)
+        | Type::TSigma(_, domain, codomain, _)
         | Type::TArr(domain, codomain, _)
         | Type::TApp(domain, codomain, _) => {
             collect_type_spans(domain, out);

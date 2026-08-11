@@ -1649,7 +1649,7 @@ impl Parser {
 
     pub fn parse_type(&mut self) -> Result<Type, ElabError> {
         if matches!(self.peek(), Token::LParen) && self.is_dep_pi_ahead() {
-            return self.parse_dep_pi();
+            return self.parse_dependent_binder_type();
         }
         // Refinement: `{ x : A | φ }`
         if matches!(self.peek(), Token::LBrace) {
@@ -1735,22 +1735,29 @@ impl Parser {
         matches!(self.lookahead(2), Token::Colon)
     }
 
-    fn parse_dep_pi(&mut self) -> Result<Type, ElabError> {
+    fn parse_dependent_binder_type(&mut self) -> Result<Type, ElabError> {
         let start = self.peek_span().start;
         self.expect(&Token::LParen)?;
         let (x, _) = self.expect_ident()?;
         self.expect(&Token::Colon)?;
         let a = self.parse_type()?;
         self.expect(&Token::RParen)?;
-        self.expect(&Token::Arrow)?;
+        let separator = self.peek().clone();
+        if !matches!(separator, Token::Arrow | Token::Times) {
+            return Err(ElabError::ParseError {
+                msg: "expected `->` or `×` after dependent binder".into(),
+                span: self.peek_span().clone(),
+            });
+        }
+        self.advance();
         let b = self.parse_type()?;
         let end = b.span().end;
-        Ok(Type::TPi(
-            x,
-            Box::new(a),
-            Box::new(b),
-            Span::new(start, end),
-        ))
+        let span = Span::new(start, end);
+        Ok(match separator {
+            Token::Arrow => Type::TPi(x, Box::new(a), Box::new(b), span),
+            Token::Times => Type::TSigma(x, Box::new(a), Box::new(b), span),
+            _ => unreachable!("separator checked above"),
+        })
     }
 
     fn parse_atom_type(&mut self) -> Result<Type, ElabError> {
@@ -2209,17 +2216,29 @@ impl Parser {
     /// their own dots (`d.leq`, `(sort xs).leq`, etc).
     fn parse_atom_expr(&mut self) -> Result<Expr, ElabError> {
         let mut e = self.parse_atom_expr_base()?;
-        while matches!(self.peek(), Token::Dot) && matches!(self.lookahead(1), Token::Ident(_)) {
+        while matches!(self.peek(), Token::Dot)
+            && matches!(self.lookahead(1), Token::Ident(_) | Token::Nat(1 | 2))
+        {
             self.advance(); // consume '.'
-            let (field, field_span) = match self.peek().clone() {
+            let (field, index, projection_span) = match self.peek().clone() {
                 Token::Ident(s) => {
                     self.advance();
-                    (s, self.tokens[self.pos - 1].1.clone())
+                    let field_span = self.tokens[self.pos - 1].1.clone();
+                    (Some(s), None, field_span)
+                }
+                Token::Nat(index @ (1 | 2)) => {
+                    self.advance();
+                    let index_span = self.tokens[self.pos - 1].1.clone();
+                    (None, Some(index as u8), index_span)
                 }
                 _ => unreachable!("guarded by lookahead above"),
             };
-            let span = Span::new(e.span().start, field_span.end);
-            e = Expr::EProj(Box::new(e), field, span);
+            let span = Span::new(e.span().start, projection_span.end);
+            e = match (field, index) {
+                (Some(field), None) => Expr::EProj(Box::new(e), field, span),
+                (None, Some(index)) => Expr::EPosProj(Box::new(e), index, span),
+                _ => unreachable!("projection kind is exclusive"),
+            };
         }
         Ok(e)
     }
@@ -2374,6 +2393,16 @@ impl Parser {
                     });
                 }
                 let inner = self.parse_expr()?;
+                if matches!(self.peek(), Token::Comma) {
+                    let mut components = vec![inner];
+                    while matches!(self.peek(), Token::Comma) {
+                        self.advance();
+                        components.push(self.parse_expr()?);
+                    }
+                    self.expect(&Token::RParen)?;
+                    let end = self.tokens[self.pos - 1].1.end;
+                    return Ok(Expr::EPair(components, Span::new(start, end)));
+                }
                 self.expect(&Token::RParen)?;
                 let end = self.tokens[self.pos - 1].1.end;
                 let span = Span::new(start, end);
@@ -2414,7 +2443,9 @@ impl Parser {
                             else_branch,
                             span,
                         },
+                        Expr::EPair(components, _) => Expr::EPair(components, span),
                         Expr::EProj(e, field, _) => Expr::EProj(e, field, span),
+                        Expr::EPosProj(e, index, _) => Expr::EPosProj(e, index, span),
                         Expr::EPi(x, a, b, _) => Expr::EPi(x, a, b, span),
                         Expr::EArrow(a, b, _) => Expr::EArrow(a, b, span),
                         Expr::EAttachedProofRef {

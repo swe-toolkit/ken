@@ -832,6 +832,12 @@ fn rewrite_rtype(
             Box::new(rewrite_rtype(scope, exports, *b)?),
             s,
         ),
+        RType::RSigma(x, a, b, s) => RType::RSigma(
+            x,
+            Box::new(rewrite_rtype(scope, exports, *a)?),
+            Box::new(rewrite_rtype(scope, exports, *b)?),
+            s,
+        ),
         RType::RArr(a, b, s) => RType::RArr(
             Box::new(rewrite_rtype(scope, exports, *a)?),
             Box::new(rewrite_rtype(scope, exports, *b)?),
@@ -951,6 +957,16 @@ fn rewrite_rexpr(
             else_branch: Box::new(rewrite_rexpr(scope, exports, *else_branch)?),
             span,
         },
+        RExpr::RPair(components, span) => RExpr::RPair(
+            components
+                .into_iter()
+                .map(|component| rewrite_rexpr(scope, exports, component))
+                .collect::<Result<Vec<_>, _>>()?,
+            span,
+        ),
+        RExpr::RPosProj(e, index, span) => {
+            RExpr::RPosProj(Box::new(rewrite_rexpr(scope, exports, *e)?), index, span)
+        }
         RExpr::RProj(e, field, s) => {
             RExpr::RProj(Box::new(rewrite_rexpr(scope, exports, *e)?), field, s)
         }

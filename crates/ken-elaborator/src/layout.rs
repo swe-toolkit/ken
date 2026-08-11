@@ -417,6 +417,8 @@ impl<'a> LayoutPrinter<'a> {
             | Expr::EBecomes(_, _, span)
             | Expr::EBinOp(_, _, _, span)
             | Expr::EProj(_, _, span)
+            | Expr::EPosProj(_, _, span)
+            | Expr::EPair(_, span)
             | Expr::EPi(_, _, _, span) => self.print_span(span),
             _ => self.print_span(expr.span()),
         };
@@ -435,6 +437,7 @@ impl<'a> LayoutPrinter<'a> {
     fn print_type(&self, ty: &Type) -> Doc {
         match ty {
             Type::TPi(_, _, _, span)
+            | Type::TSigma(_, _, _, span)
             | Type::TArr(_, _, span)
             | Type::TEffectArr(_, _, _, span)
             | Type::TApp(_, _, span)
@@ -1717,7 +1720,7 @@ fn expr_precedence(expr: &Expr) -> u8 {
         Expr::EBinOp(op, _, _, _) => binop_precedence(*op),
         Expr::EApp(_, _, _) => 7,
         Expr::EBecomes(_, _, _) => 1,
-        Expr::EOld(_, _) | Expr::EProj(_, _, _) => 8,
+        Expr::EOld(_, _) | Expr::EProj(_, _, _) | Expr::EPosProj(_, _, _) => 8,
         _ => 9,
     }
 }

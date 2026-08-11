@@ -517,7 +517,13 @@ impl<'s> Lexer<'s> {
         let mut has_dot = false;
         let mut frac_str = String::new();
         let mut frac_places: i32 = 0;
-        if self.cur() == Some('.')
+        // A digit immediately following `.` is a positional-projection index,
+        // not the integer part of a float. Keeping this decision in the lexer
+        // preserves both halves of the lexical contract: `p.1.2` is two
+        // projections, while an ordinary `3.14` remains one float literal.
+        let follows_dot = self.src[..start].chars().next_back() == Some('.');
+        if !follows_dot
+            && self.cur() == Some('.')
             && self.src[self.pos + 1..]
                 .chars()
                 .next()
