@@ -1,13 +1,13 @@
 ---
 id: LANG-LEX-PROJECTION-ADJACENCY
 title: "The positional-projection lexer guard tests raw character adjacency, so exactly one of four spacing variants fails -- `p.1.2`, `p.1 .2` and `p. 1 .2` all lex as two projections while `p. 1.2` lexes as `Dot, FloatLit(1.2)` -- and the refusal comes from the number scanner rather than from any grammar rule"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/1864
 origin: Adversary report evt_5xgcf74gn2rgp on the merged LANG-SURFACE-PAIR (measured on origin/main=63d6e007), triaged by the Steward. The Adversary's finding was explicitly conditional on whether the spaced form is grammatical; the Steward settled that question structurally and corrected the severity. The four-variant enumeration and the mechanism fork below are Steward findings on top of that report, not part of it.
 ---
 
@@ -61,18 +61,37 @@ dot is left unconsumed.
 
 ⇒ The derived outcome is a **parse error on a program that should be
 accepted** — loud and attributable — not a program that silently means
-something else. **Derived structurally from the two sites above and not
-executed.** Establishing the observed diagnostic is the first deliverable, and
-a measurement that contradicts this derivation raises the severity rather than
-closing the node.
+something else. **This was derived structurally from the two sites above, and
+then CONFIRMED by execution** on unmodified `40ea9ffd`, before any edit:
+`p. 1.2` yields exact `ParseError { msg: "unexpected token after expression:
+Dot", span: 1..2 }`. The severity claim was measured rather than inherited,
+which is what `AC-1` existed to force.
 
-## What is not yet known
+## What was not yet known, and how it came out
 
-- Whether any formatter path (`kenfmt`, the lossless printer) can emit or
-  preserve a space after a projection dot. If one can, a reformat could turn an
-  accepted program into a rejected one. **Unmeasured, and it is the one axis
-  that would make this worse than a surface wart.**
-- Whether a comment between the dot and the index (`p. -- note` / newline /
-  `1.2`) should behave identically. It bears directly on the mechanism fork in
-  the frame, because a source-text scan cannot see past a comment and a
-  token-context guard can.
+Both open axes were measured before any repair was authorized.
+
+**The formatter axis is empty, and the stop that guarded it was mis-worded.**
+The original stop fired on a formatter that could *"emit or preserve"* a space
+after a projection dot; the hazard is one that can **produce** the failing
+spelling `p. 1.2`. Language measured both tools: the lossless printer preserves
+`p.1 .2`, `p. 1 .2` and `p. 1` byte-exactly — every one of which parses — and
+`kenfmt` canonicalizes them to `p.1.2` / `p.1`. **Neither can produce
+`p. 1.2`**, so the meaning-changing-reformat class has no member and the stop
+did not fire (Steward ruling `evt_3yktja0yw62nw`).
+
+**The comment case decided the mechanism, by the frame's own criterion.**
+`p. -- note` + newline + `1.2` had the same `FloatLit`/refusal shape, so raw
+source-text trimming would have left the inconsistency one position over.
+Language took the emitted-token context instead: `next_token` records the last
+successfully emitted token after trivia is skipped, and `lex_numeric` consults
+it at the existing fractional-part decision. **Whitespace and comments are
+trivia at this seam**, which is the rule the node was opened to state.
+
+## Landed
+
+`28cebda7` (PR #1864), Decision `dec_29w9dcyd4xd76`. All four spellings plus
+the comment-separated form share one token stream and one AST; `3.14`, `1.2e5`
+and `1.2d` keep their numeric classes; the guard A/B is causal in both
+directions; and kenfmt's canonical output of a spaced projection reparses, so
+canonicalization does not cross the accept/reject boundary.

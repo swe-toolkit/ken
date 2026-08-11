@@ -118,12 +118,19 @@ that is a stop.
 
 ## Contention
 
-Runtime is in `crates/ken-runtime/src/cranelift_backend/`. The concurrent
-Language node [[LANG-LEX-PROJECTION-ADJACENCY]] touches
-`crates/ken-elaborator/src/lexer.rs` — **so if it is still in flight when you
-start, you contend with it on that one file.** Take it after that node merges,
-or coordinate through your leader. **This is a real intersection, not a
-formality** — re-derive it at candidate time.
+Runtime is in `crates/ken-runtime/src/cranelift_backend/`. **The `lexer.rs`
+contention is CLEARED** — [[LANG-LEX-PROJECTION-ADJACENCY]] merged at
+`28cebda7` (PR #1864), so `crates/ken-elaborator/src/lexer.rs` is free and this
+node has no live intersection. **Re-derive it at candidate time anyway** — a
+merge-base goes stale without your branch moving.
+
+**One thing that node left you, and it is a help rather than a hazard.** It
+replaced the character-adjacency fraction guard with one that consults the last
+emitted token, recorded by `next_token` after trivia is skipped. So the
+fractional-part decision in `lex_numeric` now has token context available at
+exactly the point where Deliverable 2 asks whether `Token::Nat` is itself
+width-bounded. **Read the current `lex_numeric` before you measure**, not the
+frame's `ae6f750a` description of it.
 
 ## Sizing and validation
 
