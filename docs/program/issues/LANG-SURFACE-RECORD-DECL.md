@@ -173,7 +173,36 @@ compatibility API** — its required doc comment says so, and a candidate omitti
 that sentence was blocked (`dec_5cgh7x06txz16`, rejected) precisely so the broad
 raw-map view cannot fossilize.
 
-### TRACKED REMAINING WORK — delete `ClassEnv::classes()` before records land
+## `S1b` accepted partial — the storage is private, MERGED 2026-08-11
+
+Exact `d073c9475bfb4c49242fe7b4fd0f02c3b6c24d02` from declared merge-base
+`3be31f105ebf76f412a00dfb9a81e0f49e1e6aac`; two non-merge commits, exactly
+`crates/ken-elaborator/src/classes.rs` and `crates/ken-elaborator/src/elab.rs`,
+`+22/-16`. Decision `dec_7jxs6fj6hyf2s` resolved APPROVE — Architect
+`evt_573a4w9fwgx8g`, QA `evt_5sg7smy0s1gt7`. No `spec/` or `conformance/` path,
+so no Spec vote. `origin/main` is `61c034e2`.
+
+**What landed.** Slice two of the Architect's staged order: a narrow
+`register_class` owning the sole production insertion, a narrow `initialized`
+owning the real registry construction, and the `classes` field made **private**.
+The `S1a` read seam is unchanged — `classes()` remains the documented
+transitional view. Storage- and semantic-neutral: no second map, no
+`classes_mut`, no registry flip, no record syntax, no instance-resolution or
+projection change.
+
+**This closes none of the node's record-declaration surface either.** What it
+buys is that the compiler now holds the boundary the previous slice could only
+document.
+
+### The one hunk that was blocked, and why the block was cheap
+
+The Architect rejected `b00a29a7` for exactly two unformatted hunks and named
+both. The ring returned a formatting-only recut, re-ran QA, and re-approved
+inside seven minutes. **A block that names the hunk costs a ring minutes; a
+block that names a concern costs it a turn.** This is the second time on this
+node that the naming was what made the block cheap.
+
+## TRACKED REMAINING WORK — delete `ClassEnv::classes()` before records land
 
 **This node does not close while that accessor exists.** Recorded as live
 remaining work rather than only as prose, on an adversary finding
@@ -196,7 +225,32 @@ storage-independent views (`class`, `projection_by_type_id`, `class_entries`) an
 after the storage flip — **it is a deletion gate, not a compatibility API to
 preserve.**
 
-**Also owed and not yet measured:** the seven test/support paths were **outside**
-the adversary's `src/`-only census. A direct `.classes` field read there is not a
-truth-source risk, but **it would block the field's deletion**, so the census
-that clears this must cover them.
+**The census that was owed is now taken, and it clears.** It was recorded as
+outstanding because the adversary's pass covered `src/` only, leaving the
+test/support tree unmeasured. Measured at `61c034e2` across the whole crate —
+`src/` and all 150 files under `tests/` — the direct uses of the field are
+**exactly two, both inside `classes.rs`**:
+
+| site | what it is |
+|---|---|
+| `classes.rs:144` — `&self.classes` | the accessor's own body |
+| `classes.rs:147` — `self.classes.insert(...)` | inside `register_class` |
+
+Nothing else touches the field anywhere, and no `ClassEnv` struct literal
+survives outside `classes.rs`. ⇒ **The field's deletion is blocked by nothing,
+and after `S1b` the compiler is what holds that** rather than a census that
+decays. The remaining consumers are all reads through `classes()`: **31 call
+sites — 9 in `src/elab.rs`, 22 across seven test files.** Those are what
+`S2..Sn` migrate to the storage-independent views, and that migration is the
+gate's real content.
+
+**Two doc comments still name the private field as the access path**, and both
+sit in test files that can no longer compile such an expression:
+
+- `crates/ken-elaborator/tests/adversary_seal2_repros.rs:169`
+- `crates/ken-elaborator/tests/seal2_producer_closure.rs:172`
+
+Both read `` `class_env.classes[C].field_types` ``. This is prose debt, not a
+build defect — fold it into whichever `S2..Sn` slice touches those files rather
+than spending a cut on it. `tests/seal2_support/mod.rs:12` was checked and is
+**already correct** (it names `classes()`), so this is two sites, not three.
