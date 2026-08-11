@@ -3504,3 +3504,437 @@ pub(crate) fn decode_invocation_ground(
 
     decoded.remove(&root).ok_or(BOUNDARY_ERR_SHAPE)
 }
+
+#[cfg(test)]
+mod invocation_aggregate_decode_tests {
+    use super::*;
+
+    const CTOR_ID: u64 = 41;
+    const OK_ID: u64 = 42;
+    const VALUE_ID: u64 = 43;
+
+    /// A store with the identities these controls name ISSUED. Nothing here
+    /// mints one; an identity absent from this list is an unissued identity,
+    /// which is one of the refusals below.
+    fn store() -> BoundaryValueStore {
+        let mut store = BoundaryValueStore::new();
+        assert!(store.issue_carrier_identity("ctor:fixture::Box::Box", CTOR_ID));
+        assert!(store.issue_carrier_identity("ok", OK_ID));
+        assert!(store.issue_carrier_identity("value", VALUE_ID));
+        store
+    }
+
+    fn aggregate_word(index: u64) -> BoundaryWord {
+        BoundaryWord((index << BOUNDARY_TAG_BITS) | BoundaryTag::InvocationAggregate as u64)
+    }
+
+    fn bool_word(bit: bool) -> BoundaryWord {
+        BoundaryWord::immediate(BoundaryTag::ImmediateBool, u64::from(bit))
+    }
+
+    fn int_word(value: i64) -> BoundaryWord {
+        BoundaryWord::immediate(BoundaryTag::ImmediateInt, value as u64)
+    }
+
+    /// Push one invocation node with every field under the caller's control, so
+    /// a control can build a node the ordinary builders cannot.
+    fn push(
+        arena: &mut BoundaryArenaV1,
+        tag: BoundaryTag,
+        class: BoundaryClass,
+        slot: SlotId,
+        tag_id: u64,
+        children: &[BoundaryWord],
+        names: &[u64],
+    ) -> BoundaryWord {
+        arena
+            .0
+            .push_node(tag, class, slot, tag_id, 0, 0, children, names, &[])
+    }
+
+    /// **The seam, for a `Record`.** This is `nc22`'s own return shape, decoded
+    /// here directly rather than through a second fixture.
+    #[test]
+    fn a_record_aggregate_decodes_to_its_named_fields() {
+        let mut store = store();
+        let mut arena = BoundaryArenaV1::default();
+        let word = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Record,
+            NULL_SLOT,
+            0,
+            &[bool_word(true), int_word(7)],
+            &[OK_ID, VALUE_ID],
+        );
+
+        let value = decode_invocation_ground(&arena, &mut store, word).expect("decodes");
+
+        assert_eq!(
+            value,
+            RuntimeGroundValue::Record {
+                fields: vec![
+                    ("ok".to_string(), RuntimeGroundValue::Bool(true)),
+                    ("value".to_string(), RuntimeGroundValue::Int(7.into())),
+                ],
+            }
+        );
+    }
+
+    /// **The seam, for a bare `Constructor`** — the other class the tag admits,
+    /// and the reason `Record` and constructor are one cell rather than two.
+    #[test]
+    fn a_bare_constructor_aggregate_decodes_to_its_issued_symbol() {
+        let mut store = store();
+        let mut arena = BoundaryArenaV1::default();
+        let word = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[int_word(4)],
+            &[],
+        );
+
+        let value = decode_invocation_ground(&arena, &mut store, word).expect("decodes");
+
+        assert_eq!(
+            value,
+            RuntimeGroundValue::Constructor {
+                constructor: "ctor:fixture::Box::Box".to_string(),
+                args: vec![RuntimeGroundValue::Int(4.into())],
+            }
+        );
+    }
+
+    /// **Nesting, with a `PersistentGround` child** — the one child tag that is
+    /// adopted rather than read inline. The parent aggregate is still never
+    /// adopted.
+    #[test]
+    fn a_nested_aggregate_carries_an_adopted_persistent_child() {
+        let mut store = store();
+        let persistent = materialize_ground(
+            &mut store,
+            &RuntimeGroundValue::String("persistent".to_string()),
+        )
+        .expect("materializes");
+        assert_eq!(persistent.tag(), Some(BoundaryTag::PersistentGround));
+
+        let mut arena = BoundaryArenaV1::default();
+        let inner = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[persistent],
+            &[],
+        );
+        let outer = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Record,
+            NULL_SLOT,
+            0,
+            &[inner, bool_word(false)],
+            &[OK_ID, VALUE_ID],
+        );
+
+        // SEAL FIRST, exactly as `compiled.rs` does through
+        // `activation.finish(&mut store, None)`. `adopt` refuses a store that
+        // is not sealed -- MEASURED: without this the control failed with
+        // `BOUNDARY_ERR_SEALED`, which is the ordering constraint stating
+        // itself rather than a defect.
+        store.seal_persistent();
+
+        let value = decode_invocation_ground(&arena, &mut store, outer).expect("decodes");
+
+        assert_eq!(
+            value,
+            RuntimeGroundValue::Record {
+                fields: vec![
+                    (
+                        "ok".to_string(),
+                        RuntimeGroundValue::Constructor {
+                            constructor: "ctor:fixture::Box::Box".to_string(),
+                            args: vec![RuntimeGroundValue::String("persistent".to_string())],
+                        }
+                    ),
+                    ("value".to_string(), RuntimeGroundValue::Bool(false)),
+                ],
+            }
+        );
+    }
+
+    /// **Deep traversal, and sharing.**
+    ///
+    /// ## The depth here proves a property about the TRAVERSAL only
+    ///
+    /// The decoder walks an explicit stack, so descending 50,000 aggregates
+    /// costs arena nodes and not host stack frames -- and this row would
+    /// stack-overflow rather than fail if that stopped being true. It descends
+    /// the whole chain and then refuses at the bottom, so **no deep value is
+    /// ever built**, which is what isolates the traversal from the value.
+    ///
+    /// ⚠ **A deep chain that SUCCEEDS cannot be pushed this far, and the limit
+    /// is not the decoder's.** `RuntimeGroundValue` is itself a recursive type:
+    /// a 50,000-deep aggregate decodes to a 50,000-deep value whose own `drop`
+    /// recurses, and that overflows regardless of how the decoder walked it.
+    /// Measured -- an earlier revision of this row built the deep value and
+    /// aborted with `fatal runtime error: stack overflow` in `drop`, not in
+    /// `decode_invocation_ground`. The successful depth below is therefore
+    /// modest on purpose, and the bound it respects belongs to the value type.
+    #[test]
+    fn a_deep_chain_and_a_shared_child_both_decode() {
+        let mut store = store();
+        let mut arena = BoundaryArenaV1::default();
+
+        // The bottom of the deep chain is UNISSUED, so the walk descends fully
+        // and then refuses without materializing anything.
+        let mut deepest = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            999,
+            &[],
+            &[],
+        );
+        for _ in 0..50_000 {
+            deepest = push(
+                &mut arena,
+                BoundaryTag::InvocationAggregate,
+                BoundaryClass::Constructor,
+                NULL_SLOT,
+                CTOR_ID,
+                &[deepest],
+                &[],
+            );
+        }
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, deepest),
+            Err(BOUNDARY_ERR_SHAPE),
+            "the walk reaches the bottom of a 50,000-deep chain and refuses there"
+        );
+
+        // A shallow chain that SUCCEEDS, so the row above is not the only
+        // evidence the deep path runs at all.
+        let mut nested = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[int_word(1)],
+            &[],
+        );
+        for _ in 0..64 {
+            nested = push(
+                &mut arena,
+                BoundaryTag::InvocationAggregate,
+                BoundaryClass::Constructor,
+                NULL_SLOT,
+                CTOR_ID,
+                &[nested],
+                &[],
+            );
+        }
+        decode_invocation_ground(&arena, &mut store, nested).expect("deep valid data decodes");
+
+        // Sharing: one child named twice is decoded once and appears twice.
+        let shared = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[int_word(9)],
+            &[],
+        );
+        let parent = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Record,
+            NULL_SLOT,
+            0,
+            &[shared, shared],
+            &[OK_ID, VALUE_ID],
+        );
+        let RuntimeGroundValue::Record { fields } =
+            decode_invocation_ground(&arena, &mut store, parent).expect("sharing decodes")
+        else {
+            panic!("not a record")
+        };
+        assert_eq!(fields[0].1, fields[1].1, "a shared child decodes equally");
+    }
+
+    /// **A cycle refuses.** The word is built before the node it names, which is
+    /// the only way to construct one.
+    #[test]
+    fn a_cycle_refuses() {
+        let mut store = store();
+        let mut arena = BoundaryArenaV1::default();
+        let self_reference = aggregate_word(0);
+        let node = push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[self_reference],
+            &[],
+        );
+        assert_eq!(node, self_reference, "the node names itself");
+
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, node),
+            Err(BOUNDARY_ERR_CYCLE)
+        );
+    }
+
+    /// **The malformed-node refusals, each attributed to its own gate.**
+    ///
+    /// Every row perturbs exactly one acceptance condition and requires the
+    /// error that condition raises -- so a row that started failing for another
+    /// reason would fail here rather than pass as coverage.
+    #[test]
+    fn each_malformed_node_refuses_at_its_own_gate() {
+        let mut store = store();
+
+        // owner: the node is persistent-owned, so it may not be read as an
+        // invocation aggregate at all.
+        let mut arena = BoundaryArenaV1::default();
+        push(
+            &mut arena,
+            BoundaryTag::PersistentGround,
+            BoundaryClass::Constructor,
+            NULL_SLOT,
+            CTOR_ID,
+            &[],
+            &[],
+        );
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, aggregate_word(0)),
+            Err(BOUNDARY_ERR_ESCAPE),
+            "owner"
+        );
+
+        // class: invocation-owned, but not one of the two admitted classes.
+        let mut arena = BoundaryArenaV1::default();
+        push(
+            &mut arena,
+            BoundaryTag::InvocationBorrowed,
+            BoundaryClass::BorrowedOpaque,
+            NULL_SLOT,
+            0,
+            &[],
+            &[],
+        );
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, aggregate_word(0)),
+            Err(BOUNDARY_ERR_CLASS),
+            "class"
+        );
+
+        // slot: a real slot on an invocation node is internally inconsistent,
+        // because the store is the only writer of that field.
+        let mut arena = BoundaryArenaV1::default();
+        push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Constructor,
+            7,
+            CTOR_ID,
+            &[],
+            &[],
+        );
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, aggregate_word(0)),
+            Err(BOUNDARY_ERR_SHAPE),
+            "slot"
+        );
+
+        // identity, zero and unissued -- neither may be resolved by spelling.
+        for (tag_id, label) in [(0u64, "zero identity"), (999u64, "unissued identity")] {
+            let mut arena = BoundaryArenaV1::default();
+            let word = push(
+                &mut arena,
+                BoundaryTag::InvocationAggregate,
+                BoundaryClass::Constructor,
+                NULL_SLOT,
+                tag_id,
+                &[],
+                &[],
+            );
+            assert_eq!(
+                decode_invocation_ground(&arena, &mut store, word),
+                Err(BOUNDARY_ERR_SHAPE),
+                "{label}"
+            );
+        }
+
+        // span: the word names a node that does not exist.
+        let arena = BoundaryArenaV1::default();
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, aggregate_word(3)),
+            Err(BOUNDARY_ERR_BOUNDS),
+            "span"
+        );
+    }
+
+    /// **The refusal table: the six named tags plus an unknown byte.**
+    ///
+    /// Every one reaches the decoder and is refused, and the positive control is
+    /// the seam rows above -- without them this table would pass for a decoder
+    /// that refused everything.
+    #[test]
+    fn the_six_remaining_tags_and_an_unknown_byte_all_refuse() {
+        let mut store = store();
+        let mut arena = BoundaryArenaV1::default();
+        push(
+            &mut arena,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Record,
+            NULL_SLOT,
+            0,
+            &[bool_word(true)],
+            &[OK_ID],
+        );
+
+        for tag in [
+            BoundaryTag::ImmediateExitStatus,
+            BoundaryTag::ImmediateBoundedNat,
+            BoundaryTag::ImmediateStructuralNat,
+            BoundaryTag::PersistentClosure,
+            BoundaryTag::InvocationBorrowed,
+            BoundaryTag::InvocationHostResult,
+        ] {
+            let word = BoundaryWord((0 << BOUNDARY_TAG_BITS) | tag as u64);
+            assert_eq!(
+                decode_invocation_ground(&arena, &mut store, word),
+                Err(BOUNDARY_ERR_TAG),
+                "{tag:?} must not be read as an aggregate"
+            );
+        }
+
+        // An unknown tag byte: outside the closed set, so `tag()` is `None`.
+        let unknown = BoundaryWord(BOUNDARY_TAG_MASK);
+        assert_eq!(unknown.tag(), None, "the control needs an unknown byte");
+        assert_eq!(
+            decode_invocation_ground(&arena, &mut store, unknown),
+            Err(BOUNDARY_ERR_TAG),
+            "unknown"
+        );
+
+        // And the two handled child tags are refused AS A TOP-LEVEL WORD too:
+        // this decoder reads aggregates, and an immediate is the Boundary arm's
+        // own business.
+        for word in [bool_word(true), int_word(7)] {
+            assert_eq!(
+                decode_invocation_ground(&arena, &mut store, word),
+                Err(BOUNDARY_ERR_TAG)
+            );
+        }
+    }
+}
