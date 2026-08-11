@@ -14907,9 +14907,34 @@ mod tests {
             "producer and consumer are in different units, which is the split the \
              fusion exists to close"
         );
+        // The COMPLETE triple, not just its callee. Pinning one member leaves the
+        // other two free to be anything, and the caller is the emission owner the
+        // redirection in `D2f` will belong to.
+        assert_eq!(
+            candidate.invocation_caller,
+            PredeclaredFunctionId(1),
+            "the measured emission owner of the producer invocation"
+        );
         assert_eq!(
             candidate.invocation_callee, candidate.producer_owner,
-            "the unique StaticBody triple names the producer's own unit"
+            "the triple's callee is the producer's own unit"
+        );
+        assert_eq!(
+            candidate.invocation_callee,
+            PredeclaredFunctionId(3),
+            "and that unit is the measured one"
+        );
+        // Tied to the candidate's own admitted root rather than to a literal:
+        // the entry the invocation enters IS the root the descent admitted, and
+        // stating it as `== 33` alone would still hold if the two drifted apart.
+        assert_eq!(
+            candidate.invocation_callee_entry, candidate.admitted.result_root,
+            "the invocation's callee entry is the candidate's admitted root"
+        );
+        assert_eq!(
+            candidate.invocation_callee_entry,
+            StaticOriginId(33),
+            "and that root is the measured one"
         );
 
         // The converse direction, so one candidate is not the only outcome this
@@ -14989,7 +15014,7 @@ mod tests {
         );
     }
 
-    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the
+    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the
     /// admitted ledger, and it is strictly richer than the seed frontier.
     ///
     /// [`enumerate_live_fusion_candidates`] consumes this helper and is reached
