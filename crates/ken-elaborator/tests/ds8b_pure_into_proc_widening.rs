@@ -181,9 +181,9 @@ fn zero_sort_delta_class_record_kind_unchanged_by_pure_instance_registration() {
     env.elaborate_file(TRAVERSABLE_CLASSES)
         .expect("Traversable class family must elaborate");
 
-    let kind_before = env.class_env.classes["Traversable"].kind.clone();
-    let field_types_len_before = env.class_env.classes["Traversable"].field_types.len();
-    let type_id_before = env.class_env.classes["Traversable"].type_id;
+    let kind_before = env.class_env.classes()["Traversable"].kind.clone();
+    let field_types_len_before = env.class_env.classes()["Traversable"].field_types.len();
+    let type_id_before = env.class_env.classes()["Traversable"].type_id;
     assert_eq!(
         kind_before,
         ClassKind::Structure,
@@ -219,7 +219,7 @@ fn zero_sort_delta_class_record_kind_unchanged_by_pure_instance_registration() {
     )
     .expect("the pure Traversable Option instance (DS-8b) must elaborate");
 
-    let class_after = &env.class_env.classes["Traversable"];
+    let class_after = &env.class_env.classes()["Traversable"];
     assert_eq!(
         class_after.kind, kind_before,
         "zero sort delta: registering a pure instance for the proc traverse \

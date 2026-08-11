@@ -38,7 +38,7 @@ fn surf2_d1_proc_traverse_parses_elaborates_and_registers_metadata() {
 
     let traversable = env
         .class_env
-        .classes
+        .classes()
         .get("Traversable")
         .expect("Traversable class metadata is registered");
     assert_eq!(
@@ -246,20 +246,20 @@ fn surf2_d1_unmarked_classes_and_sort_discriminant_stay_status_quo() {
     .expect("marked and unmarked sort-discriminant pairs elaborate");
 
     assert_eq!(
-        env.class_env.classes["PlainStruct"].kind,
+        env.class_env.classes()["PlainStruct"].kind,
         ClassKind::Structure
     );
     assert_eq!(
-        env.class_env.classes["MarkedStruct"].kind,
+        env.class_env.classes()["MarkedStruct"].kind,
         ClassKind::Structure
     );
-    assert_eq!(env.class_env.classes["PlainProp"].kind, ClassKind::Property);
+    assert_eq!(env.class_env.classes()["PlainProp"].kind, ClassKind::Property);
     assert_eq!(
-        env.class_env.classes["MarkedProp"].kind,
+        env.class_env.classes()["MarkedProp"].kind,
         ClassKind::Property
     );
-    assert_eq!(env.class_env.classes["PlainStruct"].field_types.len(), 1);
-    assert_eq!(env.class_env.classes["MarkedStruct"].field_types.len(), 1);
-    assert_eq!(env.class_env.classes["PlainProp"].field_types.len(), 1);
-    assert_eq!(env.class_env.classes["MarkedProp"].field_types.len(), 1);
+    assert_eq!(env.class_env.classes()["PlainStruct"].field_types.len(), 1);
+    assert_eq!(env.class_env.classes()["MarkedStruct"].field_types.len(), 1);
+    assert_eq!(env.class_env.classes()["PlainProp"].field_types.len(), 1);
+    assert_eq!(env.class_env.classes()["MarkedProp"].field_types.len(), 1);
 }
