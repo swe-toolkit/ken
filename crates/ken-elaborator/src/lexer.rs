@@ -106,7 +106,7 @@ pub enum Token {
     MapsTo, // `|->` / `↦` — match arm separator
     // L1 numeric literal tokens
     IntLit(BigInt),       // integer literal too large for u32
-    FloatLit(f64),        // decimal-point float: `3.14`, `1e-9`
+    FloatLit(f64),        // decimal or hexadecimal f64: `3.14`, `1e-9`, `0x1p-3`
     DecimalLit(BigInt, i32), // `d`-suffix: coeff × 10^exp; e.g. `0.1d` → (1,-1)
     Float32Lit(f32),      // `f32`-suffix: `1.5f32`
     // Atoms
@@ -430,15 +430,26 @@ impl<'s> Lexer<'s> {
 
         // Numeric literals: starts with a digit
         if c.is_ascii_digit() {
-            if self.src[self.pos..].starts_with("0x")
-                || self.src[self.pos..].starts_with("0X")
-                || self.src[self.pos..].starts_with("0b")
-                || self.src[self.pos..].starts_with("0B")
-                || self.src[self.pos..].starts_with("0o")
-                || self.src[self.pos..].starts_with("0O")
-            {
+            if self.src[self.pos..].starts_with("0x") || self.src[self.pos..].starts_with("0X") {
+                let mut token_tail = String::new();
+                let mut exponent = false;
+                let mut exp_sign = false;
+                for ch in self.src[self.pos + 2..].chars() {
+                    if !exponent {
+                        if ch.is_ascii_hexdigit() || ch == '_' || ch == '.' { token_tail.push(ch); continue; }
+                        if ch == 'p' || ch == 'P' { exponent = true; token_tail.push(ch); continue; }
+                        break;
+                    }
+                    if !exp_sign && (ch == '+' || ch == '-') { exp_sign = true; token_tail.push(ch); continue; }
+                    if ch.is_ascii_digit() || ch == '_' { exp_sign = true; token_tail.push(ch); continue; }
+                    break;
+                }
+                if token_tail.chars().any(|c| c == '.' || c == 'p' || c == 'P') {
+                    return self.lex_hex_float(start);
+                }
                 return self.lex_radix_integer(start);
             }
+            if self.src[self.pos..].starts_with("0b") || self.src[self.pos..].starts_with("0B") || self.src[self.pos..].starts_with("0o") || self.src[self.pos..].starts_with("0O") { return self.lex_radix_integer(start); }
             return self.lex_numeric(start);
         }
 
@@ -703,6 +714,48 @@ impl<'s> Lexer<'s> {
         let n = BigInt::parse_bytes(digits.as_bytes(), radix).ok_or_else(|| ElabError::ParseError { msg: "invalid radix integer".into(), span: Span::new(start, self.pos) })?;
         if let Ok(nat) = n.to_string().parse::<u32>() { Ok((Token::Nat(nat), Span::new(start, self.pos))) } else { Ok((Token::IntLit(n), Span::new(start, self.pos))) }
     }
+
+    fn lex_hex_float(&mut self, start: usize) -> Result<(Token, Span), ElabError> {
+        self.advance(); self.advance();
+        let mut digits = String::new();
+        let mut frac = 0i32;
+        let mut after_dot = false;
+        while let Some(c) = self.cur() {
+            if c == '.' { if after_dot { break; } after_dot = true; self.advance(); continue; }
+            if c == '_' { self.advance(); if digits.is_empty() || !self.src[..self.pos - 1].chars().last().map(|p| p.is_ascii_hexdigit()).unwrap_or(false) || !self.cur().map(|n| n.is_ascii_hexdigit()).unwrap_or(false) { return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) }); } continue; }
+            if let Some(_) = c.to_digit(16) { self.advance(); digits.push(c); if after_dot { frac += 1; } } else { break; }
+        }
+        if digits.is_empty() || self.cur().map(|c| c == 'p' || c == 'P').unwrap_or(false) == false { return Err(ElabError::ParseError { msg: "hex float requires p exponent".into(), span: Span::new(start, self.pos) }); }
+        self.advance(); let mut sign = 1i32; if self.cur() == Some('+') { self.advance(); } else if self.cur() == Some('-') { sign = -1; self.advance(); }
+        let mut exp = String::new(); while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) { let c=self.advance().unwrap(); if c=='_' { if exp.is_empty() || !exp.chars().last().unwrap().is_ascii_digit() || !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false) { return Err(ElabError::ParseError { msg:"digit separator must occur between digits".into(), span:Span::new(start,self.pos)}); } } else { exp.push(c); } }
+        if exp.is_empty() { return Err(ElabError::ParseError { msg:"hex float exponent requires digits".into(), span:Span::new(start,self.pos)}); }
+        let mant = BigInt::parse_bytes(digits.as_bytes(),16).unwrap();
+        let binary_exp = sign.checked_mul(exp.parse::<i32>().map_err(|_| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?).and_then(|e| e.checked_sub(4 * frac)).ok_or_else(|| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?;
+        let value = Self::hex_mantissa_to_f64(&mant, binary_exp).ok_or_else(|| ElabError::ParseError { msg:"hex float out of range".into(), span:Span::new(start,self.pos) })?;
+        Ok((Token::FloatLit(value), Span::new(start,self.pos)))
+    }
+
+fn hex_mantissa_to_f64(m: &BigInt, shift: i32) -> Option<f64> {
+    let k = m.bits() as i32; if k == 0 { return Some(0.0); }
+    let mut e = k - 1 + shift; if e > 1023 { return Some(f64::INFINITY); }
+    if e < -1022 {
+        let s = shift + 1074;
+        let q = if s >= 0 { m << s } else {
+            let n = -s; let mut q = m >> n; let r = m - (&q << n); let half = BigInt::from(1) << (n - 1);
+            if r > half || (r == half && q.to_string().parse::<u64>().ok().is_some_and(|v| v & 1 == 1)) { q += 1; } q
+        };
+        let bits: u64 = q.to_string().parse().ok()?; return Some(f64::from_bits(bits));
+    }
+    let keep = if k > 53 { m >> (k - 53) } else { m << (53 - k) };
+    let mut q: u64 = keep.to_string().parse().ok()?;
+    if k > 53 {
+        let r = m - (&keep << (k - 53)); let half = BigInt::from(1) << (k - 54);
+        if r > half || (r == half && (q & 1) == 1) { q += 1; }
+        if q == (1u64 << 53) { q >>= 1; e += 1; }
+    }
+    if e > 1023 { return Some(f64::INFINITY); }
+    Some(f64::from_bits((((e + 1023) as u64) << 52) | (q & ((1u64 << 52) - 1))))
+}
 
     /// Lex the entire source into a token+span list (including the `Eof`
     /// sentinel).
