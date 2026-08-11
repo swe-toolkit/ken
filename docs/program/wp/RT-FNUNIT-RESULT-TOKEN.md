@@ -172,26 +172,58 @@ outcome than agreement, and it is why the deliverable exists.
   path, crates untouched. It falsified this frame's corpus premise and
   established the return-shape axis; see §3. `M` stands and no re-cut is owed.
   **Its residual is `AC-1a`, which is `D2`'s to discharge.**
-- **`D2` — locate the gap.** Which of the **eight** `compiled.rs` producers
-  raises it for `nc22`, and **whether the gap is the token's PRODUCTION or its
-  REGISTRATION** — those route differently and the answer determines `D3`'s
-  shape.
+- **`D2` — DISCHARGED, 2026-08-11**, with disposable instrumentation and no
+  candidate edit. **The answer, and it retires two of this frame's own
+  framings:**
 
-  **Establish the site by observation, not by the message** — see the correction
-  in §2: all eight render the same text. Name which `ResultDecoder` arm `nc22`
-  selects and say how you determined it; [[RT-WORKER-FIXTURE-DECODE]] §1e lists
-  the decoder-selection sites to look at. **If the arm is `TrapOnly` or an
-  unrecognized `Boundary` tag, the fault is upstream of the decode table
-  entirely** and §7's hard stop is likely live.
+  `nc22` reaches `compiled.rs`'s **`Boundary` decoder and raises at its `_ =>`
+  arm.** Token `265` is a **well-formed `InvocationAggregate` tag (Record)** —
+  **not** an unrecognized tag, and **not** a `Table` lookup.
 
-  **Do not re-derive what 265 "denotes" as an open question.**
-  [[RT-WORKER-FIXTURE-DECODE]] §1d settles the general form: `token` is the
-  **native return value** — literally what the compiled code returned — not an
-  error code, an arm tag, or an index into anything. So `265` carries no
-  information until you have named the selected decoder. **An inference drawn
-  from the numeral before that point is unfounded**, which is the trap this
-  frame walked into by calling the message a result-table fact.
-- **`D3` — the repair.** Cut against `D2`'s finding.
+  **STRUCK — *"whether the gap is the token's PRODUCTION or its
+  REGISTRATION."*** It is neither. The tag is produced correctly and is
+  well-formed; **there is simply no arm to receive it.** The production/
+  registration fork was the wrong pair of alternatives to offer.
+
+  **STRUCK — *"if the arm is `TrapOnly` or an unrecognized `Boundary` tag, the
+  fault is upstream of the decode table entirely and §7's hard stop is likely
+  live."*** The arm **is** the `Boundary` `_ =>`, but the tag is well-formed,
+  so the fault is **not** upstream and **§7 does not fire.** This frame paired
+  "the `_ =>` arm was reached" with "the tag is malformed" as though they
+  travelled together. They do not, and the distinction is the whole finding.
+
+  `AC-1a` is discharged **positive**: `nc5` reaches the same `Boundary`
+  decoder's native call by name and emits `ImmediateInt 7`, so it is a genuine
+  lane control rather than a fixture that is green because the path was never
+  reached.
+
+  **What survives unchanged, and it did its job:** *establish the site by
+  observation, not by the message.* All eight producers render one text
+  accurate for exactly one of them, and `nc22` is now a **confirmed instance of
+  the seven where it is false** — see `D3`.
+
+- **`D3` — the repair. TWO parts.** Cut ruled by the Steward 2026-08-11
+  (`evt_5fn8nb9s03785`).
+
+  **`D3a` — the decode arm.** An `InvocationAggregate` decode path.
+  **The mechanism is the Architect's ruling, not this frame's and not the
+  leader's** — the question routed to it is whether the correct shape is *a
+  specific `InvocationAggregate` arm with the `_ =>` refusal RETAINED for the
+  remaining six tags.* **Do not build ahead of that ruling.** `AC-4` binds
+  hardest here and is quoted in the ruling request: the repair lands in one of
+  the two arms this frame names as dangerous, and "add a correct arm" versus
+  "widen `_ =>` until it stops complaining" are **indistinguishable in a green
+  test.**
+
+  **`D3b` — the error message, and it needs no design input.** The current text
+  *"native result token N is not in the result table"* is **false for this
+  case**: `265` is a well-formed tag reaching an unhandled arm, not a table
+  miss. **A message that misdirects the next reader to the table is a defect on
+  the decode surface and is this node's to fix.** This part can be staged
+  before the Architect rules.
+
+  **Out of scope: the six other unhandled `Boundary` tags.** Name them in the
+  handback; do not handle them.
 - **`D4` — un-skip `nc22` and prove it green on the functionized lane.**
   **This node closes on the row running, not on the skip being tidied.**
 
@@ -201,10 +233,18 @@ outcome than agreement, and it is why the deliverable exists.
   the owner reference removed. **Seen to fail before it passes** — this row has
   been dark, so a green with no demonstrated red is not evidence the repair did
   anything.
-- **`AC-1a` — establish that `nc5` REACHES NATIVE EMISSION, at `file:line`, or
-  record that it does not.** Added by the Steward 2026-08-11 on `D1`'s own
-  caveat, promoted from a note because it is load-bearing: **the residual
-  census `D1` ran observes IR only.**
+- **`AC-1a` — DISCHARGED POSITIVE, 2026-08-11.** `nc5` reaches the same
+  `Boundary` decoder's native call **by name** and emits `ImmediateInt 7`. ⇒
+  **It is a genuine control on the functionized lane**, not a fixture that is
+  green because the path was never reached, and §3's third struck claim stays
+  struck. The stop this AC carried did not fire.
+
+  **Kept below as landed text, because the reasoning is the reusable part.**
+
+  Establish that `nc5` REACHES NATIVE EMISSION, at `file:line`, or record that
+  it does not. Added by the Steward 2026-08-11 on `D1`'s own caveat, promoted
+  from a note because it is load-bearing: **the residual census `D1` ran
+  observes IR only.**
 
   Everything `nc5` contributes rests on it being **green on
   `FunctionizedUnits`**. If it never reaches native emission, it is green for a
@@ -219,12 +259,19 @@ outcome than agreement, and it is why the deliverable exists.
   that changes what `AC-2` is deciding, and the coverage call may not rest on
   it.
 
-- **`AC-2` — the coverage gap is closed or explicitly reported.** `D1` found a
-  second instance of the closure-call shape, so the axis is **return shape**
-  (`nc5` returns `Int`; `nc22` returns a `Record`). Every uninstantiated cell —
-  Bool, bare-constructor, Boundary — is covered or named with its measured
-  cause. **A repair that fixes `nc22` alone while a family exists must say so.**
-  **This AC is gated on `AC-1a`.**
+- **`AC-2` — RESOLVED by `D2`, without authoring a fixture family.** The
+  enumerable family is **`Boundary` tags**, not program shapes:
+  `ImmediateInt`/`Bool`/`PersistentGround` are **handled**;
+  `InvocationAggregate` — **Record and bare constructor together, one cell** —
+  falls through; **six other tags remain unhandled.**
+
+  **That collapses the coverage question.** Bool is already handled, and Record
+  and bare-constructor share a single tag cell, so there is no family to author
+  fixtures for. **No proliferation, no re-cut, `M` stands.**
+
+  **What this AC still requires of the handback:** name the six unhandled tags.
+  They are out of scope to fix and in scope to enumerate — an unnamed remainder
+  is how a narrowed surface reads as a complete one.
 - **`AC-3` (no-regression).** Workspace green **in CI** — never a local
   `--workspace` run (`COORDINATION §12`).
 - **`AC-4` — the decode surface stays fail-closed, on the arm the repair
