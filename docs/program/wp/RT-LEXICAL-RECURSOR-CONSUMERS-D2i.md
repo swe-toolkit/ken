@@ -1,171 +1,200 @@
-# RT-LEXICAL-RECURSOR-CONSUMERS D2i — the productive checked twin
+# RT-LEXICAL-RECURSOR-CONSUMERS D2i — the R3-derived artifact and the discovery ledger
 
-Owner: runtime. Size: M. Node: [[RT-LEXICAL-RECURSOR-CONSUMERS]] (`#6d`).
-Architect ruling **`evt_1dgwdvxhnabg4`** — this frame is that ruling made
+Owner: runtime. Size: **L**. Node: [[RT-LEXICAL-RECURSOR-CONSUMERS]] (`#6d`).
+Architect ruling **`evt_2x157jk8bmpxk`** — this frame is that ruling made
 executable, and where the two differ the ruling wins.
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
-**RELEASED 2026-08-11 on `main` `2a2e311e`.** Re-derive your merge-base from
-`origin/main`; do not take a SHA from this frame.
+**RE-CUT 2026-08-11 on `main` `8898c426`.** This supersedes the first `D2i`
+frame entirely. Re-derive your merge-base from `origin/main`.
 
-## Why this WP exists, stated so nobody re-derives it
-
-[[RT-LEXICAL-RECURSOR-CONSUMERS-D2h]] hard-stopped before any candidate. Its key
-plane compiled and ran and **interned zero fusions**, because the landed `D2g`
-twin has shape `Construct[LexicalClosure[inner match]]` and production discovery
-treats `Construct` and `LexicalClosure` as **terminal**. No producer/consumer
-pair is ever presented, so nothing positive can fire.
-
-**`D2g`'s `AC-1` is true and was the wrong criterion.** It pinned the
-producer-to-IH-consumer relation through `CheckedIhBinding` — binder resolution
-— which still passes on the twin. **Result-flow membership is a different
-relation**, and nothing in `D2g` consumed the pair, so nothing in `D2g` could
-have caught it. **That is a Steward framing defect, not an implementation or
-review miss.** It is recorded here so the correction is not mistaken for a
-criticism of the ring that found it.
-
-**`D2g` is not reopened and `D2h` is not re-scoped.** `D2h` is respun unchanged
-on this WP's output and keeps its own thread.
-
-## The mechanism question is RULED. Do not reopen it.
-
-`continuation_result_origins` owns the exact result-position closure of one
-planner-issued root, and **its current traversal is semantically right**:
-checked wrappers are transparent; a `Let` contributes its body, an `If` its
-branches, a `Match`/`ComputationalMatch` its reachable case bodies; and
-`Construct`, `Closure`, and `LexicalClosure` are **values, therefore terminal**.
-
-**A closure stored in a constructor field is not the result of that
-constructor.** Descending through either terminal would convert contained values
-and dormant closure bodies into results of the enclosing expression, and would
-destroy the disjoint seed-versus-worker-body ownership that existing
-continuation discovery and emission-owner reasoning rely on. **That is a
-semantic widening, not a repair.**
-
-> **Do not change `continuation_result_origins`, and do not add a
-> `Construct`/`LexicalClosure` descent for fusion discovery.** If your positive
-> requires either, that is a hard stop and it comes back to me.
-
-## Deliverable
-
-**Additive, and the additivity is the point.** Retain the landed terminal twin
-**unchanged** as a discriminator, and **add a productive checked sibling** on
-which the production planner issues a result root whose result-flow population
-contains the exact producer construct consumed by the exact computational
-continuation.
-
-The sibling may carry both roots as the real `R3` witness does, or another
-arrangement with the same planner-issued relation. **The shape is not the
-authority — the six facts below are.**
-
-Deliver the productive fixture, its complete oriented plan, and the causal
-observations. Nothing else.
-
-## AC-1 — the required authority, six facts on ONE productive checked artifact
-
-All must hold simultaneously.
-
-1. **The actual continuation-discovery path — not a test reimplementation —
-   issues the consumer and the productive result root.**
-2. `continuation_result_origins` for that exact root **contains the exact
-   producer `Construct`**, and the **terminal sibling root does not**.
-3. The producer construct matches the exact consumer alternative, and its
-   recursive argument is the exact IH binding from `build_checked_ih_bindings`.
-4. The selected case's exact consuming `Call` resolves to that same
-   consumer-frame/recursive-position binding.
-5. The frame, selected slot, and invocation at that call resolve against **one
-   complete, independently authored oriented plan**. The existing per-slot
-   outer/inner constructor pins and the runtime-only marker-relocation
-   discriminator **remain intact**.
-6. The producer invocation edge, emission owner, owner split, complete ordered
-   input projection, and exact consuming suffix are **projectable** on this
-   artifact.
-
-**Re-derive every occurrence coordinate. No numerical coincidence with `D2d` or
-with the landed twin is evidence** — a coordinate that happens to match across
-two artifacts is right by accident.
-
-> ### THE PRODUCTIVE ROOT MUST BE PLANNER-ISSUED
+> ## THE FIRST CUT WAS WRONG AND `a334b9a0` IS EVIDENCE ONLY
 >
-> A test that calls `continuation_result_origins` with an **arbitrarily selected
-> inner origin**, or that **searches structurally** for an inner match and
-> treats it as a root, is **manufactured authority and does not discharge this
-> ruling**. The whole failure being repaired is a fixture that satisfied a real
-> relation nobody needed; **satisfying this one by construction would repeat it
-> exactly, one layer down.**
+> **Do not extend `a334b9a0` as a candidate and do not publish it.** Its
+> "productive" sibling proved pair, suffix and transport, but **changed away the
+> producer unit boundary** to get result flow. It is useful only as an
+> edge-absence refusal if retained.
 >
-> Observe the facts through a **test-only capture at the production candidate
-> boundary** if you need to. **Do not create a second discovery algorithm in the
-> test.**
+> **The measured absence was never authority to invent a third fixture**, and it
+> is not a reason to widen `continuation_result_origins`. Two synthetic shapes
+> each obtained one half of what `R3` has; a third would have been a guess.
+> **Runtime stopped instead of guessing, twice. That was right both times.**
 
-## AC-2 — three populations, established SEPARATELY
+## The relation already exists in production — nobody had to invent it
 
-The distinction is only causal if each of these is its own observation.
+`build_continuation_specialization_plan` seeds the outer computational match,
+interns the ordinary closure specialization, and **only after that successful
+insertion** enqueues:
+
+```
+ContinuationDiscovery {
+    continuation_origin: <the same consumer>,
+    result_root: worker.body_origin,
+    enclosing_specialization: Some(target),
+}
+```
+
+On the real `R3` before-hole witness **that second, planner-issued root is
+origin 18, and its result population contains producer origin 23.** That is also
+why `R3` carries the unique `StaticBody` edge into producer owner 2 while the
+direct-root sibling does not.
+
+⇒ **`R3` was never a luckier shape. It is the shape production actually
+issues**, and both prior fixtures were missing the second discovery rather than
+missing a structural trick.
+
+## Deliverable 1 — the R3-derived checked artifact
+
+**Replace the positive synthetic sibling with a checked/unmarked variant of the
+actual `R3` before-hole builder.**
+
+- **Preserve the `Construct[LexicalClosure[...]]` and function-unit boundary
+  exactly.** That boundary is what produces the `StaticBody` edge; the previous
+  cut destroyed it by making the inner frame a scrutinee.
+- **Add only checked wrappers, through the same parameterized builder.**
+- **Assert that erasing those wrappers yields the unmarked `R3` expression.**
+  That assertion is what makes it *derived* rather than *resembling*.
+- Author and **positively validate one complete oriented plan** at the **freshly
+  derived** marker locations.
+
+**Banned:** copying the `R3` shape into a second planning-only builder, and
+post-processing an already-built tree by structural search. **Either would
+reintroduce exactly the divergence this WP exists to remove.**
+
+## Deliverable 2 — fusion enumeration consumes production-issued discoveries
+
+**The current enumerator is not that, and this is the defect.** It independently
+scans every computational match and uses only `child(consumer, 0)`, so **it can
+never see the worker-body root that production issues after ordinary
+specialization.**
+
+- **Record each discovery only after the production `visited.insert` admits
+  it.**
+- **Return or pass that closed ledger from the same
+  `build_continuation_specialization_plan` invocation.**
+- Fusion enumeration **may** walk `continuation_result_origins` for those ledger
+  roots.
+- It **may not** reconstruct seeds, scan worker bodies, or run a parallel fixed
+  point.
+
+Ordinary specialization may already be interned. **No fusion id, key, or
+descriptor may exist yet.**
+
+> ## THE CLOSED HANDOFF CONTRACT — no further gate may be discovered piecemeal
+>
+> **This list is the point of the re-cut.** Five stops on this node, three of
+> them a fixture lacking a property the *next* gate consumed. The Architect has
+> now closed the set. **Before `D2h`, one candidate must carry or expose all of
+> these exact facts:**
+>
+> 1. the admitted production `ContinuationDiscovery` — consumer origin, result
+>    root, and enclosing specialization/context;
+> 2. producer construct origin and owner, matching alternative, recursive
+>    position, exact argument origin, and its producer-side `CheckedIhBinding`;
+> 3. selected case-body origin, the exact consuming `Call`, its callee origin,
+>    and the consumer-frame/position `CheckedIhBinding`;
+> 4. the resolved frame/slot/invocation `CheckedTransportCoordinate`;
+> 5. the unique exact `StaticBody` edge triple — emission caller, producer
+>    callee owner, and callee entry;
+> 6. the producer/consumer owner split and exact result-edge membership;
+> 7. the **complete ordered** `ContinuationProducerEnvironment.inputs`
+>    projection, every required slot closed, unique, and source-slot validated.
+>
+> **These are pre-interning facts, not key or interner work.**
+>
+> ### Two corrections that follow, and both are easy to get wrong
+>
+> - **`continuation_inputs: usize` is NOT the complete ordered projection.**
+>   `D2h` keys and later validates the projection itself; **retaining only its
+>   length is insufficient.**
+> - **Retain the selected case-body origin NOW, alongside the exact call.** It
+>   **must not** be recoverable later from "the case containing the call" —
+>   that is a structural re-derivation of a fact you were holding.
+
+## AC-1 — three populations, established separately
 
 | population | what must hold |
 |---|---|
-| **landed terminal checked twin** | transport validates **and** the `CheckedIhBinding` relation holds, **and** production discovery presents **zero** fusion producer/consumer pairs for that consumer |
-| **productive unmarked sibling** | the exact result-flow pair and exact consuming suffix exist, **and no checked coordinate resolves** |
-| **productive checked sibling** | pair, suffix, and plan-backed coordinate all exist together, and **exactly one** complete pre-interning fusion candidate reaches the `D2h` handoff boundary |
+| **landed `D2g` terminal checked twin** | binder relation and transport hold; **zero** result-flow pair |
+| **`R3`-derived productive unmarked** | production-issued pair, suffix, and edge; **no checked coordinate** |
+| **the same `R3`-derived productive checked artifact** | the same pair, suffix and edge, **plus** one plan-backed coordinate, reaching **exactly one** pre-interning candidate |
 
-**The first row is the regression control and it is the one this whole WP
-exists to install:** it proves binder and transport truth **do not imply**
-result flow. Had it existed in `D2g`, `D2h` would not have stopped.
+The second and third are **the same artifact** differing only in checked
+wrappers — that is what the erasure assertion in Deliverable 1 buys.
 
-The second row keeps **transport absence as a distinct, later gate** — do not
-let it collapse into the pair-absence case.
+## AC-2 — the causal root control
 
-## AC-3 — the informative mutation, and its converse
+**Suppress only the production descent after the ordinary closure specialization
+is inserted.** Then:
 
-**Forward.** Change **only result-root reachability**, keeping the binder
-relation and checked transport valid: place the productive inner computation
-behind the value boundary, or select the terminal sibling root. **The exact
-candidate population must go from one to zero before interning.**
+- the worker-body discovery **disappears**;
+- the fusion candidate count goes **1 → 0**;
+- **the initial terminal root remains unchanged.**
 
-**Converse, and it is the one that catches a lazy refusal.** Stripping or
-transplanting transport **while preserving the productive result-flow pair**
-must fail **at the transport gate** — it must **not** be reported as absence of
-the pair. Two different refusals, two different reasons; a mechanism that
-reports both the same way passes both halves for the wrong reason.
+That third clause is what makes it causal rather than a blunt disable.
 
-## Excluded scope — the stop line
+## AC-3 — the transport converse, and multiplicity
 
-**This WP contains no fusion key, id, descriptor, interner, re-derivation
-validator, ABI, emission, edge redirection, or `R3`-green claim.** `D2h` resumes
-unchanged only after this lands.
+**Strip or transplant only the checked transport** on the productive artifact.
+It must **refuse at transport** — **not at pair discovery and not at edge
+discovery.** Three gates, three distinct refusals; a mechanism that reports them
+alike passes for the wrong reason.
 
-**Stop and return to me if producing the positive requires any of:**
+**Multiplicity refuses.** More than one otherwise-matching issued discovery, or
+more than one matching producer edge, is a refusal. **Do not choose one.**
 
-- descending through `Construct` or `LexicalClosure`;
-- injecting an unissued result root;
-- structural search for the producer, the consumer, or the checked markers;
-- weakening the existing `D2g` transport plan or its constructor pins;
-- beginning the `D2h` key plane here.
+## Excluded scope and stop line
 
-**The discarded `D2h` plane remains correctly discarded.** A plane with zero
-positive candidates must not land, and rebuilding it early inside this WP is the
-same error with a different frame around it.
+**No semantic traversal changes.** `Construct`, `Closure`, and `LexicalClosure`
+**stay terminal**. `D2g` stays closed. `D2h` stays held.
+
+**Contains no** fusion key, id, descriptor, re-derivation validator, ABI,
+emitter, edge redirection, or `R3`-green claim.
+
+**Stop and return to me if the positive requires** widening the traversal,
+reconstructing seeds, scanning worker bodies, running a parallel fixed point,
+a second planning-only builder, structural post-processing of a built tree,
+choosing among multiple matches, or beginning the `D2h` key plane.
+
+## Declared partial seam — land the ledger without waiting for the whole
+
+**This is size L and I am not pretending otherwise.** Under the accepted-partial
+policy you may land at one declared seam:
+
+> **Deliverable 2 plus the `R3`-derived *unmarked* artifact**, with `AC-1`'s
+> first two populations and `AC-2`'s causal root control.
+
+That is a coherent, independently reviewable increment: the enumerator consumes
+production-issued discoveries, and the pair/suffix/edge are shown on a real
+derived artifact. **The checked variant, the plan-backed coordinate, and the
+closed fact list then follow as the remainder.**
+
+**Take the seam if the whole does not fit one turn.** Do not take it if the
+ledger is not independently exercised — a ledger with nothing enumerating from
+it is the same green-by-construction shape you correctly refused twice.
 
 ## Contention
 
 `crates/ken-runtime`. Language is on `crates/ken-elaborator` under
 [[LANG-SPACE-PRESTATE-BIND]] — no intersection. **No `spec/` or `conformance/`
-path, so no Spec vote** on the merge Decision.
+path, so no Spec vote.**
 
 ## Validation
 
 Targeted only. `-p ken-runtime`, or `--test <name>`, **never `--workspace`**.
 "No regression" means green in CI.
 
-## Sizing
+## Sizing, and what I owe you
 
-One turn to a releasable increment or a genuine hard stop. **Both are good
-outcomes, and on this node the stops have been worth more than the increments.**
+**This is the fifth stop on `#6d` and the pattern in the first four was mine:**
+each frame required the properties I could name, and each next gate consumed one
+I had not. `D2g`'s `AC-1` pinned binder resolution; `D2h` needed result flow.
+The first `D2i` pinned result flow and transport; the enumerator needed a
+`StaticBody` edge.
 
-`D2h`'s stop was the fourth on `#6d` and every one has been a framing defect of
-mine. **If this frame is wrong in the same way — an acceptance criterion that
-measures a real property the next deliverable does not consume — say so and
-stop.** You have now done that twice, correctly, at real cost to your own
-completed work, and it is the behaviour I want rather than a candidate that
-passes.
+**The closed handoff contract above is the fix for that**, and it is the
+Architect's list rather than mine — which is the point. **If a gate beyond it
+still consumes something unnamed, that is a defect in the contract and I want to
+know immediately**, because it means the piecemeal discovery is not closed and
+the next cut has to be structural rather than another slice.
