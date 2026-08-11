@@ -66,11 +66,11 @@ one that panicked.**
 
 ## The three questions, and they route differently
 
-| question | owner |
-|---|---|
-| Should `subst_outer` bound the index and refuse rather than panic? | Architect (mechanism) |
-| Is refusing a **contract change** to a kernel function, or defensive behaviour within the existing contract? | Architect |
-| Does adding a refusal path to a kernel primitive grow or shrink the TCB? | **Operator — I forward this, I do not decide it** |
+| question | owner | state |
+|---|---|---|
+| Should `subst_outer` bound the index and refuse rather than panic? | Architect (mechanism) | **RULED — yes** |
+| Is refusing a **contract change** to a kernel function, or defensive behaviour within the existing contract? | Architect | **RULED — it is a contract change** |
+| Does adding a refusal path to a kernel primitive grow or shrink the TCB? | **Operator — I forward this, I do not decide it** | **forwarded 2026-08-10, `evt_561jx5e0ffy40`** |
 
 **The second question is the one that decides whether this is small.** `D10`'s
 frame made a `subst_outer` contract change a stop condition precisely because
@@ -78,6 +78,61 @@ the distinction was not obvious then and is not obvious now. A bounds check that
 returns an error is a new failure mode in a trusted primitive; a bounds check
 that cannot fire is dead code in the TCB. **Neither is free, and that is the
 argument for ruling rather than for quietly adding one.**
+
+## The Architect's ruling, recorded 2026-08-10
+
+Ruled at `evt_4aqgwcanhhkgn` (thread `thr_6b5f267m16jwk`). **Recorded here
+because a ruling that lives only in a thread is not a durable deliverable** —
+this node, not the thread, is what a future framer reads.
+
+**Both Architect questions resolve yes.** The reachability defence is not an
+adequate permanent boundary for a public cross-crate primitive with 29 external
+call sites, 14 of them in-kernel: it can justify `D10`'s local repair, but it
+cannot make unchecked indexing an invariant carrier for future callers. And
+returning an error adds an observable outcome and forces caller propagation, so
+calling it merely defensive would hide the real API/TCB decision.
+
+**The classification does not make the change semantically expansive.** On valid
+inputs the resulting term must be byte-for-byte identical; the new outcome exists
+only where the old function was undefined-by-precondition and actually panicked.
+At the kernel entry surface that is a refinement toward the existing rule that
+raw-well-formed input yields yes/no or a minimal reason, never a crash.
+
+**The guard must cover the whole arithmetic domain**, not merely swap
+`params[p_idx]` for `params.get(p_idx)`:
+
+- establish `params.len() == m` once at the public entry;
+- for a variable at or beyond `inner_depth`, compute the relative index with
+  checked/subtractive structure and require it strictly below `m`;
+- only then derive the reversed parameter index;
+- preserve variables below `inner_depth`;
+- return a typed substitution/scoping error for either arity mismatch or a
+  variable beyond `inner_depth + m`.
+
+**No unsigned underflow, wrapped index, unchanged invalid variable, sentinel
+term, or panic is an acceptable failure policy.** The old unchecked public route
+must not remain beside a checked one — the thirtieth caller would simply select
+the easier API.
+
+### What this does to the sizing, and it is the operative constraint
+
+**Not shovel-ready as size S on Architect authority alone.** The frame must bind
+all 29 current sites, not merely the `D10` path. Every current caller propagates
+or contextually translates the refusal, and **no caller may `unwrap` it**.
+Required controls: both arity directions, the first out-of-scope outer variable,
+the two valid endpoint parameters under nonzero inner depth, and at least one
+additional binder descent. Valid-domain equivalence is pinned across
+representative `check`, `obs`, `inductive`, and elaborator consumers.
+
+> **There is no interim partial.** The Architect ruled out landing a panic-only
+> assertion, and ruled out a bounds check that cannot reach a typed boundary.
+> If authorized, the typed refusal and the full caller migration are framed and
+> land **together**. A Steward tempted to cut this smaller should read that as
+> the ruling forbidding the cut, not as a sizing problem to solve.
+
+**`D10` is not reopened.** Its coordinate-origin repair remains sound and
+necessary. The ruling replaces a census-dependent absence claim with a local
+totality boundary; it does not claim another caller is defective.
 
 ## Why draft rather than ready
 

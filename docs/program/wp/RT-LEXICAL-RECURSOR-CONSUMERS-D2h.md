@@ -6,16 +6,33 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
-**HELD pending [[RT-LEXICAL-RECURSOR-CONSUMERS-D2g]].** Fixed inputs will be
-measured at whatever `main` carries the twin; **do not take a SHA from this
-frame**, and do not start before I release it.
+**RELEASED 2026-08-11. The `D2g` hold is discharged.**
+[[RT-LEXICAL-RECURSOR-CONSUMERS-D2g]] merged as `main` `ae9db606` (candidate
+`027a0674`, declared merge-base `72fe6714`, PR #1844, three commits, one path,
+`+984/-0`, blob-verified). Re-derive your merge-base from `origin/main`; **do
+not take a SHA from this frame.**
 
-**The gate is the twin landing, and it is stated as a property rather than an
-event.** Do not start until `D2g`'s `AC-1`..`AC-4` are discharged and the
-checked twin is on `main`. Under the accepted-partial policy a WP branch merges
-repeatedly by construction, so a release condition keyed on a merge *event*
-fires early by default — that already happened once on this node, and the
-correction is why this sentence reads the way it does.
+**The gate was stated as a property, and I checked the property rather than the
+merge.** The condition was `D2g`'s `AC-1`..`AC-4` discharged and the checked
+twin on `main`, not "D2g merged". Both reviewers verified those ACs on exact
+`027a0674`: `AC-1`'s same-builder binding to one consumer-frame/position-0
+`CheckedIhBinding`; `AC-2`'s causal, runtime-only discriminator, where the plan
+is held byte-fixed and equality-guarded while only the Runtime declaration moves
+the outer slot wrapper to a real sibling case; the per-slot constructor pins on
+outer `D2gOut::Node` and inner `D2gIn::Node` with their inequality asserted; and
+the plan-backed triple resolution with relation-severance yielding no coordinate.
+
+**Why that distinction was worth keeping.** Under the accepted-partial policy a
+node merges repeatedly by construction — `RT-LEXICAL-RECURSOR-CONSUMERS` has
+landed eight times (`D2b`, `D2c`, `D2d` twice, `D2e` three times, and now `D2g`)
+— so a release condition keyed on "the WP merged" names an event that recurs and
+fires early by default. That already happened once on this node, which is why
+this gate reads as a property instead.
+
+`D2g` itself merged once, at `ae9db606`. Its two earlier candidates were
+**rejected in review, never merged** — the first for a non-causal `AC-2`
+discriminator, the second for a single constructor answering for both slot
+frames. Both defects are closed in what landed.
 
 ## What this deliverable is
 
