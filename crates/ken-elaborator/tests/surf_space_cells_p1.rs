@@ -40,7 +40,7 @@ fn literal_value(value: &NumericLitVal, decimal_pair: GlobalId) -> EvalVal {
         NumericLitVal::Float(value) => EvalVal::Float(*value),
         NumericLitVal::Float32(value) => EvalVal::Float32(*value),
         NumericLitVal::Decimal { coeff, exp } => {
-            ken_interp::decimal_value(decimal_pair, *coeff, *exp)
+            ken_interp::decimal_value(decimal_pair, coeff.clone(), *exp)
         }
         NumericLitVal::Str(value) => EvalVal::Str(value.clone()),
     }

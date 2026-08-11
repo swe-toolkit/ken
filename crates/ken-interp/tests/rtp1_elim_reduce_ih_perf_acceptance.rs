@@ -67,7 +67,7 @@ fn run(src: &str) -> (Duration, EvalVal, ElabEnv) {
             NumericLitVal::Float(f) => EvalVal::Float(*f),
             NumericLitVal::Float32(f) => EvalVal::Float32(*f),
             NumericLitVal::Decimal { coeff, exp } => {
-                ken_interp::decimal_value(mkdecimalpair_id, *coeff, *exp)
+            ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
             }
             NumericLitVal::Str(s) => EvalVal::Str(s.clone()),
         };

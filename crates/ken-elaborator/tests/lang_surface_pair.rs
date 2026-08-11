@@ -7,6 +7,7 @@ use ken_elaborator::lossless::parse_lossless;
 use ken_elaborator::parser::parse_expr;
 use ken_elaborator::{ElabEnv, Expr};
 use ken_kernel::{whnf, Context, Term};
+use num_bigint::BigInt;
 
 fn token_kinds(source: &str) -> Vec<Token> {
     Lexer::lex(source)
@@ -64,7 +65,7 @@ fn projection_chains_and_float_literals_split_at_the_lexer() {
     ));
     assert_eq!(
         token_kinds("1.2d"),
-        vec![Token::DecimalLit(12, -1), Token::Eof]
+        vec![Token::DecimalLit(BigInt::from(12), -1), Token::Eof]
     );
 }
 

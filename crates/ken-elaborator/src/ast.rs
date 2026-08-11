@@ -540,7 +540,7 @@ pub enum NumLit {
     /// Decimal-point float — defaults to `Float`.
     Float(f64),
     /// `d`-suffix exact decimal — defaults to `Decimal`.
-    Decimal(i64, i32),
+    Decimal(BigInt, i32),
     /// `f32`-suffix IEEE single — defaults to `Float32`.
     Float32(f32),
 }

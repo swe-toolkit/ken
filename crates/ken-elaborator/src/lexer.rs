@@ -107,7 +107,7 @@ pub enum Token {
     // L1 numeric literal tokens
     IntLit(BigInt),       // integer literal too large for u32
     FloatLit(f64),        // decimal-point float: `3.14`, `1e-9`
-    DecimalLit(i64, i32), // `d`-suffix: coeff × 10^exp; e.g. `0.1d` → (1,-1)
+    DecimalLit(BigInt, i32), // `d`-suffix: coeff × 10^exp; e.g. `0.1d` → (1,-1)
     Float32Lit(f32),      // `f32`-suffix: `1.5f32`
     // Atoms
     Ident(String), // lowercase-initial term variable
@@ -573,7 +573,7 @@ impl<'s> Lexer<'s> {
         {
             self.advance(); // consume 'd'
             let coeff_str = format!("{}{}", int_str, frac_str);
-            let coeff: i64 = coeff_str.parse().map_err(|_| ElabError::ParseError {
+            let coeff: BigInt = coeff_str.parse().map_err(|_| ElabError::ParseError {
                 msg: format!("decimal literal coefficient too large: {}", coeff_str),
                 span: Span::new(start, self.pos),
             })?;
