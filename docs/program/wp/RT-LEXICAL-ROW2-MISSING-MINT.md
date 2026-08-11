@@ -169,6 +169,37 @@ the `px8j` instrument.
 `RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` landed and where its `R2`/`R3` residual
 will land. Runtime runs one node at a time.
 
-**This is not on the RecursiveDescent critical path.** `RT-DESCENT-RETIRE` gates
-on `RT-RECURSOR-TRANSPORT` and `RT-FNUNIT-RESULT-TOKEN`, and this node is
-neither. Sequence it behind the arc, not into it.
+**ON the RecursiveDescent critical path. Corrected 2026-08-11**, Architect
+ruling `evt_2jnf3x8f06psz` on a Steward escalation.
+
+> **STRUCK — *"This is not on the RecursiveDescent critical path.
+> `RT-DESCENT-RETIRE` gates on `RT-RECURSOR-TRANSPORT` and
+> `RT-FNUNIT-RESULT-TOKEN`, and this node is neither. Sequence it behind the
+> arc, not into it."***
+>
+> **The reasoning checked the wrong node.** It read `#7`'s dependencies
+> correctly and never asked whether **`#6b`'s own `D3` bar** includes row 2. It
+> does — `D3` must prove all six rows green with no exclusion hook, and row 2 is
+> one of the six. `#6d` cannot repair it.
+>
+> **The `R4` carve-out changed the repair OWNER, not the retirement ACCEPTANCE
+> SURFACE.** Those are two questions and the carve-out answered only the first.
+>
+> **This correction landed on the issue node first and was stranded here for
+> several hours** — the frame is what a ring builds from, so the stale sentence
+> was the one that would actually have been acted on.
+
+**Release order: after [[RT-LEXICAL-RECURSOR-CONSUMERS]], before
+[[RT-RECURSOR-TRANSPORT]] `D3`.**
+
+### The file contention is real but it is not a standing bar
+
+The `lowering/core*` overlap above is a **one-ring-at-a-time** coherence
+constraint, not a parallel-edit hazard: Runtime is a single ring, so the only
+question is which node it is running. **When `#6d` is stopped on a ruling with
+its branch released and its tree clean, the contention is not live** and this
+node is the right thing for the ring to run.
+
+The one genuine intersection to clear first is **unmerged** work touching
+`lowering/core/tests/control.rs`, which is this node's own observation site.
+Merge that before releasing here.
