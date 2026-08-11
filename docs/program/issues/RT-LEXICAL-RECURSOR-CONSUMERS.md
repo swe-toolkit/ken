@@ -1004,13 +1004,36 @@ question askable at all.
 > made it read as the stronger guarantee.** Reading the constant is not reading
 > its extent.
 >
-> **Two consequences for the wiring turn, which owns the repair.** Refusal
-> paths that were unreachable before this merge are now reachable on every
-> production compile and merely do not fire — `:2215` can fail a compile. And
-> arming does **not** move `main` from "chain absent" to "chain present"; it
-> moves it from "chain running on empty input" to "chain running on real
-> input", changing those stages' *data* rather than their *reachability*.
-> **Extend the gate to cover `:2214`, `:2215` and `:2486`.**
+> **The remedy first routed here — "extend the gate to cover `:2214`, `:2215`
+> and `:2486`" — is WITHDRAWN, `evt_6htz44wp8pnkx`. Do not do it.**
+> `core.rs:2163-2164` records that the arrangement is deliberate: the chain is
+> **not** guarded on `is_empty()` because *"a guard would make the zero case
+> take a different path from the one the non-zero case exercises."* A
+> whole-chain gate destroys exactly that property. The instruction would have
+> had the ring undo a correct decision to make the code match a Steward
+> summary.
+>
+> **The code was right at the site the whole time.** `core.rs:2165-2172` states
+> it precisely — everything downstream is *"built, compiled and **reachable**,
+> and every one of them is inert because `continuation_fusions()` is empty on a
+> plan with no installed plane"* — and `control.rs:4074-4079` agrees. Adversary
+> `evt_27q1fqr5m66n3` closed the population: three mentions of the constant,
+> all read, **two correct**.
+>
+> ⇒ **The defect was never in the code.** It was in prose written away from the
+> site by a reader who did not consult the comment at the site. Reading the
+> constant is not reading its extent, and the comment that would have said so
+> was in the same screenful.
+>
+> **What is actually owed, and it is smaller.** `units.rs:2889` is the one
+> genuinely wrong statement — it attributes inertness to the gate rather than
+> to the empty population, in a comment doing safety work. **Fix that comment;
+> change no code.**
+>
+> **The substantive open question, unchanged by any of the above:** `:2215` is
+> `?`-propagated, so refusal paths that were unreachable before this merge are
+> reachable on every production compile and merely do not fire. Arming
+> therefore changes those stages' *data*, not their *reachability*.
 >
 > **Still unverified, and cheap:** that the three stages are observable no-ops
 > on empty input. CI green on the corpus is not that proof. If they are not,
