@@ -15563,7 +15563,277 @@ mod tests {
         );
     }
 
-    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary
+    // ── `D2j` — the fusion-reaching witness with a NON-EMPTY input projection ──
+    //
+    // The landed `D2g` twin reaches a fusion candidate but projects zero ordered
+    // inputs, because its consumer's owning unit has no parameters to project.
+    // This witness is that same body inside a two-parameter `LexicalClosure`, so
+    // the consumer sits in a unit with an entry ABI -- one structural
+    // difference, and the reason the projection becomes non-empty.
+    //
+    // Wrapping shifts every checked marker one edge deeper: a `LexicalClosure`
+    // descends its body at edge `3`, so each `D2g` path gains a leading `3`.
+    // These are hand-derived from that convention, not read back out of the
+    // collector.
+
+    const D2J_DECLARATION: &str = "decl:fixture::d2j";
+
+    #[cfg(test)]
+    fn d2j_witness_body(checked: bool) -> RuntimeExpr {
+        RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["a".to_string(), "b".to_string()],
+            body: Box::new(d2g_declaration_body(checked)),
+        }
+    }
+
+    #[cfg(test)]
+    fn d2j_prefixed(path: Vec<u64>) -> Vec<u64> {
+        let mut prefixed = vec![3];
+        prefixed.extend(path);
+        prefixed
+    }
+
+    #[cfg(test)]
+    fn d2j_declaration(checked: bool) -> RuntimeDeclaration {
+        RuntimeDeclaration {
+            symbol: D2J_DECLARATION.to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: d2j_witness_body(checked),
+            },
+            metadata: crate::RuntimeSymbolMetadata {
+                obligations: Default::default(),
+                obligation_metadata: Default::default(),
+                assumptions: Default::default(),
+                assumption_trust_metadata: Default::default(),
+                trusted_base_delta: Default::default(),
+                lowerability: None,
+                unsupported: None,
+                runtime_checks: Default::default(),
+                capabilities: Default::default(),
+                effects: Default::default(),
+            },
+        }
+    }
+
+    #[cfg(test)]
+    fn d2j_entry() -> RuntimeExpr {
+        RuntimeExpr::DeclarationRef {
+            symbol: D2J_DECLARATION.to_string(),
+        }
+    }
+
+    #[cfg(test)]
+    fn d2j_oriented_plan() -> crate::OrientedSubcontinuationPlanV1 {
+        let body = d2j_witness_body(true);
+        let location = |path: Vec<u64>| crate::CheckedRuntimeMarkerLocationV1 {
+            declaration: D2J_DECLARATION.to_string(),
+            runtime_path: path,
+        };
+        let mut frames = Vec::new();
+        for (frame_id, semantic_position, parent) in [
+            (D2G_OUTER_FRAME, 0u64, None),
+            (D2G_INNER_FRAME, 1u64, Some(D2G_OUTER_FRAME)),
+        ] {
+            let mut frame = crate::OrientedSubcontinuationFramePlanV1 {
+                frame_id,
+                segment_site_id: 9,
+                declaration: D2J_DECLARATION.to_string(),
+                checked_occurrence_path: vec![10, frame_id],
+                semantic_position,
+                input_interface: d2g_interface(frame_id as u8),
+                output_interface: d2g_interface(frame_id as u8 + 1),
+                runtime_frame_fingerprint: d2g_frame_fingerprint(&body, frame_id),
+                occurrence_binding_fingerprint: 0,
+                control_witness: parent.map_or(
+                    crate::OrientedControlWitnessV1::DistinguishedRoot,
+                    crate::OrientedControlWitnessV1::ParentFrame,
+                ),
+            };
+            frame.occurrence_binding_fingerprint =
+                crate::compiler_private_oriented_occurrence_binding_fingerprint(&frame);
+            frames.push(frame);
+        }
+
+        let mut computational_ih_slots = Vec::new();
+        for (slot_template_id, frame_template_id, checked_path, marker, constructor) in [
+            (
+                D2G_OUTER_SLOT,
+                D2G_OUTER_FRAME,
+                vec![20u64, 0],
+                d2j_prefixed(d2g_outer_slot_location()),
+                D2G_OUTER_SLOT_CONSTRUCTOR,
+            ),
+            (
+                D2G_INNER_SLOT,
+                D2G_INNER_FRAME,
+                vec![20u64, 1],
+                d2j_prefixed(d2g_inner_slot_location()),
+                D2G_INNER_SLOT_CONSTRUCTOR,
+            ),
+        ] {
+            let mut slot = crate::CheckedComputationalIHSlotTemplateV1 {
+                slot_template_id,
+                declaration: D2J_DECLARATION.to_string(),
+                checked_match_ordinal: frame_template_id,
+                checked_occurrence_path: checked_path,
+                frame_template_id,
+                constructor: constructor.to_string(),
+                recursive_position: 0,
+                method_binder_ordinal: 0,
+                local_telescope: Vec::new(),
+                ih_interface: d2g_interface(frame_template_id as u8),
+                segment_site_id: 9,
+                frame_templates: vec![frame_template_id],
+                input_interface: d2g_interface(frame_template_id as u8),
+                output_interface: d2g_interface(frame_template_id as u8 + 1),
+                runtime_marker_locations: vec![location(marker)],
+                occurrence_binding_fingerprint: 0,
+            };
+            slot.occurrence_binding_fingerprint =
+                crate::compiler_private_computational_ih_slot_binding_fingerprint(&slot);
+            computational_ih_slots.push(slot);
+        }
+
+        let mut call = crate::CheckedComputationalIHCallTemplateV1 {
+            call_template_id: D2G_CALL,
+            declaration: D2J_DECLARATION.to_string(),
+            checked_occurrence_path: vec![30, 0],
+            slot_template_id: D2G_OUTER_SLOT,
+            arity: 1,
+            local_telescope: Vec::new(),
+            result_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
+            callee_segment_site_id: 9,
+            callee_frame_templates: vec![D2G_OUTER_FRAME],
+            parent_frame_template_id: Some(D2G_OUTER_FRAME),
+            parent_segment_site_id: Some(9),
+            caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
+            runtime_marker_locations: vec![location(d2j_prefixed(d2g_call_location()))],
+            occurrence_binding_fingerprint: 0,
+        };
+        call.occurrence_binding_fingerprint =
+            crate::compiler_private_computational_ih_call_binding_fingerprint(&call);
+
+        crate::OrientedSubcontinuationPlanV1 {
+            representation_rule_version:
+                crate::OrientedSubcontinuationPlanV1::REPRESENTATION_RULE_VERSION,
+            frames,
+            recursive_calls: Vec::new(),
+            computational_ih_slots,
+            computational_ih_calls: vec![call],
+        }
+    }
+
+    /// `D2j` — a fusion-reaching witness with a genuinely NON-EMPTY ordered
+    /// input projection, and its count.
+    ///
+    /// `D2h`'s witness reaches a fusion candidate and projects **zero** ordered
+    /// inputs, which is why its `continuation_inputs` identity class could not
+    /// be exercised there. This witness is the same body inside a
+    /// two-parameter `LexicalClosure`, so the consumer's owning unit has an
+    /// entry ABI to project -- one structural difference, and it is the reason
+    /// the projection becomes non-empty.
+    ///
+    /// Both are measured in one test, so the count is a comparison rather than
+    /// a bare number: **0 on the bare witness, 2 on this one.** A lone "2"
+    /// would not show that the parameterisation is what produced it.
+    ///
+    /// The projection's members are pinned, not just its length -- a count
+    /// could be reached by an unrelated projection of the same size.
+    ///
+    /// The earlier generic census (2360 projections across the corpus) is
+    /// negative evidence only: it showed the machinery yields non-empty runs and
+    /// is **not** promoted to a fusion witness here.
+    #[test]
+    fn d2j_the_witness_projects_a_non_empty_ordered_input_run() {
+        // The bare witness: a fusion candidate, and an empty projection.
+        let bare_declaration = d2g_declaration(true);
+        let bare_entry = d2g_entry();
+        let mut bare_declarations = BTreeMap::new();
+        bare_declarations.insert(D2G_DECLARATION, &bare_declaration);
+        let bare_plan =
+            plan_static_transition_graph(&bare_entry, &bare_declarations).expect("plannable");
+        let bare_oriented = d2g_oriented_plan();
+        let bare = enumerate_live_fusion_candidates(
+            &bare_plan,
+            &bare_entry,
+            &bare_declarations,
+            Some(&bare_oriented),
+        )
+        .expect("enumerates");
+        assert_eq!(bare.len(), 1, "the bare witness still reaches one candidate");
+        assert_eq!(
+            bare[0].continuation_inputs.len(),
+            0,
+            "and still projects nothing, which is what this witness exists to fix"
+        );
+
+        // The parameterised witness: the same candidate, with inputs to project.
+        let declaration = d2j_declaration(true);
+        let entry = d2j_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2j_oriented_plan();
+        let candidates =
+            enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+                .expect("enumerates");
+        assert_eq!(
+            candidates.len(),
+            1,
+            "wrapping must not cost the candidate: {candidates:?}"
+        );
+        let inputs = &candidates[0].continuation_inputs;
+        assert_eq!(
+            inputs.len(),
+            2,
+            "THE COUNT: two ordered inputs, one per declared parameter: {inputs:?}"
+        );
+
+        // The members, so the count cannot be met by an unrelated projection.
+        let consumer_owner = candidates[0].consumer_owner;
+        let ContinuationSourceCoordinate::EntryAbi {
+            source_owner: first_owner,
+            ..
+        } = inputs[0].coordinate
+        else {
+            panic!("the first input is not an entry-ABI coordinate: {:?}", inputs[0]);
+        };
+        for (ordinal, input) in inputs.iter().enumerate() {
+            match &input.coordinate {
+                ContinuationSourceCoordinate::EntryAbi {
+                    source_owner,
+                    source_abi_position,
+                    source,
+                } => {
+                    // MEASURED: the inputs are parameters of the unit that owns
+                    // the wrapper, which is neither the producer's nor the
+                    // consumer's. I had assumed the producer's and was wrong, so
+                    // the relation is asserted as a shared owner across the run
+                    // rather than tied to a side of the fusion by guess.
+                    assert_eq!(
+                        *source_owner, first_owner,
+                        "every input in the run comes from ONE unit's entry ABI"
+                    );
+                    assert_eq!(
+                        *source_abi_position as usize, ordinal,
+                        "and they are ORDERED, position matching ordinal"
+                    );
+                    assert!(
+                        matches!(source, ContinuationInputSource::Parameter),
+                        "and sourced from a parameter: {source:?}"
+                    );
+                }
+                other => panic!("an input projected from an unexpected coordinate: {other:?}"),
+            }
+        }
+        assert_ne!(
+            candidates[0].producer_owner, consumer_owner,
+            "and the candidate is still the cross-unit one"
+        );
+    }
+
+    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary
     /// derivation.
     ///
     /// The two routes are genuinely different: the primary builds the key from
