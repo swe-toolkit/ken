@@ -9060,6 +9060,568 @@ pub(in crate::cranelift_backend) fn fusion_redirect_target(
     Ok(selected)
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — one preflighted, move-only claim on
+/// exactly one fused source region.**
+///
+/// The Architect's ruled emitter object. It is **compiler-only**: nothing here
+/// reaches a runtime value, a `Lowered`, a Cranelift entity or a boundary word.
+/// It is **move-only** by construction — no `Clone`, no `Copy` — so a second
+/// consumer of one region cannot exist by copying the permit, which is the
+/// property the affine discipline actually needs. `PartialEq` is deliberately
+/// absent too: two claims are never compared, they are held or moved.
+///
+/// **Every field is copied out of the complete production key, or derived from
+/// the immutable plan by the landed selector.** Nothing here is a witness
+/// coordinate, a search for a plausible edge, or a re-measurement: a claim that
+/// re-derived any member from the program text would be a second authority that
+/// could disagree with the key its identity came from.
+///
+/// **What holding one authorizes, stated exactly, because it is narrower than
+/// "the fused region is mine":** emit one `Fusion(id)` definition, redirect the
+/// one named invocation, and — at that original call seat and once — replace the
+/// claimed continuation prefix with its stored successor. It authorizes no
+/// excision of any other origin, and it is not a licence to suppress a source
+/// occurrence generally.
+pub(in crate::cranelift_backend) struct FusionRegionClaim {
+    fusion: StaticContinuationFusionId,
+    /// `Fusion(id)` — carried rather than recomputed at the emission seat, so
+    /// the owner a body binds is the one preflight validated.
+    emission_owner: ContinuationEmissionOwner,
+    /// The two source authorities, **separately**. `D2f` Deliverable 3 requires
+    /// the producer's body and the suffix to be lowered under their own
+    /// validated authorities; collapsing them to one field is the defect the
+    /// pair exists to prevent.
+    producer_owner: PredeclaredFunctionId,
+    consumer_owner: PredeclaredFunctionId,
+    /// The unique landed `StaticBody` edge this claim redirects, from
+    /// [`fusion_redirect_target`] and from nothing else.
+    redirect: EmittableCallEdge,
+    /// The producer's entry occurrence — the body the fused definition lowers
+    /// first, under `producer_owner`.
+    producer_body: StaticOriginId,
+    producer_construct_origin: StaticOriginId,
+    producer_argument_origin: StaticOriginId,
+    producer_alternative: u32,
+    recursive_position: u32,
+    /// The claimed suffix: the selected case body and the consuming `Call`
+    /// inside it, which `D2f` Deliverable 4 makes the sole consumer of the
+    /// producer's activation.
+    selected_case_body: StaticOriginId,
+    consuming_call: StaticOriginId,
+    consuming_callee: StaticOriginId,
+    /// The claimed continuation prefix's own origin — the
+    /// `ComputationalMatchScrutinee` seat whose stored `next` replaces it when
+    /// this claim is consumed.
+    continuation_origin: StaticOriginId,
+    result_root: StaticOriginId,
+    enclosing_specialization: Option<ContinuationSpecializationId>,
+    checked_transport: CheckedTransportCoordinate,
+    /// The ordered projection the fused frame takes as its `Capture` run,
+    /// carried so the seat passes exactly the operands the ABI declared.
+    inputs: Vec<ContinuationSourceSlotAuthority>,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl FusionRegionClaim {
+    pub(in crate::cranelift_backend) fn fusion(&self) -> StaticContinuationFusionId {
+        self.fusion
+    }
+
+    pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
+        self.emission_owner
+    }
+
+    pub(in crate::cranelift_backend) fn producer_owner(&self) -> PredeclaredFunctionId {
+        self.producer_owner
+    }
+
+    pub(in crate::cranelift_backend) fn consumer_owner(&self) -> PredeclaredFunctionId {
+        self.consumer_owner
+    }
+
+    pub(in crate::cranelift_backend) fn redirect(&self) -> EmittableCallEdge {
+        self.redirect
+    }
+
+    pub(in crate::cranelift_backend) fn producer_body(&self) -> StaticOriginId {
+        self.producer_body
+    }
+
+    pub(in crate::cranelift_backend) fn producer_construct_origin(&self) -> StaticOriginId {
+        self.producer_construct_origin
+    }
+
+    pub(in crate::cranelift_backend) fn producer_argument_origin(&self) -> StaticOriginId {
+        self.producer_argument_origin
+    }
+
+    pub(in crate::cranelift_backend) fn producer_alternative(&self) -> u32 {
+        self.producer_alternative
+    }
+
+    pub(in crate::cranelift_backend) fn recursive_position(&self) -> u32 {
+        self.recursive_position
+    }
+
+    pub(in crate::cranelift_backend) fn selected_case_body(&self) -> StaticOriginId {
+        self.selected_case_body
+    }
+
+    pub(in crate::cranelift_backend) fn consuming_call(&self) -> StaticOriginId {
+        self.consuming_call
+    }
+
+    pub(in crate::cranelift_backend) fn consuming_callee(&self) -> StaticOriginId {
+        self.consuming_callee
+    }
+
+    pub(in crate::cranelift_backend) fn continuation_origin(&self) -> StaticOriginId {
+        self.continuation_origin
+    }
+
+    pub(in crate::cranelift_backend) fn result_root(&self) -> StaticOriginId {
+        self.result_root
+    }
+
+    pub(in crate::cranelift_backend) fn enclosing_specialization(
+        &self,
+    ) -> Option<ContinuationSpecializationId> {
+        self.enclosing_specialization
+    }
+
+    pub(in crate::cranelift_backend) fn checked_transport(&self) -> &CheckedTransportCoordinate {
+        &self.checked_transport
+    }
+
+    pub(in crate::cranelift_backend) fn inputs(&self) -> &[ContinuationSourceSlotAuthority] {
+        &self.inputs
+    }
+
+    /// The exact call seat this claim may be consumed at.
+    ///
+    /// **The seat is the redirected edge's own call-site origin, in the
+    /// consumer's body.** **Not** the consuming `Call` and not the construct
+    /// origin: the consumption replaces the continuation prefix that the
+    /// *producer invocation* returns into, so the seat is where that invocation
+    /// is, and matching on anything else would let the claim be consumed at a
+    /// sibling occurrence that merely resembles it.
+    pub(in crate::cranelift_backend) fn seat(&self) -> StaticOriginId {
+        self.redirect.call_site_origin()
+    }
+}
+
+/// Why one fused region's claim could not be issued.
+///
+/// A named cause per ruled refusal, so a control asserts *which* preflight rule
+/// fired rather than that some string contains a word. ⇒ A refusal that
+/// regressed into a different rule cannot pass a test written for the first.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum FusionClaimRefusal {
+    /// The plane/ABI/id join does not agree with the complete key.
+    Identity,
+    /// The named producer invocation is absent, ambiguous, or not a static body
+    /// edge. (Raised by [`fusion_redirect_target`] itself.)
+    SelectorEdge,
+    /// The edge's caller is not the consumer owner, its callee is not the
+    /// producer owner, or its callee entry is not the producer body.
+    InvocationTriple,
+    /// The redirect would target the unit it is emitted into.
+    ///
+    /// **No witness in the `D2j` family reaches this, and no control claims
+    /// one.** It is a fail-closed guard against a self-recursive shape this
+    /// fixture family cannot produce, kept because the alternative is emitting a
+    /// region fused with itself. Do not write a row asserting it fires.
+    SelfRedirection,
+    /// A checked binder or the admitted ledger root disagrees with the key.
+    BinderAgreement,
+    /// The ordered input projection is unavailable or disagrees with the frame
+    /// the ABI declared for it.
+    InputAvailability,
+    /// The fused frame does not declare exactly one ordinary result lane, so
+    /// what it exports is not closure-free final data by its own contract.
+    ResultLane,
+    /// Two claims name one edge, one continuation frame, or one suffix.
+    OverlappingClaim,
+}
+
+impl FusionClaimRefusal {
+    fn detail(self) -> &'static str {
+        match self {
+            Self::Identity => {
+                "a static continuation fusion claim's identity join disagrees with its complete \
+                 key, so the region it names is not the one the planner interned"
+            }
+            Self::SelectorEdge => {
+                "a static continuation fusion claim has no unique landed static body invocation \
+                 to redirect"
+            }
+            Self::InvocationTriple => {
+                "a static continuation fusion claim's redirect edge is not the producer \
+                 invocation its key names: caller must be the consumer owner, callee the \
+                 producer owner, and callee entry the producer body"
+            }
+            Self::SelfRedirection => {
+                "a static continuation fusion claim would redirect an invocation into the unit it \
+                 is emitted from, which fuses a region with itself"
+            }
+            Self::BinderAgreement => {
+                "a static continuation fusion claim's checked binders do not agree with the key's \
+                 recursive position, admitted continuation origin, or admitted result root"
+            }
+            Self::InputAvailability => {
+                "a static continuation fusion claim's ordered input projection is unavailable or \
+                 disagrees with the capture run its own ABI frame declares"
+            }
+            Self::ResultLane => {
+                "a static continuation fusion claim's frame does not declare exactly one result \
+                 lane, so the fused region has no single closure-free lane to export through"
+            }
+            Self::OverlappingClaim => {
+                "two static continuation fusion claims name one invocation edge, one continuation \
+                 frame, or one consuming suffix, so the regions are not disjoint"
+            }
+        }
+    }
+}
+
+fn fusion_claim_error(cause: FusionClaimRefusal) -> CraneliftBackendError {
+    planner_error(cause.detail())
+}
+
+/// **`D2f` — the affine ledger over every installed fusion's region claim.**
+///
+/// Built once by [`Self::preflight`], **before any unit is declared and before
+/// any body is defined**, which is the ordering the ruling fixes: a refusal
+/// after the first definition exists is a partially emitted module rather than a
+/// rejection.
+///
+/// Affine on the fusion identity. [`Self::consume`] **moves** the claim out, so
+/// a second consumption of one region is not a policy check that could be
+/// forgotten — there is no longer a claim to consume.
+pub(in crate::cranelift_backend) struct FusionRegionClaimLedger {
+    /// Every installed fusion, read once at preflight. **Never** derived from
+    /// [`Self::claims`], which shrinks as claims are consumed: a planned set
+    /// that emptied alongside its claims could not detect an unconsumed one.
+    planned: BTreeSet<StaticContinuationFusionId>,
+    claims: BTreeMap<StaticContinuationFusionId, FusionRegionClaim>,
+    /// The regions whose claim has been consumed at its seat, and the seat it
+    /// was consumed at — recorded rather than inferred, so closeout states
+    /// where the takeover happened.
+    consumed: BTreeMap<StaticContinuationFusionId, StaticOriginId>,
+    /// The regions for which a `Fusion(id)` definition was emitted.
+    defined: BTreeSet<StaticContinuationFusionId>,
+    /// The regions whose named invocation was actually redirected.
+    redirected: BTreeSet<StaticContinuationFusionId>,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl FusionRegionClaimLedger {
+    /// Derive one claim per installed fusion, refusing before anything is
+    /// declared or defined.
+    ///
+    /// **Every check here is a relation between two authorities that were
+    /// established separately** — the complete key, the installed ABI arena, and
+    /// the plan's own emittable-edge projection. A check comparing a value
+    /// with the thing that produced it is a restatement, not a gate, and none is
+    /// written below.
+    pub(in crate::cranelift_backend) fn preflight(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> Result<Self, CraneliftBackendError> {
+        let mut planned = BTreeSet::new();
+        let mut claims = BTreeMap::new();
+        // The three disjointness domains, accumulated across fusions. Separate
+        // sets rather than one tuple set: two claims sharing a suffix while
+        // differing in their edge is a real overlap, and a tuple key would
+        // admit it.
+        let mut claimed_edges = BTreeSet::new();
+        let mut claimed_frames = BTreeSet::new();
+        let mut claimed_suffixes = BTreeSet::new();
+
+        for view in plan.continuation_fusions()? {
+            let id = view.id();
+            let key = view.key();
+
+            // Identity: the ABI join's owners must be the key's owners. The
+            // join in `continuation_fusions` matches descriptors to keys by
+            // position; this is the independent half that makes the pairing
+            // mean something.
+            if view.producer_owner() != key.producer_owner
+                || view.consumer_owner() != key.consumer_owner
+            {
+                return Err(fusion_claim_error(FusionClaimRefusal::Identity));
+            }
+            if view.emission_owner() != ContinuationEmissionOwner::Fusion(id) {
+                return Err(fusion_claim_error(FusionClaimRefusal::Identity));
+            }
+
+            // The unique landed selector edge. `redirect_target` raises its own
+            // absent/ambiguous/declaration-kind refusals; this preflight adds
+            // the triple and the self-redirection rule on top of it.
+            let redirect = view.redirect_target(plan)?;
+            if redirect.caller() != key.consumer_owner
+                || redirect.callee() != key.producer_owner
+                || redirect.callee_origin() != key.invocation_callee_entry
+            {
+                return Err(fusion_claim_error(FusionClaimRefusal::InvocationTriple));
+            }
+            if redirect.caller() == redirect.callee() {
+                return Err(fusion_claim_error(FusionClaimRefusal::SelfRedirection));
+            }
+            // ⇒ **The two source authorities are now known distinct, and there
+            // is deliberately no separate check for it.** The triple above
+            // established `caller == consumer_owner` and `callee ==
+            // producer_owner`, and self-redirection established `caller !=
+            // callee`; together those entail `producer_owner !=
+            // consumer_owner`. A third `if` restating it could not fail, and a
+            // refusal branch that cannot fail is worse than none — nothing
+            // prompts a reader to check it, and it reads as a gate.
+
+            // Binder and admitted-ledger agreement.
+            //
+            // **`producer_argument_binding.frame_origin ==
+            // consumer_binding.frame_origin` is NOT among these, and its absence
+            // is deliberate.** The two are the same type, sit side by side in
+            // one key, and read as an obvious coherence check — but they name
+            // different checked frames by design (measured 25 and 10 on the
+            // canonical `Exact` witness), so asserting them equal would refuse
+            // the very witness this class exists for. The recursive positions
+            // beside them *do* agree, which is what makes the wrong row look
+            // confirmatory if it is added partially.
+            if key.producer_argument_binding.recursive_position != key.recursive_position
+                || key.consumer_binding.recursive_position != key.recursive_position
+                || key.consumer_binding.frame_origin != key.admitted.continuation_origin
+                || key.admitted.result_root != key.invocation_callee_entry
+            {
+                return Err(fusion_claim_error(FusionClaimRefusal::BinderAgreement));
+            }
+
+            // Ordinary input availability: the ordered projection the key
+            // carries must be exactly the capture run the installed frame
+            // declares for it, and every one of them must be an ordinary
+            // carrier.
+            //
+            // **Both halves are SUBSUMED on every path that exists today, and
+            // saying so is the honest form.** Installation necessarily precedes
+            // preflight — a claim is derived from an *installed* fusion — and the
+            // installer both builds the capture run from this same projection
+            // and applies `AC-4`'s carrier gate to it. So no reachable input can
+            // make either condition false, and **no control below claims to
+            // exercise them.** They are kept as defence in depth against a
+            // future caller that preflights against an arena some other writer
+            // filled, which is the only way they could ever fire.
+            let captures = view
+                .slots()
+                .iter()
+                .filter(|slot| slot.kind == AbiSlotKind::Capture)
+                .count();
+            if captures != key.continuation_inputs.len()
+                || view.inputs().len() != key.continuation_inputs.len()
+            {
+                return Err(fusion_claim_error(FusionClaimRefusal::InputAvailability));
+            }
+            for (ordinal, input) in key.continuation_inputs.iter().enumerate() {
+                let ordinal = u32::try_from(ordinal).map_err(|_| {
+                    planner_capacity_error("static continuation fusion input ordinal exhausted")
+                })?;
+                abi::fusion_input_carrier_admissibility(input.carrier, ordinal)?;
+            }
+
+            // Exactly one ordinary result lane. `CONVENTION_SLOTS` gives every
+            // frame one, so a count other than one means this is not the frame
+            // the arena built and the fused region has no single lane to export
+            // closure-free final data through.
+            if view
+                .slots()
+                .iter()
+                .filter(|slot| slot.kind == AbiSlotKind::Result)
+                .count()
+                != 1
+            {
+                return Err(fusion_claim_error(FusionClaimRefusal::ResultLane));
+            }
+
+            // Pairwise disjointness, across every claim issued so far.
+            let edge = (
+                redirect.caller(),
+                redirect.callee(),
+                redirect.callee_origin(),
+                redirect.call_site_origin(),
+            );
+            if !claimed_edges.insert(edge)
+                || !claimed_frames.insert(key.admitted.continuation_origin)
+                || !claimed_suffixes.insert(key.consuming_call)
+            {
+                return Err(fusion_claim_error(FusionClaimRefusal::OverlappingClaim));
+            }
+
+            planned.insert(id);
+            let previous = claims.insert(
+                id,
+                FusionRegionClaim {
+                    fusion: id,
+                    emission_owner: ContinuationEmissionOwner::Fusion(id),
+                    producer_owner: key.producer_owner,
+                    consumer_owner: key.consumer_owner,
+                    redirect,
+                    producer_body: key.invocation_callee_entry,
+                    producer_construct_origin: key.producer_construct_origin,
+                    producer_argument_origin: key.producer_argument_origin,
+                    producer_alternative: key.producer_alternative,
+                    recursive_position: key.recursive_position,
+                    selected_case_body: key.selected_case_body,
+                    consuming_call: key.consuming_call,
+                    consuming_callee: key.consuming_callee,
+                    continuation_origin: key.admitted.continuation_origin,
+                    result_root: key.admitted.result_root,
+                    enclosing_specialization: key.admitted.enclosing_specialization,
+                    checked_transport: key.checked_transport.clone(),
+                    inputs: key.continuation_inputs.clone(),
+                },
+            );
+            if previous.is_some() {
+                return Err(fusion_claim_error(FusionClaimRefusal::Identity));
+            }
+        }
+
+        Ok(Self {
+            planned,
+            claims,
+            consumed: BTreeMap::new(),
+            defined: BTreeSet::new(),
+            redirected: BTreeSet::new(),
+        })
+    }
+
+    pub(in crate::cranelift_backend) fn planned(&self) -> &BTreeSet<StaticContinuationFusionId> {
+        &self.planned
+    }
+
+    pub(in crate::cranelift_backend) fn is_empty(&self) -> bool {
+        self.planned.is_empty()
+    }
+
+    /// Read a still-unconsumed claim without taking it.
+    ///
+    /// The definition pass needs the region's authorities and origins while the
+    /// claim must stay outstanding — a definition emitted for a region whose
+    /// claim was already consumed at the seat is exactly the double-takeover
+    /// this ledger exists to refuse.
+    pub(in crate::cranelift_backend) fn claim(
+        &self,
+        fusion: StaticContinuationFusionId,
+    ) -> Option<&FusionRegionClaim> {
+        self.claims.get(&fusion)
+    }
+
+    /// **Consume the claim for `fusion` at `seat`, atomically and exactly once.**
+    ///
+    /// The seat is checked against the claim's own [`FusionRegionClaim::seat`]
+    /// *before* the claim moves out, so a consumption at the wrong occurrence
+    /// leaves the claim outstanding rather than spending it on the wrong
+    /// takeover. A refusal here is therefore recoverable state, not a hole.
+    pub(in crate::cranelift_backend) fn consume(
+        &mut self,
+        fusion: StaticContinuationFusionId,
+        seat: StaticOriginId,
+    ) -> Result<FusionRegionClaim, CraneliftBackendError> {
+        let Some(claim) = self.claims.get(&fusion) else {
+            return Err(planner_error(
+                "a static continuation fusion region claim was consumed twice, or consumed for a \
+                 fusion this compile never preflighted; the fused region has exactly one takeover",
+            ));
+        };
+        if claim.seat() != seat {
+            return Err(planner_error(
+                "a static continuation fusion region claim was offered a call seat other than the \
+                 one its redirected invocation names, so the takeover would replace a \
+                 continuation prefix this claim does not own",
+            ));
+        }
+        let claim = self
+            .claims
+            .remove(&fusion)
+            .expect("the claim was present at the borrow above");
+        self.consumed.insert(fusion, seat);
+        Ok(claim)
+    }
+
+    pub(in crate::cranelift_backend) fn record_defined(
+        &mut self,
+        fusion: StaticContinuationFusionId,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.planned.contains(&fusion) {
+            return Err(planner_error(
+                "a static continuation fusion definition was emitted for a region this compile \
+                 never preflighted",
+            ));
+        }
+        if !self.defined.insert(fusion) {
+            return Err(planner_error(
+                "two static continuation fusion definitions were emitted for one installed region",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(in crate::cranelift_backend) fn record_redirected(
+        &mut self,
+        fusion: StaticContinuationFusionId,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.planned.contains(&fusion) {
+            return Err(planner_error(
+                "a producer invocation was redirected to a region this compile never preflighted",
+            ));
+        }
+        if !self.redirected.insert(fusion) {
+            return Err(planner_error(
+                "one installed fused region's producer invocation was redirected twice",
+            ));
+        }
+        Ok(())
+    }
+
+    /// **The ruled closeout bijection: installed ↔ definition ↔ redirect ↔
+    /// consumed claim.**
+    ///
+    /// Written as four set equalities against `planned`, **not** as four counts.
+    /// Equal counts hold vacuously at zero and hold wrongly when one region is
+    /// defined twice while another is skipped; the sets do not.
+    ///
+    /// An **unconsumed** claim fails this, which is the affine half: a region
+    /// whose definition was emitted and whose seat never took it over is a
+    /// program in which the suffix runs twice.
+    pub(in crate::cranelift_backend) fn close(self) -> Result<usize, CraneliftBackendError> {
+        if !self.claims.is_empty() {
+            return Err(planner_error(
+                "a static continuation fusion region claim was never consumed: its definition was \
+                 emitted but no call seat took the region over, so the delegated suffix is still \
+                 lowered by its original consumer and would execute twice",
+            ));
+        }
+        let consumed: BTreeSet<StaticContinuationFusionId> =
+            self.consumed.keys().copied().collect();
+        if self.defined != self.planned {
+            return Err(planner_error(
+                "the emitted static continuation fusion definitions are not exactly the installed \
+                 fused regions",
+            ));
+        }
+        if self.redirected != self.planned {
+            return Err(planner_error(
+                "the redirected producer invocations are not exactly the installed fused regions",
+            ));
+        }
+        if consumed != self.planned {
+            return Err(planner_error(
+                "the consumed static continuation fusion region claims are not exactly the \
+                 installed fused regions",
+            ));
+        }
+        Ok(self.planned.len())
+    }
+}
+
 /// **`D2h` — build the fusion identity plane, in the ruled fail-closed order.**
 ///
 /// Steps 1 to 3 are [`enumerate_live_fusion_candidates`]. Step 4 derives each
@@ -17253,6 +17815,282 @@ mod tests {
              handle is refused as an input while an ordinary ground-value carrier is admitted -- \
              and the refusals share this assertion with a non-zero installed descriptor so none \
              of them can hold because nothing was installed"
+        );
+    }
+
+    /// Install one plane — optionally with the key perturbed — and preflight it.
+    ///
+    /// The perturbation is applied to the key **production derived**, so a
+    /// refusal is attributable to the one moved operand rather than to a
+    /// hand-built key that was never a real identity.
+    #[cfg(test)]
+    fn d2f_preflight_exact(
+        perturb: impl FnOnce(&mut Vec<StaticContinuationFusionKey>),
+    ) -> Result<FusionRegionClaimLedger, CraneliftBackendError> {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let resolved =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the witness resolves a plane");
+        let mut keys = resolved.installed_keys().to_vec();
+        perturb(&mut keys);
+        let mut plane = StaticContinuationFusionPlan::default();
+        for key in keys {
+            plane.intern(key)?;
+        }
+        plan.install_static_continuation_fusions(plane)?;
+        FusionRegionClaimLedger::preflight(&plan)
+    }
+
+    /// Which ruled preflight rule a refusal reached, by its own message.
+    ///
+    /// Classified rather than reduced to `is_err`: every row below moves one
+    /// operand and claims a **specific** rule fired, so a row that accepted any
+    /// planner invariant would pass when a different and possibly weaker rule
+    /// answered — including one that regressed into a coarser refusal upstream.
+    #[cfg(test)]
+    fn d2f_refusal_of(result: Result<FusionRegionClaimLedger, CraneliftBackendError>) -> String {
+        match result {
+            Ok(_) => "issued".to_string(),
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(message))) => {
+                for cause in [
+                    FusionClaimRefusal::Identity,
+                    FusionClaimRefusal::SelectorEdge,
+                    FusionClaimRefusal::InvocationTriple,
+                    FusionClaimRefusal::SelfRedirection,
+                    FusionClaimRefusal::BinderAgreement,
+                    FusionClaimRefusal::InputAvailability,
+                    FusionClaimRefusal::ResultLane,
+                    FusionClaimRefusal::OverlappingClaim,
+                ] {
+                    if message == cause.detail() {
+                        return format!("{cause:?}");
+                    }
+                }
+                // The selector's own refusals are raised by
+                // `fusion_redirect_target` and are not spelled by this enum;
+                // they are the absent/ambiguous/declaration-kind family and are
+                // reported under the rule they serve.
+                if message.contains("no edge to redirect")
+                    || message.contains("selects more than one emittable")
+                    || message.contains("rather than a static body edge")
+                {
+                    return format!("{:?}", FusionClaimRefusal::SelectorEdge);
+                }
+                format!("other planner invariant: {message}")
+            }
+            Err(error) => format!("other error: {error:?}"),
+        }
+    }
+
+    /// **`D2f` — the region claim is issued exactly once for the canonical
+    /// witness, and each ruled preflight rule REFUSES on its own moved operand.**
+    ///
+    /// The positive and the refusals share one assertion for the reason `AC-4`'s
+    /// control does: "the triple was checked" must not be readable off a run
+    /// that issued no claim at all.
+    ///
+    /// **MEASURED:** on the checked applied `Exact` witness, preflight issues one
+    /// claim whose members are the key's own — producer owner 2, consumer owner
+    /// 3, producer body 37, and a seat that is the redirected edge's call site;
+    /// and independently moving the consumer owner, the callee entry, the
+    /// admitted result root, and the recursive position each refuses at its
+    /// named rule, as does a second key sharing this one's suffix.
+    /// **CLAIMED:** no fused region is claimed whose redirect edge is not the
+    /// producer invocation its key names, whose checked binders disagree with
+    /// that key, or whose region overlaps another claim's.
+    /// **THE GAP:** this pins **preflight**. It pins no emission: no definition
+    /// is built, no edge is redirected, and no production compile calls this, so
+    /// nothing here establishes that a claim is ever consumed by real codegen.
+    /// The affine and closeout behaviour is pinned separately below, on the
+    /// ledger rather than on a compile.
+    #[test]
+    fn d2f_2_the_region_claim_is_issued_once_and_each_ruled_rule_refuses() {
+        let issued = d2f_preflight_exact(|_| ()).expect("the unperturbed witness issues a claim");
+        assert_eq!(issued.planned().len(), 1, "one installed region, one claim");
+        let id = *issued.planned().iter().next().expect("the identity");
+        let claim = issued.claim(id).expect("its claim is outstanding");
+
+        // The claim's members are the key's, and the seat is the redirected
+        // edge's call site rather than the consuming call — the distinction the
+        // accessor exists to keep.
+        let members = (
+            claim.producer_owner(),
+            claim.consumer_owner(),
+            claim.producer_body(),
+            claim.emission_owner(),
+            claim.seat() == claim.redirect().call_site_origin(),
+            claim.seat() != claim.consuming_call(),
+            claim.inputs().len(),
+        );
+
+        // ⇒ The two source authorities are distinct here as a CONSEQUENCE of the
+        // triple and the self-redirection rule, not as a separate gate. Asserted
+        // as the entailment it is, so a reader does not look for the missing
+        // `if` and conclude the property is unchecked.
+        assert_ne!(
+            claim.producer_owner(),
+            claim.consumer_owner(),
+            "distinct authorities, entailed by caller==consumer, callee==producer, caller!=callee"
+        );
+
+        let refusals = vec![
+            // The edge is findable but its caller is no longer the consumer
+            // owner: the triple's load-bearing row.
+            (
+                "consumer owner moved",
+                d2f_refusal_of(d2f_preflight_exact(|keys| {
+                    keys[0].consumer_owner = keys[0].producer_owner;
+                })),
+            ),
+            // No edge enters that entry at all, so there is nothing to redirect.
+            (
+                "callee entry moved",
+                d2f_refusal_of(d2f_preflight_exact(|keys| {
+                    keys[0].invocation_callee_entry =
+                        StaticOriginId(keys[0].invocation_callee_entry.0 + 1);
+                })),
+            ),
+            // The admitted ledger root no longer ties back to the invocation.
+            (
+                "admitted result root moved",
+                d2f_refusal_of(d2f_preflight_exact(|keys| {
+                    keys[0].admitted.result_root = StaticOriginId(keys[0].admitted.result_root.0 + 1);
+                })),
+            ),
+            // A checked binder no longer names the key's recursive position.
+            (
+                "consumer binder position moved",
+                d2f_refusal_of(d2f_preflight_exact(|keys| {
+                    keys[0].consumer_binding.recursive_position += 1;
+                })),
+            ),
+            // Two distinct identities claiming one suffix, one continuation
+            // frame and one edge.
+            (
+                "second key shares the region",
+                d2f_refusal_of(d2f_preflight_exact(|keys| {
+                    let mut twin = keys[0].clone();
+                    twin.producer_alternative += 1;
+                    keys.push(twin);
+                })),
+            ),
+        ];
+
+        assert_eq!(
+            (members, refusals),
+            (
+                (
+                    PredeclaredFunctionId(2),
+                    PredeclaredFunctionId(3),
+                    StaticOriginId(37),
+                    ContinuationEmissionOwner::Fusion(id),
+                    true,
+                    true,
+                    2,
+                ),
+                vec![
+                    ("consumer owner moved", "InvocationTriple".to_string()),
+                    ("callee entry moved", "SelectorEdge".to_string()),
+                    ("admitted result root moved", "BinderAgreement".to_string()),
+                    ("consumer binder position moved", "BinderAgreement".to_string()),
+                    ("second key shares the region", "OverlappingClaim".to_string()),
+                ],
+            ),
+            "one claim is issued for the canonical witness with the key's own members, and each \
+             ruled rule refuses on its own moved operand -- the refusals share this assertion \
+             with the issued claim so none of them can hold because preflight issued nothing"
+        );
+    }
+
+    /// **`D2f` — the claim is AFFINE and the closeout bijects.**
+    ///
+    /// Separate from the preflight control because it is a different question:
+    /// preflight asks which regions may be claimed, this asks that a claimed
+    /// region is taken over exactly once and that an untaken one fails the
+    /// closeout rather than passing quietly.
+    ///
+    /// **MEASURED:** consuming the claim at its own seat succeeds and leaves
+    /// nothing to consume; a second consumption refuses; consuming at another
+    /// occurrence refuses **and leaves the claim outstanding**, so the failed
+    /// takeover is recoverable rather than a spent permit; a closeout with the
+    /// claim unconsumed fails; and the closeout succeeds only when definition,
+    /// redirect and consumption are all recorded for the installed region.
+    /// **CLAIMED:** a fused region cannot be taken over twice, cannot be taken
+    /// over at an occurrence its redirected invocation does not name, and cannot
+    /// be left with its suffix still lowered by its original consumer.
+    /// **THE GAP:** the ledger is exercised directly. Nothing here shows that
+    /// real codegen calls `consume`, because no emitter does yet.
+    #[test]
+    fn d2f_3_one_region_is_taken_over_exactly_once_or_the_closeout_fails() {
+        let id_of = |ledger: &FusionRegionClaimLedger| {
+            *ledger.planned().iter().next().expect("the identity")
+        };
+
+        // Wrong seat: refuses, and the claim SURVIVES.
+        let mut ledger = d2f_preflight_exact(|_| ()).expect("claim");
+        let id = id_of(&ledger);
+        let seat = ledger.claim(id).expect("outstanding").seat();
+        let wrong_seat = ledger
+            .consume(id, StaticOriginId(seat.0 + 1))
+            .err()
+            .is_some();
+        let survives_wrong_seat = ledger.claim(id).is_some();
+
+        // Right seat: consumes, and there is nothing left to consume.
+        let consumed_once = ledger.consume(id, seat).is_ok();
+        let outstanding_after = ledger.claim(id).is_some();
+        let consumed_twice_refuses = ledger.consume(id, seat).is_err();
+
+        // Closeout with the region defined and redirected: bijects.
+        ledger.record_defined(id).expect("one definition");
+        ledger.record_redirected(id).expect("one redirect");
+        let bijects = ledger.close().expect("the closeout bijects");
+
+        // Closeout with the claim never consumed: fails on the unconsumed claim.
+        let mut unconsumed = d2f_preflight_exact(|_| ()).expect("claim");
+        let other = id_of(&unconsumed);
+        unconsumed.record_defined(other).expect("one definition");
+        unconsumed.record_redirected(other).expect("one redirect");
+        let unconsumed_fails = unconsumed.close().is_err();
+
+        // Closeout with the claim consumed but no definition emitted: fails on
+        // the definition set, not on the claim. A separate row because these are
+        // two different halves of the bijection and a single "close errored"
+        // could be satisfied by either.
+        let mut undefined = d2f_preflight_exact(|_| ()).expect("claim");
+        let third = id_of(&undefined);
+        let third_seat = undefined.claim(third).expect("outstanding").seat();
+        undefined.consume(third, third_seat).expect("consumed");
+        undefined.record_redirected(third).expect("one redirect");
+        let undefined_fails = undefined.close().is_err();
+
+        // A second definition for one region refuses at the recorder rather than
+        // at the closeout, so the double emission is caught where it happens.
+        let mut twice = d2f_preflight_exact(|_| ()).expect("claim");
+        let fourth = id_of(&twice);
+        twice.record_defined(fourth).expect("one definition");
+        let second_definition_refuses = twice.record_defined(fourth).is_err();
+
+        assert_eq!(
+            (
+                wrong_seat,
+                survives_wrong_seat,
+                consumed_once,
+                outstanding_after,
+                consumed_twice_refuses,
+                bijects,
+                unconsumed_fails,
+                undefined_fails,
+                second_definition_refuses,
+            ),
+            (true, true, true, false, true, 1, true, true, true),
+            "a claim offered the wrong seat refuses and survives; consumed at its own seat it is \
+             spent exactly once; the closeout bijects only when definition, redirect and \
+             consumption are all present, and an unconsumed claim or a missing definition each \
+             fails it"
         );
     }
 

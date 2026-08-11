@@ -1292,7 +1292,11 @@ fn append_continuation_context_descriptor(
 /// region's local activation is written into. What this forbids is one arriving
 /// as an *input*, which is the only direction by which activation state could
 /// cross the boundary the ruling's stop condition names.
-fn fusion_input_carrier_admissibility(
+/// **`D2f` — visible to the parent planning module, because preflight re-reads
+/// it.** The installer applies this gate before a slot is inserted; the region
+/// claim's preflight applies the identical gate again before any definition
+/// exists. Two readings of one function, never two spellings of one rule.
+pub(super) fn fusion_input_carrier_admissibility(
     carrier: AbiCarrier,
     ordinal: u32,
 ) -> Result<(), CraneliftBackendError> {
