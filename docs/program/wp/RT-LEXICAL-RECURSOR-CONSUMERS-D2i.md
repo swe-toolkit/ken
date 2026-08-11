@@ -174,6 +174,36 @@ closed fact list then follow as the remainder.**
 ledger is not independently exercised — a ledger with nothing enumerating from
 it is the same green-by-construction shape you correctly refused twice.
 
+> ### SEAM SPLIT FURTHER — Steward disposition 2026-08-11, `evt_5sr5hdnqqtxbk`
+>
+> **This records a scope ruling, not a landed fact.** Runtime released exact
+> `401c2c96` — the discovery ledger alone, below the seam above, and said so
+> plainly rather than describing it as meeting it. **I ruled it an accepted
+> partial and released the hold**; it does not wait for the R3-derived artifact.
+>
+> **The seam's one substantive condition was met.** The ledger is exercised in
+> both directions on the landed `D2g` twin: **every seed is admitted**, and
+> **strictly more pairs are admitted than the seeds can name.** Containment
+> alone would pass on a ledger that merely echoes the seeds — the vacuous shape
+> — so the strict extension is the half that carries the weight.
+>
+> **The rest of the seam was bundling, not gating.** I attached the unmarked R3
+> artifact to it because I could not then name a way to exercise the ledger that
+> did not go through R3. The implementer found one.
+>
+> **`Deliverable 2` has two halves and the review must say which landed:**
+> recording the closed ledger, and **making fusion enumeration consume it**
+> instead of `child(consumer, 0)`. Either answer merges. **A candidate described
+> as "Delivery 2" while carrying one half is the exact shape that caused three
+> of the five stops on this node** — a later gate consuming a property an
+> earlier claim was read as having delivered.
+>
+> **Residual after `401c2c96`:** the R3-derived unmarked artifact; the
+> R3-derived checked artifact; the three-population matrix; `AC-2`'s causal root
+> control; `AC-3`'s transport converse and multiplicity refusals; the closed
+> 7-fact handoff contract; and, if enumeration still keys on the seed, the
+> consuming half of `Deliverable 2`.
+
 ## Contention
 
 `crates/ken-runtime`. Language is on `crates/ken-elaborator` under
