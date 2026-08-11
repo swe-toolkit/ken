@@ -953,12 +953,18 @@ than a scope question about the cut.
 The wired shape is measured and its gap is named — see the producer-suppression
 section above. Node stays `active`; no emitter AC credited.
 
-## `D2f` emitter — the full chain, built and INERT at `bd5961f8`. NOT MERGED.
+## `D2f` emitter — the full chain, INERT. MERGED 2026-08-11, PR #1940.
 
-`bd5961f8d4ecc778999f3346dd35458f812835c0` on
-`wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2f-EMIT-2`, base `e0246b08`. One non-merge
-commit, seven `ken-runtime` paths, `+1042/-15`. `-p ken-runtime --lib` 893/893,
-`d2f_` 9/9.
+`822351670a000bea16c4e638c60cce4feec9352f`, declared merge-base `e0246b08`. Two
+non-merge commits, seven `ken-runtime` paths, `+1085/-15`. Decision
+`dec_8ssptk582gvg` read `resolved` from the object; QA exact approval
+`evt_6ka0d4pxmfy7`. Blob identity verified 7/7 against `origin/main` from the
+**declared** merge-base, and the arming constant confirmed still `false` **on
+the landed tree**, not merely in the candidate's description.
+
+**`bd5961f8` is superseded and must not be merged.** It was the first cut of
+this candidate and is referenced below only where the measurements were taken on
+it. The second commit is the correction described under "the overclaim" below.
 
 **Read this section before proposing an emitter cut.** It is the fourth
 un-wired partial and it is a different object from the first three.
@@ -973,8 +979,11 @@ cannot be regenerated that way, and it is the instrument that makes the open
 question askable at all.
 
 Arming is one line — `const D2F_EMITTER_ARMED: bool = false` at
-`lowering/core.rs:2206`, guarding the `if` at `:2207`; the control at
-`lowering/core/tests/control.rs:4075` names the inertness in place. Census rows
+`lowering/core.rs:2209`, guarding the `if` at `:2210`, with the instruction to
+flip it at `:2171`; the control at `lowering/core/tests/control.rs:4075` names
+the inertness in place. **Those coordinates are read from `origin/main` at
+`98702040`, after the merge** — they were `:2206`/`:2207` on `bd5961f8`, and the
+second commit moved them by three. Census rows
 moved and are labelled where they moved: `lowering/units.rs` 4 to 5
 builders/definitions and 3 to 4 declarations — a fifth *emitting function
 class*, not a fifth copy of an existing one.
@@ -986,6 +995,34 @@ the fused definition, redirect, input supply, takeover and closeout. Deleting
 the surplus would delete the measurement that locates the open question. **This
 consumes the fourth inert cut. There is no fifth — the next turn on this node
 is a wiring turn, gated on the Architect's answer rather than on capacity.**
+
+### The overclaim, and why the second commit is the better half
+
+**The Architect's ruling did not only answer the open question — it exposed a
+false statement in `bd5961f8`'s own durable contracts.** Those contracts
+described the causal-authority arrangement as though it were the per-phase one
+the ruling requires. It is not: the code binds a **single provisional
+`Predeclared(producer_owner)` across the whole combined lowering**, and the
+producer-to-consumer-to-producer switch at the claimed suffix seam does not
+exist yet.
+
+The second commit corrects that in place rather than leaving it. It states the
+provisional authority truthfully, keeps `Fusion` as region/definition identity
+only, and **explicitly excludes** the later authority switch and the
+fusion-specific checked-frame adoption that ruling `evt_4vqey13cxxjqs`
+requires. The direct `bd5961f8..82235167` delta is two paths, `+70/-27`, with
+**zero added executable lines and exactly one removed code line** — an unused
+`ContinuationEmissionOwner::Fusion(fusion.id)` local. Every other machinery and
+control path is blob-identical; the arming gate and installer are untouched and
+no ignores were added.
+
+> **This is the failure mode this node has hit before, caught early for once.**
+> A comment or contract that describes the mechanism the author *intends* is
+> structurally exempt from execution — no test fails when it drifts from the
+> code. Landing prose that reads as done, on machinery that is inert and will
+> be picked up by a different seat after a compaction, is precisely how the
+> next reader arms something that was never wired. **The correction is worth
+> more than the 1042 lines it annotates.**
 
 ### What arming MEASURES — four refusals cleared, and where it stops
 
@@ -1018,10 +1055,53 @@ The continuation inputs are the consumer's own entry-frame parameters
 resolved through the landed `verify_predeclared_entry_frame_membership` gate
 rather than a rule respelled at the seat.
 
-### The two design questions — the Architect's, not the ring's
+### The two design questions — BOTH RULED, `evt_4vqey13cxxjqs`
+
+> #### THE ANSWER, and it is what the next turn builds. Durable at `51e6a266`.
+>
+> **1. Adopt the consumer's checked frame; do not re-home the marker.** The
+> fused `Function` opens its **own fresh** `CheckedFrameFunctionScope`, then
+> locally re-enters the **same consumer frame identity** already carried by the
+> preflighted `FusionRegionClaim.checked_transport`. The original consumer and
+> the fused function therefore each have an **independent per-`Function`
+> consumption transaction** — this is the `D8n` split-body law, **not** one
+> transaction spanning two functions, which is where the question was
+> mis-posed. Do not carry `active_subcontinuation_frame` across a function
+> boundary, mint a new frame for `Fusion(id)`, or accept a raw frame id from a
+> scan. Expose only a fusion-specific adoption seam taking the claim's complete
+> resolved transport coordinate; `CheckedFrameFunctionScope::open` and its
+> ordinary callers stay unchanged.
+>
+> **2. `Fusion(id)` is region/definition identity, NOT causal-token authority
+> in this cut.** Keep the planner-issued source owners. Producer source lowering
+> runs under `Predeclared(producer_owner)`; when the producer dispatcher enters
+> the claimed consumer suffix/case body, **that phase runs under
+> `Predeclared(consumer_owner)`, then restores the producer phase.** No causal
+> token is re-homed or newly issued under `Fusion(id)`. The fused definition's
+> `FuncId`, the fusion claim/definition ledger identity, and source causal
+> emission authority are **three separate axes**.
+>
+> Project and declare **only the exact planner-issued token subset that moved
+> with each phase** — do not union all consumer tokens, and do not reach for a
+> generic suppressed-origin or AST-excision facility. If the existing ledger
+> cannot express that exact moved subset, it must **refuse and expose the next
+> bounded planner seam**, never silently relabel tokens as `Fusion`-owned.
+>
+> **Five causal controls are required before arming:** the original consumer and
+> fused function each consume the same checked frame once under distinct emitted
+> `FuncId`s, with the fused body reaching the checked IH slot/call relation; a
+> second activation in the same fused function refuses while the same checked
+> frame across functions accepts; wrong consumer, wrong continuation occurrence,
+> or any displaced member of the checked-transport coordinate refuses **before**
+> definition/redirect/takeover commit; producer phase under consumer owner,
+> suffix phase under producer owner, or either under `Fusion(id)` each refuse
+> independently while the exact pair succeeds; and ordinary zero-fusion and
+> unarmed paths stay byte-for-byte inert.
 
 Both were routed directly by the ring per `COORDINATION §14`; the Steward is
-not the relay.
+not the relay. **The questions as originally posed are kept below**, because
+the ruling corrected the *shape* of the first one and a reader who sees only
+the answer will not know that.
 
 1. **Step 5.** A `CheckedFrameFunctionScope` is a per-`Function` transaction,
    and a fused region is the first construct whose checked frame spans two
