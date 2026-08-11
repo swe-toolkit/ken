@@ -3525,7 +3525,7 @@ fn infer_proj(
         reason: "`.field` projection is unavailable in this elaboration context".into(),
     })?;
     let (field_names, field_types) = class_env
-        .classes
+        .classes()
         .values()
         .find(|ci| ci.type_id == class_type_id)
         .map(|ci| (ci.field_names.clone(), ci.field_types.clone()))
@@ -4510,7 +4510,7 @@ fn projected_field_row_type(
     let Some(class_name) = instance_class_for_global(ctx.class_env, instance_id) else {
         return crate::effects::RowType::empty();
     };
-    let Some(class_info) = ctx.class_env.classes.get(class_name) else {
+    let Some(class_info) = ctx.class_env.classes().get(class_name) else {
         return crate::effects::RowType::empty();
     };
     let Some(idx) = class_info.field_names.iter().position(|n| n == field) else {
@@ -4540,7 +4540,7 @@ fn projected_class_field_row_type(
     class_name: &str,
     field: &str,
 ) -> crate::effects::RowType {
-    let Some(class_info) = class_env.classes.get(class_name) else {
+    let Some(class_info) = class_env.classes().get(class_name) else {
         return crate::effects::RowType::empty();
     };
     let Some(idx) = class_info.field_names.iter().position(|n| n == field) else {
@@ -4557,7 +4557,7 @@ fn projected_class_field_row_type(
 
 fn class_name_for_dictionary_type(class_env: &ClassEnv, ty: &RType) -> Option<String> {
     let head = rtype_head_name(ty);
-    class_env.classes.contains_key(&head).then_some(head)
+    class_env.classes().contains_key(&head).then_some(head)
 }
 
 fn collect_bound_dictionary_params(
@@ -5278,7 +5278,7 @@ fn compute_ordered_field_values(
 ) -> Result<(Vec<Term>, Vec<crate::effects::RowType>), ElabError> {
     let (field_names, field_types, field_purities, has_param) = {
         let ci = class_env
-            .classes
+            .classes()
             .get(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
@@ -5425,7 +5425,7 @@ fn elab_instance_decl(
     // ---- look up class ---------------------------------------------------
     let (class_module, class_type_id, class_kind) = {
         let ci = class_env
-            .classes
+            .classes()
             .get(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),
@@ -5480,7 +5480,7 @@ fn elab_instance_decl(
     // ---- build instance type --------------------------------------------
     // App(class_type, head) if parameterized, else class_type directly.
     let instance_ty = if class_env
-        .classes
+        .classes()
         .get(class_name)
         .map(|ci| ci.param.is_some())
         .unwrap_or(false)
@@ -5502,7 +5502,7 @@ fn elab_instance_decl(
             .iter()
             .map(|constraint| {
                 let class = class_env
-                    .classes
+                    .classes()
                     .get(&constraint.class_name)
                     .ok_or_else(|| ElabError::UnresolvedCon {
                         name: constraint.class_name.clone(),
@@ -5711,7 +5711,7 @@ fn elab_derive(
 
     let (class_type_id, has_param) = {
         let ci = class_env
-            .classes
+        .classes()
             .get(class_name)
             .ok_or_else(|| ElabError::UnresolvedCon {
                 name: class_name.to_string(),

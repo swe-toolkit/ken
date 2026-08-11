@@ -139,6 +139,7 @@ pub struct ClassEnv {
 }
 
 impl ClassEnv {
+    pub fn classes(&self) -> &HashMap<String, ClassInfo> { &self.classes }
     /// Create a sentinel `ClassEnv` with placeholder IDs. Use only when the
     /// class machinery is not needed (non-class elaboration paths). The real
     /// `ClassEnv` is created by `elab::init_class_env` which pre-declares the
