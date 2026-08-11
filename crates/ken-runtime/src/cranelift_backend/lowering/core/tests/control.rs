@@ -14730,28 +14730,24 @@ fn with_d5a_witness_plan<T>(f: impl FnOnce(&StaticTransitionPlan<'_>) -> T) -> T
 fn d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_slot() {
     with_d5a_witness_plan(|plan| {
         let units = plan.continuation_units().expect("continuation units");
-        let mut predeclared = 0usize;
+        // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` rider — the predeclared rows
+        // are COLLECTED here and asserted below, off a value that exists only
+        // because the population is non-empty.**
+        //
+        // ⛔ The earlier form asserted the two equalities inside this loop and
+        // guarded them with a separate `assert!(predeclared > 0, …)`. That is
+        // the shape `D2a` repaired: the guard only NAMES the intent, so deleting
+        // it leaves the equalities compiling and passing vacuously on an empty
+        // unit list. The non-zero check is now the CONSTRUCTOR of the count the
+        // assertion loop ranges over — remove it and this is a compile error,
+        // not a silent pass.
+        let mut predeclared_rows = Vec::new();
         let mut specialization_with_a_real_difference = 0usize;
         for unit in &units {
             let inputs = unit.continuation_inputs().expect("continuation inputs");
             match unit.emission_owner() {
                 ContinuationEmissionOwner::Predeclared(owner) => {
-                    predeclared += 1;
-                    for input in &inputs {
-                        assert_eq!(
-                            input.coordinate.expect_entry_abi().0, owner,
-                            "a predeclared emitter IS its inputs' root provenance owner, so a \
-                             projection naming another owner was built against a different \
-                             emitter than the one that will run"
-                        );
-                        assert_eq!(
-                            input.availability.expect_direct_emission_slot(),
-                            input.coordinate.expect_entry_abi().1,
-                            "for a predeclared emitter the root ABI position and the immediate \
-                             slot index the same environment, so they must agree; this is the \
-                             consistency law that lets that arm read either field"
-                        );
-                    }
+                    predeclared_rows.push((owner, inputs));
                 }
                 ContinuationEmissionOwner::Specialization(_) => {
                     if inputs
@@ -14763,13 +14759,48 @@ fn d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_
                         specialization_with_a_real_difference += 1;
                     }
                 }
+                // **`D2f` — a fusion-owned continuation is not planned by this
+                // witness, and this arm refuses rather than counting one.**
+                //
+                // The two laws this control states are derived for the two
+                // owner classes it names. Neither has been derived for a fused
+                // region, whose emission owner is a third thing: silently
+                // dropping one would shrink the population the laws range over
+                // exactly the way `closure_shaped_captures` warns about, and
+                // counting one as either class would assert a law nobody has
+                // established for it.
+                ContinuationEmissionOwner::Fusion(fusion) => {
+                    panic!(
+                        "the D5a witness planned a fusion-owned continuation ({fusion:?}); this \
+                         control's root-provenance and immediate-slot laws are derived for \
+                         predeclared and specialization owners only, so the fusion class needs \
+                         its own measured law rather than admission to one of theirs"
+                    );
+                }
             }
         }
-        assert!(
-            predeclared > 0,
+        let established_predeclared = std::num::NonZeroUsize::new(predeclared_rows.len()).expect(
             "the witness must still plan at least one predeclared-owned continuation, or the \
-             equality law above is asserted over an empty population"
+             equality law below is asserted over an empty population",
         );
+        for (owner, inputs) in predeclared_rows.iter().take(established_predeclared.get()) {
+            for input in inputs {
+                assert_eq!(
+                    input.coordinate.expect_entry_abi().0,
+                    *owner,
+                    "a predeclared emitter IS its inputs' root provenance owner, so a \
+                     projection naming another owner was built against a different \
+                     emitter than the one that will run"
+                );
+                assert_eq!(
+                    input.availability.expect_direct_emission_slot(),
+                    input.coordinate.expect_entry_abi().1,
+                    "for a predeclared emitter the root ABI position and the immediate \
+                     slot index the same environment, so they must agree; this is the \
+                     consistency law that lets that arm read either field"
+                );
+            }
+        }
         assert!(
             specialization_with_a_real_difference > 0,
             "the witness must still plan at least one specialization-owned continuation whose \

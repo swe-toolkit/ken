@@ -28,8 +28,8 @@ use super::{
     ContinuationContextId, ContinuationSourceCoordinate, ContinuationSpecializationId,
     CraneliftBackendError, EdgeKind,
     PlannedContinuationContext, PlannedContinuationSpecialization, SemanticPlane,
-    SemanticSourceKind, SemanticSourceSeed, StaticEdge, StaticEdgeId, StaticNode, StaticNodeId,
-    StaticOriginId, TransitionKind,
+    SemanticSourceKind, SemanticSourceSeed, StaticContinuationFusionId, StaticEdge, StaticEdgeId,
+    StaticNode, StaticNodeId, StaticOriginId, TransitionKind,
 };
 
 /// The exclusive end of a dense range, with its overflow named.
@@ -347,6 +347,34 @@ pub(in crate::cranelift_backend) enum AbiUnitDefinition {
     ContinuationSpecialization {
         specialization: ContinuationSpecializationId,
     },
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — a planner-interned static
+    /// continuation fusion.**
+    ///
+    /// Architect ruling `evt_6sk3czsbcr85r`. The identity is `D2h`'s
+    /// [`StaticContinuationFusionId`], resolved from the complete fusion key and
+    /// from nothing else. It is a **separate** arm rather than a widening of
+    /// [`AbiUnitDefinition::ContinuationSpecialization`]: that class is defined
+    /// over a real static worker body and this one has none, so reusing it
+    /// would give a fusion the invariants of a unit it is not.
+    ///
+    /// **The class carries ordinary tagged inputs and normal outputs only.**
+    /// Activation, cursor, selection, unwind and continuation state never enter
+    /// a descriptor, slot, carrier, capture, parameter, tag, or target lane for
+    /// this arm. That is the ruling's own stop condition, and the arm is written
+    /// so that the disposition of every crossing lane is a spelled decision
+    /// rather than an inherited default.
+    ///
+    /// **This increment establishes the class and its lawful disposition at
+    /// every consumer. It emits nothing.** There is no generated definition, no
+    /// redirected producer edge, and no source-body emission authority — those
+    /// are `D2f`'s emitter half and are the documented successor seam. A
+    /// consumer that would need emitter-supplied data (arity, capture carrier,
+    /// slot run) therefore **refuses**: until the emitter exists, a site
+    /// reaching one has been handed a unit nothing constructs, and defaulting
+    /// would invent a shape for a class whose shape is not yet decided.
+    StaticContinuationFusion {
+        fusion: StaticContinuationFusionId,
+    },
 }
 
 impl AbiUnitDefinition {
@@ -370,7 +398,12 @@ impl AbiUnitDefinition {
                 declaration_origin: defining_origin,
                 provenance,
             } => Some((defining_origin, provenance)),
-            Self::SchedulingEntry { .. } | Self::ContinuationSpecialization { .. } => None,
+            // `D2f`: a fusion region has no defining closure occurrence and
+            // declares no captures, so it belongs on this side by a property of
+            // the class rather than by omission.
+            Self::SchedulingEntry { .. }
+            | Self::ContinuationSpecialization { .. }
+            | Self::StaticContinuationFusion { .. } => None,
         }
     }
 }
@@ -636,6 +669,13 @@ impl AbiPlane {
             // provenance they would have seen before the port reclassified it.
             AbiUnitDefinition::CallableDeclaration { provenance, .. } => (true, Some(provenance)),
             AbiUnitDefinition::ContinuationSpecialization { .. } => (false, None),
+            // `D2f`: not closure-shaped and carrying no capture provenance, by
+            // the same property that puts it on the `None` side of
+            // `closure_shaped_captures`. This is the class's answer, not a
+            // placeholder: a fusion region has no defining closure occurrence
+            // for a provenance to come from, so there is nothing an emitter
+            // could later supply here.
+            AbiUnitDefinition::StaticContinuationFusion { .. } => (false, None),
         };
         Ok(AbiDescriptorShape {
             definition_is_closure_body,
@@ -1496,6 +1536,17 @@ fn declared_arity(
                 "continuation specialization arity requires its exact planner projection",
             ));
         }
+        // `D2f`: a static continuation fusion's arity is the generated
+        // definition's — the ordinary producer operands plus the projected
+        // suffix inputs — and the emitter that fixes it does not exist yet.
+        // Refusing keeps the number the emitter's to supply; a default here
+        // would be a shape invented for a class nothing constructs.
+        AbiUnitDefinition::StaticContinuationFusion { .. } => {
+            return Err(planner_error(
+                "static continuation fusion arity requires its generated definition, which \
+                 this increment does not emit",
+            ));
+        }
     };
 
     let seed = source_for(sources, defining_origin)?;
@@ -1584,6 +1635,16 @@ fn push_slots(
         AbiUnitDefinition::ContinuationSpecialization { .. } => {
             return Err(planner_error(
                 "continuation specialization slots require their exact planner projection",
+            ));
+        }
+        // `D2f`: the fusion class declares no captures, but the question this
+        // match answers is which carrier its capture run would take — and that
+        // is the emitter's projection. `None` would read as "no captures, carry
+        // on"; refusing says the run is not yet decided.
+        AbiUnitDefinition::StaticContinuationFusion { .. } => {
+            return Err(planner_error(
+                "static continuation fusion slots require its generated definition's \
+                 projection, which this increment does not emit",
             ));
         }
     };
@@ -2303,8 +2364,12 @@ impl AbiPlane {
             match descriptor.definition {
                 AbiUnitDefinition::SchedulingEntry { .. }
                 | AbiUnitDefinition::CallableDeclaration { .. } => {}
+                // `D2f`: a fusion region is reached through its redirected
+                // producer edge and never as a declaration call target, so it
+                // joins the arms already refused here.
                 AbiUnitDefinition::ClosureBody { .. }
-                | AbiUnitDefinition::ContinuationSpecialization { .. } => {
+                | AbiUnitDefinition::ContinuationSpecialization { .. }
+                | AbiUnitDefinition::StaticContinuationFusion { .. } => {
                     return Err(planner_error(
                         "declaration call target is neither a scheduling entry nor a callable \
                          declaration unit",
@@ -2525,6 +2590,16 @@ fn validate_slot_run(
         AbiUnitDefinition::ContinuationSpecialization { .. } => {
             return Err(planner_error(
                 "continuation specialization slots require their exact planner projection",
+            ));
+        }
+        // `D2f`: the slot run being validated is the generated definition's, and
+        // this increment emits none — so there is no authority to validate
+        // against. Refusing is what keeps the validator from certifying a run
+        // whose canonical order the emitter has not yet fixed.
+        AbiUnitDefinition::StaticContinuationFusion { .. } => {
+            return Err(planner_error(
+                "static continuation fusion slot run requires its generated definition's \
+                 projection, which this increment does not emit",
             ));
         }
     };

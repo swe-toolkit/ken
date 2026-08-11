@@ -9746,6 +9746,45 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                      run is not this function's entry run"
                 ),
             )),
+            // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — both fusion pairs
+            // refuse, and neither is waiting on the emitter to become an
+            // acceptance.**
+            //
+            // `ContinuationFrameIdentity` has no fusion variant, so a claim
+            // reaching here always names *someone else's* frame while the frame
+            // being defined is a fused region. Indexing a predeclared entry run
+            // or a generated context's capture run from inside that region is
+            // the ruling's own stop condition: the fused region's activation is
+            // local, and a frame claim that crossed into it would be exactly the
+            // export the class forbids.
+            //
+            // When the emitter lands, the lawful successor is a frame identity
+            // of its own validated against its own descriptor — not a
+            // relaxation of either arm below.
+            (
+                ContinuationFrameIdentity::Predeclared(named),
+                ContinuationEmissionOwner::Fusion(held),
+            ) => Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "an entry-frame claim names predeclared frame {named:?} while the frame \
+                     being defined is static continuation fusion {held:?}; a fused region does \
+                     not hold another unit's entry run and RT-LEXICAL-RECURSOR-CONSUMERS D2f \
+                     refuses rather than indexing one"
+                ),
+            )),
+            (
+                ContinuationFrameIdentity::GeneratedContext { specialization, .. },
+                ContinuationEmissionOwner::Fusion(held),
+            ) => Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "an entry-frame claim names the generated context of {specialization:?} \
+                     while the frame being defined is static continuation fusion {held:?}; a \
+                     generated context's capture run is not a fused region's frame and reading \
+                     one from the other would carry activation state across the boundary"
+                ),
+            )),
         }
     }
     /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`/`D2` — `DirectCall` settles
