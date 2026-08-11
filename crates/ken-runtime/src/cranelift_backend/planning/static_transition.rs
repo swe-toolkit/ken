@@ -8473,6 +8473,33 @@ fn build_checked_ih_bindings(
 /// `build_continuation_specialization_plan` admitted, returned from that same
 /// call.
 #[cfg_attr(not(test), allow(dead_code))]
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the root source a future fusion
+/// enumerator MUST consume.**
+///
+/// NOTHING CONSUMES THIS YET. There is no live fusion enumerator and no
+/// production consumer; this helper is referenced by its own definition and its
+/// control and by nothing else. No seed-only path has been removed, because no
+/// such path exists on this branch to remove -- the seed frontier is excluded
+/// here by construction rather than deleted from live code.
+///
+/// What it fixes in advance is the root source. The alternative -- rebuilding
+/// `child(consumer, 0)` over every planned `ComputationalMatch` -- reconstructs
+/// the SEED frontier, and the fixed point admits discoveries past it that no
+/// seed scan can name. An enumerator keyed on the seeds would walk a different
+/// population from the one production works over, which is the defect this
+/// exists to keep out of the enumerator when it is written.
+///
+/// The complete identity travels, `enclosing_specialization` included: it is
+/// the immediate emission context and cannot be recovered from a worker body's
+/// raw occurrence owner. One invocation, no parallel discovery, no seed
+/// reconstruction, no worker-body scan.
+#[cfg_attr(not(test), allow(dead_code))]
+fn fusion_root_source_for_future_enumerator(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<AdmittedContinuationDiscovery>, CraneliftBackendError> {
+    admitted_continuation_discoveries(plan)
+}
+
 fn admitted_continuation_discoveries(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<AdmittedContinuationDiscovery>, CraneliftBackendError> {
@@ -14541,6 +14568,79 @@ mod tests {
                 _ => return Ok(origin),
             }
         }
+    }
+
+    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the
+    /// admitted ledger, and it is strictly richer than the seed frontier.
+    ///
+    /// NO LIVE ENUMERATOR CONSUMES THIS. Nothing in production reads the helper,
+    /// no seed-only path has been removed, and no candidate population is
+    /// claimed. What is established is which roots an enumerator will have to
+    /// walk when it is written, and why the obvious alternative is wrong.
+    ///
+    /// The equality below is an ALIAS OBSERVATION, not a causal control: the
+    /// helper is defined as the ledger, so it can only agree with it. It is kept
+    /// because it is the statement of what the root source IS, and it is
+    /// labelled so nobody reads it as evidence.
+    ///
+    /// The two causal claims are the ones after it:
+    ///
+    /// - the admitted population is **strictly larger** than the seed
+    ///   reconstruction can name, so keying an enumerator on the seeds would
+    ///   miss admitted roots;
+    /// - at least one admitted root carries **`Some(enclosing_specialization)`**,
+    ///   which no seed reconstruction can produce and which cannot be recovered
+    ///   downstream from a worker body's raw occurrence owner.
+    ///
+    /// Measured on the landed terminal twin; the claim is about that fixture.
+    #[test]
+    fn d2i_the_future_enumerators_root_source_is_richer_than_the_seed_frontier() {
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+
+        let root_source: BTreeSet<_> = fusion_root_source_for_future_enumerator(&plan)
+            .expect("root source")
+            .into_iter()
+            .collect();
+        let ledger: BTreeSet<_> = admitted_continuation_discoveries(&plan)
+            .expect("ledger")
+            .into_iter()
+            .collect();
+        assert_eq!(
+            root_source, ledger,
+            "alias observation only: the root source is DEFINED as the admitted ledger, \
+             so this states what it is and is not evidence that anything consumes it"
+        );
+
+        let mut seeds = BTreeSet::new();
+        for occurrence in plan.source_occurrences.iter().flatten() {
+            if matches!(occurrence.expr, RuntimeExpr::ComputationalMatch { .. }) {
+                seeds.insert(AdmittedContinuationDiscovery {
+                    continuation_origin: occurrence.static_origin,
+                    result_root: plan
+                        .semantic
+                        .child_origin(occurrence.static_origin, 0)
+                        .expect("scrutinee"),
+                    enclosing_specialization: None,
+                });
+            }
+        }
+        assert!(
+            root_source.len() > seeds.len(),
+            "the admitted population must exceed what the seed frontier can name, or \
+             fixing this root source in advance buys a future enumerator nothing: \
+             root_source={root_source:?} seeds={seeds:?}"
+        );
+        assert!(
+            root_source
+                .iter()
+                .any(|root| root.enclosing_specialization.is_some()),
+            "and at least one admitted root must carry its enclosing specialization, \
+             the field a seed reconstruction cannot produce: root_source={root_source:?}"
+        );
     }
 
     /// `D2i` — the discovery LEDGER is what the production fixed point admitted,
