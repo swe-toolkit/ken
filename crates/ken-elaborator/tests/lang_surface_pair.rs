@@ -4,7 +4,8 @@ use ken_elaborator::error::ElabError;
 use ken_elaborator::layout::format_ken;
 use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::lossless::parse_lossless;
-use ken_elaborator::ElabEnv;
+use ken_elaborator::parser::parse_expr;
+use ken_elaborator::{ElabEnv, Expr};
 use ken_kernel::{whnf, Context, Term};
 
 fn token_kinds(source: &str) -> Vec<Token> {
@@ -13,6 +14,20 @@ fn token_kinds(source: &str) -> Vec<Token> {
         .into_iter()
         .map(|(token, _)| token)
         .collect()
+}
+
+fn projection_path(expr: &Expr) -> Option<(String, Vec<u8>)> {
+    let mut indices = Vec::new();
+    let mut current = expr;
+    while let Expr::EPosProj(body, index, _) = current {
+        indices.push(*index);
+        current = body;
+    }
+    let Expr::EVar(name, _) = current else {
+        return None;
+    };
+    indices.reverse();
+    Some((name.clone(), indices))
 }
 
 /// Promise class: lexical discrimination.
@@ -24,8 +39,47 @@ fn token_kinds(source: &str) -> Vec<Token> {
 /// projection-specific parser workaround.
 #[test]
 fn projection_chains_and_float_literals_split_at_the_lexer() {
+    let expected_tokens = vec![
+        Token::Ident("p".into()),
+        Token::Dot,
+        Token::Nat(1),
+        Token::Dot,
+        Token::Nat(2),
+        Token::Eof,
+    ];
+    let expected_path = Some(("p".to_owned(), vec![1, 2]));
+    for source in ["p.1.2", "p.1 .2", "p. 1 .2", "p. 1.2"] {
+        assert_eq!(token_kinds(source), expected_tokens, "{source}");
+        assert_eq!(
+            projection_path(&parse_expr(source).expect("projection chain must parse")),
+            expected_path,
+            "{source}"
+        );
+    }
+
+    assert_eq!(token_kinds("3.14"), vec![Token::FloatLit(3.14), Token::Eof]);
+    assert!(matches!(
+        token_kinds("1.2e5").as_slice(),
+        [Token::FloatLit(_), Token::Eof]
+    ));
     assert_eq!(
-        token_kinds("p.1.2"),
+        token_kinds("1.2d"),
+        vec![Token::DecimalLit(12, -1), Token::Eof]
+    );
+}
+
+/// Promise class: lexical trivia invariance.
+/// MEASURED: a comment between a projection dot and its index leaves the
+/// emitted token stream and parsed projection chain unchanged.
+/// CLAIMED: fraction discrimination depends on the previous emitted token,
+/// not raw byte adjacency.
+/// THE GAP: whitespace-only controls cannot detect a guard that accidentally
+/// inspects the immediately preceding source character.
+#[test]
+fn comments_do_not_reset_projection_token_context() {
+    let source = "p. -- note\n1.2";
+    assert_eq!(
+        token_kinds(source),
         vec![
             Token::Ident("p".into()),
             Token::Dot,
@@ -35,7 +89,33 @@ fn projection_chains_and_float_literals_split_at_the_lexer() {
             Token::Eof,
         ]
     );
-    assert_eq!(token_kinds("3.14"), vec![Token::FloatLit(3.14), Token::Eof]);
+    assert_eq!(
+        projection_path(&parse_expr(source).expect("commented projection must parse")),
+        Some(("p".to_owned(), vec![1, 2]))
+    );
+}
+
+/// Promise class: formatter acceptance preservation.
+/// MEASURED: kenfmt canonicalizes spaced projections and both its input and
+/// canonical output parse losslessly.
+/// CLAIMED: canonicalization does not cross the projection accept/reject
+/// boundary.
+/// THE GAP: lexer/parser controls alone cannot detect canonical output that
+/// the lexer subsequently rejects.
+#[test]
+fn kenfmt_canonical_projection_output_remains_accepted() {
+    for (source, expected) in [
+        ("const first : Int = p. 1\n", "const first : Int = p.1\n"),
+        (
+            "const second : Int = p. 1 .2\n",
+            "const second : Int = p.1.2\n",
+        ),
+    ] {
+        parse_lossless(source).expect("spaced projection must parse");
+        let formatted = format_ken(source).expect("spaced projection must format");
+        assert_eq!(formatted, expected);
+        parse_lossless(&formatted).expect("canonical projection must remain parseable");
+    }
 }
 
 /// Promise class: semantic positive and written arity.
