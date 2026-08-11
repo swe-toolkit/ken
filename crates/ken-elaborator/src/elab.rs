@@ -758,6 +758,34 @@ fn make_if_elim(
     })
 }
 
+fn check_if(
+    cx: &mut ElabCtx<'_>,
+    condition: &RExpr,
+    then_branch: &RExpr,
+    else_branch: &RExpr,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let condition_core = elaborate_if_condition(cx, condition)?;
+    let then_core = check(cx, then_branch, expected, then_branch.span())?;
+    let else_core = check(cx, else_branch, expected, else_branch.span())?;
+    make_if_elim(cx, condition_core, then_core, else_core, expected, span)
+}
+
+fn infer_if(
+    cx: &mut ElabCtx<'_>,
+    condition: &RExpr,
+    then_branch: &RExpr,
+    else_branch: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let condition_core = elaborate_if_condition(cx, condition)?;
+    let (then_core, result_ty) = infer(cx, then_branch)?;
+    let else_core = check(cx, else_branch, &result_ty, else_branch.span())?;
+    let core = make_if_elim(cx, condition_core, then_core, else_core, &result_ty, span)?;
+    Ok((core, result_ty))
+}
+
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
     match expr {
         RExpr::RIf {
@@ -765,12 +793,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             then_branch,
             else_branch,
             span,
-        } => {
-            let condition_core = elaborate_if_condition(cx, condition)?;
-            let then_core = check(cx, then_branch, expected, then_branch.span())?;
-            let else_core = check(cx, else_branch, expected, else_branch.span())?;
-            make_if_elim(cx, condition_core, then_core, else_core, expected, span)
-        }
+        } => check_if(cx, condition, then_branch, else_branch, expected, span),
         RExpr::RNumLit(lit, num_span) => elab_num_lit_checked(cx, lit, expected, num_span),
         RExpr::RStr(s, span) => elab_str_lit(cx, s, Some(expected), span).map(|(t, _)| t),
         // `Refl` — reflexivity, checked (never inferred): the expected goal
@@ -2889,13 +2912,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             then_branch,
             else_branch,
             span,
-        } => {
-            let condition_core = elaborate_if_condition(cx, condition)?;
-            let (then_core, result_ty) = infer(cx, then_branch)?;
-            let else_core = check(cx, else_branch, &result_ty, else_branch.span())?;
-            let core = make_if_elim(cx, condition_core, then_core, else_core, &result_ty, span)?;
-            Ok((core, result_ty))
-        }
+        } => infer_if(cx, condition, then_branch, else_branch, span),
         RExpr::RRecursiveResult {
             selector,
             index,
