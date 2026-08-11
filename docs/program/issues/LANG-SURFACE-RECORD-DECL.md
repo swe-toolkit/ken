@@ -120,3 +120,55 @@ it** — a record is a right-nested Σ, and `LANG-SURFACE-PAIR` landed tuple
 introduction, so `(1, 2)` checked against `Point` builds one.
 
 Record patterns in `match` are `34 §3`'s and are not this node's either.
+
+## `S1a` accepted partial — the transitional read seam, MERGED 2026-08-11
+
+Exact `0ae99a0067cdaf67fbf0676429da75460085908c` from declared base `17f68eb1`;
+three commits, nine `crates/ken-elaborator` paths, `+88/-87`. Decision
+`dec_2pe1cesy87ne4` resolved APPROVE — Architect `evt_5j10r2p5a21q0`, QA
+`evt_66brv66dhegrm`. No `spec/` or `conformance/` path, so no Spec vote.
+
+**What landed.** A public transitional read-only `ClassEnv::classes()` borrowing
+the sole existing map, plus the migration of **every executable read** from the
+`.classes` field to the accessor. The sole production writer and the
+`init_class_env` construction stay direct; `pub classes` remains for this slice.
+Storage- and semantic-neutral — no second store, no registry flip, no
+instance-resolution or projection change, no records.
+
+**This closes none of the node's record-declaration surface.** It is slice one of
+a staged migration and buys exactly one thing: the aliasing point is now a
+**function** rather than a field.
+
+### Why that distinction was the whole problem, recorded because it cost three turns
+
+**The Steward authorized an infeasible slice.** The instruction was *"`.classes`
+becomes a thin alias over the registry, not a parallel store."* Measured:
+
+```
+crates/ken-elaborator/src/classes.rs:106:    pub classes: HashMap<String, ClassInfo>,
+```
+
+**It is a public struct field, and a field is storage.** Rust cannot make a
+public field a view over a different backing store, so the instruction had only
+two readings: materialise a second `HashMap` (a parallel store, forbidden by
+`evt_4qvpthrt47e8z`), or convert every consumer at once — which is the entire
+migration the slice existed to avoid.
+
+**The implementer refused three times and was right three times.** The Steward
+had told the leader that a third refusal would indicate the seat rather than the
+scope. **That was wrong**, and the correction belongs here rather than only in a
+thread: the seat was producing correct refusals against unbuildable
+instructions.
+
+⇒ **Before authorizing a slice, check the TYPE of the thing you are asking to
+change.** A field is not a function, and no amount of staging makes a field
+behave like one.
+
+**The Architect's staged order** (`evt_49qybm9pasz24`) supplies what the Steward's
+did not: `S1a` introduces the callable seam over the **existing** map keeping
+`pub classes`; `S1b` closes mutation and construction, then privatizes; `S2..Sn`
+introduce storage-independent views and migrate by call shape; the storage flip
+comes last and changes no call site. **`classes()` is a deletion gate, not a
+compatibility API** — its required doc comment says so, and a candidate omitting
+that sentence was blocked (`dec_5cgh7x06txz16`, rejected) precisely so the broad
+raw-map view cannot fossilize.
