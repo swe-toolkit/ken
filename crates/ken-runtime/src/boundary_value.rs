@@ -68,7 +68,7 @@
 //! held the word, and a borrowed one dies with the invocation even though the
 //! slot is frame-owned exactly as before.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ir::{RuntimeGroundValue, RuntimeSymbol};
 use crate::store::{SlotId, Store, NULL_SLOT};
@@ -3277,4 +3277,230 @@ pub fn check_escape(word: BoundaryWord) -> i64 {
             }
         },
     }
+}
+
+// ---------------------------------------------------------------------------
+// RT-FNUNIT-RESULT-TOKEN D3 — reading an invocation aggregate back as a ground
+// value
+// ---------------------------------------------------------------------------
+
+/// One validated invocation-arena node. Constructing it IS the validation.
+#[derive(Clone, Copy, Debug)]
+struct InvocationAggregateNode {
+    class: BoundaryClass,
+    tag_id: u64,
+    field_count: u64,
+    fields_at: u64,
+}
+
+impl InvocationAggregateNode {
+    /// Accept one node, or refuse. **Every acceptance condition is checked here
+    /// and nowhere else**, so a caller cannot reach node data by another route
+    /// and skip one.
+    ///
+    /// `owner` and `slot` are the two that make an escape detectable rather
+    /// than merely unlikely: an invocation node's owner is
+    /// [`BoundaryReferentOwner::InvocationArena`] and its slot is
+    /// [`NULL_SLOT`], because the store is the only writer of a real slot.
+    fn validate(arena: &BoundaryArenaV1, index: u64) -> Result<Self, i64> {
+        let field = |offset| arena.node_field(index, offset).ok_or(BOUNDARY_ERR_BOUNDS);
+        if field(NODE_OWNER)? != BoundaryReferentOwner::InvocationArena as u64 {
+            return Err(BOUNDARY_ERR_ESCAPE);
+        }
+        if field(NODE_SLOT)? != NULL_SLOT as u64 {
+            return Err(BOUNDARY_ERR_SHAPE);
+        }
+        let class = BoundaryClass::from_bits(field(NODE_CLASS)?).ok_or(BOUNDARY_ERR_CLASS)?;
+        // The admitted classes are exactly the two `InvocationAggregate` names.
+        // Spelled rather than wildcarded, so a new class is a compile error
+        // here instead of a silent admission or a silent refusal.
+        match class {
+            BoundaryClass::Constructor | BoundaryClass::Record => {}
+            BoundaryClass::Bool
+            | BoundaryClass::Int
+            | BoundaryClass::Bytes
+            | BoundaryClass::String
+            | BoundaryClass::HostResult
+            | BoundaryClass::Closure
+            | BoundaryClass::BorrowedOpaque => return Err(BOUNDARY_ERR_CLASS),
+        }
+        let field_count = field(NODE_FIELD_COUNT)?;
+        let fields_at = field(NODE_FIELDS_AT)?;
+        // The spans, checked before anything reads through them. `checked_add`
+        // rather than `+`: a span whose end wraps would otherwise index low.
+        let end = fields_at
+            .checked_add(field_count)
+            .ok_or(BOUNDARY_ERR_BOUNDS)?;
+        for at in fields_at..end {
+            arena.word_at(at).ok_or(BOUNDARY_ERR_BOUNDS)?;
+            if class == BoundaryClass::Record {
+                arena.name_at(at).ok_or(BOUNDARY_ERR_BOUNDS)?;
+            }
+        }
+        Ok(Self {
+            class,
+            tag_id: field(NODE_TAG_ID)?,
+            field_count,
+            fields_at,
+        })
+    }
+}
+
+/// The node index an `InvocationAggregate` word names, or a tag refusal.
+fn invocation_aggregate_index(word: BoundaryWord) -> Result<u64, i64> {
+    match word.tag() {
+        Some(BoundaryTag::InvocationAggregate) => Ok(word.payload()),
+        _ => Err(BOUNDARY_ERR_TAG),
+    }
+}
+
+/// An identity resolved through the planner-**issued** reverse view, or a
+/// refusal.
+///
+/// ⛔ There is no spelling lookup and no mint. A zero identity, or one the
+/// planner never issued, is a refusal — the alternative would let a node name a
+/// constructor or a field by asserting an integer.
+fn issued_carrier_symbol(store: &BoundaryValueStore, identity: u64) -> Result<RuntimeSymbol, i64> {
+    if identity == 0 {
+        return Err(BOUNDARY_ERR_SHAPE);
+    }
+    store
+        .carrier_symbol(identity)
+        .map(str::to_string)
+        .ok_or(BOUNDARY_ERR_SHAPE)
+}
+
+/// One child word of an aggregate, as a ground value.
+///
+/// Nested aggregates are read from `decoded` rather than recursed into: the
+/// traversal is iterative, and by postorder every aggregate child is already
+/// built when its parent is.
+fn decode_invocation_child(
+    store: &mut BoundaryValueStore,
+    child: BoundaryWord,
+    decoded: &BTreeMap<u64, RuntimeGroundValue>,
+) -> Result<RuntimeGroundValue, i64> {
+    match child.tag() {
+        Some(BoundaryTag::ImmediateBool) => match child.payload() {
+            0 => Ok(RuntimeGroundValue::Bool(false)),
+            1 => Ok(RuntimeGroundValue::Bool(true)),
+            // A bool word whose payload is neither is not a bool that happens
+            // to be true; it is a word this decoder cannot read.
+            _ => Err(BOUNDARY_ERR_SHAPE),
+        },
+        Some(BoundaryTag::ImmediateInt) => {
+            let value = child.signed_payload();
+            if !BoundaryWord::int_fits_immediate(value) {
+                return Err(BOUNDARY_ERR_SHAPE);
+            }
+            Ok(RuntimeGroundValue::Int(value.into()))
+        }
+        // Adopted only here, as the CHILD word, and only after the caller has
+        // sealed. The aggregate word itself is never adopted.
+        Some(BoundaryTag::PersistentGround) => {
+            let adopted = store.adopt(child)?;
+            store
+                .observe_adopted_ground(adopted)
+                .ok_or(BOUNDARY_ERR_SHAPE)
+        }
+        Some(BoundaryTag::InvocationAggregate) => decoded
+            .get(&invocation_aggregate_index(child)?)
+            .cloned()
+            .ok_or(BOUNDARY_ERR_SHAPE),
+        // The closed refusal set, spelled. Every one of these is a real tag
+        // this decoder does not read, and `None` is a byte outside the set.
+        None
+        | Some(BoundaryTag::ImmediateExitStatus)
+        | Some(BoundaryTag::ImmediateBoundedNat)
+        | Some(BoundaryTag::ImmediateStructuralNat)
+        | Some(BoundaryTag::PersistentClosure)
+        | Some(BoundaryTag::InvocationBorrowed)
+        | Some(BoundaryTag::InvocationHostResult) => Err(BOUNDARY_ERR_TAG),
+    }
+}
+
+/// **Reconstruct the ground value an invocation-scoped aggregate names.**
+///
+/// The caller must have sealed first — `activation.finish(&mut store, None)` —
+/// which withdraws writers and freezes persistent state. The activation still
+/// owns the invocation arena, and this reads it as **decode input only**: no
+/// node is written, the aggregate word is never root-adopted, and nothing
+/// arena-backed escapes, because every value returned is owned
+/// ([`RuntimeGroundValue`] holds no arena reference).
+///
+/// ## The traversal is iterative, and that is a requirement rather than a taste
+///
+/// Postorder over an explicit stack with grey/black marks:
+///
+/// - a node reached while it is still **grey** is a cycle, and cycles refuse;
+/// - a node already **black** is sharing, which is legal and is decoded once;
+/// - deep valid data therefore costs arena nodes, **not host stack frames**, so
+///   a legitimately deep aggregate cannot overflow the decoder.
+pub(crate) fn decode_invocation_ground(
+    arena: &BoundaryArenaV1,
+    store: &mut BoundaryValueStore,
+    word: BoundaryWord,
+) -> Result<RuntimeGroundValue, i64> {
+    let root = invocation_aggregate_index(word)?;
+    let mut decoded: BTreeMap<u64, RuntimeGroundValue> = BTreeMap::new();
+    let mut grey: BTreeSet<u64> = BTreeSet::new();
+    let mut stack: Vec<(u64, bool)> = vec![(root, false)];
+
+    while let Some((index, expanded)) = stack.pop() {
+        if decoded.contains_key(&index) {
+            continue;
+        }
+        let node = InvocationAggregateNode::validate(arena, index)?;
+        if !expanded {
+            if !grey.insert(index) {
+                return Err(BOUNDARY_ERR_CYCLE);
+            }
+            stack.push((index, true));
+            for at in node.fields_at..node.fields_at + node.field_count {
+                let child = arena.word_at(at).ok_or(BOUNDARY_ERR_BOUNDS)?;
+                if child.tag() == Some(BoundaryTag::InvocationAggregate) {
+                    let child_index = invocation_aggregate_index(child)?;
+                    if !decoded.contains_key(&child_index) {
+                        stack.push((child_index, false));
+                    }
+                }
+            }
+            continue;
+        }
+
+        let mut children = Vec::with_capacity(node.field_count as usize);
+        for at in node.fields_at..node.fields_at + node.field_count {
+            let child = arena.word_at(at).ok_or(BOUNDARY_ERR_BOUNDS)?;
+            children.push(decode_invocation_child(store, child, &decoded)?);
+        }
+        let value = match node.class {
+            BoundaryClass::Constructor => RuntimeGroundValue::Constructor {
+                constructor: issued_carrier_symbol(store, node.tag_id)?,
+                args: children,
+            },
+            BoundaryClass::Record => {
+                let mut fields = Vec::with_capacity(children.len());
+                for (offset, child) in children.into_iter().enumerate() {
+                    let name = arena
+                        .name_at(node.fields_at + offset as u64)
+                        .ok_or(BOUNDARY_ERR_BOUNDS)?;
+                    fields.push((issued_carrier_symbol(store, name)?, child));
+                }
+                RuntimeGroundValue::Record { fields }
+            }
+            // `validate` admits exactly the two above; spelled rather than
+            // wildcarded so this stays a compile error if that ever changes.
+            BoundaryClass::Bool
+            | BoundaryClass::Int
+            | BoundaryClass::Bytes
+            | BoundaryClass::String
+            | BoundaryClass::HostResult
+            | BoundaryClass::Closure
+            | BoundaryClass::BorrowedOpaque => return Err(BOUNDARY_ERR_CLASS),
+        };
+        grey.remove(&index);
+        decoded.insert(index, value);
+    }
+
+    decoded.remove(&root).ok_or(BOUNDARY_ERR_SHAPE)
 }

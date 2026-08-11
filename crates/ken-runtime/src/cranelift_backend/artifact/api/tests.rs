@@ -92,7 +92,6 @@ fn program_runner_preflights_metadata_before_backend_lowering() {
         .all(|report| report.trust.fidelity == NativeFidelity::F1SeedObservationAgreement));
 }
 #[test]
-#[ignore = "RT-FNUNIT-RESULT-TOKEN: fails with `native result token 265 could not be decoded`. MEASURED at D2: it selects the Boundary decoder and raises at the `_ =>` arm, because token 265 carries tag 9 = BoundaryTag::InvocationAggregate -- a VALID tag whose admitted classes are exactly Constructor and Record, which the Boundary arm does not handle. It is not a result-table miss and never reached the Table arm; the old wording quoted here said otherwise. RT-SEED-CALL-PORT D3 retired SeedClosureCall, which made this shape newly reachable on the FunctionizedUnits lane; the wall was already there and D3 is NOT the cause. Measured: flipping this fixture's callee from Closure to LexicalClosure -- an arm live since RT-DECL-CLOSURE-PORT and untouched by D2/D3 -- reproduces the identical error. RT-FNUNIT-RESULT-TOKEN owns un-skipping this row, which means running it green on the functionized lane, not tidying the skip"]
 fn nc22_cranelift_agrees_with_runtime_ir_report_for_broad_starter_shapes() {
     let body = RuntimeExpr::Let {
         value: Box::new(total_primitive(

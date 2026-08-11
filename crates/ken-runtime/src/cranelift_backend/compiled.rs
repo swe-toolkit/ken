@@ -200,7 +200,40 @@ impl CompiledModule<JITModule> {
                         backend(BackendFailure::NativeResultDecode { token })
                     })?
                 }
-                _ => {
+                // `RT-FNUNIT-RESULT-TOKEN` `D3`. The one arm this node adds.
+                //
+                // Seal FIRST: withdraw writers and freeze persistent state.
+                // The activation still owns the invocation arena, which stays
+                // read-only decode input. The aggregate word is passed to the
+                // decoder and is NEVER root-adopted -- `finish` is called with
+                // `None`, so nothing arena-backed can become persistent, and
+                // the value that comes back is owned.
+                Some(crate::boundary_value::BoundaryTag::InvocationAggregate) => {
+                    activation
+                        .finish(&mut store, None)
+                        .map_err(|_| backend(BackendFailure::NativeResultDecode { token }))?;
+                    crate::boundary_value::decode_invocation_ground(
+                        activation.arena(),
+                        &mut store,
+                        crate::boundary_value::BoundaryWord(token as u64),
+                    )
+                    .map_err(|_| backend(BackendFailure::NativeResultDecode { token }))?
+                }
+                // THE CLOSED REFUSAL SET, SPELLED RATHER THAN WILDCARDED.
+                //
+                // Every one of these is a real tag this decoder does not read,
+                // and `None` is a tag byte outside the closed set. Writing them
+                // out makes a new `BoundaryTag` a compile error here instead of
+                // silently joining the refusal -- and it is why widening this
+                // arm cannot happen by accident, which `AC-4` names as the
+                // cheap wrong repair.
+                None
+                | Some(crate::boundary_value::BoundaryTag::ImmediateExitStatus)
+                | Some(crate::boundary_value::BoundaryTag::ImmediateBoundedNat)
+                | Some(crate::boundary_value::BoundaryTag::ImmediateStructuralNat)
+                | Some(crate::boundary_value::BoundaryTag::PersistentClosure)
+                | Some(crate::boundary_value::BoundaryTag::InvocationBorrowed)
+                | Some(crate::boundary_value::BoundaryTag::InvocationHostResult) => {
                     return Err(backend(BackendFailure::NativeResultDecode { token }));
                 }
             },
