@@ -2678,6 +2678,10 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// a standalone unit. Empty until `install_fusion_owned_bodies` moves a
     /// fully validated scratch map in; there is deliberately no other writer.
     fusion_owned_bodies: BTreeMap<StaticOriginId, FusionOwnedBody>,
+    /// Whether body ownership has been installed. **Not derivable from the map's
+    /// emptiness:** a plan with no fused regions installs an empty map, and a
+    /// second install against it must still refuse.
+    fusion_bodies_installed: bool,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One ownership record per aggregate producer
     /// occurrence. ⭐ Unlike its two dormant siblings above, this population
     /// HAS a lowering accessor — the allocation lane is unreadable at the
@@ -9366,6 +9370,12 @@ pub(in crate::cranelift_backend) struct FusionRegionClaimLedger {
     /// a fused definition owns. Recorded by the atomic install and by nothing
     /// else, so the closeout bijects against a fact the plan actually holds.
     body_owned: BTreeSet<StaticContinuationFusionId>,
+    /// Whether ownership has been recorded at all. **Separate from
+    /// `body_owned.is_empty()` on purpose:** a compile with zero fused regions
+    /// records an empty set, and an emptiness sentinel cannot tell that apart
+    /// from never having recorded, so exact-once would silently become
+    /// at-most-once-if-non-empty.
+    body_owned_recorded: bool,
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -9544,6 +9554,7 @@ impl FusionRegionClaimLedger {
             defined: BTreeSet::new(),
             redirected: BTreeSet::new(),
             body_owned: BTreeSet::new(),
+            body_owned_recorded: false,
         })
     }
 
@@ -9641,13 +9652,22 @@ impl FusionRegionClaimLedger {
     /// only after that method has validated its whole scratch map. Taking the
     /// set rather than one identity at a time is what keeps the ledger's view
     /// and the plan's map the same atomic fact.
-    fn record_body_owned(
-        &mut self,
-        owned: BTreeSet<StaticContinuationFusionId>,
+    /// **Validate a proposed ownership record WITHOUT mutating anything.**
+    ///
+    /// Split from the commit below because the plan's install is a two-object
+    /// transaction: the plan's map and this ledger's set must both move or
+    /// neither must. A single fallible `record` forced the plan to mutate first
+    /// and then discover a ledger refusal, which left the plan owning bodies
+    /// after returning `Err`. Every refusal now happens here, before either
+    /// object has changed.
+    fn check_body_owned(
+        &self,
+        owned: &BTreeSet<StaticContinuationFusionId>,
     ) -> Result<(), CraneliftBackendError> {
-        if !self.body_owned.is_empty() {
+        if self.body_owned_recorded {
             return Err(planner_error(
-                "static continuation fusion body ownership was recorded twice",
+                "static continuation fusion body ownership was recorded twice on one claim \
+                 ledger; a ledger already spent on one plan cannot install ownership into another",
             ));
         }
         if !owned.is_subset(&self.planned) {
@@ -9655,8 +9675,15 @@ impl FusionRegionClaimLedger {
                 "a fusion-owned producer body names a region this compile never preflighted",
             ));
         }
-        self.body_owned = owned;
         Ok(())
+    }
+
+    /// Commit the record. **Infallible by construction** — every condition was
+    /// decided by [`Self::check_body_owned`], so there is no branch here that
+    /// could reject after the plan has already moved its map.
+    fn commit_body_owned(&mut self, owned: BTreeSet<StaticContinuationFusionId>) {
+        self.body_owned = owned;
+        self.body_owned_recorded = true;
     }
 
     /// **The ruled closeout bijection: installed ↔ fusion-owned body ↔
@@ -10835,6 +10862,7 @@ impl<'src> Planner<'src> {
                 // Empty by construction: body ownership is installed only from
                 // validated claims, which cannot exist before the plan does.
                 fusion_owned_bodies: BTreeMap::new(),
+                fusion_bodies_installed: false,
             },
             store_interner: BTreeMap::new(),
             next_source: 0,
@@ -13699,7 +13727,7 @@ impl<'src> StaticTransitionPlan<'src> {
         &mut self,
         ledger: &mut FusionRegionClaimLedger,
     ) -> Result<(), CraneliftBackendError> {
-        if !self.fusion_owned_bodies.is_empty() {
+        if self.fusion_bodies_installed {
             return Err(planner_error(
                 "static continuation fusion body ownership may be installed exactly once",
             ));
@@ -13801,9 +13829,23 @@ impl<'src> StaticTransitionPlan<'src> {
             }
         }
 
-        // Validated in full above; installed here in one move.
+        // **The transaction. Every fallible refusal is above this line.**
+        //
+        // The ledger is checked BEFORE the plan's map moves, because the two
+        // objects are not type-bound to each other: a ledger already spent on
+        // one plan can be handed to an equivalent second plan whose own scratch
+        // map validates perfectly. Recording after the move meant that case
+        // mutated the second plan and then returned `Err` — leaving it with a
+        // populated ownership map, a narrowed executable-unit population and a
+        // narrowed edge population, all from a call that reported failure.
+        //
+        // No caller convention can exclude that, so it is excluded here by
+        // ordering: the check below is the last thing that can fail, and the two
+        // commits after it are infallible.
+        ledger.check_body_owned(&owned)?;
         self.fusion_owned_bodies = scratch;
-        ledger.record_body_owned(owned)?;
+        self.fusion_bodies_installed = true;
+        ledger.commit_body_owned(owned);
         Ok(())
     }
 
@@ -18445,6 +18487,112 @@ mod tests {
             (StaticOriginId(37), StaticOriginId(37)),
             "the two axes COINCIDE on this witness, so the body-vs-call-identity row is \
              degenerate here and is deliberately not asserted as if it discriminated"
+        );
+    }
+
+    /// **`D2f` — a ledger spent on one plan cannot mutate a second, and the
+    /// refusal leaves that second plan byte-for-byte at baseline.**
+    ///
+    /// The Architect's block on `21455ec4`. The install writes two objects that
+    /// are **not type-bound to each other** — the plan's ownership map and the
+    /// ledger's recorded set — so a ledger already spent on plan A can be handed
+    /// to an equivalent plan B. B's own scratch map validates perfectly, because
+    /// B is an equivalent plan; the refusal comes only from the ledger. With the
+    /// plan mutated first, that case left B owning bodies, with a narrowed
+    /// executable-unit population and a narrowed edge population, **after a call
+    /// that returned `Err`**.
+    ///
+    /// **MEASURED:** installing into A succeeds; the same ledger against an
+    /// equivalent B is rejected; and B's ownership map, executable-unit
+    /// population and executable-edge population are each identical to the
+    /// baseline captured before the attempt. A second install into A is also
+    /// rejected, and a ledger whose region set is empty still refuses a second
+    /// record rather than reading as never-recorded.
+    /// **CLAIMED:** no failed install leaves a plan partially owned.
+    /// **THE GAP:** this pins the ordering of the transaction. It does not show
+    /// that any production caller reuses a ledger — none does today, which is
+    /// exactly why the defect was reachable only by construction and not by a
+    /// failing compile.
+    #[test]
+    fn d2f_6_a_spent_ledger_cannot_half_install_into_a_second_plan() {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+
+        let build = || {
+            let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let plane =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("plane");
+            let mut plan = plan;
+            plan.install_static_continuation_fusions(plane).expect("installs");
+            plan
+        };
+        // Two equivalent plans over one witness. B is a real second plan, not a
+        // clone of A: if it were a clone, "B was not mutated" could hold because
+        // nothing ever could mutate it.
+        let mut plan_a = build();
+        let mut plan_b = build();
+        let mut ledger = FusionRegionClaimLedger::preflight(&plan_a).expect("claims");
+
+        let snapshot = |plan: &StaticTransitionPlan<'_>| {
+            (
+                plan.fusion_owned_bodies().clone(),
+                plan.executable_units()
+                    .expect("units")
+                    .iter()
+                    .map(|unit| (unit.function(), unit.body_occurrence()))
+                    .collect::<Vec<_>>(),
+                plan.executable_call_edges()
+                    .expect("edges")
+                    .iter()
+                    .map(|edge| {
+                        (
+                            edge.caller(),
+                            edge.callee(),
+                            edge.callee_origin(),
+                            edge.call_site_origin(),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let b_baseline = snapshot(&plan_b);
+
+        let a_installs = plan_a.install_fusion_owned_bodies(&mut ledger).is_ok();
+        // A genuinely moved, which is the denominator: "B is unchanged" says
+        // nothing unless an install of this ledger demonstrably changes a plan.
+        let a_moved = snapshot(&plan_a) != b_baseline;
+
+        let b_rejected = plan_b.install_fusion_owned_bodies(&mut ledger).is_err();
+        let b_intact = snapshot(&plan_b) == b_baseline;
+
+        // A second install into A refuses on the explicit flag.
+        let a_second_refuses = plan_a.install_fusion_owned_bodies(&mut ledger).is_err();
+
+        // Exact-once survives a zero-region compile: an empty recorded set must
+        // still read as recorded. Exercised on the ledger directly, because the
+        // emptiness sentinel this replaced could not tell the two apart.
+        let mut empty_ledger = FusionRegionClaimLedger::preflight(&build()).expect("claims");
+        let empty_set: BTreeSet<StaticContinuationFusionId> = BTreeSet::new();
+        empty_ledger.check_body_owned(&empty_set).expect("first check passes");
+        empty_ledger.commit_body_owned(empty_set.clone());
+        let empty_second_refuses = empty_ledger.check_body_owned(&empty_set).is_err();
+
+        assert_eq!(
+            (
+                a_installs,
+                a_moved,
+                b_rejected,
+                b_intact,
+                a_second_refuses,
+                empty_second_refuses,
+            ),
+            (true, true, true, true, true, true),
+            "installing a ledger into one plan moves it; reusing that spent ledger against an \
+             equivalent second plan is rejected and leaves that plan's ownership map, executable \
+             units and executable edges exactly at baseline; a second install refuses; and an \
+             empty region set still records exactly once"
         );
     }
 
