@@ -8869,7 +8869,7 @@ impl StaticContinuationFusionPlan {
         self.descriptors.iter().find(|entry| entry.id == id)
     }
 
-    fn len(&self) -> usize {
+    pub(in crate::cranelift_backend) fn len(&self) -> usize {
         self.keys.len()
     }
 
@@ -8884,8 +8884,14 @@ impl StaticContinuationFusionPlan {
 /// key twice by two routes -- [`primary_fusion_key`] from the candidate, and
 /// [`rederive_fusion_key`] from planner facts -- and requires them equal. Step 5
 /// interns, and **only then** does an id or descriptor exist.
-#[cfg_attr(not(test), allow(dead_code))]
-fn build_static_continuation_fusion_plan(
+///
+/// **`D2f` — this is now REACHED on the production compile path.** Until the
+/// emitter increment it had twelve call sites and every one was inside
+/// `#[cfg(test)]`, so the plane was landed production state that no real compile
+/// ever built. `lowering/core.rs` calls it at the single production planner call
+/// site, which is the only scope where the static transition plan and the
+/// oriented plan are both authoritative at once.
+pub(in crate::cranelift_backend) fn build_static_continuation_fusion_plan(
     plan: &StaticTransitionPlan<'_>,
     entry: &RuntimeExpr,
     declarations: &BTreeMap<&str, &RuntimeDeclaration>,

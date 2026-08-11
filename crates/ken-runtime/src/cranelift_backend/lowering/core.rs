@@ -426,6 +426,31 @@ pub(in crate::cranelift_backend) fn lrc_d2a_backedge_forwards() -> usize {
     LRC_D2A_BACKEDGE_FORWARDS.with(std::cell::Cell::get)
 }
 
+// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — did a PRODUCTION compile build a
+// fusion identity plane, and what did it resolve?**
+//
+// Records one entry per compile that reaches the builder. The count matters as
+// much as the size: an empty vector means production never reached the builder
+// at all, which is the state this increment ends and is indistinguishable from
+// "reached and resolved nothing" if only sizes are kept.
+#[cfg(test)]
+thread_local! {
+    static D2F_PRODUCTION_FUSION_PLANES: std::cell::RefCell<Vec<usize>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn d2f_note_production_fusion_plane(len: usize) {
+    D2F_PRODUCTION_FUSION_PLANES.with(|cell| cell.borrow_mut().push(len));
+}
+
+/// Drains every production fusion plane built on this thread since the last
+/// take.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d2f_production_fusion_planes_take() -> Vec<usize> {
+    D2F_PRODUCTION_FUSION_PLANES.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn reset_lrc_d2a_counts() {
     LRC_D2A_BACKEDGE_ARRIVALS.with(|count| count.set(0));
@@ -1993,6 +2018,45 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             BodyEmissionAuthority::FunctionizedUnits
         ),
     )?;
+    // **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the fusion identity plane is
+    // built HERE, and this is the first production compile that has ever built
+    // one.**
+    //
+    // `D2h` landed the plane as production state under `allow(dead_code)`
+    // awaiting its consumer; every call site was inside `#[cfg(test)]`, so the
+    // emitter's input did not exist on any real compile.
+    //
+    // ⛔ **Sited at this call rather than inside the planner, and that is a
+    // design choice with a reason.** The plane is a function of the static
+    // transition plan AND the oriented plan, and this is the only scope where
+    // both are authoritative at once: the planner has no oriented plan and no
+    // other use for one, and by the time `Lowering` exists it has already begun
+    // emitting. Threading the oriented plan into
+    // `plan_static_transition_graph_with_symbols` would have touched 158 call
+    // sites to serve the one production caller that is right here.
+    //
+    // ⚠ It is `D2h`'s builder, called — not re-derived. The key, the slot-role
+    // derivation, the interner and the exact re-derivation validator are fixed
+    // inputs and are untouched.
+    let static_continuation_fusion_plan = build_static_continuation_fusion_plan(
+        &static_transition_plan,
+        expr,
+        &declarations,
+        oriented_subcontinuation_plan.as_ref(),
+    )?;
+    // **The wiring's own observation, and it exists because the increment is
+    // otherwise unobservable.**
+    //
+    // ⛔ Building the plane and dropping it would compile, warn once, and be
+    // indistinguishable from not building it at all. This records that a
+    // production compile REACHED the builder and what it resolved, so a control
+    // can assert the plane is live on the witness rather than asserting that a
+    // function exists. The emitter increment replaces this consumer with the
+    // real one; until then the observation IS the consumer.
+    #[cfg(test)]
+    d2f_note_production_fusion_plane(static_continuation_fusion_plan.len());
+    #[cfg(not(test))]
+    let _ = &static_continuation_fusion_plan;
     #[cfg(test)]
     scale_b_begin_emission_attempt(
         &static_transition_plan,

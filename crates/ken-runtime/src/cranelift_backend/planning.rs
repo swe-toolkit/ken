@@ -13,6 +13,7 @@ use crate::{RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeProg
 
 mod static_transition;
 
+pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(super) use static_transition::plan_static_transition_graph_with_symbols;
 #[cfg(test)]
 pub(super) use static_transition::{
