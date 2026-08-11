@@ -59,24 +59,67 @@ sibling rather than leaving it as prose in a merged frame.
 arbitrary-precision value and `parser.rs:2254`'s `n as i128` is removed rather
 than widened.
 
-**2. The upstream width question, answered.** Measure whether `Token::Nat` is
-itself width-bounded before the cast. **If it is, the lexer is the first
-truncation site and the cast is a symptom** — fix both or say plainly that one
-remains. A candidate that removes the cast while the lexer still cannot lex a
-large literal has moved the defect, not closed it.
+**2. The width question in BOTH directions, answered.** Measure whether
+`Token::Nat` is itself width-bounded before the cast. **If it is, the lexer is
+the first truncation site and the cast is a symptom** — fix both or say plainly
+that one remains. A candidate that removes the cast while the lexer still
+cannot lex a large literal has moved the defect, not closed it.
 
-**3. The five consumer sites reconciled.** `elab.rs:3614`, `:3662`, `:3669`,
-`:3757`, and `resolve.rs:560-562`. The `resolve.rs` pair compares against
-literal `0` and `1` for the `Zero`/`Succ` type-level spellings — **that
-comparison must keep working**, and it is the one most likely to break silently
-under a payload change.
+> **AMENDED 2026-08-11 (`evt_72g51r95710eh`), mid-turn. This deliverable
+> originally said "upstream" and pointed only at `Token::Nat`. That was a gap
+> in the frame: there is a second `i128` carrier BELOW `NumLit`, on a different
+> path than the one `AC-1` measures.**
+>
+> ```rust
+> // crates/ken-elaborator/src/numbers.rs:39-43
+> pub enum NumericLitVal { Int(i128), ... }
+>
+> // crates/ken-elaborator/src/numbers.rs:564
+> pub fn int_lit_val(n: i128, ty: &Term, nenv: &NumericEnv) -> NumericLitVal
+> ```
+>
+> **The two exits diverge.** The kernel path converts at `elab.rs:3616` —
+> `Term::IntLit(num_bigint::BigInt::from(*n))` — so once `NumLit::Int` carries
+> a `BigInt` that path is correct and **`AC-1` passes**. The evaluation path
+> does not go through there: `elab.rs:3757` builds `NumericLitVal::Int(*n)` and
+> `ken-cli/src/lib.rs:443` turns it into `ken_interp::EvalVal::from(*n)`, still
+> `i128`. **So a candidate can satisfy `AC-1` exactly as written while the same
+> literal evaluated through the CLI gives a wrapped answer.** The specified
+> consumer sweep does not catch it either — `check -p ken-cli` type-checks the
+> `EvalVal::from` call and says nothing about the value.
+>
+> `NumericLitVal::Int` and `int_lit_val`'s `n: i128` parameter are **in scope
+> for this deliverable**. Widen them with the rest, or state plainly that one
+> carrier remains and which programs still truncate.
+>
+> **Do not widen the fixed-width branch.** `int_lit_val`'s `int8_id` through
+> `uint64_id` arms deliberately wrap to a width; that is correct fixed-width
+> semantics, not the defect. **Only the `Int` branch and the parameter feeding
+> it are at issue.** If widening the parameter forces a decision about how the
+> fixed-width arms accept a `BigInt`, that is a design fork and a stop — not
+> something to work around with a cast back to `i128`.
+
+**3. The consumer sites reconciled.** `elab.rs:3614`, `:3662`, `:3669`,
+`:3757`, and `resolve.rs:560-562`, **plus `numbers.rs:564` and
+`compiler_driver.rs:3658`/`:3715` from the amendment above** — the frame's
+original "five" was an undercount, and the census is yours to re-derive rather
+than take from this list. The `resolve.rs` pair compares against literal `0`
+and `1` for the `Zero`/`Succ` type-level spellings — **that comparison must
+keep working**, and it is the one most likely to break silently under a payload
+change.
 
 ## Acceptance criteria
 
-**AC-1 — a literal wider than `i128` round-trips.** Elaborate an integer
-literal exceeding `i128::MAX` and show it reaches the kernel as an `IntLit`
-with **the value written**, not a wrapped or saturated one. **This is the
-node.** State the literal in the claim.
+**AC-1 — a literal wider than `i128` round-trips, through BOTH exits.**
+Elaborate an integer literal exceeding `i128::MAX` and show it reaches the
+kernel as an `IntLit` with **the value written**, not a wrapped or saturated
+one. **This is the node.** State the literal in the claim.
+
+**Strengthened 2026-08-11 with Deliverable 2's amendment**: reach the value
+through the kernel `IntLit` **and** through an evaluation of the same literal,
+or say explicitly which exit the claim covers. The two paths diverge below
+`NumLit`, and **a round-trip that only proves the kernel side proves the half
+that was never going to be the problem.**
 
 **AC-2 — the A/B, because AC-1 alone can pass on a lucky path.** With the
 truncation restored, the AC-1 literal must produce a **different, wrong**

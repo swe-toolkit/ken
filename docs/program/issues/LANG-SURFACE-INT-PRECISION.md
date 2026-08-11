@@ -6,7 +6,7 @@ owner: language
 size: M
 gate: none
 depends_on: []
-blocks: []
+blocks: [LANG-SURFACE-DECIMAL-PRECISION]
 github: null
 origin: Steward measurement 2026-08-11 at origin/main=ae6f750a, taken while picking the Language successor to LANG-LEX-PROJECTION-ADJACENCY. Grounded in a DECIDED spec rule, not an open question -- OQ-int was decided by the operator 2026-06-27.
 ---
