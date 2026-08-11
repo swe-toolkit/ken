@@ -1,13 +1,13 @@
 ---
 id: LANG-SURFACE-INT-PRECISION
 title: "`Int` is specified arbitrary-precision and the kernel already carries `Term::IntLit(num_bigint::BigInt)`, but the surface truncates to `NumLit::Int(i128)` through a lossy `n as i128` cast, and the lexer implements none of the `0x`/`0b`/`0o`/`_` forms that 31-lexical lists"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: []
-blocks: [LANG-SURFACE-DECIMAL-PRECISION]
-github: null
+blocks: [LANG-SURFACE-DECIMAL-PRECISION, LANG-LEX-NUMERIC-FORMS]
+github: https://github.com/swe-toolkit/ken/pull/1871
 origin: Steward measurement 2026-08-11 at origin/main=ae6f750a, taken while picking the Language successor to LANG-LEX-PROJECTION-ADJACENCY. Grounded in a DECIDED spec rule, not an open question -- OQ-int was decided by the operator 2026-06-27.
 ---
 
