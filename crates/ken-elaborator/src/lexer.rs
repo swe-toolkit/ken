@@ -587,7 +587,7 @@ impl<'s> Lexer<'s> {
                 let c = self.advance().unwrap();
                 if c == '_' {
                     if !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false)
-                        || exp_str.len() <= 1
+                        || !exp_str.chars().last().is_some_and(|c| c.is_ascii_digit())
                     {
                         return Err(ElabError::ParseError {
                             msg: "digit separator must occur between digits".into(),
