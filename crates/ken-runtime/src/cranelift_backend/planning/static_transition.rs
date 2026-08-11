@@ -8473,6 +8473,26 @@ fn build_checked_ih_bindings(
 /// `build_continuation_specialization_plan` admitted, returned from that same
 /// call.
 #[cfg_attr(not(test), allow(dead_code))]
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the roots fusion enumeration walks.**
+///
+/// These are the production-admitted discoveries, taken whole. The alternative
+/// -- rebuilding `child(consumer, 0)` over every planned `ComputationalMatch` --
+/// reconstructs the SEED frontier, and the fixed point admits discoveries past
+/// it that no seed scan can name. An enumerator keyed on the seeds therefore
+/// walks a different population from the one production works over.
+///
+/// The complete identity travels, `enclosing_specialization` included: it is
+/// the immediate emission context and cannot be recovered from a worker body's
+/// raw occurrence owner. Nothing here re-derives a seed, scans a worker body,
+/// or runs a second fixed point -- one invocation, one ledger, consumed as it
+/// was produced.
+#[cfg_attr(not(test), allow(dead_code))]
+fn fusion_enumeration_roots(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<AdmittedContinuationDiscovery>, CraneliftBackendError> {
+    admitted_continuation_discoveries(plan)
+}
+
 fn admitted_continuation_discoveries(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<AdmittedContinuationDiscovery>, CraneliftBackendError> {
@@ -14541,6 +14561,69 @@ mod tests {
                 _ => return Ok(origin),
             }
         }
+    }
+
+    /// `D2i` deliverable 2, half (2) — fusion enumeration walks the ADMITTED
+    /// ledger, and the seed-only path is gone.
+    ///
+    /// The claim is a replacement, so both sides are asserted: the roots the
+    /// enumerator walks are exactly the ledger's, **and** they are strictly more
+    /// than the seed reconstruction can name. Equality with the ledger alone
+    /// would also hold if the ledger happened to equal the seeds, which is the
+    /// case that would make the replacement inert.
+    ///
+    /// The complete identity travels: at least one walked root carries
+    /// `Some(enclosing_specialization)`, which no seed reconstruction can
+    /// produce and which cannot be recovered downstream from a worker body's raw
+    /// occurrence owner.
+    ///
+    /// Measured on the landed terminal twin; the claim is about that fixture.
+    #[test]
+    fn d2i_fusion_enumeration_walks_the_admitted_ledger_not_the_seeds() {
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+
+        let walked: BTreeSet<_> = fusion_enumeration_roots(&plan)
+            .expect("enumeration roots")
+            .into_iter()
+            .collect();
+        let ledger: BTreeSet<_> = admitted_continuation_discoveries(&plan)
+            .expect("ledger")
+            .into_iter()
+            .collect();
+        assert_eq!(
+            walked, ledger,
+            "enumeration must walk exactly the admitted population"
+        );
+
+        let mut seeds = BTreeSet::new();
+        for occurrence in plan.source_occurrences.iter().flatten() {
+            if matches!(occurrence.expr, RuntimeExpr::ComputationalMatch { .. }) {
+                seeds.insert(AdmittedContinuationDiscovery {
+                    continuation_origin: occurrence.static_origin,
+                    result_root: plan
+                        .semantic
+                        .child_origin(occurrence.static_origin, 0)
+                        .expect("scrutinee"),
+                    enclosing_specialization: None,
+                });
+            }
+        }
+        assert!(
+            walked.len() > seeds.len(),
+            "the walked population must exceed what the seeds can name, or replacing \
+             the seed path changed nothing: walked={walked:?} seeds={seeds:?}"
+        );
+        assert!(
+            walked
+                .iter()
+                .any(|root| root.enclosing_specialization.is_some()),
+            "and at least one walked root must carry its enclosing specialization, \
+             which is the field a seed reconstruction cannot produce: walked={walked:?}"
+        );
     }
 
     /// `D2i` — the discovery LEDGER is what the production fixed point admitted,
