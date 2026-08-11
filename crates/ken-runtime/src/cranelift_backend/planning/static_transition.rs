@@ -2664,6 +2664,16 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts,
     /// derived after the specialization fixed point closes.
     continuation_contexts: Vec<PlannedContinuationContext>,
+    /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
+    /// plane, **installed after planning rather than during it**.
+    ///
+    /// **Empty on every plan the planner returns, and that is not a defect**: a
+    /// fusion's identity is a function of this plan *and* the oriented plan, and
+    /// the planner holds only the first. [`Self::install_static_continuation_`]
+    /// [`fusions`] is the one writer, and it writes this field and the ABI
+    /// arena together so the two-sided identity join below cannot see one
+    /// without the other.
+    static_continuation_fusions: StaticContinuationFusionPlan,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One ownership record per aggregate producer
     /// occurrence. ⭐ Unlike its two dormant siblings above, this population
     /// HAS a lowering accessor — the allocation lane is unreadable at the
@@ -8897,6 +8907,98 @@ impl StaticContinuationFusionPlan {
     fn is_empty(&self) -> bool {
         self.keys.is_empty()
     }
+
+    /// The interned keys, in interning order — the production reader `D2f`'s
+    /// installer and its ABI join both consume.
+    ///
+    /// Distinct from [`Self::observed_keys`], which is `#[cfg(test)]` and exists
+    /// for a control to state what a compile resolved. Sharing one accessor
+    /// would have made the production path depend on a test-only item, which
+    /// compiles under `cfg(test)` and is a production-only red.
+    fn installed_keys(&self) -> &[StaticContinuationFusionKey] {
+        &self.keys
+    }
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — one installed fused region, joined
+/// from the fusion plane and its own ABI arena.**
+///
+/// Every field is borrowed from exactly one authority, so nothing here is a
+/// second copy that could disagree: the identity and the complete key come from
+/// the plane, the frame contract from the arena, and the redirect target is
+/// derived on demand from the key rather than stored.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(in crate::cranelift_backend) struct StaticContinuationFusionView<'plan> {
+    id: StaticContinuationFusionId,
+    key: &'plan StaticContinuationFusionKey,
+    planned: &'plan StaticContinuationFusionDescriptor,
+    header: AbiFrameHeader,
+    slots: &'plan [AbiSlot],
+    inputs: &'plan [abi::AbiContinuationInputAuthority],
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl<'plan> StaticContinuationFusionView<'plan> {
+    pub(in crate::cranelift_backend) fn id(&self) -> StaticContinuationFusionId {
+        self.id
+    }
+
+    pub(in crate::cranelift_backend) fn key(&self) -> &'plan StaticContinuationFusionKey {
+        self.key
+    }
+
+    /// The emission owner this fused region carries. **`Fusion(local id)` and
+    /// never a `PredeclaredFunctionId`** — `D2f` Deliverable 2's whole point is
+    /// that the fused region is a third thing that owns itself, not the original
+    /// producer or consumer.
+    pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
+        ContinuationEmissionOwner::Fusion(self.id)
+    }
+
+    /// The producer's source-body authority: the unit whose body computes the
+    /// activation.
+    pub(in crate::cranelift_backend) fn producer_owner(&self) -> PredeclaredFunctionId {
+        self.planned.producer_owner
+    }
+
+    /// The suffix's source-body authority, **separately carried**. `D2f`
+    /// Deliverable 3 requires the suffix to be lowered under its own validated
+    /// authority rather than under the producer's, so the two are two fields
+    /// here and never one.
+    pub(in crate::cranelift_backend) fn consumer_owner(&self) -> PredeclaredFunctionId {
+        self.planned.consumer_owner
+    }
+
+    pub(in crate::cranelift_backend) fn header(&self) -> AbiFrameHeader {
+        self.header
+    }
+
+    pub(in crate::cranelift_backend) fn slots(&self) -> &'plan [AbiSlot] {
+        self.slots
+    }
+
+    pub(in crate::cranelift_backend) fn inputs(&self) -> &'plan [abi::AbiContinuationInputAuthority] {
+        self.inputs
+    }
+
+    pub(in crate::cranelift_backend) fn slot_offsets(
+        &self,
+    ) -> Result<(Vec<u32>, u32), CraneliftBackendError> {
+        abi::slot_offsets(self.slots)
+    }
+
+    /// The one producer invocation this fused region may redirect, derived from
+    /// the complete key by `D2f` Deliverable 5's landed selector.
+    ///
+    /// **Derived here rather than stored at install time**: storing it would make
+    /// the redirect a fact about when the plane was installed, and the selector
+    /// is the authority on which edge the key names.
+    pub(in crate::cranelift_backend) fn redirect_target(
+        &self,
+        plan: &StaticTransitionPlan<'_>,
+    ) -> Result<EmittableCallEdge, CraneliftBackendError> {
+        fusion_redirect_target(plan, self.key)
+    }
 }
 
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` Deliverable 5 — the ONE producer
@@ -10081,6 +10183,10 @@ impl<'src> Planner<'src> {
                 continuation_specializations: Vec::new(),
                 continuation_specialization_calls: Vec::new(),
                 continuation_contexts: Vec::new(),
+                // Empty by construction: the planner has no oriented plan, so a
+                // fusion identity cannot exist yet. `D2f`'s post-planner
+                // installer is the only writer.
+                static_continuation_fusions: StaticContinuationFusionPlan::default(),
             },
             store_interner: BTreeMap::new(),
             next_source: 0,
@@ -11316,21 +11422,34 @@ impl<'src> StaticTransitionPlan<'src> {
     /// **Zero until the emitter exists**, and that is exactly what the gate
     /// pins: the checked witness reaches plane `1` while this stays `0`, so the
     /// later `0 -> 1` movement is a statement about emission rather than about
-    /// the plane. Counting descriptors carrying the fusion definition is the
-    /// independent read -- it comes from the ABI plane, not from the fusion
-    /// plane the same compile resolved.
+    /// the plane.
+    ///
+    /// > ### REPOINTED — it used to read a population this class cannot enter
+    /// >
+    /// > This counted descriptors carrying the fusion definition arm in
+    /// > [`AbiPlane::descriptors`], described as "the independent read -- it
+    /// > comes from the ABI plane, not from the fusion plane the same compile
+    /// > resolved." **The independence was real and the population was wrong.**
+    /// > `descriptors` is built positionally over the semantic plane's function
+    /// > partition and refuses a descriptor whose id is not its ordinal; its
+    /// > builder has no arm constructing the fusion variant; and it is closed
+    /// > before a fusion identity exists at all. So the zero was not "no
+    /// > emission yet" — it was the only value that read could ever hold, and a
+    /// > pre-movement baseline is the one measurement that cannot tell a resting
+    /// > zero from an unreachable one.
+    /// >
+    /// > The direction was the saving grace rather than the design: an assertion
+    /// > against an unmovable counter **fails** when emission lands, so the cost
+    /// > was a wasted emitter turn and not a shipped false green.
+    /// >
+    /// > It now reads `fusion_descriptors` — the arena the generated definitions
+    /// > are actually installed into. That arena is empty on every compile until
+    /// > `D2f`'s installer is wired to the production path, so **this still reads
+    /// > `0` and the gate is unchanged.** What changed is that the zero is now a
+    /// > population the mover can enter.
     #[cfg(test)]
     pub(in crate::cranelift_backend) fn observed_fusion_definition_count(&self) -> usize {
-        self.abi
-            .descriptors
-            .iter()
-            .filter(|descriptor| {
-                matches!(
-                    descriptor.definition,
-                    AbiUnitDefinition::StaticContinuationFusion { .. }
-                )
-            })
-            .count()
+        self.abi.fusion_descriptors.len()
     }
 
     /// Planner-private source lookup for pre-allocation derivations.
@@ -13187,6 +13306,137 @@ impl<'src> StaticTransitionPlan<'src> {
                 Ok(ContinuationContextView {
                     planned,
                     finalized: &planned.finalized_availability,
+                    header: descriptor.header,
+                    slots,
+                    inputs,
+                })
+            })
+            .collect()
+    }
+
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — install one compile's fusion
+    /// identity plane and the generated-definition ABI it determines.**
+    ///
+    /// The one writer of both, and it writes them together on purpose: a plane
+    /// without its arena and an arena without its plane are each individually
+    /// consistent and jointly meaningless, and [`Self::continuation_fusions`]
+    /// below is a join over both.
+    ///
+    /// **The producer's parameter run is READ, never chosen.** The redirected
+    /// invocation keeps passing exactly the operands it passed before, so the
+    /// producer unit's own descriptor is the authority for how many there are.
+    /// A fusion whose producer owner has no descriptor is a fusion whose
+    /// producer has no declared ABI, which is refused rather than defaulted.
+    pub(in crate::cranelift_backend) fn install_static_continuation_fusions(
+        &mut self,
+        fusions: StaticContinuationFusionPlan,
+    ) -> Result<(), CraneliftBackendError> {
+        if !self.static_continuation_fusions.is_empty() {
+            return Err(planner_error(
+                "a static continuation fusion plane may be installed exactly once",
+            ));
+        }
+        let mut projections = Vec::new();
+        projections.try_reserve_exact(fusions.len()).map_err(|_| {
+            planner_capacity_error("static continuation fusion projection allocation failed")
+        })?;
+        for (position, key) in fusions.installed_keys().iter().enumerate() {
+            let id = StaticContinuationFusionId(u32::try_from(position).map_err(|_| {
+                planner_capacity_error("static continuation fusion identity exhausted")
+            })?);
+            let producer = self
+                .abi
+                .descriptors
+                .iter()
+                .find(|descriptor| descriptor.function == key.producer_owner)
+                .ok_or_else(|| {
+                    planner_error(
+                        "a static continuation fusion's producer owner has no ABI descriptor, so \
+                         the operand run its redirected invocation already passes is unknown",
+                    )
+                })?;
+            projections.push(abi::PlannedStaticContinuationFusionAbi {
+                id,
+                producer_parameters: producer.header.parameters,
+                continuation_inputs: &key.continuation_inputs,
+            });
+        }
+        abi::install_static_continuation_fusion_abi(&mut self.abi, &projections)?;
+        drop(projections);
+        self.static_continuation_fusions = fusions;
+        Ok(())
+    }
+
+    /// **`D2f` — every installed fused region, joined ABI-to-plane BY IDENTITY.**
+    ///
+    /// Revalidates plane/ABI agreement the way [`Self::continuation_contexts`]
+    /// does and for the same reason: the join indexes descriptors by the id they
+    /// declare, so an identical reordering of both sides does not pass.
+    pub(in crate::cranelift_backend) fn continuation_fusions(
+        &self,
+    ) -> Result<Vec<StaticContinuationFusionView<'_>>, CraneliftBackendError> {
+        if self.abi.fusion_descriptors.len() != self.static_continuation_fusions.len() {
+            return Err(planner_error(
+                "static continuation fusion ABI descriptor count disagrees with the installed \
+                 fusion plane",
+            ));
+        }
+        let mut by_id: BTreeMap<
+            StaticContinuationFusionId,
+            &abi::AbiStaticContinuationFusionDescriptor,
+        > = BTreeMap::new();
+        for descriptor in &self.abi.fusion_descriptors {
+            let AbiUnitDefinition::StaticContinuationFusion { fusion } = descriptor.definition
+            else {
+                return Err(planner_error(
+                    "a static continuation fusion ABI descriptor declares another class's unit \
+                     definition",
+                ));
+            };
+            if by_id.insert(fusion, descriptor).is_some() {
+                return Err(planner_error(
+                    "two static continuation fusion ABI descriptors declare the same identity",
+                ));
+            }
+        }
+        self.static_continuation_fusions
+            .installed_keys()
+            .iter()
+            .enumerate()
+            .map(|(position, key)| {
+                let id = StaticContinuationFusionId(u32::try_from(position).map_err(|_| {
+                    planner_capacity_error("static continuation fusion identity exhausted")
+                })?);
+                let descriptor = *by_id.get(&id).ok_or_else(|| {
+                    planner_error(
+                        "an installed static continuation fusion has no ABI descriptor declaring \
+                         its identity",
+                    )
+                })?;
+                let planned = self
+                    .static_continuation_fusions
+                    .descriptor_for(id)
+                    .ok_or_else(|| {
+                        planner_error(
+                            "an installed static continuation fusion has no planner descriptor",
+                        )
+                    })?;
+                let slots = dense_slice(&self.abi.fusion_slots, descriptor.slots).ok_or_else(
+                    || planner_error("static continuation fusion slot range is outside the plane"),
+                )?;
+                let inputs = dense_slice(&self.abi.fusion_inputs, descriptor.inputs).ok_or_else(
+                    || planner_error("static continuation fusion input range is outside the plane"),
+                )?;
+                if inputs.len() != key.continuation_inputs.len() {
+                    return Err(planner_error(
+                        "static continuation fusion input authority count disagrees with the \
+                         complete key's ordered projection",
+                    ));
+                }
+                Ok(StaticContinuationFusionView {
+                    id,
+                    key,
+                    planned,
                     header: descriptor.header,
                     slots,
                     inputs,
@@ -16863,6 +17113,149 @@ mod tests {
     /// The earlier generic census (2360 projections across the corpus) is
     /// negative evidence only: it showed the machinery yields non-empty runs and
     /// is **not** promoted to a fusion witness here.
+    /// **`D2f` Deliverables 1 and `AC-4` — the fused region's frame is derived
+    /// from the producer's declared operands and the key's projected run, and
+    /// an activation carrier arriving as an input is REFUSED.**
+    ///
+    /// The frame contract and the refusal are one control because `AC-4`'s named
+    /// failure mode is a check that passes because nothing reached it. The
+    /// mutated row's refusal is asserted in the **same** assertion as the
+    /// unmutated row's non-zero descriptor and its frame, so "the activation
+    /// carrier was refused" cannot be read off a compile that installed nothing.
+    ///
+    /// The mutation is compile-preserving and reaching: it moves one operand —
+    /// the carrier on the key's first projected input — and enters through the
+    /// production installer, not through the carrier gate directly.
+    ///
+    /// **MEASURED:** on the checked applied `Exact` witness the installer builds
+    /// one fusion descriptor whose frame is one parameter (the producer unit's
+    /// own declared run), two captures (the key's projected inputs), and the
+    /// four convention slots; and the same installer refuses when one projected
+    /// input's carrier is an activation word.
+    /// **CLAIMED:** no activation, cursor, selection or unwind carrier can enter
+    /// a fused region's input lane, and the fused frame's parameter run is the
+    /// producer's rather than a count chosen here.
+    /// **THE GAP:** this pins the **arena and its gate**. It pins no emission:
+    /// no generated definition is built, no edge is redirected, and the
+    /// production path does not call this installer, so
+    /// `observed_fusion_definition_count` still reads `0` on every compile.
+    #[test]
+    fn d2f_1_the_fused_frame_is_the_producers_run_and_refuses_an_activation_input() {
+        /// Install one plane into the witness's own plan and report the frame.
+        fn install(
+            mutate: Option<AbiCarrier>,
+        ) -> Result<(usize, u32, u32, Vec<(AbiSlotKind, AbiCarrier)>), CraneliftBackendError>
+        {
+            let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2J_DECLARATION, &declaration);
+            let mut plan =
+                plan_static_transition_graph(&entry, &declarations).expect("the twin plans");
+            let resolved =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("the twin resolves a plane");
+            let plane = match mutate {
+                None => resolved,
+                Some(carrier) => {
+                    // The operand moved, and nothing else. The key is otherwise
+                    // the one production derived, so a refusal here is
+                    // attributable to the carrier and not to a hand-built key.
+                    let mut key = resolved.installed_keys()[0].clone();
+                    key.continuation_inputs[0].carrier = carrier;
+                    let mut mutated = StaticContinuationFusionPlan::default();
+                    mutated.intern(key).expect("the mutated key interns");
+                    mutated
+                }
+            };
+            plan.install_static_continuation_fusions(plane)?;
+            let views = plan.continuation_fusions()?;
+            let view = &views[0];
+            Ok((
+                views.len(),
+                view.header().parameters,
+                view.header().captures,
+                view.slots()
+                    .iter()
+                    .map(|slot| (slot.kind, slot.carrier))
+                    .collect(),
+            ))
+        }
+
+        let unmutated = install(None).expect("the unmutated twin installs");
+        // Every activation carrier, and the store handle, each refused on its
+        // own row: a single `ControlWord` row would leave the other three
+        // admitted-by-omission, which is the shape the exhaustive match exists
+        // to make impossible.
+        //
+        // Each row reports WHICH refusal it reached, not merely that it failed.
+        // The two reasons are different claims — an activation word crossing
+        // inward, and a durable lane arriving as an input — so a row that
+        // collapsed them would pass if the gate answered the wrong one, and
+        // would also pass on an unrelated planner invariant.
+        let classify = |carrier: AbiCarrier| match install(Some(carrier)) {
+            Ok(_) => "admitted",
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(message))) => {
+                if message.contains("names an activation carrier") {
+                    "activation"
+                } else if message.contains("names a persistent store handle") {
+                    "store"
+                } else {
+                    "other planner invariant"
+                }
+            }
+            Err(_) => "other error",
+        };
+        let refused: Vec<(AbiCarrier, &str)> = [
+            AbiCarrier::ResultWord,
+            AbiCarrier::ControlWord,
+            AbiCarrier::TrapWord,
+            AbiCarrier::StoreHandle,
+        ]
+        .into_iter()
+        .map(|carrier| (carrier, classify(carrier)))
+        .collect();
+        // And the admitted sibling, so the refusals above are not merely "this
+        // installer refuses everything".
+        let admitted = install(Some(AbiCarrier::GroundValueCarrier))
+            .expect("an ordinary ground-value input is admitted");
+
+        assert_eq!(
+            (
+                unmutated,
+                refused,
+                (admitted.0, admitted.1, admitted.2),
+            ),
+            (
+                (
+                    1,
+                    1,
+                    2,
+                    vec![
+                        (AbiSlotKind::Parameter, AbiCarrier::ValueWord),
+                        (AbiSlotKind::Capture, AbiCarrier::ValueWord),
+                        (AbiSlotKind::Capture, AbiCarrier::ValueWord),
+                        (AbiSlotKind::Result, AbiCarrier::ResultWord),
+                        (AbiSlotKind::Control, AbiCarrier::ControlWord),
+                        (AbiSlotKind::Trap, AbiCarrier::TrapWord),
+                        (AbiSlotKind::Store, AbiCarrier::StoreHandle),
+                    ],
+                ),
+                vec![
+                    (AbiCarrier::ResultWord, "activation"),
+                    (AbiCarrier::ControlWord, "activation"),
+                    (AbiCarrier::TrapWord, "activation"),
+                    (AbiCarrier::StoreHandle, "store"),
+                ],
+                (1, 1, 2),
+            ),
+            "the fused frame is the producer unit's one declared parameter plus the key's two \
+             projected inputs plus the convention tail; each activation carrier and the store \
+             handle is refused as an input while an ordinary ground-value carrier is admitted -- \
+             and the refusals share this assertion with a non-zero installed descriptor so none \
+             of them can hold because nothing was installed"
+        );
+    }
+
     /// **`D2f` Deliverable 5 — the redirect target is DERIVED from the complete
     /// key, and every invocation member of that key is load-bearing.**
     ///
