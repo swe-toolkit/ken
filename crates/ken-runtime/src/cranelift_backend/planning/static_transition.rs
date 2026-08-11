@@ -8262,6 +8262,163 @@ fn derive_checked_ih_bindings(
     Ok(())
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2g` — the resolved checked transport
+/// coordinate at one occurrence.**
+///
+/// The Architect ruled this coordinate **required and never optional**, and
+/// ruled it an exact resolved triple rather than a raw id: the enclosing
+/// `CheckedSubcontinuationFrame`'s frame, the selected
+/// `CheckedComputationalIHSlots` template with its checked occurrence path, and
+/// the `CheckedComputationalIHInvocation` template with its path.
+///
+/// Every member is read off a marker the walk descended through. Nothing is
+/// inferred from the Runtime shape, nothing selects "the only marker", and a
+/// raw id is never accepted on its own -- the path travels with the id it was
+/// declared beside, so a template used at the wrong location cannot present as
+/// the right one.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct CheckedTransportCoordinate {
+    frame_id: u64,
+    slot_template_id: u64,
+    slot_occurrence_path: Vec<u64>,
+    call_template_id: u64,
+    call_occurrence_path: Vec<u64>,
+}
+
+/// What is in scope while descending; a member stays `None` until its marker is
+/// crossed, and a coordinate is recorded only when all three are present.
+#[derive(Clone, Debug, Default)]
+struct CheckedTransportScope {
+    frame_id: Option<u64>,
+    slot: Option<(u64, Vec<u64>)>,
+    invocation: Option<(u64, Vec<u64>)>,
+}
+
+/// Thread the checked wrapper authorities down the occurrence tree and
+/// **resolve them through a validated oriented plan**.
+///
+/// The coordinate is **inherited**, not binder-scoped, so this descends every
+/// child uniformly through the closed child inventory rather than spelling the
+/// per-variant child positions a second time. Only the three marker variants
+/// change what is in scope.
+///
+/// A raw wrapper value is NOT authority. A marker names a template id and the
+/// checked occurrence path it was declared at; this resolves that pair against
+/// the plan's own entries and then requires the three to be **related**: the
+/// slot must belong to the frame in scope, and the call must be the call of
+/// that slot. A marker whose id resolves but whose relationships do not is left
+/// unresolved rather than recorded, so coincidence cannot present as authority.
+///
+/// A `CheckedComputationalIHSlots` marker declares one template per recursive
+/// position. This threads the **selected** one -- the entry whose index matches
+/// the recursive position being consumed -- rather than "the only" entry, which
+/// is the existential shape the ruling forbids. With one declared position the
+/// two coincide, which is exactly why the selection is written positionally
+/// instead of by `first()`.
+fn derive_checked_transport(
+    plan: &StaticTransitionPlan<'_>,
+    oriented: &crate::OrientedSubcontinuationPlanV1,
+    origin: StaticOriginId,
+    scope: &CheckedTransportScope,
+    out: &mut BTreeMap<StaticOriginId, CheckedTransportCoordinate>,
+) -> Result<(), CraneliftBackendError> {
+    let expr = plan.planned_occurrence_expr(origin)?;
+    let mut scope = scope.clone();
+    match expr {
+        RuntimeExpr::CheckedSubcontinuationFrame { frame_id, .. } => {
+            scope.frame_id = Some(*frame_id);
+        }
+        RuntimeExpr::CheckedComputationalIHSlots {
+            slot_template_ids,
+            checked_occurrence_paths,
+            ..
+        } => {
+            if slot_template_ids.len() != checked_occurrence_paths.len() {
+                return Err(planner_error(
+                    "checked computational-IH slot marker identity and location arity differ",
+                ));
+            }
+            // Positional selection, and only a single-entry marker is resolved
+            // here: a marker declaring several templates needs the consuming
+            // position to choose among them, and that arrives with the key in
+            // `D2h`. Leaving it unresolved refuses rather than guesses.
+            if let ([slot_template_id], [checked_occurrence_path]) =
+                (&slot_template_ids[..], &checked_occurrence_paths[..])
+            {
+                scope.slot = Some((*slot_template_id, checked_occurrence_path.clone()));
+            } else {
+                scope.slot = None;
+            }
+        }
+        RuntimeExpr::CheckedComputationalIHInvocation {
+            call_template_id,
+            checked_occurrence_path,
+            ..
+        } => {
+            scope.invocation = Some((*call_template_id, checked_occurrence_path.clone()));
+        }
+        _ => {}
+    }
+    if let (Some(frame_id), Some((slot_id, slot_path)), Some((call_id, call_path))) =
+        (&scope.frame_id, &scope.slot, &scope.invocation)
+    {
+        // Each member must resolve to a plan entry BY ITS PAIR -- id and the
+        // checked occurrence path it was declared at -- so a template used at
+        // the wrong location cannot answer for the right one.
+        let frame = oriented
+            .frames
+            .iter()
+            .find(|frame| frame.frame_id == *frame_id);
+        let slot = oriented.computational_ih_slots.iter().find(|slot| {
+            slot.slot_template_id == *slot_id && slot.checked_occurrence_path == *slot_path
+        });
+        let call = oriented.computational_ih_calls.iter().find(|call| {
+            call.call_template_id == *call_id && call.checked_occurrence_path == *call_path
+        });
+        if let (Some(frame), Some(slot), Some(call)) = (frame, slot, call) {
+            // The relationships, which are what make three resolved entries one
+            // coordinate rather than three coincidences.
+            let related = slot.frame_template_id == frame.frame_id
+                && call.slot_template_id == slot.slot_template_id;
+            if related {
+                out.insert(
+                    origin,
+                    CheckedTransportCoordinate {
+                        frame_id: frame.frame_id,
+                        slot_template_id: slot.slot_template_id,
+                        slot_occurrence_path: slot.checked_occurrence_path.clone(),
+                        call_template_id: call.call_template_id,
+                        call_occurrence_path: call.checked_occurrence_path.clone(),
+                    },
+                );
+            }
+        }
+    }
+    for child in plan.semantic.child_origins(origin)?.to_vec() {
+        derive_checked_transport(plan, oriented, child, &scope, out)?;
+    }
+    Ok(())
+}
+
+/// Every occurrence at which a complete, plan-resolved checked transport
+/// coordinate is in scope, from the same roots the IH binding uses.
+#[cfg_attr(not(test), allow(dead_code))]
+fn build_checked_transport(
+    plan: &StaticTransitionPlan<'_>,
+    oriented: &crate::OrientedSubcontinuationPlanV1,
+) -> Result<BTreeMap<StaticOriginId, CheckedTransportCoordinate>, CraneliftBackendError> {
+    let mut out = BTreeMap::new();
+    let scope = CheckedTransportScope::default();
+    if let Some(root) = plan.root_occurrence {
+        derive_checked_transport(plan, oriented, root, &scope, &mut out)?;
+    }
+    for origin in plan.declaration_occurrences.values().copied() {
+        derive_checked_transport(plan, oriented, origin, &scope, &mut out)?;
+    }
+    Ok(out)
+}
+
 /// Every `Var` occurrence in the program that names an induction hypothesis.
 ///
 /// Walked from the same roots [`build_case_emission_plan`] uses -- the program
@@ -13906,6 +14063,833 @@ pub(in crate::cranelift_backend) use tests::contspec_nested_fixture;
 #[cfg(test)]
 mod tests {
     use super::abi::{AbiCarrier, AbiSlot, AbiSlotKind};
+    /// `D2g` — the `R3` shape, in an unmarked and a checked-transport form.
+    ///
+    /// One builder for both, so the two differ in **transport and nothing
+    /// else**. A separately authored twin could differ in shape as well, and
+    /// then a relation that survived would not be evidence about transport.
+    ///
+    /// This is a DECLARATION body. The landed validator refuses a recursive/IH
+    /// marker that escapes its declaration into the entry expression, so a
+    /// checked fixture living in the entry can never be positively validated --
+    /// the entry only references this.
+    #[cfg(test)]
+    fn d2g_declaration_body(checked: bool) -> RuntimeExpr {
+        d2g_declaration_body_relocated(checked, false)
+    }
+
+    /// The same body, optionally with the OUTER SLOT WRAPPER MOVED to the
+    /// sibling case.
+    ///
+    /// This is the runtime-only mutation `AC-2` needs. The plan stays
+    /// byte-for-byte fixed and the ARTIFACT changes: the outer slot marker
+    /// stops wrapping the selected case body and wraps the sibling `OutLeaf`
+    /// case instead -- a real case body, so nothing is malformed. The
+    /// invocation marker stays on the consuming `Call` where it always was.
+    ///
+    /// Mutating the plan instead would only show that the validator notices
+    /// when its own description is edited. Moving the marker in the Runtime IR
+    /// is what shows it detects a change in the thing described.
+    #[cfg(test)]
+    fn d2g_declaration_body_relocated(checked: bool, relocate_outer_slot: bool) -> RuntimeExpr {
+        let trap = |what: &str| RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: format!("D2g {what} default"),
+        };
+        let unit = || RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            args: Vec::new(),
+        };
+        // Frame wrappers and slot/invocation markers are applied ONLY in the
+        // checked form; the unmarked form is the same tree without them.
+        let frame = |id: u64, body: RuntimeExpr| {
+            if checked {
+                RuntimeExpr::CheckedSubcontinuationFrame {
+                    frame_id: id,
+                    body: Box::new(body),
+                }
+            } else {
+                body
+            }
+        };
+        let slots = |slot: u64, path: Vec<u64>, body: RuntimeExpr| {
+            if checked {
+                RuntimeExpr::CheckedComputationalIHSlots {
+                    slot_template_ids: vec![slot],
+                    checked_occurrence_paths: vec![path],
+                    body: Box::new(body),
+                }
+            } else {
+                body
+            }
+        };
+        let invocation = |call: u64, path: Vec<u64>, body: RuntimeExpr| {
+            if checked {
+                RuntimeExpr::CheckedComputationalIHInvocation {
+                    call_template_id: call,
+                    checked_occurrence_path: path,
+                    body: Box::new(body),
+                }
+            } else {
+                body
+            }
+        };
+
+        let inner = frame(
+            1,
+            RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::D2gIn::Node".to_string(),
+                    args: vec![RuntimeExpr::LexicalClosure {
+                        captures: Vec::new(),
+                        params: vec!["unit".to_string()],
+                        body: Box::new(RuntimeExpr::Construct {
+                            constructor: "ctor:fixture::D2gIn::Leaf".to_string(),
+                            args: Vec::new(),
+                        }),
+                    }],
+                }),
+                cases: vec![
+                    RuntimeComputationalMatchCase {
+                        constructor: "ctor:fixture::D2gIn::Node".to_string(),
+                        argument_binders: 1,
+                        recursive_positions: vec![0],
+                        // THE PRODUCER: the hypothesis lands in field 0.
+                        body: slots(
+                            D2G_INNER_SLOT,
+                            vec![20, 1],
+                            RuntimeExpr::Construct {
+                                constructor: "ctor:fixture::D2gOut::Node".to_string(),
+                                args: vec![RuntimeExpr::Var(0)],
+                            },
+                        ),
+                    },
+                    RuntimeComputationalMatchCase {
+                        constructor: "ctor:fixture::D2gIn::Leaf".to_string(),
+                        argument_binders: 0,
+                        recursive_positions: Vec::new(),
+                        body: RuntimeExpr::Construct {
+                            constructor: "ctor:fixture::D2gOut::Leaf".to_string(),
+                            args: Vec::new(),
+                        },
+                    },
+                ],
+                default: trap("inner"),
+            },
+        );
+
+        frame(
+            0,
+            RuntimeExpr::ComputationalMatch {
+                scrutinee: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::D2gOut::Node".to_string(),
+                    args: vec![RuntimeExpr::LexicalClosure {
+                        captures: Vec::new(),
+                        params: vec!["unit".to_string()],
+                        body: Box::new(inner),
+                    }],
+                }),
+                cases: vec![
+                    RuntimeComputationalMatchCase {
+                        constructor: "ctor:fixture::D2gOut::Node".to_string(),
+                        argument_binders: 1,
+                        recursive_positions: vec![0],
+                        // THE IH-CONSUMING CALL, under its slot and invocation
+                        // markers in the checked form.
+                        body: {
+                            let consuming = invocation(
+                                D2G_CALL,
+                                vec![30, 0],
+                                RuntimeExpr::Call {
+                                    callee: Box::new(RuntimeExpr::Var(0)),
+                                    args: vec![unit()],
+                                },
+                            );
+                            if relocate_outer_slot {
+                                consuming
+                            } else {
+                                slots(D2G_OUTER_SLOT, vec![20, 0], consuming)
+                            }
+                        },
+                    },
+                    RuntimeComputationalMatchCase {
+                        constructor: "ctor:fixture::D2gOut::Leaf".to_string(),
+                        argument_binders: 0,
+                        recursive_positions: Vec::new(),
+                        body: {
+                            let ok = RuntimeExpr::Construct {
+                                constructor: "ctor:prelude::Result::Ok".to_string(),
+                                args: vec![unit()],
+                            };
+                            if relocate_outer_slot {
+                                slots(D2G_OUTER_SLOT, vec![20, 0], ok)
+                            } else {
+                                ok
+                            }
+                        },
+                    },
+                ],
+                default: trap("outer"),
+            },
+        )
+    }
+
+
+    const D2G_DECLARATION: &str = "decl:fixture::d2g";
+    const D2G_OUTER_FRAME: u64 = 0;
+    const D2G_INNER_FRAME: u64 = 1;
+    const D2G_OUTER_SLOT: u64 = 200;
+    const D2G_INNER_SLOT: u64 = 201;
+    const D2G_CALL: u64 = 100;
+    /// The constructor each slot's own frame eliminates. Two different facts,
+    /// and the validator cannot tell them apart -- so they are pinned.
+    const D2G_OUTER_SLOT_CONSTRUCTOR: &str = "ctor:fixture::D2gOut::Node";
+    const D2G_INNER_SLOT_CONSTRUCTOR: &str = "ctor:fixture::D2gIn::Node";
+
+    /// The marker locations, DERIVED BY HAND from the collector's documented
+    /// edge convention and this fixture's structure -- never read back out of
+    /// the collector.
+    ///
+    /// Feeding collected locations into the plan would make the positive
+    /// validation compare the collector with itself. That is the
+    /// manufactured-evidence form the frame forbids, and it is why an earlier
+    /// revision of this deliverable was blocked.
+    ///
+    /// The convention, from `collect_checked_oriented_markers`: a checked
+    /// wrapper descends its body at edge `0`; `ComputationalMatch` takes its
+    /// scrutinee at `0` and case *i*'s body at `1 + i`; `Construct` takes
+    /// argument *i* at `i`; `LexicalClosure` takes its body at `3`.
+    ///
+    /// ```text
+    /// []                    frame 0 wrapper
+    /// [0]                     outer ComputationalMatch
+    /// [0, 0]                    Construct D2gOut::Node
+    /// [0, 0, 0]                   LexicalClosure
+    /// [0, 0, 0, 3]                  frame 1 wrapper
+    /// [0, 0, 0, 3, 0]                 inner ComputationalMatch
+    /// [0, 0, 0, 3, 0, 1]                slot 201   <- inner slot marker
+    /// [0, 1]                    slot 200           <- outer slot marker
+    /// [0, 1, 0]                   call 100         <- invocation marker
+    /// ```
+    #[cfg(test)]
+    fn d2g_outer_slot_location() -> Vec<u64> {
+        vec![0, 1]
+    }
+    #[cfg(test)]
+    fn d2g_inner_slot_location() -> Vec<u64> {
+        vec![0, 0, 0, 3, 0, 1]
+    }
+    #[cfg(test)]
+    fn d2g_call_location() -> Vec<u64> {
+        vec![0, 1, 0]
+    }
+
+    #[cfg(test)]
+    fn d2g_declaration(checked: bool) -> RuntimeDeclaration {
+        RuntimeDeclaration {
+            symbol: D2G_DECLARATION.to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: d2g_declaration_body(checked),
+            },
+            metadata: crate::RuntimeSymbolMetadata {
+                obligations: Default::default(),
+                obligation_metadata: Default::default(),
+                assumptions: Default::default(),
+                assumption_trust_metadata: Default::default(),
+                trusted_base_delta: Default::default(),
+                lowerability: None,
+                unsupported: None,
+                runtime_checks: Default::default(),
+                capabilities: Default::default(),
+                effects: Default::default(),
+            },
+        }
+    }
+
+    #[cfg(test)]
+    fn d2g_entry() -> RuntimeExpr {
+        RuntimeExpr::DeclarationRef {
+            symbol: D2G_DECLARATION.to_string(),
+        }
+    }
+
+    #[cfg(test)]
+    fn d2g_interface(name: u8) -> crate::CheckedAnswerInterfaceV1 {
+        let mut bytes = crate::CHECKED_ANSWER_INTERFACE_V1_HEADER.to_vec();
+        bytes.push(name);
+        crate::CheckedAnswerInterfaceV1::new(bytes).expect("interface")
+    }
+
+    /// One checked frame's fingerprint, from the frame's OWN cases and default.
+    ///
+    /// The fingerprint is definitionally that content's hash and there is no
+    /// other way to obtain it, so computing it here is not the circularity the
+    /// ruling forbids -- that prohibition is about LOCATIONS, which are
+    /// hand-derived above.
+    #[cfg(test)]
+    fn d2g_frame_fingerprint(body: &RuntimeExpr, frame_id: u64) -> u64 {
+        fn find(expr: &RuntimeExpr, frame_id: u64) -> Option<u64> {
+            match expr {
+                RuntimeExpr::CheckedSubcontinuationFrame { frame_id: id, body } => {
+                    if *id == frame_id {
+                        if let RuntimeExpr::ComputationalMatch { cases, default, .. } =
+                            body.as_ref()
+                        {
+                            return Some(
+                                crate::compiler_private_computational_match_frame_fingerprint(
+                                    cases, default,
+                                ),
+                            );
+                        }
+                    }
+                    find(body, frame_id)
+                }
+                RuntimeExpr::CheckedComputationalIHSlots { body, .. }
+                | RuntimeExpr::CheckedComputationalIHInvocation { body, .. } => find(body, frame_id),
+                RuntimeExpr::ComputationalMatch {
+                    scrutinee, cases, ..
+                } => find(scrutinee, frame_id)
+                    .or_else(|| cases.iter().find_map(|case| find(&case.body, frame_id))),
+                RuntimeExpr::Construct { args, .. } => args.iter().find_map(|arg| find(arg, frame_id)),
+                RuntimeExpr::LexicalClosure { body, .. } => find(body, frame_id),
+                RuntimeExpr::Call { callee, args } => find(callee, frame_id)
+                    .or_else(|| args.iter().find_map(|arg| find(arg, frame_id))),
+                _ => None,
+            }
+        }
+        find(body, frame_id).expect("the fixture declares this frame")
+    }
+
+    /// A complete `OrientedSubcontinuationPlanV1` for the twin, authored
+    /// independently of the collector.
+    #[cfg(test)]
+    fn d2g_oriented_plan() -> crate::OrientedSubcontinuationPlanV1 {
+        let body = d2g_declaration_body(true);
+        let location = |path: Vec<u64>| crate::CheckedRuntimeMarkerLocationV1 {
+            declaration: D2G_DECLARATION.to_string(),
+            runtime_path: path,
+        };
+        let mut frames = Vec::new();
+        for (frame_id, semantic_position, parent) in [
+            (D2G_OUTER_FRAME, 0u64, None),
+            (D2G_INNER_FRAME, 1u64, Some(D2G_OUTER_FRAME)),
+        ] {
+            let mut frame = crate::OrientedSubcontinuationFramePlanV1 {
+                frame_id,
+                segment_site_id: 9,
+                declaration: D2G_DECLARATION.to_string(),
+                checked_occurrence_path: vec![10, frame_id],
+                semantic_position,
+                input_interface: d2g_interface(frame_id as u8),
+                output_interface: d2g_interface(frame_id as u8 + 1),
+                runtime_frame_fingerprint: d2g_frame_fingerprint(&body, frame_id),
+                occurrence_binding_fingerprint: 0,
+                control_witness: parent.map_or(
+                    crate::OrientedControlWitnessV1::DistinguishedRoot,
+                    crate::OrientedControlWitnessV1::ParentFrame,
+                ),
+            };
+            frame.occurrence_binding_fingerprint =
+                crate::compiler_private_oriented_occurrence_binding_fingerprint(&frame);
+            frames.push(frame);
+        }
+
+        let mut computational_ih_slots = Vec::new();
+        // The constructor is a PER-SLOT fact, authored from each slot's own case.
+        // The outer frame eliminates `D2gOut` and the inner one eliminates
+        // `D2gIn`; hardcoding one for both is a semantic mismatch the landed
+        // validator cannot detect, which is why `d2g_slot_constructors` pins it.
+        for (slot_template_id, frame_template_id, checked_path, marker, constructor) in [
+            (
+                D2G_OUTER_SLOT,
+                D2G_OUTER_FRAME,
+                vec![20u64, 0],
+                d2g_outer_slot_location(),
+                D2G_OUTER_SLOT_CONSTRUCTOR,
+            ),
+            (
+                D2G_INNER_SLOT,
+                D2G_INNER_FRAME,
+                vec![20u64, 1],
+                d2g_inner_slot_location(),
+                D2G_INNER_SLOT_CONSTRUCTOR,
+            ),
+        ] {
+            let mut slot = crate::CheckedComputationalIHSlotTemplateV1 {
+                slot_template_id,
+                declaration: D2G_DECLARATION.to_string(),
+                checked_match_ordinal: frame_template_id,
+                checked_occurrence_path: checked_path,
+                frame_template_id,
+                constructor: constructor.to_string(),
+                recursive_position: 0,
+                method_binder_ordinal: 0,
+                local_telescope: Vec::new(),
+                ih_interface: d2g_interface(frame_template_id as u8),
+                segment_site_id: 9,
+                frame_templates: vec![frame_template_id],
+                input_interface: d2g_interface(frame_template_id as u8),
+                output_interface: d2g_interface(frame_template_id as u8 + 1),
+                runtime_marker_locations: vec![location(marker)],
+                occurrence_binding_fingerprint: 0,
+            };
+            slot.occurrence_binding_fingerprint =
+                crate::compiler_private_computational_ih_slot_binding_fingerprint(&slot);
+            computational_ih_slots.push(slot);
+        }
+
+        let mut call = crate::CheckedComputationalIHCallTemplateV1 {
+            call_template_id: D2G_CALL,
+            declaration: D2G_DECLARATION.to_string(),
+            checked_occurrence_path: vec![30, 0],
+            slot_template_id: D2G_OUTER_SLOT,
+            arity: 1,
+            local_telescope: Vec::new(),
+            result_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
+            callee_segment_site_id: 9,
+            callee_frame_templates: vec![D2G_OUTER_FRAME],
+            parent_frame_template_id: Some(D2G_OUTER_FRAME),
+            parent_segment_site_id: Some(9),
+            caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
+            runtime_marker_locations: vec![location(d2g_call_location())],
+            occurrence_binding_fingerprint: 0,
+        };
+        call.occurrence_binding_fingerprint =
+            crate::compiler_private_computational_ih_call_binding_fingerprint(&call);
+
+        crate::OrientedSubcontinuationPlanV1 {
+            representation_rule_version:
+                crate::OrientedSubcontinuationPlanV1::REPRESENTATION_RULE_VERSION,
+            frames,
+            recursive_calls: Vec::new(),
+            computational_ih_slots,
+            computational_ih_calls: vec![call],
+        }
+    }
+
+    /// Walk down through any checked wrappers to the occurrence they carry.
+    ///
+    /// The wrappers are real occurrences in the semantic tree, so the checked
+    /// form's coordinates are NOT the unmarked form's. This descends by the
+    /// wrapper's own body edge rather than assuming a depth.
+    #[cfg(test)]
+    fn d2g_through_wrappers(
+        plan: &StaticTransitionPlan<'_>,
+        mut origin: StaticOriginId,
+    ) -> Result<StaticOriginId, CraneliftBackendError> {
+        loop {
+            match plan.planned_occurrence_expr(origin)? {
+                RuntimeExpr::CheckedSubcontinuationFrame { .. }
+                | RuntimeExpr::CheckedComputationalIHSlots { .. }
+                | RuntimeExpr::CheckedComputationalIHInvocation { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. }
+                | RuntimeExpr::CheckedJoinSite { .. } => {
+                    origin = plan.semantic.child_origin(origin, 0)?;
+                }
+                _ => return Ok(origin),
+            }
+        }
+    }
+
+    /// `D2g` `AC-1` — the checked twin reaches the SAME producer to IH-consumer
+    /// relation as the unmarked witness, through the landed authority.
+    ///
+    /// The relation: the consumer's selected case body is the exact suffix iff
+    /// its callee `Var` resolves to
+    /// `CheckedIhBinding { frame_origin: <the consumer frame>, recursive_position }`.
+    /// Read out of `build_checked_ih_bindings`, the authority that landed in
+    /// `D2e`, and not re-derived here.
+    ///
+    /// Both forms are measured in one loop, so a twin that lost the relation
+    /// could not pass on the unmarked side alone. Measured on this one fixture
+    /// pair; the claim is about it, not about checked wrapping in general.
+    #[test]
+    fn d2g_ac1_checked_twin_reaches_the_same_producer_to_ih_consumer_relation() {
+        for checked in [false, true] {
+            let declaration = d2g_declaration(checked);
+            let entry = d2g_entry();
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2G_DECLARATION, &declaration);
+            let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let bindings = build_checked_ih_bindings(&plan).expect("bindings derive");
+
+            let body = *plan
+                .declaration_occurrences
+                .get(D2G_DECLARATION)
+                .expect("the declaration is planned");
+            let outer = d2g_through_wrappers(&plan, body).expect("outer frame");
+            let case_body = plan
+                .semantic
+                .child_origin(outer, 1)
+                .expect("the OutNode case body");
+            let call = d2g_through_wrappers(&plan, case_body).expect("the consuming Call");
+            assert!(
+                matches!(
+                    plan.planned_occurrence_expr(call).expect("call expr"),
+                    RuntimeExpr::Call { .. }
+                ),
+                "checked={checked}: the selected case body must reach a Call"
+            );
+            let callee = plan.semantic.child_origin(call, 0).expect("callee");
+            assert_eq!(
+                bindings.get(&callee).copied(),
+                Some(CheckedIhBinding {
+                    frame_origin: outer,
+                    recursive_position: 0,
+                }),
+                "checked={checked}: the consuming Call's callee must resolve to THIS \
+                 consumer frame's hypothesis at position 0"
+            );
+        }
+    }
+
+    /// `D2g` `AC-2` POSITIVE — a complete independently authored plan authorizes
+    /// this fixture, and the check is not circular.
+    ///
+    /// The plan's `runtime_marker_locations` are hand-derived from the
+    /// collector's edge convention rather than collected from the fixture, so
+    /// this compares two independently produced descriptions of the same tree.
+    /// It covers all three marker populations, the frame fingerprints, the
+    /// declaration paths, the checked occurrence paths and the exact runtime
+    /// locations, because `validate_oriented_subcontinuation_transport` requires
+    /// every one of them.
+    ///
+    /// Alone this proves only that the two agree; the mutation below is what
+    /// makes the agreement causal.
+    #[test]
+    fn d2g_ac2_a_complete_independent_plan_positively_validates_the_twin() {
+        use crate::cranelift_backend::planning::validate_oriented_subcontinuation_transport;
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let oriented = d2g_oriented_plan();
+        validate_oriented_subcontinuation_transport(&entry, &declarations, Some(&oriented))
+            .expect("the independently authored plan must authorize this fixture");
+    }
+
+    /// `D2g` `AC-2` DISCRIMINATOR — the plan is held FIXED and the RUNTIME moves.
+    ///
+    /// An earlier revision mutated the plan's own marker location and re-sealed
+    /// its fingerprint. That shows only that the validator notices when its
+    /// description is edited; it says nothing about whether it detects a change
+    /// in the artifact. **Here the plan is the same object the positive
+    /// accepted, byte for byte, including every fingerprint.**
+    ///
+    /// What moves is the Runtime declaration: the outer slot wrapper stops
+    /// wrapping the selected case body and wraps the sibling `OutLeaf` case
+    /// instead. That is a real case body, so the refusal cannot be about
+    /// malformedness. The invocation marker stays on the consuming `Call`.
+    ///
+    /// The actual collected location is asserted BEFORE validation, to show the
+    /// mutation landed where intended -- and it is used only as an observation,
+    /// never to build or feed the plan.
+    #[test]
+    fn d2g_ac2_relocating_the_runtime_marker_against_a_fixed_plan_is_refused() {
+        use crate::cranelift_backend::planning::{
+            collect_checked_oriented_markers, validate_oriented_subcontinuation_transport,
+            CheckedOrientedMarkerSets,
+        };
+
+        // The plan the positive used, unmodified.
+        let oriented = d2g_oriented_plan();
+        assert_eq!(
+            oriented, d2g_oriented_plan(),
+            "the plan must be the positive's plan; nothing here may reseal or edit it"
+        );
+
+        let mutated_body = d2g_declaration_body_relocated(true, true);
+        let mut markers = CheckedOrientedMarkerSets::default();
+        collect_checked_oriented_markers(
+            &mutated_body,
+            &mut markers,
+            D2G_DECLARATION,
+            &mut Vec::new(),
+        )
+        .expect("markers collect");
+        let observed = markers
+            .computational_ih_slots
+            .get(&(D2G_OUTER_SLOT, vec![20, 0]))
+            .expect("the outer slot marker is still present, at its new home");
+        assert_eq!(
+            observed.iter().cloned().collect::<Vec<_>>(),
+            vec![vec![0, 2]],
+            "the mutation must have moved the outer slot marker to the sibling case"
+        );
+        assert_ne!(
+            observed.iter().cloned().collect::<Vec<_>>(),
+            vec![d2g_outer_slot_location()],
+            "and it must no longer sit where the fixed plan says it does"
+        );
+
+        let declaration = RuntimeDeclaration {
+            symbol: D2G_DECLARATION.to_string(),
+            kind: RuntimeDeclarationKind::Transparent { body: mutated_body },
+            metadata: crate::RuntimeSymbolMetadata {
+                obligations: Default::default(),
+                obligation_metadata: Default::default(),
+                assumptions: Default::default(),
+                assumption_trust_metadata: Default::default(),
+                trusted_base_delta: Default::default(),
+                lowerability: None,
+                unsupported: None,
+                runtime_checks: Default::default(),
+                capabilities: Default::default(),
+                effects: Default::default(),
+            },
+        };
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+
+        let refusal =
+            validate_oriented_subcontinuation_transport(&entry, &declarations, Some(&oriented))
+                .expect_err("a relocated runtime marker must be refused against the fixed plan");
+        let rendered = format!("{refusal:?}");
+        assert!(
+            rendered.contains("checked computational-IH slot Runtime occurrences differ"),
+            "the refusal must name the exact slot location mismatch: {rendered}"
+        );
+    }
+
+    /// `D2g` — each slot's constructor fact is its OWN frame's, and both are
+    /// pinned because the validator cannot tell them apart.
+    ///
+    /// The outer frame eliminates `D2gOut` and the inner one eliminates
+    /// `D2gIn`. An earlier revision wrote the outer constructor into both slot
+    /// templates. `validate_oriented_subcontinuation_transport` checks
+    /// identities, paths, locations and fingerprints -- **not** whether a slot's
+    /// constructor matches the case it stands for -- so the mismatch validated
+    /// cleanly and would have travelled into the key as a wrong fact.
+    ///
+    /// A pin is the only thing that catches it, so the two facts are asserted
+    /// separately and asserted to DIFFER; equal values would mean the
+    /// hardcoding came back.
+    #[test]
+    fn d2g_each_slot_carries_its_own_frames_constructor() {
+        let oriented = d2g_oriented_plan();
+        let constructor = |slot_template_id: u64| {
+            oriented
+                .computational_ih_slots
+                .iter()
+                .find(|slot| slot.slot_template_id == slot_template_id)
+                .map(|slot| slot.constructor.clone())
+                .expect("the slot is planned")
+        };
+        assert_eq!(constructor(D2G_OUTER_SLOT), D2G_OUTER_SLOT_CONSTRUCTOR);
+        assert_eq!(constructor(D2G_INNER_SLOT), D2G_INNER_SLOT_CONSTRUCTOR);
+        assert_ne!(
+            constructor(D2G_OUTER_SLOT),
+            constructor(D2G_INNER_SLOT),
+            "the two slots eliminate different constructors; equal values here means \
+             one was hardcoded for both again"
+        );
+
+        // And the facts agree with the fixture, so the pin is about the program
+        // rather than about two constants agreeing with each other.
+        let body = d2g_declaration_body(true);
+        let rendered = format!("{body:?}");
+        assert!(
+            rendered.contains(D2G_OUTER_SLOT_CONSTRUCTOR)
+                && rendered.contains(D2G_INNER_SLOT_CONSTRUCTOR),
+            "both constructors must actually occur in the fixture"
+        );
+    }
+
+    /// `D2g` — the capture helper resolves the exact PLAN-BACKED triple on the
+    /// twin, and resolves nothing on the unmarked witness.
+    ///
+    /// A raw wrapper value is not authority. Each member is resolved against the
+    /// plan by its id AND the checked occurrence path it was declared at, and
+    /// the three must be related -- the slot belongs to the frame, the call is
+    /// that slot's call -- before a coordinate is recorded.
+    #[test]
+    fn d2g_ac2_transport_resolves_plan_backed_on_the_twin_and_is_absent_on_the_witness() {
+        let oriented = d2g_oriented_plan();
+        for (checked, expect_some) in [(true, true), (false, false)] {
+            let declaration = d2g_declaration(checked);
+            let entry = d2g_entry();
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2G_DECLARATION, &declaration);
+            let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let transport = build_checked_transport(&plan, &oriented).expect("transport derives");
+
+            let body = *plan
+                .declaration_occurrences
+                .get(D2G_DECLARATION)
+                .expect("declaration planned");
+            let outer = d2g_through_wrappers(&plan, body).expect("outer frame");
+            let case_body = plan.semantic.child_origin(outer, 1).expect("case body");
+            let call = d2g_through_wrappers(&plan, case_body).expect("consuming Call");
+
+            if expect_some {
+                assert_eq!(
+                    transport.get(&call),
+                    Some(&CheckedTransportCoordinate {
+                        frame_id: D2G_OUTER_FRAME,
+                        slot_template_id: D2G_OUTER_SLOT,
+                        slot_occurrence_path: vec![20, 0],
+                        call_template_id: D2G_CALL,
+                        call_occurrence_path: vec![30, 0],
+                    }),
+                    "the consuming Call carries the resolved, related triple"
+                );
+            } else {
+                assert!(
+                    transport.is_empty(),
+                    "the unmarked witness resolves no coordinate anywhere: {transport:?}"
+                );
+            }
+        }
+    }
+
+    /// `D2g` — a resolved id with a BROKEN relationship is not authority.
+    ///
+    /// Every id still resolves; only the slot-to-frame relation is severed. A
+    /// helper that recorded "three markers were in scope and all three ids exist"
+    /// would still answer here, which is what this rules out.
+    #[test]
+    fn d2g_ac2_a_broken_slot_to_frame_relation_resolves_nothing() {
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+
+        let mut oriented = d2g_oriented_plan();
+        let slot = oriented
+            .computational_ih_slots
+            .iter_mut()
+            .find(|slot| slot.slot_template_id == D2G_OUTER_SLOT)
+            .expect("outer slot");
+        // The slot now claims the INNER frame while the marker sits inside the
+        // outer one. Both frames are real and both ids resolve.
+        slot.frame_template_id = D2G_INNER_FRAME;
+
+        let transport = build_checked_transport(&plan, &oriented).expect("transport derives");
+        assert!(
+            transport.is_empty(),
+            "a slot that does not belong to the frame in scope must resolve nothing: \
+             {transport:?}"
+        );
+    }
+
+    /// `D2g` `AC-4` — the absence control is exercised in the direction that can
+    /// FAIL.
+    ///
+    /// "No markers and no plan is accepted" passes whether or not the validator
+    /// can see anything, because that is its trivially-accepting case. The
+    /// discriminating half is markers present with NO plan, which must be
+    /// refused -- and that is what would have caught a validator wired to accept
+    /// everything.
+    #[test]
+    fn d2g_ac4_transport_validator_refuses_markers_without_a_plan() {
+        use crate::cranelift_backend::planning::validate_oriented_subcontinuation_transport;
+        let unmarked = d2g_declaration(false);
+        let checked = d2g_declaration(true);
+        let entry = d2g_entry();
+
+        let mut unmarked_declarations = BTreeMap::new();
+        unmarked_declarations.insert(D2G_DECLARATION, &unmarked);
+        validate_oriented_subcontinuation_transport(&entry, &unmarked_declarations, None)
+            .expect("no markers and no plan is the lawful absent case");
+
+        let mut checked_declarations = BTreeMap::new();
+        checked_declarations.insert(D2G_DECLARATION, &checked);
+        let refusal =
+            validate_oriented_subcontinuation_transport(&entry, &checked_declarations, None)
+                .expect_err("markers present with no plan must be refused");
+        let rendered = format!("{refusal:?}");
+        assert!(
+            rendered.contains("checked subcontinuation markers have no checked plan metadata"),
+            "the refusal must be the transport one: {rendered}"
+        );
+    }
+
+    /// `D2g` `AC-2` census — the marker populations, per fixture.
+    ///
+    /// Stated per fixture because that is the shape of the fact: this unmarked
+    /// body has none and this twin has all three. Neither is a property of
+    /// checked fixtures in general.
+    #[test]
+    fn d2g_ac2_marker_census_per_fixture() {
+        use crate::cranelift_backend::planning::{
+            collect_checked_oriented_markers, CheckedOrientedMarkerSets,
+        };
+        let census = |expr: &RuntimeExpr| {
+            let mut markers = CheckedOrientedMarkerSets::default();
+            collect_checked_oriented_markers(expr, &mut markers, D2G_DECLARATION, &mut Vec::new())
+                .expect("markers collect");
+            (
+                markers.computational_ih_slots.len(),
+                markers.computational_ih_calls.len(),
+                markers.recursive_calls.len(),
+            )
+        };
+        assert_eq!(
+            census(&d2g_declaration_body(false)),
+            (0, 0, 0),
+            "the unmarked body: no slot, no invocation, no recursive-call marker"
+        );
+        assert_eq!(
+            census(&d2g_declaration_body(true)),
+            (2, 1, 0),
+            "the twin: two IH-slot markers, one per recursive case, and one \
+             IH-invocation marker at the consuming Call"
+        );
+    }
+
+    /// `D2g` `AC-3` — the twin's coordinates are FRESH, and some COINCIDE.
+    ///
+    /// Checked markers are real occurrences, so coordinates below the first
+    /// wrapper shift. Measured, and not what I predicted: the declaration body,
+    /// the selected case body and the scrutinee move, while others land on the
+    /// same origin in both forms.
+    ///
+    /// The coinciding coordinate is the dangerous one. A number carried over
+    /// from the unmarked witness is then right BY ACCIDENT -- it survives
+    /// review, survives a spot check, and is wrong the moment the fixture
+    /// changes.
+    #[test]
+    fn d2g_ac3_the_twins_coordinates_are_fresh_and_some_coincide() {
+        let roles = |checked: bool| {
+            let declaration = d2g_declaration(checked);
+            let entry = d2g_entry();
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2G_DECLARATION, &declaration);
+            let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let body = *plan
+                .declaration_occurrences
+                .get(D2G_DECLARATION)
+                .expect("declaration planned");
+            let outer = d2g_through_wrappers(&plan, body).expect("outer frame");
+            let case_body = plan.semantic.child_origin(outer, 1).expect("case body");
+            let call = d2g_through_wrappers(&plan, case_body).expect("consuming Call");
+            let scrutinee = plan.semantic.child_origin(outer, 0).expect("scrutinee");
+            vec![body, outer, case_body, call, scrutinee]
+        };
+        let unmarked = roles(false);
+        let twin = roles(true);
+        println!("D2G unmarked (body, outer, case_body, call, scrutinee) = {unmarked:?}");
+        println!("D2G twin     (body, outer, case_body, call, scrutinee) = {twin:?}");
+
+        let agreeing = unmarked
+            .iter()
+            .zip(&twin)
+            .filter(|(left, right)| left == right)
+            .count();
+        assert!(
+            agreeing < unmarked.len(),
+            "the wrappers must move at least one coordinate, or nothing here is fresh: \
+             unmarked={unmarked:?} twin={twin:?}"
+        );
+        assert!(
+            agreeing > 0,
+            "and at least one must coincide, or this fixture cannot demonstrate that \
+             agreement is uninformative: unmarked={unmarked:?} twin={twin:?}"
+        );
+    }
+
     /// The one fixture for `AC-1` and `AC-2`: a hypothesis reached three ways
     /// and an ordinary child sitting beside it in the same scope.
     ///
