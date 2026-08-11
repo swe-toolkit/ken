@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-11 01:47:44Z — from 214 issue file(s) in `docs/program/issues/`.
+2026-08-11 02:23:46Z — from 215 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -62,6 +62,7 @@ the committed file matches the generator's output.
 | `CI-DOCTEST-UNEXECUTED` | CI runs no --doc step on a premise that is false -- doctests are collected but never executed, and the positive control for a 20-block compile_fail set is among the dead ones | merged | verify | S | none | — |
 | `CI-IGNORED-SWEEP` | nothing in the repo ever re-runs an ignored row, so every skip is write-only and a landed repair ships with its own regression cover switched off | merged | verify | S | none | — |
 | `CI-L1-EXECUTING-COVER` | Three executing, green l1_acceptance rows certify conformance cases they cannot check -- sec62 never issues the conversion query its soundness row turns on, sec61 names a row id that does not exist, and ac5_no_implicit_cross_type_coercion is satisfied by an elaboration limitation rather than by the coercion refusal it claims | merged | verify | M | none | — |
+| `CI-OLD-PRESTATE-ROW-CURRENCY` | The `old`-capture flip pair still asserts pre-state elaboration is unavailable, which LANG-SPACE-PRESTATE-BIND made false -- and the soundness row's stated relation, `reject/reject at distinct gates, not a verdict flip`, is now the opposite of what the code does | ready | verify | S | none | — |
 | `CI-ROW-CLAIM-COMMENT-FORM` | verify-row-claims extracts only from /// doc comments, so a row claim written with // is invisible to it -- two false soundness certificates survive on main in exactly that form | merged | verify | S | none | — |
 | `CI-ROW-CLAIM-NAMESPACE` | verify-row-claims hardcodes surface/ in both its claim and heading patterns, so eight of the nine conformance namespaces are structurally invisible to it -- a claim it cannot see is indistinguishable from a claim that does not exist | merged | verify | S | none | — |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
@@ -258,6 +259,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `CI-OLD-PRESTATE-ROW-CURRENCY` — The `old`-capture flip pair still asserts pre-state elaboration is unavailable, which LANG-SPACE-PRESTATE-BIND made false -- and the soundness row's stated relation, `reject/reject at distinct gates, not a verdict flip`, is now the opposite of what the code does
 - `LANG-SURFACE-IF` — `if e then t else f` is required by 32-grammar §3 and is wholly absent -- no token, no keyword-map entry, no parser arm, no AST node -- while its stated elaboration target (real matchable `data Bool = True | False`) has been pre-registered since ES2
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
