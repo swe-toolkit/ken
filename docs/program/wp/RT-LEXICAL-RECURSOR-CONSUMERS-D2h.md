@@ -6,11 +6,41 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
-> ## HELD AGAIN 2026-08-11, on a fixed input that does not present the pair.
+> ## RELEASED 2026-08-11 — the gate below is discharged. `D2i` is on `main`.
 >
-> **This frame's scope is unchanged and still correct. It is blocked, not
-> mis-scoped**, so it is respun rather than split and its existing thread stays
-> its spine — there will be no fresh `D2h` kick.
+> **`D2i` merged at `f01e63a1`** (`c1725317`, the live enumerator reading the
+> admitted ledger; the ledger half landed earlier at `b7142fe5`). The gate at
+> the foot of this block said *"resume unchanged once `D2i` is on `main`"*, and
+> it is. **Scope is unchanged. Resume.**
+>
+> **But read how the gate was satisfied, because it is not how it was written.**
+> The gate expected a *new* productive checked twin. The `D2i` scope ruling
+> retired that artifact: making the enumerator live measured the **landed `D2g`
+> twin itself** as productive on a production-issued ledger root, so no
+> replacement fixture was built. The twin did not change — **the instrument
+> did.** Zero result-flow pair under seed enumeration, one under ledger
+> enumeration.
+>
+> ### YOUR FIRST STEP IS A MEASUREMENT, NOT THE PLANE
+>
+> **Before building anything, confirm the enumerator presents exactly one
+> pre-interning candidate on your fixture.** State the count.
+>
+> - **One candidate ⇒ proceed**, and the zero-fusion condition that held this
+>   frame twice is gone.
+> - **Zero ⇒ STOP AND COME BACK TO ME IMMEDIATELY.** That is the third hold on
+>   this frame, and a third would mean the gate itself is mis-specified rather
+>   than unmet. **Do not build the plane to find out**, and do not manufacture a
+>   fixture to make the count non-zero — that is the green-by-construction shape
+>   Runtime correctly refused twice.
+>
+> `continuation_result_origins` **must not be widened** (Architect
+> `evt_1dgwdvxhnabg4`). If presenting the pair appears to require widening it,
+> that is the stop above, not a licence.
+>
+> **This frame's scope is unchanged and still correct. It was blocked, not
+> mis-scoped**, so it was respun rather than split and its existing thread stays
+> its spine — there is no fresh `D2h` kick.
 >
 > **The key plane interns zero fusions on the landed `D2g` twin.** Production
 > discovery walks `continuation_result_origins` by result positions and treats
