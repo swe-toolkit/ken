@@ -2081,6 +2081,242 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
     );
 }
 
+/// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` **Deliverable 0 — the applied-root
+/// production-path gate.** Architect `evt_6907h4rv5kq1a` and `evt_4trsqtkxtghjx`.
+///
+/// **Every row here is rebaselined on its own cause-selected root.** No
+/// coordinate, key, descriptor or refusal literal is transported from the
+/// withdrawn bare-root revision, and there is no origin translation.
+///
+/// | row | phase reached | resolved | definitions |
+/// |---|---|---|---|
+/// | old `px8j` seed | builder, `oriented_present = false` | nothing | 0 |
+/// | `Exact`, applied root | builder, then the twin's OWN ordinary refusal | one key, one descriptor | 0 |
+/// | `ReHomed`, bare root | builder, then its OWN ordinary refusal | one key, one descriptor | 0 |
+/// | `Frame` / `SelectedSlot` / `Invocation` | **transport validation — no arrival** | nothing | 0 |
+/// | `ExactSuffix` / `CallIdentity` | builder | nothing | 0 |
+///
+/// **The five refusal causes are TWO phases, not one.** Three refuse upstream
+/// of the builder and never arrive; two arrive and resolve zero. Both end with
+/// no key, ID, descriptor or definition — so a control asserting only that
+/// shared consequence would read as satisfied while being blind to which phase
+/// actually fired. The phase is asserted per row.
+///
+/// **Why arrival LENGTH is the discriminator.** `d2f_gate_note_arrival`, which
+/// sits beside `d2f_note_production_fusion_plane` at the single production
+/// builder call site, is an **unconditional push** — executed once per builder
+/// call with no predicate in front of it.
+/// So the vector's length counts arrivals exactly: `0` means the builder was
+/// never reached, `1` means reached once. A conditional push would make the
+/// same zero mean either "never reached" or "reached and filtered", and the
+/// three-versus-two phase split above would collapse into an unreadable zero.
+///
+/// **Where "sole production compile path" comes from, and what it rests on.**
+/// `compile_expr_into_module_with_root_projection` is the only scope holding
+/// the static transition plan and the oriented plan authoritatively at once,
+/// and the four public compile entries — `compile_expr_into_module`,
+/// `compile_expr_into_object_module`, `compile_program_expr_into_module` and
+/// `compile_program_expr_into_object_module` — all delegate into it. That is a
+/// **structural** claim about the delegation graph: it is established by those
+/// four being its only callers, not by a measurement over program shapes.
+/// Stated so a reader knows which kind of claim it is.
+///
+/// **Named rather than cited by line**, because a line number goes stale
+/// silently and then points at unrelated real content — a reader who follows it
+/// gets a confident wrong answer instead of a missing one.
+///
+/// **`ReHomed` is a POSITIVE on a bare root**, not a negative comparator. That
+/// cause removes the outer `LexicalClosure`, so the re-homed program has zero
+/// ABI inputs and applying two `Unit`s would build an ill-typed program whose
+/// failure would be evidence about this harness. It gets its own root from the
+/// one constructor's explicit branch, and its own planner comparator.
+///
+/// **Promise class: durable invariant.** Arrival, presence, phase, and key
+/// agreement between two independently reached derivations. The literals are
+/// `1` (the cardinality the identity plane is defined to produce for one
+/// candidate) and `0` (the definition population before an emitter exists).
+#[test]
+fn d2f_0_the_applied_root_production_path_gate() {
+    use crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take;
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause, D2J_DECLARATION};
+
+    /// One cause, compiled through the production entry on its own root.
+    fn compile_cause(
+        cause: D2jCause,
+        symbol: &str,
+    ) -> (
+        Vec<crate::cranelift_backend::lowering::core::D2fGateArrival>,
+        Option<CraneliftBackendError>,
+    ) {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let _ = crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take();
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(
+            crate::cranelift_backend::planning::D2J_DECLARATION,
+            &declaration,
+        );
+        let result = crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+            crate::cranelift_backend::artifact::new_object_module_for_lowering_tests("ken-d2f-gate")
+                .expect("object module"),
+            symbol,
+            cranelift_module::Linkage::Export,
+            &entry,
+            &crate::NativeSeedEnvironment::empty(),
+            declarations,
+            None,
+            false,
+            None,
+            None,
+            Some(oriented),
+        );
+        (
+            crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take(),
+            result.err(),
+        )
+    }
+
+    /// The planner comparator for one cause, on that cause's OWN root. This is
+    /// a DIFFERENT derivation from the compile above; neither reads the other,
+    /// which is the only reason their agreement says anything.
+    fn planner_plane(
+        cause: D2jCause,
+    ) -> crate::cranelift_backend::planning::StaticContinuationFusionPlan {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(
+            crate::cranelift_backend::planning::D2J_DECLARATION,
+            &declaration,
+        );
+        let plan = crate::cranelift_backend::planning::plan_static_transition_graph(
+            &entry,
+            &declarations,
+        )
+        .expect("the cause-selected root plans");
+        crate::cranelift_backend::planning::build_static_continuation_fusion_plan(
+            &plan,
+            &entry,
+            &declarations,
+            Some(&oriented),
+        )
+        .expect("the cause-selected root resolves a plane")
+    }
+
+    let ordinary_refusal = |error: &Option<CraneliftBackendError>, side: &str| {
+        assert!(
+            matches!(
+                error,
+                Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                    if *construct == "ComputationalMatch"
+                        && reason.contains("in-flight activation")
+            ),
+            "{side}: before emission this root must reach the twin's OWN ordinary refusal -- \
+             that refusal is the thing fusion is supposed to eliminate, so it is the baseline \
+             the later 0 -> 1 movement is measured against: {error:?}"
+        );
+    };
+
+    // ---- the two positives, each on its own root.
+    let (exact_arrivals, exact_error) = compile_cause(D2jCause::Exact, "ken_d2f_gate_exact");
+    let (rehomed_arrivals, rehomed_error) = compile_cause(D2jCause::ReHomed, "ken_d2f_gate_rehomed");
+    let exact = match exact_arrivals.as_slice() {
+        [only] => only.clone(),
+        other => panic!("the applied exact root must reach the builder once: {}", other.len()),
+    };
+    let rehomed = match rehomed_arrivals.as_slice() {
+        [only] => only.clone(),
+        other => panic!("the bare re-homed root must reach the builder once: {}", other.len()),
+    };
+
+    // ---- the old seed witness, which carries no marker at all.
+    let seed_expr = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::BeforeReturnHole,
+    ));
+    let _ = d2f_gate_arrivals_take();
+    let (seed_result, _trace) = px8j_capture_source_trace(&seed_expr, false, "ken_d2f_gate_seed");
+    seed_result.expect("the old seed witness still lowers");
+    let seed = match d2f_gate_arrivals_take().as_slice() {
+        [only] => only.clone(),
+        other => panic!("the seed witness must reach the builder once: {}", other.len()),
+    };
+
+    // ---- AC-6a, per row, BESIDE the non-empty positive.
+    //
+    // Every number in the refusal rows is a zero and no zero proves anything by
+    // itself, so the positives' populations are operands of the same assertion.
+    let no_arrival: Vec<(D2jCause, usize)> = [
+        D2jCause::Frame,
+        D2jCause::SelectedSlot,
+        D2jCause::Invocation,
+    ]
+    .into_iter()
+    .map(|cause| (cause, compile_cause(cause, "ken_d2f_gate_neg").0.len()))
+    .collect();
+    let arrived_empty: Vec<(D2jCause, usize, usize, usize)> =
+        [D2jCause::ExactSuffix, D2jCause::CallIdentity]
+            .into_iter()
+            .map(|cause| {
+                let arrivals = compile_cause(cause, "ken_d2f_gate_empty").0;
+                let one = match arrivals.as_slice() {
+                    [only] => only.clone(),
+                    other => panic!("{cause:?} must reach the builder once: {}", other.len()),
+                };
+                (cause, arrivals.len(), one.keys.len(), one.descriptors.len())
+            })
+            .collect();
+
+    assert_eq!(
+        (
+            // the positives -- the denominator for everything below them
+            (exact.oriented_present, exact.keys.len(), exact.descriptors.len(), exact.fusion_definitions),
+            (rehomed.oriented_present, rehomed.keys.len(), rehomed.descriptors.len(), rehomed.fusion_definitions),
+            // the unmarked seed
+            (seed.oriented_present, seed.keys.len(), seed.descriptors.len(), seed.fusion_definitions),
+            // AC-6a phase A: refused upstream, never arrived
+            no_arrival.iter().map(|(_, n)| *n).collect::<Vec<_>>(),
+            // AC-6a phase B: arrived once, resolved nothing
+            arrived_empty.iter().map(|(_, a, k, d)| (*a, *k, *d)).collect::<Vec<_>>(),
+        ),
+        (
+            (true, 1, 1, 0),
+            (true, 1, 1, 0),
+            (false, 0, 0, 0),
+            vec![0, 0, 0],
+            vec![(1, 0, 0), (1, 0, 0)],
+        ),
+        "both positives must resolve exactly one key and one descriptor at definition count \
+         zero, while the unmarked seed reaches the same builder and resolves nothing, three \
+         marker causes never reach it, and two source-shape causes reach it and resolve \
+         nothing -- rows {no_arrival:?} and {arrived_empty:?}"
+    );
+
+    // ---- the pre-emission seat, per positive, on its own root.
+    ordinary_refusal(&exact_error, "exact");
+    ordinary_refusal(&rehomed_error, "re-homed");
+
+    // ---- production must agree with the INDEPENDENT planner derivation, per cause.
+    let exact_planner = planner_plane(D2jCause::Exact);
+    let rehomed_planner = planner_plane(D2jCause::ReHomed);
+    assert_eq!(
+        (exact.keys.as_slice(), exact.descriptors.as_slice()),
+        (exact_planner.observed_keys(), exact_planner.observed_descriptors()),
+        "the applied exact root must resolve the SAME complete key and descriptor through the \
+         production compile as the planner controls derive from it"
+    );
+    assert_eq!(
+        (rehomed.keys.as_slice(), rehomed.descriptors.as_slice()),
+        (rehomed_planner.observed_keys(), rehomed_planner.observed_descriptors()),
+        "and the bare re-homed root likewise, against ITS own planner derivation"
+    );
+
+    // ---- non-aliasing, by whole keys and never by id (AC-6c).
+    assert_ne!(
+        exact.keys, rehomed.keys,
+        "the two roots describe different programs, so their complete keys must differ -- \
+         established by the keys themselves, never by an id inequality, since the two planes \
+         are independent interners that both lawfully issue local id 0"
+    );
+}
+
 #[test]
 fn px8j_selected_scope_partitions_differ_across_the_real_return_hole() {
     let before = host_result_closure_match(px8j_equal_payload_hole_placement(

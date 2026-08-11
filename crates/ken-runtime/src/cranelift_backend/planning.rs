@@ -14,6 +14,17 @@ use crate::{RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeProg
 mod static_transition;
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
+/// `D2f` Deliverable 0 — the resolved plane's observation types, so a control
+/// downstream of a production compile can state which key resolved.
+#[cfg(test)]
+pub(in crate::cranelift_backend) use static_transition::{
+    StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
+};
+/// `D2f` Deliverable 0 — THE shared checked-witness fixture constructor.
+#[cfg(test)]
+pub(in crate::cranelift_backend) use static_transition::{
+    d2j_checked_fixture_under, D2jCause, D2J_DECLARATION,
+};
 pub(super) use static_transition::plan_static_transition_graph_with_symbols;
 #[cfg(test)]
 pub(super) use static_transition::{

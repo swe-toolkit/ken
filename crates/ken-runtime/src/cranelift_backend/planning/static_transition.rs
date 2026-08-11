@@ -8873,6 +8873,27 @@ impl StaticContinuationFusionPlan {
         self.keys.len()
     }
 
+    /// `D2f` Deliverable 0 — READ-ONLY observation of what this plane resolved.
+    ///
+    /// **Not a re-opening of the identity plane.** Key derivation, the slot-role
+    /// derivation, interning and the re-derivation validator are untouched;
+    /// these hand back what `intern` already stored so a control downstream of
+    /// a production compile can state *what* resolved rather than only *how
+    /// many*. The gate needs the key itself: "exactly one key" and "the
+    /// production path resolved the same key the planner controls derive" are
+    /// claims a count cannot carry.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn observed_keys(&self) -> &[StaticContinuationFusionKey] {
+        &self.keys
+    }
+
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn observed_descriptors(
+        &self,
+    ) -> &[StaticContinuationFusionDescriptor] {
+        &self.descriptors
+    }
+
     fn is_empty(&self) -> bool {
         self.keys.is_empty()
     }
@@ -11231,6 +11252,28 @@ pub(in crate::cranelift_backend) fn ac4_route_counts() -> (usize, usize) {
 }
 
 impl<'src> StaticTransitionPlan<'src> {
+    /// `D2f` Deliverable 0 — the generated-definition population, observed.
+    ///
+    /// **Zero until the emitter exists**, and that is exactly what the gate
+    /// pins: the checked witness reaches plane `1` while this stays `0`, so the
+    /// later `0 -> 1` movement is a statement about emission rather than about
+    /// the plane. Counting descriptors carrying the fusion definition is the
+    /// independent read -- it comes from the ABI plane, not from the fusion
+    /// plane the same compile resolved.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn observed_fusion_definition_count(&self) -> usize {
+        self.abi
+            .descriptors
+            .iter()
+            .filter(|descriptor| {
+                matches!(
+                    descriptor.definition,
+                    AbiUnitDefinition::StaticContinuationFusion { .. }
+                )
+            })
+            .count()
+    }
+
     /// Planner-private source lookup for pre-allocation derivations.
     ///
     /// This intentionally does not increment `AC4_RESOLUTIONS`: that counter
@@ -14862,6 +14905,11 @@ pub(in crate::cranelift_backend) fn governed_nested_resource_bracket(depth: usiz
 #[cfg(test)]
 pub(in crate::cranelift_backend) use tests::contspec_nested_fixture;
 
+/// `D2f` Deliverable 0 — the shared checked-witness fixture, re-exported so the
+/// full-compile gate consumes the very constructor the planner controls do.
+#[cfg(test)]
+pub(in crate::cranelift_backend) use tests::{D2J_DECLARATION, D2jCause, d2j_checked_fixture_under};
+
 #[cfg(test)]
 mod tests {
     use super::abi::{AbiCarrier, AbiSlot, AbiSlotKind};
@@ -15627,7 +15675,7 @@ mod tests {
     // These are hand-derived from that convention, not read back out of the
     // collector.
 
-    const D2J_DECLARATION: &str = "decl:fixture::d2j";
+    pub(in crate::cranelift_backend) const D2J_DECLARATION: &str = "decl:fixture::d2j";
 
     /// `D2j` — the source-side causes, each a variant of ONE witness family.
     ///
@@ -15641,7 +15689,7 @@ mod tests {
     /// does not fire.
     #[cfg(test)]
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    enum D2jCause {
+    pub(in crate::cranelift_backend) enum D2jCause {
         Exact,
         /// The frame marker's identity no longer matches the plan's frame.
         Frame,
@@ -15882,9 +15930,55 @@ mod tests {
     }
 
     #[cfg(test)]
-    fn d2j_entry() -> RuntimeExpr {
-        RuntimeExpr::DeclarationRef {
+    /// The entry for one cause. **The root family is PER CAUSE** — Architect
+    /// `evt_4trsqtkxtghjx`.
+    ///
+    /// Every cause that keeps the declaration's `params: ["a", "b"]` gets the
+    /// **ABI-applied** root, because the governing invariant is one end-to-end
+    /// *program*: the complete key carries positional and provenance facts
+    /// derived from the planned program, and a bare `DeclarationRef` stops at
+    /// `Unsupported(Closure)` in root projection, so it cannot state the
+    /// emission contract at all.
+    ///
+    /// **`ReHomed` is the explicit exception, and it is not a special case
+    /// of convenience.** That cause *removes* the outer `LexicalClosure`, so the
+    /// re-homed program has ZERO ABI inputs. Applying two `Unit`s to it builds
+    /// an **ill-typed program**, and the `Unsupported(Call, "callee is not a
+    /// closure")` that follows would be evidence about this harness rather than
+    /// about fusion.
+    ///
+    /// **The branch is on the cause, never on the mutated body.** Inferring the
+    /// root by inspecting the source would let the entry contract drift silently
+    /// along with a malformed mutation; an explicit arm keeps it reviewable.
+    /// Every arm is spelled out so a new cause is a compile error here rather
+    /// than an inherited default.
+    #[cfg(test)]
+    fn d2j_entry_under(cause: D2jCause) -> RuntimeExpr {
+        let bare = || RuntimeExpr::DeclarationRef {
             symbol: D2J_DECLARATION.to_string(),
+        };
+        let applied = || RuntimeExpr::Call {
+            callee: Box::new(bare()),
+            args: vec![
+                RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+                    args: Vec::new(),
+                },
+                RuntimeExpr::Construct {
+                    constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+                    args: Vec::new(),
+                },
+            ],
+        };
+        match cause {
+            D2jCause::ReHomed => bare(),
+            D2jCause::Exact
+            | D2jCause::Frame
+            | D2jCause::SelectedSlot
+            | D2jCause::Invocation
+            | D2jCause::ExactSuffix
+            | D2jCause::CallIdentity
+            | D2jCause::ProducerArity => applied(),
         }
     }
 
@@ -16044,12 +16138,13 @@ mod tests {
     /// derivation, and it is tested as exactly what it is -- see below.
     #[test]
     fn d2j_every_member_matches_its_authoritative_planner_fact() {
-        let declaration = d2j_declaration(true);
-        let entry = d2j_entry();
+        // REBASELINED onto the cause-selected root. Every coordinate below is
+        // re-derived from THIS entry; none is transported from the bare-root
+        // revision of this control.
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
         let mut declarations = BTreeMap::new();
         declarations.insert(D2J_DECLARATION, &declaration);
         let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
-        let oriented = d2j_oriented_plan();
         let candidates =
             enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
                 .expect("enumerates");
@@ -16522,22 +16617,27 @@ mod tests {
     /// compares an id across them.
     #[test]
     fn d2j_the_segment_owner_re_home_is_provenance_and_non_aliasing() {
-        let entry = d2j_entry();
-
-        let exact_declaration = d2j_declaration_under(D2jCause::Exact);
+        // REBASELINED, and the two sides no longer share a root. The sharing
+        // invariant is PER CAUSE: `Exact` is the ABI-applied program, `ReHomed`
+        // is the bare one, because that cause removes the outer closure and has
+        // zero ABI inputs. Sharing one root here would have measured one of the
+        // two against a program it does not describe.
+        let (exact_entry, exact_declaration, exact_oriented) =
+            d2j_checked_fixture_under(D2jCause::Exact);
         let mut exact_declarations = BTreeMap::new();
         exact_declarations.insert(D2J_DECLARATION, &exact_declaration);
         let exact_plan =
-            plan_static_transition_graph(&entry, &exact_declarations).expect("plannable");
+            plan_static_transition_graph(&exact_entry, &exact_declarations).expect("plannable");
         let exact_plane = build_static_continuation_fusion_plan(
             &exact_plan,
-            &entry,
+            &exact_entry,
             &exact_declarations,
-            Some(&d2j_oriented_plan_under(D2jCause::Exact)),
+            Some(&exact_oriented),
         )
         .expect("the exact witness builds");
 
-        let rehomed_declaration = d2j_declaration_under(D2jCause::ReHomed);
+        let (entry, rehomed_declaration, rehomed_oriented) =
+            d2j_checked_fixture_under(D2jCause::ReHomed);
         let mut rehomed_declarations = BTreeMap::new();
         rehomed_declarations.insert(D2J_DECLARATION, &rehomed_declaration);
         let rehomed_plan =
@@ -16546,7 +16646,7 @@ mod tests {
             &rehomed_plan,
             &entry,
             &rehomed_declarations,
-            Some(&d2j_oriented_plan_under(D2jCause::ReHomed)),
+            Some(&rehomed_oriented),
         )
         .expect("the re-home still builds; nothing about transport changed");
 
@@ -16631,17 +16731,56 @@ mod tests {
         );
     }
 
+    /// `D2f` Deliverable 0 — THE ONE fixture constructor, shared by the
+    /// planner controls in this module and the full-compile gate in
+    /// `lowering::core`'s controls.
+    ///
+    /// **It exists so the two cannot drift.** `D2f`'s gate has to establish
+    /// that the checked witness reaches a resolved plane through the *production*
+    /// compile, and that claim is only about the same witness the planner
+    /// controls measure if both consume one constructor. A duplicated or
+    /// re-hand-wrapped fixture would let the planner side stay green while the
+    /// production side measured a different program — which is the exact defect
+    /// that made the old `px8j` binding unsatisfiable.
+    ///
+    /// Returns the entry, the transparent declaration, and the independently
+    /// authored plan **for one cause**, together, because a caller that took
+    /// them from three separate calls could mix causes.
+    ///
+    /// **The sharing invariant is PER CAUSE** — Architect `evt_4trsqtkxtghjx`.
+    /// One fixture means one *cause-aware* constructor, not one identical root
+    /// across causes that deliberately change callable arity. Planner,
+    /// production-gate and emitter controls for `Exact` all consume the same
+    /// applied object; those for `ReHomed` all consume the same bare object.
+    /// **Different causes are not required to share an outer root**, and
+    /// `d2j_entry_under` is where that family is decided.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn d2j_checked_fixture_under(
+        cause: D2jCause,
+    ) -> (
+        RuntimeExpr,
+        crate::RuntimeDeclaration,
+        crate::OrientedSubcontinuationPlanV1,
+    ) {
+        (
+            d2j_entry_under(cause),
+            d2j_declaration_under(cause),
+            d2j_oriented_plan_under(cause),
+        )
+    }
+
     /// Build the plane for one cause: mutated source, correct plan.
     #[cfg(test)]
     fn d2j_plane_under(
         cause: D2jCause,
     ) -> Result<StaticContinuationFusionPlan, CraneliftBackendError> {
-        let declaration = d2j_declaration_under(cause);
-        let entry = d2j_entry();
+        // Through the SHARED constructor, so this plane and the full-compile
+        // gate are measurements of one witness rather than two that resemble
+        // each other.
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
         let mut declarations = BTreeMap::new();
         declarations.insert(D2J_DECLARATION, &declaration);
         let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
-        let oriented = d2j_oriented_plan_under(cause);
         build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
     }
 
@@ -16690,12 +16829,11 @@ mod tests {
         );
 
         // The parameterised witness: the same candidate, with inputs to project.
-        let declaration = d2j_declaration(true);
-        let entry = d2j_entry();
+        // REBASELINED onto the cause-selected applied root.
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
         let mut declarations = BTreeMap::new();
         declarations.insert(D2J_DECLARATION, &declaration);
         let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
-        let oriented = d2j_oriented_plan();
         let candidates =
             enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
                 .expect("enumerates");
