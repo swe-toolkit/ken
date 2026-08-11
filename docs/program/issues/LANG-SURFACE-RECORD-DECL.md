@@ -172,3 +172,31 @@ comes last and changes no call site. **`classes()` is a deletion gate, not a
 compatibility API** — its required doc comment says so, and a candidate omitting
 that sentence was blocked (`dec_5cgh7x06txz16`, rejected) precisely so the broad
 raw-map view cannot fossilize.
+
+### TRACKED REMAINING WORK — delete `ClassEnv::classes()` before records land
+
+**This node does not close while that accessor exists.** Recorded as live
+remaining work rather than only as prose, on an adversary finding
+(`evt_cfzgvy0512yw`) that named the structural reason:
+
+> **The deletion obligation was recorded only in the doc comment of the item
+> being deleted.** When `classes()` goes, its comment goes with it — so that
+> sentence can never be what *reminds* anyone. It is readable only by someone
+> who has already found the accessor.
+
+⇒ **The risk is fossilization, and fossilization is exactly the case where
+nobody goes looking.** A broad raw-map accessor outlives its slice precisely
+because no one is reading its doc comment. **A gate whose only statement lives at
+the point of work does not fire**; this one has to sit where a node status check
+sees it.
+
+**Closure condition:** `classes()` is deleted, and its caller census is zero. The
+Architect's order puts that after `S2..Sn` migrate consumers to the
+storage-independent views (`class`, `projection_by_type_id`, `class_entries`) and
+after the storage flip — **it is a deletion gate, not a compatibility API to
+preserve.**
+
+**Also owed and not yet measured:** the seven test/support paths were **outside**
+the adversary's `src/`-only census. A direct `.classes` field read there is not a
+truth-source risk, but **it would block the field's deletion**, so the census
+that clears this must cover them.
