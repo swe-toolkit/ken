@@ -582,6 +582,13 @@ pub struct LetBinding {
     pub span: Span,
 }
 
+#[derive(Clone, Debug)]
+pub struct RecordExprField {
+    pub name: String,
+    pub value: Expr,
+    pub name_span: Span,
+}
+
 /// A surface expression (`39 §5.2`, `21 §6.1`).
 #[derive(Clone, Debug)]
 pub enum Expr {
@@ -627,6 +634,11 @@ pub enum Expr {
     /// `(a, b, c)` — a pair literal retaining its written arity. Elaboration
     /// right-nests the components into binary kernel `Pair` terms.
     EPair(Vec<Expr>, Span),
+    ERecord {
+        base: Option<Box<Expr>>,
+        fields: Vec<RecordExprField>,
+        span: Span,
+    },
     /// `e.field` — Σ-record field projection (`33 §5.2` η) on a class
     /// instance/dictionary value. Postfix, lowest-binding-atom precedence;
     /// only fires on a non-`ConId`-headed base (a `ConId`-headed dotted
@@ -683,6 +695,7 @@ impl Expr {
             | Expr::EBinOp(_, _, _, s)
             | Expr::EIf { span: s, .. }
             | Expr::EPair(_, s)
+            | Expr::ERecord { span: s, .. }
             | Expr::EProj(_, _, s)
             | Expr::EPosProj(_, _, s) => s,
             Expr::EMatch { span, .. } => span,

@@ -573,6 +573,15 @@ fn collect_expr_spans(expr: &Expr, out: &mut Vec<Span>) {
         Expr::EPair(components, _) => components
             .iter()
             .for_each(|component| collect_expr_spans(component, out)),
+        Expr::ERecord { base, fields, .. } => {
+            if let Some(base) = base {
+                collect_expr_spans(base, out);
+            }
+            for field in fields {
+                out.push(field.name_span.clone());
+                collect_expr_spans(&field.value, out);
+            }
+        }
         Expr::ELet(bindings, body, _) => {
             for binding in bindings {
                 out.push(binding.span.clone());

@@ -819,6 +819,123 @@ fn check_pair(
     Ok(Term::pair(first, tail))
 }
 
+fn check_record(
+    cx: &mut ElabCtx<'_>,
+    base: Option<&RExpr>,
+    fields: &[(String, RExpr, Span)],
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let (owner_id, head_arg) = match expected {
+        Term::App(f, a) => match f.as_ref() {
+            Term::Const { id, .. } => (*id, Some((**a).clone())),
+            _ => {
+                return Err(ElabError::TypeMismatch {
+                    span: span.clone(),
+                    reason: "record literal requires an expected named-field owner type".into(),
+                })
+            }
+        },
+        Term::Const { id, .. } => (*id, None),
+        _ => {
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "record literal requires an expected named-field owner type".into(),
+            })
+        }
+    };
+    let class_env = cx.class_env.ok_or_else(|| ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "record literal is unavailable in this elaboration context".into(),
+    })?;
+    let projection = class_env
+        .projection_by_type_id(owner_id)
+        .ok_or_else(|| ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "record literal expected type is not a known named-field owner".into(),
+        })?;
+    let owner_name = projection.owner_name.to_string();
+    let field_names = projection.field_names.to_vec();
+    let field_types = projection.field_types.to_vec();
+    let record_nil_val_id = class_env.record_nil_val_id;
+    let mut seen = HashMap::<String, Span>::new();
+    for (name, _, name_span) in fields {
+        if seen.insert(name.clone(), name_span.clone()).is_some() {
+            return Err(ElabError::TypeMismatch {
+                span: name_span.clone(),
+                reason: format!("duplicate field '{name}' for record '{owner_name}'"),
+            });
+        }
+        if !field_names.iter().any(|declared| declared == name) {
+            return Err(ElabError::UnresolvedCon {
+                name: format!("{owner_name}.{name}"),
+                span: name_span.clone(),
+            });
+        }
+    }
+    if base.is_none() {
+        if let Some(missing) = field_names.iter().find(|name| !seen.contains_key(*name)) {
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: format!("record '{owner_name}' literal is missing field '{missing}'"),
+            });
+        }
+    }
+    let base_core = base
+        .map(|base| check(cx, base, expected, base.span()))
+        .transpose()?;
+    let mut values = Vec::new();
+    for (index, name) in field_names.iter().enumerate() {
+        let mut args = Vec::new();
+        if let Some(head) = &head_arg {
+            args.push(head.clone());
+        }
+        args.extend(values.iter().cloned());
+        let field_expected = subst_tel(&field_types[index], &args);
+        let value = if let Some((_, expr, _)) = fields.iter().find(|(given, _, _)| given == name) {
+            check(cx, expr, &field_expected, expr.span())?
+        } else {
+            let mut projected = base_core.clone().expect("update base established");
+            for _ in 0..index {
+                projected = Term::proj2(projected);
+            }
+            Term::proj1(projected)
+        };
+        values.push(value);
+    }
+    Ok(build_pair_chain(&values, record_nil_val_id))
+}
+
+fn check_positional_named_record(
+    cx: &mut ElabCtx<'_>,
+    components: &[RExpr],
+    expected: &Term,
+    span: &Span,
+) -> Option<Result<Term, ElabError>> {
+    let owner_id = match expected {
+        Term::App(f, _) => match f.as_ref() {
+            Term::Const { id, .. } => *id,
+            _ => return None,
+        },
+        Term::Const { id, .. } => *id,
+        _ => return None,
+    };
+    let names = cx
+        .class_env?
+        .projection_by_type_id(owner_id)?
+        .field_names
+        .to_vec();
+    if names.len() != components.len() {
+        return None;
+    }
+    let fields = names
+        .into_iter()
+        .zip(components.iter().cloned())
+        .map(|(name, value)| (name, value, span.clone()))
+        .collect::<Vec<_>>();
+    Some(check_record(cx, None, &fields, expected, span))
+}
+
 fn infer_pair(
     cx: &mut ElabCtx<'_>,
     components: &[RExpr],
@@ -841,7 +958,16 @@ fn infer_pair(
 
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
     match expr {
-        RExpr::RPair(components, span) => check_pair(cx, components, expected, span),
+        RExpr::RPair(components, span) => {
+            if let Some(result) = check_positional_named_record(cx, components, expected, span) {
+                result
+            } else {
+                check_pair(cx, components, expected, span)
+            }
+        }
+        RExpr::RRecord { base, fields, span } => {
+            check_record(cx, base.as_deref(), fields, expected, span)
+        }
         RExpr::RIf {
             condition,
             then_branch,
@@ -3232,6 +3358,10 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         }
 
         RExpr::RPair(components, span) => infer_pair(cx, components, span),
+        RExpr::RRecord { span, .. } => Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "cannot infer record literal type without an expected named record type".into(),
+        }),
 
         RExpr::RPi(_, a, b, span) => infer_pi(cx, a, b, span),
 
@@ -4636,6 +4766,16 @@ fn infer_expr_row_type(
             .fold(crate::effects::RowType::empty(), |row, component| {
                 row.join(infer_expr_row_type(component, effect_rows, projection_ctx))
             }),
+        RExpr::RRecord { base, fields, .. } => {
+            let mut row = base
+                .as_deref()
+                .map(|base| infer_expr_row_type(base, effect_rows, projection_ctx))
+                .unwrap_or_else(crate::effects::RowType::empty);
+            for (_, value, _) in fields {
+                row = row.join(infer_expr_row_type(value, effect_rows, projection_ctx));
+            }
+            row
+        }
         RExpr::RPosProj(e, _, _) => infer_expr_row_type(e, effect_rows, projection_ctx),
         RExpr::RProj(e, field, _) => infer_expr_row_type(e, effect_rows, projection_ctx)
             .join(projected_field_row_type(e, field, projection_ctx)),
@@ -6801,6 +6941,13 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RPair(components, _) => components
             .iter()
             .any(|component| rexpr_mentions_name(component, name)),
+        RExpr::RRecord { base, fields, .. } => {
+            base.as_deref()
+                .is_some_and(|base| rexpr_mentions_name(base, name))
+                || fields
+                    .iter()
+                    .any(|(_, value, _)| rexpr_mentions_name(value, name))
+        }
         RExpr::RPosProj(e, _, _) => rexpr_mentions_name(e, name),
         RExpr::RProj(e, _, _) => rexpr_mentions_name(e, name),
         // The domain is a `type`, not an `RExpr` — a mutual-recursion call

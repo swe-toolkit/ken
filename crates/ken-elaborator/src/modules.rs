@@ -964,6 +964,18 @@ fn rewrite_rexpr(
                 .collect::<Result<Vec<_>, _>>()?,
             span,
         ),
+        RExpr::RRecord { base, fields, span } => RExpr::RRecord {
+            base: base
+                .map(|base| rewrite_rexpr(scope, exports, *base).map(Box::new))
+                .transpose()?,
+            fields: fields
+                .into_iter()
+                .map(|(name, value, name_span)| {
+                    Ok((name, rewrite_rexpr(scope, exports, value)?, name_span))
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
+            span,
+        },
         RExpr::RPosProj(e, index, span) => {
             RExpr::RPosProj(Box::new(rewrite_rexpr(scope, exports, *e)?), index, span)
         }
