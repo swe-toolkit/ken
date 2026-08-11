@@ -146,3 +146,41 @@ fixtures or a report.
 **`D1` worked as designed.** It was written as a gate that could resize the
 node and it returned "the sizing survives, for a reason nobody had" — which is
 a better outcome than agreement, and the reason the deliverable was a gate.
+
+## Post-merge adversary pass — what it covered, and what it did NOT
+
+**Structural pass at `evt_6tfhakf962cer`, measured on `76dd2022`. No finding.**
+Recorded here rather than left in the thread, because **a merge with a clean
+adversary pass reads as swept unless the unswept surface is written down.**
+
+**What it closed.** The Steward's notified gap was whether every path into the
+new decoder reaches it through a sealed store. `decode_invocation_ground` has
+**exactly one production caller** — `compiled.rs:213`, with
+`.finish(&mut store, None)` immediately above it — and twenty test call sites,
+all inside the `#[cfg(test)]` module. ⇒ The enumeration closes at the **caller
+count**, not at an argument, which is stronger than checking the argument at
+each site.
+
+**The residual that was considered and deliberately not filed.** The seal is a
+**caller-side invariant**: the decoder's signature does not require a sealed
+store, `adopt` refuses one at runtime. A future second production caller could
+therefore omit it. Not filed, on two grounds — it is findable in **one
+permanent grep** while the production caller count stays at one, and it **fails
+loudly** (`BOUNDARY_ERR_SEALED`, which is how the ring's own control found the
+ordering) rather than adopting silently. **Fail-closed in the direction that
+matters.**
+
+**UNHUNTED, and that is not the same as clear.** The pass executed nothing and
+read only the ordering at the single production site. It did **not** examine:
+
+- the iterative traversal;
+- the grey/black cycle handling;
+- the node-admission predicate;
+- the identity resolution through `carrier_symbol`;
+- whether the written-out arms actually exhaust `BoundaryTag`'s variants — the
+  claim that a new tag is now a compile error here was taken from the handback,
+  **not verified by counting arms against the enum.**
+
+⇒ **Those five are the merge's substance.** They were gated by QA and the
+Architect, which is the real assurance; the adversary pass adds nothing to them
+and must not be read as if it did.
