@@ -337,6 +337,38 @@ restored byte-identically.
 structural prerequisites, zero rows — stated here because the merge count is
 what a later reader will otherwise use to size this node.
 
+### The arrival proof rests on the CALL SITE, and nothing says so. Fold into `D0`.
+
+Adversary `evt_23zyn4pywy6yg`, measured on `446c3e79`. **The vector-shape
+argument holds** — `d2f_note_production_fusion_plane` has one writer
+(`core.rs:444`) and one call site (`core.rs:2057`), and **the call is
+unconditional**. So a reached compile pushes exactly one element (possibly `0`)
+and an unreached compile pushes nothing, which is what makes `planes.len()`
+discriminate arrival from non-arrival.
+
+**The durability defect: that reason is not written beside the thing it
+protects.** The comment at `:2053-2055` explains why the observation is the
+consumer; **it does not say that the unconditional push is what makes `len()`
+discriminate.**
+
+⇒ **Pushing a `0` looks pointless in isolation**, so `if !static_continuation_`
+`fusion_plan.is_empty() { … }` is a plausible tidy. It would silently convert
+the control from *"the path was reached"* into *"the path resolved something"*
+and make the `expect` **panic on a legal empty resolution** — which is exactly
+the state this witness is in.
+
+**Disposition: one sentence at `:2057`, folded into `D2f` Deliverable 0.** No new
+node, no re-review of `aa3b78f8`. Same file family, active ring, and it is
+cheaper than the grep that found it.
+
+**Also fold: record where the "sole production compile path" claim is
+established.** That question has been open across all three `D2f` partials. The
+enumeration was performed once by the implementer during grounding and lives
+only in a retro, so it currently reads as asserted. **Deliverable 0 measures
+arrival counts, which is not the same claim** — arrival-is-one does not establish
+that only one production call site exists. Record the caller enumeration beside
+the control.
+
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
 **DISCHARGED 2026-08-11** by the `D2f` ABI-class partial above, which carries
