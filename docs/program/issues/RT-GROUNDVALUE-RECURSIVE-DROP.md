@@ -1,6 +1,6 @@
 ---
 id: RT-GROUNDVALUE-RECURSIVE-DROP
-title: "`RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a 50,000-deep aggregate decodes without a host frame and then overflows the stack in `drop`, which means the bound belongs to the value type and not to any decoder that returns it"
+title: "`RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a deeply nested value overflows the stack in its own `drop`, reproducible without the decoder, and the depth at which that happens is UNMEASURED: the two numbers in the source report are an observed abort and a deliberately-safe control, not a bisected threshold"
 status: draft
 owner: runtime
 size: unknown
@@ -47,17 +47,52 @@ so fixing it inside one consumer would be the wrong layer.
 merges and its thread takes no further posts; a finding left there is
 unreachable by anyone who does not already know it exists.
 
-## What is NOT established
+## NEITHER NUMBER ABOVE IS A THRESHOLD
 
-- **Whether this matters in practice.** Nobody has shown that a legitimate
-  program produces a ground value deep enough to overflow on drop. The observed
-  overflow was a control constructed to probe the traversal, not a workload.
+**Corrected by runtime-implementer at `evt_2etrw0xrbv8yq`, before this node
+could inherit them as sized.**
+
+- **50,000 is where the overflow was observed. It is not a measured limit** —
+  it was the first number picked, and it happened to be past the edge.
+- **64 is the successful depth in the committed control. It is not a measured
+  ceiling either** — it was chosen to be obviously safe after the abort, with
+  no approach to the edge.
+
+**No bisect was run, so the depth at which a successful decode overflows in
+`drop` is UNKNOWN.** Nothing in the evidence distinguishes a ceiling near 100
+from one near 40,000.
+
+## The first work is a bisect, and it decides whether this node is real
+
+**That unknown is the whole question, and my earlier framing of it was wrong.**
+This node previously said the issue was whether "a legitimate program reaches
+the ceiling", which quietly assumed the ceiling sits somewhere near 50,000. **It
+is not a question about how deep programs get — it is a question about where the
+ceiling is.** If it turns out to be a few hundred, the node changes character
+entirely.
+
+**A bisect is one cheap run against the value type.** It needs no decoder
+involvement, and it should be the first thing done here.
+
+## Two facts recorded so they are not re-derived
+
+- **The overflow is reproducible WITHOUT the decoder.** Construct a deeply
+  nested `RuntimeGroundValue` directly and let it fall out of scope; the
+  recursion is in its `drop`.
+- **`decode_invocation_ground`'s own cost is worse than the type's, and that is
+  the decoder's shape rather than the type's.** Each level clones its child's
+  decoded value into the parent while the child stays in the postorder map for
+  sharing, so a chain costs **O(n²) in data** as well as O(n) in drop depth.
+  Fair to fix at that decoder **if** this node ever wants the depth raised —
+  and not otherwise.
+
+## Also not established
+
 - **What the fix would be, or whether there should be one.** An iterative
   `Drop`, a depth cap with a refusal, or a non-recursive representation are all
-  shapes someone could propose; none has been costed and this node does not
-  prefer one.
+  shapes someone could propose; none has been costed and this node prefers
+  none.
 - **Whether other recursive runtime types have the same ceiling.** Not swept.
 
-**Do not size or schedule this from the prose above.** The first work is
-deciding whether the ceiling is reachable by a real program — if it is not,
-recording that answer is the whole node.
+**Do not size or schedule this from the prose above.** Run the bisect first;
+the answer decides whether anything follows it.

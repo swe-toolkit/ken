@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-11 11:26:51Z — from 225 issue file(s) in `docs/program/issues/`.
+2026-08-11 11:42:02Z — from 225 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -206,7 +206,7 @@ the committed file matches the generator's output.
 | `RT-FNSPLIT-RECUR-PORT` | emission-port completion — the governed nested-bracket family (recursive ComputationalMatch + trap arms) must select FunctionizedUnits, so RT-SCALE-B can measure the completed population | merged | runtime | XL | none | — |
 | `RT-FNUNIT-RESULT-TOKEN` | Broad starter shapes fail the result-token table on the FunctionizedUnits lane — pre-existing, unmasked by retiring SeedClosureCall | active | runtime | M | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |
-| `RT-GROUNDVALUE-RECURSIVE-DROP` | `RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a 50,000-deep aggregate decodes without a host frame and then overflows the stack in `drop`, which means the bound belongs to the value type and not to any decoder that returns it | draft | runtime | unknown | none | — |
+| `RT-GROUNDVALUE-RECURSIVE-DROP` | `RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a deeply nested value overflows the stack in its own `drop`, reproducible without the decoder, and the depth at which that happens is UNMEASURED: the two numbers in the source report are an observed abort and a deliberately-safe control, not a bisected threshold | draft | runtime | unknown | none | — |
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
 | `RT-JOIN-ORIGIN-ATTRIBUTION` | A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong | merged | runtime | S | none | — |
 | `RT-LEXICAL-RECURSOR-CONSUMERS` | Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam | active | runtime | M | none | — |
