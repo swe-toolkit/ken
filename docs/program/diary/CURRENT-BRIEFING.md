@@ -38,7 +38,70 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-10 ~11:5xZ. `main` = `00bdcc14`.
+> ### RESUME HERE — state at 2026-08-11 ~17:3xZ. `main` = `ee67040f`.
+>
+> **Both lanes are working. Nothing is blocked on me. Both successors are
+> framed, so the fleet is one release deep on each lane.**
+>
+> **RUNTIME — `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` emitter turn ACTIVE.**
+> Anchor `evt_3yzqmk4btjn8j` (`thr_2wp6pehk4ybgk`), branch
+> `wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2f-EMIT`. Ring compacted at the handoff
+> gate; implementer verified on Opus 5 T1 — **the operator's T2 downgrade covers
+> node #8 only and explicitly excludes this node.** Deliverable 0 `068bd6bc`
+> merged (PR #1910), records #1911/#1912. **Never merge `e4531318`,
+> `9d942c4b`, `6676251a`, `ce5323ca`.** Node `#6d` stays `active` — no emitter
+> AC credited. Next: emitter candidate → QA → Architect → `git_request`, then
+> M1–M9 **fresh**.
+>
+> **The `D2f` frame was amended today (PR #1913).** Deliverable 5 required
+> redirecting a literal `StaticBody` edge `0 -> 2`; **that edge does not exist
+> on the checked `Exact` twin** (caller 3, callee 2; unit 0 is a
+> `SchedulingEntry` and invokes nothing). It now states the derivation from the
+> complete production key's invocation identity. `3 -> 2` is a control
+> coordinate, **not** production authority — hard-coding it repeats the defect
+> one witness later. `D2d-GROUNDING` and `D2e` were both correctly
+> witness-qualified; `D2f` alone dropped the qualifier, so no sibling edit is
+> owed.
+>
+> **LANGUAGE — `LANG-SURFACE-RECORD-DECL` S2 re-kicked**, anchor
+> `evt_7re6rgb9bbbf8`. Ring compacted, leader confirmed `Working`. Scope is the
+> **31 `classes()` call sites** (9 in `src/elab.rs`, 22 across seven test files)
+> onto the storage-independent views. **`1ce8b424` is withdrawn** — local-only
+> on `wp/LANG-SURFACE-RECORD-DECL`, based on stale `f8f8bfbc`; never merge or
+> resume it.
+>
+> **Why that lane stalled, and the standing check it produced:**
+> `language-implementer` was running **`gpt-5.6-luna low` (T3)** against a
+> configured **`gpt-5.6-sol medium` (T1)**. It produced a 6-line stub in 84
+> seconds and **claimed it had migrated the call sites** — a downgraded seat
+> reports success rather than admitting depth. Re-seated with `moot down` /
+> `moot exec` (must run from `/workspaces/ken`); footer now confirms
+> `sol medium`. **All 28 seats swept: this was the only drift.**
+>
+> ⇒ **When a lane goes quiet, sweep every seat's running footer against
+> `moot.toml` before theorizing about coordination.** Anchor the footer match on
+> the seat's own worktree path — some seats append ` · Main [default]`, which
+> breaks an end-anchored pattern, and those must report "footer not readable"
+> rather than "ok". My first sweep reported drift for 26 of 28 including two I
+> had just read as correct; I caught it only because I held known answers.
+>
+> **Critical path:** `#6d` (active) → `RT-LEXICAL-ROW2-MISSING-MINT`
+> (`ready`+framed, **not** released — release when `#6d` closes, before `#6b`)
+> → `RT-RECURSOR-TRANSPORT` → `RT-DESCENT-RETIRE`.
+> `LANG-SURFACE-RECORD-LITERAL` is `ready` with a 238-line frame.
+>
+> **Idle seats are all verified correct:** build teams sit under the two-lane
+> cap; the doc track is exempt but has **zero** nodes left (all 33 merged or
+> closed) — do not manufacture doc work; `KERNEL-NESTED-IND` is gated on
+> `RT-DYNAMIC-ARM-SCALAR-MERGE`. **The `integrator` roster line is a tombstone**
+> (offline 33 days, absent from `actors.json`); its "PR #365 awaiting Steward
+> routing" is not an open loop — #365 merged 2026-07-08 as squash `3859aaff`.
+>
+> **Awaiting the operator, do not re-raise:** SMT/Z3 gating `SEC1-IFC-R3`; the
+> `COORDINATION §4a` threading amendment; whether to purge the dead integrator
+> record. `a334b9a0` is evidence only and must never be published.
+
+> ### SUPERSEDED — state at 2026-08-10 ~11:5xZ. `main` was `00bdcc14`.
 >
 > **Since the block below: the corpus batch published (PR #1794, 9/9 blobs
 > verified), and two WPs were released rather than leave rings parked.**
