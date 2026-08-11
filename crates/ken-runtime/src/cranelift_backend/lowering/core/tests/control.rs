@@ -2044,6 +2044,16 @@ fn px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind() {
 /// today — this witness plans no admitted fusion — so the assertion is on
 /// arrival, and the resolved sizes are recorded rather than pinned.
 ///
+/// **There is no count equality here, and its absence is the point.** The
+/// first cut of this control asserted `planes.len() == reached.get()` where
+/// `reached` was built from `planes.len()` -- a tautology that read as a
+/// two-population relation. An equality between counters is a measurement only
+/// when its two sides come from **different reads**; this control has one read,
+/// so the `expect` is the entire content. A second counter added to restore the
+/// equality's shape would be cosmetic. The equality becomes real once a fusion
+/// resolves, because builder arrival and resolved-fusion population are then
+/// independently meaningful quantities -- that is the moment to reinstate it.
+///
 /// **Promise class: durable invariant.** The relation asserted is "a production
 /// compile reaches the builder", which survives every intended extension; no
 /// count, size, or identity is frozen.
@@ -2057,17 +2067,17 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
         px8j_capture_source_trace(&before, false, "ken_d2f_fusion_plane_wiring");
     result.expect("the R3 before-hole witness lowers");
     let planes = crate::cranelift_backend::lowering::core::d2f_production_fusion_planes_take();
-    // THE DENOMINATOR, and it is the whole claim. Delete the production wiring
-    // and this is empty -- not merely a different size.
-    let reached = std::num::NonZeroUsize::new(planes.len()).expect(
+    // THE WHOLE CLAIM, and it is one line on purpose. Delete the production
+    // wiring and this is empty -- not merely a different size.
+    //
+    // There is deliberately NO equality here. `planes` is the only read this
+    // control performs, so any count compared against `planes.len()` would be
+    // derived from that same read and the comparison would restate the value
+    // rather than check it. Arrival IS the measurement until a fusion resolves.
+    std::num::NonZeroUsize::new(planes.len()).expect(
         "no production compile reached build_static_continuation_fusion_plan, so the fusion \
          identity plane is still test-only state and every emitter acceptance criterion rests \
          on an input that is never constructed",
-    );
-    assert_eq!(
-        planes.len(),
-        reached.get(),
-        "the recorded planes and the established arrival count must be the same population"
     );
 }
 
