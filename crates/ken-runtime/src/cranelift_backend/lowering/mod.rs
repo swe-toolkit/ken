@@ -74,7 +74,8 @@ pub(in crate::cranelift_backend) use crate::{
 pub(in crate::cranelift_backend) use super::compiled::{CompiledModule, ResultDecoder};
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
-    plan_static_transition_graph_with_symbols, validate_oriented_subcontinuation_transport,
+    build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
+    validate_oriented_subcontinuation_transport,
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
     AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
     expected_capture_slot,

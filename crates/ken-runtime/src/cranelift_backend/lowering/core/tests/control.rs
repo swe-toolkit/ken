@@ -2024,6 +2024,53 @@ fn px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind() {
         );
     }
 }
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — a PRODUCTION compile builds the
+/// fusion identity plane, and before this it never did.**
+///
+/// `D2h` landed the plane as production state under `allow(dead_code)`. Every
+/// call to `build_static_continuation_fusion_plan` was inside `#[cfg(test)]`, so
+/// the emitter's own input did not exist on any real compile — a fact invisible
+/// to `D2h`'s controls, which call the builder directly and therefore cannot
+/// distinguish "the plane is correct" from "the plane is never built".
+///
+/// ⛔ **The subject is REACHABILITY, not the plane's contents.** `D2h`'s
+/// controls own correctness and are untouched. This asserts only that the
+/// production path arrives at the builder, which is the precondition every
+/// emitter AC rests on and the one nobody had measured.
+///
+/// **The observation is a vector, not a count, and that is load-bearing.** An
+/// empty vector means production never reached the builder; a size alone cannot
+/// tell that apart from reaching it and resolving nothing. Both are legal
+/// today — this witness plans no admitted fusion — so the assertion is on
+/// arrival, and the resolved sizes are recorded rather than pinned.
+///
+/// **Promise class: durable invariant.** The relation asserted is "a production
+/// compile reaches the builder", which survives every intended extension; no
+/// count, size, or identity is frozen.
+#[test]
+fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
+    let before = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::BeforeReturnHole,
+    ));
+    let _ = crate::cranelift_backend::lowering::core::d2f_production_fusion_planes_take();
+    let (result, _trace) =
+        px8j_capture_source_trace(&before, false, "ken_d2f_fusion_plane_wiring");
+    result.expect("the R3 before-hole witness lowers");
+    let planes = crate::cranelift_backend::lowering::core::d2f_production_fusion_planes_take();
+    // THE DENOMINATOR, and it is the whole claim. Delete the production wiring
+    // and this is empty -- not merely a different size.
+    let reached = std::num::NonZeroUsize::new(planes.len()).expect(
+        "no production compile reached build_static_continuation_fusion_plan, so the fusion \
+         identity plane is still test-only state and every emitter acceptance criterion rests \
+         on an input that is never constructed",
+    );
+    assert_eq!(
+        planes.len(),
+        reached.get(),
+        "the recorded planes and the established arrival count must be the same population"
+    );
+}
+
 #[test]
 fn px8j_selected_scope_partitions_differ_across_the_real_return_hole() {
     let before = host_result_closure_match(px8j_equal_payload_hole_placement(
