@@ -141,6 +141,28 @@ one commit, six paths, `+285/-35`, no added ignores. M6 blob identity 6/6 MATCH.
 > rather than traps; and the only two matches for redirected-edge or emission
 > vocabulary are **doc comments stating their own absence.**
 
+## Second `D2f` partial — identity-plane wiring, MERGED 2026-08-11, PR #1899
+
+Exact `1b362f5ea3201ba4dc54d74f0dc88462e3fa4f19` from declared base `e0e4aeb3`;
+one commit, five `ken-runtime` paths, `+123/-4`. M6 blob identity 5/5 MATCH.
+
+**The landed fusion identity plan now reaches the sole production compile
+path**, with a causal arrival control. **Empty resolution remains legal.**
+Excludes definitions, descriptors, authorities, edge redirection, emitter
+behaviour, planner signature widening, and every emitter AC claim.
+
+**This one also closes zero of the eight expressions.** Two partials, two
+structural prerequisites, zero rows.
+
+> **Why its control is not vacuous** — and it is worth recording, because
+> *"empty resolution is legal"* is exactly the condition that lets an arrival
+> control pass for free. It takes `NonZeroUsize::new(planes.len()).expect(...)`,
+> so **a zero arrival panics rather than passing**, and the assertion then
+> equates the recorded planes with the established arrival count as **one
+> population**. Resolved sizes are **recorded, not pinned** — this witness plans
+> no admitted fusion, so a control asserting resolution *success* would have
+> been either vacuous or wrong.
+
 **The `D2f` emitter is the next increment**, scoped to the one `R3` before-hole
 witness — **not** an eight-row repair. The `R3` after-hole / missing-`Mint` cell
 is excluded from `D2f` and owned by [[RT-LEXICAL-ROW2-MISSING-MINT]].
