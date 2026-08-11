@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-11 07:32:54Z — from 220 issue file(s) in `docs/program/issues/`.
+2026-08-11 08:03:47Z — from 220 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -126,7 +126,7 @@ the committed file matches the generator's output.
 | `LANG-SORT-META-CAPABILITY` | Rule whether a term/sort metavariable representation is authorized -- the elaborator cannot today leave a selected result undecided between Type and Omega, so the spec's conditional ambiguity clause has an unreachable antecedent | draft | spec-enclave | S | none | — |
 | `LANG-SPACE-PRESTATE-BIND` | `old` in a block-space operation's `ensures` still fails closed, though the cell environment it was waiting for now exists -- bind s_pre/s_post and elaborate the Hoare pair against the state transformer | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1848 |
 | `LANG-STRUCTURAL-RESULT-ELAB` | Implement the structural-result selector in the elaborator -- derive the field/evidence/result association from the kernel method telescope and elaborate `structural result of x` to the hidden recursive method result | merged | language | L | none | — |
-| `LANG-SURFACE-DECIMAL-PRECISION` | `Decimal` is specified with an arbitrary-precision coefficient and the spec explicitly forecloses a fixed-width one, but the surface caps it at `i64` across three carriers -- `Token::DecimalLit(i64, i32)`, `NumLit::Decimal(i64, i32)`, and `NumericLitVal::Decimal { coeff: i64 }` -- and the lexer refuses a wider coefficient outright | ready | language | M | none | — |
+| `LANG-SURFACE-DECIMAL-PRECISION` | `Decimal` is specified with an arbitrary-precision coefficient and the spec explicitly forecloses a fixed-width one, but the surface caps it at `i64` across three carriers -- `Token::DecimalLit(i64, i32)`, `NumLit::Decimal(i64, i32)`, and `NumericLitVal::Decimal { coeff: i64 }` -- and the lexer refuses a wider coefficient outright | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1876 |
 | `LANG-SURFACE-IF` | `if e then t else f` is required by 32-grammar §3 and is wholly absent -- no token, no keyword-map entry, no parser arm, no AST node -- while its stated elaboration target (real matchable `data Bool = True | False`) has been pre-registered since ES2 | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1819 |
 | `LANG-SURFACE-INT-PRECISION` | `Int` is specified arbitrary-precision and the kernel already carries `Term::IntLit(num_bigint::BigInt)`, but the surface truncates to `NumLit::Int(i128)` through a lossy `n as i128` cast, and the lexer implements none of the `0x`/`0b`/`0o`/`_` forms that 31-lexical lists | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1871 |
 | `LANG-SURFACE-PAIR` | Pair literals, positional projections, and the Sigma type production are required by 32-grammar and wholly absent from the surface -- `Token::Times` is lexed for `×` and consumed by nothing, `(a, b)` is a parse error, and `.1`/`.2` fall outside the projection guard -- while the kernel's Sigma/Pair/Proj1/Proj2 are complete and already exercised by records | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1859 |
@@ -265,7 +265,6 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `LANG-LEX-NUMERIC-FORMS` — The lexer implements none of the numeric literal forms 31-lexical and 35-numbers list besides bare decimal -- no `1_000` separators, no `0xFF`/`0b1010`/`0o17` radix integers, no `0x1p-3` hex float -- and `1e-9`, which both spec tables give as the canonical Float example, does not lex as a float at all because the exponent branch is gated on having seen a dot
-- `LANG-SURFACE-DECIMAL-PRECISION` — `Decimal` is specified with an arbitrary-precision coefficient and the spec explicitly forecloses a fixed-width one, but the surface caps it at `i64` across three carriers -- `Token::DecimalLit(i64, i32)`, `NumLit::Decimal(i64, i32)`, and `NumericLitVal::Decimal { coeff: i64 }` -- and the lexer refuses a wider coefficient outright
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
