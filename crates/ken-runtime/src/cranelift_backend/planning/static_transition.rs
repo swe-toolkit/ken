@@ -7882,6 +7882,7 @@ struct ContinuationDiscovery {
 thread_local! {
     static WEAKEN_CONTINUATION_DECREASING_MEASURE: Cell<bool> = const { Cell::new(false) };
     static SUPPRESS_POST_SPECIALIZATION_DESCENT: Cell<bool> = const { Cell::new(false) };
+    static DUPLICATE_STATIC_BODY_TRIPLE: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -7949,6 +7950,13 @@ fn envelope_defect() -> EnvelopeDefect {
 /// Nothing else changes: the initial frontier is still seeded and admitted, so
 /// a candidate that vanishes under this hook vanished because the descent root
 /// is gone and not because discovery stopped.
+/// `D2i` `AC-3` — present a second matching `StaticBody` edge to the uniqueness
+/// decision, and change nothing else.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_static_body_triple_duplicated(armed: bool) {
+    DUPLICATE_STATIC_BODY_TRIPLE.with(|cell| cell.set(armed));
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn set_post_specialization_descent_suppressed(armed: bool) {
     SUPPRESS_POST_SPECIALIZATION_DESCENT.with(|cell| cell.set(armed));
@@ -8531,17 +8539,29 @@ fn fusion_unique_static_body_triple(
     Option<(PredeclaredFunctionId, PredeclaredFunctionId, StaticOriginId)>,
     CraneliftBackendError,
 > {
-    let mut found = None;
+    let mut matching = Vec::new();
     for edge in plan.semantic.static_body_call_edges(&plan.edges)? {
-        if edge.1 != producer_owner {
-            continue;
+        if edge.1 == producer_owner {
+            matching.push(edge);
         }
-        if found.is_some() {
-            return Ok(None);
-        }
-        found = Some(edge);
     }
-    Ok(found)
+    // `D2i` `AC-3` multiplicity control. Arming this presents a SECOND matching
+    // edge to the uniqueness decision and changes nothing else: the transport
+    // gate, the bindings, the exact consuming suffix and the input projection
+    // have all already been satisfied by the time this runs, so a candidate that
+    // disappears here disappeared at the uniqueness gate specifically.
+    #[cfg(test)]
+    if DUPLICATE_STATIC_BODY_TRIPLE.with(Cell::get) {
+        if let Some(first) = matching.first().copied() {
+            matching.push(first);
+        }
+    }
+    if matching.len() != 1 {
+        // Absence and multiplicity are both refusals: "the only edge" would be
+        // an existential and choosing among several would be a guess.
+        return Ok(None);
+    }
+    Ok(matching.into_iter().next())
 }
 
 /// Descend the checked wrappers to the occurrence they carry.
@@ -14945,6 +14965,65 @@ mod tests {
         assert!(
             format!("{absent:?}").contains("checked subcontinuation markers have no checked plan"),
             "and it must refuse for the transport reason: {absent:?}"
+        );
+    }
+
+    /// `D2i` `AC-3` — MULTIPLICITY is refused, and it is executed rather than
+    /// claimed.
+    ///
+    /// The previous candidate asserted only that "multiplicity would be a
+    /// refusal" in a message. `fusion_unique_static_body_triple` declines on a
+    /// second matching edge, but nothing reached that branch, so the claim was
+    /// unexecuted.
+    ///
+    /// Arming the control presents a second matching edge at the uniqueness
+    /// decision and changes nothing else. Every earlier gate has already been
+    /// satisfied by the time it runs -- the transport coordinate still resolves
+    /// and the admitted roots are unchanged, both asserted below -- so the
+    /// candidate that disappears did so at the uniqueness gate specifically and
+    /// not because something upstream broke.
+    #[test]
+    fn d2i_ac3_a_second_matching_static_body_edge_is_refused() {
+        struct Restore;
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                set_static_body_triple_duplicated(false);
+            }
+        }
+
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2g_oriented_plan();
+
+        let before = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+        assert_eq!(before, 1, "the unsuppressed baseline is one candidate");
+        let roots_before = fusion_root_source_for_future_enumerator(&plan).expect("roots");
+        let transport_before = build_checked_transport(&plan, &oriented).expect("transport");
+
+        let _restore = Restore;
+        set_static_body_triple_duplicated(true);
+        let after = enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+            .expect("enumerates")
+            .len();
+
+        assert_eq!(
+            after, 0,
+            "a second matching StaticBody edge must refuse rather than select among them"
+        );
+        assert_eq!(
+            fusion_root_source_for_future_enumerator(&plan).expect("roots"),
+            roots_before,
+            "and the admitted roots are untouched, so discovery did not change"
+        );
+        assert_eq!(
+            build_checked_transport(&plan, &oriented).expect("transport"),
+            transport_before,
+            "and the transport coordinates still resolve, so the earlier gates still pass"
         );
     }
 
