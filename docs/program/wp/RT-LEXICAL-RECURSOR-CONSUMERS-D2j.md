@@ -7,19 +7,51 @@ scope ruling `evt_2vfgg71s847ns` as corrected by Architect ruling
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
-> ## ACCEPTED PARTIAL LANDED — `0e5aba4e`, PR #1874. THIS FRAME IS NOT
-> ## DISCHARGED AND `#6d` IS NOT CLOSED.
+> ## TWO ACCEPTED PARTIALS LANDED. THIS FRAME IS NOT DISCHARGED AND `#6d` IS
+> ## NOT CLOSED.
 >
-> Decision `dec_4gds5week8a6w`, merged 2026-08-11 from base `301e1099`: two
-> paths, `+142/-4`, crate change **comments-only** (zero non-comment changed
-> lines). Blob-identical to the reviewed `783ca939`.
+> **Partial 2 — `f3f2c1a0`, PR #1878, Decision `dec_35g9zxj3a8c0b`**, merged
+> 2026-08-11 from base `5f4b514b`: one planning path, `+294/-0`, test-side
+> only. **This discharges Deliverable 2.**
+>
+> **Partial 1 — `0e5aba4e`, PR #1874, Decision `dec_4gds5week8a6w`**, merged
+> from base `301e1099`: two paths, `+142/-4`, crate change **comments-only**
+> (zero non-comment changed lines).
 >
 > **STILL OUTSTANDING, and this list is the node's remaining work — not a
 > record of what was once owed:**
 >
-> - the **fusion-reaching non-empty ordered-input witness** (Deliverable 2),
 > - the **source-side provenance mutations** (Deliverable 1's third column),
 > - the **six planner-valid refusals** (Deliverable 3).
+>
+> ### What Deliverable 2 cost, and the lesson belongs in Deliverable 1
+>
+> The witness is a paired control — one bare candidate projecting **zero**
+> ordered inputs, one wrapped candidate projecting **two**, with a
+> hand-derived shifted marker plan reaching exact transport validation.
+>
+> **Two successive revisions carried an owner claim with no assertion behind
+> it.** First that the ordered inputs were the *producer's* parameters; then,
+> after that was caught, that they were *neither* fusion side. Both were
+> wrong. The test had been reading `first_owner` **out of the run it was
+> checking**, so "every input shares it" was self-consistency and could not
+> constrain which unit it is — **the claim beside it could not fail.**
+>
+> Measured: they are entry-ABI parameters of the **consumer's own** unit.
+> Three assertions now stand where the prose was — the owner equals the
+> consumer's unit, differs from the producer's, and is independently pinned to
+> `PredeclaredFunctionId(3)`. QA confirmed it causally by mutating the sole
+> production call site of `continuation_owner_entry_sources` to
+> `producer_owner`, reddening the unchanged control, then restoring
+> byte-identically.
+>
+> The implementer's own statement of it, which is the standard for every
+> remaining row: **"A relation I haven't asserted isn't a finding, however
+> carefully I've written it down."**
+>
+> ⇒ **`AC-1`'s "gap that reads as coverage" is exactly this.** A per-member
+> row resting on prose is worse than a missing row, because nothing prompts a
+> reader to check it. **Every row needs its assertion.**
 >
 > **What landed is a measurement and a boundary, not evidence.** Specifically:
 > the completed-range record, and the census result that **a generic non-empty
@@ -84,9 +116,16 @@ about derivation, because a clone is not something the planner produced.
 can be structurally distinct in the map and still be derived from the wrong
 planner fact, and the interner would never notice.
 
-## The measured fact that makes this unavoidable
+## The measured fact that made this unavoidable — NOW DISCHARGED by `f3f2c1a0`
 
-**The ordered ABI input projection has never run non-trivially on any witness.**
+> **Read this section as history, not as current state.** It is why
+> Deliverable 2 existed, and Deliverable 2 has landed: there is now a paired
+> witness projecting **two** ordered inputs against a bare candidate
+> projecting zero. **The sentence below was true until `f3f2c1a0` and is
+> false now**, and it is kept because the reasoning still governs any *new*
+> member you cannot reach.
+
+**The ordered ABI input projection had never run non-trivially on any witness.**
 `intrinsic_environment_floor` is `entry_sources.len()`
 (`crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs:6947`),
 and `required_input_count` rises above it only when a case body needs a longer
@@ -131,12 +170,18 @@ Each row states four things:
 4. **Agreement** between the primary derivation and the independently authored
    re-derivation `D2h` landed.
 
-### 2. The non-empty ordered-input witness
+### 2. The non-empty ordered-input witness — LANDED at `f3f2c1a0`
 
 A consumer with entry values, or a case body requiring a longer surrounding
 prefix, such that `required_input_count` exceeds zero and the projection is
-genuinely populated. **State the count.** This witness then discharges the
-ordered-input row of Deliverable 1, and any other row it can reach.
+genuinely populated. **State the count.**
+
+**Delivered: a paired control, zero inputs on the bare candidate and two on
+the wrapped one**, with a hand-derived shifted marker plan reaching exact
+transport validation, pinning `EntryAbi`, ordinal order, and `Parameter`
+source. **This discharges the ordered-input row of Deliverable 1**, and any
+other row it can reach — but it discharges those rows **only where you write
+the assertion**, per the owner-claim lesson in the header block.
 
 ### 3. The six relocated pre-interning refusals
 
@@ -180,6 +225,13 @@ rather than omitting it.
 
 **AC-2 — the ordered-input row is discharged on a non-empty projection**, with
 the count stated in the claim. This is the row the node exists for.
+
+> **STILL OPEN, and do not read `f3f2c1a0` as having closed it.** That merge
+> landed the **witness**; `AC-2` is about the **row**, which lives in
+> Deliverable 1's matrix and is not written yet. What changed is that the
+> obstacle is gone — a non-empty projection exists now, count **two**, so the
+> row can be discharged rather than merely owed. **The witness is the
+> precondition, not the discharge.**
 
 **AC-3 — the six refusals each reach no id and no descriptor, independently.**
 Baseline mints exactly one identity first, so each zero is a change rather than
