@@ -25,7 +25,8 @@ use super::semantic_ir::{
 };
 use super::{
     planner_capacity_error, planner_error, unsupported, BoundaryReferentOwner,
-    ContinuationContextId, ContinuationSourceCoordinate, ContinuationSpecializationId,
+    ContinuationContextId, ContinuationSourceCoordinate, ContinuationSourceSlotAuthority,
+    ContinuationSpecializationId,
     CraneliftBackendError, EdgeKind,
     PlannedContinuationContext, PlannedContinuationSpecialization, SemanticPlane,
     SemanticSourceKind, SemanticSourceSeed, StaticContinuationFusionId, StaticEdge, StaticEdgeId,
@@ -620,6 +621,55 @@ pub(super) struct AbiContinuationContextDescriptor {
     pub(super) inputs: DenseRange,
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — one interned static continuation
+/// fusion's generated-definition ABI contract.**
+///
+/// Kept in its own arena, for the reason the two sibling generated classes
+/// already record and not as a new argument. [`AbiPlane::descriptors`] is
+/// **positional** over the `PredeclaredFunction` partition — `build_abi_plane`
+/// refuses a descriptor whose id is not its ordinal — so a fusion appended
+/// there would have to be given a `PredeclaredFunctionId` it does not have, and
+/// the fourth id domain would become readable as the first. That is the
+/// aliasing `evt_609am4v7cdt5b` forbids, and it is why
+/// [`AbiContinuationDescriptor`] and [`AbiContinuationContextDescriptor`] each
+/// took an arena of their own rather than a row in that one.
+///
+/// The slot run is `[Parameter x producer parameters]
+/// ++ [Capture x projected continuation inputs] ++ CONVENTION_SLOTS`. The
+/// parameters are the producer invocation's own operands — the redirected edge
+/// keeps passing exactly what it passed before — and the captures are the
+/// suffix's projected input run, which the redirecting caller has in scope
+/// because those coordinates name **its own** entry ABI.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(C)]
+pub(super) struct AbiStaticContinuationFusionDescriptor {
+    /// Carries the [`AbiUnitDefinition::StaticContinuationFusion`] arm rather
+    /// than a bare id, exactly as [`AbiContinuationDescriptor`] does: the
+    /// generated-definition population is then countable by the definition arm
+    /// it declares, which is the read `D2f` Deliverable 0's gate performs.
+    pub(super) definition: AbiUnitDefinition,
+    pub(super) header: AbiFrameHeader,
+    pub(super) slots: DenseRange,
+    pub(super) inputs: DenseRange,
+}
+
+/// The planner-side projection one fusion contributes to the ABI plane.
+///
+/// Deliberately not the fusion key: the key is `D2h`'s and is a complete
+/// identity, while this is the subset the layout is a function of. Passing the
+/// key would let a layout decision be made from a member that has nothing to do
+/// with layout, and would put the identity plane back inside `D2f`'s reach.
+pub(super) struct PlannedStaticContinuationFusionAbi<'plan> {
+    pub(super) id: StaticContinuationFusionId,
+    /// The producer unit's declared parameter run, read from that unit's own
+    /// descriptor. **Not recomputed here** — the redirected invocation must keep
+    /// passing the operand count the producer already declares, so the producer's
+    /// descriptor is the authority and this carries its answer.
+    pub(super) producer_parameters: u32,
+    /// The suffix's ordered projected input run, from the complete key.
+    pub(super) continuation_inputs: &'plan [ContinuationSourceSlotAuthority],
+}
+
 /// The ABI plane: one descriptor per `PredeclaredFunction`, and their slots.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct AbiPlane {
@@ -636,6 +686,13 @@ pub(super) struct AbiPlane {
     pub(super) context_slots: Vec<AbiSlot>,
     pub(super) context_inputs: Vec<AbiContinuationInputAuthority>,
     pub(super) context_affinities: Vec<BoundaryReferentOwner>,
+    /// `D2f`'s generated fusion-definition population, in its own arenas and
+    /// installed at the post-planner scope — the only scope where the static
+    /// transition plan and the oriented plan are both authoritative at once.
+    pub(super) fusion_descriptors: Vec<AbiStaticContinuationFusionDescriptor>,
+    pub(super) fusion_slots: Vec<AbiSlot>,
+    pub(super) fusion_inputs: Vec<AbiContinuationInputAuthority>,
+    pub(super) fusion_affinities: Vec<BoundaryReferentOwner>,
 }
 
 /// The fixed per-unit convention slots every activation carries, in layout
@@ -1194,6 +1251,281 @@ fn append_continuation_context_descriptor(
     abi.context_descriptors
         .push(AbiContinuationContextDescriptor {
             context: context.id(),
+            header,
+            slots,
+            inputs,
+        });
+    Ok(())
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` `AC-4` — the carriers a fused
+/// region's projected input run may carry, decided ONE input at a time.**
+///
+/// `AC-4` asks for a property of the *emitted definition*, not of a projection
+/// that happened to contain no activation. This is where that property is
+/// enforced, because this is the seat that decides what the generated
+/// definition's frame declares: a carrier admitted here becomes a slot in the
+/// fused frame, and a carrier refused here has no lane into it at all.
+///
+/// **Exhaustive with no wildcard, no default, and no fallback.** A seventh
+/// [`AbiCarrier`] must be assigned an arm here before it compiles. That is the
+/// difference between a gate that stays correct as the carrier vocabulary grows
+/// and one that silently admits whatever is added next — and the activation
+/// carriers below are exactly the ones a future addition would most resemble.
+///
+/// **The three refused carriers are the activation's own words.**
+/// `CONVENTION_SLOTS` gives *every* frame a `ResultWord`, a `ControlWord` and a
+/// `TrapWord` as its local tail, so "no activation in a slot" cannot be the
+/// claim — every frame has all three and always will. The claim `AC-4` needs is
+/// narrower and is the one enforced here: **no activation carrier in the
+/// projected input run**, which is the run whose values cross into the fused
+/// definition from outside. `StoreHandle` is refused on the same footing: a
+/// store handle is the persistent lane, and a fused region exports only
+/// closure-free final data.
+///
+/// **MEASURED:** every projected input's carrier is `ValueWord` or
+/// `GroundValueCarrier`.
+/// **CLAIMED:** no activation, cursor, selection or unwind state enters the
+/// generated definition's slot, carrier or parameter lanes from outside.
+/// **THE GAP:** this pins the **input run**. The fused frame's own convention
+/// tail still carries the three activation words, and must — they are what the
+/// region's local activation is written into. What this forbids is one arriving
+/// as an *input*, which is the only direction by which activation state could
+/// cross the boundary the ruling's stop condition names.
+fn fusion_input_carrier_admissibility(
+    carrier: AbiCarrier,
+    ordinal: u32,
+) -> Result<(), CraneliftBackendError> {
+    match carrier {
+        AbiCarrier::ValueWord | AbiCarrier::GroundValueCarrier => Ok(()),
+        // The ordinal is named in both refusals rather than dropped: with a
+        // multi-input run, "some input is inadmissible" does not say which, and
+        // the decision is per input.
+        AbiCarrier::ResultWord | AbiCarrier::ControlWord | AbiCarrier::TrapWord => {
+            Err(planner_error(format!(
+                "static continuation fusion input {ordinal} names an activation carrier \
+                 ({carrier:?}); a fused region's activation is local to it, so an activation word \
+                 arriving as an input would carry activation state across the boundary this class \
+                 forbids"
+            )))
+        }
+        AbiCarrier::StoreHandle => Err(planner_error(format!(
+            "static continuation fusion input {ordinal} names a persistent store handle; a fused \
+             region exports only closure-free final data and takes no durable lane as an input"
+        ))),
+    }
+}
+
+/// **`D2f` Deliverables 1 and 4 — install the fused regions' generated-definition
+/// ABI.**
+///
+/// Same discipline as [`install_continuation_specialization_abi`] and
+/// [`install_continuation_context_abi`], and deliberately not a looser one: the
+/// four arenas are reserved to their exact closed populations before the first
+/// descriptor is built, capacity growth while appending is refused rather than
+/// tolerated, and the identity is required to be positional in its own arena.
+///
+/// **Installed at the post-planner scope, unlike its two siblings.** Both of
+/// those install inside the planner's own finalize, where their planned
+/// population already exists. A fusion's population is a function of the static
+/// transition plan **and** the oriented plan, and the planner holds only the
+/// first — so this installer is called from the one production site where both
+/// are authoritative. That is a difference in *when*, not in what is checked.
+pub(super) fn install_static_continuation_fusion_abi(
+    abi: &mut AbiPlane,
+    fusions: &[PlannedStaticContinuationFusionAbi<'_>],
+) -> Result<(), CraneliftBackendError> {
+    if !abi.fusion_descriptors.is_empty()
+        || !abi.fusion_slots.is_empty()
+        || !abi.fusion_inputs.is_empty()
+        || !abi.fusion_affinities.is_empty()
+    {
+        return Err(planner_error(
+            "static continuation fusion ABI may be installed exactly once",
+        ));
+    }
+
+    let mut slot_count = 0usize;
+    let mut input_count = 0usize;
+    let mut affinity_count = 0usize;
+    for fusion in fusions {
+        let parameters = usize::try_from(fusion.producer_parameters).map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI parameter count exhausted")
+        })?;
+        slot_count = slot_count
+            .checked_add(parameters)
+            .and_then(|count| count.checked_add(fusion.continuation_inputs.len()))
+            .and_then(|count| count.checked_add(CONVENTION_SLOTS.len()))
+            .ok_or_else(|| {
+                planner_capacity_error("static continuation fusion ABI slot population exhausted")
+            })?;
+        input_count = input_count
+            .checked_add(fusion.continuation_inputs.len())
+            .ok_or_else(|| {
+                planner_capacity_error("static continuation fusion ABI input population exhausted")
+            })?;
+        for projection in fusion.continuation_inputs {
+            affinity_count = affinity_count
+                .checked_add(projection.referent_affinity.len())
+                .ok_or_else(|| {
+                    planner_capacity_error(
+                        "static continuation fusion ABI affinity population exhausted",
+                    )
+                })?;
+        }
+    }
+
+    abi.fusion_descriptors
+        .try_reserve_exact(fusions.len())
+        .map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI descriptor allocation failed")
+        })?;
+    abi.fusion_slots.try_reserve_exact(slot_count).map_err(|_| {
+        planner_capacity_error("static continuation fusion ABI slot allocation failed")
+    })?;
+    abi.fusion_inputs
+        .try_reserve_exact(input_count)
+        .map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI input allocation failed")
+        })?;
+    abi.fusion_affinities
+        .try_reserve_exact(affinity_count)
+        .map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI affinity allocation failed")
+        })?;
+
+    for fusion in fusions {
+        let capacities = (
+            abi.fusion_descriptors.capacity(),
+            abi.fusion_slots.capacity(),
+            abi.fusion_inputs.capacity(),
+            abi.fusion_affinities.capacity(),
+        );
+        append_static_continuation_fusion_descriptor(abi, fusion)?;
+        if capacities
+            != (
+                abi.fusion_descriptors.capacity(),
+                abi.fusion_slots.capacity(),
+                abi.fusion_inputs.capacity(),
+                abi.fusion_affinities.capacity(),
+            )
+        {
+            return Err(planner_error(
+                "static continuation fusion ABI descriptor construction allocated after preflight",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn append_static_continuation_fusion_descriptor(
+    abi: &mut AbiPlane,
+    fusion: &PlannedStaticContinuationFusionAbi<'_>,
+) -> Result<(), CraneliftBackendError> {
+    // Constructed positionally here exactly as the specialization installer
+    // constructs its own id: this module is a descendant of the module that owns
+    // the newtype, so the check compares the planner's issued identity against
+    // this arena's ordinal rather than minting a public constructor for it.
+    let expected_id = StaticContinuationFusionId(
+        u32::try_from(abi.fusion_descriptors.len()).map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI descriptor identity exhausted")
+        })?,
+    );
+    if fusion.id != expected_id {
+        return Err(planner_error(
+            "static continuation fusion ABI descriptor identity is not positional",
+        ));
+    }
+
+    let slot_start = abi.fusion_slots.len();
+    for ordinal in 0..fusion.producer_parameters {
+        abi.fusion_slots
+            .push(slot(AbiSlotKind::Parameter, AbiCarrier::ValueWord, ordinal));
+    }
+
+    let input_start = abi.fusion_inputs.len();
+    for (position, projection) in fusion.continuation_inputs.iter().enumerate() {
+        let ordinal = u32::try_from(position).map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI input ordinal exhausted")
+        })?;
+        // **There is deliberately no positionality check here, and the
+        // asymmetry with the two sibling installers is real rather than an
+        // omission.** Each of those receives a projection carrying its own
+        // `ordinal` (and, for a specialization, its `ordinary_abi_position`), so
+        // it can compare the planner's declared position against the arena's and
+        // refuse a disagreement. A `ContinuationSourceSlotAuthority` declares no
+        // ordinal: the key's `continuation_inputs` run is ordered **by
+        // construction**, and its order is its identity. The ordinal below is
+        // therefore *assigned* here, with nothing independent to compare it to,
+        // and a check written anyway would compare this loop's counter with
+        // itself.
+        //
+        // `D2j` pinned the members of that run rather than only its length,
+        // which is what makes assigning position from it sound.
+        //
+        // `AC-4`, per input and before the slot exists. Placed ahead of every
+        // push so a refused run leaves no partial frame behind.
+        fusion_input_carrier_admissibility(projection.carrier, ordinal)?;
+        let affinity_start = abi.fusion_affinities.len();
+        abi.fusion_affinities
+            .extend_from_slice(&projection.referent_affinity);
+        let referent_affinity = DenseRange {
+            start: u32::try_from(affinity_start).map_err(|_| {
+                planner_capacity_error("static continuation fusion ABI affinity identity exhausted")
+            })?,
+            len: u32::try_from(projection.referent_affinity.len()).map_err(|_| {
+                planner_capacity_error("static continuation fusion ABI affinity range exhausted")
+            })?,
+        };
+        abi.fusion_inputs.push(AbiContinuationInputAuthority {
+            ordinal,
+            // ROOT provenance, retained unchanged, as both sibling planes do:
+            // the fused region makes the value available to the suffix; it does
+            // not become its origin.
+            provenance: AbiContinuationInputProvenance::of(projection.coordinate),
+            referent_affinity,
+        });
+        abi.fusion_slots.push(AbiSlot {
+            kind: AbiSlotKind::Capture,
+            carrier: projection.carrier,
+            ownership: projection.ownership,
+            storage_owner: projection.storage_owner,
+            width_bytes: projection.carrier.width_bytes(),
+            align_bytes: projection.carrier.align_bytes(),
+            ordinal,
+        });
+    }
+    for (kind, carrier) in CONVENTION_SLOTS {
+        abi.fusion_slots.push(slot(kind, carrier, 0));
+    }
+
+    let slots = DenseRange {
+        start: u32::try_from(slot_start).map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI slot identity exhausted")
+        })?,
+        len: u32::try_from(abi.fusion_slots.len() - slot_start).map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI slot range exhausted")
+        })?,
+    };
+    let inputs = DenseRange {
+        start: u32::try_from(input_start).map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI input identity exhausted")
+        })?,
+        len: u32::try_from(abi.fusion_inputs.len() - input_start).map_err(|_| {
+            planner_capacity_error("static continuation fusion ABI input range exhausted")
+        })?,
+    };
+    let captures = u32::try_from(fusion.continuation_inputs.len()).map_err(|_| {
+        planner_capacity_error("static continuation fusion ABI capture count exhausted")
+    })?;
+    let header = frame_header(
+        &abi.fusion_slots[slot_start..],
+        fusion.producer_parameters,
+        captures,
+    )?;
+    abi.fusion_descriptors
+        .push(AbiStaticContinuationFusionDescriptor {
+            definition: AbiUnitDefinition::StaticContinuationFusion { fusion: fusion.id },
             header,
             slots,
             inputs,
