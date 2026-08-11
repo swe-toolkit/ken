@@ -15618,9 +15618,16 @@ mod tests {
         ProducerArity,
     }
 
-    /// The producer construct of the `D2g` family, which [`D2jCause::ProducerArity`]
-    /// widens. Asserted against the plan's own constructor identity at the row
-    /// that uses it, so a rename cannot silently make the widening a no-op.
+    /// The constructor the producer carries.
+    ///
+    /// **IT IS NOT A SELECTOR, AND USING IT AS ONE WAS A DEFECT.** Two
+    /// constructs in this fixture carry this symbol: the inner case-body
+    /// producer, and the OUTER computational match's scrutinee. An earlier
+    /// revision of [`D2jCause::ProducerArity`] keyed the widening on the symbol
+    /// and so widened both, which made the "producer-only" causal claim beside
+    /// it false. The widening is keyed on STRUCTURAL POSITION instead --
+    /// see [`d2j_rewrite_body`] -- and the census in the matrix test holds the
+    /// other occurrence at arity one.
     #[cfg(test)]
     const D2J_PRODUCER_CONSTRUCTOR: &str = "ctor:fixture::D2gOut::Node";
 
@@ -15636,7 +15643,7 @@ mod tests {
             | D2jCause::CallIdentity
             | D2jCause::Frame
             | D2jCause::SelectedSlot
-            | D2jCause::Invocation => d2j_rewrite_body(inner, cause),
+            | D2jCause::Invocation => d2j_rewrite_body(inner, cause, false),
         };
         if cause == D2jCause::ReHomed {
             // No wrapper: the producer stops being behind a closure, so the two
@@ -15653,8 +15660,18 @@ mod tests {
     }
 
     /// Apply one source-side cause to the checked body.
+    ///
+    /// `in_case_body` is the STRUCTURAL POSITION of `expr` relative to its
+    /// nearest enclosing [`RuntimeExpr::ComputationalMatch`]: true in a case
+    /// body, false in a scrutinee. It is reset at every match rather than
+    /// inherited, so descending through the outer match's scrutinee into the
+    /// inner match's case body arrives at the producer with it true.
+    ///
+    /// This exists because [`D2J_PRODUCER_CONSTRUCTOR`] does not identify the
+    /// producer: the outer match's scrutinee carries the same symbol, and
+    /// keying the widening on the symbol widened both.
     #[cfg(test)]
-    fn d2j_rewrite_body(expr: RuntimeExpr, cause: D2jCause) -> RuntimeExpr {
+    fn d2j_rewrite_body(expr: RuntimeExpr, cause: D2jCause, in_case_body: bool) -> RuntimeExpr {
         match expr {
             RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
                 let frame_id = if cause == D2jCause::Frame && frame_id == D2G_OUTER_FRAME {
@@ -15664,7 +15681,7 @@ mod tests {
                 };
                 RuntimeExpr::CheckedSubcontinuationFrame {
                     frame_id,
-                    body: Box::new(d2j_rewrite_body(*body, cause)),
+                    body: Box::new(d2j_rewrite_body(*body, cause, in_case_body)),
                 }
             }
             RuntimeExpr::CheckedComputationalIHSlots {
@@ -15683,7 +15700,7 @@ mod tests {
                     })
                     .collect(),
                 checked_occurrence_paths,
-                body: Box::new(d2j_rewrite_body(*body, cause)),
+                body: Box::new(d2j_rewrite_body(*body, cause, in_case_body)),
             },
             RuntimeExpr::CheckedComputationalIHInvocation {
                 call_template_id,
@@ -15696,18 +15713,19 @@ mod tests {
                     call_template_id
                 },
                 checked_occurrence_path,
-                body: Box::new(d2j_rewrite_body(*body, cause)),
+                body: Box::new(d2j_rewrite_body(*body, cause, in_case_body)),
             },
             RuntimeExpr::ComputationalMatch {
                 scrutinee,
                 cases,
                 default,
             } => RuntimeExpr::ComputationalMatch {
-                scrutinee: Box::new(d2j_rewrite_body(*scrutinee, cause)),
+                // THE POSITION IS RESET HERE, NOT INHERITED.
+                scrutinee: Box::new(d2j_rewrite_body(*scrutinee, cause, false)),
                 cases: cases
                     .into_iter()
                     .map(|case| crate::RuntimeComputationalMatchCase {
-                        body: d2j_rewrite_body(case.body, cause),
+                        body: d2j_rewrite_body(case.body, cause, true),
                         ..case
                     })
                     .collect(),
@@ -15716,13 +15734,20 @@ mod tests {
             RuntimeExpr::Construct { constructor, args } => {
                 let mut args: Vec<RuntimeExpr> = args
                     .into_iter()
-                    .map(|arg| d2j_rewrite_body(arg, cause))
+                    .map(|arg| d2j_rewrite_body(arg, cause, in_case_body))
                     .collect();
-                // A second child on the producer construct ONLY. It is a nullary
+                // A second child on the CASE-BODY producer only. It is a nullary
                 // constructor, so it adds no result-position origin and no
                 // marker edge -- the one thing it changes is the size of the
                 // inventory the argument row selects from.
-                if cause == D2jCause::ProducerArity && constructor == D2J_PRODUCER_CONSTRUCTOR {
+                //
+                // The symbol alone does not select it. The outer match's
+                // scrutinee carries the same one and must stay at arity one,
+                // which the census in the matrix test asserts.
+                if cause == D2jCause::ProducerArity
+                    && in_case_body
+                    && constructor == D2J_PRODUCER_CONSTRUCTOR
+                {
                     args.push(RuntimeExpr::Construct {
                         constructor: "ctor:prelude::Unit::MkUnit".to_string(),
                         args: Vec::new(),
@@ -15737,7 +15762,7 @@ mod tests {
             } => RuntimeExpr::LexicalClosure {
                 captures,
                 params,
-                body: Box::new(d2j_rewrite_body(*body, cause)),
+                body: Box::new(d2j_rewrite_body(*body, cause, in_case_body)),
             },
             RuntimeExpr::Call { callee, args } => match cause {
                 // The selected case body stops being the consuming Call.
@@ -16276,11 +16301,8 @@ mod tests {
         else {
             panic!("the widened producer is not a construct")
         };
-        assert_eq!(
-            widened_constructor, D2J_PRODUCER_CONSTRUCTOR,
-            "the knob landed on the producer construct and nowhere else"
-        );
-        assert_eq!(widened_args.len(), 2, "and gave it a second argument");
+        assert_eq!(widened_constructor, D2J_PRODUCER_CONSTRUCTOR);
+        assert_eq!(widened_args.len(), 2, "the producer gained a second argument");
         assert!(
             matches!(
                 &widened_args[1],
@@ -16288,6 +16310,68 @@ mod tests {
                     if constructor == "ctor:prelude::Unit::MkUnit" && args.is_empty()
             ),
             "the added child is nullary, so it contributes no result origin and no marker edge"
+        );
+
+        // THE CENSUS -- BECAUSE THE SYMBOL IS NOT A SELECTOR.
+        //
+        // Two constructs in this fixture carry `D2J_PRODUCER_CONSTRUCTOR`: the
+        // case-body producer and the OUTER match's scrutinee. An earlier
+        // revision keyed the widening on the symbol and moved BOTH, so the
+        // "producer-only" claim beside it was false and the mutation was not
+        // the one the row attributes its discrimination to.
+        //
+        // Both occurrences are enumerated on both plans. The exact plan holds
+        // them at arity one; the widened plan moves EXACTLY the producer.
+        let arity_census = |census_plan: &StaticTransitionPlan<'_>| -> Vec<(StaticOriginId, usize)> {
+            let mut found: Vec<(StaticOriginId, usize)> = census_plan
+                .occurrence_authorities
+                .iter()
+                .map(|authority| authority.origin)
+                .filter_map(|origin| match census_plan.planned_occurrence_expr(origin) {
+                    Ok(RuntimeExpr::Construct { constructor, args })
+                        if constructor == D2J_PRODUCER_CONSTRUCTOR =>
+                    {
+                        Some((origin, args.len()))
+                    }
+                    _ => None,
+                })
+                .collect();
+            found.sort();
+            found
+        };
+        let exact_census = arity_census(&plan);
+        let widened_census = arity_census(&widened_plan);
+        assert_eq!(
+            exact_census.len(),
+            2,
+            "the symbol names TWO occurrences, which is the whole reason for this census: {exact_census:?}"
+        );
+        assert!(
+            exact_census.iter().all(|(_, arity)| *arity == 1),
+            "both are arity one before the knob: {exact_census:?}"
+        );
+        assert_eq!(
+            widened_census.len(),
+            2,
+            "the knob adds no occurrence of the symbol: {widened_census:?}"
+        );
+        assert_eq!(
+            widened_census
+                .iter()
+                .filter(|(_, arity)| *arity == 2)
+                .map(|(origin, _)| *origin)
+                .collect::<Vec<_>>(),
+            vec![w.producer_construct_origin],
+            "exactly one occurrence moved, and it is the producer the row is about"
+        );
+        assert_eq!(
+            widened_census
+                .iter()
+                .filter(|(origin, _)| *origin != w.producer_construct_origin)
+                .map(|(_, arity)| *arity)
+                .collect::<Vec<_>>(),
+            vec![1],
+            "and the other same-symbol construct stayed at arity one"
         );
         let widened_children = widened_plan
             .semantic
