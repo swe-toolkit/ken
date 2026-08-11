@@ -439,12 +439,26 @@ occurrence; the implementer swept the **class** and found five across two files,
 leaving pre-existing ones alone on the grounds that copying nearby style is how
 it introduced them.
 
-**One caveat that belongs on the record.** Every executable line is identical
-across the last three candidates, so the three A/B mutations were measured on
-`9d942c4b`'s tree and carried forward on the argument that each delta was
-comment-only. The argument is sound and was checked (`git diff` filtered to
-non-comment lines is empty), but **it is an argument, not a re-measurement** —
-worth knowing if a later finding turns on that evidence.
+**The mutation-evidence carry is MEASURED, not argued.** The three A/B mutations
+were taken on `9d942c4b`'s tree. Each recut step was checked comment-only by its
+author, but **nobody had checked the composition end-to-end** — three
+individually-comment-only steps is not the same claim as the whole chain being
+comment-only, and the raw stat across it is 3 files and 100 changed lines, net
+negative, which `--stat` cannot separate into comments and code.
+
+Measured at `f81e36f6`, on both trees present locally:
+
+```sh
+git diff -w 9d942c4b 068bd6bc -- crates/ | grep -E '^[+-]' \
+  | grep -vE '^(\+\+\+|---)' | grep -vE '^[+-][[:space:]]*(//|/\*|\*)'
+```
+
+**Zero non-comment changed lines.** ⇒ The executable tree the mutations were
+taken on is byte-identical to the merged one, and the evidence transfers. This
+was first written here as a caveat *"it is an argument, not a re-measurement"*;
+the adversary's point (`evt_2kn8jtgn64d9s`) was that a one-command conversion
+from argument to measurement should never be left as a caveat, and that a decent
+prior on the answer is a reason to expect the empty result, not to skip it.
 
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
