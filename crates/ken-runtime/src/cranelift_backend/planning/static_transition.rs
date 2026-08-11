@@ -7829,6 +7829,24 @@ fn intern_specialization(
     Ok((id, true))
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — one discovery the production fixed
+/// point ADMITTED.**
+///
+/// Recorded only after `visited.insert` accepts the item, and returned from the
+/// same `build_continuation_specialization_plan` invocation that produced it.
+///
+/// This exists because reconstructing the roots from `child(consumer, 0)` is a
+/// SEED reconstruction, not the discovery: the fixed point descends and admits
+/// further `(consumer, root)` pairs that no seed scan can name. A consumer
+/// therefore has one seed and may have several admitted roots, and only the
+/// admitted set is the production population.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct AdmittedContinuationDiscovery {
+    continuation_origin: StaticOriginId,
+    result_root: StaticOriginId,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct ContinuationDiscovery {
     continuation_origin: StaticOriginId,
@@ -8438,6 +8456,20 @@ fn build_checked_ih_bindings(
     Ok(out)
 }
 
+/// The admitted-discovery ledger for this plan, from the production fixed point.
+///
+/// One invocation, one ledger. Nothing here reconstructs a seed, scans worker
+/// bodies, or runs a parallel fixed point -- the entries are exactly what
+/// `build_continuation_specialization_plan` admitted, returned from that same
+/// call.
+#[cfg_attr(not(test), allow(dead_code))]
+fn admitted_continuation_discoveries(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<AdmittedContinuationDiscovery>, CraneliftBackendError> {
+    let (_, _, _, admitted) = build_continuation_specialization_plan(plan)?;
+    Ok(admitted)
+}
+
 fn build_continuation_specialization_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<
@@ -8445,9 +8477,11 @@ fn build_continuation_specialization_plan(
         Vec<PlannedContinuationSpecialization>,
         Vec<PlannedContinuationSpecializationCall>,
         Vec<PlannedContinuationContext>,
+        Vec<AdmittedContinuationDiscovery>,
     ),
     CraneliftBackendError,
 > {
+    let mut admitted: Vec<AdmittedContinuationDiscovery> = Vec::new();
     let mut pending = Vec::new();
     for occurrence in plan.source_occurrences.iter().flatten() {
         if matches!(occurrence.expr, RuntimeExpr::ComputationalMatch { .. }) {
@@ -8498,6 +8532,12 @@ fn build_continuation_specialization_plan(
         if !visited.insert(discovery) {
             continue;
         }
+        // The ledger entry, written only where the production fixed point has
+        // already admitted this item. Nothing else writes here.
+        admitted.push(AdmittedContinuationDiscovery {
+            continuation_origin: discovery.continuation_origin,
+            result_root: discovery.result_root,
+        });
 
         let continuation = plan.planned_occurrence_expr(discovery.continuation_origin)?;
         let RuntimeExpr::ComputationalMatch { cases, .. } = continuation else {
@@ -8756,7 +8796,7 @@ fn build_continuation_specialization_plan(
     let calls = calls.into_iter().collect::<Vec<_>>();
     validate_continuation_specialization_closure(&interned, &units, &calls)?;
     let contexts = intern_generated_contexts(&units, &calls)?;
-    Ok((units, calls, contexts))
+    Ok((units, calls, contexts, admitted))
 }
 
 /// The `Parameter` run of the generated context that executes one specialization
@@ -9122,7 +9162,7 @@ fn validate_static_worker_member_population(
 fn validate_continuation_specialization_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<(), CraneliftBackendError> {
-    let (expected_units, expected_calls, expected_contexts) =
+    let (expected_units, expected_calls, expected_contexts, _admitted) =
         build_continuation_specialization_plan(plan)?;
     // ⛔⛔ **The comparison is against the DERIVATION, and `D3b`'s stage-2
     // finalization is not part of it.**
@@ -10110,6 +10150,7 @@ impl<'src> Planner<'src> {
             continuation_specializations,
             continuation_specialization_calls,
             continuation_contexts,
+            _admitted_discoveries,
         ) = build_continuation_specialization_plan(&self.plan)?;
         self.plan.continuation_specializations = continuation_specializations;
         self.plan.continuation_specialization_calls = continuation_specialization_calls;
@@ -14489,6 +14530,57 @@ mod tests {
                 _ => return Ok(origin),
             }
         }
+    }
+
+    /// `D2i` — the discovery LEDGER is what the production fixed point admitted,
+    /// and it is not reconstructible from the seeds.
+    ///
+    /// The seed set is one root per planned `ComputationalMatch`,
+    /// `child(consumer, 0)`. The fixed point then descends and admits further
+    /// `(consumer, root)` pairs. A consumer can therefore appear more than once,
+    /// with roots no seed scan can name -- which is exactly why an enumerator
+    /// keyed on the seed sees a different population from the production one.
+    ///
+    /// Both directions are asserted: the ledger contains every seed, and it
+    /// contains at least one admitted pair that is **not** a seed. Containment
+    /// alone would pass on a ledger that merely echoed the seeds.
+    #[test]
+    fn d2i_the_discovery_ledger_is_richer_than_the_seed_reconstruction() {
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+
+        let ledger = admitted_continuation_discoveries(&plan).expect("ledger");
+        assert!(!ledger.is_empty(), "the fixed point admitted nothing at all");
+
+        // The seed reconstruction, spelled out here only so the two can be
+        // compared. Nothing in production derives roots this way any more.
+        let mut seeds = BTreeSet::new();
+        for occurrence in plan.source_occurrences.iter().flatten() {
+            if matches!(occurrence.expr, RuntimeExpr::ComputationalMatch { .. }) {
+                seeds.insert(AdmittedContinuationDiscovery {
+                    continuation_origin: occurrence.static_origin,
+                    result_root: plan
+                        .semantic
+                        .child_origin(occurrence.static_origin, 0)
+                        .expect("scrutinee"),
+                });
+            }
+        }
+        let admitted: BTreeSet<_> = ledger.iter().copied().collect();
+
+        assert!(
+            seeds.is_subset(&admitted),
+            "every seed must be admitted, or the ledger is missing the frontier it \
+             started from: seeds={seeds:?} admitted={admitted:?}"
+        );
+        assert!(
+            admitted.len() > seeds.len(),
+            "the ledger must admit at least one pair the seeds cannot name, or reading \
+             it buys nothing over reconstructing them: seeds={seeds:?} admitted={admitted:?}"
+        );
     }
 
     /// `D2g` `AC-1` — the checked twin reaches the SAME producer to IH-consumer
