@@ -18570,14 +18570,10 @@ mod tests {
         // A second install into A refuses on the explicit flag.
         let a_second_refuses = plan_a.install_fusion_owned_bodies(&mut ledger).is_err();
 
-        // Exact-once survives a zero-region compile: an empty recorded set must
-        // still read as recorded. Exercised on the ledger directly, because the
-        // emptiness sentinel this replaced could not tell the two apart.
-        let mut empty_ledger = FusionRegionClaimLedger::preflight(&build()).expect("claims");
-        let empty_set: BTreeSet<StaticContinuationFusionId> = BTreeSet::new();
-        empty_ledger.check_body_owned(&empty_set).expect("first check passes");
-        empty_ledger.commit_body_owned(empty_set.clone());
-        let empty_second_refuses = empty_ledger.check_body_owned(&empty_set).is_err();
+        // The zero-region half of exact-once is `d2f_7`, on a plan that
+        // genuinely installs no regions. It is NOT tested here: feeding an
+        // artificial empty subset to a one-region ledger exercises neither
+        // flag against a real zero-region install.
 
         assert_eq!(
             (
@@ -18586,13 +18582,120 @@ mod tests {
                 b_rejected,
                 b_intact,
                 a_second_refuses,
-                empty_second_refuses,
             ),
-            (true, true, true, true, true, true),
+            (true, true, true, true, true),
             "installing a ledger into one plan moves it; reusing that spent ledger against an \
              equivalent second plan is rejected and leaves that plan's ownership map, executable \
-             units and executable edges exactly at baseline; a second install refuses; and an \
-             empty region set still records exactly once"
+             units and executable edges exactly at baseline; and a second install refuses"
+        );
+    }
+
+    /// **`D2f` — exact-once holds on a plan that installs NO fused regions, on
+    /// both flags independently.**
+    ///
+    /// The Architect's second block. `d2f_6` fed an artificial empty owned
+    /// subset to a **one-region** ledger, which exercised neither flag against a
+    /// real zero-region install — so reverting the plan's `fusion_bodies_installed`
+    /// to the old empty-map sentinel left that control green. The population a
+    /// row selects from has to be the real one; an empty set handed to a
+    /// non-empty ledger is a constructed input, not a zero-region compile.
+    ///
+    /// `D2jCause::ExactSuffix` is the genuine article: it reaches the plane
+    /// builder and resolves **zero** keys, so its plan installs an empty fusion
+    /// arena and its preflight ledger has an empty `planned` set. Both flags are
+    /// then the only thing that can distinguish never-installed from
+    /// installed-empty, because every emptiness test in sight answers "empty"
+    /// either way.
+    ///
+    /// **MEASURED:** the plane resolves zero regions; the first install on that
+    /// empty plan succeeds; a second install on the same plan is rejected; the
+    /// recorded empty ledger reused against an equivalent empty plan is
+    /// rejected without mutating it; and that plan remains installable by a
+    /// fresh empty ledger, which is what proves the rejection left no residue.
+    /// **CLAIMED:** exact-once is a property of whether the transaction ran, not
+    /// of whether its payload was non-empty.
+    /// **THE GAP:** un-wired, as with every control on this branch.
+    #[test]
+    fn d2f_7_the_zero_region_install_is_exact_once_on_both_flags() {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::ExactSuffix);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+
+        let build = || {
+            let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let plane =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("plane");
+            let regions = plane.len();
+            let mut plan = plan;
+            plan.install_static_continuation_fusions(plane).expect("installs");
+            (plan, regions)
+        };
+
+        let (mut empty_a, regions) = build();
+        let mut ledger = FusionRegionClaimLedger::preflight(&empty_a).expect("claims");
+        // The population this control depends on, asserted rather than assumed:
+        // a cause that quietly began resolving one region would turn every row
+        // below into the one-region case under a zero-region name.
+        let ledger_empty = ledger.is_empty();
+
+        // First install on a genuinely zero-region plan SUCCEEDS. Under the old
+        // emptiness sentinel this was indistinguishable from never having run.
+        let first_install = empty_a.install_fusion_owned_bodies(&mut ledger).is_ok();
+        // Second install on the SAME plan must reject. This is the row that
+        // pins the plan's flag: the map is still empty, so nothing but the flag
+        // can refuse.
+        let second_install_rejects = empty_a.install_fusion_owned_bodies(&mut ledger).is_err();
+
+        // The recorded empty ledger against an EQUIVALENT empty plan: rejected,
+        // and B unchanged. This is the row that pins the ledger's flag, and it
+        // is a separate object from the row above so a single flag cannot carry
+        // both.
+        let (mut empty_b, _) = build();
+        let b_baseline = (
+            empty_b.fusion_owned_bodies().clone(),
+            empty_b
+                .executable_units()
+                .expect("units")
+                .iter()
+                .map(|unit| (unit.function(), unit.body_occurrence()))
+                .collect::<Vec<_>>(),
+            empty_b.executable_call_edges().expect("edges").len(),
+        );
+        let b_rejects_spent_ledger = empty_b.install_fusion_owned_bodies(&mut ledger).is_err();
+        let b_intact = (
+            empty_b.fusion_owned_bodies().clone(),
+            empty_b
+                .executable_units()
+                .expect("units")
+                .iter()
+                .map(|unit| (unit.function(), unit.body_occurrence()))
+                .collect::<Vec<_>>(),
+            empty_b.executable_call_edges().expect("edges").len(),
+        ) == b_baseline;
+        // And B is still INSTALLABLE by a fresh empty ledger. Without this the
+        // rejection above is consistent with B having been quietly consumed:
+        // "unchanged and dead" and "unchanged and live" look identical from a
+        // snapshot alone.
+        let mut fresh = FusionRegionClaimLedger::preflight(&empty_b).expect("claims");
+        let b_still_installable = empty_b.install_fusion_owned_bodies(&mut fresh).is_ok();
+
+        assert_eq!(
+            (
+                regions,
+                ledger_empty,
+                first_install,
+                second_install_rejects,
+                b_rejects_spent_ledger,
+                b_intact,
+                b_still_installable,
+            ),
+            (0, true, true, true, true, true, true),
+            "on a plan that genuinely installs zero fused regions, the first ownership install \
+             succeeds, a second on the same plan is rejected by the plan's own flag, the recorded \
+             empty ledger is rejected against an equivalent plan without mutating it, and that \
+             plan is still installable by a fresh ledger -- so exact-once is a property of \
+             whether the transaction ran and not of whether its payload was non-empty"
         );
     }
 
