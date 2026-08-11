@@ -122,7 +122,44 @@ that matters is `blocks: [RT-RECURSOR-TRANSPORT]`.
   reachability is unproved; old-green runtime capability is **proved**, and
   these rows are the only probes for the guards they exercise.
 
+## `D2f` ABI-class accepted partial — MERGED 2026-08-11, PR #1897
+
+Exact `006730d4085a04e95dc6b2ca7bebe19d1fbcb6d4` from declared base `84a8f66d`;
+one commit, six paths, `+285/-35`, no added ignores. M6 blob identity 6/6 MATCH.
+**This node stays `active`.**
+
+> ### IT CLOSES ZERO OF THE EIGHT EXPRESSIONS, BY DESIGN
+>
+> **A landed partial on a node with 27 merges reads as progress against the row
+> count unless it says otherwise.** This one is a **structural prerequisite**:
+> the fail-closed `StaticContinuationFusion` ABI class and
+> `ContinuationEmissionOwner::Fusion`, with every consumer disposition refusing.
+>
+> **No constructor, no emitter, no source-body emission authority, no redirected
+> producer edge, and no fusion runtime behaviour.** Verified on the object:
+> seven `Err(` sites added and **zero** panic-style macros, so the class refuses
+> rather than traps; and the only two matches for redirected-edge or emission
+> vocabulary are **doc comments stating their own absence.**
+
+**The `D2f` emitter is the next increment**, scoped to the one `R3` before-hole
+witness — **not** an eight-row repair. The `R3` after-hole / missing-`Mint` cell
+is excluded from `D2f` and owned by [[RT-LEXICAL-ROW2-MISSING-MINT]].
+
+**Measured remainder** (runtime-leader, `evt_645tm43wf1cne`): the `D2f` emitter
+plus its review cycle is **closer to one working day**; **`#6d` closure is
+closer to a week.** ⇒ **`D2f` completion and `#6d` closure are separate planning
+milestones**, and the former does not discharge the latter. The Steward examined
+a re-cut on that estimate and **declined** — the remainder is bounded and named,
+so cutting further would manufacture nodes rather than reveal them.
+
+**The `D2a` rider below is discharged by this partial** — it is one of the six
+paths.
+
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
+
+**DISCHARGED 2026-08-11** by the `D2f` ABI-class partial above, which carries
+`docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2a.md` among its six paths.
+Retained below as the statement of what was owed and why.
 
 **Land this with the next candidate that touches `control.rs`.** It is a rider,
 not a deliverable, and it does not earn its own node. It is recorded here
