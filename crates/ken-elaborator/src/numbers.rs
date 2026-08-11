@@ -41,7 +41,7 @@ pub enum NumericLitVal {
     Int(BigInt),
     Float(f64),
     Float32(f32),
-    Decimal { coeff: i64, exp: i32 },
+    Decimal { coeff: BigInt, exp: i32 },
     /// NFC-normalized UTF-8 string literal (`37 §2.1`, VAL1-surface).
     Str(NfcString),
 }

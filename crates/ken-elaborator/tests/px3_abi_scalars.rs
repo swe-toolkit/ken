@@ -37,7 +37,7 @@ fn eval_const(env: &ElabEnv, id: ken_kernel::GlobalId) -> EvalVal {
             NumericLitVal::Float(value) => EvalVal::Float(*value),
             NumericLitVal::Float32(value) => EvalVal::Float32(*value),
             NumericLitVal::Decimal { coeff, exp } => {
-                ken_interp::decimal_value(mkdecimalpair_id, *coeff, *exp)
+            ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
             }
             NumericLitVal::Str(value) => EvalVal::Str(value.clone()),
         };

@@ -3686,7 +3686,7 @@ fn elab_num_lit_checked(
             }
             NumLit::Float(f) if ty_id == nenv.float_id => Some(NumericLitVal::Float(*f)),
             NumLit::Decimal(c, e) if ty_id == nenv.decimal_id || ty_id == nenv.decimalpair_id => {
-                Some(NumericLitVal::Decimal { coeff: *c, exp: *e })
+                Some(NumericLitVal::Decimal { coeff: c.clone(), exp: *e })
             }
             NumLit::Float32(f) if ty_id == nenv.float32_id => Some(NumericLitVal::Float32(*f)),
             _ => None,
@@ -3755,7 +3755,7 @@ fn num_lit_default_type(lit: &NumLit, nenv: &NumericEnv) -> (NumericLitVal, Glob
         NumLit::Int(n) => (NumericLitVal::Int(n.clone()), nenv.int_id),
         NumLit::Float(f) => (NumericLitVal::Float(*f), nenv.float_id),
         NumLit::Decimal(c, e) => (
-            NumericLitVal::Decimal { coeff: *c, exp: *e },
+            NumericLitVal::Decimal { coeff: c.clone(), exp: *e },
             nenv.decimal_id,
         ),
         NumLit::Float32(f) => (NumericLitVal::Float32(*f), nenv.float32_id),

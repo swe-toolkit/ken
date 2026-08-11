@@ -1259,10 +1259,10 @@ impl From<BigInt> for EvalVal {
 /// call sites outside this crate (`ken-cli`, elaborator test drivers) that
 /// turn an elaborated `NumericLitVal::Decimal` into its `EvalVal`; not
 /// interned here (callers intern via the store when needed).
-pub fn decimal_value(mkdecimalpair_id: GlobalId, coeff: i64, exp: i32) -> EvalVal {
+pub fn decimal_value(mkdecimalpair_id: GlobalId, coeff: BigInt, exp: i32) -> EvalVal {
     EvalVal::Ctor {
         id: mkdecimalpair_id,
-        args: Rc::new(vec![EvalVal::Int(coeff), EvalVal::Int(exp as i64)]),
+        args: Rc::new(vec![EvalVal::from(coeff), EvalVal::Int(exp as i64)]),
         slot: NULL_SLOT,
     }
 }

@@ -444,7 +444,7 @@ fn lit_to_eval(
         NumericLitVal::Float(f) => ken_interp::EvalVal::Float(*f),
         NumericLitVal::Float32(f) => ken_interp::EvalVal::Float32(*f),
         NumericLitVal::Decimal { coeff, exp } => {
-            ken_interp::decimal_value(mkdecimalpair_id, *coeff, *exp)
+            ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
         }
         NumericLitVal::Str(s) => ken_interp::EvalVal::Str(s.clone()),
     }
