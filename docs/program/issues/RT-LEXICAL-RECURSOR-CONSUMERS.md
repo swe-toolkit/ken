@@ -154,14 +154,37 @@ behaviour, planner signature widening, and every emitter AC claim.
 **This one also closes zero of the eight expressions.** Two partials, two
 structural prerequisites, zero rows.
 
-> **Why its control is not vacuous** — and it is worth recording, because
-> *"empty resolution is legal"* is exactly the condition that lets an arrival
-> control pass for free. It takes `NonZeroUsize::new(planes.len()).expect(...)`,
-> so **a zero arrival panics rather than passing**, and the assertion then
-> equates the recorded planes with the established arrival count as **one
-> population**. Resolved sizes are **recorded, not pinned** — this witness plans
-> no admitted fusion, so a control asserting resolution *success* would have
-> been either vacuous or wrong.
+> **What its control proves, CORRECTED 2026-08-11.** *"Empty resolution is
+> legal"* is exactly the condition that lets an arrival control pass for free,
+> so what the control does and does not establish is worth stating exactly.
+>
+> **It proves arrival, and that half is real.**
+> `NonZeroUsize::new(planes.len()).expect(...)` panics on an empty drain, so
+> **a compile that never reached the production builder fails the control
+> rather than passing it.** Resolved sizes are **recorded, not pinned** — this
+> witness plans no admitted fusion, so a control asserting resolution *success*
+> would have been either vacuous or wrong.
+>
+> **STRUCK — *"the assertion equates the recorded planes with the established
+> arrival count as one population."*** **That is false, and it was published
+> here and in PR #1899's body.** `planes` is read **once**; `reached` is
+> `NonZeroUsize::new(planes.len())`; the assertion then compares `planes.len()`
+> to `reached.get()`. Both sides come from that one read, so it is
+> `planes.len() == planes.len()` — **a tautology, not a second measurement.**
+> Adversary-measured; Steward disposition `evt_7ewdkteptjr8t`.
+>
+> **An equality is a measurement only if its two sides come from different
+> reads.** No count of intervening named bindings changes that, and naming the
+> doubt in the merge notification after the fact was not the same as checking
+> it.
+>
+> **The repair is folded into the `D2f` emitter increment, not re-reviewed
+> here** — the merged code is not wrong, only weaker than the sentence above
+> claimed. The honest form is to drop the `assert_eq!` and keep the `expect`;
+> **a second counter manufactured to make the equality look measured is the
+> cosmetic repair and is forbidden.** A real equality becomes available only
+> once a fusion resolves, at which point builder arrival and resolved-plane
+> population are genuinely independent quantities.
 
 **The `D2f` emitter is the next increment**, scoped to the one `R3` before-hole
 witness — **not** an eight-row repair. The `R3` after-hole / missing-`Mint` cell
@@ -176,6 +199,81 @@ so cutting further would manufacture nodes rather than reveal them.
 
 **The `D2a` rider below is discharged by this partial** — it is one of the six
 paths.
+
+## The `D2f` gating measurement came back EMPTY. 2026-08-11.
+
+**The emitter increment is stopped, and it stopped for the right reason.**
+Runtime measured the gate before touching the emitter, which is exactly what
+the gate was placed there to do.
+
+Measured on the exact `R3` before-hole `B`-only compile
+(`px8j_equal_payload_hole_placement(BeforeReturnHole)` through
+`px8j_capture_source_trace`), with temporary instrumentation at the production
+call site, since reverted:
+
+```
+planes=[0]   oriented_present=[false]
+```
+
+One production compile reached the builder. It resolved **zero**. The first
+reason is the `oriented` gate at `planning/static_transition.rs:8901` and
+`:9058`, which returns an empty plan **before any candidate enumeration runs** —
+before checked transport, IH bindings, or the root walk. The `None` originates
+at `cranelift_backend/test_objects.rs:70`, where the harness passes a **literal**
+`None` for `oriented_subcontinuation_plan`. Production oriented plans are
+decoded from a checked package's metadata (`planning.rs:144`); the `px8j`
+witness is a **seed-lane** compile, so there is no metadata to decode and
+nothing that could supply one.
+
+⇒ **This is structural, not a defect in the enumerator.**
+
+**Every gate below the `oriented` check is UNMEASURED on this witness.** The
+probe short-circuits at the first cause, so it measured that cause and not the
+set. Nothing here says the enumerator would or would not find a candidate if a
+plan were supplied.
+
+**And no control has ever exercised this mechanism on the witness the ACs
+name.** Every `D2h`/`D2j` control that reaches a fusion candidate uses its own
+synthetic fixture (`d2j_entry()` / `D2J_DECLARATION` with a hand-authored
+`d2j_oriented_plan_under(cause)`) and calls the builder directly. **None of them
+compiles `px8j`** — so the mechanism is untested against the acceptance fixture
+on *both* sides of the gate.
+
+### The frame defect is the Steward's, and it is named here so it is not inherited
+
+**`AC-1` requires the fusion to occur on the exact `px8j` `R3` before-hole
+compile. That compile structurally cannot carry an oriented plan today.** The
+frame therefore pins acceptance to a witness that cannot carry the mechanism's
+required input — **a defect in the frame I wrote, not in the work.** It is
+recorded now rather than after the ruling, because the next slice frame would
+otherwise inherit the same witness by citation.
+
+**`AC-1` is NOT amended yet, deliberately.** Which amendment is correct depends
+on the mechanism ruling below, and amending first would presume its answer.
+
+### The open fork — routed to the Architect, `evt_` in the `#6d` thread
+
+Two repairs are visible and **both cross lines a leader or the Steward may not
+cross alone**:
+
+1. **Give the `px8j` witness a lawful oriented plan.** Keeps `AC-1` as written.
+   But authoring the plan is authoring the input the key re-derives against, and
+   the line between *supplying the witness's real oriented facts* and
+   *fabricating a candidate so the emitter has something to emit* is exactly the
+   line the ring was told not to cross.
+2. **Make fusion not require an oriented plan.** This reopens `D2h`'s key
+   re-derivation, which is the soundness-bearing half and is **excluded scope**
+   under this frame.
+
+**Neither was started.** The standing risk handed back one turn earlier is now
+**confirmed rather than suspected**: an emitter built against this witness would
+discharge `AC-4` **vacuously** — a no-activation proof over nothing emitted
+passes for free — and `AC-6a`'s refusal controls would assert against a resting
+zero, which the frame already warns proves nothing.
+
+⇒ **Do not authorize a synthetic candidate or a zero-definition emitter to
+unblock the increment.** That trades a stop for a control that cannot fail,
+which is the failure this node has now filed against itself three times.
 
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
