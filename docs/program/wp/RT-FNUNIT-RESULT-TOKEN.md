@@ -6,9 +6,41 @@ port and was masked by it; retiring `SeedClosureCall` made it reachable. This
 node makes the shape work on the functionized lane.**
 
 **Owner:** Team Runtime. **Branch:** `wp/RT-FNUNIT-RESULT-TOKEN`.
-**Size:** M — **provisional, and §3 may overturn it before any code is written.**
+**Size:** M — held. §3 tested it and it survived, for a reason nobody had.
 **Risk:** medium — the failure is in result decoding, which every native return
 crosses.
+
+> ## MERGED AND COMPLETE, 2026-08-11 — every deliverable and every AC discharged
+>
+> Landed as **PR #1892**, exact `dbbf782feb9b9af3f4d07cc3321a2b499ebba8c9`
+> from declared base `cc56e460`, four paths, `+804/-5`. `origin/main` is
+> `8111fa06`. M6 blob identity: 4/4 MATCH against the declared scope.
+>
+> | | outcome |
+> |---|---|
+> | `D1` | discharged at `be54d47f` — falsified this frame's corpus premise |
+> | `D2` | discharged — retired two of this frame's own framings |
+> | `D3a` | discharged — one `InvocationAggregate` arm, per the Architect's ruling |
+> | `D3b` | discharged — neutral message, `_ =>` **deleted** rather than retained |
+> | `D4` | discharged — `nc22` un-skipped and green, seen to fail first |
+> | `AC-1` `AC-1a` `AC-2` `AC-3` `AC-4` | all discharged; see each below |
+>
+> **This node no longer blocks [[RT-DESCENT-RETIRE]].**
+>
+> **The frame's `D3a` guess was wrong in the safe direction, and the ring
+> improved on it.** This frame proposed the `_ =>` refusal be **retained** for
+> the six remaining tags. The Architect ruled the arm, and the implementer went
+> further: the wildcard is **gone**, replaced by `None` plus the six tags
+> spelled out. A future `BoundaryTag` is now a **compile error at this
+> decoder** instead of silently inheriting the wildcard's policy. That converts
+> `AC-4` from a rule a reviewer must remember into one the compiler enforces —
+> and it makes the cheap wrong repair unavailable rather than merely forbidden.
+>
+> **One finding was carried out rather than absorbed:**
+> [[RT-GROUNDVALUE-RECURSIVE-DROP]] — `RuntimeGroundValue` is itself recursive,
+> so "deep valid data uses no recursive host stack" holds for the traversal and
+> **cannot** hold end to end. That ceiling belongs to the value type, not to
+> this decoder, so fixing it here would have been the wrong layer.
 
 **Read `docs/program/16-recursive-descent-retirement.md` first.** This node exists
 because of that campaign's Trap 2, and the frame does not repeat the traps.
@@ -205,34 +237,44 @@ outcome than agreement, and it is why the deliverable exists.
 - **`D3` — the repair. TWO parts.** Cut ruled by the Steward 2026-08-11
   (`evt_5fn8nb9s03785`).
 
-  **`D3a` — the decode arm.** An `InvocationAggregate` decode path.
-  **The mechanism is the Architect's ruling, not this frame's and not the
-  leader's** — the question routed to it is whether the correct shape is *a
-  specific `InvocationAggregate` arm with the `_ =>` refusal RETAINED for the
-  remaining six tags.* **Do not build ahead of that ruling.** `AC-4` binds
-  hardest here and is quoted in the ruling request: the repair lands in one of
-  the two arms this frame names as dangerous, and "add a correct arm" versus
-  "widen `_ =>` until it stops complaining" are **indistinguishable in a green
-  test.**
+  **`D3a` — DISCHARGED, 2026-08-11.** The Architect's ruling
+  (`evt_78ynjwzj0gpa8`, Decision `dec_5q3qd281q9shw`) is the mechanism, as this
+  frame required. Exactly one `Some(BoundaryTag::InvocationAggregate)` arm,
+  after `activation.finish(&mut store, None)` seals the persistent image;
+  reconstruction is `decode_invocation_ground` in the boundary-value layer, not
+  node-field logic in `compiled.rs`; traversal is iterative postorder with
+  grey/black state, so cycles refuse and sharing stays legal; the aggregate root
+  is never adopted and nothing arena-backed escapes.
 
-  **`D3b` — the error message, and it needs no design input.** The current text
-  *"native result token N is not in the result table"* is **false for this
-  case**: `265` is a well-formed tag reaching an unhandled arm, not a table
-  miss. **A message that misdirects the next reader to the table is a defect on
-  the decode surface and is this node's to fix.** This part can be staged
-  before the Architect rules.
+  **STRUCK — *"the `_ =>` refusal RETAINED for the remaining six tags."*** The
+  wildcard is **deleted**, not retained. `None` plus the six tags are spelled
+  out, making the match exhaustive without a wildcard. **This frame asked for
+  the weaker thing and got the stronger one** — see the header block for why
+  that matters more than the arm.
 
-  **Out of scope: the six other unhandled `Boundary` tags.** Name them in the
-  handback; do not handle them.
-- **`D4` — un-skip `nc22` and prove it green on the functionized lane.**
-  **This node closes on the row running, not on the skip being tidied.**
+  **`D3b` — DISCHARGED, 2026-08-11.** `native result token {token} could not be
+  decoded`. **Saying less was the correction.** The old text named a mechanism
+  false at **seven of the eight** raise sites, and `D2` measured it failing in
+  the worst way — reporting a result-table miss for a token that never reached
+  the `Table` arm, against a table that was empty. The variant carries no
+  raise-site discriminator, so nothing in the rendering can localize the fault;
+  localizing it *wrongly* is worse than not localizing it.
+
+  **Out of scope, and honoured: the six other unhandled `Boundary` tags.** Named
+  in the handback, not handled — see `AC-2`.
+- **`D4` — DISCHARGED, 2026-08-11.** `nc22` is un-skipped and green on
+  `FunctionizedUnits`, asserting the exact
+  `Record { ok: Bool(true), value: Int(7) }` observation plus
+  `F1RuntimeIrEvaluatorAgreement`. **The row runs; the skip was not tidied.**
 
 ## 5. Acceptance criteria
 
-- **`AC-1` — `nc22` runs green on `FunctionizedUnits`**, with its `#[ignore]` and
-  the owner reference removed. **Seen to fail before it passes** — this row has
-  been dark, so a green with no demonstrated red is not evidence the repair did
-  anything.
+- **`AC-1` — DISCHARGED, 2026-08-11.** `nc22` runs green on
+  `FunctionizedUnits`, `#[ignore]` and the owner reference removed. **The
+  demonstrated red is on this same node**, under `--ignored` at `D2`, twice —
+  so the green is evidence the repair did something. The suite moved 875 → 883
+  passing and 5 → 4 ignored with **no other row moving**, which is the part
+  that says the repair was not a side effect of something else.
 - **`AC-1a` — DISCHARGED POSITIVE, 2026-08-11.** `nc5` reaches the same
   `Boundary` decoder's native call **by name** and emits `ImmediateInt 7`. ⇒
   **It is a genuine control on the functionized lane**, not a fixture that is
@@ -269,12 +311,26 @@ outcome than agreement, and it is why the deliverable exists.
   and bare-constructor share a single tag cell, so there is no family to author
   fixtures for. **No proliferation, no re-cut, `M` stands.**
 
-  **What this AC still requires of the handback:** name the six unhandled tags.
-  They are out of scope to fix and in scope to enumerate — an unnamed remainder
-  is how a narrowed surface reads as a complete one.
-- **`AC-3` (no-regression).** Workspace green **in CI** — never a local
-  `--workspace` run (`COORDINATION §12`).
-- **`AC-4` — the decode surface stays fail-closed, on the arm the repair
+  **The six were named, and then made structural.** The handback enumerated
+  them — `ImmediateExitStatus`, `ImmediateBoundedNat`, `ImmediateStructuralNat`,
+  `PersistentClosure`, `InvocationBorrowed`, `InvocationHostResult` — and the
+  landed match spells all six plus `None` in the source. ⇒ **The remainder can
+  no longer go unnamed**, which is what this clause was defending against.
+- **`AC-3` — DISCHARGED, 2026-08-11.** Workspace green **in CI** on PR #1892
+  (`COORDINATION §12`); never a local `--workspace` run. Targeted evidence
+  alongside it: `-p ken-runtime` 884 passed, 0 failed, 4 ignored.
+- **`AC-4` — DISCHARGED, 2026-08-11, and by the strongest available means.**
+  Verified by the Steward **on the merged object**, because this is the AC a
+  green test cannot see: exactly one `Some(BoundaryTag::InvocationAggregate)`
+  arm, the six other tags plus `None` written out explicitly, **no `_ =>`
+  anywhere in that match**, and the neutral message. Widening the new arm now
+  requires **deleting a named tag** — the cheap wrong repair is unavailable,
+  not merely banned. The old result-table wording survives only in a doc
+  comment recording the history.
+
+  **Kept below as landed text, because the reasoning is the reusable part.**
+
+  **The decode surface stays fail-closed, on the arm the repair
   actually touches.** A value the decoder genuinely cannot interpret must still
   raise `NativeResultDecode` rather than being defaulted, silently mapped, or
   widened away. **Making the error disappear is the failure mode, not the fix.**
