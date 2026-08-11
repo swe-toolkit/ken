@@ -4,8 +4,28 @@ Node: `docs/program/issues/RT-FNUNIT-RESULT-TOKEN.md`. Frame:
 `RT-FNUNIT-RESULT-TOKEN.md`. Measurement-only turn: **no `crates/` change, no
 fixture authored, no repair, and `D2` not started.**
 
-Base and merge-base `origin/main` `a6438b76afcd717cd9c42f22a5d8d4036ba22b0a`,
-re-derived. Every command targeted; no `--workspace`.
+**Two base coordinates, and they are not the same commit.** An earlier revision
+of this line named one, which made a stale measurement base read as the
+candidate's merge-base.
+
+| coordinate | value | what it is |
+|---|---|---|
+| **measurement base** | `a6438b76afcd717cd9c42f22a5d8d4036ba22b0a` | where **every observation below was taken**. Fixed for the life of this record. |
+| **candidate merge-base** | re-derive from `origin/main` at review time | where this record is **anchored**. It moves whenever `main` does, and this candidate has already been rebased once. |
+
+**Every measurement in this record is scoped to the measurement base**, and is
+stated as such at each site rather than as a claim about the candidate's
+anchor.
+
+**Why the observations still carry to the candidate:** the three source files
+they depend on are byte-identical across the two coordinates —
+`ir.rs` `e9b0114d`, `cranelift_backend/artifact/api/tests.rs` `7ea92d79`,
+`cranelift_backend/compiled.rs` `31e5c149`. That is what makes the historical
+base usable, and it is a fact to re-check rather than inherit: if any of the
+three moves, the observation resting on it is owed a re-run at the new anchor,
+not a re-labelling.
+
+Every command targeted; no `--workspace`.
 
 ## 0. The headline
 
@@ -26,10 +46,11 @@ it.
 
 ## 1. Fixed inputs, re-pinned
 
-At `a6438b76`, all three blobs are **identical to the Steward's `22fb3a61`
-pins** — `artifact/api/tests.rs` has not moved again since `90ddcf1c`.
+At the **measurement base** `a6438b76`, all three blobs are **identical to the
+Steward's `22fb3a61` pins** — `artifact/api/tests.rs` has not moved again since
+`90ddcf1c`.
 
-| path | pinned `22fb3a61` | measured `a6438b76` | |
+| path | pinned `22fb3a61` | measured at the measurement base | |
 |---|---|---|---|
 | `cranelift_backend/surface.rs` | `99b9b507` | `99b9b507` | unchanged |
 | `cranelift_backend/artifact/api/tests.rs` | `7ea92d79` | `7ea92d79` | unchanged |
@@ -47,8 +68,8 @@ right: RuntimeIrNativeAgreement { stage: RuntimeIrNativeCompare }
 ```
 
 at `artifact/api/tests.rs:188`. **`AC-1`'s "seen to fail before it passes"
-precondition is now on the record at this base**, which it was not — the row has
-been dark since the skip.
+precondition is now on the record at the measurement base**, which it was not —
+the row has been dark since the skip.
 
 ## 3. The second instance
 
@@ -73,7 +94,7 @@ producing the seed corpus"*, selected by name from `values.rs`,
 
 ### 3.1 It is on the functionized lane, and it is green
 
-Two committed controls, both **measured passing** at `a6438b76`:
+Two committed controls, both **measured passing** at the measurement base:
 
 - **`d3_the_seed_corpus_fires_no_residual_at_all`** (`control.rs`) enumerates
   every `nc5` example through `enumerate_recursive_descent_residuals` and
@@ -140,7 +161,7 @@ a fixture sweep would not look.
 
 `object_linker_packaging.rs:3033`, in
 `process_artifact_maps_exitcode_and_reports_terminal_traps` — **measured green
-at this base** — builds a `Match` whose *scrutinee* is a `Call` with a
+at the measurement base** — builds a `Match` whose *scrutinee* is a `Call` with a
 `LexicalClosure` callee, and executes it to a linked process artifact. Its own
 comment reads:
 
