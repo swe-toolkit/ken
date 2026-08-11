@@ -1,13 +1,13 @@
 ---
 id: LANG-LEX-NUMERIC-FORMS
 title: "The lexer implements none of the numeric literal forms 31-lexical and 35-numbers list besides bare decimal -- no `1_000` separators, no `0xFF`/`0b1010`/`0o17` radix integers, no `0x1p-3` hex float -- and `1e-9`, which both spec tables give as the canonical Float example, does not lex as a float at all because the exponent branch is gated on having seen a dot"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: [LANG-SURFACE-INT-PRECISION]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/1881
 origin: Steward measurement 2026-08-11 at origin/main=90ce6743, taken after LANG-SURFACE-INT-PRECISION reported a precision-only cut. Its frame said the lexical forms share a spec line with the precision half but not a mechanism, and that the sibling would be filed once the cut was known. This is that filing.
 ---
 
@@ -77,18 +77,56 @@ land on. That carrier merged at `90ce6743`: `Token::IntLit` now carries
 ⇒ **The radix work now has a target and did not before.** Both nodes also
 edit `lex_numeric`, so they contend directly.
 
-## What is not yet known
+## Landed — `5f9a11f1`, PR #1881
 
-- Whether separators belong in the scanner or in a normalisation step before
-  `parse`. The current integer path parses `int_str` directly into `BigInt`, so
-  stripping `_` from that string is one line; the decimal and float paths build
-  their strings separately and would each need it.
-- Whether `0x1p-3` is worth taking with the radix integers. It shares the `0x`
-  prefix and nothing else — the mantissa is hex, the exponent is binary and
-  decimal-spelled. **It may be its own cut.**
-- Whether a separator is legal adjacent to the radix prefix or the decimal
-  point (`0x_FF`, `1_.5`, `1._5`). The spec says only *"underscores are digit
-  separators and are ignored"* (`31 §3`), which does not settle placement.
+Five non-merge commits from `24933da4`, two paths, `+128/-11`. Decision
+`dec_1zav38jz0b6y3`. Separators, `0x`/`0b`/`0o` integers through `BigInt`, and
+decimal exponent floats.
+
+## What was not yet known, and how it came out
+
+**Separators live in the scanner, per position, not in a normalisation step.**
+Each of the integer, fractional, and exponent scans validates placement itself
+under one rule — **a separator must sit between digits**. Trailing, doubled,
+and post-sign placements refuse with spans.
+
+**`0x1p-3` was NOT taken here, and the reason is mechanical rather than a
+sizing preference.** Every other form in this arc ends by handing a string to
+something that already parses it; hex floats have no such destination, since
+`"0x1p-3".parse::<f64>()` is an error and there is no `from_str_radix` for
+floats. That makes the deliverable a correctly-rounded conversion rather than a
+scanner. It is [[LANG-LEX-HEX-FLOAT]], which this node unblocks.
+
+**Placement adjacent to the prefix and the decimal point is settled by the
+between-digits rule** — `0x_FF`, `1_.5`, `1._5` all fail it. **The rule is what
+was controlled; those three spellings were not each named as controls on the
+review record.**
+
+## What this node repaired that its own frame did not predict
+
+**Two silent wrong answers, both pre-existing, neither in the original cut.**
+
+- **`3.14e5` lexed to `FloatLit(0.0)`**, as did `1.2e5`, `3.14E5`, `3.14e-2`.
+  `exp_str` already held the `e` and the float branch formatted `"{}.{}e{}"`,
+  so `"3.14ee5"` failed to parse and `unwrap_or(0.0_f64)` returned zero. **Both
+  silent-zero sites are now span-bearing refusals.**
+- **`1e2d` became `DecimalLit(1,0)` and `1e2f32` became `Float32Lit(1.0)`**,
+  each dropping the exponent. Now lexical refusals.
+
+**And one boundary that took two rounds.** After consuming `e+`,
+`exp_str.len() == 2`, and a guard testing `len() <= 1` accepted `1e+_1` as
+`FloatLit(10.0)`. **A sign is not a digit, and a length test on a buffer that
+already contains the sign cannot say so.**
+
+## What is still not established
+
+**`1e-9`'s post-repair value was never executed on the review record.** AC-1
+was a *pre-edit* severity measurement, and it correctly reported the unrepaired
+stream `Nat(1), Ident("e"), Minus, Nat(9)`. The cut then removed the `has_dot`
+gate on the exponent scan, which should make `1e-9` a float for the first
+time — but no reviewer executed it afterwards. **The frame reasoning says it
+now lexes as `FloatLit(1e-9)`; nobody measured it.** [[LANG-LEX-HEX-FLOAT]]'s
+AC-6 carries the obligation to measure and pin it.
 
 ## Not this node
 

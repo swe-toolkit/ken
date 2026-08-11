@@ -15,16 +15,21 @@ does not answer", which may be the exception.
 > radix integers. **Extend it. Do not build a second `0x` entry point** — the
 > prefix is loaded three ways and only one scanner may own the fork.
 >
-> **Direction two, and this one is a stop.** That node also repairs the float
-> path you are about to join. Measured by execution on `47a0b791`,
-> **`3.14e5` lexes to `FloatLit(0.0)`** — `exp_str` already holds the `e`
-> (`lexer.rs:555`) and the float branch formats `"{}.{}e{}"` at `:610`, so
-> `"3.14ee5"` fails to parse and `unwrap_or(0.0_f64)` returns zero.
+> **Direction two — THIS STOP IS NOW DISCHARGED. Do not act on it.** That node
+> also repaired the float path you are about to join. The defect was real:
+> measured by execution on `47a0b791`, **`3.14e5` lexed to `FloatLit(0.0)`**,
+> because `exp_str` already held the `e` and the float branch formatted
+> `"{}.{}e{}"`, so `"3.14ee5"` failed to parse and `unwrap_or(0.0_f64)`
+> returned zero.
 >
-> **If both `unwrap_or(0.0)` sites (`:600`, `:610`) are still there when you
-> start, stop and tell me.** A new literal form built on a parser that
-> swallows its own failures inherits the swallow, and a hex float that
-> silently becomes `0.0` is strictly worse than one that does not lex.
+> **Both `unwrap_or(0.0)` sites are gone**, verified against the merged blob:
+> the float and `f32` constructions now end in
+> `.parse().map_err(|_| ElabError::ParseError { … })?` — a span-bearing
+> refusal. **You are joining a float path that refuses rather than zeroes**,
+> which is the condition this gate was protecting.
+>
+> **The `has_dot` gate on the exponent is also gone**, so the exponent scan now
+> fires on any `e`/`E`. That is what makes `1e-9` a float at all; see AC-6.
 
 ## What this deliverable is
 
@@ -152,8 +157,17 @@ permit separators, they are rejections; if you forbid them entirely, so is
 uncontrolled sign boundary is a known gap here, not a hypothetical one.
 
 **AC-6 — the existing forms and the projection seam are unchanged.** `3.14`,
-`1e-9` and `3.14e5` as the sibling leaves them, `1.2d`, `1.5f32`, `42`, and
-`p.1.2` / `p. 1.2`.
+`1e-9`, `3.14e5`, `1.2d`, `1.5f32`, `42`, and `p.1.2` / `p. 1.2`.
+
+**Two of those changed meaning in the sibling, so measure them rather than
+copying an expectation.** `3.14e5` was `FloatLit(0.0)` and is now a correct
+float; `1e-9` was not a float at all — it lexed as
+`Nat(1), Ident("e"), Minus, Nat(9)` — and the removal of the `has_dot` gate
+makes it one. **`1e-9`'s post-repair value is not on the review record**: the
+sibling's ring executed the separator and suffix nets, and its `1e-9`
+measurement was the *pre-edit* severity check, not a post-edit one. **Measure
+both, pin the values you get, and if `1e-9` is still not a float, that is a
+stop** — it is one of the spec's own three float examples.
 
 **AC-7 — no `spec/` edit, no new surface production, `trusted_base()`
 unchanged.**
@@ -170,7 +184,9 @@ unchanged.**
 
 ## Stop conditions — return to me, do not decide
 
-- **The `unwrap_or(0.0)` sites are still present** (the gate).
+- ~~**The `unwrap_or(0.0)` sites are still present**~~ — **RETIRED. This stop
+  can no longer fire.** Both sites were replaced by span-bearing refusals in
+  [[LANG-LEX-NUMERIC-FORMS]]; see the gate block above.
 - **You decide the `p` exponent is optional.**
 - **Correct rounding turns out to need a change outside `lex_numeric`** — for
   instance a different `Float` carrier. That would mean the form is not a
