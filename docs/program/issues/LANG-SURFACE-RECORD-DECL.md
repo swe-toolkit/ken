@@ -1,7 +1,7 @@
 ---
 id: LANG-SURFACE-RECORD-DECL
 title: "`33 §2` specifies `record Point { x : Int, y : Int }` and `record` is already a reserved keyword, but the lexer emits no token for it and the parser has no declaration form -- while the elaboration target is complete and already exercised, since `class` elaborates to exactly the right-nested Sigma chain a record needs and `p.x` already parses and resolves, refusing only at `infer_proj` because that lookup scans the class registry"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
@@ -90,7 +90,35 @@ failure.
 occurs check, none of which exist. That is a foundational node, not a surface
 one. **Do not size it from the presence of the word `unify`.**
 
-## What is not yet known
+## What was not yet known at framing — ALL THREE ANSWERED, 2026-08-11
+
+> ### RESOLVED by the declaration form, PR #1938
+>
+> Verified against `origin/main`, not taken from review prose.
+>
+> 1. **Registry.** `class_env`, as **one** map — a single private
+>    `named_field_owners` (`classes.rs:195`) keyed by owner name, each entry
+>    pairing projection facts with a closed
+>    `NamedFieldKind::Class(ClassOnlyInfo) | Record`. Not a sibling registry
+>    and not two maps. `class()`/`class_entries()` return `None` on the
+>    `Record` arm, so nothing that scans for classes sees records.
+> 2. **`Decl::Transparent`** — yes, and **the hazard was real and is handled
+>    the same way.** `elab.rs:3494-3495` states it in the code: `infer_proj`
+>    deliberately inspects `base_ty` **as elaborated and never `whnf`'d**,
+>    because a named owner type is itself `Decl::Transparent` and `whnf` would
+>    unfold it straight into the raw Σ-chain, losing the identity the lookup
+>    needs. The frame guessed "same hazard, probably same answer"; that guess
+>    was correct and is now measured.
+> 3. **Dependent field ordering** — admitted, with a control rather than an
+>    assertion that it ought to work:
+>    `record_decl_form.rs:53`,
+>    `right_nested_third_and_dependent_record_fields_elaborate`.
+
+**The original framing text is kept below for its reasoning about why each was
+a real fork. Every "not measured" in it is now false** — the block above is the
+current state. It is retained because the forks it names are the ones a reader
+of [[LANG-SURFACE-RECORD-LITERAL]] will meet again, not because anything here
+is still open.
 
 - **Whether records register in `class_env` or a sibling registry.** Reusing
   `ClassInfo` makes the `infer_proj` lookup generalize for free but puts
@@ -489,3 +517,64 @@ Both read `` `class_env.classes[C].field_types` ``. This is prose debt, not a
 build defect — fold it into whichever `S2..Sn` slice touches those files rather
 than spending a cut on it. `tests/seal2_support/mod.rs:12` was checked and is
 **already correct** (it names `classes()`), so this is two sites, not three.
+
+## THE DECLARATION FORM — MERGED 2026-08-11, PR #1938. NODE COMPLETE.
+
+Exact `e55dc44d15ae48125be587e9b7ad51a861d1103c`, declared merge-base
+`e0246b08`. One non-merge commit, 17 paths, `+558/-52`. Decision
+`dec_473msdv6y0r69` read `resolved` from the object at merge time; QA
+`evt_6ccmdz6nmzwpp`, Architect `evt_63q168nccj6nr`, Spec/Fidelity recorded in
+the Decision's own resolution and cast by the conformance-validator. Blob
+identity verified 17/17 against `origin/main` from the **declared** merge-base.
+
+**This is the node's headline deliverable and the first slice that was.** `S1a`
+through `S4` were all `ClassEnv` migration clearing the way; none touched the
+form. At the merge-base the lexer had zero `KwRecord`; `33 §2`'s
+`record Point { x : Int, y : Int }` now parses, elaborates and projects.
+
+### The CI rejection is the part worth carrying forward
+
+**A first cut, `d5c7df82`, was `resolved` with QA and Architect exact
+approvals and still failed CI.** Adding `record` to the declaration keywords
+invalidated `kw_theorem_surface_keyword.rs:50`, which asserts the parser's full
+keyword enumeration **verbatim** — from a file outside that cut's ten paths. It
+is an enumeration oracle doing exactly its job, and it is close to invisible to
+a reviewer reading a diff.
+
+⇒ **`resolved` is not the last gate. CI is.** Three approvals did not catch it.
+
+**The re-cut's response is the lesson, not the failure.** The publisher's
+failing-log filter is a floor, not a complete failure list, and the ring treated
+it as one: the range went from ten paths to **seventeen**, sweeping the class of
+defect rather than patching the single test CI named. That found three further
+true enumerations CI had not yet reached — the `conformance/` diagnostic copy,
+the formatter's top-level-prefix inventory, and the highlight-js
+grammar/README/sample. **Patching the named test would have landed and left
+three wrong copies.**
+
+### A routing defect held the merge, and it was not a quality problem
+
+The Spec vote was first cast by `spec-leader`. `COORDINATION.md:1294-1305`
+assigns the `spec/`+`conformance/` soundness vote to the frontier-class member
+of team Spec — the conformance-validator — with the spec-leader assembling but
+not casting. The Decision was held `proposed` until the correct seat voted; the
+Architect reached the same reading independently. **Nothing about the candidate
+was in question, and the correct vote took about five minutes once routed.**
+
+CV's vote is the one that mattered here: it compared the conformance oracle to
+the production `ParseError` **character-for-character** through Rust
+line-continuation and Markdown line-wrap normalization, rather than by eye.
+That is the same defect class that took `d5c7df82` down.
+
+### What closed with it
+
+The `S4` adversary item — a producer-population control whose fixture declared
+only one class, so it could not discriminate class-level omission — is
+**discharged**, not carried. A one-field `SingletonProbe.only` fixture now pins
+the minimum nonempty class-field population, complementing rather than
+replacing the two-field equality control. Population-side mutation evidence: the
+nearest legal two-field neighbour made the unchanged singleton test fail.
+
+Node `status: merged`. Record literals, punning, functional update and patterns
+remain [[LANG-SURFACE-RECORD-LITERAL]]'s; that frame was re-pinned against this
+SHA at the same time, and its registry stop condition is retired.
