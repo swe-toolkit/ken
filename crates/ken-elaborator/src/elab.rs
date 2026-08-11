@@ -353,6 +353,9 @@ struct ElabCtx<'e> {
     /// The stable bottom-relative position of the state binder plus the
     /// declared cell types while elaborating one space-operation continuation.
     space_state: Option<(usize, Vec<Term>)>,
+    /// The stable bottom-relative pre-state position plus cell types while
+    /// elaborating a block-space contract. Absent for modifier `space proc`.
+    space_pre_state: Option<(usize, Vec<Term>)>,
 }
 
 impl<'e> ElabCtx<'e> {
@@ -379,6 +382,7 @@ impl<'e> ElabCtx<'e> {
             hidden_positions: Vec::new(),
             lift_bindings: HashMap::new(),
             space_state: None,
+            space_pre_state: None,
         }
     }
 
@@ -792,10 +796,15 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                 body: Box::new(body_core),
             })
         }
-        // The reachable `space proc` surface has no cell environment or
-        // pre-state binding. Refuse `old` rather than silently elaborating it
-        // as the post-state expression (`36 §4.3`).
-        RExpr::ROld(_, span) => Err(ElabError::OldPreStateUnsupported { span: span.clone() }),
+        RExpr::ROld(inner, span) => {
+            let Some(pre_state) = cx.space_pre_state.clone() else {
+                return Err(ElabError::OldPreStateUnsupported { span: span.clone() });
+            };
+            let post_state = cx.space_state.replace(pre_state);
+            let result = check(cx, inner, expected, span);
+            cx.space_state = post_state;
+            result
+        }
         // `match` against a KNOWN expected type: build the motive from the
         // ascribed goal (`λd. expected[d/scrut]`), not inferred from the
         // first arm's body (ES4-lawproofs AC4). This is what lets a
@@ -3020,9 +3029,15 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             ))
         }
 
-        // `old` cannot be assigned a sound core term until the space-operation
-        // elaboration context names its pre-state (`36 §4.3`).
-        RExpr::ROld(_, span) => Err(ElabError::OldPreStateUnsupported { span: span.clone() }),
+        RExpr::ROld(inner, span) => {
+            let Some(pre_state) = cx.space_pre_state.clone() else {
+                return Err(ElabError::OldPreStateUnsupported { span: span.clone() });
+            };
+            let post_state = cx.space_state.replace(pre_state);
+            let result = infer(cx, inner);
+            cx.space_state = post_state;
+            result
+        }
 
         RExpr::RNumLit(lit, span) => elab_num_lit_infer(cx, lit, span),
 
@@ -5709,29 +5724,41 @@ fn update_space_cell(state: Term, index: usize, cell_count: usize, value: Term) 
     )
 }
 
-fn first_old_span(expr: &RExpr) -> Option<Span> {
-    match expr {
-        RExpr::ROld(_, span) => Some(span.clone()),
-        RExpr::RApp(a, b, _) | RExpr::RArrow(a, b, _) | RExpr::RBinOp(_, a, b, _) => {
-            first_old_span(a).or_else(|| first_old_span(b))
+fn elab_space_contract_prop(cx: &mut ElabCtx<'_>, expr: &RExpr) -> Result<Term, ElabError> {
+    let (core, ty) = infer(cx, expr)?;
+    let core = cx.metas.zonk_term(&core);
+    let ty = cx.metas.zonk_term(&ty);
+    if !matches!(ty, Term::Omega(_)) {
+        return Err(ElabError::TypeMismatch {
+            span: expr.span().clone(),
+            reason: "space-operation contract clause must have type Omega".to_string(),
+        });
+    }
+    Ok(core)
+}
+
+fn space_transformer_payload(
+    cx: &ElabCtx<'_>,
+    run: Term,
+    ret_id: GlobalId,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let normalized = whnf(cx.env, &cx.ctx, &run);
+    let mut head = &normalized;
+    let mut args = Vec::new();
+    while let Term::App(function, argument) = head {
+        args.push(argument.as_ref());
+        head = function.as_ref();
+    }
+    let is_ret = matches!(head, Term::Constructor { id, .. } if *id == ret_id);
+    match (is_ret, args.first().copied()) {
+        (true, Some(Term::Pair(result, post_state))) => {
+            Ok((result.as_ref().clone(), post_state.as_ref().clone()))
         }
-        RExpr::RLam(_, body, _)
-        | RExpr::RAsc(body, _, _)
-        | RExpr::RProj(body, _, _)
-        | RExpr::RBecomes(_, _, body, _) => first_old_span(body),
-        RExpr::RLet(_, _, value, body, _) => first_old_span(value).or_else(|| first_old_span(body)),
-        RExpr::RMatch { scrut, arms, .. } => {
-            first_old_span(scrut).or_else(|| arms.iter().find_map(|arm| first_old_span(&arm.body)))
-        }
-        RExpr::RPi(_, _, body, _) => first_old_span(body),
-        RExpr::RVar(..)
-        | RExpr::RCon(..)
-        | RExpr::RUniv(..)
-        | RExpr::RCell(..)
-        | RExpr::RNumLit(..)
-        | RExpr::RStr(..)
-        | RExpr::RRecursiveResult { .. }
-        | RExpr::RAttachedProofRef { .. } => None,
+        _ => Err(ElabError::Internal(format!(
+            "space contract transformer did not reduce to Ret (result, post-state) at {:?}: {:?}",
+            span, normalized
+        ))),
     }
 }
 
@@ -5807,18 +5834,6 @@ pub(crate) fn elaborate_space_decl(
     let resp_empty = Term::lam(empty_type.clone(), unit_type.clone());
 
     for operation in &space.operations {
-        for clause in operation.requires.iter().chain(&operation.ensures) {
-            if let Some(span) = first_old_span(clause) {
-                return Err(ElabError::OldPreStateUnsupported { span });
-            }
-        }
-        if !operation.requires.is_empty() || !operation.ensures.is_empty() {
-            return Err(ElabError::TypeMismatch {
-                span: operation.span.clone(),
-                reason: "space-operation contracts without `old` are staged with the pre-state successor"
-                    .to_string(),
-            });
-        }
         let visits = operation
             .visits
             .as_ref()
@@ -5920,6 +5935,7 @@ pub(crate) fn elaborate_space_decl(
 
         cx.ctx.push(state_type.clone());
         cx.install_space_state(&cell_types);
+        cx.hidden_positions.push(cx.ctx.len() - 1);
         let continuation_body = match &operation.body {
             RExpr::RBecomes(index, _, value, span) => {
                 kernel_check(
@@ -5962,9 +5978,10 @@ pub(crate) fn elaborate_space_decl(
             }
         };
         cx.space_state = None;
+        cx.hidden_positions.pop();
         cx.ctx.pop();
         let continuation = Term::lam(state_type.clone(), continuation_body);
-        let mut body = apply_space_args(
+        let body = apply_space_args(
             Term::const_(prelude.bind_id, vec![]),
             &[
                 op_type.clone(),
@@ -5975,6 +5992,88 @@ pub(crate) fn elaborate_space_decl(
                 continuation,
             ],
         );
+
+        let mut contract_obligations = Vec::new();
+        if !operation.requires.is_empty() || !operation.ensures.is_empty() {
+            let contract_base_depth = cx.ctx.len();
+            cx.ctx.push(state_type.clone());
+            let pre_state_position = cx.ctx.len() - 1;
+            cx.hidden_positions.push(pre_state_position);
+            cx.install_space_state(&cell_types);
+            cx.space_pre_state = Some((pre_state_position, cell_types.clone()));
+
+            let mut requirement_count = 0usize;
+            for requirement in &operation.requires {
+                let requirement = elab_space_contract_prop(&mut cx, requirement)?;
+                cx.ctx.push(requirement);
+                cx.hidden_positions.push(cx.ctx.len() - 1);
+                requirement_count += 1;
+            }
+
+            let pre_state_index = cx.ctx.len() - 1 - pre_state_position;
+            let run = apply_space_args(
+                Term::const_(prelude.run_state_id, vec![]),
+                &[
+                    state_type.clone(),
+                    empty_type.clone(),
+                    resp_empty.clone(),
+                    weaken(&return_type, (1 + requirement_count) as i64),
+                    Term::var(pre_state_index),
+                    weaken(&body, (1 + requirement_count) as i64),
+                ],
+            );
+            let (result_value, post_state_value) =
+                space_transformer_payload(&cx, run, prelude.ret_id, &operation.span)?;
+
+            for ensures in &operation.ensures {
+                cx.ctx
+                    .push(weaken(&return_type, (1 + requirement_count) as i64));
+                let result_position = cx.ctx.len() - 1;
+                cx.ctx.push(state_type.clone());
+                let post_state_position = cx.ctx.len() - 1;
+                cx.hidden_positions.push(post_state_position);
+                cx.space_state = Some((post_state_position, cell_types.clone()));
+
+                let predicate = elab_space_contract_prop(&mut cx, ensures)?;
+                let goal = subst0(
+                    &subst0(&predicate, &weaken(&post_state_value, 1)),
+                    &result_value,
+                );
+
+                cx.space_state = Some((pre_state_position, cell_types.clone()));
+                cx.hidden_positions.pop();
+                cx.ctx.pop();
+                debug_assert_eq!(cx.ctx.len() - 1, result_position);
+                cx.ctx.pop();
+
+                let closed = close_goal(&cx.ctx, goal);
+                let hole_id =
+                    declare_postulate(cx.env, qualified_name.clone(), vec![], closed.clone())
+                        .map_err(|error| ElabError::KernelRejected {
+                            error,
+                            span: ensures.span().clone(),
+                        })?;
+                contract_obligations.push(Obligation {
+                    id: contract_obligations.len() as u32,
+                    hole_id,
+                    goal_closed: closed,
+                    span: ensures.span().clone(),
+                    kind: ObligationKind::Ensures,
+                });
+            }
+
+            cx.space_state = None;
+            cx.space_pre_state = None;
+            for _ in 0..requirement_count {
+                cx.hidden_positions.pop();
+                cx.ctx.pop();
+            }
+            cx.hidden_positions.pop();
+            cx.ctx.pop();
+            debug_assert_eq!(cx.ctx.len(), contract_base_depth);
+        }
+
+        let mut body = body;
         let mut operation_type = computation_type;
         for domain in parameter_domains.iter().rev() {
             body = Term::lam(domain.clone(), body);
@@ -5993,7 +6092,7 @@ pub(crate) fn elaborate_space_decl(
         results.push(ElabResult {
             name: qualified_name,
             def_id: operation_id,
-            obligations: vec![],
+            obligations: contract_obligations,
             foreign_binding: None,
             temporal_obligations: vec![],
             effect_row_type: Some(declared_row),
