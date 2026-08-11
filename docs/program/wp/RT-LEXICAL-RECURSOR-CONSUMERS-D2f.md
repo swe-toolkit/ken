@@ -23,6 +23,34 @@ comes back to me rather than being redone under this frame.
 
 ## Deliverables
 
+**0. The production-path gate. ADDED 2026-08-11 (Architect `evt_6vf66hmwv52y6`).
+Commit this BEFORE any emitter definition is written.** It is a deliverable, not
+a preflight, because it is the thing that establishes the emitter has a
+non-vacuous subject at all.
+
+One committed control carrying these four results **side by side**:
+
+| input | required result |
+|---|---|
+| old exact `px8j` seed witness | exactly one builder arrival, `oriented_present=false`, resolved plane `0`, and **no** key / ID / descriptor / definition |
+| checked exact `D2j` positive | exactly one builder arrival, `oriented_present=true`, resolved plane `1`, exactly **one** key / ID / descriptor, closed seven facts matching that fixture's independently re-derived planner facts |
+| strip or relocate **one** checked marker, plan held fixed | exact **validator refusal**, before any key / ID / descriptor / definition |
+
+**No emitter AC may be credited until the positive row is non-zero.** That is the
+whole point of ordering this first: every emitter criterion in this frame
+discharges **vacuously** against a permanently empty plane, and a no-activation
+proof over nothing emitted passes for free.
+
+**Once emission is added**, the same positive must move definition count
+**`0 → 1`**; and fusion-only suppression must keep builder arrival and the
+resolved plane **non-zero** while moving definition/redirection count
+**`1 → 0`** and restoring the checked twin's own ordinary refusal.
+
+**The existing `planes=[0], oriented_present=[false]` result is accepted as the
+old witness's negative evidence** and does not need re-measuring. It says nothing
+about the gates below `oriented`, which **remain unmeasured** until the checked
+positive reaches them.
+
 **1. The ABI arm.** A separate exhaustive `AbiUnitDefinition::StaticContinuation`
 `Fusion` definition with its descriptors. **Only ordinary tagged inputs and
 normal outputs.** Activation, cursor, selection and unwind state must never enter
@@ -65,17 +93,62 @@ clean.
 `D2d`'s `AC-1`..`AC-3` and `AC-5`, carried forward unchanged, plus the emitter
 obligation.
 
-**AC-1.** On the exact `R3` before-hole compile under B-only exclusion
-(`RecursiveDescentResidual::LexicalCallArgumentRecursor`, fixture
-`px8j_equal_payload_hole_placement(BeforeReturnHole)`), the inner `Node` recursor
-closure and its exact activation and cursor are produced and consumed by the
-downstream call **in the same specialized unit**, with **zero**
-`transfer_into_carrier` attempts for that intermediate
+> # AC-1 AND AC-2 REBOUND 2026-08-11 — the old fixture binding was UNSATISFIABLE
+>
+> **Architect ruling `evt_6vf66hmwv52y6`**, on a Runtime hard stop. **The
+> correction is required, not wording cleanup, and the defect is the Steward's.**
+>
+> **STRUCK — *"On the exact `R3` before-hole compile under B-only exclusion
+> (fixture `px8j_equal_payload_hole_placement(BeforeReturnHole)`)…"* as the
+> POSITIVE.** That witness was deliberately preserved as the **unmarked
+> negative**: it carries no checked frame, no selected-IH-slot, and no
+> checked-IH-invocation marker, so **it is not a fusion candidate and cannot be
+> made into one.** `validate_oriented_subcontinuation_transport` makes that
+> boundary structural — unmarked IR with `None` is lawful seed IR producing no
+> fusion; unmarked IR with a non-empty plan is a marker/plan mismatch that must
+> **reject**; an empty supplied plan carries no checked transport coordinate;
+> and adding wrappers changes the occurrence tree, so it is no longer the exact
+> fixture.
+>
+> ⇒ **The frame pinned acceptance to a witness that cannot carry the mechanism's
+> required input.** This follows from the landed required-member ruling and was
+> true when the frame was written — today's `planes=[0]` measurement revealed it,
+> it did not cause it.
+>
+> **The old witness is NOT deleted from the frame. It is the absence /
+> ordinary-refusal comparator**, and it must never again be described as the
+> fusion-positive.
+
+**AC-1 — the positive full-pipeline baseline is the CHECKED `R3`-shaped `D2j`
+exact witness.** Reuse the landed `D2g`/`D2j` checked fixture and its complete,
+independently authored `OrientedSubcontinuationPlanV1`. **Do not duplicate it and
+do not re-hand-wrap it** — hoist or re-export one `#[cfg(test)]` fixture
+constructor from the existing `D2g`/`D2j` builder so the planner tests and this
+full-compile control consume the **same** entry, transparent declaration, and
+plan.
+
+On that witness, the inner `Node` recursor closure and its exact activation and
+cursor are produced and consumed by the downstream call **in the same specialized
+unit**, with **zero** `transfer_into_carrier` attempts for that intermediate
 `Node[ComputationalRecursorClosure]`.
 
-**AC-2 — the A/B witness, and its suppressor is load-bearing by construction.**
-Suppressing **only** the continuation fusion restores the measured origin-23
-refusal. Suppressing anything else does not count.
+**The control must enter `compile_expr_into_object_module`** with that
+declaration map and `Some(oriented)`, so it traverses
+`compile_expr_into_module_with_root_projection`, production static planning,
+exact transport validation, candidate enumeration, full-key re-derivation,
+interning, and later emission. **It must not call the fusion builder or the
+emitter directly** — a control that bypasses the planner cannot see the path
+these criteria are about.
+
+**AC-2 — the A/B witness, bound to the TWIN's own coordinates.** Suppressing
+**only** the continuation fusion restores that twin's **own ordinary refusal**,
+at its **freshly derived planner coordinates**. Suppressing anything else does
+not count.
+
+> **STRUCK — *"restores the measured origin-23 refusal."*** Origin 23 is the old
+> `px8j` coordinate. **The checked twin's origins, owners, and edge are its own
+> and are never copied from `px8j`** — its fresh planner coordinates and complete
+> seven-fact key are authoritative.
 
 **The denominator must be an operand of the assertion, never an argument to its
 message.** This is the standing form of the finding `D2e` repairs: a value read
@@ -176,6 +249,35 @@ different emitted ABI projection.** Never by an ID inequality.
 - **Row 5 after-hole stays reported-only.** `R4` is
   [[RT-LEXICAL-ROW2-MISSING-MINT]]. `#6d` keeps its status; `D3` and the
   retirement are untouched.
+
+### Explicitly forbidden routes to a positive. Architect `evt_6vf66hmwv52y6`.
+
+These are named because each is a plausible way to make the old witness look
+like a candidate, and every one of them is a way of **fabricating the input the
+key re-derives against**:
+
+- **Do not pass `Some(plan)` to `px8j_capture_source_trace.`**
+- **Do not synthesize a default plan**, and do not infer markers from the
+  Runtime shape.
+- **Do not weaken the required checked-transport key member.**
+- **Route (2) — making fusion independent of `oriented` — is REJECTED
+  outright.** It would reopen `D2h`'s soundness-bearing identity and contradict
+  the required-member ruling. It is not a fallback if the checked route proves
+  awkward; it is closed.
+
+### The authority split, so the fixture plan is not mistaken for a production one
+
+1. **In real package-backed production the only authority remains canonical
+   checked-package metadata** decoded by `oriented_subcontinuation_plan_for_`
+   `program`. **Runtime synthesizes nothing.**
+2. **In the `#[cfg(test)]` control**, the already-authorized `D2g`/`D2j` plan is
+   lawful **fixture** authority — and only because it is complete,
+   independently authored from the marker collector, and passes exact validation
+   against all three marker populations and structural locations. **Passing it
+   explicitly in that test does not create a production fallback.**
+3. **The old `px8j` origins, owners, and edge are never copied into the checked
+   twin.** The twin's fresh planner coordinates and complete seven-fact key
+   remain authoritative.
 
 ## Stop conditions — return to the Architect, do not decide
 
