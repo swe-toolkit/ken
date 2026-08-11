@@ -102,6 +102,12 @@ pub enum ElabError {
         unresolved_result_type: Term,
         implicated_metavariables: Vec<LevelVar>,
     },
+    /// The selected result's type inferred successfully, but its classifier
+    /// did not reduce to either accepted universe constructor.
+    RecursiveResultClassifierNotUniverse {
+        selector_span: Span,
+        binding_span: Span,
+    },
     /// `old` reached elaboration in a space-operation `ensures`, but the
     /// reachable surface has no pre-state binding yet (`36 §4.3`).
     OldPreStateUnsupported { span: Span },
@@ -344,6 +350,18 @@ impl fmt::Display for ElabError {
                 binding_span.end,
                 unresolved_result_type,
                 implicated_metavariables,
+            ),
+            ElabError::RecursiveResultClassifierNotUniverse {
+                selector_span,
+                binding_span,
+            } => write!(
+                f,
+                "RecursiveResultClassifierNotUniverse at {}-{} for binding at {}-{}: \
+                 selected result type is not classified by a universe",
+                selector_span.start,
+                selector_span.end,
+                binding_span.start,
+                binding_span.end,
             ),
             ElabError::OldPreStateUnsupported { span } => write!(
                 f,
