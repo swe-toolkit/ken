@@ -24,6 +24,14 @@ comment — a provenance claim about a candidate goes stale as soon as the
 candidate grows, and this one described the commit before it rather than the
 range.
 
+> **The same staleness has now happened again, and this note is the fix rather
+> than a rewrite of the numbers above.** Every figure in this section describes
+> the *grounding* commit. **The candidate has since grown to carry the matrix
+> itself, the five refusals and the segment-owner comparator**, so the `+24/-4`
+> comments-only delta describes one commit of the range and not the range.
+> Read this whole record as the measurement turn it was; take the candidate's
+> shape from the handback and its base from `origin/main`.
+
 ## 1. The stop condition that mattered — a non-empty projection is REACHABLE
 
 The frame names three stops. The live one was whether a non-empty ordered input
@@ -111,7 +119,8 @@ candidate rather than whether the planner can produce one.
 
 No `D2h` re-productionization and no change to its interner-unit controls. No
 `D2f`, `R3`, ABI, emission, edge or traversal work. No matrix built, and no
-fixture authored — this turn grounds them.
+fixture authored **in the turn this record describes** — it grounds them, and
+later commits on the same branch build them.
 
 Provenance: Ken-owned frame, tracker, rulings and this repository's own source
 and measurements only. No `local/refs/`, permissive, copyleft or
