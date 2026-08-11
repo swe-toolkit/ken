@@ -1,13 +1,13 @@
 ---
 id: LANG-SURFACE-PAIR
 title: "Pair literals, positional projections, and the Sigma type production are required by 32-grammar and wholly absent from the surface -- `Token::Times` is lexed for `×` and consumed by nothing, `(a, b)` is a parse error, and `.1`/`.2` fall outside the projection guard -- while the kernel's Sigma/Pair/Proj1/Proj2 are complete and already exercised by records"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/1859
 origin: Steward measurement 2026-08-11 at origin/main=81e90e4e, from the research surface-gap sweep at 8898c426 (evt_3dsd7j9t4r33a), which ranked pair/Sigma among the next Language candidates. The lexer hazard in the projection section below is a Steward finding on top of that sweep, not part of it.
 ---
 

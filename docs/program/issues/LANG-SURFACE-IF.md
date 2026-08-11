@@ -1,13 +1,13 @@
 ---
 id: LANG-SURFACE-IF
 title: "`if e then t else f` is required by 32-grammar §3 and is wholly absent -- no token, no keyword-map entry, no parser arm, no AST node -- while its stated elaboration target (real matchable `data Bool = True | False`) has been pre-registered since ES2"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/1819
 origin: Steward measurement 2026-08-11 at origin/main=f4069bf4, from the research surface-gap sweep at 8898c426 (evt_3dsd7j9t4r33a), which ranked conditionals the cleanest next one-turn Language candidate. The intervening main advance is doc-only, so the code measurement carries. The constructor-capture hazard below is a Steward finding on top of that sweep, not part of it.
 ---
 
