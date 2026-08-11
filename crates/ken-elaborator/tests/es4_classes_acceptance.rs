@@ -212,9 +212,14 @@ fn classes_are_transparent_structure_records_zero_delta() {
 fn ord_total_law_is_the_bool_or_equation() {
     let env = mk_env_with_package();
     let bool_or_id = env.globals["bool_or"];
-    let ord_ci = &env.class_env.classes()["Ord"];
-    let total_idx = ord_ci.field_names.iter().position(|n| n == "total").expect("Ord has a `total` field");
-    let total_ty = &ord_ci.field_types[total_idx];
+    let ord_ci = env.class_env.class("Ord").unwrap();
+    let total_idx = ord_ci
+        .projection
+        .field_names
+        .iter()
+        .position(|n| n == "total")
+        .expect("Ord has a `total` field");
+    let total_ty = &ord_ci.projection.field_types[total_idx];
     assert!(
         mentions_const(total_ty, bool_or_id),
         "Ord's `total` law field must mention `bool_or` (the Bool-equation \

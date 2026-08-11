@@ -38,11 +38,10 @@ fn surf2_d1_proc_traverse_parses_elaborates_and_registers_metadata() {
 
     let traversable = env
         .class_env
-        .classes()
-        .get("Traversable")
+        .class("Traversable")
         .expect("Traversable class metadata is registered");
     assert_eq!(
-        traversable.field_names,
+        traversable.projection.field_names,
         vec![
             "functor".to_string(),
             "foldable".to_string(),
@@ -50,7 +49,7 @@ fn surf2_d1_proc_traverse_parses_elaborates_and_registers_metadata() {
         ]
     );
     assert_eq!(
-        traversable.field_types.len(),
+        traversable.projection.field_types.len(),
         3,
         "Sigma field types stay field-only"
     );
@@ -246,20 +245,55 @@ fn surf2_d1_unmarked_classes_and_sort_discriminant_stay_status_quo() {
     .expect("marked and unmarked sort-discriminant pairs elaborate");
 
     assert_eq!(
-        env.class_env.classes()["PlainStruct"].kind,
-        ClassKind::Structure
+        env.class_env.class("PlainStruct").unwrap().kind,
+        &ClassKind::Structure
     );
     assert_eq!(
-        env.class_env.classes()["MarkedStruct"].kind,
-        ClassKind::Structure
+        env.class_env.class("MarkedStruct").unwrap().kind,
+        &ClassKind::Structure
     );
-    assert_eq!(env.class_env.classes()["PlainProp"].kind, ClassKind::Property);
     assert_eq!(
-        env.class_env.classes()["MarkedProp"].kind,
-        ClassKind::Property
+        env.class_env.class("PlainProp").unwrap().kind,
+        &ClassKind::Property
     );
-    assert_eq!(env.class_env.classes()["PlainStruct"].field_types.len(), 1);
-    assert_eq!(env.class_env.classes()["MarkedStruct"].field_types.len(), 1);
-    assert_eq!(env.class_env.classes()["PlainProp"].field_types.len(), 1);
-    assert_eq!(env.class_env.classes()["MarkedProp"].field_types.len(), 1);
+    assert_eq!(
+        env.class_env.class("MarkedProp").unwrap().kind,
+        &ClassKind::Property
+    );
+    assert_eq!(
+        env.class_env
+            .class("PlainStruct")
+            .unwrap()
+            .projection
+            .field_types
+            .len(),
+        1
+    );
+    assert_eq!(
+        env.class_env
+            .class("MarkedStruct")
+            .unwrap()
+            .projection
+            .field_types
+            .len(),
+        1
+    );
+    assert_eq!(
+        env.class_env
+            .class("PlainProp")
+            .unwrap()
+            .projection
+            .field_types
+            .len(),
+        1
+    );
+    assert_eq!(
+        env.class_env
+            .class("MarkedProp")
+            .unwrap()
+            .projection
+            .field_types
+            .len(),
+        1
+    );
 }

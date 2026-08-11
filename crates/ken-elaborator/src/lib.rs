@@ -53,7 +53,9 @@ pub use ast::{
     LetBinding, RecursiveResultSelector, SpaceCell, SpaceOperation, Type,
 };
 pub use bytes::BytesEnv;
-pub use classes::{ClassEnv, ClassInfo, ClassKind, InstanceInfo, InstanceResolution};
+pub use classes::{
+    ClassEnv, ClassInfo, ClassKind, ClassView, InstanceInfo, InstanceResolution, ProjectionView,
+};
 pub use diagnostics::{
     project_all, project_diagnostic, tv_and, tv_not, tv_or, tv_strict, Diagnostic, DiagnosticTag,
     FailureWitness, FormRef, HoleId, KripkeCountermodel, Region, SuggestedAction, ThirdValue,

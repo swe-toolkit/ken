@@ -175,7 +175,7 @@ fn ac3_overlap_check_first_ok_second_errors() {
     // Now try to declare a second instance for (Eq2, Int) → OverlappingInstances.
     // We need to drive the real elaboration path. The overlap check fires early.
     // Declare the class info so the resolver finds it:
-    // (Eq2 is already in env4.class_env.classes() from the elab above)
+    // (Eq2 is already in env4.class_env.class("Eq2") from the elab above)
     // Try declaring instance Eq2 Int again.
     let r3 = env4.elaborate_decl("instance Eq2 Int { is_eq = is_eq }");
     assert!(
@@ -220,7 +220,7 @@ fn ac4_property_vs_structure_sort_discriminant() {
     let mut env_str = mk_env();
     elab(&mut env_str, "class Count2 A { n : Nat }").unwrap();
     // Verify kind was classified as Structure.
-    let kind = &env_str.class_env.classes().get("Count2").unwrap().kind;
+    let kind = env_str.class_env.class("Count2").unwrap().kind;
     assert_eq!(
         *kind,
         ken_elaborator::ClassKind::Structure,
@@ -251,7 +251,7 @@ fn ac4_property_vs_structure_sort_discriminant() {
     );
 
     // Also verify that the property class kind is Property.
-    let kind_prop = &env_prop.class_env.classes().get("Trivial").unwrap().kind;
+    let kind_prop = env_prop.class_env.class("Trivial").unwrap().kind;
     assert_eq!(
         *kind_prop,
         ken_elaborator::ClassKind::Property,
