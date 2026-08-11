@@ -6,7 +6,7 @@ owner: runtime
 size: S
 gate: none
 depends_on: [RT-LEXICAL-RECURSOR-CONSUMERS]
-blocks: []
+blocks: [RT-RECURSOR-TRANSPORT]
 github: null
 origin: Runtime D0/D1 checkpoint evt_3wzr30y2jjh41 at exact 0de4f130a9864623afcffa0b4751f65ddd87e818, QA-approved at evt_1f9hknbynb5nk, measured at 9adeb30f. Steward ruling evt_rcjr99tjga9 removed this class (R4) from RT-LEXICAL-RECURSOR-CONSUMERS. Steward-filed per COORDINATION §2.
 ---
@@ -62,8 +62,44 @@ that stopped at the first cause. It remains a **floor**: `D0` re-closes it at th
 candidate's own base, and if it comes back wider, that is a re-size signal to
 post and stop.
 
-## Sequencing
+## Sequencing — ON THE CRITICAL PATH. Corrected 2026-08-11.
 
-Behind `RT-LEXICAL-RECURSOR-CONSUMERS`. Not on the RecursiveDescent critical
-path: `#6d` closes on `R1`-`R3`, and `#7` `RT-DESCENT-RETIRE` gates on
-`RT-RECURSOR-TRANSPORT` and `RT-FNUNIT-RESULT-TOKEN`, neither of which is this.
+**Release after [[RT-LEXICAL-RECURSOR-CONSUMERS]] and BEFORE
+[[RT-RECURSOR-TRANSPORT]] `D3`.** Architect ruling `evt_2jnf3x8f06psz`, on a
+Steward escalation.
+
+> **STRUCK — *"Not on the RecursiveDescent critical path: `#6d` closes on
+> `R1`-`R3`, and `#7` `RT-DESCENT-RETIRE` gates on `RT-RECURSOR-TRANSPORT` and
+> `RT-FNUNIT-RESULT-TOKEN`, neither of which is this."***
+>
+> **The reasoning was about the wrong node.** It checked `#7`'s dependencies —
+> correctly — and never asked whether **`#6b`'s own `D3` bar** includes row 2.
+> It does: `D3` must prove **all six rows green without any exclusion hook**,
+> stated in four places, and row 2 is one of the six. `#6d` cannot repair it.
+> ⇒ **This node sat off the graph while being required by it.**
+>
+> **The carve-out changed the repair OWNER, not the retirement ACCEPTANCE
+> SURFACE.** `#6d` was correctly forbidden to absorb `R4` — its `D2` is
+> boundary-only and a missing `Mint` has no boundary — but that says nothing
+> about whether a post-retirement semantic regression is acceptable. **Those are
+> two different questions and the carve-out only answered the first.**
+
+**Why row 2's assertion survives the retirement**, which is what makes this a
+real blocker rather than a bookkeeping edge: its subject is still live after the
+residual enum is emptied — **both producer paths must install and consume the
+recursive IH.** Contrast the spent exact-set oracle in `#7`, whose subject
+*disappears* with the deletion. A control whose subject survives is a control
+that must still pass.
+
+**The B-only result is precursor evidence, not the acceptance proof.** `D3`'s
+final obligation is the unchanged row green on the **real, no-hook retirement
+tree**.
+
+⇒ **The hook-artifact uncertainty belongs to this node's `D0`**, which already
+requires an activation denominator and a cause (i) versus (ii) determination.
+**If `D0` proves the hook alone caused the missing `Mint`, this node may close
+without a production repair.** Until that proof exists, deleting row 2 from
+`D3`'s bar would trade an **observed prospective regression** for an assumption.
+
+**`D3`'s six-row / no-hook wording is RETAINED and is not amended** (same
+ruling). The fix was the missing edge, not the criterion.
