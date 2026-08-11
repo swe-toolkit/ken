@@ -8473,6 +8473,237 @@ fn build_checked_ih_bindings(
 /// `build_continuation_specialization_plan` admitted, returned from that same
 /// call.
 #[cfg_attr(not(test), allow(dead_code))]
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — one fusion CANDIDATE, established
+/// and not interned.**
+///
+/// Carries only facts from the Architect's closed seven. There is no id, no
+/// descriptor, no key and no interning here, and none may be added: those are
+/// `D2h`.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StaticContinuationFusionCandidate {
+    /// 1. the admitted discovery context, taken whole from the ledger.
+    admitted: AdmittedContinuationDiscovery,
+    /// 2. the producer.
+    producer_construct_origin: StaticOriginId,
+    producer_owner: PredeclaredFunctionId,
+    producer_alternative: u32,
+    recursive_position: u32,
+    producer_argument_origin: StaticOriginId,
+    producer_argument_binding: CheckedIhBinding,
+    /// 3. the selected case body and its exact consuming call.
+    selected_case_body: StaticOriginId,
+    consuming_call: StaticOriginId,
+    consuming_callee: StaticOriginId,
+    consumer_binding: CheckedIhBinding,
+    /// 4. the required transport coordinate.
+    checked_transport: CheckedTransportCoordinate,
+    /// 5. the unique `StaticBody` triple.
+    invocation_caller: PredeclaredFunctionId,
+    invocation_callee: PredeclaredFunctionId,
+    invocation_callee_entry: StaticOriginId,
+    /// 6. the owner split.
+    consumer_owner: PredeclaredFunctionId,
+    /// 7. the complete ordered input projection.
+    continuation_inputs: Vec<ContinuationSourceSlotAuthority>,
+}
+
+/// The exact producer invocation edge, or a refusal.
+///
+/// Requires **exactly one** `StaticBody` call edge into the producer unit.
+/// Absence and multiplicity are both refusals: "the only edge" would be an
+/// existential and choosing among several would be a guess.
+fn fusion_unique_static_body_triple(
+    plan: &StaticTransitionPlan<'_>,
+    producer_owner: PredeclaredFunctionId,
+) -> Result<
+    Option<(PredeclaredFunctionId, PredeclaredFunctionId, StaticOriginId)>,
+    CraneliftBackendError,
+> {
+    let mut found = None;
+    for edge in plan.semantic.static_body_call_edges(&plan.edges)? {
+        if edge.1 != producer_owner {
+            continue;
+        }
+        if found.is_some() {
+            return Ok(None);
+        }
+        found = Some(edge);
+    }
+    Ok(found)
+}
+
+/// Descend the checked wrappers to the occurrence they carry.
+fn fusion_through_checked_wrappers(
+    plan: &StaticTransitionPlan<'_>,
+    mut origin: StaticOriginId,
+) -> Result<StaticOriginId, CraneliftBackendError> {
+    loop {
+        match plan.planned_occurrence_expr(origin)? {
+            RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedComputationalIHSlots { .. }
+            | RuntimeExpr::CheckedComputationalIHInvocation { .. }
+            | RuntimeExpr::CheckedRecursiveInvocation { .. }
+            | RuntimeExpr::CheckedJoinSite { .. } => {
+                origin = plan.semantic.child_origin(origin, 0)?;
+            }
+            _ => return Ok(origin),
+        }
+    }
+}
+
+/// **`D2i` — the first LIVE fusion enumerator.**
+///
+/// ## What it now does
+///
+/// It consumes [`fusion_root_source_for_future_enumerator`], so the roots are
+/// the production-admitted ledger with its complete identity. Nothing here
+/// reconstructs a seed, scans a worker body, runs a parallel fixed point, or
+/// changes terminal traversal.
+///
+/// ## What is still absent
+///
+/// **It mints nothing.** There is no id, no descriptor, no key and no
+/// interning -- those are `D2h`, and a candidate here is established evidence
+/// rather than an identity. **No emission, ABI or edge redirection exists**, and
+/// no `R3` row is claimed green.
+///
+/// ## The gates, each declining rather than guessing
+///
+/// Every fact comes from the Architect's closed seven. If a gate ever needs a
+/// fact outside them, that is a closed-contract failure to report rather than
+/// plumbing to add.
+#[cfg_attr(not(test), allow(dead_code))]
+fn enumerate_live_fusion_candidates(
+    plan: &StaticTransitionPlan<'_>,
+    entry: &RuntimeExpr,
+    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    oriented: Option<&crate::OrientedSubcontinuationPlanV1>,
+) -> Result<Vec<StaticContinuationFusionCandidate>, CraneliftBackendError> {
+    crate::cranelift_backend::planning::validate_oriented_subcontinuation_transport(
+        entry,
+        declarations,
+        oriented,
+    )?;
+    let Some(oriented) = oriented else {
+        return Ok(Vec::new());
+    };
+    let transport = build_checked_transport(plan, oriented)?;
+    let ih_bindings = build_checked_ih_bindings(plan)?;
+    let mut candidates = Vec::new();
+
+    for admitted in fusion_root_source_for_future_enumerator(plan)? {
+        let continuation_origin = admitted.continuation_origin;
+        let RuntimeExpr::ComputationalMatch { cases, .. } =
+            plan.planned_occurrence_expr(continuation_origin)?
+        else {
+            continue;
+        };
+        let consumer_owner = occurrence_authority(plan, continuation_origin)?.owner;
+
+        for producer_construct_origin in continuation_result_origins(plan, admitted.result_root)? {
+            let producer = plan.planned_occurrence_expr(producer_construct_origin)?;
+            let RuntimeExpr::Construct { args, .. } = producer else {
+                continue;
+            };
+            let identity = plan.constructor_symbol_identity(producer_construct_origin)?;
+            let producer_owner = occurrence_authority(plan, producer_construct_origin)?.owner;
+
+            for (alternative, case) in cases.iter().enumerate() {
+                if plan.case_constructor_identity(continuation_origin, alternative)? != identity {
+                    continue;
+                }
+                let producer_alternative = u32::try_from(alternative)
+                    .map_err(|_| planner_capacity_error("fusion alternative exhausted"))?;
+
+                for position in case.recursive_positions.iter().copied() {
+                    let recursive_position = u32::try_from(position)
+                        .map_err(|_| planner_capacity_error("fusion position exhausted"))?;
+                    if args.get(position).is_none() {
+                        continue;
+                    }
+                    let Some(producer_argument_origin) = plan
+                        .semantic
+                        .child_origins(producer_construct_origin)?
+                        .get(position)
+                        .copied()
+                    else {
+                        continue;
+                    };
+                    let Some(producer_argument_binding) =
+                        ih_bindings.get(&producer_argument_origin).copied()
+                    else {
+                        continue;
+                    };
+
+                    let selected_case_body = plan
+                        .semantic
+                        .child_origin(continuation_origin, 1 + alternative)?;
+                    let consuming_call =
+                        fusion_through_checked_wrappers(plan, selected_case_body)?;
+                    if !matches!(
+                        plan.planned_occurrence_expr(consuming_call)?,
+                        RuntimeExpr::Call { .. }
+                    ) {
+                        continue;
+                    }
+                    let consuming_callee = plan.semantic.child_origin(consuming_call, 0)?;
+                    let expected = CheckedIhBinding {
+                        frame_origin: continuation_origin,
+                        recursive_position,
+                    };
+                    let Some(consumer_binding) = ih_bindings.get(&consuming_callee).copied() else {
+                        continue;
+                    };
+                    if consumer_binding != expected {
+                        continue;
+                    }
+                    let Some(checked_transport) = transport.get(&consuming_call).cloned() else {
+                        continue;
+                    };
+                    let Some((invocation_caller, invocation_callee, invocation_callee_entry)) =
+                        fusion_unique_static_body_triple(plan, producer_owner)?
+                    else {
+                        continue;
+                    };
+                    let Some(environment) = exact_continuation_source_environment(
+                        plan,
+                        producer_owner,
+                        admitted.result_root,
+                        producer_construct_origin,
+                        consumer_owner,
+                        continuation_origin,
+                    )?
+                    else {
+                        continue;
+                    };
+
+                    candidates.push(StaticContinuationFusionCandidate {
+                        admitted,
+                        producer_construct_origin,
+                        producer_owner,
+                        producer_alternative,
+                        recursive_position,
+                        producer_argument_origin,
+                        producer_argument_binding,
+                        selected_case_body,
+                        consuming_call,
+                        consuming_callee,
+                        consumer_binding,
+                        checked_transport,
+                        invocation_caller,
+                        invocation_callee,
+                        invocation_callee_entry,
+                        consumer_owner,
+                        continuation_inputs: environment.inputs.clone(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(candidates)
+}
+
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the root source a future fusion
 /// enumerator MUST consume.**
 ///
@@ -14628,11 +14859,34 @@ mod tests {
                 });
             }
         }
+        // CARDINALITY IS NOT CONTAINMENT. `len() >` alone permits a ledger that
+        // LOSES seed pairs while gaining unrelated roots, which is a strictly
+        // worse failure than the one the count was meant to catch.
+        //
+        // The containment claim belongs on `(continuation_origin, result_root)`,
+        // because a reconstructed seed carries `None` for its enclosing
+        // specialization while the admitted entry for the same syntactic pair
+        // may carry one -- so full-identity containment would fail for a reason
+        // that is not a defect. Strict extension stays on the full identity.
+        let projection = |set: &BTreeSet<AdmittedContinuationDiscovery>| {
+            set.iter()
+                .map(|entry| (entry.continuation_origin, entry.result_root))
+                .collect::<BTreeSet<_>>()
+        };
+        let seed_pairs = projection(&seeds);
+        let admitted_pairs = projection(&root_source);
+        assert!(
+            seed_pairs.is_subset(&admitted_pairs),
+            "every independently reconstructed syntactic seed pair must occur in the \
+             admitted projection, or the ledger has dropped a root the frontier names: \
+             missing={:?}",
+            seed_pairs.difference(&admitted_pairs).collect::<Vec<_>>()
+        );
         assert!(
             root_source.len() > seeds.len(),
-            "the admitted population must exceed what the seed frontier can name, or \
-             fixing this root source in advance buys a future enumerator nothing: \
-             root_source={root_source:?} seeds={seeds:?}"
+            "and the admitted population must strictly extend the seed frontier on the \
+             FULL identity, or fixing this root source in advance buys a future \
+             enumerator nothing: root_source={root_source:?} seeds={seeds:?}"
         );
         assert!(
             root_source
