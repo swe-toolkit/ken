@@ -256,4 +256,41 @@ Sibling of [[grep-the-producer-not-the-cited-proxy]] (there: verify a *value*
 against its true producer; here: enumerate a *kind* against its true closure),
 [[named-floor-must-be-grepped-not-assumed]], and
 [[a-risk-register-is-a-grep-list-not-a-forecast]].
+
+## THE SEVENTH INSTANCE — and the first time the POSITIVE form was demonstrated
+
+2026-08-11, `D2f` `a656fca1`. Every instance above is the rule being *violated*.
+This one is the rule being *satisfied*, and it shows what a proven closure
+actually looks like, which is worth more than another failure.
+
+The Steward's merge notification argued a partial was inert because a map is
+never populated in production, and supported it with: *`install_fusion_owned_bodies`
+has eleven call sites, all inside `mod tests`.* **He then stated the gap himself
+rather than shipping it as sufficient:**
+
+> *"That establishes 'this function is never called in production', which is
+> only the property I need if it is the sole way the map acquires an entry. I
+> did not enumerate writers — a constructor, a `Default`, a builder, a second
+> method, or any direct field mutation would be invisible to what I ran."*
+
+The adversary ran it. The complete write set is **two** sites: the constructor
+at `:10864` initialising empty, and one whole-map assignment at `:13846` inside
+the installer. Plus a field declaration at `:2680` — **private, no `pub`.**
+
+**The privacy is what closes it, not the grep.** A private field's write set is
+bounded by its module *by construction*, so the enumeration is complete for a
+structural reason and **stays** complete under edits elsewhere in the crate. A
+caller census is invalidated silently by the next call site anyone adds.
+
+⇒ **The general form: prefer a closure the language enforces over one you
+established by looking.** Privacy, an exhaustive `match` the compiler checks, a
+sealed trait, a single constructor with a private field — each *bounds* the
+population instead of *sampling* it. When you can convert an enumeration
+question into a visibility question, do it; the answer then survives the next
+commit.
+
+**And the tell that you owe this conversion:** you wrote "the only writer" or
+"nothing else calls it". Both are claims about a *set you searched*. Ask what
+makes the set closed, and if the answer is "I looked", you have the weaker
+check — say so, as here, rather than letting the stronger claim ride.
 </content>

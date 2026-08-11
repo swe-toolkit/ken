@@ -897,8 +897,36 @@ rather than carried.
 
 Measured at the merged SHA and again on `main`: `install_fusion_owned_bodies` is
 defined at `:13726` with **eleven** call sites, `:18168` through `:18689`, and
-`mod tests` opens at `:16097`. Every call site is after the boundary. **Zero
-production callers, so nothing populates the ownership map.**
+`mod tests` opens at `:16097`. Every call site is after the boundary.
+
+**That census was the weaker check, and the Steward said so at the time rather
+than letting it ride.** Zero production callers of one named function proves the
+map is empty only if that function is the *sole* way an entry can enter it — a
+constructor, a `Default`, a builder, or any direct field mutation would be
+invisible to a caller census.
+
+### CLOSED on the write set, and structurally — adversary `evt_5p4mrr5begwyg`
+
+The complete write set of `fusion_owned_bodies` is **two** sites: `:10864`, the
+constructor, initialising it **empty**; and `:13846`, a whole-map assignment
+inside the installer. The field is declared at `:2680` and is **private, no
+`pub`**.
+
+⇒ **The map cannot acquire a `FusionOwned` entry in production**, so the
+disposition filter is the identity and the inertness argument holds — now
+established on the property the argument needs rather than on the one first
+measured.
+
+**The privacy is what closes it, not the grep.** A private field's write set is
+bounded by its module by construction, so this survives edits elsewhere in the
+crate; a caller census is silently invalidated by the next call site anyone adds.
+
+**A narrowing on the atomicity question, explicitly a shape fact and not a
+verification:** `:13846` is a whole-map *assignment* from `scratch`, not an
+incremental insert into `self`. A single move-assignment cannot half-populate, so
+a half-install would have to arise inside `scratch`'s construction and then be
+assigned wholesale. That is a narrower failure mode than a partially-mutated live
+map, and it remains unhunted.
 
 ### The acceptance property CHANGED shape, and this is the trap for the next reader
 
