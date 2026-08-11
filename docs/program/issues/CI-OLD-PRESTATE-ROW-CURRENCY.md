@@ -1,13 +1,13 @@
 ---
 id: CI-OLD-PRESTATE-ROW-CURRENCY
 title: "The `old`-capture flip pair still asserts pre-state elaboration is unavailable, which LANG-SPACE-PRESTATE-BIND made false -- and the soundness row's stated relation, `reject/reject at distinct gates, not a verdict flip`, is now the opposite of what the code does"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none
 depends_on: [LANG-SPACE-PRESTATE-BIND]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/1854
 origin: Adversary finding evt_33wfx803mv0r7, measured on origin/main=5df41be0 against the LANG-SPACE-PRESTATE-BIND merge at 19006e37, and triaged by the Steward as a confirmed defect. The Adversary surfaced the first row; the Steward's triage found the second, which is the soundness half of the same pair.
 ---
 
