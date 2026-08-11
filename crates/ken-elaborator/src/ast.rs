@@ -330,6 +330,14 @@ pub enum Decl {
         source: String,
         span: Span,
     },
+    /// `record Point { x : Int, y : Int }` — a transparent named-field
+    /// record type represented by the existing right-nested Sigma encoding.
+    RecordDecl {
+        name: String,
+        /// Field declarations in Sigma-telescope order.
+        fields: Vec<(String, Type)>,
+        span: Span,
+    },
     /// `class C (A : Type) { field : Type ; … }` — typeclass declaration
     /// (`33 §5`). Elaborates to a record type (Σ-chain) whose kernel sort
     /// determines property vs structure via `sort_sigma` (`check.rs:192`).
@@ -485,6 +493,7 @@ impl Decl {
             | Decl::TypeAlias { name, .. }
             | Decl::ForeignDecl { name, .. }
             | Decl::TemporalDecl { name, .. }
+            | Decl::RecordDecl { name, .. }
             | Decl::ClassDecl { name, .. } => name,
             Decl::InstanceDecl { class_name, .. } => class_name,
             Decl::DeriveDecl { class_name, .. } => class_name,
@@ -509,6 +518,7 @@ impl Decl {
             | Decl::TypeAlias { span, .. }
             | Decl::ForeignDecl { span, .. }
             | Decl::TemporalDecl { span, .. }
+            | Decl::RecordDecl { span, .. }
             | Decl::ClassDecl { span, .. }
             | Decl::InstanceDecl { span, .. }
             | Decl::DeriveDecl { span, .. }

@@ -519,6 +519,11 @@ fn collect_decl_spans(decl: &Decl, out: &mut Vec<Span>) {
                 .iter()
                 .for_each(|field| collect_type_spans(&field.ty, out));
         }
+        Decl::RecordDecl { fields, .. } => {
+            fields
+                .iter()
+                .for_each(|(_, field_ty)| collect_type_spans(field_ty, out));
+        }
         Decl::ModuleDecl { decls, .. } => {
             decls.iter().for_each(|decl| collect_decl_spans(decl, out));
         }

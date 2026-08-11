@@ -72,21 +72,74 @@ pub struct ClassView<'a> {
 }
 
 impl ClassInfo {
-    fn view<'a>(&'a self, owner_name: &'a str) -> ClassView<'a> {
-        ClassView {
-            projection: ProjectionView {
-                owner_name,
+    fn into_named_field(self) -> NamedFieldInfo {
+        NamedFieldInfo {
+            projection: ProjectionInfo {
                 type_id: self.type_id,
-                head_param: self.param.as_deref(),
-                field_names: &self.field_names,
-                field_types: &self.field_types,
+                head_param: self.param,
+                field_names: self.field_names,
+                field_types: self.field_types,
             },
+            kind: NamedFieldKind::Class(ClassOnlyInfo {
+                param_kind: self.param_kind,
+                field_purities: self.field_purities,
+                kind: self.kind,
+                module_id: self.module_id,
+            }),
+        }
+    }
+}
+
+/// Projection metadata shared by every named-field owner.
+struct ProjectionInfo {
+    type_id: GlobalId,
+    head_param: Option<String>,
+    field_names: Vec<String>,
+    field_types: Vec<Term>,
+}
+
+impl ProjectionInfo {
+    fn view<'a>(&'a self, owner_name: &'a str) -> ProjectionView<'a> {
+        ProjectionView {
+            owner_name,
+            type_id: self.type_id,
+            head_param: self.head_param.as_deref(),
+            field_names: &self.field_names,
+            field_types: &self.field_types,
+        }
+    }
+}
+
+/// Metadata meaningful only for class owners and instance resolution.
+struct ClassOnlyInfo {
+    param_kind: Option<Term>,
+    field_purities: Vec<Option<DefKeyword>>,
+    kind: ClassKind,
+    module_id: u32,
+}
+
+impl ClassOnlyInfo {
+    fn view<'a>(&'a self, projection: ProjectionView<'a>) -> ClassView<'a> {
+        ClassView {
+            projection,
             param_kind: self.param_kind.as_ref(),
             field_purities: &self.field_purities,
             kind: &self.kind,
             module_id: self.module_id,
         }
     }
+}
+
+/// The closed owner classification stored atomically with projection facts.
+enum NamedFieldKind {
+    Class(ClassOnlyInfo),
+    Record,
+}
+
+/// The sole private registry entry for every named-field owner.
+struct NamedFieldInfo {
+    projection: ProjectionInfo,
+    kind: NamedFieldKind,
 }
 
 /// Per-instance metadata.
@@ -139,7 +192,7 @@ pub struct InstanceConstraintInfo {
 /// The typeclass environment: class registry, canonical instance registry,
 /// structural postulate IDs, and per-module tracking for the orphan check.
 pub struct ClassEnv {
-    classes: HashMap<String, ClassInfo>,
+    named_field_owners: HashMap<String, NamedFieldInfo>,
     /// Canonical instances: `(class_name, head_type_name)` → `InstanceInfo`.
     /// For property classes this may hold multiple under different keys, but
     /// only one per `(class, head)` pair (property instances on the same head
@@ -178,29 +231,62 @@ impl ClassEnv {
     /// Enumerate every registered class through the storage-independent
     /// borrowed view.
     pub fn class_entries(&self) -> impl Iterator<Item = ClassView<'_>> + '_ {
-        self.classes
+        self.named_field_owners
             .iter()
-            .map(|(owner_name, info)| info.view(owner_name))
+            .filter_map(|(owner_name, info)| match &info.kind {
+                NamedFieldKind::Class(class_info) => {
+                    Some(class_info.view(info.projection.view(owner_name)))
+                }
+                NamedFieldKind::Record => None,
+            })
     }
 
     pub fn class(&self, name: &str) -> Option<ClassView<'_>> {
-        self.classes
-            .get_key_value(name)
-            .map(|(owner_name, info)| info.view(owner_name))
+        let (owner_name, info) = self.named_field_owners.get_key_value(name)?;
+        match &info.kind {
+            NamedFieldKind::Class(class_info) => {
+                Some(class_info.view(info.projection.view(owner_name)))
+            }
+            NamedFieldKind::Record => None,
+        }
     }
 
     pub fn projection_by_type_id(&self, id: GlobalId) -> Option<ProjectionView<'_>> {
-        self.classes.iter().find_map(|(owner_name, info)| {
-            (info.type_id == id).then(|| info.view(owner_name).projection)
-        })
+        self.named_field_owners
+            .iter()
+            .find_map(|(owner_name, info)| {
+                (info.projection.type_id == id).then(|| info.projection.view(owner_name))
+            })
     }
 
     pub fn register_class(&mut self, name: String, info: ClassInfo) {
-        self.classes.insert(name, info);
+        self.named_field_owners
+            .insert(name, info.into_named_field());
+    }
+
+    pub(crate) fn register_record(
+        &mut self,
+        name: String,
+        type_id: GlobalId,
+        field_names: Vec<String>,
+        field_types: Vec<Term>,
+    ) {
+        self.named_field_owners.insert(
+            name,
+            NamedFieldInfo {
+                projection: ProjectionInfo {
+                    type_id,
+                    head_param: None,
+                    field_names,
+                    field_types,
+                },
+                kind: NamedFieldKind::Record,
+            },
+        );
     }
     pub fn initialized(record_nil_id: GlobalId, record_nil_val_id: GlobalId) -> Self {
         Self {
-            classes: HashMap::new(),
+            named_field_owners: HashMap::new(),
             instances: HashMap::new(),
             record_nil_id,
             record_nil_val_id,
@@ -221,7 +307,7 @@ impl ClassEnv {
     /// the structural postulates in the kernel.
     pub fn sentinel() -> Self {
         ClassEnv {
-            classes: HashMap::new(),
+            named_field_owners: HashMap::new(),
             instances: HashMap::new(),
             record_nil_id: GlobalId(0),
             record_nil_val_id: GlobalId(0),

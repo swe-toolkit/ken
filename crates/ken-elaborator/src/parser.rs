@@ -213,6 +213,7 @@ impl Parser {
             }),
             Token::KwForeign => self.parse_foreign_decl(start),
             Token::KwTemporal => self.parse_temporal_decl(start),
+            Token::KwRecord => self.parse_record_decl(start),
             Token::KwClass => self.parse_class_decl(start),
             Token::KwInstance => self.parse_instance_decl(start),
             Token::KwDerive => self.parse_derive_decl(start),
@@ -231,7 +232,7 @@ impl Parser {
             other => Err(ElabError::ParseError {
                 msg: format!(
                     "expected 'view', 'const', 'fn', 'proc', 'let', 'prove', 'prop', 'theorem', 'proof', \
-                     'law', 'data', 'def', 'foreign', 'temporal', 'class', 'instance', \
+                     'law', 'data', 'def', 'foreign', 'temporal', 'record', 'class', 'instance', \
                      'derive', 'module', 'import', 'export', \
                      'pub', 'program', 'package', or 'space proc', found {:?}",
                     other
@@ -988,6 +989,35 @@ impl Parser {
             name,
             param,
             param_kind,
+            fields,
+            span: Span::new(start, end),
+        })
+    }
+
+    /// `record Point { x : Int, y : Int }` — named-field record declaration.
+    fn parse_record_decl(&mut self, start: usize) -> Result<Decl, ElabError> {
+        self.advance(); // consume 'record'
+        let (name, _) = self.expect_ident()?;
+        self.expect(&Token::LBrace)?;
+        let mut fields = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let (field_name, _) = self.expect_ident()?;
+            self.expect(&Token::Colon)?;
+            let ty = self.parse_type()?;
+            fields.push((field_name, ty));
+            if matches!(self.peek(), Token::Comma) {
+                self.advance();
+            } else if !matches!(self.peek(), Token::RBrace) {
+                return Err(ElabError::ParseError {
+                    msg: "expected ',' or '}' after record field".to_string(),
+                    span: self.peek_span().clone(),
+                });
+            }
+        }
+        let end = self.peek_span().end;
+        self.expect(&Token::RBrace)?;
+        Ok(Decl::RecordDecl {
+            name,
             fields,
             span: Span::new(start, end),
         })

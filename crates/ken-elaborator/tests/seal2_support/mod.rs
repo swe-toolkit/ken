@@ -961,6 +961,18 @@ fn walk_decl(decl: &SurfaceDecl, facts: &mut RootFacts) {
             // the closure when any field does.
             facts.propagators.push((name.clone(), field_refs));
         }
+        SurfaceDecl::RecordDecl { name, fields, .. } => {
+            let mut field_refs = BTreeSet::new();
+            for (field_name, field_ty) in fields {
+                let mut refs = BTreeSet::new();
+                type_names_in_type(field_ty, &mut refs);
+                field_refs.extend(refs.iter().cloned());
+                facts
+                    .decl_refs
+                    .push((format!("{name}.{field_name}"), refs));
+            }
+            facts.propagators.push((name.clone(), field_refs));
+        }
         SurfaceDecl::InstanceDecl {
             class_name,
             head_type,
