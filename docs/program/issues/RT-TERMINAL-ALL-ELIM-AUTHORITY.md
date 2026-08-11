@@ -210,6 +210,58 @@ string test by swapping `terminal_support` for `all_support_origins`** — that
 reproduces the same defect one identifier over, and the next cut may name it
 something else again.
 
+### RE-MEASURED at `main = d63dc183` (2026-08-11): fact 2 is LOSSY AT CAPTURE
+
+Taken by the three capability rows, by name and by reading the constructed
+fields — not by any string grep, per the section above.
+
+| row | answer at `d63dc183` |
+|---|---|
+| 1. does `DataMetadata` carry the terminal-support relation under any name? | **No.** `checked_core.rs` still has exactly `parameter_count`, `index_count`, `constructors`, `eliminator`, `lowerability` — unchanged since `678acebc` |
+| 2. does `runtime_data_metadata` **project** it? | **No.** It builds `RuntimeDataAuditMetadata` from those same five and nothing else. The function is now `erasure.rs:6467` — was `:6045`, was `:5982`; the coordinate has drifted a third time and the answer has not |
+| 3. does what it projects carry all **five** facts? | **No** — none of them |
+
+**The new finding is at the capture site, and it makes the gap larger than
+"the relation is in a lane this node does not read."**
+
+`compiler_driver.rs:3838` populates `semantic.all_support_origins` in the same
+loop that constructs the `DataMetadata` above it:
+
+```rust
+if let Some((origin, _, _)) = env.env.all_support_origin(ind.id) {
+```
+
+The kernel accessor returns `Option<(GlobalId, usize, AllSupportSort)>`
+(`ken-kernel/src/env.rs:400`). **That triple is fact 2's `(host, parameter,
+sort)`.** The elaborator destructures it and **discards `parameter` and
+`sort`**, storing a host-only `BTreeMap<StableSymbol, StableSymbol>`.
+
+⇒ The earlier readings recorded fact 2 as *arrived, but in the wrong lane*.
+That is too generous. **Fact 2 has not arrived: what landed is its first
+component.** Routing `all_support_origins` onward into `DataMetadata` and
+through `runtime_data_metadata` — the obvious reading of what this gate waits
+for — would deliver a host-only map and **still not satisfy fact 2**. The
+repair belongs at the capture, upstream of the routing, and `D1` owns it.
+
+**This lands on `AC-1`'s control.** That row perturbs the recorded `(host,
+parameter, sort)` and requires consumption to refuse. Against the landed
+capture shape two of those three components are not recorded at all, so
+perturbing them is unobservable and the control passes for a reason unrelated
+to the property. Read `AC-1` as requiring the capture to be widened first: a
+control written against the host-only map discharges one third of its own row
+and reads as green for the other two.
+
+**The `D0` witness makes that concrete rather than hypothetical.** The fixed
+inputs record the eliminated family as host `g570` = `Bag`, **parameter 0**,
+**sort `Type`**. Both discarded components are load-bearing on the exact
+witness this node was measured on.
+
+`AC-8`'s citation still resolves and has not drifted: `register_all_supports`
+is `env.rs:416-428`, and it still inserts into `all_supports` with no
+injectivity assertion on the values. That row remains undischarged.
+
+**Verdict: do not release.**
+
 ## Deliverables
 
 - **`D1` — issue the relation.** In checked erasure/planning, emit the
