@@ -567,8 +567,7 @@ impl<'s> Lexer<'s> {
                     if !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false) || frac_str.is_empty() {
                         return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) });
                     }
-                } else { frac_str.push(c); }
-                frac_places += 1;
+                } else { frac_str.push(c); frac_places += 1; }
             }
         }
         if self.cur() == Some('.')
@@ -586,6 +585,12 @@ impl<'s> Lexer<'s> {
             }
             while self.cur().map(|c| c.is_ascii_digit()).unwrap_or(false) {
                 exp_str.push(self.advance().unwrap());
+            }
+            if exp_str.len() == 1 || (exp_str.len() == 2 && matches!(exp_str.as_bytes()[1], b'+' | b'-')) {
+                return Err(ElabError::ParseError {
+                    msg: "exponent requires at least one digit".into(),
+                    span: Span::new(start, self.pos),
+                });
             }
         }
 
@@ -623,7 +628,9 @@ impl<'s> Lexer<'s> {
             } else {
                 int_str.clone()
             };
-            let f: f32 = s.parse().unwrap_or(0.0_f32);
+            let f: f32 = s.parse().map_err(|_| ElabError::ParseError {
+                msg: "invalid float literal".into(), span: Span::new(start, self.pos)
+            })?;
             return Ok((Token::Float32Lit(f), Span::new(start, self.pos)));
         }
 
@@ -636,7 +643,9 @@ impl<'s> Lexer<'s> {
             } else {
                 format!("{}{}", int_str, exp_str)
             };
-            let f: f64 = s.parse().unwrap_or(0.0_f64);
+            let f: f64 = s.parse().map_err(|_| ElabError::ParseError {
+                msg: "invalid float literal".into(), span: Span::new(start, self.pos)
+            })?;
             return Ok((Token::FloatLit(f), Span::new(start, self.pos)));
         }
 

@@ -23,4 +23,10 @@ fn exponent_values_are_not_zeroed() {
     assert_eq!(tokens("3.14e5"), vec![Token::FloatLit(314000.0), Token::Eof]);
     assert_eq!(tokens("1e-9"), vec![Token::FloatLit(1e-9), Token::Eof]);
     assert_eq!(tokens("3.14E-2"), vec![Token::FloatLit(0.0314), Token::Eof]);
+    for bad in ["1e", "1e+", "1e-"] { assert!(Lexer::lex(bad).is_err(), "{bad}"); }
+}
+
+#[test]
+fn decimal_fraction_separators_do_not_change_exponent() {
+    assert_eq!(tokens("1.0_0d"), vec![Token::DecimalLit(BigInt::from(100), -2), Token::Eof]);
 }
