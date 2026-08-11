@@ -251,10 +251,48 @@ otherwise inherit the same witness by citation.
 **`AC-1` is NOT amended yet, deliberately.** Which amendment is correct depends
 on the mechanism ruling below, and amending first would presume its answer.
 
-### The open fork — routed to the Architect, `evt_` in the `#6d` thread
+### The fork is RULED. Architect `evt_6vf66hmwv52y6`, 2026-08-11.
 
-Two repairs are visible and **both cross lines a leader or the Steward may not
-cross alone**:
+> **There is no lawful plan-supply route for the exact unmarked `px8j` seed
+> witness, so `D2f`'s `AC-1`/`AC-2` fixture binding was UNSATISFIABLE.**
+>
+> This follows from the **landed required-member ruling**, not from the empty
+> measurement — the measurement revealed the defect rather than causing it. The
+> `px8j` witness was **deliberately preserved as the unmarked negative**: no
+> checked frame, no selected-IH-slot, no checked-IH-invocation marker, so it is
+> not a fusion candidate. `validate_oriented_subcontinuation_transport` makes
+> the boundary structural — unmarked IR with `None` is lawful seed IR producing
+> no fusion; unmarked IR with a non-empty plan is a marker/plan mismatch that
+> must **reject**; an empty supplied plan carries no checked transport
+> coordinate; wrapping changes the occurrence tree.
+>
+> **Route 2 — making fusion independent of `oriented` — is REJECTED outright.**
+> It would reopen `D2h`'s soundness-bearing identity and contradict the
+> required-member ruling.
+>
+> **The lawful positive already exists**: the landed `D2g`/`D2j` checked
+> `R3`-shaped fixture and its complete, independently authored
+> `OrientedSubcontinuationPlanV1`, consumed through **one hoisted `#[cfg(test)]`
+> constructor** and entered through `compile_expr_into_object_module` with
+> `Some(oriented)` — never by calling the builder or emitter directly.
+
+**Frame correction landed at `main` `17f68eb1`** (PR from the Steward; Runtime
+notified `evt_r775vtj0pqye`). `AC-1` now names the checked `D2j` witness as the
+positive full-pipeline baseline; `AC-2` binds to that twin's **own freshly
+derived coordinates**, with the origin-23 reference struck as an old `px8j`
+coordinate. **`px8j` is retained as the absence / ordinary-refusal comparator**
+and must never again be described as the fusion-positive.
+
+**A new `Deliverable 0` gates the emitter**: the old negative at resolved plane
+`0`, the checked positive at resolved plane `1` with exactly one
+key/ID/descriptor, and a one-marker-stripped exact validator refusal — committed
+**before any emitter definition**. **No emitter AC may be credited until the
+positive row is non-zero.**
+
+### The two routes as they stood before the ruling, retained
+
+Both crossed lines a leader or the Steward could not cross alone, which is why
+this went to the Architect rather than being decided in the ring:
 
 1. **Give the `px8j` witness a lawful oriented plan.** Keeps `AC-1` as written.
    But authoring the plan is authoring the input the key re-derives against, and
@@ -274,6 +312,85 @@ zero, which the frame already warns proves nothing.
 ⇒ **Do not authorize a synthetic candidate or a zero-definition emitter to
 unblock the increment.** That trades a stop for a control that cannot fail,
 which is the failure this node has now filed against itself three times.
+
+**The ruling closed both routes and supplied a third the frame had not
+considered** — reuse of the already-landed checked fixture. **The forbidden
+routes are now named in the frame** so they are not re-derived as options: no
+`Some(plan)` to `px8j_capture_source_trace`, no synthesized default plan, no
+marker inference from the Runtime shape, and no weakening of the required
+checked-transport key member.
+
+## Third `D2f` partial — the arrival-control repair, MERGED 2026-08-11
+
+Exact `aa3b78f8680c9637b754d524012b0d7d48c38834` from declared base `87f6983f`;
+one commit, one path (`lowering/core/tests/control.rs`), `+18/-8`. Decision
+`dec_17c3zfw5zxwk8` resolved APPROVE — Architect `evt_1y9jzz923ymdd`, QA
+`evt_1ry88yshf6629`.
+
+**Deletes the tautological equality corrected above.**
+`NonZeroUsize::new(planes.len()).expect(...)` now stands as the whole control.
+**No second counter was manufactured.** Causal A/B: replacing the production
+observation with a discarded length reds the control at its own arrival message;
+restored byte-identically.
+
+**This one also closes zero of the eight expressions.** Three partials, three
+structural prerequisites, zero rows — stated here because the merge count is
+what a later reader will otherwise use to size this node.
+
+### The arrival proof rests on the CALL SITE, and nothing says so. Fold into `D0`.
+
+Adversary `evt_23zyn4pywy6yg`, measured on `446c3e79`. **The vector-shape
+argument holds** — `d2f_note_production_fusion_plane` has one writer
+(`core.rs:444`) and one call site (`core.rs:2057`), and **the call is
+unconditional**. So a reached compile pushes exactly one element (possibly `0`)
+and an unreached compile pushes nothing, which is what makes `planes.len()`
+discriminate arrival from non-arrival.
+
+**The durability defect: that reason is not written beside the thing it
+protects.** The comment at `:2053-2055` explains why the observation is the
+consumer; **it does not say that the unconditional push is what makes `len()`
+discriminate.**
+
+⇒ **Pushing a `0` looks pointless in isolation**, so `if !static_continuation_`
+`fusion_plan.is_empty() { … }` is a plausible tidy. It would silently convert
+the control from *"the path was reached"* into *"the path resolved something"*
+and make the `expect` **panic on a legal empty resolution** — which is exactly
+the state this witness is in.
+
+**Disposition: one sentence at `:2057`, folded into `D2f` Deliverable 0.** No new
+node, no re-review of `aa3b78f8`. Same file family, active ring, and it is
+cheaper than the grep that found it.
+
+## `e4531318` — APPROVED, THEN WITHDRAWN UNPUBLISHED. Not a dropped merge.
+
+Deliverable 0's first candidate `e45313180eb6404a309df0d0234a686c2d239405`
+(one commit, five `ken-runtime` paths, `+323/-5`) reached a **resolved APPROVE**
+— `dec_5x9mfj08wfftt`, Architect `evt_79wp5r4wj64jz`, QA `evt_3gpsy11vbr0pn` —
+and was routed to the Steward for publication. **It was withdrawn by
+runtime-leader before the publisher ran** (`evt_2yr8wqjknbmvs`), on Architect
+ruling `evt_6907h4rv5kq1a`. **It never became a PR and nothing was reverted.**
+
+**Why, and it is not a defect in the candidate.** The Architect's own words: it
+**remains a sound identity-plane partial**, but its **bare-root observation
+cannot carry into emitter acceptance.** The gate observed the bare
+`DeclarationRef`, and root projection stops there at `Unsupported(Closure)` — so
+that shape **cannot reach the definition movement Deliverable 0 exists to
+prove.** A positive that cannot reach the claimed movement is not a positive.
+
+**`dec_5x9mfj08wfftt` is spent on `e4531318` alone.** The applied-root recut
+needs **fresh QA and Architect review**; no coordinate and no vote carries.
+
+⇒ **This is the accepted-partial policy working, not failing.** The candidate was
+correct for the claim it made and merging it would have put a bare-root baseline
+on `main` under a deliverable whose successor must not use one.
+
+**Also fold: record where the "sole production compile path" claim is
+established.** That question has been open across all three `D2f` partials. The
+enumeration was performed once by the implementer during grounding and lives
+only in a retro, so it currently reads as asserted. **Deliverable 0 measures
+arrival counts, which is not the same claim** — arrival-is-one does not establish
+that only one production call site exists. Record the caller enumeration beside
+the control.
 
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
