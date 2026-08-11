@@ -511,6 +511,64 @@ determine the numeric story (`35`):
 | **bytes** | `b"…"`, `0x[deadbeef]` | `Bytes` (`38`) |
 | **bool** | `true`, `false` | `Bool` |
 
+### Escape repertoire
+
+Ordinary string, character, and byte-string literals use the following closed
+escape repertoire. No other backslash sequence is accepted.
+
+| Escape | String `"…"` | Character `'…'` | Byte string `b"…"` | Decoded value |
+|---|---:|---:|---:|---|
+| `\\` | yes | yes | yes | backslash |
+| `\"` | yes | yes | yes | double quote |
+| `\'` | yes | yes | yes | single quote |
+| `\0` | yes | yes | yes | null scalar or byte `0x00` |
+| `\n` | yes | yes | yes | line-feed scalar or byte `0x0A` |
+| `\r` | yes | yes | yes | carriage-return scalar or byte `0x0D` |
+| `\t` | yes | yes | yes | horizontal-tab scalar or byte `0x09` |
+| `\u{H…H}` | yes | yes | no | the denoted Unicode scalar |
+| `\xHH` | no | no | yes | the denoted byte |
+
+Here `H` is one ASCII hexadecimal digit. A Unicode escape contains between one
+and six digits, with no separator, and its value must be in U+0000–U+10FFFF,
+excluding the surrogate range U+D800–U+DFFF. A byte escape contains exactly two
+digits and denotes one byte in `0x00`–`0xFF`. It consumes exactly those two
+digits: any following hexadecimal character is ordinary byte-string content,
+not part of the escape. The lexer neither consumes it greedily nor uses it to
+reject the completed escape. Thus `b"\x41BC"` contains byte `0x41` followed by
+the ordinary ASCII bytes for `B` and `C`.
+
+Escape decoding precedes the existing literal-type validity check. After
+decoding, a character literal contains exactly one Unicode scalar. An ordinary
+string contains Unicode scalars and constructs the existing UTF-8 `String`; an
+escape never introduces a surrogate. Within a byte string, every unescaped
+body character is ASCII and contributes its ASCII byte, while `\xHH`
+contributes one arbitrary byte. A non-ASCII body character is not implicitly
+UTF-8-encoded into a byte string. The `0x[…]` byte-literal form is unchanged.
+
+Triple-quoted raw strings perform no escape processing. Within `"""…"""`, a
+backslash is an ordinary body scalar; the lexer applies only the existing raw-
+string delimiter and multiline rules.
+
+An escape not listed for its literal kind, or a listed escape with a malformed
+shape or invalid Unicode-scalar value, rejects with the lexical error
+`InvalidEscape`. The lexer emits no literal token and does not preserve the
+attempted escape as ordinary literal contents. Its primary span begins at the
+backslash and ends immediately after the last source character belonging to the
+offending sequence. For an unrecognized escape this includes its discriminator;
+for a malformed escape it includes the first non-boundary character that makes
+the selected production invalid; and for a well-shaped escape whose value or
+literal kind is invalid it includes the complete escape. If a literal delimiter,
+line boundary, or end of input arrives before the selected escape is complete,
+the span ends immediately before that boundary. The boundary is not consumed as
+part of the error span.
+
+After consuming a backslash, the lexer is committed to an escape production.
+If the literal reaches its delimiter, a disallowed line boundary, or end of
+input before that production is complete, `InvalidEscape` takes precedence over
+an unterminated-literal error. This precedence is the only unterminated-literal
+behavior fixed here. Other literal errors retain their existing behavior; this
+section introduces no stable diagnostic name for them.
+
 - **Critical rule (exact numerics at the lexer):** a bare integer literal is
   **`Int`**, never a float. `2` is `Int`; `2.0` is `Float`; `2.0d` is `Decimal`.
   Integers and floats are *different tokens with different default types*; there
