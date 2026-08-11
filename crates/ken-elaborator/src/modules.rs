@@ -1158,6 +1158,17 @@ fn rewrite_rdecl(
             visits,
         },
         RDeclKind::Temporal { formula, source } => RDeclKind::Temporal { formula, source },
+        RDeclKind::RecordDecl { fields } => RDeclKind::RecordDecl {
+            fields: fields
+                .into_iter()
+                .map(|field| {
+                    Ok(crate::resolve::RRecordField {
+                        name: field.name,
+                        ty: rewrite_rtype(scope, exports, field.ty)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
+        },
         RDeclKind::ClassDecl {
             param,
             param_kind,

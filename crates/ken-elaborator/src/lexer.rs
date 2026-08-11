@@ -43,6 +43,7 @@ pub enum Token {
     // L7 keywords (`38 §2.1`, spellings are `(oracle)`)
     KwForeign,
     // Lc keywords (`33 §5`, `39 §6`)
+    KwRecord,   // "record"   — named-field record declaration
     KwClass,    // "class"    — typeclass declaration
     KwInstance, // "instance" — instance declaration
     KwDerive,   // "derive"   — auto-derive request
@@ -488,6 +489,7 @@ impl<'s> Lexer<'s> {
                 "type" => Token::KwTypeReserved,
                 "foreign" => Token::KwForeign,
                 "temporal" => Token::KwTemporal,
+                "record" => Token::KwRecord,
                 "class" => Token::KwClass,
                 "instance" => Token::KwInstance,
                 "derive" => Token::KwDerive,

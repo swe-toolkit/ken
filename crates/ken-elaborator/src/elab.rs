@@ -28,7 +28,8 @@ use crate::error::{ElabError, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
-    RPropIntro, RSpaceDecl, RType, SUGAR_ABSURD, SUGAR_AXIOM, SUGAR_EQ, SUGAR_J, SUGAR_REFL,
+    RPropIntro, RRecordField, RSpaceDecl, RType, SUGAR_ABSURD, SUGAR_AXIOM, SUGAR_EQ, SUGAR_J,
+    SUGAR_REFL,
 };
 
 // ----- obligation model -----
@@ -3475,8 +3476,8 @@ fn infer_j(
 }
 
 /// `e.field` — Σ-record field projection (`33 §5.2` η). Infers `e`'s type,
-/// identifies which registered class it's a dictionary of (matching the
-/// type's head `Const` against `ClassInfo::type_id`), finds `field`'s
+/// identifies which registered named-field owner produced its transparent
+/// type identity, finds `field`'s
 /// declared position, and builds `proj1(proj2^k(e))` — the field's
 /// expected type is `field_types[k]` with the class param (this
 /// dictionary's concrete head type) and every EARLIER field substituted by
@@ -3490,13 +3491,12 @@ fn infer_proj(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let (base_core, base_ty) = infer(cx, base)?;
-    // Deliberately inspect `base_ty` AS ELABORATED (never `whnf`'d): a class
-    // type is itself `Decl::Transparent` (`elab_class_decl` admits it via
-    // `declare_def`, `33 §5.2`), so `whnf` would eagerly unfold `App(Const
-    // (class_id), head)` straight through into the raw Σ-chain — losing
-    // exactly the "which class is this" information this lookup needs.
-    // The surface-elaborated shape (`App(Const(class_id), head)` or bare
-    // `Const(class_id)` for an unparameterized class) is always already in
+    // Deliberately inspect `base_ty` AS ELABORATED (never `whnf`'d): a named
+    // owner type is itself `Decl::Transparent`, so `whnf` would eagerly unfold
+    // it straight through into the raw Sigma chain — losing exactly the owner
+    // identity this lookup needs.
+    // The surface-elaborated shape (`App(Const(owner_id), head)` or bare
+    // `Const(owner_id)` for an unparameterized owner) is always already in
     // this un-unfolded form immediately after `infer`/`env.const_type`.
     let (class_type_id, head_arg) = match &base_ty {
         Term::App(f, a) => match f.as_ref() {
@@ -3504,7 +3504,7 @@ fn infer_proj(
             _ => {
                 return Err(ElabError::TypeMismatch {
                     span: span.clone(),
-                    reason: "projection base's type is not a class dictionary".into(),
+                    reason: "projection base's type is not a named-field owner".into(),
                 })
             }
         },
@@ -3512,7 +3512,7 @@ fn infer_proj(
         _ => {
             return Err(ElabError::TypeMismatch {
                 span: span.clone(),
-                reason: "projection base's type is not a class dictionary".into(),
+                reason: "projection base's type is not a named-field owner".into(),
             })
         }
     };
@@ -3524,17 +3524,16 @@ fn infer_proj(
         .projection_by_type_id(class_type_id)
         .ok_or_else(|| ElabError::TypeMismatch {
             span: span.clone(),
-            reason: "projection base's type is not a known class dictionary".into(),
+            reason: "projection base's type is not a known named-field owner".into(),
         })?;
-    let idx =
-        projection
-            .field_names
-            .iter()
-            .position(|n| n == field)
-            .ok_or_else(|| ElabError::UnresolvedCon {
-                name: field.to_string(),
-                span: span.clone(),
-            })?;
+    let idx = projection
+        .field_names
+        .iter()
+        .position(|n| n == field)
+        .ok_or_else(|| ElabError::UnresolvedCon {
+            name: field.to_string(),
+            span: span.clone(),
+        })?;
 
     // Build proj1(proj2^idx(base_core)) — field `idx`'s value. Each
     // earlier field's self-projection (proj1(proj2^j(base_core)), j<idx)
@@ -3906,7 +3905,8 @@ pub fn elaborate_rdecl(
     rdecl: &RDecl,
 ) -> Result<GlobalId, ElabError> {
     let class_dependent = match &rdecl.kind {
-        RDeclKind::ClassDecl { .. }
+        RDeclKind::RecordDecl { .. }
+        | RDeclKind::ClassDecl { .. }
         | RDeclKind::InstanceDecl { .. }
         | RDeclKind::DeriveDecl { .. } => true,
         RDeclKind::View { constraints, .. } => !constraints.is_empty(),
@@ -5026,6 +5026,15 @@ pub fn elaborate_rdecl_v1_with_effect_rows(
         RDeclKind::Temporal { formula, source } => {
             elaborate_temporal(env, globals, rdecl, formula, source)
         }
+        RDeclKind::RecordDecl { fields } => elab_record_decl(
+            env,
+            globals,
+            num_values,
+            numeric_env,
+            class_env,
+            rdecl,
+            fields,
+        ),
         RDeclKind::ClassDecl {
             param,
             param_kind,
@@ -5128,6 +5137,63 @@ fn build_pair_chain(field_vals: &[Term], record_nil_val_id: GlobalId) -> Term {
         acc = Term::pair(v.clone(), acc);
     }
     acc
+}
+
+/// Elaborate a named-field record declaration to the existing transparent
+/// right-nested Sigma encoding and register only its shared projection facts.
+fn elab_record_decl(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    class_env: &mut ClassEnv,
+    rdecl: &RDecl,
+    fields: &[RRecordField],
+) -> Result<ElabResult, ElabError> {
+    let field_types = {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+        let mut types = Vec::new();
+        for field in fields {
+            let ty = elab_type(&mut cx, &field.ty)?;
+            let ty = cx.metas.zonk_term(&ty);
+            cx.ctx.push(ty.clone());
+            types.push(ty);
+        }
+        types
+    };
+
+    let sigma_chain = build_sigma_chain(&field_types, class_env.record_nil_id);
+    let record_sort = kernel_infer(env, &Context::new(), &sigma_chain).map_err(|error| {
+        ElabError::KernelRejected {
+            error,
+            span: rdecl.span.clone(),
+        }
+    })?;
+    let id = declare_def(env, vec![], record_sort, sigma_chain).map_err(|error| {
+        ElabError::KernelRejected {
+            error,
+            span: rdecl.span.clone(),
+        }
+    })?;
+    globals.insert(rdecl.name.clone(), id);
+    class_env
+        .global_modules
+        .insert(id, class_env.current_module);
+    class_env.register_record(
+        rdecl.name.clone(),
+        id,
+        fields.iter().map(|field| field.name.clone()).collect(),
+        field_types,
+    );
+
+    Ok(ElabResult {
+        name: rdecl.name.clone(),
+        def_id: id,
+        obligations: vec![],
+        foreign_binding: None,
+        temporal_obligations: vec![],
+        effect_row_type: None,
+    })
 }
 
 /// Extract the outermost type constructor name from a resolved type.

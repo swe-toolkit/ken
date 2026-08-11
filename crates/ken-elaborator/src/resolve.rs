@@ -115,6 +115,13 @@ pub struct RClassField {
     pub ty: RType,
 }
 
+/// A resolved named-field record entry.
+#[derive(Clone, Debug)]
+pub struct RRecordField {
+    pub name: String,
+    pub ty: RType,
+}
+
 /// A resolved prerequisite dictionary on an instance declaration.
 #[derive(Clone, Debug)]
 pub struct RInstanceConstraint {
@@ -180,6 +187,8 @@ pub enum RDeclKind {
         formula: crate::temporal::TemporalExpr,
         source: String,
     },
+    /// `record Point { x : Int, y : Int }`.
+    RecordDecl { fields: Vec<RRecordField> },
     /// `class C A { field : Type ; … }` (`33 §5`).
     ClassDecl {
         param: Option<String>,
@@ -1386,6 +1395,33 @@ pub(crate) fn resolve_decl_in_unit(
                 kind: RDeclKind::Temporal {
                     formula: formula.clone(),
                     source: source.clone(),
+                },
+            })
+        }
+
+        Decl::RecordDecl { name, fields, span } => {
+            // Record fields form the same real Sigma telescope as class
+            // projection metadata: later field types may reference earlier
+            // field values by name.
+            let mut scope = Scope::new();
+            let mut resolved_fields = Vec::new();
+            for (field_name, field_ty) in fields {
+                let ty = resolve_type(&mut scope, field_ty)?;
+                resolved_fields.push(RRecordField {
+                    name: field_name.clone(),
+                    ty,
+                });
+                scope.push(field_name);
+            }
+            Ok(RDecl {
+                name: name.clone(),
+                ty: None,
+                body: RExpr::RUniv(None, span.clone()),
+                requires: vec![],
+                ensures: vec![],
+                span: span.clone(),
+                kind: RDeclKind::RecordDecl {
+                    fields: resolved_fields,
                 },
             })
         }
