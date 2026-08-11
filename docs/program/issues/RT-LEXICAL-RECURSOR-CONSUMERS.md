@@ -522,9 +522,58 @@ origin 34 a real callee entry — and each repointing must refuse. That is the
 right shape for a selector, because one matching on a **subset** of the key
 would still pass a whole-key positive.
 
-**Unverified outside the ring:** whether the three members are jointly
-sufficient on any witness other than this one. The fail-closed zero/multiple
-errors bound the damage if they are not.
+### The bound, split into its two halves — they cost very differently
+
+**This was first written here as one item, "whether the three members are
+jointly sufficient on any witness other than this one." That conflates two
+questions** (adversary, `evt_2rzveprrs80p0`), and only one of them is open:
+
+| half | state |
+|---|---|
+| a **subset** match would still pass a whole-key positive | **closed by construction** at this SHA — all three conjuncts are visibly present in the predicate |
+| a proper subset would be **insufficient** to name one edge on some other witness | **open, witness-dependent, not answerable by reading** |
+
+The predicate is the whole of it:
+
+```rust
+edge.caller()        == key.invocation_caller
+    && edge.callee()        == key.invocation_callee
+    && edge.callee_origin() == key.invocation_callee_entry
+```
+
+⇒ **The per-member controls are not what excludes a subset match today — the
+code is. What they protect against is REGRESSION to a subset**, which is a
+different and still-worth-having job. Saying "the controls guard joint
+sufficiency" credits them with the wrong half.
+
+**No coordinate leaked into the derivation.** The function body contains no
+literal identity — no `PredeclaredFunctionId(N)`, no `StaticOriginId(N)`, no
+bare `== N`; the only comparisons in it are those three. That was the specific
+thing the frame amendment existed to prevent, and it is measured rather than
+assumed.
+
+### The open half and the ordering question need the SAME missing witness
+
+The validate-on-survivor ordering differs from a `StaticBody` pre-filter **only
+when the three members fail to determine one edge.** That is the same ambiguous
+key the necessity half needs.
+
+⇒ **One fixture with an ambiguous key would settle both**, and if the key is
+provably unambiguous, **both dissolve together** rather than needing separate
+answers. Do not scope two controls here. This is the adversary's observation and
+it is the most useful thing on this record for whoever cuts the next slice.
+
+### A claim chain that looked corroborated and was inherited
+
+The per-member repointing description travelled: implementer's commit message →
+my PR body and this node → the adversary, which **explicitly took my description
+rather than opening the controls.** Three artifacts agreeing, one source.
+
+**Now read directly at the merged tree:** the controls are as described — a
+per-member table repointing `invocation_caller` at `PredeclaredFunctionId(2)`,
+`invocation_callee` at `PredeclaredFunctionId(1)`, and the callee entry at
+origin 34, each required to refuse. **Confirmed, and it was worth confirming**;
+agreement among readers who share a premise is not corroboration of it.
 
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
