@@ -70,3 +70,46 @@ on the same line.
   `elab.rs:3614`, `:3662`, `:3669`, `:3757` and `resolve.rs:560-562` all match
   on it, and `resolve.rs` compares against literal `0` and `1` for `Zero`/`Succ`
   type-level spellings.
+
+## Resolved after merge: does the guard dominate BOTH exits?
+
+**Adversary `evt_4q1n8wx6pn5ay` on `90ce6743` asked the right question and
+could not resolve it. Recorded here so the next reader does not re-derive it.**
+
+The report first confirmed the guard is not vacuous: across `lexer.rs`,
+`parser.rs`, `ast.rs` and `numbers.rs` there are **zero** occurrences of
+`as i128`, `as u128`, `i128::try_from`, `u128::try_from`, `to_i128` or
+`to_u128`, so no surviving upstream width conversion can pre-empt it, and
+`FixedWidthLiteralOutOfRange` has exactly one production raise site
+(`elab.rs:3674`).
+
+**Then the sharp part.** A single raise site is the strongest form when it
+dominates every path and the weakest when it does not, and **source order is
+not control flow.** If `:3674` sat inside the kernel-path block, a large
+literal taking the evaluation exit would reach `NumericLitVal::Int` and the CLI
+without ever meeting the range check — and `255`/`256 : UInt8` would still
+discriminate correctly on the kernel exit. That is the same two-exit divergence
+that made this frame's original `AC-1` insufficient, applied one layer lower.
+
+**Measured, and it comes back clean for a structural reason rather than a
+lucky one.**
+
+| site | enclosing fn | path |
+|---|---|---|
+| `:3674` the guard | `elab_num_lit_checked` | expected-type override |
+| `:3755` `NumericLitVal::Int` | `num_lit_default_type` | unconstrained default |
+
+`num_lit_default_type` has **exactly one caller** (`:3619`) and, for
+`NumLit::Int`, returns `nenv.int_id` — arbitrary-precision `Int`, **which has
+no bounds to check.** A fixed-width target can only arise from an expected
+type, and that routes through `elab_num_lit_checked`, where the guard runs
+before `int_lit_val`.
+
+⇒ **The guard's absence on the default path is correct by construction, not a
+bypass.** It dominates every path on which a bound exists. **No defect, and no
+follow-up node.**
+
+**The load-bearing fact, so a future change knows what it would break:** this
+holds because the declared default for an integer literal is `Int`. If the
+default table ever yields a fixed-width type for an unconstrained literal, the
+default path acquires a bound and would need its own check.
