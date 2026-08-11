@@ -371,6 +371,45 @@ built.
 **The reading hazard this creates is recorded in the section below**, because
 discharging a gate makes its prose read as a finished node.
 
+### CONFIRMED, and owed: the population control cannot see the axis it exists for
+
+Adversary `evt_xa93e5r8qxj9`, measured on `413444ba`. **The assertion is the
+strongest shape on this arc and is not the defect.** It is set equality against
+a literal — `BTreeSet::from(["CensusProbe.first", "CensusProbe.second"])` — so an
+empty result fails as `{} != {two}`, omission fails one way and invention the
+other, and the equality-at-`0 == 0` vacuity is structurally impossible. My
+non-vacuity concern is closed.
+
+**The fixture declares one class.** So the control discriminates *field*-level
+omission **within** a class, and cannot discriminate *class*-level omission
+**across** classes. That second axis is the one that matters here: the site
+which forced this slice iterates the whole class **map**, and its property is
+that no *class* is dropped. With a one-class population, *"returns every entry"*
+and *"returns the only entry"* are the same sentence.
+
+⇒ **Owed, and it is one line.** Add a second class to the same fixture — e.g.
+`class CensusProbeB A { third : A → Bool }` — and both classes' fields to the
+expected literal. The existing assertion then discriminates both axes with no
+change to the assertion itself.
+
+**Fold this into whichever slice next touches
+`crates/ken-elaborator/tests/seal2_support/mod.rs`; do not spend a cut on it.**
+It does not gate the node and it does not gate the record declaration form.
+
+**Still open and not closed by anyone:** the accessor-deletion evidence is a
+*textual* caller census (`fn classes(` zero, `.classes()` zero). That
+establishes "no textual `.classes()` call", not "no raw-map reader" — a
+re-export, a differently-named accessor, or a `ClassEnv` struct literal
+reconstructing the map are all invisible to it. The structural version is the
+`S1a`/`S1b` field-visibility-plus-construction-site census re-taken at this SHA
+rather than carried, and it is not one command. Iteration order and entry
+identity are likewise untouched.
+
+The general form of the fixture defect is filed at
+`agent/memory/build/a-controls-fixture-must-instantiate-the-quantifier-its-claim-ranges-over.md`
+— it is the fifth instance of one shape on this arc, and in every one the
+assertion was fine and the witness collapsed the axis.
+
 ## TRACKED REMAINING WORK — delete `ClassEnv::classes()` before records land
 
 > ### DISCHARGED by `S4`. This was a GATE, never the node's deliverable.
