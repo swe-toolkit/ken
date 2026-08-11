@@ -8479,7 +8479,7 @@ fn build_checked_ih_bindings(
 /// Carries only facts from the Architect's closed seven. There is no id, no
 /// descriptor, no key and no interning here, and none may be added: those are
 /// `D2h`.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct StaticContinuationFusionCandidate {
     /// 1. the admitted discovery context, taken whole from the ledger.
@@ -8563,6 +8563,10 @@ fn fusion_through_checked_wrappers(
 ///
 /// ## What is still absent
 ///
+/// **No production caller.** The intended consumer is `D2h`'s key plane, which
+/// does not exist; this is reached by its control and by nothing else, and it
+/// is `#[cfg(test)]` so it cannot read as compiled-in.
+///
 /// **It mints nothing.** There is no id, no descriptor, no key and no
 /// interning -- those are `D2h`, and a candidate here is established evidence
 /// rather than an identity. **No emission, ABI or edge redirection exists**, and
@@ -8573,7 +8577,7 @@ fn fusion_through_checked_wrappers(
 /// Every fact comes from the Architect's closed seven. If a gate ever needs a
 /// fact outside them, that is a closed-contract failure to report rather than
 /// plumbing to add.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 fn enumerate_live_fusion_candidates(
     plan: &StaticTransitionPlan<'_>,
     entry: &RuntimeExpr,
@@ -8707,11 +8711,14 @@ fn enumerate_live_fusion_candidates(
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the root source a future fusion
 /// enumerator MUST consume.**
 ///
-/// NOTHING CONSUMES THIS YET. There is no live fusion enumerator and no
-/// production consumer; this helper is referenced by its own definition and its
-/// control and by nothing else. No seed-only path has been removed, because no
-/// such path exists on this branch to remove -- the seed frontier is excluded
-/// here by construction rather than deleted from live code.
+/// [`enumerate_live_fusion_candidates`] consumes this, and is exercised by a
+/// committed reaching control. What is still absent is a PRODUCTION caller: the
+/// intended one is `D2h`'s key plane, which does not exist yet, so nothing on a
+/// compiled path reads this today.
+///
+/// No seed-only path has been removed, because no such path exists on this
+/// branch to remove -- the seed frontier is excluded here by construction
+/// rather than deleted from live code.
 ///
 /// What it fixes in advance is the root source. The alternative -- rebuilding
 /// `child(consumer, 0)` over every planned `ComputationalMatch` -- reconstructs
@@ -14801,13 +14808,108 @@ mod tests {
         }
     }
 
-    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the
+    /// `D2i` — the enumerator is REACHED, and on ledger roots the terminal twin
+    /// yields EXACTLY ONE candidate.
+    ///
+    /// MEASURED, and it is not what the earlier seed-keyed reading concluded.
+    /// `D2h` reported that this fixture could present no producer/consumer pair,
+    /// and that was true of the SEED root `child(consumer, 0)` only. The
+    /// admitted ledger also carries a DESCENT root -- one the fixed point
+    /// admitted with `Some(enclosing_specialization)`, which no seed
+    /// reconstruction can name -- and from that root the walk reaches the
+    /// producer.
+    ///
+    /// So consuming the ledger is what makes the fixture productive. Every gate
+    /// then passes on facts inside the Architect's seven: the producer's
+    /// argument binds a hypothesis, the selected case body's exact `Call`
+    /// resolves to this consumer frame at this position, the transport
+    /// coordinate resolves, the `StaticBody` triple is unique, and the owners
+    /// split.
+    ///
+    /// The candidate's members are pinned rather than counted, because a count
+    /// would pass on a candidate assembled from the wrong root.
+    #[test]
+    fn d2i_the_enumerator_is_reached_and_yields_one_candidate_from_a_descent_root() {
+        let declaration = d2g_declaration(true);
+        let entry = d2g_entry();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let oriented = d2g_oriented_plan();
+
+        let roots = fusion_root_source_for_future_enumerator(&plan).expect("root source");
+        assert!(
+            !roots.is_empty(),
+            "the enumerator must have had roots to walk"
+        );
+
+        let candidates =
+            enumerate_live_fusion_candidates(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the enumerator runs to completion");
+        assert_eq!(
+            candidates.len(),
+            1,
+            "exactly one candidate, and multiplicity would be a refusal rather than a \
+             selection: {candidates:?}"
+        );
+        let candidate = &candidates[0];
+
+        // THE LOAD-BEARING MEMBER: the root is a descent, not the seed. A seed
+        // reconstruction carries `None` here by construction, so this member is
+        // what shows the ledger is why the fixture is productive at all.
+        assert!(
+            candidate.admitted.enclosing_specialization.is_some(),
+            "the candidate must come from an admitted DESCENT root, which no seed \
+             reconstruction can name: {:?}",
+            candidate.admitted
+        );
+        assert_ne!(
+            candidate.admitted.result_root,
+            plan.semantic
+                .child_origin(candidate.admitted.continuation_origin, 0)
+                .expect("scrutinee"),
+            "and that root must differ from the consumer's own seed root"
+        );
+
+        // The consumer binding names this frame and position, not merely some
+        // hypothesis.
+        assert_eq!(
+            candidate.consumer_binding,
+            CheckedIhBinding {
+                frame_origin: candidate.admitted.continuation_origin,
+                recursive_position: candidate.recursive_position,
+            },
+            "the consuming Call's callee resolves to THIS consumer frame and position"
+        );
+        assert_ne!(
+            candidate.producer_owner, candidate.consumer_owner,
+            "producer and consumer are in different units, which is the split the \
+             fusion exists to close"
+        );
+        assert_eq!(
+            candidate.invocation_callee, candidate.producer_owner,
+            "the unique StaticBody triple names the producer's own unit"
+        );
+
+        // The converse direction, so one candidate is not the only outcome this
+        // control can produce: with no oriented plan the required transport
+        // member cannot resolve and the enumerator refuses at that gate.
+        let absent = enumerate_live_fusion_candidates(&plan, &entry, &declarations, None)
+            .expect_err("markers present with no plan must refuse at the transport gate");
+        assert!(
+            format!("{absent:?}").contains("checked subcontinuation markers have no checked plan"),
+            "and it must refuse for the transport reason: {absent:?}"
+        );
+    }
+
+    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the
     /// admitted ledger, and it is strictly richer than the seed frontier.
     ///
-    /// NO LIVE ENUMERATOR CONSUMES THIS. Nothing in production reads the helper,
-    /// no seed-only path has been removed, and no candidate population is
-    /// claimed. What is established is which roots an enumerator will have to
-    /// walk when it is written, and why the obvious alternative is wrong.
+    /// [`enumerate_live_fusion_candidates`] consumes this helper and is reached
+    /// by its own control below. Nothing in PRODUCTION reads either yet -- the
+    /// intended caller is `D2h`'s key plane -- and no seed-only path has been
+    /// removed. What is established here is which roots the enumerator walks,
+    /// and why the obvious alternative is wrong.
     ///
     /// The equality below is an ALIAS OBSERVATION, not a causal control: the
     /// helper is defined as the ledger, so it can only agree with it. It is kept
