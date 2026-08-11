@@ -1,7 +1,7 @@
 ---
 id: LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC
 title: "The selector's non-universe classifier arm reports the elaborator's own refusal as KernelRejected and fabricates a Type(?0) expectation that Omega would equally satisfy"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none

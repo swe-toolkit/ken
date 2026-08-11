@@ -1,7 +1,7 @@
 ---
 id: SURF-SPACE-CELLS
 title: "The `space` block surface — cells and `becomes` — is unbuilt, while its entire desugaring target (the `State` effect: Get/Put/run_state) is built and live"
-status: draft
+status: merged
 owner: language
 size: M–L
 gate: none
@@ -11,30 +11,61 @@ github: https://github.com/swe-toolkit/ken/pull/1152
 origin: Steward measurement 2026-07-27 at `origin/main = aea07d62`, taken while scoping the residual left by EFF-SPACE-ENSURES-PRESTATE (closed Shape B, PR #1115). Filed per COORDINATION §2.
 ---
 
-> ## ⛔ P1 MERGED, NODE PARKED — Steward, 2026-07-28
+> ## MERGED — Steward, 2026-08-11. The parked-P2 block was wrong and is replaced.
 >
 > **`SURF-SPACE-CELLS-P1` merged as PR #1152** at `origin/main = 05f259d7`
-> (candidate `ec412eca`, landed tree `b1e4cc10`, blob-verified). That closes the
-> **first phase only**.
+> (candidate `ec412eca`, landed tree `b1e4cc10`, blob-verified). **Measured at
+> `origin/main = 26b3d2c5`, P1 discharged this node's entire section 4 IN list**,
+> so the node is `merged` rather than a first phase awaiting a second.
 >
-> ⛔ **The node is NOT done and no successor is scheduled.** Under the operator's
-> ABI wind-down (2026-07-28) Team Language takes no new work after this landing,
-> so the P2 residual below is **parked, not dropped**.
+> | this node's IN item | landed control |
+> |---|---|
+> | the `space` block surface | `ac_s1_spec_counter_example_parses_verbatim` |
+> | `mut` cells, `§4.1` desugaring | `ac_s2_middle_write_preserves_both_neighbors`, `ac_s3_reads_each_of_three_pairwise_distinct_components` |
+> | `becomes` as `Get`-then-`Put` | `ac_s4_write_core_is_bind_get_then_put` |
+> | one effect label per space | `ac_s5_space_label_is_emitted_and_required` |
+> | the `§7.3` class-4 error | `ac_s6_mut_outside_space_...`, `ac_s6_becomes_outside_space_...` |
+> | `old` stays fenced (an OUT item, held) | `ac_s7_old_in_space_...`, `ac_s7_old_in_pure_code_...` |
 >
-> ⛔ **Status is `draft`, and `draft` here does NOT mean unstarted** — P1 landed.
-> It means the P2 residual has no frame, which is the generator's own legend
-> (`draft` = not framed / deps unmet). This node previously read `active` on the
-> reasoning that a reader would otherwise mistake a merged phase for a merged
-> node. That reasoning was wrong twice over: `active` means **a team is
-> building**, no team is, and the anti-merged signal it was reaching for is
-> carried by this block, not by the status field. Corrected 2026-08-05.
+> ### The two "carried blockers" were both addressed by P1. Corrected 2026-08-11.
 >
-> ⚠ The two blockers the Architect raised against the earlier candidate
-> `31e5f097` are **carried into the parked residual**, not fixed by P1:
-> `elaborate_space_decl` still admits `proc leak () : Int visits [S] = fs n` with
-> an `FS` callee (it checks only `declared_row.concrete_effects()` and never
-> infers the body row), and `Pub(SpaceDecl)` still falls through to
-> `resolve_scoped_decl`, which rejects it as `Internal`.
+> The replaced block claimed the Architect's two blockers against candidate
+> `31e5f097` were carried into a parked residual and not fixed. **Measured at
+> `26b3d2c5`, neither survives**, and the residual it defined therefore does not
+> exist:
+>
+> - **Body-row inference — repaired.** `elab.rs:5852-5864` now calls
+>   `infer_expr_row_type` on the operation body and runs `check_decl_poly`
+>   against the declared row. `proc leak () : Int visits [S] = fs n` with an `FS`
+>   callee is rejected as a false-purity/effect escape. The blocker described the
+>   code as checking only `declared_row.concrete_effects()`; that check is still
+>   there at `:5841`, but it is now the *first* of two, not the only one.
+> - **`Pub(SpaceDecl)` — no longer an `Internal` fall-through.**
+>   `modules.rs:1312-1328` refuses public and nested spaces up front with a
+>   specific `UnsupportedSpacePlacement`, before qualification can turn the
+>   unsupported surface into an internal error. The capability is still absent;
+>   what changed is that it now fails closed and says so.
+>
+> **Why this was worth correcting rather than leaving.** The block was a claim
+> about the past written in the present tense, sitting in the one artifact a
+> future framer reads to size the work. Acting on it would have produced a WP to
+> fix two things that are already fixed.
+>
+> ### Two live limitations, neither a defect, neither blocking
+>
+> - **`pub` and nested spaces are refused.** P1 admits only private block spaces
+>   at the true file root. `36 §4` specifies neither placement, so this is a
+>   scoped limitation rather than an unmet requirement — and per the
+>   interrogate-the-constraint rule it does not earn a node until something
+>   grounded demands it.
+> - **`old` still fails closed**, deliberately — it was always OUT of this node.
+>
+> ### Successor, now `ready`: [`LANG-SPACE-PRESTATE-BIND`](LANG-SPACE-PRESTATE-BIND.md)
+>
+> `EFF-SPACE-ENSURES-PRESTATE` closed as Shape B because no cell environment
+> existed to elaborate `s_pre`/`s_post` against, and named its successor as
+> framable once cells exist. **Cells exist.** That successor is framed and
+> released.
 
 > ## ⭐ RELEASED 2026-07-27 to **Team Language** as
 > **[`SURF-SPACE-CELLS-P1`](../wp/SURF-SPACE-CELLS-P1.md)**.
