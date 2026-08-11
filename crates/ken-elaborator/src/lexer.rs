@@ -430,6 +430,15 @@ impl<'s> Lexer<'s> {
 
         // Numeric literals: starts with a digit
         if c.is_ascii_digit() {
+            if self.src[self.pos..].starts_with("0x")
+                || self.src[self.pos..].starts_with("0X")
+                || self.src[self.pos..].starts_with("0b")
+                || self.src[self.pos..].starts_with("0B")
+                || self.src[self.pos..].starts_with("0o")
+                || self.src[self.pos..].starts_with("0O")
+            {
+                return self.lex_radix_integer(start);
+            }
             return self.lex_numeric(start);
         }
 
@@ -521,8 +530,15 @@ impl<'s> Lexer<'s> {
     fn lex_numeric(&mut self, start: usize) -> Result<(Token, Span), ElabError> {
         // Read integer part
         let mut int_str = String::new();
-        while self.cur().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-            int_str.push(self.advance().unwrap());
+        while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) {
+            let c = self.advance().unwrap();
+            if c == '_' {
+                if !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false)
+                    || int_str.is_empty()
+                {
+                    return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) });
+                }
+            } else { int_str.push(c); }
         }
 
         // Optional fractional part
@@ -545,22 +561,58 @@ impl<'s> Lexer<'s> {
         {
             self.advance(); // consume '.'
             has_dot = true;
-            while self.cur().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                frac_str.push(self.advance().unwrap());
-                frac_places += 1;
+            while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) {
+                let c = self.advance().unwrap();
+                if c == '_' {
+                    if !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false) || frac_str.is_empty() {
+                        return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) });
+                    }
+                } else { frac_str.push(c); frac_places += 1; }
             }
+        }
+        if self.cur() == Some('.')
+            && self.src[self.pos + 1..].starts_with('_')
+        {
+            return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos + 2) });
         }
 
         // Optional exponent (for FloatLit only)
         let mut exp_str = String::new();
-        if has_dot && (self.cur() == Some('e') || self.cur() == Some('E')) {
+        if self.cur() == Some('e') || self.cur() == Some('E') {
             exp_str.push(self.advance().unwrap());
             if self.cur() == Some('+') || self.cur() == Some('-') {
                 exp_str.push(self.advance().unwrap());
             }
-            while self.cur().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                exp_str.push(self.advance().unwrap());
+            while self.cur().map(|c| c.is_ascii_digit() || c == '_').unwrap_or(false) {
+                let c = self.advance().unwrap();
+                if c == '_' {
+                    if !self.cur().map(|n| n.is_ascii_digit()).unwrap_or(false)
+                        || !exp_str.chars().last().is_some_and(|c| c.is_ascii_digit())
+                    {
+                        return Err(ElabError::ParseError {
+                            msg: "digit separator must occur between digits".into(),
+                            span: Span::new(start, self.pos),
+                        });
+                    }
+                } else {
+                    exp_str.push(c);
+                }
             }
+            if exp_str.len() == 1 || (exp_str.len() == 2 && matches!(exp_str.as_bytes()[1], b'+' | b'-')) {
+                return Err(ElabError::ParseError {
+                    msg: "exponent requires at least one digit".into(),
+                    span: Span::new(start, self.pos),
+                });
+            }
+        }
+
+        if !exp_str.is_empty()
+            && (self.cur() == Some('d') || self.src[self.pos..].starts_with("f32"))
+        {
+            return Err(ElabError::ParseError {
+                msg: "exponent suffix combinations are not supported".into(),
+                span: Span::new(start, self.pos),
+            });
         }
 
         // Check for `d` suffix → Decimal
@@ -597,7 +649,9 @@ impl<'s> Lexer<'s> {
             } else {
                 int_str.clone()
             };
-            let f: f32 = s.parse().unwrap_or(0.0_f32);
+            let f: f32 = s.parse().map_err(|_| ElabError::ParseError {
+                msg: "invalid float literal".into(), span: Span::new(start, self.pos)
+            })?;
             return Ok((Token::Float32Lit(f), Span::new(start, self.pos)));
         }
 
@@ -605,10 +659,14 @@ impl<'s> Lexer<'s> {
         if has_dot || !exp_str.is_empty() {
             let s = if exp_str.is_empty() {
                 format!("{}.{}", int_str, frac_str)
+            } else if has_dot {
+                format!("{}.{}{}", int_str, frac_str, exp_str)
             } else {
-                format!("{}.{}e{}", int_str, frac_str, exp_str)
+                format!("{}{}", int_str, exp_str)
             };
-            let f: f64 = s.parse().unwrap_or(0.0_f64);
+            let f: f64 = s.parse().map_err(|_| ElabError::ParseError {
+                msg: "invalid float literal".into(), span: Span::new(start, self.pos)
+            })?;
             return Ok((Token::FloatLit(f), Span::new(start, self.pos)));
         }
 
@@ -622,6 +680,28 @@ impl<'s> Lexer<'s> {
         } else {
             Ok((Token::IntLit(n), Span::new(start, self.pos)))
         }
+    }
+
+    fn lex_radix_integer(&mut self, start: usize) -> Result<(Token, Span), ElabError> {
+        self.advance();
+        let base_ch = self.advance().unwrap();
+        let radix = match base_ch.to_ascii_lowercase() { 'x' => 16, 'b' => 2, 'o' => 8, _ => unreachable!() };
+        let mut digits = String::new();
+        while let Some(c) = self.cur() {
+            if c == '_' || c.is_ascii_hexdigit() {
+                self.advance();
+                if c == '_' {
+                    if digits.is_empty() || !self.cur().map(|n| n.is_ascii_hexdigit()).unwrap_or(false) {
+                        return Err(ElabError::ParseError { msg: "digit separator must occur between digits".into(), span: Span::new(start, self.pos) });
+                    }
+                } else { digits.push(c); }
+            } else { break; }
+        }
+        if digits.is_empty() || !digits.chars().all(|c| c.to_digit(radix).is_some()) {
+            return Err(ElabError::ParseError { msg: "invalid radix integer".into(), span: Span::new(start, self.pos) });
+        }
+        let n = BigInt::parse_bytes(digits.as_bytes(), radix).ok_or_else(|| ElabError::ParseError { msg: "invalid radix integer".into(), span: Span::new(start, self.pos) })?;
+        if let Ok(nat) = n.to_string().parse::<u32>() { Ok((Token::Nat(nat), Span::new(start, self.pos))) } else { Ok((Token::IntLit(n), Span::new(start, self.pos))) }
     }
 
     /// Lex the entire source into a token+span list (including the `Eof`
