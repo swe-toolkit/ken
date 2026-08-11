@@ -606,6 +606,28 @@ puts the `AC-4` carrier gate on `main` **before the emitter exists**. The
 implementer's own argument for the ordering — a gate written after a working
 emitter can be shaped to fit it, and this one cannot be.
 
+### The un-wired premise was MEASURED, not inspected
+
+Adversary `evt_28ndgecr5a6ms`, on `41cd949e`. My ruling rested on *"no
+production installer caller"*, which is an enumeration, so it was checked
+directly. `install_static_continuation_fusions` has exactly two occurrences: the
+definition at `:13330`, before the test boundary, and its **sole call at
+`:17170`, inside `mod tests`** — which opens at `:15223` under `#[cfg(test)]` at
+`:15222`.
+
+⇒ **Zero production callers.** The stronger reading is the correct one: not
+"nothing calls it yet", but that no production path *can* at this SHA without a
+new call site being added. The `AC-4` ordering argument is supported by the same
+measurement — there is no emitter the gate could have been shaped around and no
+production consumer whose behaviour could have been fitted to it.
+
+**And the property expires by design.** The installer is `pub(in
+crate::cranelift_backend)`, so un-wired-ness ends the moment any call appears
+anywhere in that module tree, and nothing in the code marks that transition.
+That transition **is** the emitter increment, so there is nothing to guard — but
+it is worth writing down that this is a property true *at a SHA*, not by
+construction. Do not cite this section as evidence about any later tree.
+
 ### What it deliberately does NOT do — a handover, not a defect
 
 `install_static_continuation_fusions` reads the producer's declared operand run
