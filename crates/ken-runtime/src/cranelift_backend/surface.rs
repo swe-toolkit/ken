@@ -189,6 +189,22 @@ pub enum BackendFailure {
     Verifier(String),
     Module(String),
     PlannerInvariant(String),
+    /// The compiled code returned `token` and the result decoder could not turn
+    /// it into a value.
+    ///
+    /// **The token is the native RETURN VALUE, not an error code, an arm tag or
+    /// an index.** `compiled.rs` raises this variant at **eight** sites across
+    /// five decoder kinds, and the rendering below is deliberately silent about
+    /// which one: only one of the eight is a result-table lookup, and a message
+    /// naming that mechanism was **false at the other seven**. It said
+    /// `is not in the result table` and was measured on `nc22` reporting a
+    /// result-table miss for a token that never reached the `Table` arm and
+    /// against a table that was empty.
+    ///
+    /// The variant carries no site discriminator, so nothing here can localize
+    /// the fault; a reader must observe which decoder was selected. Saying less
+    /// is the correction — the previous wording localized it **wrongly**, which
+    /// is worse than not localizing it at all.
     NativeResultDecode { token: i64 },
 }
 
@@ -248,7 +264,7 @@ impl fmt::Display for BackendFailure {
                  please report this compiler bug: {msg}"
             ),
             BackendFailure::NativeResultDecode { token } => {
-                write!(f, "native result token {token} is not in the result table")
+                write!(f, "native result token {token} could not be decoded")
             }
         }
     }
@@ -312,7 +328,7 @@ mod surface_diagnostics_tests {
                      please report this compiler bug: {msg}"
                 ),
                 BackendFailure::NativeResultDecode { token } => {
-                    format!("native result token {token} is not in the result table")
+                    format!("native result token {token} could not be decoded")
                 }
             };
             assert_eq!(rendered, expected, "BackendFailure rendering drifted");
