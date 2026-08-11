@@ -61,6 +61,8 @@ pub enum ElabError {
     UnboundName { name: String, span: Span },
     /// A surface conditional's condition did not check against `Bool`.
     IfConditionNotBool { span: Span },
+    /// A positional projection was applied to a non-Sigma value.
+    PositionalProjectionNotPair { projection: u8, span: Span },
     /// A structural-result selector resolved its operand, but that exact
     /// surface binding has no validated result association in this branch.
     StructuralResultOutOfScope {
@@ -272,6 +274,11 @@ impl fmt::Display for ElabError {
                 f,
                 "conditional condition at {}-{} must have type Bool",
                 span.start, span.end,
+            ),
+            ElabError::PositionalProjectionNotPair { projection, span } => write!(
+                f,
+                "positional projection .{} at {}-{} requires a pair type",
+                projection, span.start, span.end,
             ),
             ElabError::StructuralResultOutOfScope {
                 selector_span,
