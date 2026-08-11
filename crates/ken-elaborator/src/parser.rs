@@ -2251,7 +2251,7 @@ impl Parser {
             Token::Nat(n) => {
                 let span = self.peek_span().clone();
                 self.advance();
-                Ok(Expr::ENumLit(NumLit::Int(n as i128), span))
+                Ok(Expr::ENumLit(NumLit::Int(num_bigint::BigInt::from(n)), span))
             }
             Token::IntLit(n) => {
                 let span = self.peek_span().clone();

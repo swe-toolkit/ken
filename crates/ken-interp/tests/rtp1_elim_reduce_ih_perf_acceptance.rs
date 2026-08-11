@@ -63,7 +63,7 @@ fn run(src: &str) -> (Duration, EvalVal, ElabEnv) {
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
     for (id, lit) in &env.num_values {
         let val = match lit {
-            NumericLitVal::Int(n) => EvalVal::from(*n),
+            NumericLitVal::Int(n) => EvalVal::from(n.clone()),
             NumericLitVal::Float(f) => EvalVal::Float(*f),
             NumericLitVal::Float32(f) => EvalVal::Float32(*f),
             NumericLitVal::Decimal { coeff, exp } => {

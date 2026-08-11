@@ -440,7 +440,7 @@ fn lit_to_eval(
 ) -> ken_interp::EvalVal {
     use ken_elaborator::NumericLitVal;
     match v {
-        NumericLitVal::Int(n) => ken_interp::EvalVal::from(*n),
+        NumericLitVal::Int(n) => ken_interp::EvalVal::from(n.clone()),
         NumericLitVal::Float(f) => ken_interp::EvalVal::Float(*f),
         NumericLitVal::Float32(f) => ken_interp::EvalVal::Float32(*f),
         NumericLitVal::Decimal { coeff, exp } => {

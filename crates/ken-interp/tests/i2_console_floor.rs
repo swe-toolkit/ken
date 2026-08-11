@@ -51,7 +51,7 @@ fn eval_store(env: &ConsoleEnv) -> EvalStore {
     let mut store = EvalStore::new();
     for (id, literal) in &env.elab.num_values {
         let value = match literal {
-            NumericLitVal::Int(value) => EvalVal::from(*value),
+            NumericLitVal::Int(value) => EvalVal::from(value.clone()),
             NumericLitVal::Float(value) => EvalVal::Float(*value),
             NumericLitVal::Float32(value) => EvalVal::Float32(*value),
             NumericLitVal::Decimal { coeff, exp } => {

@@ -10,6 +10,7 @@
 //! comments are skipped.
 
 use crate::error::{ElabError, Span};
+use num_bigint::BigInt;
 
 /// A V0/V1/L1 token.
 #[derive(Clone, Debug, PartialEq)]
@@ -104,7 +105,7 @@ pub enum Token {
     // L2 punctuation
     MapsTo, // `|->` / `↦` — match arm separator
     // L1 numeric literal tokens
-    IntLit(i128),         // integer literal too large for u32
+    IntLit(BigInt),       // integer literal too large for u32
     FloatLit(f64),        // decimal-point float: `3.14`, `1e-9`
     DecimalLit(i64, i32), // `d`-suffix: coeff × 10^exp; e.g. `0.1d` → (1,-1)
     Float32Lit(f32),      // `f32`-suffix: `1.5f32`
@@ -612,12 +613,12 @@ impl<'s> Lexer<'s> {
         }
 
         // Plain integer
-        let n: i128 = int_str.parse().map_err(|_| ElabError::ParseError {
+        let n: BigInt = int_str.parse().map_err(|_| ElabError::ParseError {
             msg: format!("integer literal too large: {}", int_str),
             span: Span::new(start, self.pos),
         })?;
-        if n >= 0 && n <= u32::MAX as i128 {
-            Ok((Token::Nat(n as u32), Span::new(start, self.pos)))
+        if let Ok(nat) = int_str.parse::<u32>() {
+            Ok((Token::Nat(nat), Span::new(start, self.pos)))
         } else {
             Ok((Token::IntLit(n), Span::new(start, self.pos)))
         }

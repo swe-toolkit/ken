@@ -1248,6 +1248,12 @@ impl From<i128> for EvalVal {
     }
 }
 
+impl From<BigInt> for EvalVal {
+    fn from(n: BigInt) -> Self {
+        bigint_to_int_val(n)
+    }
+}
+
 /// Build a `Decimal` value — `Ctor{id:mkdecimalpair_id, args:[coeff, exp]}`
 /// (`18a §5.6.1`) — from a `(coeff, exp)` pair. Used by literal-conversion
 /// call sites outside this crate (`ken-cli`, elaborator test drivers) that

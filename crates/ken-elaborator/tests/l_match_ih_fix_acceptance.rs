@@ -70,7 +70,7 @@ fn ac2_tree_size_uses_both_ihs_and_computes_right_value() {
             store
                 .num_values
                 .entry(*nid)
-                .or_insert_with(|| ken_interp::eval::EvalVal::from(*n));
+                .or_insert_with(|| ken_interp::eval::EvalVal::from(n.clone()));
         }
     }
 

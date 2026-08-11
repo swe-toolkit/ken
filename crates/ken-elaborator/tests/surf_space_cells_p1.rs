@@ -36,7 +36,7 @@ space Collision {
 
 fn literal_value(value: &NumericLitVal, decimal_pair: GlobalId) -> EvalVal {
     match value {
-        NumericLitVal::Int(value) => EvalVal::from(*value),
+        NumericLitVal::Int(value) => EvalVal::from(value.clone()),
         NumericLitVal::Float(value) => EvalVal::Float(*value),
         NumericLitVal::Float32(value) => EvalVal::Float32(*value),
         NumericLitVal::Decimal { coeff, exp } => {

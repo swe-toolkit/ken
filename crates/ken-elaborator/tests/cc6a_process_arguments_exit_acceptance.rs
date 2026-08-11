@@ -55,7 +55,7 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
 
 fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
     match value {
-        NumericLitVal::Int(n) => EvalVal::from(*n),
+        NumericLitVal::Int(n) => EvalVal::from(n.clone()),
         NumericLitVal::Float(f) => EvalVal::Float(*f),
         NumericLitVal::Float32(f) => EvalVal::Float32(*f),
         NumericLitVal::Decimal { coeff, exp } => {

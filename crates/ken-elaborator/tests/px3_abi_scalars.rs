@@ -33,7 +33,7 @@ fn eval_const(env: &ElabEnv, id: ken_kernel::GlobalId) -> EvalVal {
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
     for (literal_id, value) in &env.num_values {
         let value = match value {
-            NumericLitVal::Int(value) => EvalVal::from(*value),
+            NumericLitVal::Int(value) => EvalVal::from(value.clone()),
             NumericLitVal::Float(value) => EvalVal::Float(*value),
             NumericLitVal::Float32(value) => EvalVal::Float32(*value),
             NumericLitVal::Decimal { coeff, exp } => {

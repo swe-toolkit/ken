@@ -3,6 +3,7 @@
 use std::fmt;
 
 use ken_kernel::{GlobalId, KernelError, Level, LevelVar, Term};
+use num_bigint::BigInt;
 
 /// The determined classifier of a selected hidden recursive result.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +64,14 @@ pub enum ElabError {
     IfConditionNotBool { span: Span },
     /// A positional projection was applied to a non-Sigma value.
     PositionalProjectionNotPair { projection: u8, span: Span },
+    /// An integer literal does not fit its expected fixed-width type.
+    FixedWidthLiteralOutOfRange {
+        literal: BigInt,
+        target: &'static str,
+        min: BigInt,
+        max: BigInt,
+        span: Span,
+    },
     /// A structural-result selector resolved its operand, but that exact
     /// surface binding has no validated result association in this branch.
     StructuralResultOutOfScope {
@@ -279,6 +288,17 @@ impl fmt::Display for ElabError {
                 f,
                 "positional projection .{} at {}-{} requires a pair type",
                 projection, span.start, span.end,
+            ),
+            ElabError::FixedWidthLiteralOutOfRange {
+                literal,
+                target,
+                min,
+                max,
+                span,
+            } => write!(
+                f,
+                "integer literal {} at {}-{} is outside {}'s representable interval [{}..{}]",
+                literal, span.start, span.end, target, min, max,
             ),
             ElabError::StructuralResultOutOfScope {
                 selector_span,
