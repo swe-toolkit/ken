@@ -99,10 +99,69 @@ that *would* export activation must be refused.
 `DeclarationClosure` unconditionally non-transferable at every depth, and
 `call_declared_unit_target` free of any closure lane.
 
-**AC-6 — the fail-closed boundary survives emission.** `D2e`'s transplant
-controls — call identity and segment owner, independently — still reject, and
-still reject **before** any definition is created. Emission must not introduce a
-path that reaches a generated definition for a key that failed to resolve.
+**AC-6 — the fail-closed boundary survives emission.** Emission must not
+introduce a path that reaches a generated definition for a key that failed to
+resolve.
+
+> **AMENDED IN PLACE 2026-08-11 by the Steward**, on Architect ruling
+> `evt_1jmng1vr3dw3k`, which confirms this AC inherits the landed `D2j`
+> disposition `evt_cnwn4y5xykg1`.
+>
+> **STRUCK — *"`D2e`'s transplant controls — call identity and segment owner,
+> independently — still reject."*** **Segment owner must NOT reject.** A
+> coherently re-homed source determines a *different complete key* and is not
+> refused for it; building that rejection would add a topology restriction the
+> production key model neither has nor needs. **This frame predates the ruling
+> that corrected it, and the criterion as written could not be discharged.**
+> Found at grounding by the implementer, not at acceptance.
+>
+> An *incoherent* owner exists only as a mutated key or an inconsistent plan
+> artifact, and the landed `D2h` interner/re-derivation and oriented-plan
+> validators already own that refusal. **`D2f` must not add a second
+> owner-rejection path.**
+
+**AC-6a — the five refusals still refuse, and reach nothing.** Checked frame,
+selected slot, invocation template, exact suffix, and **call identity**. Start
+each from the **same positive full-pipeline baseline** that resolves one
+key/ID/descriptor and creates exactly one `Fusion` definition, then apply one
+source-side cause independently, with the matching independently authored
+oriented plan where applicable. Each negative must yield **no key, no `Fusion`
+ID, no descriptor, no generated definition, and no redirected edge.**
+
+- **The definition/edge population must be an operand of the assertion**, with
+  the positive baseline present. **A refusal control asserted against a resting
+  zero proves nothing** — it holds whether or not the mechanism ran.
+- **Enter through the ordinary planner-to-emission path.** Do not mutate a key
+  struct and do not call the emitter directly. The control's job is to prove
+  **emission has no fallback around a failed resolution**, and a control that
+  bypasses the planner cannot see that path.
+
+**AC-6b — segment owner is a POSITIVE comparator, not a refusal.** Build the
+exact and coherently re-homed sources against their own plans; **each must still
+resolve one complete key and emit exactly one generated definition.** Then:
+
+- re-assert each key's producer and consumer owners against **its own plan's**
+  `occurrence_authority`, preserving `producer_owner != consumer_owner`;
+- require the **owner pairs and the complete keys to differ**, and preserve the
+  constant checked-transport relation;
+- bind each emitted definition to **its own** locally resolved
+  descriptor/key — owner `ContinuationEmissionOwner::Fusion(local_id)`, its own
+  validated source-body authorities, and exactly its own redirected producer
+  edge;
+- require the emitted ordinary-ABI projection to reflect the discriminating
+  source facts `D2j` already established — **two continuation inputs on the
+  exact side, zero on the re-homed side** — so that reusing one side's
+  descriptor or definition for the other **reds**.
+
+**AC-6c — do NOT compare bare numeric `Fusion` IDs across the two planes.** They
+are **independent interners and both may lawfully issue local ID `0`.** An
+assertion that two such IDs differ is `0 != 0` — it fails on correct code, and
+manufacturing a shared namespace to make it pass would invent a cross-plane
+relation production does not have.
+
+⇒ **Non-aliasing is established by the distinct complete keys, by each
+compilation-local key ↔ ID ↔ descriptor ↔ definition binding, and by the
+different emitted ABI projection.** Never by an ID inequality.
 
 ## Excluded scope
 
