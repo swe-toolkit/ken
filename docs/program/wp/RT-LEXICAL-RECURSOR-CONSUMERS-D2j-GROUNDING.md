@@ -7,9 +7,22 @@ records the rows and the fixture economy, and builds no matrix.
 ## 0. Provenance
 
 Merge-base re-derived at the moment of writing; state it from `origin/main`
-rather than from this record. No `crates/` change: every measurement below was
-taken with temporary instrumentation that is removed, and the planner sources
-are byte-identical to the base.
+rather than from this record.
+
+**No production or control logic change.** Every measurement below was taken
+with temporary instrumentation, which is removed.
+
+**The one `crates/` delta is the provenance-comment correction** in
+`planning/static_transition.rs` — `+24/-4` relative to the checkpoint base,
+comments only. It corrects two overclaims about how `recursive_position` is
+established; it changes no behaviour and no control.
+
+An earlier revision of this section said *"No `crates/` change"* and *"the
+planner sources are byte-identical to the base"*. That was true when the
+checkpoint was record-only and became false the moment the recut touched a
+comment — a provenance claim about a candidate goes stale as soon as the
+candidate grows, and this one described the commit before it rather than the
+range.
 
 ## 1. The stop condition that mattered — a non-empty projection is REACHABLE
 
