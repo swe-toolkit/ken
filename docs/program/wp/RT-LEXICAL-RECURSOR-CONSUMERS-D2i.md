@@ -1,4 +1,8 @@
-# RT-LEXICAL-RECURSOR-CONSUMERS D2i — the R3-derived artifact and the discovery ledger
+# RT-LEXICAL-RECURSOR-CONSUMERS D2i — the discovery ledger and its enumerator
+
+**The title said "the R3-derived artifact and the discovery ledger" until the
+scope ruling below retired the R3-derived half.** Read that ruling before the
+deliverables; where it and the body differ, the ruling wins.
 
 Owner: runtime. Size: **L**. Node: [[RT-LEXICAL-RECURSOR-CONSUMERS]] (`#6d`).
 Architect ruling **`evt_2x157jk8bmpxk`** — this frame is that ruling made
@@ -203,6 +207,54 @@ it is the same green-by-construction shape you correctly refused twice.
 > control; `AC-3`'s transport converse and multiplicity refusals; the closed
 > 7-fact handoff contract; and, if enumeration still keys on the seed, the
 > consuming half of `Deliverable 2`.
+
+> ### SCOPE RULING — Steward, 2026-08-11, `evt_57ypzyard9jjx`
+>
+> **The ledger partial `eaaaf141` merged at `b7142fe5`** (one path, +100/-0). It
+> establishes the root source and claims nothing beyond it: no live enumerator,
+> no production consumer, no removed seed path, and the ledger equality
+> explicitly labelled an alias observation.
+>
+> Making the enumerator live then measured **the landed `D2g` terminal twin as
+> productive** on a production-issued ledger descent root, carrying one full
+> seven-fact candidate. **That inverts the premise `AC-1` was built on.**
+>
+> `AC-1`'s first population is the twin with **zero** result-flow pair. The
+> `R3`-derived sibling exists *because* the twin was measured as having no pair
+> to observe. The reconciliation is that both measurements are right and a
+> qualifier is missing: **zero pair under seed enumeration, a pair under ledger
+> enumeration** — which is the merged partial's own claim, that the ledger
+> admits roots no seed scan can name.
+>
+> ⇒ **The `R3`-derived sibling and the three-population matrix are NOT owed if
+> the twin carries the seven facts.**
+>
+> **But this removes the matrix's negative population rather than shortening
+> it.** All three rows would be productive, and nothing would then discriminate
+> *"finds a pair where production issues one"* from *"finds a pair anywhere it
+> looks."* **`AC-2`'s causal root control replaces it and is not optional** —
+> suppressing the production descent must take the count 1 to 0 with the initial
+> terminal root unchanged. That is a stronger negative than a second fixture,
+> because it is causal rather than comparative.
+>
+> **State the twin's pair count under both enumerators, naming each.** Restating
+> the old number as simply wrong hides the finding: a reader seeing only the new
+> count cannot tell whether the twin changed or the instrument did.
+>
+> **`AC-3` is untouched** — three gates, three distinct refusals, multiplicity
+> refuses rather than choosing.
+>
+> **Also fold in `evt_htsm7kmzzv5g`:** the merged `static_transition.rs:14631`
+> control asserts `len() > len()`, which is **cardinality where its own prose
+> claims containment** — a ledger that lost a seed while gaining two unnameable
+> roots passes it. Compare on the `(continuation_origin, result_root)`
+> projection, not the full triple: `PartialEq` derives over all three fields and
+> the seed reconstruction hardcodes `enclosing_specialization: None`, so a
+> full-triple superset test fails for a reason unrelated to the defect.
+>
+> **The seven-fact confirmation is the Architect's**, not mine. A fact outside
+> the seven is the closed-contract failure this frame told you to report
+> immediately, and it comes to me.
 
 ## Contention
 
