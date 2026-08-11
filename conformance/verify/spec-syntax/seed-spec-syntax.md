@@ -50,10 +50,10 @@ status **model** and concrete grammar for
 spelling** (`tested`/`assume`/`test`/`delegated`) stays **reserved**
 (`OQ-syntax`, downstream of `../70-behavioral/`). Cases that would exercise that
 spelling are tagged **`[deferred — §5.5, OQ-syntax]`** and assert the model,
-never un-landed grammar. The second instance is the **deferred-model
-expectation** in each `old` scope row, tagged
-**`[deferred — old/pre-state elaboration; OQ-Space model decided]`**; each
-row's landed expectation remains live and untagged.
+never un-landed grammar. The former second instance was the deferred-model
+expectation in each `old` scope row. Pre-state elaboration for block-space
+cells has landed, so those two row-level deferrals are retired. This does not
+retire separate `OQ-Space` concurrency or space-placement gaps.
 
 Cases tagged **(soundness)** encode the honesty/scope commitments the whole
 model
@@ -171,46 +171,37 @@ rests on (`21 §5.4`) and must never regress.
 
 ### verify/spec-syntax/old-resolves-in-space-op-ensures
 - spec: `21 §6.4` (elabSpaceEnsures), `36 §4.3`; `16 §2` (`refl`)
-- given: a `space` op `inc` over a cell `n : Int` with `ensures n == old(n) + 1`
-- expect (landed): **rejected at elaboration as unsupported**; the
-  space-operation scope recognizes `old(n)`, but no obligation using it is
-  emitted because pre-state elaboration is unavailable.
-- expect (model, deferred):
-  **`[deferred — old/pre-state elaboration; OQ-Space model decided]`** once
-  pre-state elaboration is available, `old(n)` resolves to the pre-state
-  projection and bare `n` to the post-state projection. For the
-  stated increment, substitution and record reduction leave a reflexive
-  equality.
-- why: `OQ-Space` settles the semantic model and `21 §6.4` specifies it, but the
-  positive elaboration capability has not landed. The landed behavior proves
-  that the enclosing-declaration scope recognizes `old` in a space-operation
-  postcondition; the tagged clause records the later positive resolution
-  contract without claiming current acceptance.
+- given: a **block-space** op `inc` over a cell `n : Int` with
+  `ensures n == old(n) + 1`
+- expect (landed): **accepts**; `old(n)` resolves to the pre-state projection
+  and bare `n` to the post-state projection. The elaborator emits the
+  postcondition obligation, and substitution plus record reduction leave a
+  reflexive equality that a kernel-checked `Refl` certificate discharges.
+- why: the block-space operation installs distinct pre-state and post-state
+  cell environments while elaborating its contracts. The landed control emits
+  three obligations using both checked and proposition-root `old`, and kernel
+  `Refl` discharges all three; changing only the promised increment from `+1`
+  to `+2` leaves the obligation open. This is specifically the block-space
+  form: modifier-form `space proc` has no cells or state environment and still
+  refuses `old` with `OldPreStateUnsupported`.
 
 ### verify/spec-syntax/old-out-of-scope-rejects (soundness)
 - spec: `21 §6.4` (scope guard), `§4`, `36 §7.3`
 - given: a **pure**
   `view k (x : Int) : Int ensures result == old(x) + 1 = x + 1`
 - expect (landed): **rejected** as `UnboundName("old")` at scope resolution.
-  With the same `old(…)` syntax in a space-operation postcondition, scope
-  resolution recognizes `old` and elaboration proceeds to the later
-  unsupported-pre-state rejection. The landed relation is therefore
-  **reject/reject at distinct gates**, not a verdict flip.
-- expect (model, deferred):
-  **`[deferred — old/pre-state elaboration; OQ-Space model decided]`** once
-  pre-state elaboration lands, the space-operation case resolves `old` to the
-  pre-state and accepts, while the pure-view case
-  continues to reject `old` as unbound; only then is the intended accept/reject
-  verdict flip live.
-- why: the live scope guard is the enclosing declaration kind. It is observable
-  now through gate identity: outside a space-operation postcondition, `old` is
-  unbound; inside one, the expression passes that guard and reaches the separate
-  missing-capability fence. If the scope guard were dropped today, the pure-view
-  case would no longer produce `UnboundName("old")`; it would progress to the
-  later unsupported-pre-state rejection. Thus the exact landed diagnostic
-  distinguishes the guard even while both cases reject. The tagged future
-  clause states the stronger verdict discriminator that becomes available when
-  pre-state elaboration lands.
+  With the same `old(…)` syntax in a block-space operation postcondition, the
+  operation **accepts** and resolves `old` to its pre-state cell projection.
+  The landed relation is therefore a true **reject/accept verdict flip**.
+- why: spelling alone is not the guard. Pure code is resolver-rejected as
+  `UnboundName("old")`; modifier-form `space proc` passes resolution but has no
+  `space_pre_state`, so elaboration refuses it as `OldPreStateUnsupported`; a
+  block-space operation passes resolution and installs the pre-state cell
+  environment, so its contract accepts. Acceptance therefore requires both an
+  admitting resolver scope and an installed block-space pre-state environment.
+  The pure rejection proves the resolver scope remains live, while the modifier
+  control proves declaration kind alone is insufficient. The pure/block pair
+  retains the true reject/accept verdict flip.
 
 ---
 
@@ -394,11 +385,12 @@ rests on (`21 §5.4`) and must never regress.
   `proved-status-cert-checks-not-in-trusted-base`, `bogus-cert-not-proved`,
   `unknown-hole-distinct-from-proved`, `disproved-distinct-from-unknown`,
   `epistemic-projection-distinct`.
-- **#3 `old` semantics** — live distinct-gate scope guard:
-  `old-out-of-scope-rejects` produces `UnboundName("old")`, while
-  `old-resolves-in-space-op-ensures` passes scope resolution and reaches the
-  unsupported-pre-state fence. The positive accept/reject flip is
-  **`[deferred — old/pre-state elaboration; OQ-Space model decided]`**.
+- **#3 `old` semantics** — live verdict flip:
+  `old-out-of-scope-rejects` produces `UnboundName("old")` in pure code, while
+  `old-resolves-in-space-op-ensures` accepts the same syntax against a
+  block-space cell environment and emits a `Refl`-dischargeable obligation.
+  Modifier-form `space proc` has no cells and remains refused with
+  `OldPreStateUnsupported`.
 - **#4 V2-ready** — `obligation-hole-set-exposed-to-v2`.
 - **#5 no regression** — `v0-unchanged-for-non-spec-programs`.
 - **goals** — `prove-goal-obligation-and-postulate-binding`,
