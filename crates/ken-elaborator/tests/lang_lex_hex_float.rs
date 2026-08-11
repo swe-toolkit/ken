@@ -22,6 +22,10 @@ fn hex_float_values_and_boundaries() {
     assert!(matches!(Lexer::lex("0xFF + p").unwrap()[0].0, Token::Nat(255)));
     assert!(matches!(Lexer::lex("0xFF:p").unwrap()[0].0, Token::Nat(255)));
     assert!(matches!(Lexer::lex("0xFF:x.1").unwrap()[0].0, Token::Nat(255)));
+    let plus: Vec<_> = Lexer::lex("0xFF+p").unwrap().into_iter().map(|(t, _)| t).collect();
+    assert_eq!(plus, vec![Token::Nat(255), Token::Plus, Token::Ident("p".into()), Token::Eof]);
+    let minus: Vec<_> = Lexer::lex("0xFF-p").unwrap().into_iter().map(|(t, _)| t).collect();
+    assert_eq!(minus, vec![Token::Nat(255), Token::Minus, Token::Ident("p".into()), Token::Eof]);
     assert!(matches!(Lexer::lex("0b10 + p").unwrap()[0].0, Token::Nat(2)));
     assert!(matches!(Lexer::lex("0o7 + p").unwrap()[0].0, Token::Nat(7)));
 }

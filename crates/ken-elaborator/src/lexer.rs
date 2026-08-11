@@ -431,10 +431,19 @@ impl<'s> Lexer<'s> {
         // Numeric literals: starts with a digit
         if c.is_ascii_digit() {
             if self.src[self.pos..].starts_with("0x") || self.src[self.pos..].starts_with("0X") {
-                let token_tail: String = self.src[self.pos + 2..]
-                    .chars()
-                    .take_while(|c| c.is_ascii_hexdigit() || matches!(c, '_' | '.' | 'p' | 'P' | '+' | '-'))
-                    .collect();
+                let mut token_tail = String::new();
+                let mut exponent = false;
+                let mut exp_sign = false;
+                for ch in self.src[self.pos + 2..].chars() {
+                    if !exponent {
+                        if ch.is_ascii_hexdigit() || ch == '_' || ch == '.' { token_tail.push(ch); continue; }
+                        if ch == 'p' || ch == 'P' { exponent = true; token_tail.push(ch); continue; }
+                        break;
+                    }
+                    if !exp_sign && (ch == '+' || ch == '-') { exp_sign = true; token_tail.push(ch); continue; }
+                    if ch.is_ascii_digit() || ch == '_' { exp_sign = true; token_tail.push(ch); continue; }
+                    break;
+                }
                 if token_tail.chars().any(|c| c == '.' || c == 'p' || c == 'P') {
                     return self.lex_hex_float(start);
                 }
