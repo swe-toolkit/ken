@@ -392,6 +392,60 @@ arrival counts, which is not the same claim** — arrival-is-one does not establ
 that only one production call site exists. Record the caller enumeration beside
 the control.
 
+## `D2f` Deliverable 0 — the per-cause applied-root gate, MERGED 2026-08-11
+
+Exact `068bd6bcd7a74fe970460f6dc54c842d7dc9edf0` from declared merge-base
+`1585a2e6`; one commit, five `ken-runtime` paths, `+489/-21`. Decision
+`dec_1n9rxnp3tbfjc` resolved APPROVE — Architect `evt_3cgg4nab999t6`, QA
+`evt_2b6g8xk7mtza3`. PR #1910; `origin/main` is `f81e36f6`. M6 blob identity
+5/5 MATCH. The staleness intersection against `main`'s changes since the
+merge-base was empty, so no rebase was owed despite the base sitting two merges
+back.
+
+**What landed.** One exported `d2j_checked_fixture_under(cause)` with a
+**per-cause** root family, every arm spelled out so a new cause is a compile
+error rather than an inherited default: the `Exact` family takes an applied
+`Call(DeclarationRef(D2J), [Unit, Unit])`; `ReHomed` takes a bare
+`DeclarationRef` in its own explicit branch. The planner-only bare-entry helper
+is retired with zero callers. All four `D2j` planner controls were rebaselined
+on their own cause-selected roots — one had been sharing a single entry across
+both causes, so one of its two sides was being measured against a program it
+does not describe.
+
+**The node stays `active`.** No emitter definition, authority, edge redirection,
+or emitter AC is credited, and none of the eight target expressions closes.
+This is the fifth merge on `#6d` and the count still overstates progress
+against the node's actual surface.
+
+### Both carried riders above are discharged in this range
+
+The `core.rs` doc now names the **unconditional push** as why arrival *length*
+discriminates never-reached from reached-and-empty — a conditional push would
+collapse the three-versus-two phase split into an unreadable zero. And the
+"sole production compile path" claim is now recorded as what it is: a
+**structural** claim about four delegating entries, not a measurement over
+program shapes. A reader can now tell which kind of claim it is, which is the
+thing the rider asked for.
+
+### Four candidates for one deliverable, and what that bought
+
+`e4531318` approved-then-withdrawn (above); `9d942c4b` and `ce5323ca` QA-blocked.
+**Neither block was about code.** The first: replacing a test body from `#[test]`
+downward left the previous doc block in place, so the item carried two doc
+comments, Rust concatenated them, and the **withdrawn** bare-root contract was
+the first durable reading — on a commit whose central claim is that the
+withdrawn revision does not extend. The second: a decorative glyph. QA named one
+occurrence; the implementer swept the **class** and found five across two files,
+leaving pre-existing ones alone on the grounds that copying nearby style is how
+it introduced them.
+
+**One caveat that belongs on the record.** Every executable line is identical
+across the last three candidates, so the three A/B mutations were measured on
+`9d942c4b`'s tree and carried forward on the argument that each delta was
+comment-only. The argument is sound and was checked (`git diff` filtered to
+non-comment lines is empty), but **it is an argument, not a re-measurement** —
+worth knowing if a later finding turns on that evidence.
+
 ## Carried rider — the `D2a` control's durability. Owed, not optional.
 
 **DISCHARGED 2026-08-11** by the `D2f` ABI-class partial above, which carries
