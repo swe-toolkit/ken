@@ -7,8 +7,14 @@ scope ruling `evt_2vfgg71s847ns` as corrected by Architect ruling
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
-> ## TWO ACCEPTED PARTIALS LANDED. THIS FRAME IS NOT DISCHARGED AND `#6d` IS
-> ## NOT CLOSED.
+> ## THREE ACCEPTED PARTIALS LANDED. ALL THREE DELIVERABLES ARE NOW
+> ## DISCHARGED. `#6d` REMAINS ACTIVE.
+>
+> **Partial 3 — `e2907c5e`, PR #1886, Decision `dec_1s85w6rjhm6f5`**, merged
+> 2026-08-11 from base `44a935c5`: two paths, `+885/-6`, `planning/
+> static_transition.rs` plus the grounding record. **This discharges
+> Deliverable 1's source-side matrix, `AC-2`'s ordered-input row, Deliverable
+> 3's five refusals, and `AC-3a`'s comparator.**
 >
 > **Partial 2 — `f3f2c1a0`, PR #1878, Decision `dec_35g9zxj3a8c0b`**, merged
 > 2026-08-11 from base `5f4b514b`: one planning path, `+294/-0`, test-side
@@ -18,15 +24,38 @@ scope ruling `evt_2vfgg71s847ns` as corrected by Architect ruling
 > from base `301e1099`: two paths, `+142/-4`, crate change **comments-only**
 > (zero non-comment changed lines).
 >
-> **STILL OUTSTANDING, and this list is the node's remaining work — not a
-> record of what was once owed:**
+> **NOTHING ON THIS FRAME IS OUTSTANDING.** The previous revision of this block
+> listed the source-side provenance mutations and the five refusals as the
+> node's remaining work; **`e2907c5e` landed both**, so that list is now a
+> record of what was once owed and has been replaced rather than appended to.
 >
-> - the **source-side provenance mutations** (Deliverable 1's third column),
-> - **five** planner-valid refusals, plus the **segment-owner provenance and
->   non-aliasing disposition** (Deliverable 3). **Recounted from six by
->   Architect ruling `evt_cnwn4y5xykg1`, 2026-08-11** — the sixth category is a
->   structural non-refusal, and the earlier wording would have required
->   inventing a second owner-rejection mechanism. See that deliverable.
+> ### `#6d` stays active, and the distinction is the point
+>
+> **This frame being discharged does not close `#6d`.** `D2j` owns the
+> *derivation* half of `D2h`'s original `AC-1`; the parent node's remaining
+> work is what this frame's "Excluded scope" section names — `D2f`, `R3`, ABI,
+> emission, edge and traversal work — none of which any partial here touched.
+> **Do not read "all deliverables discharged" as "the node is done."**
+>
+> ### Two corrections this frame absorbed while it ran, kept because they bind
+>
+> **The refusal count is FIVE, not six.** Recounted by Architect ruling
+> `evt_cnwn4y5xykg1`, 2026-08-11: the sixth category — segment owner — is a
+> **structural non-refusal**, and the earlier wording would have forced the ring
+> to invent a second owner-rejection mechanism production does not have. It
+> became `AC-3a`'s comparator instead. The error was the Steward's, in this
+> frame's own text.
+>
+> **A constructor symbol is not an occurrence selector.** The first candidate
+> keyed `ProducerArity`'s widening on `D2J_PRODUCER_CONSTRUCTOR`, which occurs
+> **twice** in the witness body — the inner case-body producer and the outer
+> computational match's scrutinee — so the committed "producer construct only"
+> claim was false and the row's discrimination was attributed to a mutation
+> that did not happen. The repair carries structural position relative to the
+> **nearest enclosing** `ComputationalMatch`, resetting at each nested match,
+> and adds a census over both occurrences. **The reset is load-bearing**: the
+> producer lives under the outer match's scrutinee, so a flag that propagated
+> downward would have excluded the producer itself.
 >
 > ### What Deliverable 2 cost, and the lesson belongs in Deliverable 1
 >

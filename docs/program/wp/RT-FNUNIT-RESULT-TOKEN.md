@@ -17,20 +17,48 @@ because of that campaign's Trap 2, and the frame does not repeat the traps.
 
 ## 1. Fixed inputs
 
-Measured at `ddddb48d`, **re-verified at `origin/main = 464cb446`
-(2026-08-08): all three blobs are unchanged between those two commits.**
+Measured at `ddddb48d`, re-verified at `origin/main = 464cb446` (2026-08-08),
+and **re-pinned by the Steward at `origin/main = 22fb3a61` (2026-08-11). One
+of the three has MOVED.**
 
-| path | blob |
-|---|---|
-| `crates/ken-runtime/src/cranelift_backend/surface.rs` | `99b9b507` |
-| `crates/ken-runtime/src/cranelift_backend/artifact/api/tests.rs` | `f96a0b0b` |
-| `crates/ken-runtime/src/cranelift_backend/compiled.rs` | `31e5c149` |
+| path | blob at `464cb446` | blob at `22fb3a61` | |
+|---|---|---|---|
+| `crates/ken-runtime/src/cranelift_backend/surface.rs` | `99b9b507` | `99b9b507` | unchanged |
+| `crates/ken-runtime/src/cranelift_backend/artifact/api/tests.rs` | `f96a0b0b` | **`7ea92d79`** | **MOVED, `+208/-9`** |
+| `crates/ken-runtime/src/cranelift_backend/compiled.rs` | `31e5c149` | `31e5c149` | unchanged |
 
 `RT-PRODUCER-MATCH-PORT` was in flight when this frame was written and has
 since **merged**; it did not touch any of the three.
 
 **Re-pin at pickup anyway.** These are recorded so the derivation below can be
 checked against what changed — not so the numbers can be trusted.
+
+### 1.1 What moved, and the new adjacency it creates for you
+
+One commit moved that file: **`90ddcf1c`, `RT-DYNAMIC-ARM-SCALAR-MERGE c1`** —
+typed role authority at the consumption boundary, admitting real packages to
+the native lane.
+
+**Your deliverable is intact.** The `nc22` row is still `#[ignore]`d and still
+names this node as its owner, in the same words, and nothing in that commit
+touches `NativeResultDecode`, the result table, or the decode path.
+
+**But the instrument you would reach for now has two consumers it did not
+have.** `nc22_program_with_body` went from **6 references to 8**. The two new
+callers are **not** `nc22` tests:
+
+- `a_package_backed_program_without_a_role_record_refuses_before_lowering`
+- `the_synthetic_entrypoint_consumes_the_authority_it_is_given`
+
+⇒ **Changing the shared program builder to make `nc22` green now perturbs two
+tests belonging to a different node.** That is not a prohibition — it is the
+thing to notice before you edit it, and the reason to prefer a change local to
+the `nc22` row or a new builder over widening the shared one. If you do widen
+it, those two are the controls that say whether you broke something.
+
+**`RT-DYNAMIC-ARM-SCALAR-MERGE` is `active`.** Confirm its live state with your
+leader before editing this file — the contention is real and current, not
+historical.
 
 ## 2. What is known, and how it was established
 

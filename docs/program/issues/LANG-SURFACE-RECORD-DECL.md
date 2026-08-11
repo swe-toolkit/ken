@@ -1,7 +1,7 @@
 ---
 id: LANG-SURFACE-RECORD-DECL
 title: "`33 §2` specifies `record Point { x : Int, y : Int }` and `record` is already a reserved keyword, but the lexer emits no token for it and the parser has no declaration form -- while the elaboration target is complete and already exercised, since `class` elaborates to exactly the right-nested Sigma chain a record needs and `p.x` already parses and resolves, refusing only at `infer_proj` because that lookup scans the class registry"
-status: ready
+status: active
 owner: language
 size: M
 gate: none
