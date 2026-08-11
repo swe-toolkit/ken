@@ -4,6 +4,25 @@ Owner: language. Size: M. Node: [[LANG-LEX-NUMERIC-FORMS]].
 Fixed inputs measured at `origin/main` = **`90ce6743`**. Re-derive your
 merge-base from `origin/main`; **do not take a SHA from this frame.**
 
+> ## THE CONTENTION IS GONE. [[LANG-SURFACE-DECIMAL-PRECISION]] LANDED at
+> ## `ebf24a82` (PR #1876), 2026-08-11.
+>
+> This frame was written while both nodes were live on `lex_numeric` and told
+> you to sequence with your leader. **That is settled: Decimal went first and
+> is on `main`.** You have the function to yourself.
+>
+> **What changed under you, and it touches the separators piece:**
+> `Token::DecimalLit`, `NumLit::Decimal`, and `NumericLitVal::Decimal` now
+> carry `num_bigint::BigInt` rather than `i64`. The exponent is still `i32`.
+> Combined with the `Int` carrier from `LANG-SURFACE-INT-PRECISION`, **every
+> numeric literal path you would strip a separator out of now parses into an
+> arbitrary-precision carrier**, so `1_000_000_000_000_000_000_000.00d` has
+> somewhere to land.
+>
+> ⇒ **`lex_numeric` has now changed three times this week, not twice. Read the
+> landed function before you plan anything** — this frame's code descriptions
+> are the oldest thing in it.
+
 **Seat tier: T2 build ring.** Architect votes at merge. **No Spec vote** if
 your diff stays in `crates/` — the spec already gives the forms as a table.
 If you want to edit `spec/`, that is a stop.
@@ -132,9 +151,11 @@ unchanged.**
 ## Excluded scope
 
 - **`0x[deadbeef]` byte literals** — that is `38-ffi-io`, not a numeric form.
-- **No `Decimal` coefficient work.** [[LANG-SURFACE-DECIMAL-PRECISION]] owns
-  the bounded mantissa; **if separators in `1_000.00d` collide with it, take
-  the integer separators and say so.**
+- **No `Decimal` coefficient work.** [[LANG-SURFACE-DECIMAL-PRECISION]] already
+  took the mantissa and it is on `main`, so the coefficient is no longer yours
+  to widen — but **the collision that clause was hedging against cannot happen
+  any more.** Separators in `1_000.00d` are now a lexical question about one
+  landed carrier, not a race with a concurrent one.
 - No numeric tower, no `Float`/`Float32` semantics change, no overflow work,
   no conversion API, no performance work.
 
@@ -144,16 +165,18 @@ unchanged.**
 - **A piece needs a parser change.** This is lexical on purpose.
 - **Hex floats turn out to need the float path restructured.** That is the
   sibling, not this node.
-- **Separators collide with `DECIMAL-PRECISION`'s carrier change.**
+- ~~**Separators collide with `DECIMAL-PRECISION`'s carrier change.**~~
+  **RETIRED — this stop can no longer fire.** It was a concurrency stop, and
+  the carrier change landed at `ebf24a82`. A separator problem in `1_000.00d`
+  is now ordinary work inside this node, not a reason to come back to me.
 
 ## Contention
 
-`crates/ken-elaborator/src/lexer.rs`, and specifically `lex_numeric` — which
-[[LANG-SURFACE-DECIMAL-PRECISION]] also edits. **Those two contend directly and
-neither is gated on the other.** Coordinate through your leader on which goes
-first; I have not sequenced them because either order works and the ring knows
-its own load. Runtime is in `crates/ken-runtime/`. **Re-derive the intersection
-at candidate time.**
+`crates/ken-elaborator/src/lexer.rs`, and specifically `lex_numeric`. **The
+contention with [[LANG-SURFACE-DECIMAL-PRECISION]] is discharged** — it landed
+at `ebf24a82` and the function is free. Runtime is in `crates/ken-runtime/`.
+**Re-derive the intersection at candidate time** — a merge-base goes stale
+without your branch moving.
 
 ## Sizing and validation
 

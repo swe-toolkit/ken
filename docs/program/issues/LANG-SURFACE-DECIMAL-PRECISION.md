@@ -1,13 +1,13 @@
 ---
 id: LANG-SURFACE-DECIMAL-PRECISION
 title: "`Decimal` is specified with an arbitrary-precision coefficient and the spec explicitly forecloses a fixed-width one, but the surface caps it at `i64` across three carriers -- `Token::DecimalLit(i64, i32)`, `NumLit::Decimal(i64, i32)`, and `NumericLitVal::Decimal { coeff: i64 }` -- and the lexer refuses a wider coefficient outright"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: [LANG-SURFACE-INT-PRECISION]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/1876
 origin: Steward measurement 2026-08-11 at origin/main=7f8a5e6b, taken while picking the Language successor to LANG-SURFACE-INT-PRECISION. The INT-PRECISION frame named Decimal's bounded mantissa as a real and separate gap and said to file it; this is that filing, with the spec grounding measured rather than assumed.
 ---
 
@@ -105,20 +105,44 @@ sizing argument. The coefficient is arbitrary-precision from the constructor
 inward; the cap exists only in the three surface carriers above it. Nothing in
 the kernel, the pair, or the decimal arithmetic needs to change.
 
-## What is not yet known
+## Landed — `ebf24a82`, PR #1876
 
-- Whether the `i32` exponent is correct as landed. The spec says the exponent
-  **is** bounded `i32`, so it likely needs no change — but the lexer computes
-  it as `-frac_places` from a `String` push loop, and no control pins its
-  behaviour at the bound.
-- Whether the durable big-`Decimal` encoding at tag `0x0A` (`35 §2.3`, cited to
-  `41 §3a`) implies work outside `crates/ken-elaborator`. **If it does, that is
-  a separate node and not this one.**
-- Whether `decimalPow10`'s `MAX_SHIFT` cascade interacts with a wide
-  coefficient. It bounds the **exponent** difference, not the coefficient, and
-  going STUCK beyond `MAX_SHIFT` is a deliberate Architect ruling
-  (`evt_7dwtqbmka62bf`) rather than a defect — **do not touch it**. Named here
-  only so it is not rediscovered as a blocker.
+Merged 2026-08-11 from merge-base `0e5aba4e`; two commits, 33 paths, all under
+`crates/`, `+135/-35`. Decision `dec_7ammj4fnjteg3`. The sizing argument held:
+the three surface carriers widened in place to `BigInt`, the exponent stayed
+`i32`, and nothing in the kernel, the pair, or the decimal arithmetic changed.
+
+**The `AC-3` round is the part worth keeping.** The first cut built two
+`MkDecimalPair` values by hand and compared them. That proves the target
+comparator handles a wide `Int` — but it constructs the target directly, so it
+never crosses the surface carrier this node widened, and it never reaches
+`decimalAdd`. The Architect rejected it on exactly that: **a control can pass
+on the property you care about while bypassing the mechanism you changed.** The
+replacement is a surface expression,
+`(9223372036854775808d + 1d) == 9223372036854775809d`, which forces both
+operands and the result through surface `Decimal`, dispatches `+` to
+`decimalAdd` and `==` to `decimalEq`, and evaluates to `Bool(true)`.
+
+## What was not yet known, and how it came out
+
+- **The `i32` exponent — unchanged, and correct, but the bound is still
+  unpinned.** The exponent stayed `i32` as `35-numbers` requires, and a control
+  now pins the `-30` case. **`-30` is nowhere near `i32`'s bound**, so the
+  original concern — that the lexer computes the exponent as `-frac_places`
+  from a `String` push loop with nothing pinning its behaviour *at the bound* —
+  is not discharged. It was not in scope and is not a defect on any measured
+  input; it is simply still open.
+- **The durable big-`Decimal` encoding at tag `0x0A` (`35 §2.3`, cited to
+  `41 §3a`) was not measured.** It was excluded from the cut and the
+  Architect's sweep confirmed no durable-encoding path was touched — which
+  establishes that this node did not disturb it, **not** that it is consistent
+  with an arbitrary-precision coefficient. If that question is real it is still
+  a separate node, and nothing here answers it.
+- **`decimalPow10`'s `MAX_SHIFT` cascade was confirmed untouched.** The
+  reasoning that it cannot interact — it bounds the **exponent** difference,
+  not the coefficient — is structural rather than executed. Going STUCK beyond
+  `MAX_SHIFT` remains a deliberate Architect ruling (`evt_7dwtqbmka62bf`)
+  rather than a defect; **do not touch it.**
 
 ## Not this node
 
