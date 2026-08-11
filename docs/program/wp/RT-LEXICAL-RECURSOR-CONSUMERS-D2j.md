@@ -7,6 +7,41 @@ scope ruling `evt_2vfgg71s847ns` as corrected by Architect ruling
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
+> ## ACCEPTED PARTIAL LANDED — `0e5aba4e`, PR #1874. THIS FRAME IS NOT
+> ## DISCHARGED AND `#6d` IS NOT CLOSED.
+>
+> Decision `dec_4gds5week8a6w`, merged 2026-08-11 from base `301e1099`: two
+> paths, `+142/-4`, crate change **comments-only** (zero non-comment changed
+> lines). Blob-identical to the reviewed `783ca939`.
+>
+> **STILL OUTSTANDING, and this list is the node's remaining work — not a
+> record of what was once owed:**
+>
+> - the **fusion-reaching non-empty ordered-input witness** (Deliverable 2),
+> - the **source-side provenance mutations** (Deliverable 1's third column),
+> - the **six planner-valid refusals** (Deliverable 3).
+>
+> **What landed is a measurement and a boundary, not evidence.** Specifically:
+> the completed-range record, and the census result that **a generic non-empty
+> projection census does NOT promote an unmeasured fusion candidate** — that is,
+> the census is not a substitute for the witness Deliverable 2 still owes, and
+> it was measured in order to establish that it is not.
+>
+> **Plus the provenance-boundary correction**, which is the Adversary finding on
+> merged `D2h` (`evt_5qc5nz5k3x5c`) triaged here rather than reopening `D2h`
+> (`evt_7da668d2tw9pk`). `rederive_fusion_key` derives `recursive_position` from
+> `key.consumer_binding.recursive_position` — a field of the key — while its
+> comment claimed independence from the key. The comment now states the narrow
+> truth: the selector establishes only that the position named by
+> `key.consumer_binding` is **declared on the case**, with independence
+> **conditional** on the later `ih_bindings` re-establishment plus the caller's
+> whole-key equality. The enclosing comment names precisely the three
+> **unconditional** locators and routes the position to that qualification.
+>
+> **When you write the `recursive_position` row of Deliverable 1's matrix, it
+> inherits that conditionality.** A row claiming unconditional independence
+> there would be false, and `AC-1` calls that the gap that reads as coverage.
+
 > ## GATE — SATISFIED. `D2h` landed at `30efb016`; this frame is startable.
 >
 > **Verified by the Steward on the landed tree, 2026-08-11**, so you do not
