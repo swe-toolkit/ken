@@ -176,8 +176,37 @@ exposes **only the closure-free final result**. The suffix `Call` is the sole
 consumer of that activation.
 
 **5. Exact edge redirection.** Redirect **only** the exact original producer
-invocation — the single `StaticBody` edge `0 -> 2` on the `R3` witness. Not
-every edge to that callee, and not a search for a plausible one.
+invocation. Not every edge to that callee, and not a search for a plausible one.
+
+**Derive that edge from the complete production key's invocation identity —
+caller and callee — and validate it before redirecting.** Redirect only after
+the full key and the local descriptor agree. The frame states the derivation;
+it does not state the coordinate.
+
+> **This deliverable previously named a literal `0 -> 2` edge, and that edge
+> does not exist on the checked `Exact` twin.** `0 -> 2` was measured on the
+> retired `px8j` witness, and **this frame is where it lost its scope.** Its two
+> upstream sources were both correct: `D2d-GROUNDING` records it under "measured
+> coordinate **on this witness**", and `D2e` says in as many words *"do not
+> re-derive those coordinates; derive the mechanism that produces them."* `D2f`
+> restated it as a bare requirement with the witness qualifier dropped — which
+> is the whole defect, since dropping a measurement's scope always strengthens
+> the claim. On the
+> checked twin the invocation is caller **3**, callee **2**; unit **0** is a
+> `SchedulingEntry` and invokes nothing — so the old text prescribed an absent
+> edge. Struck on `runtime-leader`'s measurement (`evt_4xktmhfam8gyy`,
+> 2026-08-11).
+>
+> **`3 -> 2` is this fixture's observed control coordinate, not production
+> authority.** Do not hard-code it in place of the struck one. An implementation
+> that reads the coordinate from the key may *assert* the derivation yields
+> `3 -> 2` on this witness; one that hard-codes `3 -> 2` has reproduced the same
+> defect one witness later.
+>
+> The general lesson, since this frame is not the last to inherit a coordinate:
+> **pin a frame against the derivation, never against the number it produced on
+> the witness that happened to be current.** A number survives the witness it
+> was measured on and stays syntactically valid after it stops being true.
 
 ## The obligation this deliverable inherits, and it is the live one
 
