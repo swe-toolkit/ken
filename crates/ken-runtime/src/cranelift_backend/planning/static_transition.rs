@@ -15806,11 +15806,6 @@ mod tests {
                     source_abi_position,
                     source,
                 } => {
-                    // MEASURED: the inputs are parameters of the unit that owns
-                    // the wrapper, which is neither the producer's nor the
-                    // consumer's. I had assumed the producer's and was wrong, so
-                    // the relation is asserted as a shared owner across the run
-                    // rather than tied to a side of the fusion by guess.
                     assert_eq!(
                         *source_owner, first_owner,
                         "every input in the run comes from ONE unit's entry ABI"
@@ -15831,9 +15826,38 @@ mod tests {
             candidates[0].producer_owner, consumer_owner,
             "and the candidate is still the cross-unit one"
         );
+
+        // THE OWNER RELATION, ASSERTED RATHER THAN OBSERVED, AND IT FALSIFIED
+        // TWO SUCCESSIVE GUESSES OF MINE.
+        //
+        // `first_owner` is read out of the run being checked, so "every input
+        // shares it" is a self-consistency check and cannot constrain WHICH unit
+        // it is. Two revisions carried a prose claim about that unit while
+        // asserting nothing that could fail if the claim were wrong: first that
+        // the inputs are parameters of the PRODUCER's unit, then that they are
+        // of neither fusion side. Both were wrong.
+        //
+        // MEASURED: the inputs are entry-ABI parameters of the CONSUMER's own
+        // unit, which is also what the `R3` before-hole measurement recorded
+        // (`source_owner` 0 against a consumer owner of 0). The continuation
+        // inputs are what the consuming frame supplies, so this is the relation
+        // that was there all along.
+        assert_eq!(
+            first_owner, consumer_owner,
+            "the entry-ABI owner is the CONSUMER's unit"
+        );
+        assert_ne!(
+            first_owner, candidates[0].producer_owner,
+            "and not the producer's, which was the first wrong guess"
+        );
+        assert_eq!(
+            first_owner,
+            PredeclaredFunctionId(3),
+            "and it is the measured unit, pinned so a shift in the fixture is visible"
+        );
     }
 
-    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary
+    /// `D2h` — the independent re-derivation CATCHES a mutation of the primary
     /// derivation.
     ///
     /// The two routes are genuinely different: the primary builds the key from
