@@ -46,6 +46,27 @@ mis-sized, its severity is wrong, and the sequencing is mine to redo. **Do not
 repair it and report the severity afterwards** — the ordering is the point, and
 it is the ordering `LANG-LEX-PROJECTION-ADJACENCY` used to good effect.
 
+> **NARROWED 2026-08-11, and I expect the stop NOT to fire. Still measure it.**
+>
+> I wrote above that `1 e - 9` "may be a well-formed expression" if `e` is
+> bound. **That was a claim about the token stream that I did not check against
+> the consumer one hop down**, which is the same error the Adversary recorded
+> about itself on `LANG-SURFACE-PAIR` — asserting "silent" from the producer
+> without asking what happens next.
+>
+> Checked: **`e` is not in the prelude roster**, so with no user binding the
+> result is an unbound-identifier error. And if a user *does* bind `e`,
+> application binds tighter than `-`, so the expression is `(1 e) - 9` — an
+> application whose head is a numeric literal. `elab.rs:3166` raises
+> `ElabError::NotAFunction` when an application head is not a Pi, and `Int` is
+> not.
+>
+> ⇒ **Loud in both contexts, so the silent-mis-parse class looks empty and this
+> is a missing-feature node.** Derived structurally and **not executed** — the
+> same standing as the original claim, which is exactly why `AC-1` stays a
+> measurement rather than becoming an assumption. **If you measure a silent
+> path, the stop still fires and I still want it.**
+
 ## The cut is yours, and I expect you to take fewer than four
 
 Four things are in the table. **They do not share a mechanism and you should
