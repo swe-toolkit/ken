@@ -170,10 +170,30 @@ amending them.
 ## Validation
 
 Targeted only. `-p ken-elaborator`, or `--test <name>`, **never `--workspace`**.
-New public AST variants make the floor a full `-p ken-elaborator` test build, as
-[[LANG-SURFACE-IF]] found: a suite-scoped run cannot observe an exhaustive
-`match` in a sibling target, and this change adds variants that `lossless.rs`,
-`layout.rs`, and `resolve.rs` all match on. "No regression" means green in CI.
+New public AST variants make the floor a full `-p ken-elaborator` test build: a
+suite-scoped run cannot observe an exhaustive `match` in a sibling target, and
+this change adds variants that `lossless.rs`, `layout.rs`, and `resolve.rs` all
+match on. "No regression" means green in CI.
+
+> ### THE FLOOR ABOVE IS NOT THE BLAST RADIUS. Measured on [[LANG-SURFACE-IF]].
+>
+> That node passed its full `-p ken-elaborator` floor, cleared QA and the
+> Architect on the exact SHA, and **failed six CI checks** — every one of them a
+> stack overflow in `ken-cli`, a consumer crate the elaborator floor never
+> builds. Three different tests in two different `ken-cli` binaries, all
+> aborting within about 0.15 seconds, none of them touching the new syntax.
+>
+> **A public AST variant's blast radius is every crate that consumes the AST**,
+> not every target in the crate that declares it. The floor rule above was
+> written reasoning only about sibling targets, and that reasoning was too
+> narrow by exactly one hop.
+>
+> **You still may not run `--workspace` locally** — that is the operator's hard
+> rule and CI is the venue. What changes is what you should expect: **name the
+> consumer crates your variant reaches before you hand off**, and say in the
+> handoff that CI is the first thing to build them. A green elaborator floor is
+> not evidence about `ken-cli`, and treating it as such is what cost a full
+> publish cycle.
 
 ## Sizing
 
