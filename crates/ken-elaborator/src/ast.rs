@@ -606,6 +606,13 @@ pub enum Expr {
         arms: Vec<MatchArm>,
         span: Span,
     },
+    /// `if condition then consequent else alternative` (`32 §3`).
+    EIf {
+        condition: Box<Expr>,
+        then_branch: Box<Expr>,
+        else_branch: Box<Expr>,
+        span: Span,
+    },
     /// `e.field` — Σ-record field projection (`33 §5.2` η) on a class
     /// instance/dictionary value. Postfix, lowest-binding-atom precedence;
     /// only fires on a non-`ConId`-headed base (a `ConId`-headed dotted
@@ -658,6 +665,7 @@ impl Expr {
             | Expr::EAttachedProofRef { span: s, .. }
             | Expr::ERecursiveResult { span: s, .. }
             | Expr::EBinOp(_, _, _, s)
+            | Expr::EIf { span: s, .. }
             | Expr::EProj(_, _, s) => s,
             Expr::EMatch { span, .. } => span,
         }

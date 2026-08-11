@@ -109,6 +109,9 @@ pub struct NumericEnv {
     pub float_id:   GlobalId,
     pub float32_id: GlobalId,
     pub bool_id:    GlobalId,
+    /// Preregistered identities used by surface conditional elaboration.
+    pub bool_true_id: GlobalId,
+    pub bool_false_id: GlobalId,
     /// Derived (`18a §5.9`) — filled in by `decimal_char::register_decimal_char`.
     pub char_id:    GlobalId,
     /// `uint8_int_retract`, SUB-1b's single conversion-layer postulate.
@@ -360,6 +363,11 @@ pub fn register_numeric_env(
         .ok_or_else(|| ElabError::Internal("Bool not registered as inductive".into()))?
         .constructors[0]
         .id;
+    let bool_false_id = env
+        .inductive(bool_id)
+        .expect("Bool preregistered as an inductive")
+        .constructors[1]
+        .id;
     let int_eq_cert = declare_deceq_certificate(env, int_id, eq_int_id, bool_id, bool_true_id)
         .map_err(|e| ElabError::Internal(format!("Int deceq certificate failed: {}", e)))?;
     globals.insert("int_eq_sound".to_string(), int_eq_cert.sound);
@@ -532,7 +540,8 @@ pub fn register_numeric_env(
     Ok(NumericEnv {
         int_id, int8_id, int16_id, int32_id, int64_id,
         uint8_id, uint16_id, uint32_id, uint64_id, usize_id, isize_id, cint_id,
-        decimal_id, decimalpair_id, float_id, float32_id, bool_id, char_id,
+        decimal_id, decimalpair_id, float_id, float32_id, bool_id,
+        bool_true_id, bool_false_id, char_id,
         uint8_int_retract_id: GlobalId(0),
         uint8_retract_trusted_delta: Vec::new(),
         abi_scalar_type_trusted_delta,

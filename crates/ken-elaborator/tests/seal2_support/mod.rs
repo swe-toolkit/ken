@@ -661,6 +661,16 @@ pub fn type_names_in_expr(e: &Expr, out: &mut BTreeSet<String>) {
                 type_names_in_expr(&arm.body, out);
             }
         }
+        Expr::EIf {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            type_names_in_expr(condition, out);
+            type_names_in_expr(then_branch, out);
+            type_names_in_expr(else_branch, out);
+        }
     }
 }
 

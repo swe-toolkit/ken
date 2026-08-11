@@ -587,6 +587,16 @@ fn collect_expr_spans(expr: &Expr, out: &mut Vec<Span>) {
             arms.iter()
                 .for_each(|arm| collect_match_arm_spans(arm, out));
         }
+        Expr::EIf {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            collect_expr_spans(condition, out);
+            collect_expr_spans(then_branch, out);
+            collect_expr_spans(else_branch, out);
+        }
         Expr::EPi(_, domain, codomain, _) => {
             collect_type_spans(domain, out);
             collect_expr_spans(codomain, out);

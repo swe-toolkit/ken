@@ -685,8 +685,115 @@ fn prepare_let_rhs(
     }
 }
 
+fn elaborate_if_condition(cx: &mut ElabCtx<'_>, condition: &RExpr) -> Result<Term, ElabError> {
+    let (condition_core, _) = infer(cx, condition)?;
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    kernel_check(cx.env, &cx.ctx, &condition_core, &bool_ty).map_err(|_| {
+        ElabError::IfConditionNotBool {
+            span: condition.span().clone(),
+        }
+    })?;
+    Ok(condition_core)
+}
+
+fn make_if_elim(
+    cx: &mut ElabCtx<'_>,
+    condition: Term,
+    then_branch: Term,
+    else_branch: Term,
+    result_ty: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let classifier =
+        kernel_infer(cx.env, &cx.ctx, result_ty).map_err(|error| ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        })?;
+    let motive_sort = match whnf(cx.env, &cx.ctx, &classifier) {
+        Term::Type(level) => Term::ty(level),
+        Term::Omega(level) => Term::omega(level),
+        _ => {
+            return Err(ElabError::Internal(
+                "conditional result type is not classified by a universe".into(),
+            ))
+        }
+    };
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    let motive = Term::Ascript(
+        Box::new(Term::lam(bool_ty.clone(), weaken(result_ty, 1))),
+        Box::new(Term::pi(bool_ty, weaken(&motive_sort, 1))),
+    );
+    let bool_decl = cx
+        .env
+        .inductive(cx.numeric_env.bool_id)
+        .ok_or_else(|| ElabError::Internal("preregistered Bool is missing".into()))?;
+    let methods = bool_decl
+        .constructors
+        .iter()
+        .map(|constructor| {
+            if constructor.id == cx.numeric_env.bool_true_id {
+                Ok(then_branch.clone())
+            } else if constructor.id == cx.numeric_env.bool_false_id {
+                Ok(else_branch.clone())
+            } else {
+                Err(ElabError::Internal(
+                    "preregistered Bool has an unknown constructor identity".into(),
+                ))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if methods.len() != 2 {
+        return Err(ElabError::Internal(
+            "preregistered Bool does not have exactly two constructors".into(),
+        ));
+    }
+    Ok(Term::Elim {
+        fam: cx.numeric_env.bool_id,
+        level_args: vec![],
+        params: vec![],
+        motive: Box::new(motive),
+        methods,
+        indices: vec![],
+        scrut: Box::new(condition),
+    })
+}
+
+fn check_if(
+    cx: &mut ElabCtx<'_>,
+    condition: &RExpr,
+    then_branch: &RExpr,
+    else_branch: &RExpr,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let condition_core = elaborate_if_condition(cx, condition)?;
+    let then_core = check(cx, then_branch, expected, then_branch.span())?;
+    let else_core = check(cx, else_branch, expected, else_branch.span())?;
+    make_if_elim(cx, condition_core, then_core, else_core, expected, span)
+}
+
+fn infer_if(
+    cx: &mut ElabCtx<'_>,
+    condition: &RExpr,
+    then_branch: &RExpr,
+    else_branch: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let condition_core = elaborate_if_condition(cx, condition)?;
+    let (then_core, result_ty) = infer(cx, then_branch)?;
+    let else_core = check(cx, else_branch, &result_ty, else_branch.span())?;
+    let core = make_if_elim(cx, condition_core, then_core, else_core, &result_ty, span)?;
+    Ok((core, result_ty))
+}
+
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
     match expr {
+        RExpr::RIf {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        } => check_if(cx, condition, then_branch, else_branch, expected, span),
         RExpr::RNumLit(lit, num_span) => elab_num_lit_checked(cx, lit, expected, num_span),
         RExpr::RStr(s, span) => elab_str_lit(cx, s, Some(expected), span).map(|(t, _)| t),
         // `Refl` — reflexivity, checked (never inferred): the expected goal
@@ -2800,6 +2907,12 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
 
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
+        RExpr::RIf {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        } => infer_if(cx, condition, then_branch, else_branch, span),
         RExpr::RRecursiveResult {
             selector,
             index,
@@ -4418,6 +4531,22 @@ fn infer_expr_row_type(
             }
             row
         }
+        RExpr::RIf {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => infer_expr_row_type(condition, effect_rows, projection_ctx)
+            .join(infer_expr_row_type(
+                then_branch,
+                effect_rows,
+                projection_ctx,
+            ))
+            .join(infer_expr_row_type(
+                else_branch,
+                effect_rows,
+                projection_ctx,
+            )),
     }
 }
 
@@ -6492,6 +6621,16 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RMatch { scrut, arms, .. } => {
             rexpr_mentions_name(scrut, name)
                 || arms.iter().any(|a| rexpr_mentions_name(&a.body, name))
+        }
+        RExpr::RIf {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            rexpr_mentions_name(condition, name)
+                || rexpr_mentions_name(then_branch, name)
+                || rexpr_mentions_name(else_branch, name)
         }
         RExpr::RProj(e, _, _) => rexpr_mentions_name(e, name),
         // The domain is a `type`, not an `RExpr` — a mutual-recursion call

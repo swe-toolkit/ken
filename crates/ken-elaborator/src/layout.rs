@@ -1711,7 +1711,7 @@ enum ExprContext {
 
 fn expr_precedence(expr: &Expr) -> u8 {
     match expr {
-        Expr::ELam(_, _, _) | Expr::ELet(_, _, _) | Expr::EMatch { .. } => 0,
+        Expr::ELam(_, _, _) | Expr::ELet(_, _, _) | Expr::EMatch { .. } | Expr::EIf { .. } => 0,
         Expr::EPi(_, _, _, _) | Expr::EArrow(_, _, _) => 1,
         Expr::EAsc(_, _, _) => 2,
         Expr::EBinOp(op, _, _, _) => binop_precedence(*op),
@@ -1940,6 +1940,7 @@ fn atom_can_start(token: &Token) -> bool {
             | Token::KwType
             | Token::KwMatch
             | Token::KwLet
+            | Token::KwIf
             | Token::Lambda
             | Token::KwOld
     )
@@ -1973,6 +1974,16 @@ fn is_compound_expr(expr: &Expr) -> bool {
                 .iter()
                 .any(|binding| is_compound_expr(&binding.value))
                 || is_compound_expr(body)
+        }
+        Expr::EIf {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            is_compound_expr(condition)
+                || is_compound_expr(then_branch)
+                || is_compound_expr(else_branch)
         }
         _ => false,
     }
