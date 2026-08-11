@@ -5,7 +5,7 @@ status: ready
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-CONTSPEC-WITNESS, RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-RECURSOR-CONSUMERS]
+depends_on: [RT-CONTSPEC-WITNESS, RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-RECURSOR-CONSUMERS, RT-LEXICAL-ROW2-MISSING-MINT]
 blocks: [RT-DESCENT-RETIRE]
 github: null
 origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDescent, migrate the remaining residual classes, do not linger half-migrated. Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2). Recut 2026-08-08 per Architect ruling evt_237tbdsacqbk4.
