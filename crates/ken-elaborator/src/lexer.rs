@@ -606,6 +606,15 @@ impl<'s> Lexer<'s> {
             }
         }
 
+        if !exp_str.is_empty()
+            && (self.cur() == Some('d') || self.src[self.pos..].starts_with("f32"))
+        {
+            return Err(ElabError::ParseError {
+                msg: "exponent suffix combinations are not supported".into(),
+                span: Span::new(start, self.pos),
+            });
+        }
+
         // Check for `d` suffix → Decimal
         if self.cur() == Some('d')
             && !self.src[self.pos + 1..]

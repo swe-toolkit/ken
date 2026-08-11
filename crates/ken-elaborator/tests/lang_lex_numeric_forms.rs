@@ -28,6 +28,7 @@ fn exponent_values_are_not_zeroed() {
     for bad in ["1e", "1e+", "1e-", "1e1_", "1e1__0", "1e+_1", "1e-_1"] {
         assert!(Lexer::lex(bad).is_err(), "{bad}");
     }
+    for bad in ["1e2d", "1e2f32"] { assert!(Lexer::lex(bad).is_err(), "{bad}"); }
 }
 
 #[test]
