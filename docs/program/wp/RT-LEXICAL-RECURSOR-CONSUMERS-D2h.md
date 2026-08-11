@@ -6,7 +6,33 @@ Architect rulings `evt_2wwh9yamyhs7p`, `evt_6sk3czsbcr85r`, and
 
 **Seat tier: T1.** The `#8` suspension does not reach `#6d`.
 
-**RELEASED 2026-08-11. The `D2g` hold is discharged.**
+> ## HELD AGAIN 2026-08-11, on a fixed input that does not present the pair.
+>
+> **This frame's scope is unchanged and still correct. It is blocked, not
+> mis-scoped**, so it is respun rather than split and its existing thread stays
+> its spine — there will be no fresh `D2h` kick.
+>
+> **The key plane interns zero fusions on the landed `D2g` twin.** Production
+> discovery walks `continuation_result_origins` by result positions and treats
+> `Construct` and `LexicalClosure` as terminal; the twin's shape is
+> `Construct[LexicalClosure[inner match]]`, so no producer/consumer pair is ever
+> presented. Runtime built the whole plane, measured zero, and **discarded it
+> rather than land a mechanism green by construction** — that was correct, and
+> a plane with zero positive candidates must not land.
+>
+> **`D2g`'s `AC-1` is true and was the wrong criterion.** It pinned binder
+> resolution through `CheckedIhBinding`, which still passes on the twin.
+> Result-flow membership is a different relation, and nothing in `D2g` consumed
+> the pair, so nothing in `D2g` could have caught it. **Steward framing defect**,
+> not an implementation or review miss.
+>
+> **Gate: [[RT-LEXICAL-RECURSOR-CONSUMERS-D2i]] lands the productive checked
+> twin.** Architect ruling `evt_1dgwdvxhnabg4` settled the mechanism —
+> `continuation_result_origins` is semantically right and **must not be
+> widened**. Resume unchanged once `D2i` is on `main`; **do not manufacture the
+> replacement fixture under this frame.**
+
+**Superseded release note, retained because its `D2g` half still holds.**
 [[RT-LEXICAL-RECURSOR-CONSUMERS-D2g]] merged as `main` `ae9db606` (candidate
 `027a0674`, declared merge-base `72fe6714`, PR #1844, three commits, one path,
 `+984/-0`, blob-verified). Re-derive your merge-base from `origin/main`; **do
