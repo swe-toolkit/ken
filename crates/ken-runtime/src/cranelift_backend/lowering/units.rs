@@ -157,6 +157,18 @@ pub(in crate::cranelift_backend) struct UnitBundle {
     /// ruling's "do not cast or alias one ID domain into the other" is enforced
     /// here by there being no map a caller could reach with the wrong key type.
     contexts: BTreeMap<ContinuationContextId, FuncId>,
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`** -- one declared target per
+    /// installed static continuation fusion region.
+    ///
+    /// A **fourth** map for the same reason there is a third: a
+    /// `StaticContinuationFusionId` is none of the other three identities, and
+    /// the standing "do not cast or alias one ID domain into the other" ruling
+    /// is enforced here by there being no map a caller could reach with the
+    /// wrong key type. In particular it is **not** keyed by the producer's
+    /// `PredeclaredFunctionId`: the fused region is a third thing that owns
+    /// itself, and keying it by the producer would make the redirect below
+    /// resolve to whichever of the two the last writer meant.
+    fusions: BTreeMap<StaticContinuationFusionId, FuncId>,
 }
 
 impl UnitBundle {
@@ -194,6 +206,21 @@ impl UnitBundle {
         context: ContinuationContextId,
     ) -> Option<FuncId> {
         self.contexts.get(&context).copied()
+    }
+
+    /// The declared target for one installed fused region.
+    ///
+    /// `None` is a real answer, exactly as for the three maps above.
+    pub(in crate::cranelift_backend) fn fusion(
+        &self,
+        fusion: StaticContinuationFusionId,
+    ) -> Option<FuncId> {
+        self.fusions.get(&fusion).copied()
+    }
+
+    /// How many fused-region targets this bundle declares.
+    pub(in crate::cranelift_backend) fn fusion_len(&self) -> usize {
+        self.fusions.len()
     }
 
     /// How many continuation targets this bundle declares.
@@ -952,12 +979,35 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
             ));
         }
     }
+    // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` -- forward-declare one target per
+    // installed fused region, in the same pre-definition pass and for the same
+    // reason as the three above: the fused function is called from the
+    // consumer's body through the redirected invocation, and that body is
+    // defined below.
+    //
+    // Driven by `continuation_fusions()`, which is the join over the plane
+    // AND its ABI arena. Iterating the plane alone would declare a target for a
+    // region with no frame contract, and the definition pass would then have
+    // nothing to lower it against.
+    let mut fusions = BTreeMap::new();
+    for (ordinal, fusion) in plan.continuation_fusions()?.into_iter().enumerate() {
+        let name = format!("ken_static_continuation_fusion_{ordinal}");
+        let id = module
+            .declare_function(&name, Linkage::Local, &sig)
+            .map_err(|err| backend_module(err.to_string()))?;
+        if fusions.insert(fusion.id(), id).is_some() {
+            return Err(backend_module(
+                "two static continuation fusion descriptors claim one installed region".to_string(),
+            ));
+        }
+    }
     #[cfg(test)]
     B2F_UNIT_EMISSION.with(|cell| cell.set((functions.len(), 0)));
     Ok(UnitBundle {
         functions,
         continuations,
         contexts,
+        fusions,
     })
 }
 
@@ -2823,6 +2873,528 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
     Ok(defined)
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — define one `Function` per installed
+/// fused region: the producer's body and the consumer's suffix, in one frame.**
+///
+/// **The two phases are lowered under TWO authorities, and that is the whole
+/// deliverable.** Phase 1 lowers the producer's body under the producer's
+/// source-body authority over the frame's `Parameter` run; phase 2 eliminates
+/// that result under the *consumer's* authority over the frame's `Capture` run.
+/// Binding one authority for both would lower the consumer's case bodies against
+/// the producer's source occurrences, which is a wrong program rather than a
+/// missing one — the binders would resolve, to the wrong terms.
+///
+/// **The suffix is run ONCE, here.** Node `:650` measured that redirecting the
+/// producer invocation alone leaves the consumer's own suffix live and executes
+/// it twice. That is why the redirect, this definition, and the consumer takeover
+/// are one irreducible core: any two of the three, without the third, is a wrong
+/// artifact and not a partial one.
+///
+/// **No new elimination machinery.** Phase 2 is
+/// `lower_computational_producer_expr` with a single-frame eliminator stack — the
+/// same entry the producer dispatcher's own fallback arm uses. It handles the
+/// carried and the specialized phase already, so nothing here re-derives case
+/// selection, and nothing synthesizes an `ActiveContinuationFrame`.
+///
+/// **The claim is READ, not consumed.** The takeover at the consumer's seat is
+/// the one consumption, and consuming here would make a definition spend the
+/// affine right the redirect's seat still needs.
+pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
+    module: &mut M,
+    compiler: &mut Lowering<'_>,
+    helpers: ArtifactHelpers<'_>,
+    bundle: &UnitBundle,
+    call_edges: &CallEdgeTargets,
+) -> Result<usize, CraneliftBackendError> {
+    struct OwnedFusion {
+        id: StaticContinuationFusionId,
+        producer_owner: PredeclaredFunctionId,
+        consumer_owner: PredeclaredFunctionId,
+        producer_body: StaticOriginId,
+        continuation_origin: StaticOriginId,
+        slots: Vec<AbiSlot>,
+        offsets: Vec<u32>,
+        header_parameters: u32,
+        header_captures: u32,
+    }
+    // Own every projected fact before the loop, for the same reason the context
+    // pass does: the projection borrows the plan and definition below needs the
+    // compiler mutably.
+    //
+    // The two ORIGINS come from the claim, not from the view. The view carries
+    // the plane's key; the claim carries the region the ledger actually admitted,
+    // and those are the same fact only when preflight accepted. Reading the view
+    // here would define a body for a region whose claim was refused.
+    let fusions = {
+        let claims = compiler.fusion_claims.as_ref();
+        compiler
+            .static_transition_plan
+            .continuation_fusions()?
+            .into_iter()
+            .map(|fusion: StaticContinuationFusionView<'_>| {
+                let (offsets, _frame_bytes) = fusion.slot_offsets()?;
+                let claim = claims
+                    .and_then(|ledger| ledger.claim(fusion.id()))
+                    .ok_or_else(|| {
+                        backend_module(
+                            "an installed static continuation fusion has no outstanding region \
+                             claim, so its definition would take over a suffix nothing admitted"
+                                .to_string(),
+                        )
+                    })?;
+                Ok(OwnedFusion {
+                    id: fusion.id(),
+                    producer_owner: claim.producer_owner(),
+                    consumer_owner: claim.consumer_owner(),
+                    producer_body: claim.producer_body(),
+                    continuation_origin: claim.continuation_origin(),
+                    slots: fusion.slots().to_vec(),
+                    offsets,
+                    header_parameters: fusion.header().parameters,
+                    header_captures: fusion.header().captures,
+                })
+            })
+            .collect::<Result<Vec<_>, CraneliftBackendError>>()?
+    };
+
+    let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
+    let mut defined = 0usize;
+    for fusion in fusions {
+        let id = bundle.fusion(fusion.id).ok_or_else(|| {
+            backend_module(
+                "an installed static continuation fusion was never forward-declared".to_string(),
+            )
+        })?;
+        let slots = fusion.slots.as_slice();
+        let offsets = fusion.offsets.as_slice();
+        if slots.len() != offsets.len() {
+            return Err(backend_module(
+                "a fused region slot run disagrees with its own offset walk".to_string(),
+            ));
+        }
+        let parameter_count = slots
+            .iter()
+            .filter(|slot| slot.kind == AbiSlotKind::Parameter)
+            .count();
+        let capture_count = slots
+            .iter()
+            .filter(|slot| slot.kind == AbiSlotKind::Capture)
+            .count();
+        // The header is the declared contract and the slot run is what this body
+        // will actually walk; a disagreement means the environment this body
+        // binds is not the one the redirected invocation passes operands for.
+        if u32::try_from(parameter_count).ok() != Some(fusion.header_parameters)
+            || u32::try_from(capture_count).ok() != Some(fusion.header_captures)
+        {
+            return Err(backend_module(
+                "a fused region's slot run disagrees with its declared frame header".to_string(),
+            ));
+        }
+        let result_offset = slots
+            .iter()
+            .zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Result)
+            .map(|(_, offset)| *offset)
+            .ok_or_else(|| {
+                backend_module("fused region frame declares no result slot".to_string())
+            })?;
+        let trap_offset = slots
+            .iter()
+            .zip(offsets)
+            .find(|(slot, _)| slot.kind == AbiSlotKind::Trap)
+            .map(|(_, offset)| *offset)
+            .ok_or_else(|| {
+                backend_module("fused region frame declares no trap slot".to_string())
+            })?;
+
+        let sig = unit_signature(module);
+        let mut func = Function::with_name_signature(UserFuncName::user(4, id.as_u32()), sig);
+        let mut function_local = helpers.declare_in_func(module, &mut func, None);
+        // The PRODUCER's own call edges, declared into this function. This is
+        // what carries the inherited producer edge: the producer's body still
+        // names the callees the source named, and it is only its *host* that
+        // changed. Not the consumer's edges — the consumer's redirected
+        // invocation is the edge that reaches this function, not one inside it.
+        let declared_calls = call_edges.declare_in_func(fusion.producer_owner, module, &mut func)?;
+        function_local.unit_calls = declared_calls.static_bodies;
+        function_local.declaration_calls = declared_calls.declarations;
+        function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
+        // No retarget happens in a fused body, so the two tables agree. Populated
+        // anyway rather than left empty, for the same reason as every other
+        // generated function: the raw route must resolve from its own table here,
+        // or resolution silently depends on which function it runs in.
+        function_local.raw_worker_calls = function_local.worker_calls.clone();
+        function_local.worker_templates = worker_targets.templates().clone();
+        function_local.context_calls = declare_context_calls_in_func(
+            module,
+            &mut func,
+            &compiler.static_transition_plan,
+            bundle,
+        )?;
+        // This region's own causal call refs, selected by the EMISSION owner —
+        // which is `Fusion(id)` and neither of the two predeclared units. The
+        // fused region is a third thing that owns itself.
+        let emission_owner = ContinuationEmissionOwner::Fusion(fusion.id);
+        // The causal refs declared here are the **PRODUCER's**, and that is a
+        // different question from who this body emits AS.
+        //
+        // `emission_owner` above is `Fusion(id)`: the fused region owns itself,
+        // and that is what the ambient authority binds. But the causal call
+        // tokens the planner issued for the producer's body were issued under
+        // `Predeclared(producer)`, and installing body ownership removed the
+        // producer's standalone `Function` — so this is now the only `Function`
+        // that lowers that body, and therefore the only one that can declare its
+        // refs. Asking for `Fusion(id)`-owned tokens instead returns the empty
+        // set, and the producer's first causal call then refuses with *"the
+        // claimed continuation target was not declared into this function"*.
+        //
+        // NOT the union with the consumer's tokens. The consumer's own
+        // `Function` still exists and still declares them; declaring them here
+        // as well would be a second declaration of one token, which the claim
+        // ledger's exact-set law refuses — correctly.
+        let causal_owner = ContinuationEmissionOwner::Predeclared(fusion.producer_owner);
+        function_local.continuation_calls = match compiler.continuation_claims.as_ref() {
+            Some(ledger) => ledger.declare_owned_in_func(
+                causal_owner,
+                module,
+                &mut func,
+                &compiler.static_transition_plan,
+            )?,
+            None => BTreeMap::new(),
+        };
+        if let Some(ledger) = compiler.continuation_claims.as_mut() {
+            ledger.record_declared(function_local.continuation_calls.keys().cloned())?;
+        }
+        let result_edges = compiler
+            .static_transition_plan
+            .continuation_result_edges_owned_by(causal_owner)?;
+
+        let frame_scope = CheckedFrameFunctionScope::open(compiler)?;
+        let mut func_ctx = FunctionBuilderContext::new();
+        {
+            let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
+            let entry = builder.create_block();
+            builder.append_block_params_for_function_params(entry);
+            builder.switch_to_block(entry);
+            let envelope_pointer = builder.block_params(entry)[0];
+            let frame = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                envelope_pointer,
+                crate::activation_services::UNIT_CALL_FRAME_SLOTS,
+            );
+            let host_dispatch_context = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                envelope_pointer,
+                crate::activation_services::UNIT_CALL_FRAME_HOST_DISPATCH_CONTEXT,
+            );
+            let services = builder.block_params(entry)[1];
+            let native_int_arena = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_NATIVE_INT_ARENA,
+            );
+            Lowering::require_nonzero(&mut builder, native_int_arena);
+            let boundary_arena = builder.ins().load(
+                module.target_config().pointer_type(),
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_BOUNDARY_ARENA,
+            );
+            Lowering::require_nonzero(&mut builder, boundary_arena);
+            function_local.host_dispatch_context = Some(host_dispatch_context);
+            function_local.native_int_arena = Some(native_int_arena);
+            function_local.boundary_arena = Some(boundary_arena);
+            function_local.services_pointer = Some(services);
+            function_local.bind_unit_trap_frame(
+                frame,
+                i32::try_from(trap_offset).map_err(|_| {
+                    backend_module("fused region trap slot offset exceeds range".to_string())
+                })?,
+            )?;
+            compiler.function_local = function_local;
+            compiler.open_aggregate_events(id)?;
+
+            // The two runs, walked once and kept SEPARATE. The context pass
+            // concatenates them because one body binds both; here they are two
+            // environments for two authorities, and concatenating would hand the
+            // producer the consumer's captures.
+            let mut parameters = Vec::new();
+            let mut captures = Vec::new();
+            for (slot, offset) in slots.iter().zip(offsets) {
+                if !matches!(slot.kind, AbiSlotKind::Parameter | AbiSlotKind::Capture) {
+                    continue;
+                }
+                let offset = i32::try_from(*offset).map_err(|_| {
+                    backend_module("fused region slot offset exceeds addressable range".to_string())
+                })?;
+                let word = builder
+                    .ins()
+                    .load(types::I64, MemFlags::trusted(), frame, offset);
+                let binding = LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                    CarriedBoundaryWord { word },
+                ));
+                match slot.kind {
+                    AbiSlotKind::Parameter => parameters.push(binding),
+                    _ => captures.push(binding),
+                }
+            }
+
+            // THE FUSION ITSELF: the producer's body is lowered THROUGH the
+            // consumer's eliminator, in one pass, not to a value and then into
+            // one.
+            //
+            // **Lowering the producer first and eliminating afterwards is
+            // the defect, and it is the natural way to write this.** MEASURED:
+            // that shape reaches the producer's own `"a computational recursor
+            // closure names an in-flight activation, not a transferable value"`
+            // refusal *inside the fused function* — the identical refusal fusion
+            // exists to remove, merely relocated. The producer's body has no
+            // value representation to hand anywhere; that it does not is the
+            // whole reason the region is fused rather than called.
+            //
+            // ⇒ The eliminator goes ON THE STACK and the producer dispatcher
+            // consumes it, so the producer's selected case body feeds the
+            // consumer's suffix with no intermediate activation materialized.
+            // This is the same entry the dispatcher's own nested arm uses to
+            // fuse an inner eliminator ahead of an outer stack.
+            let lowered = {
+                let ambient =
+                    AmbientBodyAuthority::bind(compiler, causal_owner, fusion.producer_owner);
+                let lowered = fuse_producer_through_consumer_suffix(
+                    compiler,
+                    &mut builder,
+                    fusion.producer_body,
+                    fusion.continuation_origin,
+                    &parameters,
+                    &captures,
+                );
+                ambient.release(compiler);
+                lowered?
+            };
+
+            let lowered = compiler.eliminate_detached_producer_continuation(
+                &mut builder,
+                &result_edges,
+                lowered,
+                &captures,
+            )?;
+            let word = match lowered {
+                LoweringOperand::Carried(word) => Some(word.word),
+                LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                    compiler.emit_current_trap(&mut builder, &trap)?;
+                    None
+                }
+                LoweringOperand::Specialized(value) => Some(
+                    compiler
+                        .transfer_unit_result_into_carrier(
+                            &mut builder,
+                            fusion.continuation_origin,
+                            &value,
+                        )?
+                        .word,
+                ),
+            };
+            if let Some(word) = word {
+                builder.ins().store(
+                    MemFlags::trusted(),
+                    word,
+                    frame,
+                    i32::try_from(result_offset).map_err(|_| {
+                        backend_module("fused region result slot offset exceeds range".to_string())
+                    })?,
+                );
+            }
+            let status = builder.ins().iconst(types::I64, 0);
+            builder.ins().return_(&[status]);
+            builder.seal_all_blocks();
+            builder.finalize();
+        }
+        frame_scope.close(compiler)?;
+        compiler.verify_emitted_continuation_calls(&func, bundle)?;
+        compiler.verify_recorded_composed_discharges(&func, bundle)?;
+        #[cfg(test)]
+        crate::cranelift_backend::lowering::record_d8j_discharged(
+            compiler.function_local.composed_discharges.keys().cloned(),
+        );
+        if let Some(ledger) = compiler.continuation_claims.as_mut() {
+            ledger.record_composed(
+                compiler.function_local.composed_discharges.keys().cloned(),
+                causal_owner,
+            )?;
+        }
+        if let Some(ledger) = compiler.continuation_claims.as_mut() {
+            ledger.record_emitted(
+                compiler.function_local.continuation_emissions.keys().cloned(),
+            )?;
+        }
+        verify_cranelift_function(&func, module.isa())?;
+        compiler.commit_aggregate_events()?;
+        if let Some(ledger) = compiler.fusion_claims.as_mut() {
+            ledger.record_defined(fusion.id)?;
+        }
+        let mut ctx = module.make_context();
+        std::mem::swap(&mut ctx.func, &mut func);
+        module
+            .define_function(id, &mut ctx)
+            .map_err(|error| backend_module(error.to_string()))?;
+        defined += 1;
+    }
+    Ok(defined)
+}
+
+/// Lower the producer's body **through** the consumer's continuation occurrence.
+///
+/// Split out so the fused body reads as one step, and so the "the suffix must be
+/// an elimination" refusal has exactly one site. It builds a **single-frame**
+/// eliminator stack: this is the consumer's own suffix and nothing else, so
+/// composing a second frame here would run a continuation the claim does not own.
+///
+/// The eliminator's environment is the **captures** and the producer's is the
+/// **parameters**. They are two runs of one frame and are never concatenated:
+/// the consumer's case bodies index its own continuation inputs, and handing
+/// them the producer's parameter prefix would shift every one of those indices.
+fn fuse_producer_through_consumer_suffix(
+    compiler: &mut Lowering<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    producer_body: StaticOriginId,
+    continuation_origin: StaticOriginId,
+    parameters: &[LoweringEnvironmentBinding],
+    captures: &[LoweringEnvironmentBinding],
+) -> Result<LoweringOperand, CraneliftBackendError> {
+    let suffix = compiler.retained_body_occurrence(continuation_origin)?;
+    let RuntimeExpr::ComputationalMatch { cases, default, .. } = suffix.expr else {
+        return Err(unsupported(
+            "StaticContinuationFusion",
+            "the claimed consumer continuation is not a computational match, so the fused region \
+             has no suffix to run",
+        ));
+    };
+    let body = compiler.retained_body_occurrence(producer_body)?;
+    compiler.lower_fused_producer_through_suffix(
+        builder,
+        body,
+        continuation_origin,
+        cases,
+        default,
+        parameters,
+        captures,
+    )
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — point every fused region's
+/// redirected invocation at the fused `Function`, in the caller being defined.**
+///
+/// **Selection is by the CLAIM's own redirect edge and by the unit being
+/// defined — nothing here searches.** The edge was chosen once, by
+/// `fusion_redirect_target`, from the complete key, and validated by preflight
+/// against the un-narrowed population. Re-deriving it here would search an edge
+/// population that this region's own installation already narrowed, and could
+/// not find the very edge whose supersession narrowed it.
+///
+/// **The frame contract installed is the FUSED region's, and that is not
+/// optional.** The record drives the caller's stack-slot layout and its operand
+/// walk; keeping the producer's frame while calling the fused body would write
+/// the caller's operands at the wrong offsets. The `origin` field stays the
+/// original edge's callee entry: it is the transfer coordinate the source
+/// invocation already named, and the operand run it names is unchanged.
+///
+/// **`record_redirected` is affine and fires here**, so a second unit that
+/// somehow claimed the same region refuses instead of silently installing a
+/// second redirect.
+fn redirect_fused_producer_invocations<M: Module>(
+    module: &mut M,
+    func: &mut Function,
+    compiler: &mut Lowering<'_>,
+    bundle: &UnitBundle,
+    caller: PredeclaredFunctionId,
+    unit_calls: &mut BTreeMap<StaticOriginId, DeclaredUnitCall>,
+) -> Result<(), CraneliftBackendError> {
+    // Own every fact before the ledger is borrowed mutably below.
+    let redirects = {
+        let Some(ledger) = compiler.fusion_claims.as_ref() else {
+            return Ok(());
+        };
+        if ledger.is_empty() {
+            return Ok(());
+        }
+        let contracts = compiler
+            .static_transition_plan
+            .continuation_fusions()?
+            .into_iter()
+            .map(|fusion| {
+                let (offsets, _frame_bytes) = fusion.slot_offsets()?;
+                Ok((fusion.id(), fusion.header(), fusion.slots().to_vec(), offsets))
+            })
+            .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+        let mut redirects = Vec::new();
+        for fusion in ledger.planned() {
+            let Some(claim) = ledger.claim(*fusion) else {
+                // Already consumed at its takeover. A claim is consumed exactly
+                // once, and the takeover cannot run before the body it sits in
+                // is defined, so reaching this in the declaration half of a
+                // definition means the region was taken over by another seat.
+                continue;
+            };
+            if claim.consumer_owner() != caller {
+                continue;
+            }
+            let target = bundle.fusion(*fusion).ok_or_else(|| {
+                backend_module(
+                    "a claimed fused region has no forward-declared target to redirect to"
+                        .to_string(),
+                )
+            })?;
+            let (_, header, slots, offsets) = contracts
+                .iter()
+                .find(|(id, ..)| id == fusion)
+                .ok_or_else(|| {
+                    backend_module(
+                        "a claimed fused region has no installed frame contract".to_string(),
+                    )
+                })?;
+            redirects.push((
+                *fusion,
+                claim.seat(),
+                claim.redirect().callee_origin(),
+                target,
+                *header,
+                slots.clone(),
+                offsets.clone(),
+            ));
+        }
+        redirects
+    };
+    for (fusion, seat, callee_origin, target, header, slots, offsets) in redirects {
+        let call = DeclaredUnitCall {
+            function: module.declare_func_in_func(target, func),
+            origin: callee_origin,
+            call_site_origin: seat,
+            header,
+            slots,
+            offsets,
+        };
+        // The entry is INSERTED, and its absence beforehand is required rather
+        // than assumed. Installing body ownership removed this seat's edge from
+        // `executable_call_edges`, so an entry already standing here means the
+        // producer is still reachable by its standalone route and the redirect
+        // would be one of two answers to the same lookup.
+        if unit_calls.insert(seat, call).is_some() {
+            return Err(backend_module(
+                "a fused region's redirected seat still holds a standalone producer call target, \
+                 so the producer's body would remain reachable beside its fused definition"
+                    .to_string(),
+            ));
+        }
+        if let Some(ledger) = compiler.fusion_claims.as_mut() {
+            ledger.record_redirected(fusion)?;
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn define_root_adapter<M: Module>(
     module: &mut M,
     compiler: &mut Lowering<'_>,
@@ -4430,6 +5002,20 @@ fn define_unit_body<M: Module>(
     );
     function_local.unit_calls = declared_calls.static_bodies;
     function_local.declaration_calls = declared_calls.declarations;
+    // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — THE REDIRECT.
+    //
+    // Installing body ownership removed the producer's invocation from
+    // `executable_call_edges`, so the seat this unit calls the producer at has no
+    // entry in the table above. That absence is not the redirect — it is the hole
+    // the redirect fills, and leaving it is the `"retained body ... has no
+    // graph-derived call target in this unit"` refusal.
+    //
+    // Applied to the function-local COPY, after the table is populated and
+    // before any body is defined. Never to the plan's descriptor: the plane and
+    // its ABI arena are the authority the frame contract below is checked
+    // against, and mutating them would leave both sides agreeing and prove
+    // nothing.
+    redirect_fused_producer_invocations(module, &mut func, compiler, bundle, unit.function, &mut function_local.unit_calls)?;
     // `RT-DECL-CLOSURE-PORT` `D5` — the causal control on the ABI half.
     //
     // ⛔⛔ **Injected HERE, on the function-local COPY, and never on the plan's

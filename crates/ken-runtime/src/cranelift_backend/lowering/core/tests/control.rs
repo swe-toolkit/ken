@@ -83,6 +83,7 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -249,6 +250,7 @@ fn run_px8j_malformed_recursor_consumer(
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -2457,6 +2459,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -4060,14 +4063,32 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             // the event this row exists to force a reader to look at, and it is
             // the fourth such class rather than a fourth copy of an existing
             // one.
-            builders: 4,
-            definitions: 4,
+            //
+            // And 4 -> 5 for `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`'s static
+            // continuation fusion bodies, for the same reason and on the same
+            // terms: a **fifth** emitting function class, not a fifth copy of an
+            // existing one. A fused region is a third owner beside the producer
+            // and the consumer, so its body is built by its own pass rather than
+            // by widening one of the four above.
+            //
+            // The row moved while the emitter itself is **un-wired**
+            // (`D2F_EMITTER_ARMED`): the pass is compiled and reachable but
+            // installs no plane, so it defines zero functions on every current
+            // compile. That is exactly why this row cannot be read as an
+            // emitted-unit count — it counts builder SITES in this file, and
+            // `UnitBundle::len` is the number it cannot see.
+            builders: 5,
+            definitions: 5,
             // Three declaration sites: the emittable unit bundle,
             // `RT-CONTSPEC-ACTIVATE` `D2`'s forward declaration of one target
             // per planned continuation specialization, and `D5a`'s forward
             // declaration of one target per planned generated context. Each is a
-            // deliberate addition and this row is the record of them.
-            declarations: 3,
+            // deliberate addition and this row is the record of them. `D2f`'s
+            // forward declaration of one target per installed fused region is
+            // the fourth, in the same up-front bundle pass and for the same
+            // reason: a target called from a body defined below must exist
+            // before that body is built.
+            declarations: 4,
             data_declarations: 0,
             data_definitions: 0,
         },

@@ -78,6 +78,7 @@ fn run_checked_bounded_nat_fixture(
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,

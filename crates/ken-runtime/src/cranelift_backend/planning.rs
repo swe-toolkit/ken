@@ -18,6 +18,18 @@ pub(in crate::cranelift_backend) use static_transition::{
     BodyEmissionDisposition, FusionClaimRefusal, FusionOwnedBody, FusionRegionClaim,
     FusionRegionClaimLedger,
 };
+/// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
+///
+/// Deliberately **not** in the `#[cfg(test)]` block below, and that is the
+/// whole distinction between this line and the next one. The emitter declares
+/// one target per `StaticContinuationFusionId` and defines its body from a
+/// `StaticContinuationFusionView`, so both names are needed on the real compile.
+/// An ungated *use* of a `cfg(test)`-gated re-export is an unresolved import in
+/// the production build that the test profile cannot see — the trap this file
+/// warns about three times below.
+pub(in crate::cranelift_backend) use static_transition::{
+    StaticContinuationFusionId, StaticContinuationFusionView,
+};
 /// `D2f` Deliverable 0 — the resolved plane's observation types, so a control
 /// downstream of a production compile can state which key resolved.
 #[cfg(test)]

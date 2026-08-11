@@ -2069,7 +2069,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // which derive their authority through the fail-closed validation lane, so
     // there is no longer any path by which a package silently lowers against
     // prelude spellings its own checked package never recorded.
-    let static_transition_plan = plan_static_transition_graph_with_symbols(
+    let mut static_transition_plan = plan_static_transition_graph_with_symbols(
         expr,
         &declarations,
         process_symbols,
@@ -2131,8 +2131,85 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             .to_vec(),
         fusion_definitions: static_transition_plan.observed_fusion_definition_count(),
     });
-    #[cfg(not(test))]
-    let _ = &static_continuation_fusion_plan;
+    // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — THE FIRST BEHAVIOUR-CHANGING
+    // STEP. Everything above this point observed the plane; from here the plane
+    // decides what the artifact contains.
+    //
+    // The three statements are one transaction in the order they appear, and the
+    // order is the mechanism:
+    //
+    // 1. **Install the plane and its ABI arena together.** `continuation_fusions`
+    //    is a join over both, so a plane installed without its arena would
+    //    declare regions with no frame contract.
+    // 2. **Preflight every region against the COMPLETE executable population.**
+    //    `FusionRegionClaimLedger::preflight` reads the plan with no ownership
+    //    installed, which is why its per-region refusals are decided against the
+    //    population the source actually has rather than one a partial install
+    //    already narrowed.
+    // 3. **Install body ownership**, which is what removes the producer's
+    //    standalone unit from `executable_units` and its inbound invocation from
+    //    `executable_call_edges`. Both projections read `body_dispositions`, so
+    //    the declaration pass below and every downstream projection see one
+    //    answer.
+    //
+    // All three sit BEFORE `declare_unit_bundle`. Declaring the bundle first
+    // would forward-declare a `Function` for the producer unit that this install
+    // then removes from the definition population — the undefined phantom the
+    // `D5a` ruling names, arrived at from the other direction.
+    //
+    // On a compile with no fused region every one of these is a no-op over an
+    // empty plane: `preflight` returns an empty ledger and `install_fusion_owned_
+    // bodies` moves an empty map. That is why this is unconditional rather than
+    // guarded on `is_empty()` — a guard would make the zero case take a
+    // different path from the one the non-zero case exercises.
+    //
+    // **THE PLANE IS NOT INSTALLED, AND THIS ONE LINE IS THE WHOLE
+    // ARMING SWITCH.** Everything downstream of it — the fourth bundle map, the
+    // fused definition pass, the redirect, the takeover and the closeout — is
+    // built, compiled and reachable, and every one of them is inert because
+    // `continuation_fusions()` is empty on a plan with no installed plane. Set
+    // `D2F_EMITTER_ARMED` to `true` and the chain runs.
+    //
+    // **This is a labelled un-wired partial, and the label is not a
+    // formality.** The wired form was built and measured on the `Exact` witness;
+    // it advances the compile through four successive distinct refusals and
+    // stops at a fifth. The measured sequence, each step a real one:
+    //
+    //   1. `ComputationalMatch: a computational recursor closure names an
+    //      in-flight activation` — the BASELINE, in the producer's standalone
+    //      unit. Body ownership removes that unit, so this refusal is gone.
+    //   2. `callee frame is missing a declared input` — the redirect is live and
+    //      the fused frame's continuation inputs are unsupplied. Closed by
+    //      `Lowering::fused_redirect_inputs`.
+    //   3. `the claimed continuation target was not declared into this function`
+    //      — the fused body lowers, and the producer's causal refs need
+    //      declaring in it. Closed by declaring under `causal_owner`.
+    //   4. `a continuation call token was claimed by a context that is not its
+    //      emission owner` — the ambient emission owner must be the body's own
+    //      predeclared owner per phase, not `Fusion(id)`.
+    //   5. `OrientedSubcontinuationPlanV1: computational IH slot marker is
+    //      detached from its checked frame` — **where it stops.** The fused
+    //      `Function` opens its own `CheckedFrameFunctionScope`, and the IH slot
+    //      marker the producer's body carries belongs to the consumer's checked
+    //      frame, which now spans two `Function`s.
+    //
+    // ⇒ **Step 5 is the open question and it is not an implementation detail:**
+    // a checked frame is currently a per-`Function` transaction, and a fused
+    // region is the first construct whose frame spans the producer's body and
+    // the consumer's suffix across one. Whether the fused body adopts the
+    // consumer's frame, or the marker is re-homed, is a design question for the
+    // Architect rather than a refusal to code around.
+    //
+    // Do NOT arm this to "see how far it gets" without that answer. Arming it
+    // makes the `Exact` and `ReHomed` roots refuse at step 5, which reds
+    // `d2f_0` — whose baseline assertion pins refusal 1 above.
+    const D2F_EMITTER_ARMED: bool = false;
+    if D2F_EMITTER_ARMED {
+        static_transition_plan
+            .install_static_continuation_fusions(static_continuation_fusion_plan)?;
+    }
+    let mut fusion_claims = FusionRegionClaimLedger::preflight(&static_transition_plan)?;
+    static_transition_plan.install_fusion_owned_bodies(&mut fusion_claims)?;
     #[cfg(test)]
     scale_b_begin_emission_attempt(
         &static_transition_plan,
@@ -2296,6 +2373,11 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let mut func_ctx = FunctionBuilderContext::new();
     let mut compiler = Lowering {
         continuation_claims: None,
+        // `D2f` — the preflighted ledger, moved in whole. Handed over rather
+        // than rebuilt here: preflight read the plan BEFORE ownership was
+        // installed, and a ledger rebuilt at this point would validate every
+        // region against the population its own install already narrowed.
+        fusion_claims: Some(fusion_claims),
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -2383,6 +2465,28 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // so a candidate can authorize a binding without asserting a call.
             // The passes accumulate into these two and they are checked once.
             super::units::open_continuation_claim_ledger(&mut compiler, unit_bundle)?;
+            // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — define each fused
+            // region BEFORE the ordinary bodies, and the order is forced.
+            //
+            // The three operations on one region are `define`, `redirect`, and
+            // `take over`, and the takeover **consumes the claim**. The
+            // consumer's takeover happens inside its own body, so it runs in the
+            // pass below; a definition pass placed after it would find the claim
+            // already spent and could not read the region's authorities at all.
+            // This is therefore not a readability choice, unlike the two
+            // passes further down: the affine ledger orders these two.
+            //
+            // Every target was forward-declared in the one up-front bundle pass,
+            // so nothing here depends on a body existing yet — the fused body's
+            // own calls resolve through the same declared bundle every other
+            // generated `Function` uses.
+            super::units::define_static_continuation_fusion_bodies(
+                &mut module,
+                &mut compiler,
+                helpers,
+                unit_bundle,
+                call_edges,
+            )?;
             let root_result = super::units::define_unit_bodies(
                 &mut module,
                 &mut compiler,
@@ -2477,6 +2581,14 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // none today — that is a fact about the adapter, not a reason to
             // narrow the window.
             super::units::close_continuation_claim_ledger(&mut compiler)?;
+            // `D2f` — the fused-region ledger's four-way closeout: ownership,
+            // definition, redirect and takeover are each exactly the installed
+            // population. Closed here, beside the causal ledger and after every
+            // generated `Function` exists, so a region that was redirected but
+            // never taken over is caught rather than shipped.
+            if let Some(ledger) = compiler.fusion_claims.take() {
+                ledger.close()?;
+            }
             // `D7` — the relation's enforced laws close here: every event
             // maps to exactly one record, every committed pair is unique,
             // every related record is in `P`, no body is built twice, and
@@ -4591,6 +4703,112 @@ impl<'a> Lowering<'a> {
                 )
             }
         }
+    }
+
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — take over the fused region
+    /// whose suffix sits at `continuation_origin`, if this body owns one.**
+    ///
+    /// `Ok(None)` is the ordinary answer and means exactly *"no installed fused
+    /// region names this occurrence as its suffix"* — it is the common path on
+    /// every compile, and the caller must go on to eliminate normally.
+    ///
+    /// **Selected by the occurrence AND the unit being defined**, both
+    /// supplied rather than searched. The consumer's identity is what stops a
+    /// fused region installed for one unit from being taken over inside another
+    /// that happens to share a continuation origin.
+    fn take_fused_region_at(
+        &mut self,
+        continuation_origin: StaticOriginId,
+    ) -> Result<Option<StaticContinuationFusionId>, CraneliftBackendError> {
+        let Some(defining) = self.defining_unit else {
+            return Ok(None);
+        };
+        let Some(ledger) = self.fusion_claims.as_ref() else {
+            return Ok(None);
+        };
+        let mut matched = ledger.planned().iter().copied().filter(|fusion| {
+            ledger.claim(*fusion).is_some_and(|claim| {
+                claim.continuation_origin() == continuation_origin
+                    && claim.consumer_owner() == defining
+            })
+        });
+        let Some(fusion) = matched.next() else {
+            return Ok(None);
+        };
+        if matched.next().is_some() {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "two installed fused regions claim one consumer continuation occurrence in one \
+                 unit, so which suffix this seat hands over is undetermined",
+            ));
+        }
+        let seat = ledger
+            .claim(fusion)
+            .expect("the claim was present at the filter above")
+            .seat();
+        let ledger = self
+            .fusion_claims
+            .as_mut()
+            .expect("the ledger was present at the borrow above");
+        ledger.consume(fusion, seat)?;
+        Ok(Some(fusion))
+    }
+
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the fused region's body: the
+    /// producer's tree-producing form consumed by the consumer's eliminator, in
+    /// one pass.**
+    ///
+    /// This is a **seat**, not a mechanism: it assembles the consumer's own
+    /// eliminator frame from that consumer's occurrence and hands it to the
+    /// producer dispatcher. Nothing here selects a case, reads a constructor
+    /// template, or decides a route — each already has exactly one authority, and
+    /// a second copy on the fusion path is how the fused body would come to
+    /// disagree with the unfused one it must match.
+    ///
+    /// **The dispatcher is entered with the eliminator ALREADY on the stack.**
+    /// Lowering the producer to a value first and eliminating after is the shape
+    /// this replaces: it materializes the in-flight activation the producer has
+    /// no value representation for, and refuses with the producer's own
+    /// `"names an in-flight activation"` — the exact refusal the fusion exists to
+    /// remove.
+    ///
+    /// `answer_route` is `DirectScrutinee`, like every construction site that
+    /// is not `SourceContinuation::ComputationalMatchScrutinee`. The producer's
+    /// result reaches this eliminator inside one frame, not as a checked answer
+    /// returned across a specialization boundary, so raising the route would
+    /// claim a check no call performed.
+    pub(super) fn lower_fused_producer_through_suffix(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        producer: SourceOccurrence<'a>,
+        continuation_origin: StaticOriginId,
+        cases: &[crate::RuntimeComputationalMatchCase],
+        default: &RuntimeTrap,
+        parameters: &[LoweringEnvironmentBinding],
+        captures: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let provenance = self.mint_recursor_frame_provenance();
+        let checked = self.checked_computational_frame(cases, default)?;
+        let frame = ComputationalEliminatorFrame {
+            cases,
+            default,
+            env: captures,
+            static_origin: continuation_origin,
+            retained_scrutinee_index: None,
+            deferred_constructor_case: None,
+            provenance,
+            checked_frame_id: checked.id,
+            checked_invocation_id: checked.invocation_id,
+            checked_invocation_source: checked.invocation_source,
+            checked_invocation_depth: checked.invocation_depth,
+            answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
+        };
+        self.lower_computational_producer_expr(
+            builder,
+            producer,
+            parameters,
+            &[EliminatorFrame::Computational(frame)],
+        )
     }
 
     fn lower_computational_match_value_composed(
@@ -6953,6 +7171,46 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         control,
                                     };
                                 }
+                            }
+                            // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — THE
+                            // CONSUMER TAKEOVER, and the third member of the
+                            // irreducible core.
+                            //
+                            // The redirected invocation already returned the
+                            // FUSED result: the producer's body and this very
+                            // suffix, run once inside the fused `Function`. So
+                            // this seat has nothing left to eliminate, and
+                            // running it would execute the suffix a second time
+                            // — the defect node `:650` measured, which is why
+                            // the redirect cannot ship without this.
+                            //
+                            // Taken BEFORE `enter_source_occurrence_plan`,
+                            // like the backedge forward above and for a sharper
+                            // reason: this occurrence's plan is consumed inside
+                            // the fused body, by the eliminator frame built
+                            // there. Entering it here as well would consume one
+                            // occurrence plan twice.
+                            //
+                            // The claim is consumed at **its own seat**, not
+                            // at this origin. `consume` checks the seat against
+                            // the claim's redirected invocation, so a takeover
+                            // offered at the wrong occurrence leaves the claim
+                            // outstanding rather than spending it on a suffix it
+                            // does not own.
+                            //
+                            // `incoming_route` is carried, not reset, for the
+                            // same reason the backedge arm carries it: this
+                            // FORWARDS an operand that a call already produced.
+                            if let Some(taken) = self.take_fused_region_at(static_origin)? {
+                                let _ = taken;
+                                control.continuation = *next;
+                                break 'computational_scrutinee SourceMachineState::Value {
+                                    value: RoutedAnswer {
+                                        value,
+                                        route: incoming_route,
+                                    },
+                                    control,
+                                };
                             }
                             self.enter_source_occurrence_plan(static_origin)?;
                             #[cfg(test)]
