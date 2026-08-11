@@ -5075,20 +5075,7 @@ pub fn init_class_env(
     )
     .map_err(|e| ElabError::Internal(format!("record_nil_val postulate: {}", e)))?;
     globals.insert("record_nil_val".to_string(), record_nil_val_id);
-    Ok(ClassEnv {
-        classes: std::collections::HashMap::new(),
-        instances: std::collections::HashMap::new(),
-        record_nil_id,
-        record_nil_val_id,
-        current_module: 0,
-        global_modules: std::collections::HashMap::new(),
-        current_package: None,
-        direct_use_packages: None,
-        direct_use_instances: std::collections::HashSet::new(),
-        implicit_single_provider: false,
-        source_instance_packages: std::collections::HashSet::new(),
-        resolution_provenance: Vec::new(),
-    })
+    Ok(ClassEnv::initialized(record_nil_id, record_nil_val_id))
 }
 
 // ---- typeclass elaboration (`33 §5`, `39 §6`) --------------------------------
@@ -5230,7 +5217,7 @@ fn elab_class_decl(
     class_env
         .global_modules
         .insert(id, class_env.current_module);
-    class_env.classes.insert(
+    class_env.register_class(
         rdecl.name.clone(),
         ClassInfo {
             param: param.clone(),

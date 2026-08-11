@@ -103,7 +103,7 @@ pub struct InstanceConstraintInfo {
 /// The typeclass environment: class registry, canonical instance registry,
 /// structural postulate IDs, and per-module tracking for the orphan check.
 pub struct ClassEnv {
-    pub classes: HashMap<String, ClassInfo>,
+    classes: HashMap<String, ClassInfo>,
     /// Canonical instances: `(class_name, head_type_name)` → `InstanceInfo`.
     /// For property classes this may hold multiple under different keys, but
     /// only one per `(class, head)` pair (property instances on the same head
@@ -142,6 +142,10 @@ impl ClassEnv {
     /// Transitional read-only compatibility view. Removed before records land.
     pub fn classes(&self) -> &HashMap<String, ClassInfo> {
         &self.classes
+    }
+    pub fn register_class(&mut self, name: String, info: ClassInfo) { self.classes.insert(name, info); }
+    pub fn initialized(record_nil_id: GlobalId, record_nil_val_id: GlobalId) -> Self {
+        Self { classes: HashMap::new(), instances: HashMap::new(), record_nil_id, record_nil_val_id, current_module: 0, global_modules: HashMap::new(), current_package: None, direct_use_packages: None, direct_use_instances: std::collections::HashSet::new(), implicit_single_provider: false, source_instance_packages: std::collections::HashSet::new(), resolution_provenance: Vec::new() }
     }
     /// Create a sentinel `ClassEnv` with placeholder IDs. Use only when the
     /// class machinery is not needed (non-class elaboration paths). The real
