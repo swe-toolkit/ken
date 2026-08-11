@@ -8493,13 +8493,6 @@ fn build_checked_ih_bindings(
     Ok(out)
 }
 
-/// The admitted-discovery ledger for this plan, from the production fixed point.
-///
-/// One invocation, one ledger. Nothing here reconstructs a seed, scans worker
-/// bodies, or runs a parallel fixed point -- the entries are exactly what
-/// `build_continuation_specialization_plan` admitted, returned from that same
-/// call.
-#[cfg_attr(not(test), allow(dead_code))]
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2h` — dense identity of one interned
 /// static continuation fusion.**
 ///
@@ -8576,9 +8569,14 @@ fn primary_fusion_key(candidate: &StaticContinuationFusionCandidate) -> StaticCo
     // PRIMARY derivation only; the second route below re-reads planner facts and
     // is untouched by it, which is what makes the comparison a real check rather
     // than a function agreeing with itself.
+    // Perturbs a LOCATOR -- the admitted root the whole re-derivation hangs off
+    // -- rather than a downstream member the second path recomputes anyway.
+    // Mutating a recomputed field only shows that one field is recomputed; the
+    // claim is that the locators are established, so the control has to attack
+    // one of those.
     #[cfg(test)]
     if MUTATE_PRIMARY_FUSION_KEY_DERIVATION.with(Cell::get) {
-        key.consuming_callee = StaticOriginId(key.consuming_callee.0 + 1);
+        key.admitted.result_root = StaticOriginId(key.admitted.result_root.0 + 1);
     }
     key
 }
@@ -8604,22 +8602,67 @@ fn rederive_fusion_key(
 ) -> Result<StaticContinuationFusionKey, CraneliftBackendError> {
     let transport = build_checked_transport(plan, oriented)?;
     let ih_bindings = build_checked_ih_bindings(plan)?;
-    let continuation_origin = key.admitted.continuation_origin;
+
+    // THE LOCATORS ARE ESTABLISHED, NOT COPIED. An earlier revision took
+    // `admitted`, the construct origin, the alternative and the position from
+    // the primary key and re-derived only what hangs off them -- so a
+    // correlated primary error in a selector reproduced itself one layer up and
+    // the comparison agreed. Each of the four is now independently justified
+    // against production authority before anything downstream is derived.
+    let admitted = fusion_root_source_for_future_enumerator(plan)?
+        .into_iter()
+        .find(|entry| *entry == key.admitted)
+        .ok_or_else(|| {
+            planner_error("a fusion key's admitted discovery is not in the production ledger")
+        })?;
+    let continuation_origin = admitted.continuation_origin;
 
     let RuntimeExpr::ComputationalMatch { cases, .. } =
         plan.planned_occurrence_expr(continuation_origin)?
     else {
         return Err(planner_error("a fusion key names a non-computational consumer"));
     };
-    let alternative = key.producer_alternative as usize;
+
+    // The construct origin must belong to the result population of the admitted
+    // root, which is where a producer is allowed to come from at all.
+    if !continuation_result_origins(plan, admitted.result_root)?
+        .contains(&key.producer_construct_origin)
+    {
+        return Err(planner_error(
+            "a fusion key's producer construct is not in its admitted root's result population",
+        ));
+    }
+
+    // The alternative is DERIVED from constructor identity, not read off the
+    // key: exactly one case may match, and multiplicity is a refusal.
+    let identity = plan.constructor_symbol_identity(key.producer_construct_origin)?;
+    let mut matching = Vec::new();
+    for alternative in 0..cases.len() {
+        if plan.case_constructor_identity(continuation_origin, alternative)? == identity {
+            matching.push(alternative);
+        }
+    }
+    let [alternative] = matching[..] else {
+        return Err(planner_error(
+            "a fusion key's producer constructor does not select exactly one consumer case",
+        ));
+    };
+    let producer_alternative = u32::try_from(alternative)
+        .map_err(|_| planner_capacity_error("fusion alternative exhausted"))?;
     let case = cases
         .get(alternative)
         .ok_or_else(|| planner_error("a fusion key names an absent consumer alternative"))?;
+
+    // The position is derived from the case's own declaration, and must be the
+    // one the consuming binding names -- not the one the key asserts.
+    let consuming_binding_position = key.consumer_binding.recursive_position as usize;
     let position = *case
         .recursive_positions
         .iter()
-        .find(|position| **position == key.recursive_position as usize)
+        .find(|position| **position == consuming_binding_position)
         .ok_or_else(|| planner_error("a fusion key names an undeclared recursive position"))?;
+    let recursive_position = u32::try_from(position)
+        .map_err(|_| planner_capacity_error("fusion position exhausted"))?;
 
     let selected_case_body = plan
         .semantic
@@ -8662,11 +8705,11 @@ fn rederive_fusion_key(
     .ok_or_else(|| planner_error("a fusion key's input projection does not re-resolve"))?;
 
     Ok(StaticContinuationFusionKey {
-        admitted: key.admitted,
+        admitted,
         producer_construct_origin: key.producer_construct_origin,
         producer_owner,
-        producer_alternative: key.producer_alternative,
-        recursive_position: key.recursive_position,
+        producer_alternative,
+        recursive_position,
         producer_argument_origin,
         producer_argument_binding,
         selected_case_body,
@@ -8707,6 +8750,37 @@ pub(in crate::cranelift_backend) struct StaticContinuationFusionPlan {
 
 #[cfg_attr(not(test), allow(dead_code))]
 impl StaticContinuationFusionPlan {
+    /// **The production interning seam, keyed by the COMPLETE structural key.**
+    ///
+    /// Submitting a key either reuses the id an equal key already has or mints a
+    /// fresh one. Equality is over every member, so two keys differing anywhere
+    /// are two fusions and receive two ids -- there is no equivalence class that
+    /// ignores a member and no fallback identity.
+    ///
+    /// This is what makes the bijection a property of the interner rather than
+    /// of a lookup table: `id_for` below only reads, and a read cannot show that
+    /// an unequal key would be given its own identity.
+    fn intern(
+        &mut self,
+        key: StaticContinuationFusionKey,
+    ) -> Result<StaticContinuationFusionId, CraneliftBackendError> {
+        if let Some(existing) = self.id_for(&key) {
+            return Ok(existing);
+        }
+        let id = StaticContinuationFusionId(u32::try_from(self.keys.len()).map_err(|_| {
+            planner_capacity_error("static continuation fusion identity exhausted")
+        })?);
+        self.descriptors.push(StaticContinuationFusionDescriptor {
+            id,
+            continuation_inputs: key.continuation_inputs.len(),
+            recursive_position: key.recursive_position,
+            consumer_owner: key.consumer_owner,
+            producer_owner: key.producer_owner,
+        });
+        self.keys.push(key);
+        Ok(id)
+    }
+
     /// key -> ID, on WHOLE-key equality: a key differing in any member is a
     /// different key.
     fn id_for(&self, key: &StaticContinuationFusionKey) -> Option<StaticContinuationFusionId> {
@@ -8766,20 +8840,7 @@ fn build_static_continuation_fusion_plan(
                 "a static continuation fusion key does not re-derive exactly from planner facts",
             ));
         }
-        if fusion.id_for(&key).is_some() {
-            continue;
-        }
-        let id = StaticContinuationFusionId(u32::try_from(fusion.keys.len()).map_err(|_| {
-            planner_capacity_error("static continuation fusion identity exhausted")
-        })?);
-        fusion.descriptors.push(StaticContinuationFusionDescriptor {
-            id,
-            continuation_inputs: key.continuation_inputs.len(),
-            recursive_position: key.recursive_position,
-            consumer_owner: key.consumer_owner,
-            producer_owner: key.producer_owner,
-        });
-        fusion.keys.push(key);
+        fusion.intern(key)?;
     }
     Ok(fusion)
 }
@@ -9074,6 +9135,13 @@ fn fusion_root_source_for_future_enumerator(
     admitted_continuation_discoveries(plan)
 }
 
+/// The admitted-discovery ledger for this plan, from the production fixed point.
+///
+/// One invocation, one ledger. Nothing here reconstructs a seed, scans worker
+/// bodies, or runs a parallel fixed point -- the entries are exactly what
+/// `build_continuation_specialization_plan` admitted, returned from that same
+/// call.
+#[cfg_attr(not(test), allow(dead_code))]
 fn admitted_continuation_discoveries(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<AdmittedContinuationDiscovery>, CraneliftBackendError> {
@@ -15319,6 +15387,162 @@ mod tests {
         );
     }
 
+    /// `D2h` `AC-1` — the INTERNER-UNIT matrix: every one-member mutation is
+    /// submitted to the production interner and receives its own ID.
+    ///
+    /// This is the interner's property, not a lookup table's. An earlier
+    /// revision only asked `id_for` whether a perturbed key still resolved --
+    /// a read, which cannot show that an unequal key would be GIVEN an identity
+    /// of its own. Here each mutation is interned, so the plane actually mints a
+    /// second id, and both keys then round-trip.
+    ///
+    /// Same-key reuse is proved alongside it: re-submitting an equal key returns
+    /// the id it already has rather than minting a second one, which is the
+    /// other half of the identity relation being a function.
+    ///
+    /// These are SYNTHETIC keys, deliberately. Whether the planner can produce
+    /// two valid keys differing in each member is the derivation/provenance
+    /// question, and it lives in `D2j`; what is established here is that the
+    /// interner keys on the complete structure.
+    #[test]
+    fn d2h_ac1_every_one_member_mutation_interns_to_its_own_id() {
+        let (declaration, entry, oriented) = d2h_plane_fixture();
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2G_DECLARATION, &declaration);
+        let plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let mut fusion =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the plane builds");
+        assert_eq!(fusion.len(), 1);
+
+        let base = fusion
+            .key_for(StaticContinuationFusionId(0))
+            .expect("key")
+            .clone();
+        let base_id = fusion.intern(base.clone()).expect("intern");
+        assert_eq!(
+            base_id,
+            StaticContinuationFusionId(0),
+            "same-key reuse: an equal key returns the id it already has"
+        );
+        assert_eq!(fusion.len(), 1, "and mints nothing new");
+
+        let bump = |origin: StaticOriginId| StaticOriginId(origin.0 + 1);
+        let mut variants: Vec<(&'static str, StaticContinuationFusionKey)> = Vec::new();
+        let mut push = |label: &'static str, mutate: &dyn Fn(&mut StaticContinuationFusionKey)| {
+            let mut key = base.clone();
+            mutate(&mut key);
+            variants.push((label, key));
+        };
+
+        push("admitted.continuation_origin", &|k| {
+            k.admitted.continuation_origin = bump(k.admitted.continuation_origin)
+        });
+        push("admitted.result_root", &|k| {
+            k.admitted.result_root = bump(k.admitted.result_root)
+        });
+        push("admitted.enclosing_specialization", &|k| {
+            k.admitted.enclosing_specialization = None
+        });
+        push("producer_construct_origin", &|k| {
+            k.producer_construct_origin = bump(k.producer_construct_origin)
+        });
+        push("producer_owner", &|k| {
+            k.producer_owner = PredeclaredFunctionId(k.producer_owner.0 + 1)
+        });
+        push("producer_alternative", &|k| k.producer_alternative += 1);
+        push("recursive_position", &|k| k.recursive_position += 1);
+        push("producer_argument_origin", &|k| {
+            k.producer_argument_origin = bump(k.producer_argument_origin)
+        });
+        push("producer_argument_binding", &|k| {
+            k.producer_argument_binding.recursive_position += 1
+        });
+        push("selected_case_body", &|k| {
+            k.selected_case_body = bump(k.selected_case_body)
+        });
+        push("consuming_call", &|k| k.consuming_call = bump(k.consuming_call));
+        push("consuming_callee", &|k| {
+            k.consuming_callee = bump(k.consuming_callee)
+        });
+        push("consumer_binding", &|k| {
+            k.consumer_binding.frame_origin = bump(k.consumer_binding.frame_origin)
+        });
+        push("transport.frame_id", &|k| k.checked_transport.frame_id += 1);
+        push("transport.slot_template_id", &|k| {
+            k.checked_transport.slot_template_id += 1
+        });
+        push("transport.slot_occurrence_path", &|k| {
+            k.checked_transport.slot_occurrence_path.push(99)
+        });
+        push("transport.call_template_id", &|k| {
+            k.checked_transport.call_template_id += 1
+        });
+        push("transport.call_occurrence_path", &|k| {
+            k.checked_transport.call_occurrence_path.push(99)
+        });
+        push("invocation_caller", &|k| {
+            k.invocation_caller = PredeclaredFunctionId(k.invocation_caller.0 + 1)
+        });
+        push("invocation_callee", &|k| {
+            k.invocation_callee = PredeclaredFunctionId(k.invocation_callee.0 + 1)
+        });
+        push("invocation_callee_entry", &|k| {
+            k.invocation_callee_entry = bump(k.invocation_callee_entry)
+        });
+        push("consumer_owner", &|k| {
+            k.consumer_owner = PredeclaredFunctionId(k.consumer_owner.0 + 1)
+        });
+        // `continuation_inputs` is NOT varied here: the projection is empty on
+        // this witness, so every mutation of it would be a no-op. A non-empty
+        // projection is `D2j`'s fixture obligation, and asserting a no-op would
+        // read as coverage.
+        assert!(
+            base.continuation_inputs.is_empty(),
+            "if this witness gains a projected input, vary that class too rather \
+             than leaving the exclusion: {:?}",
+            base.continuation_inputs
+        );
+
+        let mut seen = BTreeSet::new();
+        seen.insert(base_id);
+        for (label, variant) in &variants {
+            assert_ne!(
+                variant, &base,
+                "the {label} mutation must actually change the key, or it interns nothing new"
+            );
+            let id = fusion.intern(variant.clone()).expect("intern");
+            assert!(
+                seen.insert(id),
+                "the {label} mutation must mint its OWN id, not reuse one already issued"
+            );
+            assert_eq!(
+                fusion.key_for(id),
+                Some(variant),
+                "and {label}'s id must round-trip to the key it was minted from"
+            );
+            assert_eq!(
+                fusion.id_for(variant),
+                Some(id),
+                "and back again"
+            );
+            assert!(
+                fusion.descriptor_for(id).is_some(),
+                "and carry a descriptor of its own"
+            );
+        }
+        assert_eq!(
+            fusion.len(),
+            1 + variants.len(),
+            "one identity per distinct key, and no collisions"
+        );
+        assert_eq!(
+            fusion.id_for(&base),
+            Some(base_id),
+            "and the original key still resolves to its original id"
+        );
+    }
+
     /// `D2h` — the independent re-derivation CATCHES a mutation of the primary
     /// derivation.
     ///
@@ -15356,9 +15580,18 @@ mod tests {
         let caught =
             build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
                 .expect_err("a mutated primary derivation must be caught");
+        // MEASURED, and sharper than the whole-key comparison I expected. The
+        // mutation perturbs the admitted root, which the re-derivation now
+        // ESTABLISHES against the production ledger before deriving anything
+        // from it -- so it is refused at establishment rather than surviving to
+        // the final equality. That is the stronger place to be caught: a locator
+        // that cannot be justified never gets to select the members that hang
+        // off it.
         assert!(
-            format!("{caught:?}").contains("does not re-derive exactly from planner facts"),
-            "and caught by the re-derivation comparison specifically: {caught:?}"
+            format!("{caught:?}")
+                .contains("admitted discovery is not in the production ledger"),
+            "and caught where the locator is established, not merely at the closing \
+             comparison: {caught:?}"
         );
     }
 
