@@ -13,6 +13,7 @@ use crate::ast::{
     ExplicitDataCtor, Expr, InstanceConstraint, NumLit, PatKind, SpaceCell, SpaceOperation, Type,
 };
 use crate::error::{ElabError, Span};
+use num_bigint::BigInt;
 
 /// A resolved constructor declaration (from `data` decl resolution).
 #[derive(Clone, Debug)]
@@ -557,9 +558,11 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
             Box::new(expr_as_type(codomain)?),
             span.clone(),
         )),
-        Expr::ENumLit(NumLit::Int(0), span) => Ok(Type::TVar("Zero".to_string(), span.clone())),
+        Expr::ENumLit(NumLit::Int(n), span) if n == &BigInt::from(0u8) => {
+            Ok(Type::TVar("Zero".to_string(), span.clone()))
+        }
         Expr::EBinOp(BinOp::Add, lhs, rhs, span) => {
-            if matches!(rhs.as_ref(), Expr::ENumLit(NumLit::Int(1), _)) {
+            if matches!(rhs.as_ref(), Expr::ENumLit(NumLit::Int(n), _) if n == &BigInt::from(1u8)) {
                 Ok(Type::TApp(
                     Box::new(Type::TVar("Suc".to_string(), span.clone())),
                     Box::new(expr_as_type(lhs)?),

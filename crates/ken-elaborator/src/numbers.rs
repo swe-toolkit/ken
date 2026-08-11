@@ -24,6 +24,7 @@ use ken_kernel::{
     Term,
 };
 use ken_kernel::env::PrimReduction;
+use num_bigint::BigInt;
 
 use crate::error::ElabError;
 use crate::strings::NfcString;
@@ -37,7 +38,7 @@ use crate::strings::NfcString;
 /// via the bridge in `ken-interp/tests/`.
 #[derive(Clone, Debug)]
 pub enum NumericLitVal {
-    Int(i128),
+    Int(BigInt),
     Float(f64),
     Float32(f32),
     Decimal { coeff: i64, exp: i32 },
@@ -130,6 +131,8 @@ pub struct NumericEnv {
     /// conversion floors and three retract postulates.
     pub abi_scalar_conversion_trusted_delta: Vec<GlobalId>,
 
+    fixed_int_literal_descriptors: Vec<FixedIntLiteralDescriptor>,
+
     // --- `+` dispatch table (keyed by the type's GlobalId) ---
     add_table: HashMap<GlobalId, AddEntry>,
 
@@ -143,7 +146,30 @@ pub struct NumericEnv {
     mul_table: HashMap<GlobalId, BinOpEntry>,
 }
 
+struct FixedIntLiteralDescriptor {
+    type_id: GlobalId,
+    type_name: &'static str,
+    min: BigInt,
+    max: BigInt,
+}
+
 impl NumericEnv {
+    pub(crate) fn fixed_int_literal_descriptor(
+        &self,
+        ty_id: GlobalId,
+    ) -> Option<(&'static str, &BigInt, &BigInt)> {
+        self.fixed_int_literal_descriptors
+            .iter()
+            .find(|descriptor| descriptor.type_id == ty_id)
+            .map(|descriptor| {
+                (
+                    descriptor.type_name,
+                    &descriptor.min,
+                    &descriptor.max,
+                )
+            })
+    }
+
     /// Register (or replace) the `+` dispatch entry for `ty_id` — used by
     /// `decimal_char::register_decimal_char` to wire `Decimal` to the derived
     /// `decimal_add`, since `add_table` itself is private to this module.
@@ -537,6 +563,35 @@ pub fn register_numeric_env(
     sub_table.insert(float_id, BinOpEntry { op_id: sub_float_id, result_id: float_id });
     mul_table.insert(float_id, BinOpEntry { op_id: mul_float_id, result_id: float_id });
 
+    let signed_descriptor = |type_id: GlobalId, type_name: &'static str, bits: usize| {
+        let boundary = BigInt::from(1u8) << (bits - 1);
+        FixedIntLiteralDescriptor {
+            type_id,
+            type_name,
+            min: -boundary.clone(),
+            max: boundary - 1,
+        }
+    };
+    let unsigned_descriptor =
+        |type_id: GlobalId, type_name: &'static str, bits: usize| {
+            FixedIntLiteralDescriptor {
+                type_id,
+                type_name,
+                min: BigInt::from(0u8),
+                max: (BigInt::from(1u8) << bits) - 1,
+            }
+        };
+    let fixed_int_literal_descriptors = vec![
+        signed_descriptor(int8_id, "Int8", 8),
+        signed_descriptor(int16_id, "Int16", 16),
+        signed_descriptor(int32_id, "Int32", 32),
+        signed_descriptor(int64_id, "Int64", 64),
+        unsigned_descriptor(uint8_id, "UInt8", 8),
+        unsigned_descriptor(uint16_id, "UInt16", 16),
+        unsigned_descriptor(uint32_id, "UInt32", 32),
+        unsigned_descriptor(uint64_id, "UInt64", 64),
+    ];
+
     Ok(NumericEnv {
         int_id, int8_id, int16_id, int32_id, int64_id,
         uint8_id, uint16_id, uint32_id, uint64_id, usize_id, isize_id, cint_id,
@@ -547,6 +602,7 @@ pub fn register_numeric_env(
         abi_scalar_type_trusted_delta,
         abi_scalar_retract_ids: Vec::new(),
         abi_scalar_conversion_trusted_delta: Vec::new(),
+        fixed_int_literal_descriptors,
         add_table,
         eq_table,
         sub_table,
@@ -556,27 +612,7 @@ pub fn register_numeric_env(
 
 // ── literal value construction ─────────────────────────────────────────────
 
-/// Construct a `NumericLitVal` from an integer literal `n` at type `ty`.
-///
-/// If `ty` is `Int`, produce `NumericLitVal::Int(n)`.
-/// If `ty` is a fixed-width signed/unsigned type, clamp/truncate to that width
-/// so the interpreter evaluates the correct bit-pattern.
-pub fn int_lit_val(n: i128, ty: &Term, nenv: &NumericEnv) -> NumericLitVal {
-    if let Term::Const { id, .. } = ty {
-        if *id == nenv.int_id {
-            return NumericLitVal::Int(n);
-        }
-        // Fixed-width: store the truncated value as i64 (EvalVal::Int)
-        let truncated = if *id == nenv.int8_id  { (n as i8) as i128 }
-            else if *id == nenv.int16_id { (n as i16) as i128 }
-            else if *id == nenv.int32_id { (n as i32) as i128 }
-            else if *id == nenv.int64_id { (n as i64) as i128 }
-            else if *id == nenv.uint8_id  { (n as u8) as i128 }
-            else if *id == nenv.uint16_id { (n as u16) as i128 }
-            else if *id == nenv.uint32_id { (n as u32) as i128 }
-            else if *id == nenv.uint64_id { (n as u64) as i128 }
-            else { n };
-        return NumericLitVal::Int(truncated);
-    }
-    NumericLitVal::Int(n)
+/// Preserve an elaborated integer literal in the evaluator side table.
+pub fn int_lit_val(n: &BigInt) -> NumericLitVal {
+    NumericLitVal::Int(n.clone())
 }

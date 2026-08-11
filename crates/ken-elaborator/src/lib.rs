@@ -79,7 +79,7 @@ pub use literate::{
     extract_ken_md, format_ken_md, validate_ken_md_fences, KenMdExtraction, KenMdFence,
     KenMdFenceRole,
 };
-pub use numbers::{NumericEnv, NumericLitVal};
+pub use numbers::{int_lit_val, NumericEnv, NumericLitVal};
 pub use strings::NfcString;
 pub use prelude::PreludeEnv;
 pub use protocol::{

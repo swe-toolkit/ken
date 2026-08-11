@@ -213,7 +213,7 @@ fn mk_int_const(env: &mut ElabEnv, n: i128) -> Term {
         .declare_postulate_raw(&format!("__lit_{}", n), ty)
         .expect("declare lit");
     env.num_values
-        .insert(id, ken_elaborator::NumericLitVal::Int(n));
+        .insert(id, ken_elaborator::NumericLitVal::Int(n.into()));
     Term::const_(id, vec![])
 }
 
@@ -511,7 +511,7 @@ fn term_mentions_type(term: &Term, id: GlobalId) -> bool {
 /// side-table the eval store consumes).
 fn lit_to_evalval(lit: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
     match lit {
-        NumericLitVal::Int(n) => EvalVal::from(*n),
+        NumericLitVal::Int(n) => EvalVal::from(n.clone()),
         NumericLitVal::Float(f) => EvalVal::Float(*f),
         NumericLitVal::Float32(f) => EvalVal::Float32(*f),
         NumericLitVal::Decimal { coeff, exp } => {

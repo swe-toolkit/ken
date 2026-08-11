@@ -2,6 +2,7 @@
 //! `34` — data/match/refinements).
 
 use crate::error::Span;
+use num_bigint::BigInt;
 
 /// A binder group `(x y z : A)` from a `view` parameter list.
 #[derive(Clone, Debug)]
@@ -535,7 +536,7 @@ impl Decl {
 #[derive(Clone, Debug, PartialEq)]
 pub enum NumLit {
     /// Integer literal — defaults to `Int` unless an expected type is given.
-    Int(i128),
+    Int(BigInt),
     /// Decimal-point float — defaults to `Float`.
     Float(f64),
     /// `d`-suffix exact decimal — defaults to `Decimal`.

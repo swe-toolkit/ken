@@ -33,7 +33,7 @@ fn eval_view(src: &str) -> EvalVal {
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
     for (id, v) in &env.num_values {
         let val = match v {
-            NumericLitVal::Int(n) => EvalVal::from(*n),
+            NumericLitVal::Int(n) => EvalVal::from(n.clone()),
             NumericLitVal::Float(f) => EvalVal::Float(*f),
             NumericLitVal::Float32(f) => EvalVal::Float32(*f),
             NumericLitVal::Decimal { coeff, exp } => {

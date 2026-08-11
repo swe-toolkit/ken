@@ -3613,7 +3613,7 @@ fn elab_num_lit_infer(
     // int / Float / Decimal / Float32 are untouched, below.
     if let NumLit::Int(n) = lit {
         let ty_term = Term::const_(cx.numeric_env.int_id, vec![]);
-        return Ok((Term::IntLit(num_bigint::BigInt::from(*n)), ty_term));
+        return Ok((Term::IntLit(n.clone()), ty_term));
     }
 
     let (val, type_id) = num_lit_default_type(lit, cx.numeric_env);
@@ -3661,27 +3661,25 @@ fn elab_num_lit_checked(
         // mechanism is registered for `Int` only.
         if let NumLit::Int(n) = lit {
             if ty_id == nenv.int_id {
-                return Ok(Term::IntLit(num_bigint::BigInt::from(*n)));
+                return Ok(Term::IntLit(n.clone()));
             }
         }
 
         let val_opt: Option<NumericLitVal> = match lit {
             NumLit::Int(n) => {
-                // Fixed-width integer types only (`Int` itself is handled
-                // above); unchanged postulate + `num_values` path.
-                let is_fixed_int_type = [
-                    nenv.int8_id,
-                    nenv.int16_id,
-                    nenv.int32_id,
-                    nenv.int64_id,
-                    nenv.uint8_id,
-                    nenv.uint16_id,
-                    nenv.uint32_id,
-                    nenv.uint64_id,
-                ]
-                .contains(&ty_id);
-                if is_fixed_int_type {
-                    Some(crate::numbers::int_lit_val(*n, &exp_wh, nenv))
+                if let Some((target, min, max)) =
+                    nenv.fixed_int_literal_descriptor(ty_id)
+                {
+                    if n < min || n > max {
+                        return Err(ElabError::FixedWidthLiteralOutOfRange {
+                            literal: n.clone(),
+                            target,
+                            min: min.clone(),
+                            max: max.clone(),
+                            span: span.clone(),
+                        });
+                    }
+                    Some(crate::numbers::int_lit_val(n))
                 } else {
                     None
                 }
@@ -3754,7 +3752,7 @@ fn elab_str_lit(
 /// Returns the default (Val, TypeId) for a literal without an expected type.
 fn num_lit_default_type(lit: &NumLit, nenv: &NumericEnv) -> (NumericLitVal, GlobalId) {
     match lit {
-        NumLit::Int(n) => (NumericLitVal::Int(*n), nenv.int_id),
+        NumLit::Int(n) => (NumericLitVal::Int(n.clone()), nenv.int_id),
         NumLit::Float(f) => (NumericLitVal::Float(*f), nenv.float_id),
         NumLit::Decimal(c, e) => (
             NumericLitVal::Decimal { coeff: *c, exp: *e },

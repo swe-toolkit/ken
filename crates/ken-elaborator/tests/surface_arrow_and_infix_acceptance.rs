@@ -23,7 +23,7 @@ fn eval_int_decl(env: &mut ElabEnv, src: &str) -> i128 {
             store
                 .num_values
                 .entry(*nid)
-                .or_insert_with(|| EvalVal::from(*n));
+                .or_insert_with(|| EvalVal::from(n.clone()));
         }
     }
     let body = match env.env.lookup(id) {

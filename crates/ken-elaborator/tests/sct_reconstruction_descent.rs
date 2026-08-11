@@ -63,7 +63,7 @@ fn eval_nat_decl(env: &ElabEnv, name: &str) -> u64 {
             store
                 .num_values
                 .entry(*nid)
-                .or_insert_with(|| ken_interp::eval::EvalVal::from(*n));
+                .or_insert_with(|| ken_interp::eval::EvalVal::from(n.clone()));
         }
     }
     let v = ken_interp::eval::eval(&[], &body, &env.env, &mut store);

@@ -133,7 +133,7 @@ fn shape_a_accepts_and_evaluates_correctly() {
             store
                 .num_values
                 .entry(*nid)
-                .or_insert_with(|| ken_interp::eval::EvalVal::from(*n));
+                .or_insert_with(|| ken_interp::eval::EvalVal::from(n.clone()));
         }
     }
     let result_id = *env.globals.get("result").expect("result should be a global");

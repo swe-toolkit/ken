@@ -2,9 +2,9 @@
 //!
 //! Covers AC1 (no-wrap totality across the i128 ceiling) and AC2 (the
 //! independent differential oracle) against `ken_interp::eval::prim_reduce`
-//! directly — the surface lexer's `NumericLitVal::Int(i128)` cap is out of
-//! F1's scope, so operands beyond `i128` are constructed in Rust, not parsed
-//! from `.ken` source text. AC3 (store round-trip) needs the crate-private
+//! directly. Surface arbitrary-precision literal transport is tested at the
+//! elaborator boundary; these arithmetic operands are constructed in Rust.
+//! AC3 (store round-trip) needs the crate-private
 //! `to_rt`/`intern` producer and lives in `src/eval.rs`'s own test module.
 
 use ken_interp::eval::{prim_reduce, EvalVal};
