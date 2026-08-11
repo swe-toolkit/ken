@@ -19,8 +19,8 @@ use ken_kernel::Term;
 
 use seal2_support::{
     assert_confined, carrier_closure, catalog_package_files, catalog_root_facts, closed_producers,
-    conservative_deep_producers, head_only_producers, reaching_roots, result_type_produces,
-    synthetic_facts, ALLOWED_SECTIONS,
+    conservative_deep_producers, enumerate_producer_types, head_only_producers, reaching_roots,
+    result_type_produces, synthetic_facts, ALLOWED_SECTIONS,
 };
 
 const BUFFER_KEN_MD: &str =
@@ -168,8 +168,38 @@ fn position_closure_holds_under_every_structural_former() {
 // AC-2 — namespace closure: class fields are enumerated (a second namespace).
 // ===========================================================================
 
+/// Durable invariant: the producer census independently retains the complete
+/// class-field population declared by this fixture, while the distinct globals
+/// population remains live. Emptying or bypassing the class-entry enumeration
+/// loses both class-field rows without affecting the globals discriminator.
+#[test]
+fn class_entry_view_preserves_the_seal2_producer_population() {
+    let mut env = ElabEnv::empty().expect("prelude");
+    env.elaborate_decl("class CensusProbe A { first : A → BufferSpan; second : A → Bool }")
+        .expect("class with two census fields elaborates");
+
+    let producers = enumerate_producer_types(&env);
+    let class_fields = producers
+        .iter()
+        .filter(|producer| producer.namespace == "class_field")
+        .map(|producer| producer.name.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        class_fields,
+        BTreeSet::from(["CensusProbe.first", "CensusProbe.second"]),
+        "the class-entry view must preserve every declared class-field producer"
+    );
+
+    assert!(
+        producers
+            .iter()
+            .any(|producer| producer.namespace == "globals" && producer.name == "CensusProbe"),
+        "the independent globals producer census must remain live"
+    );
+}
+
 /// A class field `unbox : A → BufferSpan` produces the carrier by projection,
-/// but lives in `class_env.classes[C].field_types`, never in `globals`. The
+/// but lives behind `class_env.class_entries()`, never in `globals`. The
 /// head-only oracle (globals-only) cannot see it at all; the closed oracle's
 /// structure-derived enumeration reaches the class-field namespace. (AC-2, AC-6
 /// — adversary S1 family B.)

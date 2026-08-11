@@ -175,9 +175,12 @@ pub struct ClassEnv {
 }
 
 impl ClassEnv {
-    /// Transitional read-only compatibility view. Removed before records land.
-    pub fn classes(&self) -> &HashMap<String, ClassInfo> {
-        &self.classes
+    /// Enumerate every registered class through the storage-independent
+    /// borrowed view.
+    pub fn class_entries(&self) -> impl Iterator<Item = ClassView<'_>> + '_ {
+        self.classes
+            .iter()
+            .map(|(owner_name, info)| info.view(owner_name))
     }
 
     pub fn class(&self, name: &str) -> Option<ClassView<'_>> {

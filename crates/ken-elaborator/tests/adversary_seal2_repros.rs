@@ -166,7 +166,7 @@ fn wrapped_return_is_seen_by_the_closed_oracle() {
 }
 
 /// S1 family (B): an unenumerated namespace. Class field types live in
-/// `class_env.classes[C].field_types` and are source-reachable by `d.field`
+/// `class_env.class_entries()` and are source-reachable by `d.field`
 /// projection; they never enter `globals`.
 ///
 /// Was: `gap_class_field_producer_is_invisible_to_landed_oracle` — asserted the
