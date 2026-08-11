@@ -8791,9 +8791,9 @@ fn build_static_continuation_fusion_plan(
 /// descriptor, no key and no interning here, and none may be added: those are
 /// `D2h`.
 ///
-/// PRODUCTION planner state. It survives a non-test Runtime build because
-/// `D2f` consumes it as a fixed input; the `allow` records that its consumer
-/// does not exist yet, not that the type is test scaffolding.
+/// PRODUCTION planner state, consumed by the `D2h` key plane above it. The
+/// `allow` covers the chain's top -- `D2f` has not been built -- and records
+/// nothing about this type being test scaffolding, which it is not.
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct StaticContinuationFusionCandidate {
@@ -8888,16 +8888,21 @@ fn fusion_through_checked_wrappers(
 /// reconstructs a seed, scans a worker body, runs a parallel fixed point, or
 /// changes terminal traversal.
 ///
+/// ## Who consumes it
+///
+/// [`build_static_continuation_fusion_plan`] -- the `D2h` production key plane
+/// -- consumes it. Both are production planner state and neither is
+/// `#[cfg(test)]`, so this compiles into a non-test Runtime build.
+///
 /// ## What is still absent
 ///
-/// **No production caller.** The intended consumer is `D2h`'s key plane, which
-/// does not exist; this is reached by its control and by nothing else, and it
-/// is `#[cfg(test)]` so it cannot read as compiled-in.
+/// **It still mints nothing itself.** The id, the descriptor and the interning
+/// belong to the plane above it; a candidate here is established evidence
+/// rather than an identity, and that split is deliberate.
 ///
-/// **It mints nothing.** There is no id, no descriptor, no key and no
-/// interning -- those are `D2h`, and a candidate here is established evidence
-/// rather than an identity. **No emission, ABI or edge redirection exists**, and
-/// no `R3` row is claimed green.
+/// **No emission, ABI or edge redirection exists** -- those are `D2f`, and the
+/// plane is their fixed input rather than their beginning. No `R3` row is
+/// claimed green.
 ///
 /// ## The gates, each declining rather than guessing
 ///
@@ -9037,13 +9042,15 @@ fn enumerate_live_fusion_candidates(
     Ok(candidates)
 }
 
-/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the root source a future fusion
-/// enumerator MUST consume.**
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the root source fusion enumeration
+/// consumes.**
 ///
-/// [`enumerate_live_fusion_candidates`] consumes this, and is exercised by a
-/// committed reaching control. What is still absent is a PRODUCTION caller: the
-/// intended one is `D2h`'s key plane, which does not exist yet, so nothing on a
-/// compiled path reads this today.
+/// [`enumerate_live_fusion_candidates`] consumes this, and the `D2h` production
+/// key plane consumes that. All three are production planner state, so this
+/// chain compiles into a non-test Runtime build.
+///
+/// What has no consumer yet is the plane at the top: `D2f` is its fixed input
+/// and has not been built.
 ///
 /// No seed-only path has been removed, because no such path exists on this
 /// branch to remove -- the seed frontier is excluded here by construction
@@ -15555,14 +15562,15 @@ mod tests {
         );
     }
 
-    /// `D2i` — the ROOT SOURCE a future fusion enumerator must consume is the
-    /// admitted ledger, and it is strictly richer than the seed frontier.
+    /// `D2i` — the ROOT SOURCE fusion enumeration consumes is the admitted
+    /// ledger, and it is strictly richer than the seed frontier.
     ///
-    /// [`enumerate_live_fusion_candidates`] consumes this helper and is reached
-    /// by its own control below. Nothing in PRODUCTION reads either yet -- the
-    /// intended caller is `D2h`'s key plane -- and no seed-only path has been
-    /// removed. What is established here is which roots the enumerator walks,
-    /// and why the obvious alternative is wrong.
+    /// [`enumerate_live_fusion_candidates`] consumes this helper, and the `D2h`
+    /// production key plane consumes that; all three are production planner
+    /// state. No seed-only path was ever removed, because none existed on this
+    /// branch to delete -- the seed frontier is excluded by construction. What
+    /// is established here is which roots the enumerator walks, and why the
+    /// obvious alternative is wrong.
     ///
     /// The equality below is an ALIAS OBSERVATION, not a causal control: the
     /// helper is defined as the ledger, so it can only agree with it. It is kept
