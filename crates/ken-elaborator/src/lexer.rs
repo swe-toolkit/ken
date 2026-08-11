@@ -723,7 +723,7 @@ impl<'s> Lexer<'s> {
         if exp.is_empty() { return Err(ElabError::ParseError { msg:"hex float exponent requires digits".into(), span:Span::new(start,self.pos)}); }
         let mant = BigInt::parse_bytes(digits.as_bytes(),16).unwrap();
         let binary_exp = sign.checked_mul(exp.parse::<i32>().map_err(|_| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?).and_then(|e| e.checked_sub(4 * frac)).ok_or_else(|| ElabError::ParseError { msg:"hex exponent out of range".into(), span:Span::new(start,self.pos) })?;
-        let value = hex_mantissa_to_f64(&mant, binary_exp).ok_or_else(|| ElabError::ParseError { msg:"hex float out of range".into(), span:Span::new(start,self.pos) })?;
+        let value = Self::hex_mantissa_to_f64(&mant, binary_exp).ok_or_else(|| ElabError::ParseError { msg:"hex float out of range".into(), span:Span::new(start,self.pos) })?;
         Ok((Token::FloatLit(value), Span::new(start,self.pos)))
     }
 
@@ -746,7 +746,7 @@ fn hex_mantissa_to_f64(m: &BigInt, shift: i32) -> Option<f64> {
         if q == (1u64 << 53) { q >>= 1; e += 1; }
     }
     if e > 1023 { return Some(f64::INFINITY); }
-    Some(f64::from_bits(((e + 1023) as u64 << 52) | (q & ((1u64 << 52) - 1))))
+    Some(f64::from_bits((((e + 1023) as u64) << 52) | (q & ((1u64 << 52) - 1))))
 }
 
     /// Lex the entire source into a token+span list (including the `Eof`
