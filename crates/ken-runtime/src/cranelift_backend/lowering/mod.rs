@@ -83,6 +83,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
     build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
     BodyEmissionDisposition, FusionOwnedBody, FusionRegionClaim, FusionRegionClaimLedger,
+    StaticContinuationFusionId, StaticContinuationFusionView,
     validate_oriented_subcontinuation_transport,
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
     AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
@@ -2637,6 +2638,21 @@ struct Lowering<'a> {
     /// the whole unit-definition pass so a token claimed at one producer
     /// occurrence cannot be claimed again at another.
     continuation_claims: Option<units::ContinuationClaimLedger>,
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`** — the fused-region claim
+    /// ledger, held across the whole unit-definition pass for the same reason
+    /// the continuation ledger above is: the redirect happens while defining the
+    /// consumer's Function and the takeover happens inside that same body, so a
+    /// region claimed at one seat cannot be claimed again at another.
+    ///
+    /// A separate ledger rather than an arm of `continuation_claims`. The two
+    /// are affine over **different** things — a causal call token versus a fused
+    /// region — and a single ledger would make "this token was spent" and "this
+    /// region was taken over" one exhaustion.
+    ///
+    /// `None` on a compile that never reached the emission seam; **empty rather
+    /// than absent** on a compile that reached it with no fused region, which is
+    /// what keeps the zero case on the same path as the non-zero one.
+    fusion_claims: Option<FusionRegionClaimLedger>,
     /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`** — the binding-candidate
     /// ledger, a sibling of the claim ledger on the same artifact lifetime.
     continuation_candidates: Option<units::ContinuationCandidateLedger>,
@@ -6257,14 +6273,145 @@ impl<'a> Lowering<'a> {
                     "retained body {body_origin:?} has no graph-derived call target in this unit"
                 ))
             })?;
-        self.call_declared_unit_target(
-            builder,
-            target,
-            inputs,
-            #[cfg(test)]
-            launch_ingress,
-        )
-        .map(|(operand, _inst)| operand)
+        // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — the redirected invocation's
+        // EXTRA operands.
+        //
+        // The fused frame is the producer's parameter run **plus** the
+        // consumer's ordered continuation inputs, because the suffix now runs
+        // inside the callee and needs the environment it used to have in the
+        // caller. The source invocation passes only the producer's run, so the
+        // remainder is supplied here — at the one seat that knows the call was
+        // redirected.
+        //
+        // `None` is the ordinary path and is not the same as `Some(vec![])`:
+        // the first means this seat has no fused region, the second means it has
+        // one whose suffix needs nothing beyond the producer's operands. Both
+        // occur, and collapsing them would let a claim's arity failure read as
+        // an unfused call.
+        match self.fused_redirect_inputs(body_origin)? {
+            None => self
+                .call_declared_unit_target(
+                    builder,
+                    target,
+                    inputs,
+                    #[cfg(test)]
+                    launch_ingress,
+                )
+                .map(|(operand, _inst)| operand),
+            Some(continuation_inputs) => {
+                let mut all = inputs.to_vec();
+                all.extend(continuation_inputs);
+                self.call_declared_unit_target(
+                    builder,
+                    target,
+                    &all,
+                    #[cfg(test)]
+                    launch_ingress,
+                )
+                .map(|(operand, _inst)| operand)
+            }
+        }
+    }
+
+    /// **`D2f` — the ordered continuation-input operands one redirected
+    /// invocation must append, resolved in the caller being defined.**
+    ///
+    /// **Each input is resolved through the LANDED entry-frame membership
+    /// gate**, not through a rule respelled here.
+    /// `verify_predeclared_entry_frame_membership` is `D3b`'s authority on
+    /// whether a predeclared frame really declares a member for a coordinate at
+    /// a slot; calling it means the fused call and every other consumer of an
+    /// entry-frame coordinate answer that question the same way, and a later
+    /// change to the rule reaches this seat too.
+    ///
+    /// **Both non-serviceable shapes refuse rather than defaulting.** A
+    /// `ProducerLocal` coordinate names a mid-body value, and this seat holds an
+    /// ABI operand run and no lexical environment — the same refusal
+    /// `resolve_context_capture_claim` makes, for the same reason. An `EntryAbi`
+    /// coordinate naming a frame other than the one being defined names an
+    /// operand run this caller does not hold. Substituting a plausible operand
+    /// for either would pass the callee a word from the wrong frame.
+    fn fused_redirect_inputs(
+        &mut self,
+        seat: StaticOriginId,
+    ) -> Result<Option<Vec<LoweringOperand>>, CraneliftBackendError> {
+        let Some(defining) = self.defining_unit else {
+            return Ok(None);
+        };
+        let Some(ledger) = self.fusion_claims.as_ref() else {
+            return Ok(None);
+        };
+        let mut matched = ledger.planned().iter().copied().filter(|fusion| {
+            ledger
+                .claim(*fusion)
+                .is_some_and(|claim| claim.seat() == seat && claim.consumer_owner() == defining)
+        });
+        let Some(fusion) = matched.next() else {
+            return Ok(None);
+        };
+        if matched.next().is_some() {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "two installed fused regions claim one redirected invocation seat in one unit, so \
+                 which region's continuation inputs this call passes is undetermined",
+            ));
+        }
+        let authorities = ledger
+            .claim(fusion)
+            .expect("the claim was present at the filter above")
+            .inputs()
+            .to_vec();
+        let mut resolved = Vec::with_capacity(authorities.len());
+        for authority in authorities {
+            let ContinuationSourceCoordinate::EntryAbi {
+                source_owner,
+                source_abi_position,
+                ..
+            } = authority.coordinate
+            else {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    "a fused region's continuation input names a producer-local coordinate; the \
+                     redirected call seat holds an entry ABI operand run and no lexical \
+                     environment, so there is no operand to pass and this refuses rather than \
+                     indexing one run with the other's index",
+                ));
+            };
+            if source_owner != defining {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    format!(
+                        "a fused region's continuation input names entry frame {source_owner:?}, \
+                         which is not the frame making the redirected call ({defining:?}); its \
+                         declared position indexes an operand run this caller does not hold"
+                    ),
+                ));
+            }
+            verify_predeclared_entry_frame_membership(
+                &self.static_transition_plan,
+                source_owner,
+                authority.coordinate,
+                source_abi_position,
+            )?;
+            let operand = self
+                .function_local
+                .defining_abi_operands
+                .get(source_abi_position as usize)
+                .ok_or_else(|| {
+                    unsupported(
+                        "StaticContinuationFusion",
+                        format!(
+                            "a fused region's continuation input names entry ABI position {} \
+                             outside the calling function's {} operands",
+                            source_abi_position,
+                            self.function_local.defining_abi_operands.len(),
+                        ),
+                    )
+                })?
+                .clone();
+            resolved.push(operand);
+        }
+        Ok(Some(resolved))
     }
 
     /// **`RT-DECL-CLOSURE-PORT` `D4` — the call at a `DeclarationRef`, with its
