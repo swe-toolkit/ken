@@ -361,6 +361,29 @@ the state this witness is in.
 node, no re-review of `aa3b78f8`. Same file family, active ring, and it is
 cheaper than the grep that found it.
 
+## `e4531318` — APPROVED, THEN WITHDRAWN UNPUBLISHED. Not a dropped merge.
+
+Deliverable 0's first candidate `e45313180eb6404a309df0d0234a686c2d239405`
+(one commit, five `ken-runtime` paths, `+323/-5`) reached a **resolved APPROVE**
+— `dec_5x9mfj08wfftt`, Architect `evt_79wp5r4wj64jz`, QA `evt_3gpsy11vbr0pn` —
+and was routed to the Steward for publication. **It was withdrawn by
+runtime-leader before the publisher ran** (`evt_2yr8wqjknbmvs`), on Architect
+ruling `evt_6907h4rv5kq1a`. **It never became a PR and nothing was reverted.**
+
+**Why, and it is not a defect in the candidate.** The Architect's own words: it
+**remains a sound identity-plane partial**, but its **bare-root observation
+cannot carry into emitter acceptance.** The gate observed the bare
+`DeclarationRef`, and root projection stops there at `Unsupported(Closure)` — so
+that shape **cannot reach the definition movement Deliverable 0 exists to
+prove.** A positive that cannot reach the claimed movement is not a positive.
+
+**`dec_5x9mfj08wfftt` is spent on `e4531318` alone.** The applied-root recut
+needs **fresh QA and Architect review**; no coordinate and no vote carries.
+
+⇒ **This is the accepted-partial policy working, not failing.** The candidate was
+correct for the claim it made and merging it would have put a bare-root baseline
+on `main` under a deliverable whose successor must not use one.
+
 **Also fold: record where the "sole production compile path" claim is
 established.** That question has been open across all three `D2f` partials. The
 enumeration was performed once by the implementer during grounding and lives
