@@ -22,7 +22,11 @@ scope ruling `evt_2vfgg71s847ns` as corrected by Architect ruling
 > record of what was once owed:**
 >
 > - the **source-side provenance mutations** (Deliverable 1's third column),
-> - the **six planner-valid refusals** (Deliverable 3).
+> - **five** planner-valid refusals, plus the **segment-owner provenance and
+>   non-aliasing disposition** (Deliverable 3). **Recounted from six by
+>   Architect ruling `evt_cnwn4y5xykg1`, 2026-08-11** — the sixth category is a
+>   structural non-refusal, and the earlier wording would have required
+>   inventing a second owner-rejection mechanism. See that deliverable.
 >
 > ### What Deliverable 2 cost, and the lesson belongs in Deliverable 1
 >
@@ -183,17 +187,42 @@ source. **This discharges the ordered-input row of Deliverable 1**, and any
 other row it can reach — but it discharges those rows **only where you write
 the assertion**, per the owner-claim lesson in the header block.
 
-### 3. The six relocated pre-interning refusals
+### 3. Five relocated pre-interning refusals, plus one provenance disposition
 
-Frame, selected slot, invocation, exact suffix, call identity, and segment
-owner — each **independently** reaching no id and no descriptor.
+> **CORRECTED 2026-08-11 by Architect ruling `evt_cnwn4y5xykg1`. This
+> deliverable said "six refusals" and that was wrong.** The sixth category —
+> segment owner — is a **structural non-refusal**, and demanding a refusal for
+> it would have forced the ring to invent a second owner-rejection mechanism
+> that production does not have and should not have. The corrected shape is
+> below; the ruling is the authority, not this frame's earlier wording.
 
-These relocated on measurement, not estimate: Runtime enumerated
+**The five that are refusals.** Frame, selected slot, invocation, exact suffix,
+and call identity — each **independently** reaching no id and no descriptor.
+
+**The sixth is a segment-owner provenance and non-aliasing disposition, not a
+rejection.** A source program coherently re-homed under a different owner
+**determines a different complete key and is not rejected for it.** Production
+derives `producer_owner` from `occurrence_authority(producer_construct_origin)`
+and `consumer_owner` from `occurrence_authority(continuation_origin)`; both are
+members of the closed key, and `rederive_fusion_key` rebuilds them before
+whole-key equality. **Forcing a coherent re-home to mint nothing would add an
+undocumented topology restriction.** An *incoherent* owner value exists only as
+a mutated key or an inconsistent plan artifact — that is `D2h`'s landed
+interner/validator or oriented-plan validation, and it is not this node's.
+
+**Why the wrapper-removal test does not count as the sixth refusal.** Removing
+the outer `LexicalClosure` removes the consumer unit's two-entry ABI floor. It
+does **not** transplant the producer out of its inner closure, does not
+collapse `producer_owner != consumer_owner`, and does not invalidate the
+checked transport, exact suffix, or Call. **The surviving one-key/empty-input
+result is the lawful `D2h`-shaped projection, not a missed rejection.**
+
+The five relocated on measurement, not estimate: Runtime enumerated
 `ContinuationProductionMutation` on exact `1139e0be` and its complete variant
 set is `Exact`, `ResultLifetimeProxy`, `ConstructorFieldCountPrefix`,
-`DescriptorOrdinalSources`, and `DescriptorInputCountTruncation` — **none of the
-six.** So each needs a planner-valid transplant, which is why they are here and
-not in `D2h`.
+`DescriptorOrdinalSources`, and `DescriptorInputCountTruncation` — **none of
+them.** So each needs a planner-valid transplant, which is why they are here
+and not in `D2h`.
 
 **These are the `D2b`/`D2d` inheritance.** They are what separates an identity
 from a value that happens to be unique in the measured population, and that is
@@ -233,9 +262,24 @@ the count stated in the claim. This is the row the node exists for.
 > row can be discharged rather than merely owed. **The witness is the
 > precondition, not the discharge.**
 
-**AC-3 — the six refusals each reach no id and no descriptor, independently.**
+**AC-3 — the FIVE refusals each reach no id and no descriptor,
+independently.** Frame, selected slot, invocation, exact suffix, call identity.
 Baseline mints exactly one identity first, so each zero is a change rather than
 the fixture's resting state. Earlier `D2g`/`D2i` controls do not substitute.
+
+**AC-3a — the segment-owner disposition is a comparator, not a refusal.**
+Relabel the wrapper-removed test as the coherent re-home/projection
+comparator, and strengthen it to:
+
+- compare the exact and re-homed keys' **owner pairs**, and
+- assert **at least one owner member changes**, and
+- **re-assert each owner against its own plan's `occurrence_authority`**, and
+- retain the measured candidate-survives / input-run-collapses result.
+
+**Do not compare the two planes' numeric ID `0` values**, do not extend `D2h`'s
+interner matrix, and do not add an eighth fact or an enumerator gate. **A
+control asserting that a re-home is rejected is the wrong control** — it
+asserts a behavior production does not have.
 
 **AC-4 — source-side, not key-side.** No row is discharged by mutating a key
 struct. If a row can only be reached that way, it belongs to `D2h`'s
