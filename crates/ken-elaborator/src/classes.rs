@@ -186,6 +186,12 @@ impl ClassEnv {
             .map(|(owner_name, info)| info.view(owner_name))
     }
 
+    pub fn projection_by_type_id(&self, id: GlobalId) -> Option<ProjectionView<'_>> {
+        self.classes.iter().find_map(|(owner_name, info)| {
+            (info.type_id == id).then(|| info.view(owner_name).projection)
+        })
+    }
+
     pub fn register_class(&mut self, name: String, info: ClassInfo) {
         self.classes.insert(name, info);
     }
