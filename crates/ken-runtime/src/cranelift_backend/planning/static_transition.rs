@@ -535,6 +535,20 @@ pub(in crate::cranelift_backend) enum ContinuationEmissionOwner {
     /// The generated execution context of an interned specialization emits this
     /// call. The raw body's predeclared owner remains **provenance only**.
     Specialization(ContinuationSpecializationId),
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`.** A planner-interned static
+    /// continuation fusion emits this call from the generated region it owns.
+    ///
+    /// The fused region is a **third thing**: not the original producer's owner
+    /// and not the consumer's. `D2d`'s grounding record measured those two, and
+    /// naming either of them here would make the generated region's emissions
+    /// indistinguishable from the source units it was fused out of.
+    ///
+    /// The domain rule above binds this variant too: a
+    /// [`StaticContinuationFusionId`] is never cast into, or aliased with, a
+    /// `PredeclaredFunctionId` or a `ContinuationSpecializationId`. The three
+    /// interners are independent and each may lawfully issue local id `0`, so a
+    /// bare numeric comparison across them is not an identity test.
+    Fusion(StaticContinuationFusionId),
 }
 
 /// Dense identity of one planner-interned generated producer execution context.
@@ -547,11 +561,30 @@ pub(in crate::cranelift_backend) enum ContinuationEmissionOwner {
 /// continuation inputs still live).
 ///
 /// ⚠ [`ContinuationEmissionOwner`] deliberately does **not** gain a variant for
-/// this. `Specialization(id)` already names the emitting context uniquely: a
-/// specialization has exactly one selected worker body, so
+/// **this** class. `Specialization(id)` already names the emitting context
+/// uniquely: a specialization has exactly one selected worker body, so
 /// `(specialization, worker_body_origin)` — the context key — is determined by
-/// the specialization alone. Adding a fourth owner class would give the same
+/// the specialization alone. An owner variant for a context would give the same
 /// context two names, and the claim ledger's affinity is keyed on the owner.
+///
+/// ⚠ **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — read the paragraph above as
+/// scoped to `ContinuationContextId`, which is all it ever established.**
+/// [`ContinuationEmissionOwner`] now carries a third variant,
+/// [`ContinuationEmissionOwner::Fusion`], and that is not in tension with it:
+/// the argument here is *"a context is already determined by its
+/// specialization"*, and a static continuation fusion is not. Its identity is
+/// the complete [`StaticContinuationFusionKey`], no member of which is derivable
+/// from a specialization — the fused region is neither the producer's owner nor
+/// the consumer's, so no existing variant names it.
+///
+/// **The stated consequence survives the correction and is real work.** Ledger
+/// affinity keys on the owner, so a third variant widens what that key ranges
+/// over: every affinity comparison must be over the whole
+/// [`ContinuationEmissionOwner`] value, never over an extracted inner id, since
+/// the four id domains are independent interners that each issue local `0`.
+/// Comparing owners as enum values is what keeps affinity total across the
+/// widened domain; comparing inner integers would silently identify a fusion
+/// with a predeclared unit.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub(in crate::cranelift_backend) struct ContinuationContextId(u32);
@@ -6064,6 +6097,18 @@ fn continuation_owner_entry_sources(
                     AbiUnitDefinition::ContinuationSpecialization { .. } => {
                         return Err(planner_error(
                             "a dormant continuation specialization cannot source another planner environment",
+                        ));
+                    }
+                    // `D2f`: this arm asks a fusion region to be the SOURCE of
+                    // another unit's continuation environment. That is the lane
+                    // the ruling's stop condition names — a fused region's
+                    // locals are its activation, and sourcing them out would be
+                    // activation state crossing the descriptor boundary. It
+                    // refuses on the class, not on the absence of an emitter.
+                    AbiUnitDefinition::StaticContinuationFusion { .. } => {
+                        return Err(planner_error(
+                            "a static continuation fusion cannot source another planner \
+                             environment; its region keeps its activation local",
                         ));
                     }
                 }
@@ -23565,7 +23610,10 @@ mod tests {
                 }
                 AbiUnitDefinition::ClosureBody { .. }
                 | AbiUnitDefinition::CallableDeclaration { .. }
-                | AbiUnitDefinition::ContinuationSpecialization { .. } => None,
+                | AbiUnitDefinition::ContinuationSpecialization { .. }
+                // `D2f`: a fusion region is not a scheduling entry, so it is
+                // outside the population this census measures.
+                | AbiUnitDefinition::StaticContinuationFusion { .. } => None,
             })
             .collect::<Vec<_>>();
         assert_eq!(
@@ -23629,7 +23677,11 @@ mod tests {
                     Some(unit.header().captures)
                 }
                 AbiUnitDefinition::SchedulingEntry { .. }
-                | AbiUnitDefinition::ContinuationSpecialization { .. } => None,
+                | AbiUnitDefinition::ContinuationSpecialization { .. }
+                // `D2f`: grouped with the `None` arm because a fusion region
+                // declares no captures -- a property of the class, so no later
+                // fusion unit has captures to be silently dropped here.
+                | AbiUnitDefinition::StaticContinuationFusion { .. } => None,
             })
             .collect::<Vec<_>>();
         assert_eq!(capture_counts, vec![2]);
@@ -23657,7 +23709,11 @@ mod tests {
                     Some(unit.header().captures)
                 }
                 AbiUnitDefinition::SchedulingEntry { .. }
-                | AbiUnitDefinition::ContinuationSpecialization { .. } => None,
+                | AbiUnitDefinition::ContinuationSpecialization { .. }
+                // `D2f`: grouped with the `None` arm because a fusion region
+                // declares no captures -- a property of the class, so no later
+                // fusion unit has captures to be silently dropped here.
+                | AbiUnitDefinition::StaticContinuationFusion { .. } => None,
             })
             .collect::<Vec<_>>();
         assert_eq!(
@@ -24269,6 +24325,13 @@ mod tests {
                 AbiUnitDefinition::ClosureBody { .. } => "ClosureBody",
                 AbiUnitDefinition::ContinuationSpecialization { .. } => {
                     "ContinuationSpecialization"
+                }
+                // `D2f`: named rather than filtered, so the census stays a
+                // TOTAL classification of the planned population. Absorbing the
+                // class into another label is how a new unit class becomes
+                // invisible to the very control that measures the population.
+                AbiUnitDefinition::StaticContinuationFusion { .. } => {
+                    "StaticContinuationFusion"
                 }
             })
             .collect::<Vec<_>>();

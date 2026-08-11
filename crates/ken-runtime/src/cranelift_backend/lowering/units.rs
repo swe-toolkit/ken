@@ -2675,7 +2675,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                     }
                 }
             }
-            let context_converts = source_body_binding_order(context.raw_owner_definition);
+            let context_converts = source_body_binding_order(context.raw_owner_definition)?;
             if context_converts {
                 context_parameters.reverse();
                 #[cfg(test)]
@@ -4279,16 +4279,36 @@ pub(in crate::cranelift_backend) fn srcbody_bind_order_take()
     SRCBODY_BIND_ORDER.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — this became fallible for the
+/// fusion arm, and `false` would have been the wrong answer rather than a safe
+/// one.**
+///
+/// The other four arms answer from a property of their class that is already
+/// settled. A static continuation fusion's binding order is not: it is decided
+/// by how the emitter builds the generated definition's environment, and
+/// `D2f`'s scoped source-body authorities are the successor seam. Answering
+/// `false` here would pick one of the two orders for a class whose environment
+/// nothing constructs yet, and the wrong pick is silent — it reverses an
+/// operand run rather than failing.
 pub(in crate::cranelift_backend) fn source_body_binding_order(
     definition: AbiUnitDefinition,
-) -> bool {
-    match definition {
+) -> Result<bool, CraneliftBackendError> {
+    Ok(match definition {
         AbiUnitDefinition::CallableDeclaration { .. } | AbiUnitDefinition::ClosureBody { .. } => {
             true
         }
         AbiUnitDefinition::SchedulingEntry { .. }
         | AbiUnitDefinition::ContinuationSpecialization { .. } => false,
-    }
+        AbiUnitDefinition::StaticContinuationFusion { .. } => {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "a static continuation fusion unit reached environment construction, but its \
+                 source-body binding order is the emitter's to establish and no generated \
+                 definition exists; RT-LEXICAL-RECURSOR-CONSUMERS D2f refuses rather than \
+                 choosing an operand order for it",
+            ));
+        }
+    })
 }
 
 fn define_unit_body<M: Module>(
@@ -4650,7 +4670,7 @@ fn define_unit_body<M: Module>(
         // `validate_slot_run` proves the Parameter run is a contiguous prefix
         // of the Capture run, so concatenating the two IS the descriptor order
         // — which is what the non-source arms below must keep byte-identically.
-        let converts = source_body_binding_order(unit.definition);
+        let converts = source_body_binding_order(unit.definition)?;
         if converts {
             parameters.reverse();
             #[cfg(test)]

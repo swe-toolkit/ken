@@ -86,6 +86,28 @@ arrived. The control now establishes the denominator **first and alone**, and
 reads the equality off a value that exists only because of it. Relations
 throughout; no count pinned.
 
+### 5.1 The rider reached a second control — `D2f`, 2026-08-11
+
+The durability rider was folded at
+`d5a_a_specialization_owned_edge_separates_root_provenance_from_its_immediate_slot`
+(`lowering/core/tests/control.rs`), which `D2f`'s ABI-class increment had to
+touch for its own reason. **That control carried the exact shape this section
+repairs, in a different file**: two per-input equalities asserted inside the
+loop over the planned units, guarded afterwards by a separate
+`assert!(predeclared > 0, …)`.
+
+The guard was removable without breaking anything — delete it and both
+equalities still compile and still pass on an empty unit population. The rows
+are now collected in the loop and the equalities asserted below, ranging over a
+count constructed by `NonZeroUsize::new(...).expect(...)`, so removing the
+non-zero check is a compile error rather than a silent pass.
+
+**Stated as the rider's reach, not as a new claim about `D2a`'s own control.**
+Nothing in §5 above changed; what changed is that a second control now has the
+same structural form. **The finding worth carrying is that this shape does not
+live in one place** — it was found by editing an unrelated match arm in the same
+function, which is not a search anyone ran.
+
 ## 6. Guards
 
 `AC-3`'s five guards are intact. Neither the constructor guard nor the
