@@ -12957,11 +12957,17 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 // the field carries. Recognizing a worker is what creates the
                 // obligation, so the obligation is recorded at recognition and
                 // not at any later point that could be skipped.
-                self.static_worker_fields
-                    .recognize(static_origin, position, field_origin, constructor);
+                let recognition = self.static_worker_fields.recognize(
+                    static_origin,
+                    position,
+                    field_origin,
+                    constructor,
+                    self.defining_function_id,
+                )?;
                 fields.push(ConstructorField::StaticWorker {
                     binding,
                     field_origin,
+                    recognition,
                 });
                 continue;
             }
