@@ -304,6 +304,55 @@ not from a fixture.
 - **`D0`'s plane and refusal rows are retained**, along with this frame's guard
   controls. `AC-8` is added to them, not substituted for them.
 
+> ### ROUTED IN FROM `D2k` — 2026-08-12, Steward split under `evt_290zp8kxn9jbs`
+>
+> The Architect rebound `D2k`'s `AC-1` and delegated the resulting split. **Two
+> obligations land here**, in the frame rather than as a cross-post, because
+> this node is where the mechanism that can discharge them lives. **This node
+> was carved out of `RT-LEXICAL-RECURSOR-CONSUMERS` for exactly this reason** —
+> its own title says leaving the expression in the parent while moving the
+> machinery *"would give the parent an AC it cannot discharge."* That is what
+> happened anyway, and this is the correction.
+>
+> **`AC-9` — the semantic effect, which `D2k` cannot prove.** `D2k`'s rebound
+> criterion asks a checked positive to exhibit **one recognition-to-rebind
+> transition, one exact consumer, and one suffix execution**. All three are
+> properties of an **installed** fusion, and installation is gated at
+> `lowering/core.rs:2231-2235` behind `D2F_EMITTER_ARMED: false` — which this
+> node owns and `D2k` may not touch. `AC-2` already carries the fourth
+> obligation (the restored refusal on suppression); these three join it.
+> *Control:* asserted from the armed production compile alongside `AC-8`, not
+> from a fixture, and each transition named rather than inferred from a
+> non-zero count.
+>
+> **`AC-10` — route coverage on BOTH hole placements, or the route stays open.**
+> The ruling requires acceptance to exercise every structural route the campaign
+> claims, **before-hole and after-hole**, and forbids citing a checked twin for
+> a route it does not execute.
+>
+> **Measured at `dec2e0c7`, and it is why this cannot be discharged by
+> citation:** `D2jCause` has eight variants — `Exact`, `Frame`, `SelectedSlot`,
+> `Invocation`, `ExactSuffix`, `CallIdentity`, `ReHomed`, `ProducerArity` — and
+> **none of them is a hole placement**. `d2j_entry_under` builds a
+> `DeclarationRef` to `D2J_DECLARATION` applied to two `MkUnit` arguments, and
+> the whole `D2j` fixture region contains no `Px8jSelectedScopePlacement` token.
+> The hole axis exists **only** on the `px8j` **seed** family in
+> `lowering/core/tests/control.rs` — the unmarked lane that resolves zero.
+>
+> ⇒ **Neither hole route has a checked positive today — not one missing, both.**
+> `AC-1`'s `D2j` twin is qualified to the route it actually executes and stands
+> in for neither. Authoring lawful checked positives for the two placements is
+> **new fixture population and is in scope for this node**; a route with no
+> lawful positive **remains open** rather than passing by citation. *Control:*
+> for each placement, the positive resolves its own key and the suppression
+> control reproduces its own refusal — a shared control across placements
+> discharges one of them at most.
+>
+> **Not blocking, flagged to the Architect:** that his requirement 1 presupposes
+> an armed emitter is the Steward's reading. If he intends the semantic effect
+> to be provable without installation, `AC-9` returns to `D2k` and this node
+> keeps `AC-10` alone.
+
 ## 7. Excluded scope
 
 - **Retirement of the residual class and any lane deletion.** That is
