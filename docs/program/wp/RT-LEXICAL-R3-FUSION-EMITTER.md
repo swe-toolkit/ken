@@ -252,6 +252,89 @@ increment to carry it.
 > commits with separate handbacks to the leader. This adds no review hop and no
 > new party.
 
+> ### `DP-0` — THE RETIREMENT INSTRUCTION SCHEDULES A LIVE PROHIBITION FOR DELETION
+>
+> **Added 2026-08-12 from Adversary `evt_h0mzz2y4666b`. All three findings
+> verified at the landed source before framing, not accepted on report.**
+> Comment-only, one file, `lowering/core.rs`. Released ahead of `DP`, which is
+> stopped on an open Architect relation ruling. **Do not fold this into `DP`,
+> and do not touch `DP`'s population.**
+>
+> **This repairs my own ask.** The retirement clause exists because I required
+> one on the previous partial: a tree-state claim must name its falsifier and
+> its owner, since nothing reddens when it expires. That was right. **The
+> scoping words I accepted were not.**
+>
+> **FINDING 1 — the deletion region is over-broad, and the excess is the safety
+> content.** The clause says `D1`/`D2` landing makes *"every sentence above
+> false"* and that this node owns *"deleting this block"*. `D1`/`D2` falsify
+> **the measurement** — the guard stops being unreached. They falsify neither
+> of these, both of which sit above the clause and therefore inside the region
+> marked for deletion:
+>
+> - **`core.rs:2234`** — *"Architect `evt_1q7v9fcw5hd87`; the answer is the
+>   node's `DP`"*
+> - **`core.rs:2238`** — *"A fusion-only admission of the guard, and copying or
+>   inferring the consumer's identity onto the producer, are both ruled
+>   **unlawful** rather than merely out of scope."*
+>
+> **Measured at `8b142d01`: `git grep evt_1q7v9fcw5hd87` over `crates/` returns
+> exactly one hit, line 2234, and the `unlawful` prohibition appears once, at
+> 2238. This block is the only in-tree record of both.**
+>
+> ⇒ **The prohibition is scheduled for deletion at precisely the moment it
+> becomes relevant.** `D1`/`D2` landing is what makes the guard reachable,
+> which is when a successor meets the mixed-frame refusal and reaches for one
+> of the two shortcuts — and the sentence saying those shortcuts are *ruled
+> unlawful rather than merely out of scope* goes out in the same candidate, on
+> the instruction of the block it was written into. **Fail-open, and what
+> survives is the guard while what is lost is the record that two ways around
+> it were considered and refused.**
+>
+> **The cut to make is one the block already draws elsewhere**, between *"where
+> it stops now"* and *"ANSWERED, not open"*: **a measurement of a tree state
+> expires; a ruling about what is lawful does not.** Retire the first, keep the
+> second. If you instead keep a single region, it must name its boundary
+> explicitly — *"every sentence above"* and *"this block"* are the two phrases
+> doing the scoping today and **neither names one**.
+>
+> **FINDING 2 — a labelling convention applied to one of two neighbouring
+> claims.** Step 6 carries `MEASURED on the D0 gate's own compiles at
+> `21307d7f`` plus *"do not read a green suite as evidence either way"*. Step 5
+> carries nothing, is present tense, and reads as mechanism — but was written
+> from the held commit message and the node rather than from a compile. With
+> nothing labelled a reader is uniformly cautious; **with `MEASURED` four lines
+> away, the unlabelled neighbour reads as *this one did not need saying*.**
+> Establishing the convention raised the cost of the one omission. The existing
+> qualifier does not cover it: it opens a paragraph whose heading, body and
+> entire measured content are step 6. **One clause on the step-5 sentence
+> itself — held off `main`, not re-derived here — closes it.**
+>
+> **FINDING 3 — a stale population inside the one sentence this candidate
+> rewrote.** *"Arming it makes the `Exact` and `ReHomed` roots refuse at step
+> 5, which reds `d2f_0`."* **`d2f_0` has had three positive roots since
+> `7a018ef6`, three merges ago** — `control.rs:2859-2861` reads *"the three
+> positives, each on its own root"*, and `ProducerArity` sits in the same
+> assertion tuple. The candidate **edited this sentence** and carried the
+> two-root population forward unexamined.
+>
+> **Answer it by measurement, both branches informative:** does arming make
+> `ProducerArity`'s root refuse at step 5? **Yes** ⇒ the warning under-counts
+> the reds and the fix is one word. **No** ⇒ the third positive behaves
+> differently at step 5 from its two tuple-mates, which is a more interesting
+> fact than the sentence and belongs in it. **The sentence as written is the
+> only one of the three answers not supported.** Low severity — it errs toward
+> under-promising a red — but the same population is now cited from two files.
+>
+> **Refuted by the same pass, do not re-raise:** the `MEASURED` block's own
+> currency **holds**. Every changed line in the merged range is a `//` line, so
+> nothing executable moved under the pin between `21307d7f` and `8b142d01`.
+> Pinning a measurement to a SHA and then moving no code under it is the right
+> shape and it survived the check.
+>
+> **Excluded:** `DP`'s population, the relation ruling, mechanism, planner,
+> ABI, arming, AC/node credit, and the held `D1`/`D2`/`D3` range.
+
 ## 6. Acceptance criteria
 
 **AC-1 — the positive is a real full-pipeline compile.** The checked `D2j`
