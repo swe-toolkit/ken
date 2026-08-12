@@ -2525,20 +2525,35 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
     /// elimination.
     StaticWorkerCallConsumed { origin: StaticOriginId },
     /// `D2k-1c-0` — a static `Match` elimination descended over a constructor's
-    /// fields at one of the six binder sites, tagged with **which** site and
-    /// with the planner origin of the eliminating match occurrence.
+    /// fields, tagged with **which** site and with the planner origin of the
+    /// eliminating match occurrence.
     ///
-    /// **This is the deciding-read instrument, and its subject is the ROUTE,
-    /// not the static worker.** [`StaticWorkerBinderInstalled`] fires only for
-    /// a worker field, and on today's population that is never — every row
-    /// sits at zero installs behind the route gap, so no worker-keyed event can
-    /// see whether one occurrence is descended twice. This one fires for every
-    /// constructor field of every kind, so the multiplicity question is
-    /// measurable on the rows as they stand rather than only after the repair
-    /// that would make it matter.
+    /// **THE DURABLE POPULATION IS TWO REBIND CALLERS AND SIX DESCENT SITES**:
+    /// four reach [`Lowering::rebind`] through
+    /// [`Lowering::bound_constructor_fields`] and two through
+    /// [`Lowering::extend_constructor_fields`], both by way of the single
+    /// [`Lowering::constructor_field_bindings`]. The deciding read was posed
+    /// over the four `bound_constructor_fields` sites; the two
+    /// `extend_constructor_fields` sites reach the same chokepoint and the
+    /// witness landed on one of them, so a four-site reading of this instrument
+    /// is short by exactly the sites that mattered.
+    ///
+    /// **This is a ROUTE instrument, not a worker one.**
+    /// [`StaticWorkerBinderInstalled`] fires only for a worker field, and on
+    /// today's population that is never — every row sits at zero installs
+    /// behind the route gap. This one fires for every constructor field of
+    /// every kind, so descent multiplicity is measurable on the rows as they
+    /// stand. **Descent multiplicity is not field multiplicity**: repeated
+    /// descents of one eliminating match occurrence may traverse different
+    /// constructors, and rows 4 and 5 do.
     ///
     /// [`StaticWorkerBinderInstalled`]: D2kOwnerEvent::StaticWorkerBinderInstalled
     StaticMatchBinderDescent {
+        /// **A stable function-route name**, e.g.
+        /// `extend_constructor_fields@composed` — never a `file:line`. A line
+        /// label re-aims itself at an unrelated site on any edit above it and is
+        /// then green for the wrong reason, which is the defect this node
+        /// already found in `AC-2`'s own control. `1c-0c`.
         site: &'static str,
         eliminated_origin: StaticOriginId,
     },
@@ -2979,7 +2994,23 @@ enum ConstructorField {
         /// the planner on every non-nested fixture. Carrying the key on the
         /// field is what lets the elimination and the conservation ledger name
         /// the same occurrence without either of them inferring the relation.
+        ///
+        /// **Provenance, not identity.** It names the *occurrence*, and one
+        /// occurrence can be constructed more than once in a single compile —
+        /// `D2k-1c-0` measured `row1` doing it. `recognition` below is what
+        /// distinguishes those constructions.
         field_origin: StaticOriginId,
+        /// **`D2k-1c-0` — THIS constructed field, distinct from every other
+        /// construction of the same occurrence.**
+        ///
+        /// The template carries it so the static elimination that rebinds this
+        /// field transitions **this** recognition rather than "some recognition
+        /// with that origin". Without it, two constructions of one occurrence
+        /// were one ledger record, and a single rebind-and-consume closed green
+        /// with the second worker constructed and forgotten — the forbidden
+        /// fourth state, one link earlier in the chain than the transport
+        /// identity can see. Architect `evt_3manpp82emcq6`.
+        recognition: StaticWorkerRecognitionId,
     },
 }
 
@@ -3516,28 +3547,29 @@ struct StaticWorkerBinding {
     /// consumer, and it is the thing to check when asking whether `D8i` is
     /// still transport-only.
     discharge: ContinuationDischarge,
-    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i`** — the constructor field
-    /// this binding was rebound out of, or `None` if it was bound directly.
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1c-0`** — the TRANSPORT this
+    /// binding was rebound as, or `None` if it was bound directly.
     ///
-    /// **This is the OCCURRENCE key, and it is what makes conservation
-    /// one-to-one rather than a count.** A ledger that recorded recognized
-    /// fields but counted consuming calls in aggregate accepts a compile in
-    /// which one rebound field is dropped while another is called twice, or in
-    /// which an **unrelated pre-existing** static-worker call supplies the
-    /// tally. Architect `dec_2xxj1zrwmgjdb` rejected exactly that. Carrying the
-    /// planner's `child_static_origin(owner, position)` on the binding lets the
-    /// call arm name the entry it discharges, so a consumption can be matched
-    /// to a transport instead of merely counted against one.
+    /// **This is the identity of one transport, NOT of the field.** It was a
+    /// `field_origin` through `D2k-1b-i`, which was already the second tally in
+    /// a row: the planner origin identifies the *occurrence*, and `D2k-1c-0`
+    /// measured that one occurrence is descended more than once in a single
+    /// compile. So a field-keyed binding still could not say *which* of that
+    /// occurrence's transports a call discharged, and a per-origin balance let
+    /// transport #1 be consumed twice while transport #2 was dropped. The
+    /// planner origin survives as provenance inside the ledger; the thing the
+    /// binding carries is the transport. Architect `evt_2npnrzesz3t65`.
     ///
     /// **`None` is a real state, not a missing value:** every pre-existing
     /// construction site produces it, and a call consuming such a binding
-    /// touches no ledger entry at all. That is what keeps an ordinary worker
-    /// call from paying a constructor field's debt.
+    /// discharges nothing at all. That is what keeps an ordinary worker call
+    /// from paying a transported field's debt.
     ///
-    /// ⇒ Compiler-side identity only. It is a planner-owned `StaticOriginId`,
-    /// not a runtime word, tag, descriptor or carrier, and recording it creates
-    /// no planner population.
-    transported_field: Option<StaticOriginId>,
+    /// ⇒ Compiler-side bookkeeping only. It is an opaque compile-local
+    /// identity, **not** a runtime word, tag, descriptor, carrier or callable
+    /// identity, it is never emitted, and recording it creates no planner
+    /// population.
+    transport: Option<StaticWorkerTransportId>,
 }
 
 impl StaticWorkerBinding {
@@ -4067,123 +4099,348 @@ fn specialized_field_refs_at<'a>(
 /// different *routes* — so no site local to either can see both. This is the
 /// same shape as the `D3` continuation claim ledger and the `D2f` fused-region
 /// ledger, and it closes beside them.
+/// **`D2k-1c-0` REPLACED THE COUNTERS WITH RELATIONS, and the reason is that
+/// narrowing a count's scope never turns a tally into a pairing.** The rejected
+/// ledger counted compile-wide; its successor counted per `field_origin`; both
+/// are tallies. `D2k-1c-0` measured that one static occurrence **is** descended
+/// more than once in a single compile — see
+/// `d2k_1c_0_one_static_occurrence_is_descended_more_than_once_in_one_compile`
+/// — so at `rebinds = 2`, transport #1 consumed twice with transport #2
+/// dropped balanced at `2 == 2` and closed green. **A pairing needs a fact
+/// saying WHICH transport was paid, and two `usize`s cannot carry one.**
+/// Architect `evt_2npnrzesz3t65` ruled the representation below.
 #[derive(Default)]
 struct StaticWorkerFieldLedger {
-    /// One entry per recognized constructor field, keyed by the planner's
-    /// `child_static_origin(owner, position)`.
+    /// **The recognitions.** One entry per *constructed* worker field, keyed by
+    /// a fresh [`StaticWorkerRecognitionId`].
     ///
-    /// **Keyed rather than listed, because the same static occurrence can be
-    /// lowered more than once.** Those are two transports of one occurrence,
-    /// and each owes its own consumption; they are not two occurrences and must
-    /// not become two entries.
+    /// **NOT keyed by `field_origin`.** It was, with `or_insert`, and that
+    /// silently dropped the second construction of one occurrence: `recognize`,
+    /// `recognize`, one `rebind`, one consumption, close **green** — with a
+    /// constructed worker forgotten before any transport existed to owe for it.
+    /// The candidate's own `row1` measurement said "two instances" while its
+    /// ledger held one. Architect `evt_3manpp82emcq6`.
     ///
-    /// **`D2k-1c-0` MEASURED that premise rather than inheriting it, and it
-    /// holds** — see
-    /// `d2k_1c_0_one_static_occurrence_is_descended_more_than_once_in_one_compile`.
-    /// **The cause stated here previously was NOT measured** and is removed: it
-    /// read *"a speculative descent and the descent that keeps its result"*,
-    /// which is one shape that fits and not the one the trace shows. What the
-    /// trace shows is a binder descending twice over one eliminating match
-    /// occurrence on every row, and on `row1` a `Construct` occurrence entered
-    /// twice as well. Multiplicity is established; its cause is not.
-    entries: BTreeMap<StaticOriginId, StaticWorkerFieldEntry>,
+    /// **The CAUSE of the repeated construction is unmeasured, and nothing
+    /// here should be read as naming one.** An earlier revision attributed it to
+    /// *"a speculative descent and the descent that keeps its result"*; that is
+    /// one shape that fits and it was never established. What is measured is
+    /// that it happens. **The ledger is correct either way** — that is the point
+    /// of accounting per instance rather than per cause — and Architect
+    /// `evt_2npnrzesz3t65` closed the question a cause would have borne on:
+    /// identity is minted at the transition, a discarded descent does not erase
+    /// a constructed worker, and there is no implicit rollback.
+    recognized: BTreeMap<StaticWorkerRecognitionId, RecognizedStaticWorkerField>,
+    /// **The transitions**: which recognition became which transport. The law
+    /// is `dom(transitioned) = dom(recognized)`, so a constructed worker that
+    /// never entered binding authority is caught here rather than being
+    /// unrepresentable.
+    transitioned: BTreeMap<StaticWorkerRecognitionId, StaticWorkerTransportId>,
+    /// **The transports.** One entry per *dynamic* successful `rebind`, keyed
+    /// by a fresh [`StaticWorkerTransportId`]. Two rebinds of one
+    /// `field_origin` are two entries here, which is exactly the distinction
+    /// the counters could not make.
+    minted: BTreeMap<StaticWorkerTransportId, MintedStaticWorkerTransport>,
+    /// **The consumptions**, keyed by the transport they discharge and valued
+    /// by the exact consumer occurrence. A second consumption of one key is
+    /// refused at the call rather than absorbed into a total.
+    consumed: BTreeMap<StaticWorkerTransportId, StaticOriginId>,
+    issuer: transport_identity::TransportIdIssuer,
+    recognitions: transport_identity::RecognitionIdIssuer,
 }
 
-/// One recognized static-worker constructor field, and its running balance.
-struct StaticWorkerFieldEntry {
+/// One constructed constructor field carrying a static worker.
+struct RecognizedStaticWorkerField {
+    /// Provenance only. **Never the identity** — two constructions of one
+    /// occurrence share this value and are still two constructed fields.
+    field_origin: StaticOriginId,
     owner: StaticOriginId,
     position: usize,
     constructor: String,
-    /// Installs of this field into the lexical binding authority by a static
-    /// elimination.
-    rebinds: usize,
-    /// Exact-`Var` calls that consumed a binding **naming this field**.
-    consumptions: usize,
+    /// The generated function body this field was constructed into. A
+    /// transition from another body is a provenance failure, on the same
+    /// reading as the transport's own scope.
+    scope: Option<FuncId>,
 }
+
+/// One transport: a recognized field entering lexical binding authority.
+struct MintedStaticWorkerTransport {
+    /// The recognition this transport discharges. One transport per
+    /// transitioned recognition, so the chain is
+    /// **construct -> transition -> consume** with an identity at each link.
+    recognition: StaticWorkerRecognitionId,
+    /// Provenance only. **Never the identity** — two transports of one
+    /// occurrence share this value and are still two transports.
+    field_origin: StaticOriginId,
+    owner: StaticOriginId,
+    position: usize,
+    constructor: String,
+    /// **The evidence scope: the generated function body this transport was
+    /// minted into.** A consumption from a different body is a provenance
+    /// failure, not a discharge — repeated lowering in different generated
+    /// functions mints distinct IDs, and carrying one across that boundary
+    /// without a new rebind is precisely what this refuses. Same field, and
+    /// same reading of it, as the `D7` aggregate-allocation ledger: evidence
+    /// scope, never planner authority.
+    scope: Option<FuncId>,
+}
+
+/// **The transport identity, opaque BECAUSE the field is private to an inner
+/// module and for no weaker reason.**
+///
+/// A private-field newtype declared *beside* its users refuses nothing: every
+/// sibling in the same module can still write `StaticWorkerTransportId(7)`, so
+/// "only the issuer mints" would be a comment rather than a rule. The ledger and
+/// the binder both live in this module, so the type and its issuer are moved
+/// **inside** one — where the privacy is load bearing and `mint` is the only
+/// reachable constructor.
+mod transport_identity {
+    /// An opaque compiler-only transport identity. **Not a runtime word, tag,
+    /// descriptor, carrier or callable identity**, and never emitted.
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+    pub(super) struct StaticWorkerTransportId(u64);
+
+    /// An opaque compiler-only **recognition** identity: one per successful
+    /// `ConstructorField::StaticWorker` construction.
+    ///
+    /// **A SEPARATE identity from the transport, and separate from the
+    /// planner origin, because it answers a third question.** The planner origin
+    /// names the *occurrence*; the transport names one entry into lexical
+    /// binding authority; this names one **constructed field**. Keying
+    /// recognition by origin collapsed two constructed workers of one occurrence
+    /// into one record, so the second disappeared before any transport identity
+    /// existed to account for it — green close, worker forgotten, which is the
+    /// forbidden fourth state one step earlier than the counters allowed it.
+    /// Architect `evt_3manpp82emcq6`.
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+    pub(super) struct StaticWorkerRecognitionId(u64);
+
+    /// **The checked monotone issuer.** Fresh for every dynamic successful
+    /// rebind, including repeated rebinds of the same `field_origin`.
+    #[derive(Default)]
+    pub(super) struct TransportIdIssuer {
+        next: u64,
+    }
+
+    impl TransportIdIssuer {
+        /// `None` on exhaustion rather than a wrap, so the one way to get a
+        /// duplicate identity is a refusal instead of a silent collision.
+        pub(super) fn mint(&mut self) -> Option<StaticWorkerTransportId> {
+            let issued = StaticWorkerTransportId(self.next);
+            self.next = self.next.checked_add(1)?;
+            Some(issued)
+        }
+    }
+
+    /// **The checked monotone issuer for recognitions.** Fresh for every
+    /// constructed worker field, including repeated constructions of the same
+    /// `field_origin` — which `D2k-1c-0` measured happening on `row1`.
+    #[derive(Default)]
+    pub(super) struct RecognitionIdIssuer {
+        next: u64,
+    }
+
+    impl RecognitionIdIssuer {
+        pub(super) fn mint(&mut self) -> Option<StaticWorkerRecognitionId> {
+            let issued = StaticWorkerRecognitionId(self.next);
+            self.next = self.next.checked_add(1)?;
+            Some(issued)
+        }
+    }
+}
+
+use transport_identity::{StaticWorkerRecognitionId, StaticWorkerTransportId};
 
 impl StaticWorkerFieldLedger {
     /// A producer recognized a worker and built the field.
+    /// **A producer constructed a worker field.** One recognition identity per
+    /// construction, minted here and carried by that exact compiler template.
+    ///
+    /// **Never deduplicated by `field_origin`.** Two constructions of one
+    /// occurrence are two constructed workers, each owing its own transition
+    /// and its own consumption; collapsing them loses the second before any
+    /// transport identity exists to be short.
     fn recognize(
         &mut self,
         owner: StaticOriginId,
         position: usize,
         field_origin: StaticOriginId,
         constructor: &str,
-    ) {
-        self.entries
-            .entry(field_origin)
-            .or_insert_with(|| StaticWorkerFieldEntry {
+        scope: Option<FuncId>,
+    ) -> Result<StaticWorkerRecognitionId, CraneliftBackendError> {
+        let Some(recognition) = self.recognitions.mint() else {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                "the static worker recognition issuer is exhausted; refusing rather than reusing \
+                 an identity, because a reused identity would let one constructed field stand in \
+                 for another"
+                    .to_string(),
+            ));
+        };
+        self.recognized.insert(
+            recognition,
+            RecognizedStaticWorkerField {
+                field_origin,
                 owner,
                 position,
                 constructor: constructor.to_string(),
-                rebinds: 0,
-                consumptions: 0,
-            });
+                scope,
+            },
+        );
+        Ok(recognition)
     }
 
-    /// Disposition 1, first half — a static elimination rebound this exact
-    /// field into the binding authority, keyed by the planner's origin.
+    /// **Disposition 1, first half — the TRANSPORT EVENT.** A static
+    /// elimination is putting this recognized field into lexical binding
+    /// authority, so a fresh transport identity is minted here and returned for
+    /// the rebound binding to carry.
+    ///
+    /// **Minted at the rebind, not at some later notion of retention**
+    /// (Architect `evt_2npnrzesz3t65`). `rebind` *is* the moment the field
+    /// enters the authority; deferring identity until a caller declares the
+    /// descent kept would reconstruct it after the binding may already have been
+    /// consumed, and would make retention a second authority over what happened.
+    /// The converse also holds: **calling a descent speculative does not erase a
+    /// worker after construction** — erasure is lawful only under positive
+    /// authority at or before construction, and there is none here.
+    ///
+    /// ⇒ **There is no implicit rollback and no discard API.** On normal
+    /// lowering every minted transport must be consumed even if a caller later
+    /// ignores the result; on error the compilation aborts. Annulling a mint
+    /// would be lawful only through an explicit transaction rolling back the
+    /// binding, the emitted/control state and this evidence together, and
+    /// nothing measured shows a rollback-and-continue path that would need one.
     ///
     /// **A rebind of a field no producer recognized fails closed.** It cannot
     /// happen while the armed producer is the only builder of the worker arm,
     /// which is precisely why it is worth refusing rather than ignoring: the
     /// day a second builder appears, an unrecognized transport must not be able
     /// to enter the binding authority unaccounted.
-    fn rebind(&mut self, field_origin: StaticOriginId) -> Result<(), CraneliftBackendError> {
-        let Some(entry) = self.entries.get_mut(&field_origin) else {
-            return Err(unsupported(
-                "StaticWorkerBinding",
-                format!(
-                    "a static elimination rebound a static worker field at origin \
-                     {field_origin:?} that no recognized constructor field owns"
-                ),
-            ));
-        };
-        entry.rebinds += 1;
-        Ok(())
-    }
-
-    /// Disposition 1, second half — an exact-`Var` call consumed a binding.
-    ///
-    /// **`transported_field` is what makes this one-to-one.** A binding that
-    /// never came out of a constructor field carries `None` and discharges
-    /// nothing, so an ordinary worker call cannot pay a transported field's
-    /// debt. A call naming a field with no outstanding transport is an **excess
-    /// consumption** and refuses, which is the other half the aggregate count
-    /// could not see: it accepted more consumptions than transports as readily
-    /// as fewer.
-    fn note_consuming_call(
+    fn rebind(
         &mut self,
-        transported_field: Option<StaticOriginId>,
-    ) -> Result<(), CraneliftBackendError> {
-        let Some(field_origin) = transported_field else {
-            return Ok(());
-        };
-        let Some(entry) = self.entries.get_mut(&field_origin) else {
+        recognition: StaticWorkerRecognitionId,
+        scope: Option<FuncId>,
+    ) -> Result<StaticWorkerTransportId, CraneliftBackendError> {
+        let Some(recognized) = self.recognized.get(&recognition) else {
             return Err(unsupported(
                 "StaticWorkerBinding",
                 format!(
-                    "an exact-Var call consumed a static worker naming constructor field origin \
-                     {field_origin:?}, which no recognized field owns"
+                    "a static elimination rebound a static worker field carrying recognition \
+                     {recognition:?} that this compilation never constructed"
                 ),
             ));
         };
-        if entry.consumptions >= entry.rebinds {
+        if recognized.scope != scope {
             return Err(unsupported(
                 "StaticWorkerBinding",
                 format!(
-                    "constructor {} at origin {:?} field {} was consumed {} time(s) against {} \
-                     transport(s): a consumption with no outstanding transport cannot discharge \
-                     another field's obligation",
-                    entry.constructor,
-                    entry.owner,
-                    entry.position,
-                    entry.consumptions + 1,
-                    entry.rebinds
+                    "constructor {} at origin {:?} field {} was constructed into one generated \
+                     function body and rebound while defining another; a recognized field \
+                     carried across a body boundary is provenance failure, not a transition",
+                    recognized.constructor, recognized.owner, recognized.position
                 ),
             ));
         }
-        entry.consumptions += 1;
+        if let Some(already) = self.transitioned.get(&recognition) {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "constructor {} at origin {:?} field {} was constructed once and rebound \
+                     twice; its first transition already minted transport {already:?}, and one \
+                     constructed field cannot enter binding authority as two transports",
+                    recognized.constructor, recognized.owner, recognized.position
+                ),
+            ));
+        }
+        let Some(transport) = self.issuer.mint() else {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                "the static worker transport issuer is exhausted; refusing rather than reusing \
+                 an identity, because a reused identity would let one transport discharge \
+                 another"
+                    .to_string(),
+            ));
+        };
+        self.minted.insert(
+            transport,
+            MintedStaticWorkerTransport {
+                recognition,
+                field_origin: recognized.field_origin,
+                owner: recognized.owner,
+                position: recognized.position,
+                constructor: recognized.constructor.clone(),
+                scope,
+            },
+        );
+        self.transitioned.insert(recognition, transport);
+        Ok(transport)
+    }
+
+    /// **Disposition 1, second half — an exact-`Var` call consumes ONE named
+    /// transport**, recorded against the exact consumer occurrence.
+    ///
+    /// Three refusals, and each answers a way the counters were fail-open:
+    ///
+    /// 1. **Unknown identity** — a binding naming a transport this ledger never
+    ///    minted. Nothing outside the issuer can produce one, so this is the
+    ///    fail-closed backstop for the day a second minting site appears.
+    /// 2. **Cross-scope** — minted while defining one generated function body
+    ///    and consumed while defining another. Repeated lowering in different
+    ///    bodies mints distinct identities; carrying one across that boundary
+    ///    without a new rebind is a provenance failure, **not** a licence to
+    ///    consume it again.
+    /// 3. **Already consumed** — the exact hole in the per-origin count.
+    ///    Consuming transport `A` twice used to cover an outstanding `B`
+    ///    because only the *total* was read. Here `A` is already in the
+    ///    relation, so the second consumption refuses **at the call**, and `B`
+    ///    is still outstanding at close.
+    ///
+    /// **`None` is a real state, not a missing value.** A binding that never
+    /// came out of a constructor field carries no transport and discharges
+    /// nothing, so an ordinary pre-existing worker call cannot pay a
+    /// transported field's debt.
+    fn note_consuming_call(
+        &mut self,
+        transport: Option<StaticWorkerTransportId>,
+        consumer: StaticOriginId,
+        scope: Option<FuncId>,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(transport) = transport else {
+            return Ok(());
+        };
+        let Some(minted) = self.minted.get(&transport) else {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "an exact-Var call at origin {consumer:?} consumed a static worker naming \
+                     transport {transport:?}, which this compilation never minted"
+                ),
+            ));
+        };
+        if minted.scope != scope {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "constructor {} at origin {:?} field {} was transported into one generated \
+                     function body and consumed at origin {consumer:?} while defining another; a \
+                     transport identity carried across a body boundary without a new rebind is \
+                     provenance failure, not a discharge",
+                    minted.constructor, minted.owner, minted.position
+                ),
+            ));
+        }
+        if let Some(first) = self.consumed.get(&transport) {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "constructor {} at origin {:?} field {} was transported once and consumed \
+                     twice, at origins {first:?} and {consumer:?}; a second consumption of one \
+                     transport cannot discharge a different transport's obligation",
+                    minted.constructor, minted.owner, minted.position
+                ),
+            ));
+        }
+        self.consumed.insert(transport, consumer);
         Ok(())
     }
 
@@ -4191,39 +4448,80 @@ impl StaticWorkerFieldLedger {
     /// before construction under positive unobservability authority, or refused
     /// before emission; none is dropped.
     ///
-    /// Erasure is structurally absent here — an entry exists only because the
-    /// field was built — so the two reachable outcomes are consume and refuse.
-    /// **The check is per occurrence and it is an equality**, so neither a
-    /// dropped transport nor a doubled consumption can be offset by a sibling.
+    /// Erasure is structurally absent here — a recognition exists only because
+    /// the field was built — so the two reachable outcomes are consume and
+    /// refuse.
+    ///
+    /// **The chain has three links and an identity at each one:**
+    /// `dom(transitioned) = dom(recognized)` and `dom(consumed) = dom(minted)`,
+    /// with `minted` in bijection with `transitioned` because one transition
+    /// mints exactly one transport. ⇒ **construct -> transition -> consume**,
+    /// each step per instance. A constructed field that never transitions is
+    /// caught by the first law, and it is the state a recognition map keyed by
+    /// `field_origin` could not even represent.
+    ///
+    /// **Both laws are relations and never equalities of cardinalities.** `⊆` is enforced at the call:
+    /// `note_consuming_call` refuses an identity it never minted, so nothing
+    /// can enter `consumed` that is absent from `minted`. `⊇` is enforced here.
+    /// Both directions are checked below anyway, because a law worth stating is
+    /// worth being able to fail — and the `⊆` re-check is what catches a future
+    /// second writer of `consumed` that skips the call-side guard.
     fn close(&self) -> Result<(), CraneliftBackendError> {
-        for (field_origin, entry) in &self.entries {
-            if entry.rebinds == 0 {
+        // Link one: every CONSTRUCTED field transitioned into binding
+        // authority. Per recognition instance, never "some minted transport
+        // shares this origin" -- that is what let a second construction of one
+        // occurrence vanish while the first covered for it.
+        for (recognition, recognized) in &self.recognized {
+            if !self.transitioned.contains_key(recognition) {
                 return Err(unsupported(
                     "StaticWorkerBinding",
                     format!(
                         "constructor {} at origin {:?} transports a static worker in field {} \
-                         (field origin {field_origin:?}) that no static elimination rebinds, so \
-                         the field is neither consumed at an exact-Var call nor erased before \
-                         construction; a constructor carrying an unconsumed static worker \
-                         denotes a value containing the callable and has no runtime \
-                         representation",
-                        entry.constructor, entry.owner, entry.position
+                         (field origin {:?}, recognition {recognition:?}) that no static \
+                         elimination rebinds, so the field is neither consumed at an exact-Var \
+                         call nor erased before construction; a constructor carrying an \
+                         unconsumed static worker denotes a value containing the callable and \
+                         has no runtime representation",
+                        recognized.constructor,
+                        recognized.owner,
+                        recognized.position,
+                        recognized.field_origin
                     ),
                 ));
             }
-            if entry.consumptions != entry.rebinds {
+        }
+        for (recognition, transport) in &self.transitioned {
+            if !self.recognized.contains_key(recognition) {
                 return Err(unsupported(
                     "StaticWorkerBinding",
                     format!(
-                        "constructor {} at origin {:?} field {} (field origin {field_origin:?}) \
-                         was rebound into the binding authority {} time(s) and consumed at an \
-                         exact-Var call {} time(s); a transported static worker that is not \
-                         called is dropped",
-                        entry.constructor,
-                        entry.owner,
-                        entry.position,
-                        entry.rebinds,
-                        entry.consumptions
+                        "transport {transport:?} is recorded as the transition of recognition \
+                         {recognition:?}, which this compilation never constructed"
+                    ),
+                ));
+            }
+        }
+        for (transport, minted) in &self.minted {
+            if !self.consumed.contains_key(transport) {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "constructor {} at origin {:?} field {} (field origin {:?}) was rebound \
+                         into the binding authority as transport {transport:?} and never \
+                         consumed at an exact-Var call; a transported static worker that is not \
+                         called is dropped, and no other transport's consumption discharges it",
+                        minted.constructor, minted.owner, minted.position, minted.field_origin
+                    ),
+                ));
+            }
+        }
+        for (transport, consumer) in &self.consumed {
+            if !self.minted.contains_key(transport) {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "an exact-Var call at origin {consumer:?} is recorded as consuming \
+                         transport {transport:?}, which this compilation never minted"
                     ),
                 ));
             }
@@ -4297,20 +4595,28 @@ impl Lowering<'_> {
                 ConstructorField::StaticWorker {
                     binding,
                     field_origin,
+                    recognition,
                 } => {
-                    self.static_worker_fields.rebind(*field_origin)?;
+                    // **THE TRANSPORT EVENT.** The field enters lexical
+                    // binding authority here, so the identity is minted here —
+                    // scoped to the generated function body being defined, so a
+                    // consumption from another body is a provenance failure
+                    // rather than a discharge.
+                    let transport = self
+                        .static_worker_fields
+                        .rebind(*recognition, self.defining_function_id)?;
                     #[cfg(test)]
                     record_d2k_owner_event(D2kOwnerEvent::StaticWorkerBinderInstalled {
                         field_origin: *field_origin,
                         position,
                     });
-                    // **The transport key travels WITH the binding**, so the
-                    // exact-`Var` call that consumes it can name the field it
-                    // discharges. Without this the call arm sees only a
-                    // `StaticWorkerBinding`, which is why the first attempt
-                    // could count consumptions but not pair them.
+                    // **The transport identity travels WITH the binding**, so
+                    // the exact-`Var` call that consumes it names the one
+                    // transport it discharges. A field key here would name the
+                    // occurrence, which is one transport too coarse: the same
+                    // occurrence is rebound more than once in a single compile.
                     LoweringEnvironmentBinding::StaticWorker(StaticWorkerBinding {
-                        transported_field: Some(*field_origin),
+                        transport: Some(transport),
                         ..binding.clone()
                     })
                 }
