@@ -3151,6 +3151,134 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
          refusal: {positive_error:?}"
     );
 }
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-0` — the five `StaticWorkerBinding`
+/// walls, re-derived, with their edges and routes.**
+///
+/// The frame's trap is that **all five report the same sentence, and that is
+/// not evidence of one root**: the refusal is emitted by a single chokepoint
+/// every value-producing read funnels through, so five unrelated wrong-consumer
+/// routes would produce the same string. The discriminator is the `edge`
+/// argument and the causal consumer owner, never the message.
+///
+/// **MEASURED at this base — one root.** All five refuse at the **same call
+/// site**, with the **same edge**, through **byte-identical lowering routes**.
+///
+/// | expression | edge | refusing caller | route |
+/// |---|---|---|---|
+/// | row 1, owned-scope deletion | `a Var in value position` | `core.rs:14593` | `lower_expr` child collection |
+/// | row 4, `scope_segments` depth 1 | `a Var in value position` | `core.rs:14593` | same |
+/// | row 4, `scope_segments` depth 2 | `a Var in value position` | `core.rs:14593` | same |
+/// | row 4, `scope_segments` depth 3 | `a Var in value position` | `core.rs:14593` | same |
+/// | row 5, after-hole | `a Var in value position` | `core.rs:14593` | same |
+///
+/// **`value_at` has exactly FOUR callers at this base**, re-counted rather than
+/// carried from the frame: `core.rs:6200` (*"a source-machine Var in value
+/// position"*), `core.rs:11140` (*"a continuation capture input"*),
+/// `core.rs:14593` (*"a Var in value position"*), and `mod.rs:3661` (which
+/// forwards its caller's edge). **No fifth caller**, so that scope signal does
+/// not fire.
+///
+/// **What is executable here and what is not, stated rather than blurred.** The
+/// edge and the refusal are asserted below, per expression. **The route is
+/// not**, and cannot be: observing which caller fired requires instrumenting
+/// `value_at`, and `AC-2` requires that guard to be byte-unchanged. So the
+/// route column is a **measured-and-reverted probe**, and its method is
+/// recorded here so it can be repeated rather than trusted:
+///
+/// - each `value_at` caller was temporarily tagged with its file and line, and
+///   each of the five compiled under `B`-only exclusion. In every one the last
+///   tag before the refusal was `core.rs:14593`; `mod.rs:3661` never fired.
+/// - a `Backtrace::force_capture()` at the `StaticWorker` arm, filtered to
+///   lowering frames, was **identical across all five**: the read is taken in
+///   `lower_expr`'s child-argument collection, reached directly from
+///   `compile_expr_into_module_with_root_projection`.
+/// - both probes were reverted; the committed tree touches neither `value_at`
+///   nor any caller.
+///
+/// **The limit of that measurement, since it is the load-bearing half.** The
+/// backtrace was filtered to lowering frames and truncated at sixteen. Identical
+/// filtered traces are strong evidence of one route and are **not** a proof that
+/// no difference exists above the truncation. A reader who wants to raise this
+/// to certainty should re-run the probe unfiltered rather than take this row.
+///
+/// ⇒ **One root, on this evidence.** `D2k-1` may be sized as a single repair at
+/// the owning consumer before the guard, rather than one cut per row.
+///
+/// **Promise class: durable invariant.** It asserts the wall these five stand
+/// at and the edge that identifies it. It reds when a repair moves any of them
+/// off that wall, which is the intended signal, and `D2k-1` is what retires it.
+#[test]
+fn d2k_0_the_five_static_worker_walls_share_one_edge_and_one_route() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// The refusal's `construct` and its `edge`, or `None` if it lowered.
+    fn wall(expression: &RuntimeExpr, symbol: &str) -> Option<(String, String)> {
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let _restore = Restore;
+        let (result, _trace) = px8j_capture_source_trace(expression, false, symbol);
+        match result {
+            Ok(_) => None,
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) => {
+                // The edge is the prefix the caller supplied; the rest of the
+                // sentence is the chokepoint's own and is shared by
+                // construction, so it cannot discriminate anything.
+                let edge = reason
+                    .split(" is a value-producing position")
+                    .next()
+                    .unwrap_or(&reason)
+                    .to_string();
+                Some((construct.to_string(), edge))
+            }
+            Err(other) => Some(("<not-unsupported>".to_string(), format!("{other:?}"))),
+        }
+    }
+    let aggregate_row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
+    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
+    let row5_after = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::AfterReturnHole,
+    ));
+
+    let five = [
+        ("row1-owned-scope", wall(&aggregate_row1, "ken_d2k0_row1")),
+        ("row4-depth-1", wall(&row4_d1, "ken_d2k0_row4_d1")),
+        ("row4-depth-2", wall(&row4_d2, "ken_d2k0_row4_d2")),
+        ("row4-depth-3", wall(&row4_d3, "ken_d2k0_row4_d3")),
+        ("row5-after-hole", wall(&row5_after, "ken_d2k0_row5")),
+    ];
+
+    let expected = Some((
+        "StaticWorkerBinding".to_string(),
+        "a Var in value position".to_string(),
+    ));
+    assert_eq!(
+        five.iter()
+            .map(|(label, outcome)| (*label, outcome.clone()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("row1-owned-scope", expected.clone()),
+            ("row4-depth-1", expected.clone()),
+            ("row4-depth-2", expected.clone()),
+            ("row4-depth-3", expected.clone()),
+            ("row5-after-hole", expected.clone()),
+        ],
+        "D2k-0: each of the five must stand at the StaticWorkerBinding wall and must report the \
+         SAME edge. The edge is what identifies which value-producing read was taken; the rest \
+         of the sentence is the shared chokepoint's and discriminates nothing. A row reporting \
+         a different edge is a second root and re-opens the sizing."
+    );
+}
 #[test]
 fn px8j_selected_scope_partitions_differ_across_the_real_return_hole() {
     let before = host_result_closure_match(px8j_equal_payload_hole_placement(
