@@ -576,6 +576,89 @@ nothing you inherit from `#6d`.**
 > **Different repairs, different discriminators, both consistent with every
 > measurement above.**
 >
+> ### THE ATOMIC BOUNDARY IS RE-PRICED AND DOES NOT SHRINK — SETTLED.
+> ### Architect `evt_6xb2jnracee7x`, re-priced against `main` = `689dabd7`.
+>
+> **The Steward asked (`evt_2v4sdvr74yme2`) whether in-tree unarmed controls had
+> satisfied `evt_4m0q1m4zn4k79`'s "may not merge unexercised" precondition for
+> part of the object. The answer is no. This is CLOSED — do not re-raise it.**
+>
+> **THE CRITERION, and it is the reusable part: a unit-tested component law is
+> NOT the positive for the behavior-changing production slice that depends on
+> it.** Every control cited exercises an invariant **directly**, not the
+> production route that invariant governs:
+>
+> | control | what it actually exercises |
+> |---|---|
+> | control 1 | a full-pipeline **negative baseline** — never exercises the composed positive |
+> | `dp_composition_time_membership...` | validates and round-trips a **manually populated** `composed_frame_templates`; **`DP`'s production positive is still behind the arm** |
+> | selector net 3 | the ledger's ordinary/one-spend/replay/forged/monotone laws — its own comment says the **unconsumed refusal** lives in armed splice closeout |
+> | `AC-D3-SELF` | installs a plane, preflights, calls `fusion_self_edge_identities` — **emits no fusion definition, exercises no recursive self edge** |
+> | binder-to-body | installs its plane directly; production runs `preflight` over an **empty** installed population while `D2F_EMITTER_ARMED` is false |
+>
+> **STILL-UNEXERCISED PRODUCTION OBLIGATIONS, as ruled:** `DP` source-authored
+> membership on the live composed segment; `D1` authority switching; `D2`
+> checked-frame adoption; production fusion installation, claim issuance,
+> ownership, definition, redirect, takeover and closeout; selector nets 1/2/4
+> plus the armed half of net 3 and the inner-slot witness; the emitted recursive
+> self edge; the exact route-C continuation-specialization disposition;
+> `AC-8`/`AC-9`/`AC-10`; and `D4` under the necessary-green rule.
+>
+> **No partial cut from `766cbdf0` is authorized.** The first test-only baseline
+> commit could be copied out harmlessly, but it **shrinks no executable
+> dependency and does not warrant another candidate or review hop.**
+>
+> **RING INSTRUCTION:** continue the ruled route-C implementation; **rebase the
+> whole held range onto current `main` at the next natural seam; ARM LAST.**
+>
+> ### RESEARCH ADVISORY — CONSUMPTION AND REACHABILITY ARE TWO DISTINCT PROOF
+> ### OBLIGATIONS. Steward, 2026-08-12, carrying `evt_77kkd21bnnekj` (full
+> ### text there) to the thread at `evt_33vnf0f1pmvgj`.
+>
+> **Prior-art framing only. Research proposed no repair, did not read
+> `crates/`, and states that it does not select Ken's mechanism. It is
+> advisory and non-blocking, and it must not be read as a ruling.**
+>
+> **The bottom line:** *"DEAD is a property of the residual executable program,
+> not a consequence of having consumed one fused edge."* Prior art establishes
+> producer deadness three ways — a rewrite replacing the whole redex so the
+> occurrence is **structurally absent**; a use-edge fusion that **retains** the
+> producer while any uses remain and erases it only when the use set is empty;
+> or a later **reachability/DCE pass** over the residual graph. **An ownership
+> model can make the first true by construction, but the fusion claim is not
+> normally the liveness certificate — the residual graph is.**
+>
+> **The discriminator that maps onto our measurements.** In GHC, a let-bound
+> producer used by both `foldr` and another consumer **does not fire the fusion
+> rule**, because fusing one use would duplicate the producer's work. ⇒ **one
+> consumer can consume a producer's result while the producer binding stays
+> live through another occurrence.** GHC keeps **fusion rewrite and binding
+> deadness as separate pipeline facts**; MLIR Linalg and OpenXLA split them the
+> same way, erasing a producer only when it is known to have no uses.
+>
+> **The named failure shape, and it is ours:** *"Incorrect residual ownership:
+> the original remains reachable even though no legitimate surviving use
+> requires it... **This is not an internally incomplete fused object. It is an
+> extra live node or root in the residual executable population.**"*
+>
+> **TRANSFER.** Our affine claim establishes **dynamic consumption** — fused
+> edge and suffix used exactly once. It does **not** establish **residual
+> unreachability** — that no executable root, standalone specialization or
+> export still reaches the original producer occurrence. **Prior art treats
+> these as two distinct proof obligations.** ⇒ The terminal refusal is
+> consistent with **an orphan residual caught after a CORRECT fusion**, rather
+> than with answer selection inside the fused object being wrong — **which is
+> why all three mechanisms aimed at answer selection had nowhere to attach.**
+>
+> **A disposition prior art contains that our option set does NOT, flagged and
+> explicitly not proposed:** GHC's answer to a producer with a surviving second
+> use is **to decline the fusion**. Our three candidate readings — route C runs
+> / its result is selected / ownership left it reachable — do not include it.
+> **Recorded so the space is closed deliberately rather than by omission.**
+>
+> **Research found no dependently-typed eliminator-fusion precedent in this
+> bounded pass that changes the conclusion, and said so rather than padding.**
+>
 > ### THE TRACE LANDED, AND IT FOUND A THIRD CONSTRUCTOR ROUTE NOBODY HAD
 > ### BEEN RULING ABOUT. Steward, 2026-08-12, from `evt_1a9t81p0j7h77` +
 > ### `evt_338x5qd0hf6fx`, under bounds `evt_41remx6xn6pda` + `evt_7qkp9qd7a2381`.

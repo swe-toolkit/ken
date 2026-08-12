@@ -38,7 +38,137 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~22:0xZ. `main` = `d5912acd`.
+> ### RESUME HERE — state at 2026-08-12 ~23:2xZ. **`main` = `689dabd7`.**
+>
+> > **THE STOP THIS NODE HAS BEEN ON SINCE `evt_2m62086x60c94` IS CLOSED.**
+> > `evt_11werhky391ds`: armed on both witnesses, **the `StaticWorkerBinding`
+> > refusal is GONE** — route C is no longer reached and `ground_value` is never
+> > handed the worker-bearing intermediate. Disarmed before commit.
+> >
+> > **NEW TIP `9177c6ce`, 11 commits, BASE `689dabd7`** — the implementer
+> > rebased and published the full old→new SHA mapping. **Verified: the rebase
+> > delta is FOUR FILES, all four mine from PR #2041, ZERO `crates/` delta** ⇒
+> > every region-scoped verdict in the thread **re-attaches** rather than
+> > needing to be re-earned. The path intersection was empty exactly as claimed.
+> >
+> > **THE FINDING, not a detail:** the disposition **must not key on the
+> > producer construct.** The claim names the fusion's producer (30/26) while
+> > the specialization it subsumes names the **generic continuation producer**
+> > (39/35) — matching on construct resolves **nothing** and would install,
+> > report success, and change nothing. The join is the **worker/body**
+> > relation. **Mutation proof:** keying on producer construct reds the control
+> > with *"a static continuation fusion subsumes no generated continuation
+> > specialization"* — the inert-install failure caught by a test instead of a
+> > fifth turn.
+> >
+> > **FOUR projections, not three** — `verify_emitted_continuation_calls` also
+> > required a declared `Function` per planned specialization, **found because
+> > the armed compile refused there, not by inspection.**
+> >
+> > **A JUDGEMENT THE IMPLEMENTER MADE AND FLAGGED — THIS NEEDS THE ARCHITECT
+> > AND MUST NOT GET BURIED.** The ruling says a **surviving** caller must make
+> > preflight refuse. The consumer's own unit still calls the subsumed
+> > specialization (cut-2 row 11), and the `Carried` the takeover forwards **is
+> > that call's result.** The implementer classified the region's **own** call
+> > as **not surviving** — it is the call the fusion exists to subsume — and
+> > excluded exactly it, so preflight installs and the refusal lands at
+> > emission. **Had it classified that call as surviving, preflight would refuse
+> > on both witnesses and the ruling's own discriminator 1 would be
+> > unreachable.** Both readings are defensible from the text, **they differ in
+> > observable behaviour**, and inverting is **three lines**.
+> >
+> > **NEW BOUNDARY, reported not repaired:** nothing yet replaces that call's
+> > emission with the fused result; the takeover intercepts at origin 10 **after**
+> > the call is emitted. Making the consumer not emit it is **emission routing**,
+> > outside the authorized disposition — so it stopped.
+> >
+> > **CONTROL GAP, stated in the test rather than left to be inferred: this
+> > witness CANNOT discriminate identity keying from body keying** — its two
+> > specializations have different worker bodies (34, 37), so a body-keyed
+> > filter stays green. The disposition is identity-keyed **because the ruling
+> > requires it, not because anything here proves it.** The same-body row needs
+> > a fixture **the D2j family does not contain.**
+> >
+> > **Validation:** `-p ken-runtime --lib` 910/0/4, re-run **after** the rebase.
+> >
+> > **STILL OWED:** the caller-side replacement; armed discriminators 1/3/5;
+> > discriminator 4's same-body fixture; selector nets 2/4; controls 2/3;
+> > inner-slot witness; self-edge closeout.
+>
+> > **PUBLISHED. `main` MOVED `d5912acd` → `689dabd7` (doc-only PR #2041) — the
+> > first merge in three hours.** It carried 14 commits of rulings,
+> > refutations and corrections that existed only on `steward/work` while the
+> > frame on `main` fell **four rulings** behind. `steward/work` is **reset to
+> > `origin/main`** after verifying all four files byte-identical — a
+> > squash-merged branch reads 14-ahead forever otherwise.
+> >
+> > **I HAD THE HOLD WRONG, and the correction is the lesson.** Holding was
+> > right while the ring was mid-build against a hand-named base; it was wrong
+> > once they were tracing and the branch was freed. **The path intersection was
+> > empty the whole time** — no `crates/` paths — so the rebase was always
+> > clean, and the only thing the hold bought was a `main` whose frame described
+> > none of what had been ruled. **Re-derive a hold at each tick; it does not
+> > stay true because it was true.** Ring told at `evt_2v4sdvr74yme2`; they must
+> > not name `d5912acd` again.
+> >
+> > **SETTLED — THE ATOMIC BOUNDARY DOES NOT SHRINK (`evt_6xb2jnracee7x`).
+> > DO NOT RE-RAISE THIS. I said "still one object" would be a legitimate
+> > answer I would record as settled and stop asking; it is, and I have.**
+> >
+> > **MY INFERENCE WAS WRONG, and the reason is the reusable part.** The
+> > criterion: **a unit-tested component law is NOT the positive for the
+> > behavior-changing production slice that depends on it.** Every control I
+> > cited exercises an invariant **directly** and not the production route the
+> > invariant governs — control 1 is a **negative baseline** that never
+> > exercises the composed positive; `dp_composition_time_membership...`
+> > validates a **manually populated** `composed_frame_templates` sequence, so
+> > **`DP`'s production positive is still behind the arm**; net 3 proves the
+> > ledger's laws while its own comment says the unconsumed **refusal** lives in
+> > armed splice closeout; `AC-D3-SELF` installs a plane and **emits no fusion
+> > definition**; the binder-to-body control likewise installs directly while
+> > production runs `preflight` over an **empty** population with
+> > `D2F_EMITTER_ARMED` false. ⇒ **"Four controls run unarmed" was true and did
+> > not mean what I took it to mean.** Same shape as
+> > *a fixture satisfying its own relation while invisible to the consumer.*
+> >
+> > **No partial cut from `766cbdf0` is authorized.** The first test-only
+> > baseline commit could be copied out harmlessly but **shrinks no executable
+> > dependency and does not warrant another candidate or review hop** — so do
+> > not.
+> >
+> > **RING INSTRUCTION FROM THE SAME RULING:** continue the already-ruled
+> > route-C implementation; **rebase the whole held range onto current `main` at
+> > the next natural seam; ARM LAST.** Never name `d5912acd` again.
+> >
+> > **The research advisory was received as framing and changes neither the
+> > route-C ruling nor this sizing.** That is the correct disposition and I am
+> > not re-carrying it.
+> >
+> > ~~**RE-PRICING THE ATOMIC BOUNDARY IS WITH THE ARCHITECT
+> > (`evt_2v4sdvr74yme2`), and it is a real question, not schedule
+> > pressure.**~~ **ANSWERED, above.**
+> > `evt_4m0q1m4zn4k79` forbade merging **unexercised** mechanism. Measured on
+> > `766cbdf0`, **four controls now run UNARMED in the tree** — control 1,
+> > `dp_composition_time_membership_is_validated_and_changes_the_binding_fingerprint`
+> > (**`DP` is exercised**), `d3_the_splice_capability_is_spendable_exactly_once...`
+> > (net 3), and `ac_d3_self_the_recursive_edges_call_site_is_separated_from_its_callee_body`.
+> > ⇒ **The ruling's own precondition is no longer uniformly true**; `D1`/`D2`
+> > appear to be the only unexercised parts. **I proposed NO cut** — amending an
+> > atomicity ruling is soundness and is the Architect's. **"Still one object"
+> > is a legitimate answer I will record as settled and stop asking.** It must
+> > not delay the route-C ruling.
+> >
+> > **RESEARCH ENGAGED (`evt_5h8qz9efzz1ky`), advisory and non-blocking,
+> > bounded to one turn.** Question: in fusion/deforestation, **what makes the
+> > fused-away producer DEAD and WHERE is that established** — asserted by the
+> > transform, discovered by a later DCE/reachability pass, or a property of
+> > ownership so the occurrence is never lowered again — plus the standard
+> > failure mode when a fusion leaves its producer reachable. **Approach and
+> > behavior only; no `crates/` read; no repair proposed.** *"No transferable
+> > prior art, here is why"* is an accepted answer. **Two Enters were needed
+> > (1192-char paste).**
+>
+> ### RESUME HERE — earlier state at 2026-08-12 ~22:0xZ. `main` was `d5912acd`.
 >
 > > **~23:0xZ — THE TRACE LANDED AND FOUND A THIRD CONSTRUCTOR ROUTE NOBODY
 > > WAS RULING ABOUT. The sequencing ruling paid for itself in one turn.**
