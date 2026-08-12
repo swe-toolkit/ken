@@ -88,6 +88,30 @@ mechanism-shaped question is answerable `no` while the property is `yes` —
 [[surface-the-seam-need-not-your-preferred-mechanism]] applied to a measurement
 instead of a repair.
 
+## CORRECTING AN ALREADY-EXECUTED SPECIFICATION MUST QUOTE THE WRONG VERSION
+
+**The repair, and it inverts a rule I hold.** The frame that carried my bad
+specification now **quotes the superseded wording verbatim** beside the
+correction (`152056a3`, `…-D2k.md:730`), rather than replacing it.
+
+⚠ Normally that is the defect —
+[[a-later-note-saying-a-deliverable-is-false-does-not-replace-the-deliverable]]
+says delete the stale claim from the requirement itself, because both readings
+live in the doc and the superseded one is what an implementer reads first.
+**Here the opposite is right, and the discriminator is whether the wrong version
+has already been ACTED ON.**
+
+A specification that was only ever read is repaired by deletion. **A
+specification that was executed has copies** — in a branch, in a reviewer's
+notes, in a seat's context — and a reader re-running the read from one of those
+copies gets a clean `no` with nothing on the page to tell them the population
+moved. ⇒ **Quote the wrong version so the stale copy is recognisable when
+someone arrives holding it.** Deletion protects the next reader of the document;
+quotation protects the reader who is not reading the document.
+
+⇒ **Ask, before repairing any published specification: has anyone run this
+yet?** If yes, the correction's audience is not the document's readers.
+
 ## What actually saved it, and say so plainly
 
 **The ring did not inherit either error.** They enumerated six sites themselves
