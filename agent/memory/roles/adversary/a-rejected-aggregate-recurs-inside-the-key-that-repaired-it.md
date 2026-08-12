@@ -48,6 +48,35 @@ global one. **Ask what the multiplicity of K is.** If K is unique by
 construction, the repair is complete and saying so is worth one sentence; if
 the doc says K repeats, it is not.
 
+## THE SHARPENING — a repair SEQUENCE varies one axis and keeps the other
+
+**Steward's triage, and it is a better statement of the class than the one
+above.** This was the **fourth** iteration of one error in a single increment:
+
+| attempt | the instrument |
+|---|---|
+| 1 | seven forbidden **verbs** |
+| 2 | a total naming **one disposition** |
+| 3 | a **compile-wide** scalar |
+| 4 | a **per-origin** scalar |
+
+> *Each iteration correctly narrowed the scope of the count and kept the count.*
+> **The instrument was never the scope. It was the counting.**
+
+⇒ **When one finding recurs across successive repairs, write down which axis
+each repair varied.** Four attempts all moved *scope* — verbs to dispositions
+to compile-wide to per-origin — and every one was a real improvement, which is
+exactly why nobody saw that the *representation* axis had never moved. A
+pairing needs a fact naming **which** member was paid; two `usize`s cannot carry
+one at any scope.
+
+⚠ **This is [[no-option-works-name-the-axis-you-enumerated]] recurring one level
+up** — there it was my own enumeration varying one dimension while the answer
+lay on another; here it is a *sequence of repairs by different authors* doing
+the same thing. **A repair history is an enumeration**, and it deserves the same
+question: *what dimension have all of these varied, and what has stayed fixed?*
+The fixed thing is invisible precisely because each step was progress.
+
 ## The control set's near miss is the tell
 
 The committed control has six rows and its row 3 is *"two transports of one
