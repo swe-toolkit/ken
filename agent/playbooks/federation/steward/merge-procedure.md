@@ -22,14 +22,36 @@ This file assumes that decision is made.
 watched resolve earlier can be voided by an intervening publish — **re-read it
 at merge time, never from memory.**
 
-## M2 — Verify the exact SHA from the ring's `git_request` exists on origin
+## M2 — Verify the exact SHA, and verify its SHAPE against the declared range
 
 ```sh
-git fetch origin && git cat-file -e <SHA>^{commit} && git rev-parse <SHA>
+git fetch origin --prune && git cat-file -e <SHA>^{commit} && git rev-parse <SHA>
+git log --oneline <BASE>..<SHA>          # commit count vs declared
+git diff --shortstat <BASE>..<SHA>       # +/- vs declared
+git diff --name-only <BASE>...<SHA>      # path count vs declared
 ```
 
 **Never `--target HEAD`** — it dies with `src refspec refs/heads/HEAD does not
 match any`. Always an explicit SHA.
+
+> ### The heading used to say "exists on ORIGIN". It never does, and that is lawful.
+>
+> **`COORDINATION §14` forbids build seats from pushing**, so a ring candidate
+> is a purely local object in the shared store at M2 — **the publisher is what
+> pushes it**, at M5. `git branch -r --contains <SHA>` therefore returns empty
+> on every correct handoff, and treating that as a blocker would stall every
+> merge.
+>
+> ⇒ **What M2 can actually establish is that the object exists and its shape
+> matches what the ring and the Architect declared.** Commit count, path count,
+> and the `+/-` line, each against the declared range — not against `<SHA>^`.
+> A shape mismatch here means the Decision approved something other than what
+> you are about to publish, and it is far cheaper to catch now than at M6.
+>
+> **The standing warning that `git cat-file -e` passes on a purely local commit
+> is still true** — it just is not a defect at this step. It matters when you
+> are checking whether something has *landed*, which is M6's job and M6 uses
+> blob identity for exactly that reason.
 
 ## M3 — Cited-source check
 
@@ -105,7 +127,7 @@ that fact; it must not pretend the publisher identity can self-approve.
 Ancestry lies after a squash; phrase greps lie on wrapped lines.
 
 ```sh
-git fetch origin
+git fetch origin --prune          # --prune is LOAD-BEARING, see below
 # <BASE> is the cut's merge-base -- the base the ring declared, NOT <SHA>^.
 for f in $(git diff --name-only <BASE>...<SHA>); do
   r=$(git rev-parse "origin/main:$f" 2>/dev/null); l=$(git rev-parse "<SHA>:$f")
@@ -134,6 +156,49 @@ done
 
 The publisher squashes. `git reset --hard origin/main` afterwards —
 `steward/work` is stale the instant any publish lands.
+
+> ### `--prune` HERE is what stops the NEXT publish from this branch rejecting
+>
+> **Origin deletes the head branch the moment a PR merges** — which is exactly
+> when this step runs. Your `refs/remotes/origin/wp/<ID>` is now stale, and the
+> publisher's `--force-with-lease` compares against it, so the **next** publish
+> from that branch dies before it creates a PR:
+>
+> ```
+> ! [rejected]  wp/<ID> -> wp/<ID> (stale info)
+> ```
+>
+> Under the accepted-partial policy a WP branch is published **repeatedly by
+> construction**, so this fires on most multi-deliverable nodes. It has now
+> fired **five times**.
+>
+> **Neither fetch you would otherwise run clears it, and both look reassuring:**
+>
+> | what you run | what it does |
+> |---|---|
+> | plain `git fetch origin` | succeeds, prints nothing relevant, **leaves the stale ref** |
+> | `git fetch origin wp/<ID>` at M2 | fails `couldn't find remote ref`, **leaves the stale ref** |
+>
+> That second one is the trap worth naming: it means *the remote branch is gone
+> **and** your tracking ref is now stale.* Reading only the first half — "gone,
+> the publisher will recreate it" — is what preceded the fifth occurrence.
+>
+> ⇒ **Prune where the staleness is CREATED, not where it is felt.** This step
+> already fetches after every merge, so `--prune` here is deterministic and
+> costs nothing. Every earlier prevention was phrased as *notice the early
+> warning*, and **a prevention that depends on noticing an incidental symptom
+> is not a prevention** — all five occurrences were diagnosed only after the
+> push rejected.
+>
+> `--prune` deletes only refs whose upstream is **gone**, so it cannot strand a
+> branch another seat is still publishing from. Measured on the fifth
+> occurrence: this exact line reaped the branch origin had just deleted, one
+> command after the merge.
+>
+> **If you are reading this because a push already rejected:** do not re-run
+> the publisher until `git rev-parse --verify refs/remotes/origin/wp/<ID>`
+> **fails**. A successful fetch is not that check. The failed run dies at the
+> push *before* creating a PR, so there is no orphaned PR to hunt.
 
 > **Why blob identity and not a verification phrase grep.** A phrase must not
 > span `**bold**` or `` `code` `` markers — and, the mode that fires every
