@@ -16495,6 +16495,7 @@ mod tests {
             result_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
             callee_segment_site_id: 9,
             callee_frame_templates: vec![D2G_OUTER_FRAME],
+            composed_frame_templates: Vec::new(),
             parent_frame_template_id: Some(D2G_OUTER_FRAME),
             parent_segment_site_id: Some(9),
             caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
@@ -17283,6 +17284,15 @@ mod tests {
             result_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
             callee_segment_site_id: 9,
             callee_frame_templates: vec![D2G_OUTER_FRAME],
+            // `RT-LEXICAL-R3-FUSION-EMITTER` `DP` — the checked source's
+            // composition-time claim: when a fusion splice builds this
+            // invocation's segment, the producer frame joins it, qualified by
+            // the same single invocation source and affine instance.
+            //
+            // The ordinary sequence above is UNCHANGED, which is what keeps the
+            // uncomposed segments of this same template covering exactly
+            // `{outer}`. `89ee005b` widened that one instead and refused them.
+            composed_frame_templates: vec![D2G_INNER_FRAME],
             parent_frame_template_id: Some(D2G_OUTER_FRAME),
             parent_segment_site_id: Some(9),
             caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),

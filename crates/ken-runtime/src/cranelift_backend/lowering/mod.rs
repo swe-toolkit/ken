@@ -2813,6 +2813,26 @@ struct Lowering<'a> {
     /// that runs here is the *consumer's* `Predeclared` owner, and it is
     /// restored to the producer's on the way out.
     fused_consumer_authority: Option<(StaticOriginId, PredeclaredFunctionId)>,
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `DP` — the extent within which a checked
+    /// segment is a COMPOSED one, and it carries no membership of its own.**
+    ///
+    /// Set for the extent of one fused region's body definition, exactly like
+    /// `fused_consumer_authority` above and for the same reason: composition is
+    /// a property of *where* the segment is built, and the only code that knows
+    /// it is the fused definition pass.
+    ///
+    /// **This selects a sequence; it never supplies one.** Which frames join a
+    /// composed segment is `composed_frame_templates` on the checked source's
+    /// invocation template. With that sequence empty this flag is inert, which
+    /// is what makes the membership planner-authored rather than a consequence
+    /// of a fusion existing.
+    ///
+    /// **A nested ordinary segment inside a fused body would also see
+    /// `Composed`, and that is safe because the coverage check is EXACT.** Such
+    /// a segment presents the ordinary layers, the composed expectation names
+    /// more, and it is **refused** — never silently widened. The flag can cost a
+    /// refusal it did not have to; it cannot buy an acceptance.
+    fused_composition_extent: bool,
     /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`** — the binding-candidate
     /// ledger, a sibling of the claim ledger on the same artifact lifetime.
     continuation_candidates: Option<units::ContinuationCandidateLedger>,
@@ -14208,14 +14228,49 @@ fn decompose_computational_recursor(
         LoweringOperand::Carried(word) => (LoweringOperand::Carried(word), None),
     }
 }
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `DP` — which of an invocation template's two
+/// authored sequences this segment is measured against.**
+///
+/// This is a **selector, never a source of membership.** It says which segment
+/// shape is being built; the plan says which frames belong to that shape. With
+/// an empty `composed_frame_templates` the two are identical and `Composed`
+/// changes nothing, which is exactly the A/B that shows the membership is
+/// planner-authored rather than inferred from the presence of a fusion.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SegmentComposition {
+    /// The ordinary segment, built where the checked marker was crossed.
+    Ordinary,
+    /// The segment built by a fusion composition splice, which draws the
+    /// producer and the consuming suffix into one emission region.
+    Composed,
+}
+
+impl Lowering<'_> {
+    /// `RT-LEXICAL-R3-FUSION-EMITTER` `DP` — which sequence a segment built
+    /// right here is measured against. Read at every composition site, so the
+    /// ordinary and fused paths that share one call site stay one path.
+    fn segment_composition(&self) -> SegmentComposition {
+        if self.fused_composition_extent {
+            SegmentComposition::Composed
+        } else {
+            SegmentComposition::Ordinary
+        }
+    }
+}
+
 fn checked_invocation_frame_templates(
     plan: &crate::OrientedSubcontinuationPlanV1,
     source: InvocationTemplateRef,
-) -> Result<&[u64], CraneliftBackendError> {
+    composition: SegmentComposition,
+) -> Result<Vec<u64>, CraneliftBackendError> {
     match source {
+        // A same-SCC template carries no composition-time population, so a
+        // composed segment on one covers exactly the ordinary sequence. That is
+        // deliberate and fail-closed rather than an omission: an extra layer
+        // there is refused by the exact-coverage check below, never absorbed.
         InvocationTemplateRef::SameSccCall(call_template_id) => plan
             .recursive_call(call_template_id)
-            .map(|call| call.callee_frame_templates.as_slice())
+            .map(|call| call.callee_frame_templates.clone())
             .ok_or_else(|| {
                 unsupported(
                     "OrientedSubcontinuationPlanV1",
@@ -14224,7 +14279,13 @@ fn checked_invocation_frame_templates(
             }),
         InvocationTemplateRef::ComputationalIHCall(call_template_id) => plan
             .computational_ih_call(call_template_id)
-            .map(|call| call.callee_frame_templates.as_slice())
+            .map(|call| {
+                let mut templates = call.callee_frame_templates.clone();
+                if composition == SegmentComposition::Composed {
+                    templates.extend(call.composed_frame_templates.iter().copied());
+                }
+                templates
+            })
             .ok_or_else(|| {
                 unsupported(
                     "OrientedSubcontinuationPlanV1",
@@ -14237,8 +14298,10 @@ fn instantiate_checked_invocation_segment(
     plan: &crate::OrientedSubcontinuationPlanV1,
     invocation: CheckedRecursiveInvocationInstance,
     segment: &mut RecursorInvocationSegment,
+    composition: SegmentComposition,
 ) -> Result<(), CraneliftBackendError> {
-    let frame_templates = checked_invocation_frame_templates(plan, invocation.source)?;
+    let frame_templates =
+        checked_invocation_frame_templates(plan, invocation.source, composition)?;
     let expected = frame_templates.iter().copied().collect::<BTreeSet<_>>();
     let mut instantiated = BTreeSet::new();
     // ⭐ Set equality alone cannot see a PERMUTATION (`dec_s30rdnb1dvgk` item
@@ -14355,7 +14418,7 @@ fn instantiate_checked_invocation_segment(
     // plan/marker binding. It does not mint semantic order from Runtime: the
     // plan's `semantic_position` is the authority and Runtime order is the
     // thing being checked against it.
-    let mut planned_visit_order = frame_templates.to_vec();
+    let mut planned_visit_order = frame_templates.clone();
     planned_visit_order.sort_by_key(|frame_id| {
         std::cmp::Reverse(plan.frame(*frame_id).map(|frame| frame.semantic_position))
     });
@@ -14407,6 +14470,7 @@ fn compose_oriented_subcontinuation(
     activation: ContinuationActivationId,
     mut segment: RecursorInvocationSegment,
     dynamic_splice_edges: Vec<DynamicSpliceEdge>,
+    composition: SegmentComposition,
 ) -> Result<InstalledOrientedSubcontinuationSegment, CraneliftBackendError> {
     segment.validate_open_control_obligations()?;
     let invocation = invocation.or(segment.checked_invocation);
@@ -14417,7 +14481,7 @@ fn compose_oriented_subcontinuation(
                 "dynamic invocation has no checked oriented plan",
             )
         })?;
-        instantiate_checked_invocation_segment(plan, invocation, &mut segment)?;
+        instantiate_checked_invocation_segment(plan, invocation, &mut segment, composition)?;
     }
     let producer_origin = segment.origin;
     let sibling_position = segment.sibling_position;
@@ -14650,10 +14714,42 @@ fn compose_oriented_subcontinuation(
                         "dynamic splice edge names a stale checked call template",
                     )
                 })?;
+            // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `DP` — the SECOND consumer of
+            // ---- the authored membership, and it was invisible from the first.
+            //
+            // `child_frames` is the child invocation's actual frame sequence,
+            // normalised to ascending `semantic_position` above. The plan-side
+            // operand has to describe the same segment shape, so a composed
+            // child is compared against the composed sequence.
+            //
+            // The ordinary operand is left EXACTLY as it was — the authored
+            // sequence, unsorted, compared verbatim. Only the composed branch
+            // derives and normalises, because only it concatenates two authored
+            // sequences and cannot assume the result is already in position
+            // order. Sorting the ordinary one too would have changed a landed
+            // comparison for no reason `DP` needs.
+            //
+            // **Found by an advancing refusal, not by reading.** Closing the
+            // mixed-frame guard moved the compile to *"dynamic splice edge
+            // disagrees with its checked static parent"* here. One membership
+            // law, two sites that encode it; the first refusal named only one.
+            let expected_child_frames = match composition {
+                SegmentComposition::Ordinary => call.callee_frame_templates.clone(),
+                SegmentComposition::Composed => {
+                    let mut frames = call.callee_frame_templates.clone();
+                    frames.extend(call.composed_frame_templates.iter().copied());
+                    frames.sort_by_key(|frame_id| {
+                        plan.frame(*frame_id)
+                            .expect("checked frame exists after plan validation")
+                            .semantic_position
+                    });
+                    frames
+                }
+            };
             if call.parent_frame_template_id != Some(edge.parent_frame_template_id)
                 || call.parent_segment_site_id != Some(edge.segment_site_id)
                 || call.callee_segment_site_id != edge.segment_site_id
-                || call.callee_frame_templates != *child_frames
+                || expected_child_frames != *child_frames
             {
                 return Err(unsupported(
                     "OrientedSubcontinuationPlanV1",
@@ -16624,7 +16720,7 @@ impl<'a> Lowering<'a> {
         // Qualify the exact reusable template sequence at marker consumption.
         // Existing child-qualified layers remain untouched when later parent
         // wrappers are added to the same flattened carrier.
-        instantiate_checked_invocation_segment(plan, instance, invocation)?;
+        instantiate_checked_invocation_segment(plan, instance, invocation, self.segment_composition())?;
         Ok(LoweringOperand::Specialized(value))
     }
 
@@ -18067,6 +18163,7 @@ impl<'a> Lowering<'a> {
             activation,
             invocation,
             dynamic_splice_edges,
+            self.segment_composition(),
         )?;
         debug_assert_eq!(installed.activation, activation);
         debug_assert!(installed

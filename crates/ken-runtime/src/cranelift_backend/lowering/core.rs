@@ -2478,6 +2478,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         // region against the population its own install already narrowed.
         fusion_claims: Some(fusion_claims),
         fused_consumer_authority: None,
+        fused_composition_extent: false,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -3423,6 +3424,7 @@ impl<'a> Lowering<'a> {
                                         activation,
                                         invocation,
                                         dynamic_splice_edges,
+                                        self.segment_composition(),
                                     )?;
                                     let frames = installed_oriented_eliminator_frames(&installed);
                                     let mut composed = Vec::with_capacity(frames.len() + 2);
@@ -3665,6 +3667,7 @@ impl<'a> Lowering<'a> {
                             activation,
                             invocation,
                             dynamic_splice_edges,
+                            self.segment_composition(),
                         )?;
                         let mut composed = installed_oriented_eliminator_frames(&installed);
                         composed.push(EliminatorFrame::InvocationReturn);
@@ -16060,6 +16063,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                             activation,
                             invocation,
                             dynamic_splice_edges,
+                            self.segment_composition(),
                         )?;
                         let mut frames = installed_oriented_eliminator_frames(&installed);
                         frames.push(EliminatorFrame::InvocationReturn);

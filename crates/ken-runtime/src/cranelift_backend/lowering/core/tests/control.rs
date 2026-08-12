@@ -86,6 +86,7 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
+        fused_composition_extent: false,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -255,6 +256,7 @@ fn run_px8j_malformed_recursor_consumer(
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
+        fused_composition_extent: false,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -513,6 +515,7 @@ fn oriented_same_depth_siblings_require_exact_dynamic_edges() {
         ContinuationActivationId(14),
         segment,
         edges,
+        SegmentComposition::Ordinary,
     )
     .expect("exact child-to-parent edges keep same-depth siblings separate");
     assert_eq!(
@@ -539,6 +542,7 @@ fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
                 ContinuationActivationId(14),
                 segment,
                 edges,
+                SegmentComposition::Ordinary,
             ) {
                 Ok(_) => panic!("a malformed dynamic splice graph must reject before CFG"),
                 Err(error) => error,
@@ -1205,6 +1209,7 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         deleted,
         Vec::new(),
+        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("deleting only an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1227,6 +1232,7 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         duplicated,
         Vec::new(),
+        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("duplicating an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1249,6 +1255,7 @@ fn oriented_endpoint_corruption_and_affine_reuse_fail_closed() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
+        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("endpoint corruption must reject before installation"),
         Err(error) => error,
@@ -2215,6 +2222,7 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         replayed,
         Vec::new(),
+        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("an inherited open scope cannot replay its semantic transformer"),
         Err(error) => error,
@@ -2233,6 +2241,7 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         omitted,
         Vec::new(),
+        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("a pending selection cannot be omitted from semantic work"),
         Err(error) => error,
@@ -3908,6 +3917,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
+        fused_composition_extent: false,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -3985,6 +3995,7 @@ fn oriented_segment_keeps_semantic_and_control_axes_independent() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
+        SegmentComposition::Ordinary,
     )
     .unwrap();
     assert_eq!(
@@ -4028,6 +4039,7 @@ fn oriented_fresh_ih_semantics_retain_all_inherited_control_obligations() {
         ContinuationActivationId(8),
         oriented_five_control_invocation(),
         Vec::new(),
+        SegmentComposition::Ordinary,
     )
     .unwrap();
     assert_eq!(
@@ -4328,6 +4340,7 @@ fn oriented_test_ih_plan() -> crate::OrientedSubcontinuationPlanV1 {
             result_interface: oriented_test_interface(frame_id as u8 + 1),
             callee_segment_site_id: 9,
             callee_frame_templates: vec![frame_id],
+            composed_frame_templates: Vec::new(),
             parent_frame_template_id: Some(frame_id),
             parent_segment_site_id: Some(9),
             caller_interface: oriented_test_interface(frame_id as u8 + 1),
@@ -4789,6 +4802,7 @@ fn occurrence_exact_marker_fixture(
         result_interface: oriented_test_interface(1),
         callee_segment_site_id: 9,
         callee_frame_templates: vec![0],
+        composed_frame_templates: Vec::new(),
         parent_frame_template_id: Some(0),
         parent_segment_site_id: Some(9),
         caller_interface: oriented_test_interface(1),
@@ -9366,6 +9380,7 @@ fn rtfp_compose(
         ContinuationActivationId(8),
         segment,
         Vec::new(),
+        SegmentComposition::Ordinary,
     )
 }
 
@@ -25081,6 +25096,7 @@ fn d8f_plan_with(
         result_interface: oriented_test_interface(1),
         callee_segment_site_id: 9,
         callee_frame_templates: vec![7],
+        composed_frame_templates: Vec::new(),
         parent_frame_template_id: Some(7),
         parent_segment_site_id: Some(9),
         caller_interface: oriented_test_interface(1),
@@ -32863,5 +32879,157 @@ fn r3_the_base_uncomposed_slot_population_stays_singleton_and_rehomed_expects_no
          Rows are (cause, outer slot, inner slot, call callee, reached the ordinary refusal). \
          errors={:?}",
         rows.iter().map(|(cause, _, _, _, error)| (cause, error)).collect::<Vec<_>>()
+    );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `DP` — the composition-time membership
+/// population law: what the checked source may claim, and what a claim is worth
+/// to the binding fingerprint.**
+///
+/// `composed_frame_templates` is new planner population, so the question that
+/// decides whether it is safe is not "does the lawful case work" but **"can it
+/// be made to say nothing, and does anything notice?"** Every row here is a way
+/// the sequence could have been vacuous, and every one is a refusal rather than
+/// a tolerated shape.
+///
+/// | row | claim | verdict |
+/// |---|---|---|
+/// | lawful | a frame of this segment, not already named | accepted |
+/// | stale | a frame the plan does not contain | refused |
+/// | repeat | the same frame twice in one sequence | refused |
+/// | overlap | a frame the ordinary sequence already names | refused |
+///
+/// **Why `overlap` is a refusal and not a harmless duplicate.** The ordinary and
+/// composed sequences are concatenated to build a composed segment's expectation.
+/// A frame in both would be expected twice, and the instantiator would meet it as
+/// *"one invocation instantiates a checked frame template more than once"* — a
+/// Runtime error blaming the segment for a defect that is in the plan. Refusing
+/// at `validate` puts the diagnosis where the mistake is.
+///
+/// **The fingerprint row is the one that is easy to omit and expensive to lose.**
+/// The two sequences are encoded back to back, so `([outer], [inner])` and
+/// `([outer, inner], [])` are the same frame ids in the same order — and until
+/// the composed sequence carries a length prefix they hash **identically**. The
+/// binding fingerprint is what makes a template's identity depend on what it
+/// claims, so two templates whose composition-time claims differ must not agree
+/// on it. Asserting `!=` here is asserting that the separator is load-bearing.
+///
+/// **What this does NOT cover, stated rather than implied.** `validate` also
+/// refuses a composed frame from another checked segment. This fixture has one
+/// segment site, so that row has no witness here and is **not** exercised — the
+/// closure exists in the validator and this test is not evidence for it.
+///
+/// **Promise class: durable invariant.** Acceptance and refusal of authored
+/// claims, plus the inequality of two fingerprints that describe different
+/// claims. It carries no literal frame ids of its own: every id is read off the
+/// fixture's own plan, and the one literal is the count `2`, which is what makes
+/// a repeat a repeat.
+#[test]
+fn dp_composition_time_membership_is_validated_and_changes_the_binding_fingerprint() {
+    // The lawful claim: `outer` keeps the ordinary sequence and `inner` — a real
+    // frame of the same segment that the ordinary sequence does not name — is
+    // claimed as a composition-time member.
+    let base = oriented_test_ih_plan();
+    let ordinary = base
+        .computational_ih_calls
+        .first()
+        .expect("the IH fixture carries a call template")
+        .clone();
+    let outer = *ordinary
+        .callee_frame_templates
+        .first()
+        .expect("the ordinary sequence is non-empty");
+    let inner = base
+        .frames
+        .iter()
+        .map(|frame| frame.frame_id)
+        .find(|frame_id| !ordinary.callee_frame_templates.contains(frame_id))
+        .expect("the fixture has a frame the ordinary sequence does not name");
+    let stale = base
+        .frames
+        .iter()
+        .map(|frame| frame.frame_id)
+        .max()
+        .expect("the fixture has frames")
+        + 1;
+
+    /// Re-seal the first call template's composition-time claim and revalidate.
+    ///
+    /// The fingerprint is recomputed, never left stale: a plan that fails only
+    /// because its fingerprint no longer matches would refuse for a reason that
+    /// has nothing to do with the claim under test, and every row below would
+    /// pass for the wrong reason.
+    fn under(
+        base: &crate::OrientedSubcontinuationPlanV1,
+        composed: Vec<u64>,
+    ) -> (crate::OrientedSubcontinuationPlanV1, Result<(), &'static str>) {
+        let mut plan = base.clone();
+        let call = plan
+            .computational_ih_calls
+            .first_mut()
+            .expect("the IH fixture carries a call template");
+        call.composed_frame_templates = composed;
+        call.occurrence_binding_fingerprint =
+            crate::compiler_private_computational_ih_call_binding_fingerprint(call);
+        let verdict = plan.validate();
+        (plan, verdict)
+    }
+
+    let (lawful, lawful_verdict) = under(&base, vec![inner]);
+    let (_, stale_verdict) = under(&base, vec![stale]);
+    let (_, repeat_verdict) = under(&base, vec![inner, inner]);
+    let (_, overlap_verdict) = under(&base, vec![outer]);
+
+    // The separator row. Same ids, same order, different claim: one says
+    // "`inner` joins only when composed", the other says "`inner` is always a
+    // member". Their binding fingerprints must disagree.
+    let composed_claim = lawful
+        .computational_ih_calls
+        .first()
+        .expect("the lawful plan kept its call template")
+        .occurrence_binding_fingerprint;
+    let folded_claim = {
+        let mut call = ordinary.clone();
+        call.callee_frame_templates = vec![outer, inner];
+        call.composed_frame_templates = Vec::new();
+        crate::compiler_private_computational_ih_call_binding_fingerprint(&call)
+    };
+
+    // The claim survives transport. A population the checked source authors and
+    // the decoder drops is a population Runtime never sees.
+    let decoded = crate::OrientedSubcontinuationPlanV1::decode(&lawful.canonical_bytes())
+        .expect("the lawful plan round-trips");
+    let decoded_claim = decoded
+        .computational_ih_calls
+        .first()
+        .expect("the decoded plan kept its call template")
+        .composed_frame_templates
+        .clone();
+
+    assert_eq!(
+        (
+            lawful_verdict,
+            stale_verdict,
+            repeat_verdict,
+            overlap_verdict,
+            composed_claim == folded_claim,
+            decoded_claim.as_slice(),
+        ),
+        (
+            Ok(()),
+            Err("computational IH call names a stale composed frame"),
+            Err("computational IH call repeats a composed frame"),
+            Err("computational IH call composes a frame it already names"),
+            false,
+            [inner].as_slice(),
+        ),
+        "DP: a composition-time claim naming a real, not-already-named frame of this segment is \
+         accepted; a stale frame, a repeat, and a frame the ordinary sequence already names are \
+         each refused by their own sentence; the claim changes the binding fingerprint, so \
+         'inner joins when composed' and 'inner is always a member' are not the same template; \
+         and the claim survives encode/decode. A row that stops refusing means the population \
+         can be made vacuous; a fingerprint that starts agreeing means the two sequences were \
+         encoded without a separator and a composition-time claim became invisible to the \
+         identity that is supposed to bind it."
     );
 }
