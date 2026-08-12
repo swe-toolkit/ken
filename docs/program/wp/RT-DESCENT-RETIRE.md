@@ -85,7 +85,7 @@ the proof is unavailable and any argument for it is circular.
 > lane — becomes **load-bearing for the first time**, with no control standing
 > behind it.
 >
-> ⛔ **Nothing about the arm changes at that moment, so nothing prompts anyone
+> **Nothing about the arm changes at that moment, so nothing prompts anyone
 > to re-read its evidence.** That is the whole hazard: a diff-driven review sees
 > an untouched arm and moves on. It is the same **cost-moves-at-activation**
 > shape recorded at [[RT-SEED-CALL-PORT]] `D3`, where unmutated `AC-6` controls

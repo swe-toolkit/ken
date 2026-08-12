@@ -67,7 +67,7 @@ retires the fallback and the detector together. Un-skipping `nc22` green on the
 functionized lane is that node's closure condition, and it is this node's
 release gate.
 
-## ▶ THE FRAME IS WRITTEN
+## THE FRAME IS WRITTEN
 
 `docs/program/wp/RT-DESCENT-RETIRE.md`. Campaign context, the binding traps that
 bind every node in this arc, and the full schedule:

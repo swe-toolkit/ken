@@ -910,9 +910,11 @@ where the coordinate is actually consumed, and **makes the two-route structure
 visible on the page** — which is exactly what the original enumeration got
 wrong. Update both sides of the assertion together.
 
-**`D2k-1c-1` — THE THREE-LINK CHAIN HAS NO LAW ON ITS JOIN. Do this before the
-route repair.** Adversary `evt_733esjz2t4bn8`, confirmed. The relation landed at
-`b16aa1e`; this is a gap in it, not a regression.
+**`D2k-1c-1` — THE THREE-LINK CHAIN HAD NO LAW ON ITS JOIN. LANDED at
+`3bad778f` (PR #2003), `main = 5c7b40b6`.** Adversary `evt_733esjz2t4bn8`,
+confirmed. The relation landed at `b16aa1e`; this was a gap in it, not a
+regression. **What landed is stronger than what this block first prescribed —
+read the correction below before reusing any of this text.**
 
 `close()` (`mod.rs:4469`) states the chain as **construct → transition →
 consume** and asserts four containments — `dom(recognized)` and
@@ -942,10 +944,128 @@ transition mints exactly one transport."* That is a claim about `rebind`'s body,
 > for a strictly weaker case and not applied to the load-bearing join.** Links
 > one and three have laws; the join the chain argument rests on has none.
 
-**Repair is one line, in a loop that already binds the value.** `mod.rs:4493`
-reads `for (recognition, transport) in &self.transitioned` and uses `transport`
-**only in the error message** — a `contains_key` away, in scope, no new
-traversal. Give it a row that fails without it.
+> ### THE ONE-LINE REPAIR THIS FRAME PRESCRIBED IS INSUFFICIENT
+>
+> Measured, not argued, and the landed law is strictly stronger.
+>
+> This block used to end: *"Repair is one line, in a loop that already binds the
+> value. `mod.rs:4493` reads `for (recognition, transport) in
+> &self.transitioned` and uses `transport` **only in the error message** — a
+> `contains_key` away, in scope, no new traversal."* **Do not build that. It is
+> the mutation the landed controls red.**
+>
+> `range(transitioned) ⊆ dom(minted)` is **satisfied by
+> `transitioned[r1] = transitioned[r2] = T`** — two constructed fields
+> transitioning to one minted transport, discharged by that transport's single
+> lawful consumption. Loops one and two pass, the containment passes, `T` is
+> consumed. ⇒ **green close, one worker forgotten.** The admitted state is not
+> closed; it is moved sideways.
+>
+> **The law is the agreeing bijection, not the containment:**
+> `minted[transitioned[r]].recognition == r`, and the converse over `minted`.
+> Injectivity is then a consequence rather than a second check. Three refusals,
+> each with a row that fails without it: forward existence, forward agreement,
+> and the converse.
+>
+> **Why the frame got it wrong, stated because it is the fourth instance in this
+> node.** The finding named **one** admitted state and prescribed the check that
+> closes **that state**. This frame published the prescription. **A repair
+> specified to close a named counterexample closes the counterexample, not the
+> class** — the property is *a transition and its transport must name each
+> other*, and the containment is a strictly weaker shadow of it. Derive the law
+> from the property and check that the named state falls out; do not derive the
+> law from the state.
+
+**Give it rows that fail without it, and build them against the maps directly.**
+A row that reaches the admitted state by calling `rebind` proves the adjacency
+of its two inserts, **not the law** — and the whole finding is that `close()`
+cannot fail when that adjacency does not hold.
+
+**`D2k-1c-1a` — THE PROVENANCE REFUSALS ARE INERT ON THE `RecursiveDescent`
+ARM. A deciding read, carried with `1c-2` because only the route repair can
+answer it.** Adversary `evt_7sm778ppegre9`, confirmed. **Re-derived
+independently at `main = 5c7b40b6`; every coordinate below is measured, not
+relayed.**
+
+Two refusals compare scope, both `Option<FuncId>` inequality, so **`None !=
+None` is false and both pass vacuously when the scope is absent**:
+
+| refusal | site |
+|---|---|
+| `recognized.scope != scope` | `mod.rs:4335`, in `rebind` |
+| `minted.scope != scope` | `mod.rs:4422`, in `note_consuming_call` |
+
+`defining_function_id` has **exactly two assignments** (`mod.rs:8939` to
+`Some`, `:8970` to `None`), and the `Some` one is reached only through
+`open_aggregate_events`, whose callers are **five, all in `units.rs`** — the
+`FunctionizedUnits` arm. Measured: zero callers in `core.rs` or `mod.rs`.
+
+⇒ **On the `RecursiveDescent` arm the field is `None` for the whole root
+descent**, so a worker recognized, rebound and consumed on that arm meets
+`None == None` at both refusals. **Inert, not merely untested.**
+
+**The control set exercises the axis exclusively at `Some`** —
+`control.rs:31707`, `:31708`, `:31934` are the only scope values, all
+`Some(FuncId::from_u32(..))`. Those rows prove the guard fires when two bodies
+differ. **They cannot show it is ever live**, because every instance sits on the
+side of the distinction where the comparison has content.
+
+> **The fact is already written down, in a comment beside the fixture, and no
+> operative row is on its side.** `control.rs:31704-31706`: *"Production always
+> passes `defining_function_id`, which is `None` outside the emission pass."*
+> **This is the third time in this node** that a precise fact sat in prose next
+> to the rows while every row was on the other side of it — the same shape as
+> the six born-stale `site` labels and the descent-vs-field multiplicity column.
+> Treat a comment that states a limit as an unstarted control, not a discharged
+> one.
+
+**Direction: fail-open, and only where the guard was the answer.**
+`note_consuming_call`'s own doc calls cross-body carriage *"provenance failure,
+not a licence to consume it again."* If the worker-bearing population lands on
+`RecursiveDescent`, that sentence is true of the code and false of the compile.
+
+**THE DECIDING READ, once the route repair delivers a rebound field: is
+`defining_function_id` `Some` at the recognize / rebind / consume triple on the
+path the five rows take?**
+
+- **`None`** ⇒ both refusals are vacuous on the live population and the control
+  set measures a distinction production never presents.
+- **`Some`** ⇒ the axis is live, and the residual gap is that nothing records
+  *which* value production supplies, so a later move of recognition out of the
+  emission pass silently re-vacuates it.
+
+**Do not prescribe the repair from this frame, and do not carry one in from the
+finding.** `1c-1` is the standing lesson: the fix read off the named
+counterexample was strictly weaker than the property, and this block would be
+the second instance in a day. Derive the law from the property once the read
+answers, and give it a row that fails without it.
+
+> **This node's own goal moves this finding.** `RecursiveDescent` is being
+> retired. If the worker-bearing population ends up on `FunctionizedUnits`, the
+> field is `Some` and the guard becomes live without anyone touching it — the
+> cost-moves-at-activation shape already recorded at [[RT-SEED-CALL-PORT]] `D3`.
+> **The dangerous window is now, while both arms exist**, and it closes by
+> accident rather than by a decision. That is a reason to answer the read, not a
+> reason to defer it.
+
+**Two things the same pass settled, recorded so they are not re-raised.**
+
+**The cross-firing risk I flagged at M8 is absent, and the argument is
+checkable.** Each of the three join refusals has a violation the other two
+admit: J2 quantifies over `transitioned` and never sees a second transport
+standing behind one recognition; J3 quantifies over `minted` and never sees the
+surviving violation when two recognitions share a transport — **which is exactly
+the state the one-line containment admitted**, so J2 is the repair and J3 is not
+a restatement of it; and `transitioned[r] = T ∉ minted` is invisible to J3 and
+precedes J2's `get`. ⇒ **No row can be passing on a sibling's behalf.**
+
+**One disclosure is owed on the `1c-1` rows and is cheap.** They construct
+ledger states no current writer can produce, and nothing in the control says so
+— a reader arriving at six impossible ledgers can reasonably read them as
+reachable defects. One sentence, the same disclosure `close()`'s own doc already
+makes for the `⊆` re-check: *these are states no current writer can produce; the
+laws exist for a future second writer.* Fold it into the next Runtime cut; it
+does not warrant its own.
 
 **`1c-0` and `1c-0b` are landed. THE ORDERING QUESTION IS ANSWERED TOO —
 Architect `evt_nmdrt6hdq34f`, and it needs NO new node and NO new authority.**
@@ -975,10 +1095,52 @@ surface.
 not this question. Build to `evt_3manpp82emcq6`, not to the superseded
 transport-only shape.
 
-**The defect, in one sentence:** the excluded route **loses or misattaches the
-pending outer continuation** when the producer's recursive/direct descent
-returns, so the outer static match never receives the worker-bearing occurrence
-it is owed.
+> ### THE ONE-SENTENCE DEFECT BELOW IS SUPERSEDED BY MEASUREMENT
+>
+> The mechanism fork it opens is with the Architect.
+>
+> It read: *"the excluded route **loses or misattaches the pending outer
+> continuation** when the producer's recursive/direct descent returns, so the
+> outer static match never receives the worker-bearing occurrence it is owed."*
+> **That is a statement about timing, and the measurement says the mechanism is
+> about which producer supplies the eliminated value.**
+>
+> Measured by the ring at `3bad778f` on row 5 — whose fixture names input and
+> output types differently, which is why it discriminates and row 4 does not —
+> and re-derived independently at `main = 5c7b40b6`:
+>
+> - **`recognized_constructor_worker_fields` has exactly ONE call site**,
+>   `core.rs:15008`, inside `lower_expr`'s `Construct` arm. That is the only
+>   armed producer.
+> - **The composed outer match eliminates values from the UNARMED producer**,
+>   `lower_computational_producer_expr` (`core.rs:3182`). Both eliminations
+>   complete before the worker-bearing constructor is entered at all.
+> - ⇒ **`installs == 0` is the elimination arriving at a constructor that never
+>   had a worker field to rebind — not arriving late.** A repair that only
+>   reorders will look correct in a trace and leave the count at zero. Pending
+>   the outer match is **necessary and not sufficient**.
+> - **`Lowered::Constructor` carries no `StaticOriginId`** — its four fields are
+>   `constructor`, `synthesized_identity`, `occurrence`, `args`
+>   (`mod.rs:3119-3151`). So the eliminating side has the constructor spelling
+>   and the allocation lane, which is **exactly what this frame forbids matching
+>   on**, and is how it selects a case over a different occurrence of the same
+>   constructor with nothing noticing.
+>
+> **Two facts the ring's own report did not carry, added by re-derivation:** the
+> unarmed function has **two** production sites, `:3802` and `:4329`, so any
+> re-routing repair spans both or must say which the composed path cannot reach;
+> and **`static_origin` is already in scope at both** (`:3798` calls
+> `child_occurrence(static_origin, …)`). The planner origin is not unavailable
+> at the producer — it is available and **not carried on the template**.
+>
+> **The disposition is the Architect's** (`evt_1q729cw9gf3r1` supplies the
+> population; the request is `evt_1rqy4xbjsfv95`). Three shapes are on the
+> table: reach the armed producer from the case body; arm the computational
+> producer, which adds a second recognition site and a census question; or carry
+> the planner origin on `Lowered::Constructor` the way `synthesized_identity`
+> and `occurrence` already are, which adds no recognition site. **Do not pick
+> one from this frame.** Obligations 1-5 below are unchanged by all of this —
+> they constrain the proof, not the mechanism.
 
 **The repair, bounded by the ruling:** the outer static match receives the
 recognized occurrence, **rebinds that exact planner-owned field origin without
