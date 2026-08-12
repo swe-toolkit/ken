@@ -910,9 +910,11 @@ where the coordinate is actually consumed, and **makes the two-route structure
 visible on the page** — which is exactly what the original enumeration got
 wrong. Update both sides of the assertion together.
 
-**`D2k-1c-1` — THE THREE-LINK CHAIN HAS NO LAW ON ITS JOIN. Do this before the
-route repair.** Adversary `evt_733esjz2t4bn8`, confirmed. The relation landed at
-`b16aa1e`; this is a gap in it, not a regression.
+**`D2k-1c-1` — THE THREE-LINK CHAIN HAD NO LAW ON ITS JOIN. LANDED at
+`3bad778f` (PR #2003), `main = 5c7b40b6`.** Adversary `evt_733esjz2t4bn8`,
+confirmed. The relation landed at `b16aa1e`; this was a gap in it, not a
+regression. **What landed is stronger than what this block first prescribed —
+read the correction below before reusing any of this text.**
 
 `close()` (`mod.rs:4469`) states the chain as **construct → transition →
 consume** and asserts four containments — `dom(recognized)` and
@@ -1007,10 +1009,52 @@ surface.
 not this question. Build to `evt_3manpp82emcq6`, not to the superseded
 transport-only shape.
 
-**The defect, in one sentence:** the excluded route **loses or misattaches the
-pending outer continuation** when the producer's recursive/direct descent
-returns, so the outer static match never receives the worker-bearing occurrence
-it is owed.
+> ### THE ONE-SENTENCE DEFECT BELOW IS SUPERSEDED BY MEASUREMENT
+>
+> The mechanism fork it opens is with the Architect.
+>
+> It read: *"the excluded route **loses or misattaches the pending outer
+> continuation** when the producer's recursive/direct descent returns, so the
+> outer static match never receives the worker-bearing occurrence it is owed."*
+> **That is a statement about timing, and the measurement says the mechanism is
+> about which producer supplies the eliminated value.**
+>
+> Measured by the ring at `3bad778f` on row 5 — whose fixture names input and
+> output types differently, which is why it discriminates and row 4 does not —
+> and re-derived independently at `main = 5c7b40b6`:
+>
+> - **`recognized_constructor_worker_fields` has exactly ONE call site**,
+>   `core.rs:15008`, inside `lower_expr`'s `Construct` arm. That is the only
+>   armed producer.
+> - **The composed outer match eliminates values from the UNARMED producer**,
+>   `lower_computational_producer_expr` (`core.rs:3182`). Both eliminations
+>   complete before the worker-bearing constructor is entered at all.
+> - ⇒ **`installs == 0` is the elimination arriving at a constructor that never
+>   had a worker field to rebind — not arriving late.** A repair that only
+>   reorders will look correct in a trace and leave the count at zero. Pending
+>   the outer match is **necessary and not sufficient**.
+> - **`Lowered::Constructor` carries no `StaticOriginId`** — its four fields are
+>   `constructor`, `synthesized_identity`, `occurrence`, `args`
+>   (`mod.rs:3119-3151`). So the eliminating side has the constructor spelling
+>   and the allocation lane, which is **exactly what this frame forbids matching
+>   on**, and is how it selects a case over a different occurrence of the same
+>   constructor with nothing noticing.
+>
+> **Two facts the ring's own report did not carry, added by re-derivation:** the
+> unarmed function has **two** production sites, `:3802` and `:4329`, so any
+> re-routing repair spans both or must say which the composed path cannot reach;
+> and **`static_origin` is already in scope at both** (`:3798` calls
+> `child_occurrence(static_origin, …)`). The planner origin is not unavailable
+> at the producer — it is available and **not carried on the template**.
+>
+> **The disposition is the Architect's** (`evt_1q729cw9gf3r1` supplies the
+> population; the request is `evt_1rqy4xbjsfv95`). Three shapes are on the
+> table: reach the armed producer from the case body; arm the computational
+> producer, which adds a second recognition site and a census question; or carry
+> the planner origin on `Lowered::Constructor` the way `synthesized_identity`
+> and `occurrence` already are, which adds no recognition site. **Do not pick
+> one from this frame.** Obligations 1-5 below are unchanged by all of this —
+> they constrain the proof, not the mechanism.
 
 **The repair, bounded by the ruling:** the outer static match receives the
 recognized occurrence, **rebinds that exact planner-owned field origin without
