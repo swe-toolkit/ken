@@ -981,6 +981,92 @@ A row that reaches the admitted state by calling `rebind` proves the adjacency
 of its two inserts, **not the law** — and the whole finding is that `close()`
 cannot fail when that adjacency does not hold.
 
+**`D2k-1c-1a` — THE PROVENANCE REFUSALS ARE INERT ON THE `RecursiveDescent`
+ARM. A deciding read, carried with `1c-2` because only the route repair can
+answer it.** Adversary `evt_7sm778ppegre9`, confirmed. **Re-derived
+independently at `main = 5c7b40b6`; every coordinate below is measured, not
+relayed.**
+
+Two refusals compare scope, both `Option<FuncId>` inequality, so **`None !=
+None` is false and both pass vacuously when the scope is absent**:
+
+| refusal | site |
+|---|---|
+| `recognized.scope != scope` | `mod.rs:4335`, in `rebind` |
+| `minted.scope != scope` | `mod.rs:4422`, in `note_consuming_call` |
+
+`defining_function_id` has **exactly two assignments** (`mod.rs:8939` to
+`Some`, `:8970` to `None`), and the `Some` one is reached only through
+`open_aggregate_events`, whose callers are **five, all in `units.rs`** — the
+`FunctionizedUnits` arm. Measured: zero callers in `core.rs` or `mod.rs`.
+
+⇒ **On the `RecursiveDescent` arm the field is `None` for the whole root
+descent**, so a worker recognized, rebound and consumed on that arm meets
+`None == None` at both refusals. **Inert, not merely untested.**
+
+**The control set exercises the axis exclusively at `Some`** —
+`control.rs:31707`, `:31708`, `:31934` are the only scope values, all
+`Some(FuncId::from_u32(..))`. Those rows prove the guard fires when two bodies
+differ. **They cannot show it is ever live**, because every instance sits on the
+side of the distinction where the comparison has content.
+
+> **The fact is already written down, in a comment beside the fixture, and no
+> operative row is on its side.** `control.rs:31704-31706`: *"Production always
+> passes `defining_function_id`, which is `None` outside the emission pass."*
+> **This is the third time in this node** that a precise fact sat in prose next
+> to the rows while every row was on the other side of it — the same shape as
+> the six born-stale `site` labels and the descent-vs-field multiplicity column.
+> Treat a comment that states a limit as an unstarted control, not a discharged
+> one.
+
+**Direction: fail-open, and only where the guard was the answer.**
+`note_consuming_call`'s own doc calls cross-body carriage *"provenance failure,
+not a licence to consume it again."* If the worker-bearing population lands on
+`RecursiveDescent`, that sentence is true of the code and false of the compile.
+
+**THE DECIDING READ, once the route repair delivers a rebound field: is
+`defining_function_id` `Some` at the recognize / rebind / consume triple on the
+path the five rows take?**
+
+- **`None`** ⇒ both refusals are vacuous on the live population and the control
+  set measures a distinction production never presents.
+- **`Some`** ⇒ the axis is live, and the residual gap is that nothing records
+  *which* value production supplies, so a later move of recognition out of the
+  emission pass silently re-vacuates it.
+
+**Do not prescribe the repair from this frame, and do not carry one in from the
+finding.** `1c-1` is the standing lesson: the fix read off the named
+counterexample was strictly weaker than the property, and this block would be
+the second instance in a day. Derive the law from the property once the read
+answers, and give it a row that fails without it.
+
+> **This node's own goal moves this finding.** `RecursiveDescent` is being
+> retired. If the worker-bearing population ends up on `FunctionizedUnits`, the
+> field is `Some` and the guard becomes live without anyone touching it — the
+> cost-moves-at-activation shape already recorded at [[RT-SEED-CALL-PORT]] `D3`.
+> **The dangerous window is now, while both arms exist**, and it closes by
+> accident rather than by a decision. That is a reason to answer the read, not a
+> reason to defer it.
+
+**Two things the same pass settled, recorded so they are not re-raised.**
+
+**The cross-firing risk I flagged at M8 is absent, and the argument is
+checkable.** Each of the three join refusals has a violation the other two
+admit: J2 quantifies over `transitioned` and never sees a second transport
+standing behind one recognition; J3 quantifies over `minted` and never sees the
+surviving violation when two recognitions share a transport — **which is exactly
+the state the one-line containment admitted**, so J2 is the repair and J3 is not
+a restatement of it; and `transitioned[r] = T ∉ minted` is invisible to J3 and
+precedes J2's `get`. ⇒ **No row can be passing on a sibling's behalf.**
+
+**One disclosure is owed on the `1c-1` rows and is cheap.** They construct
+ledger states no current writer can produce, and nothing in the control says so
+— a reader arriving at six impossible ledgers can reasonably read them as
+reachable defects. One sentence, the same disclosure `close()`'s own doc already
+makes for the `⊆` re-check: *these are states no current writer can produce; the
+laws exist for a future second writer.* Fold it into the next Runtime cut; it
+does not warrant its own.
+
 **`1c-0` and `1c-0b` are landed. THE ORDERING QUESTION IS ANSWERED TOO —
 Architect `evt_nmdrt6hdq34f`, and it needs NO new node and NO new authority.**
 
