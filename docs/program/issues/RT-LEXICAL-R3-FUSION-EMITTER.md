@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-R3-FUSION-EMITTER
 title: "Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,45 @@ blocks: [RT-RECURSOR-TRANSPORT]
 github: null
 origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliation returned 0 of 8 discharged across eleven merged D2f partials (runtime-leader, evt_d9n0twj6y5sp). Separability ruled by the Architect at evt_7knsqyqg72103 on a Steward question (evt_2vbhz9kgp0b44). Steward-filed (agents cannot create tracked work per COORDINATION 2).
 ---
+
+> # `D0` MERGED 2026-08-12 — THE POSITIVE ROW IS NON-ZERO
+>
+> Exact `54f10ca6`, PR #1962, **CI green**, `origin/main` `36848e08`. Declared
+> base `b2ee3377`, one non-merge commit, one test-only path
+> `core/tests/control.rs`, `+222/-0`. Decision `dec_7fm7rrj76hw58` resolved by
+> Architect `evt_59npt60pcy2vq`; QA `evt_71p5wdk23kxnz`. M6 verified by blob
+> identity from the declared merge-base.
+>
+> **The frame's central premise held on the first attempt.** `D0`'s gate is
+> committed before any emitter definition, and the checked `D2j` `R3`-shaped
+> twin reaches **resolved plane 1** with exactly one key, id and descriptor
+> through the production entry `compile_expr_into_object_module` with
+> `Some(oriented)`.
+>
+> | row | subject | resolved plane |
+> |---|---|---|
+> | absence | seed `px8j` before-hole, no oriented plan | 0 |
+> | positive | the checked `D2j` twin via the production entry | 1, one key / id / descriptor |
+> | refusal | that twin, frame marker stripped | never planned — validator refuses first |
+>
+> **Both planes are read by the same call** —
+> `build_static_continuation_fusion_plan`, differing only in `Some(oriented)`
+> against `None`. That makes `0` and `1` one
+> currency rather than an arrival field compared against a plane length, and it
+> doubles as the non-constancy proof: the same instrument answers both ways
+> inside one test.
+>
+> **Two things recorded because they are easy to misread later.** The positive
+> **still refuses** with `ComputationalMatch` / *"names an in-flight
+> activation"* — correct at this deliverable, and it is the baseline the later
+> `0 → 1` movement is measured against, which is what will make that movement
+> attributable rather than asserted. And `fusion_definitions` is **`0` in every
+> row**, deliberately: a non-zero count here would mean something was armed
+> ahead of its gate.
+>
+> **No credit beyond `D0`.** No emitter body, no arming, no interior seam, no
+> work on the other seven expressions. **`D1` is next** — the interior seam of
+> the frame's section 4, tested against reality.
 
 ## What this node is, and why it exists as a node
 
