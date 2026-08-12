@@ -4134,7 +4134,9 @@ struct StaticWorkerFieldLedger {
     /// **The transitions**: which recognition became which transport. The law
     /// is `dom(transitioned) = dom(recognized)`, so a constructed worker that
     /// never entered binding authority is caught here rather than being
-    /// unrepresentable.
+    /// unrepresentable. **Its VALUES are governed too, since `D2k-1c-1`** —
+    /// this map and `minted` must name each other, which is the join the chain
+    /// argument rests on and the one link that used to have no law.
     transitioned: BTreeMap<StaticWorkerRecognitionId, StaticWorkerTransportId>,
     /// **The transports.** One entry per *dynamic* successful `rebind`, keyed
     /// by a fresh [`StaticWorkerTransportId`]. Two rebinds of one
@@ -4453,19 +4455,44 @@ impl StaticWorkerFieldLedger {
     /// refuse.
     ///
     /// **The chain has three links and an identity at each one:**
-    /// `dom(transitioned) = dom(recognized)` and `dom(consumed) = dom(minted)`,
-    /// with `minted` in bijection with `transitioned` because one transition
-    /// mints exactly one transport. ⇒ **construct -> transition -> consume**,
-    /// each step per instance. A constructed field that never transitions is
-    /// caught by the first law, and it is the state a recognition map keyed by
-    /// `field_origin` could not even represent.
+    /// `dom(transitioned) = dom(recognized)`, then the JOIN — `transitioned` and
+    /// `minted` are mutually inverse — then `dom(consumed) = dom(minted)`.
+    /// ⇒ **construct -> transition -> consume**, each step per instance. A
+    /// constructed field that never transitions is caught by the first law, and
+    /// it is the state a recognition map keyed by `field_origin` could not even
+    /// represent.
     ///
-    /// **Both laws are relations and never equalities of cardinalities.** `⊆` is enforced at the call:
-    /// `note_consuming_call` refuses an identity it never minted, so nothing
-    /// can enter `consumed` that is absent from `minted`. `⊇` is enforced here.
-    /// Both directions are checked below anyway, because a law worth stating is
-    /// worth being able to fail — and the `⊆` re-check is what catches a future
-    /// second writer of `consumed` that skips the call-side guard.
+    /// **`D2k-1c-1` MADE THE JOIN A LAW. It was a claim about `rebind`'s body,
+    /// and the chain argument rests on it.** This doc said *"`minted` in
+    /// bijection with `transitioned` because one transition mints exactly one
+    /// transport"* while every assertion below was keyed on **its own map's
+    /// keys** — so nothing checked that a `transitioned` VALUE is a key of
+    /// `minted`. `transitioned[r] = T` with `T ∉ minted` passed all four:
+    /// `r` has a transition, `r` is recognized, and the two loops over
+    /// `minted`/`consumed` never see `T` at all. ⇒ **`close()` returned `Ok`
+    /// with a recognized field whose transport was never consumed** — the
+    /// constructed-then-forgotten state this ledger exists to make impossible,
+    /// admitted by the one link that had no law. Adversary `evt_733esjz2t4bn8`.
+    ///
+    /// **The containment alone is NOT the fix, and that is the part the finding
+    /// did not reach.** `range(transitioned) ⊆ dom(minted)` still admits
+    /// `transitioned[r1] = transitioned[r2] = T`: two constructions sharing one
+    /// transport, discharged by that transport's single consumption, with the
+    /// containment satisfied. The law is therefore the **agreeing** bijection —
+    /// `minted[transitioned[r]].recognition == r`, and back — which makes
+    /// injectivity a consequence rather than a second check. Both directions are
+    /// stated for the same reason the other two pairs are, below.
+    ///
+    /// **Every law here is a relation and never an equality of cardinalities.**
+    /// `consumed ⊆ minted` is enforced at the call: `note_consuming_call`
+    /// refuses an identity it never minted, so nothing can enter `consumed` that
+    /// is absent from `minted`. `⊇` is enforced here. Both directions are
+    /// checked below anyway, because a law worth stating is worth being able to
+    /// fail — and the `⊆` re-check is what catches a future second writer of
+    /// `consumed` that skips the call-side guard. **That standard is the whole
+    /// argument for `D2k-1c-1`:** it was adopted deliberately for a case the
+    /// call site already enforced, and not applied to the join, which nothing
+    /// enforced anywhere.
     fn close(&self) -> Result<(), CraneliftBackendError> {
         // Link one: every CONSTRUCTED field transitioned into binding
         // authority. Per recognition instance, never "some minted transport
@@ -4500,8 +4527,57 @@ impl StaticWorkerFieldLedger {
                     ),
                 ));
             }
+            // THE JOIN, forward. The transition is the only record that a
+            // construction owes anything, and the two laws around it are keyed
+            // on their own maps -- so a transport named here and absent from
+            // `minted` is an obligation no later loop can see.
+            let Some(minted) = self.minted.get(transport) else {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "recognition {recognition:?} is recorded as transitioning into transport \
+                         {transport:?}, which this compilation never minted; the transitions and \
+                         the transports must name each other, or a constructed field's obligation \
+                         is recorded against an identity nothing else quantifies over"
+                    ),
+                ));
+            };
+            // THE JOIN, agreeing -- and this is the half a containment misses.
+            // `range(transitioned) subset dom(minted)` still admits two
+            // recognitions naming ONE transport, whose single consumption then
+            // discharges both: constructed-then-forgotten with the containment
+            // satisfied. Requiring the transport to name THIS recognition back
+            // makes injectivity a consequence rather than another check.
+            if minted.recognition != *recognition {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "recognition {recognition:?} is recorded as transitioning into transport \
+                         {transport:?}, which was minted for recognition {:?}; one transport \
+                         cannot be the transition of two constructed fields, because its single \
+                         consumption would discharge both and leave one forgotten",
+                        minted.recognition
+                    ),
+                ));
+            }
         }
         for (transport, minted) in &self.minted {
+            // THE JOIN, back. A transport whose recognition does not transition
+            // to it is a construction that entered binding authority twice --
+            // `rebind` refuses the second, and this is that refusal restated as
+            // a law the close can fail on rather than a property of one writer.
+            if self.transitioned.get(&minted.recognition) != Some(transport) {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "transport {transport:?} was minted for recognition {:?}, which does not \
+                         transition to it; a constructed field enters binding authority exactly \
+                         once, so a second transport standing behind one recognition is an \
+                         obligation with no construction behind it",
+                        minted.recognition
+                    ),
+                ));
+            }
             if !self.consumed.contains_key(transport) {
                 return Err(unsupported(
                     "StaticWorkerBinding",
