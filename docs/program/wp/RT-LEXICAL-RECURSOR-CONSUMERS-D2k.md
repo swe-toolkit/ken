@@ -1105,6 +1105,46 @@ surface.
 not this question. Build to `evt_3manpp82emcq6`, not to the superseded
 transport-only shape.
 
+> ### `1c-2` IS A BOUNDED READ RIGHT NOW, NOT THE REPAIR. DO NOT WRITE ROUTE CODE.
+>
+> Architect reconciliation, released as `evt_48cyxhcc76ftq`, **supersedes the
+> earlier site-specific direction `evt_3yw1vw4rsv8rn`.** Runtime is authorized
+> for **exactly one throwaway, unfiltered trace over rows 4 and 5** — six
+> recorded facts, two identity questions, then stop and return the table.
+> **No route edit, no ledger change, no representation field, no second
+> recognition writer, and no choosing a repair shape.** Architect checkpoint
+> `548003b3`. `1c-1a` is explicitly **not** discharged by this read.
+>
+> **The reason the repair could not be chosen yet is a third insufficiency, and
+> it is the one that matters most.** The ring built the site-specific ruling as
+> a pending-continuation guard at the producer seat, and **the five-row table
+> did not move — `installs == 0` on every row, meaning the new branch was never
+> entered.** Re-derived: `recognized_constructor_worker_fields`
+> (`core.rs:12893`) recognizes an argument **only** when it is a
+> `RuntimeExpr::Var(index)` resolving to `LoweringEnvironmentBinding::
+> StaticWorker`. The `Construct` arriving at that seat is the transform's
+> **input**, whose worker argument is a literal `LexicalClosure` and not a
+> `Var`, so the predicate is **correctly** false there. The worker-bearing
+> occurrence is the transform's case **body**, `Construct Node [Var(0)]`, and it
+> never passes through that seat at all.
+>
+> ⇒ **Guarding the producer seat is not sufficient either.** Three insufficient
+> repairs in one deliverable now — reordering alone, the containment alone, and
+> the producer-seat guard — and **all three have the same shape: correct about
+> WHAT must happen, wrong about WHERE THE VALUE IS.** Read that as this node's
+> standing hazard, not as three unrelated misses. The discriminating question
+> the trace exists to answer is **which traversal lowers `Construct Node
+> [Var(0)]` in the transform's case body, and with what environment** — that is
+> where the `Var` resolves to a `StaticWorker` and where recognition can fire.
+>
+> **One hypothesis is live and must NOT be inherited as fact.** A backtrace at
+> the armed producer's recognition of owner 22 showed no intervening producer or
+> source-machine frame, but it was **filtered to lowering-module symbols**, so
+> whether those frames were absent or merely filtered is **unknown**. The
+> tempting reading — that owner 22 is lowered by a second traversal disjoint
+> from the eliminating one — **is not asserted by anyone.** The authorized trace
+> is unfiltered precisely to settle it. Treat it as the open question it is.
+>
 > ### THE ONE-SENTENCE DEFECT BELOW IS SUPERSEDED BY MEASUREMENT
 >
 > The mechanism fork it opens is with the Architect.
