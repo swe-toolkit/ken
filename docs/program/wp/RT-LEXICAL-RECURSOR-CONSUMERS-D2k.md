@@ -1232,6 +1232,73 @@ transport-only shape.
 > still be reported **with** the live recognize/rebind/consume arm it was taken
 > on.
 >
+> ### THIS EXACT CLASS WAS ALREADY RULED, ONE NODE OVER, ON THE SIBLING FIXTURE
+>
+> **`D2f`'s `AC-1`/`AC-2` were rebound on 2026-08-11 by Architect ruling
+> `evt_6vf66hmwv52y6`, for this precise defect, on this precise fixture family.**
+> Re-derived from `RT-LEXICAL-RECURSOR-CONSUMERS-D2f.md` rather than relayed.
+> Its words, not a paraphrase:
+>
+> > *"The frame pinned acceptance to a witness that cannot carry the mechanism's
+> > required input."* — and *"the defect is the Steward's."*
+>
+> The struck witness was **`px8j_equal_payload_hole_placement(BeforeReturnHole)`**.
+> **Row 5 is `AfterReturnHole`, its sibling in the same family.**
+>
+> #### THE RULING ANSWERS "PUT THEM ON THE CHECKED LANE" — AND THE ANSWER IS NO
+>
+> That witness *"is not a fusion candidate and **cannot be made into one**"*,
+> and `validate_oriented_subcontinuation_transport` makes the boundary
+> **structural**, in four parts:
+>
+> 1. unmarked IR with `None` is **lawful seed IR producing no fusion**;
+> 2. unmarked IR with a **non-empty** plan is a marker/plan mismatch that must
+>    **REJECT**;
+> 3. an **empty** supplied plan carries no checked transport coordinate;
+> 4. **adding the wrappers changes the occurrence tree**, so it is no longer the
+>    exact fixture.
+>
+> ⇒ **"Supply `Some(oriented)` for rows 4/5" is not a harness edit and not
+> merely a scope call — on the sibling fixture it was ruled impossible.** Every
+> route is closed: `None` yields nothing, non-empty rejects, empty carries no
+> coordinate, and marking them makes them different fixtures.
+>
+> **This is the correction to my own framing of the dependency.** I wrote that
+> the `None` belongs to the harness rather than the rows, which is true of the
+> *call site* and does not license the inference I was heading for. The rows are
+> **unmarked IR**, and that is a property of the rows.
+>
+> #### WHAT THIS MAKES OF `AC-1`
+>
+> **The ring's measured observation, which is the decisive one:** if the
+> mechanism requires an oriented plan for this population, **`AC-1`'s five rows
+> discharge VACUOUSLY in both directions** — a consumer over an empty plan
+> compiles, emits nothing, and satisfies every no-activation and refusal
+> criterion **for free**. That is not a worry; it is the failure mode the `D2f`
+> instance actually produced.
+>
+> ⇒ **The question is no longer "can these witnesses show the repair". It is
+> that they can go GREEN on a no-op.**
+>
+> **The precedent for the disposition already exists and is one day old:** `D2f`
+> rebound its `AC-1`/`AC-2` rather than trying to repair the fixture.
+> `evt_5ed8ee70cmrt`'s *"route repair, never a criterion correction"* predates
+> all of this. **Re-binding `AC-1` is the Architect's call, and this frame does
+> not take it** — but the frame no longer presents the criterion as safe.
+>
+> > **THIRD INSTANCE ACROSS THE CAMPAIGN, TWICE AT THE SAME GATE PAIR.**
+> >
+> > | # | node | witness | why it cannot carry the input |
+> > |---|---|---|---|
+> > | 1 | `D2f` `AC-1`/`AC-2` | `px8j_equal_payload_hole_placement(BeforeReturnHole)` | the two `oriented: None` gates |
+> > | 2 | `D2k-1c-1` | the ledger rows | construct states no current writer produces |
+> > | 3 | `D2k-1c-2` `AC-1` | the five refusing rows | the same two gates again |
+> >
+> > **Rows 1 and 3 are the same mechanism, the same short-circuit pair, and the
+> > same fixture family.** `D2f` recorded the defect as the Steward's; so is
+> > this one. **Before pinning an AC to a named witness, run the witness and
+> > read the mechanism's required input — one probe, first.**
+>
 > ### SECTION 8 FIRES, AND THE ZERO IS FORCED. `evt_7gnhxy56b7d2` AT `769eb62f`.
 >
 > **On the binary criterion as issued — exact fusion keys for both rows, or
