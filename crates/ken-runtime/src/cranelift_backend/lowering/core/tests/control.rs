@@ -2929,6 +2929,228 @@ fn d2f_0_the_applied_root_production_path_gate() {
     );
 }
 
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D0` — the gate, before any emitter body.**
+///
+/// Three rows, and the reason they are one assertion is that **two of them are
+/// zeros**. A zero proves nothing on its own: an absence comparator that
+/// resolves nothing and a refusal that resolves nothing look identical to a
+/// compile that never ran. The non-zero positive is the denominator both are
+/// read against, so it is an operand here rather than a separate test.
+///
+/// | row | subject | resolved plane |
+/// |---|---|---|
+/// | absence | the seed `px8j` before-hole compile, no oriented plan | **0** |
+/// | positive | the checked twin through the production entry | **1** |
+/// | refusal | that twin with one marker stripped | never planned |
+///
+/// **Why the seed cannot be the positive, since this is the defect the node's
+/// frame says has already cost this work once.** `px8j` is a seed-lane compile
+/// with no checked frame, no selected-IH slot and no checked-IH-invocation
+/// marker; production oriented plans are decoded from a checked package's
+/// metadata, and a seed-lane compile has none to decode. The `oriented` gate
+/// then returns an empty plane **before candidate enumeration runs**. So the
+/// seed is retained here as the **absence comparator** and is never the
+/// fusion-positive. Handing it a plan is a forbidden route, not an untried one.
+///
+/// **The positive is the landed `D2j` checked twin** — designated by the frame
+/// as the `R3`-shaped one; that designation is the frame's and is cited, not
+/// re-derived here. What this test verifies about it is narrower and its own:
+/// that it reaches the builder through `compile_expr_into_object_module` with
+/// `Some(oriented)` — **never a direct builder or emitter call** — and resolves
+/// exactly one key, one id and one descriptor.
+///
+/// **Both planes are read by the same call**, `build_static_continuation_fusion_plan`,
+/// differing only in the argument that is genuinely different between the two
+/// lanes — `Some(oriented)` against `None`. That is what makes `0` and `1` one
+/// currency instead of an arrival field compared against a plane length, and it
+/// is also the non-constancy proof: the same instrument answers both ways in
+/// this test, so neither number is a shape it returns for anything.
+///
+/// **The production compile and the planner derivation are independent, and
+/// that is the only reason their agreement says anything.** Neither reads the
+/// other: one is the arrival recorded inside a real compile, the other is
+/// `build_static_continuation_fusion_plan` run separately over the same root.
+/// Agreement on the **whole key and descriptor** is asserted, not agreement on
+/// an id — two independent interners both lawfully issue local id `0`.
+///
+/// **The refusal row is the validator's exact sentence, not a count.** Stripping
+/// the frame marker must produce the `OrientedSubcontinuationPlanV1` refusal
+/// naming a missing or transplanted frame marker, and must do so **before the
+/// builder is reached** — asserted as zero arrivals beside the positive's one.
+/// A count alone could not tell "the validator refused" from "the compile
+/// failed earlier for an unrelated reason".
+///
+/// **`fusion_definitions` is `0` in every row and that is deliberate.** No
+/// emitter body exists at this deliverable, so a non-zero definition count here
+/// would mean something was armed ahead of its gate.
+///
+/// **Promise class: durable invariant.** Arrival, presence, plane cardinality
+/// and key agreement between two independently reached derivations. The
+/// literals are `1` (what the identity plane is defined to produce for one
+/// candidate) and `0` (the definition population before an emitter exists).
+#[test]
+fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
+    use crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take;
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause, D2J_DECLARATION};
+
+    /// One cause through the PRODUCTION entry, with its own oriented plan.
+    fn compile_cause(
+        cause: D2jCause,
+        symbol: &str,
+    ) -> (
+        Vec<crate::cranelift_backend::lowering::core::D2fGateArrival>,
+        Option<CraneliftBackendError>,
+    ) {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let _ = d2f_gate_arrivals_take();
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let result = crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+            crate::cranelift_backend::artifact::new_object_module_for_lowering_tests("ken-r3-d0")
+                .expect("object module"),
+            symbol,
+            cranelift_module::Linkage::Export,
+            &entry,
+            &crate::NativeSeedEnvironment::empty(),
+            declarations,
+            None,
+            false,
+            None,
+            None,
+            Some(oriented),
+        );
+        (d2f_gate_arrivals_take(), result.err())
+    }
+
+    // ---- row 2 first: the positive is the denominator for the two zeros.
+    let (positive_arrivals, positive_error) = compile_cause(D2jCause::Exact, "ken_r3_d0_positive");
+    let positive = match positive_arrivals.as_slice() {
+        [only] => only.clone(),
+        other => panic!("the checked twin must reach the builder exactly once: {}", other.len()),
+    };
+
+    // The independent derivation. Same root, different route: this one never
+    // reads the arrival above.
+    let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+    let mut declarations = std::collections::BTreeMap::new();
+    declarations.insert(D2J_DECLARATION, &declaration);
+    let planner = crate::cranelift_backend::planning::plan_static_transition_graph(
+        &entry,
+        &declarations,
+    )
+    .expect("the checked twin plans");
+    let planner_plane = crate::cranelift_backend::planning::build_static_continuation_fusion_plan(
+        &planner,
+        &entry,
+        &declarations,
+        Some(&oriented),
+    )
+    .expect("the checked twin resolves a plane");
+
+    // ---- row 1: the seed, which carries no marker at all.
+    let seed_expr = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::BeforeReturnHole,
+    ));
+    let _ = d2f_gate_arrivals_take();
+    let (seed_result, _seed_trace) =
+        px8j_capture_source_trace(&seed_expr, false, "ken_r3_d0_seed");
+    seed_result.expect("the seed witness still lowers");
+    let seed = match d2f_gate_arrivals_take().as_slice() {
+        [only] => only.clone(),
+        other => panic!("the seed witness must reach the builder once: {}", other.len()),
+    };
+    // The seed's plane through the SAME instrument the positive is measured
+    // with, so "resolved plane 0" and "resolved plane 1" are one currency
+    // rather than an arrival field compared against a plane length. `None` is
+    // the seed lane's real argument -- it has no checked package metadata to
+    // decode a plan from, which is why it is the absence comparator.
+    let seed_declarations = std::collections::BTreeMap::new();
+    let seed_planner = crate::cranelift_backend::planning::plan_static_transition_graph(
+        &seed_expr,
+        &seed_declarations,
+    )
+    .expect("the seed witness plans");
+    let seed_plane = crate::cranelift_backend::planning::build_static_continuation_fusion_plan(
+        &seed_planner,
+        &seed_expr,
+        &seed_declarations,
+        None,
+    )
+    .expect("the seed witness resolves a plane");
+
+    // ---- row 3: one marker stripped, and the validator's own sentence.
+    let (stripped_arrivals, stripped_error) = compile_cause(D2jCause::Frame, "ken_r3_d0_stripped");
+    let stripped_refusal = matches!(
+        &stripped_error,
+        Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            if *construct == "OrientedSubcontinuationPlanV1"
+                && reason.contains("frame marker is missing or transplanted")
+    );
+
+    assert_eq!(
+        (
+            // row 2 -- the POSITIVE, and it must be non-zero or nothing below
+            // it means anything
+            (
+                positive.oriented_present,
+                positive.keys.len(),
+                positive.descriptors.len(),
+                planner_plane.len(),
+                positive.fusion_definitions,
+            ),
+            // row 1 -- the absence comparator at resolved plane zero, with its
+            // plane read by the same instrument as the positive's
+            (
+                seed.oriented_present,
+                seed.keys.len(),
+                seed.descriptors.len(),
+                seed_plane.len(),
+                seed.fusion_definitions,
+            ),
+            // row 3 -- refused by the validator, before the builder
+            (stripped_refusal, stripped_arrivals.len()),
+        ),
+        (
+            (true, 1, 1, 1, 0),
+            (false, 0, 0, 0, 0),
+            (true, 0),
+        ),
+        "D0: the checked twin must reach the builder through the production entry with \
+         Some(oriented) and resolve exactly one key, one id and one descriptor at definition \
+         count zero; the unmarked seed must reach the SAME builder and resolve nothing; and \
+         one stripped marker must produce the plan validator's own refusal without reaching \
+         the builder at all. positive={positive:?} seed={seed:?} stripped={stripped_error:?}"
+    );
+
+    // ---- the two derivations agree on the WHOLE key and descriptor.
+    //
+    // Never on an id: the production plane and the planner plane are separate
+    // interners and both lawfully issue local id 0, so an id equality would
+    // hold between two unrelated fusions.
+    assert_eq!(
+        (positive.keys.as_slice(), positive.descriptors.as_slice()),
+        (planner_plane.observed_keys(), planner_plane.observed_descriptors()),
+        "the production compile must resolve the same complete key and descriptor the \
+         planner derives independently from the same root"
+    );
+
+    // ---- the pre-emission seat, stated rather than left implicit.
+    //
+    // The positive still refuses, and refusing is correct here: no emitter body
+    // exists yet, so this is the ordinary refusal fusion is meant to remove.
+    // It is the baseline the later 0 -> 1 movement is measured against, and
+    // recording it now is what makes that movement attributable.
+    assert!(
+        matches!(
+            &positive_error,
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "ComputationalMatch"
+                    && reason.contains("in-flight activation")
+        ),
+        "before any emitter body the checked twin must still reach its own ordinary \
+         refusal: {positive_error:?}"
+    );
+}
 #[test]
 fn px8j_selected_scope_partitions_differ_across_the_real_return_hole() {
     let before = host_result_closure_match(px8j_equal_payload_hole_placement(
