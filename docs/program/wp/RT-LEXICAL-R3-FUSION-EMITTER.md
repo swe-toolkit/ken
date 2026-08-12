@@ -195,9 +195,11 @@ candidate. *Control:* `git diff`.
 `crates/ken-runtime/src/cranelift_backend/lowering/core*`, `.../units.rs`, and
 the eliminator's case-body lowering path.
 
-**Runtime runs one node at a time**, and [[RT-LEXICAL-ROW2-MISSING-MINT]] is in
-flight in the same file set. Sequence after it. Re-derive the intersection at
-candidate time — a merge-base goes stale without your branch moving.
+**Runtime runs one node at a time.** [[RT-LEXICAL-ROW2-MISSING-MINT]] held this
+file set and **merged 2026-08-12** at `main` `741f66c3` — that sequencing bar is
+cleared and this node is the released successor. Re-derive the intersection at
+candidate time anyway: a merge-base goes stale without your branch moving, and
+row 2's arc landed nine PRs into `core/tests/control.rs`.
 
 `scripts/ken-cargo test -p ken-runtime --lib` plus your focused suite.
 **Never `--workspace`**; that is CI's gate.

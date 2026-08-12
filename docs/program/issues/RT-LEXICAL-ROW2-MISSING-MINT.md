@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-ROW2-MISSING-MINT
 title: "Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -11,21 +11,32 @@ github: null
 origin: Runtime D0/D1 checkpoint evt_3wzr30y2jjh41 at exact 0de4f130a9864623afcffa0b4751f65ddd87e818, QA-approved at evt_1f9hknbynb5nk, measured at 9adeb30f. Steward ruling evt_rcjr99tjga9 removed this class (R4) from RT-LEXICAL-RECURSOR-CONSUMERS. Steward-filed per COORDINATION §2.
 ---
 
-> # FRAMED AND `ready`. NOT RELEASED.
+> # MERGED 2026-08-12 — EVIDENCE-COMPLETE, NO PRODUCTION REPAIR
 >
-> Frame: `docs/program/wp/RT-LEXICAL-ROW2-MISSING-MINT.md`, shovel-ready.
-> `RT-LEXICAL-RECURSOR-CONSUMERS` holds Runtime's lane.
+> Frame: `docs/program/wp/RT-LEXICAL-ROW2-MISSING-MINT.md`.
 >
-> **This node was `draft` pending one measurement, and that measurement is in.**
-> The three `B`-only compiles deferred after the first abort are all `R1`
-> (Architect `evt_nae7n2yxg0mk`, accepted with `RT-LEXICAL-RECURSOR-CONSUMERS`
-> `D2a`), which closed the `R1` cell at five compiles across rows 1 and 4 and
-> **reassigned nothing to this node and added no sibling.** The population here
-> is one row, and now on evidence rather than by default.
+> **The row is not a semantic regression.** `D1` closed with **no production
+> repair** (Steward `evt_26cb49zckgq4f`) and the successor measurement then
+> fired the present branch: on the functionized lane row 2's recursive IH **is**
+> minted, installed and consumed, by the carried/`Composed` route. The old
+> assertion was **over-specified** — it pinned *which producer path mints* where
+> the invariant is that the occurrence gets an IH installed and consumed.
+> Architect `evt_1rzcz31qm9y9q` ruled the diagnosis correct and **kept row 2 on
+> `D3`'s bar** on corrected grounds.
 >
-> `ready` means framed, not start-it-now. See the frame's *Contention*: this
-> node's files are the active recursor arc's files, and it is not on the
-> `RecursiveDescent` critical path.
+> | deliverable | disposition |
+> |---|---|
+> | `D0` attribution sentinel | merged, PR #1950 (corrected in place, not deleted — no repair landed) |
+> | `D1` bounded repair | **closed with no repair**; the functionized lane requires zero `SourceMachine` installations for this occurrence |
+> | `D2` discriminating controls | merged, PR #1955; bullet 4 discharged, bullets 1-3 **superseded** — each presupposes a repaired root |
+> | successor IH measurement | merged, PR #1957, CI green at `6a804eb7` |
+> | `AC-2` | struck as defective, replaced with the measured lane-conditional sets, PRs #1953 / #1958 |
+> | `AC-4` negative control | **routed to `D3`**, proof 4 of four — owed there, not here |
+>
+> **What this node did NOT establish**, and no ruling depends on it: whether the
+> `SourceMachine` path is reachable on a functionized lane by **any** occurrence.
+> The fixture builds only the recursive occurrence, so it cannot distinguish
+> *this occurrence routes elsewhere* from *the path is dead*.
 
 ## Why this is its own node rather than a `#6d` deliverable
 
@@ -86,35 +97,50 @@ Steward escalation.
 
 **Why row 2's assertion survives the retirement**, which is what makes this a
 real blocker rather than a bookkeeping edge: its subject is still live after the
-residual enum is emptied — **both producer paths must install and consume the
-recursive IH.** Contrast the spent exact-set oracle in `#7`, whose subject
-*disappears* with the deletion. A control whose subject survives is a control
-that must still pass.
+residual enum is emptied — **the row 2 program's recursive occurrence still gets
+an IH minted, installed and consumed.** Contrast the spent exact-set oracle in
+`#7`, whose subject *disappears* with the deletion. A control whose subject
+survives is a control that must still pass.
 
-> **THIS PREMISE IS NOW UNDER MEASUREMENT — do not cite it as settled.**
-> Steward ruling `evt_26cb49zckgq4f`, 2026-08-12, on the `D1` handback.
+> #### THE SURVIVING SUBJECT IS THE IH LIFECYCLE, NOT THE PATH LABELS
 >
-> `D1` measured that under `B`-only exclusion the `SourceMachine` seat is
-> entered with `LoweringOperand::Carried` and returns before the mint, so the
-> functionized lane requires **zero** `SourceMachine` installations for this
-> occurrence. **If that generalizes to every recursive occurrence, then row 2's
-> subject does NOT survive the retirement and this paragraph is false** — row 2
-> would be precisely the spent oracle it contrasts itself against.
+> Architect ruling `evt_1rzcz31qm9y9q`, 2026-08-12, closing the measurement
+> opened by Steward ruling `evt_26cb49zckgq4f`. **Row 2 stays on `D3`'s bar and
+> the conclusion of `evt_2jnf3x8f06psz` stands — on corrected grounds.**
 >
-> **It is not established that it generalizes**, and the fixture cannot decide
-> it: `px8j_all_three_producer_paths_reach_real_consumers` constructs only the
-> recursive occurrence (`recursive_computational_result_depth(2, ..)`), so it
-> cannot distinguish *this occurrence routes elsewhere* from *the path is dead*.
-> The deciding measurement is in the frame's `D1` closure block, and the
-> generalization is the **Architect's** call on its result — not the row's.
+> **The leading sentence above previously read *"both producer paths must
+> install and consume the recursive IH."* That is withdrawn.** Requiring both
+> historical producer-path *labels* to survive was an over-specification: the
+> semantic obligation is that the occurrence's IH is minted, installed and
+> consumed on **the lane actually selected**, not that every lane carry the same
+> labels.
 >
-> Until it returns, row 2 **stays** on `D3`'s bar. Removing it now would trade
-> an observed prospective regression for an assumption, which is the same trade
-> `evt_2jnf3x8f06psz` refused.
+> **The measurement that settled it** (`6a804eb7`, PR #1957, CI green): on the
+> functionized lane row 2's recursive IH **is** separately minted, installed and
+> consumed, by the carried/`Composed` route. **Row 2 is not a semantic
+> regression.** Exact installed-and-consumed multisets — descent
+> `{Composed, SourceMachine, SourceMachine}`, functionized `{Composed}`.
+>
+> **Why that keeps row 2 on the bar rather than removing it.** `#7`'s subject
+> disappears with the retired mechanism; row 2's semantic subject **must still
+> execute** after the mechanism and the selector hooks are gone. The contrast
+> the paragraph draws is correct; only its statement of what survives was wrong.
+>
+> **Still not established, and no ruling depends on it:** whether the
+> `SourceMachine` path is reachable on a functionized lane by **any** occurrence,
+> or is generally descent-specific. The fixture builds only the recursive
+> occurrence (`recursive_computational_result_depth(2, ..)`), so it cannot
+> distinguish *this occurrence routes elsewhere* from *the path is dead*. That
+> unmeasured reachability is **neither evidence for removing row 2 nor a
+> prerequisite for `D3`'s acceptance.**
 
 **The B-only result is precursor evidence, not the acceptance proof.** `D3`'s
-final obligation is the unchanged row green on the **real, no-hook retirement
-tree**.
+final obligation is on the **real, no-hook retirement tree**, against the
+corrected lane-conditional meaning — see the four proofs `evt_1rzcz31qm9y9q`
+requires of `D3`, recorded in [[RT-RECURSOR-TRANSPORT]]'s frame. The row's
+*meaning* is what must be unchanged there, not its current text: `D3` may
+rewrite or replace the original row 2 test during its control sweep so the
+no-hook final tree is the witness.
 
 ⇒ **The hook-artifact uncertainty belongs to this node's `D0`**, which already
 requires an activation denominator and a cause (i) versus (ii) determination.
