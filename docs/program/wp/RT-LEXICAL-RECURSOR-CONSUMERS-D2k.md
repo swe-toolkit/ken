@@ -684,10 +684,16 @@ warrant that the identities survived the recut. *Re-derive them at your base* �
 a merge-base goes stale without your branch moving, and row 5's pair was
 already wrong once.
 
-**`D2k-1c-0` — THE LEDGER'S OWN INVARIANT, AND IT COMES FIRST.** Do not write
-route-repair code until this is measured and reported. Adversary finding
-`evt_6jhcxr1yv7yrk`, triaged CONFIRMED `evt_55rzfnc1gkekq`, Architect
-conditional ruling `evt_6c9f1csfvrey7`.
+**`D2k-1c-0` — THE LEDGER'S OWN INVARIANT. MEASURED AND LANDED at `1a16a64d`
+(PR #1996); `1c-0b` landed with it.** Adversary finding `evt_6jhcxr1yv7yrk`,
+triaged CONFIRMED `evt_55rzfnc1gkekq`, Architect ruling `evt_6c9f1csfvrey7`,
+Decision `dec_463b5d1g62n98`.
+
+**This subsection is kept as the standing rationale, not as open work.** The
+deciding read below is answered — see the resolved block — and re-running it is
+waste. What remains binding here is *why* a counter cannot carry this property,
+because the repair is still in flight and that is the constraint it must
+satisfy.
 
 **The finding.** `close()` checks `entry.consumptions != entry.rebinds`
 (`mod.rs:4181`) — a **per-origin count**. The entry doc at `mod.rs:4058-4062`
@@ -714,27 +720,43 @@ and it is **indistinguishable at this granularity by construction**: the entry
 carries two `usize`s, so no fact in the ledger could separate them. That is the
 strongest claim the representation can support, not a gap in the rows.
 
-**THE DECIDING READ, and which way each outcome falls.** `rebind` has one
-production call site (`mod.rs:4274`), reached from four
-`bound_constructor_fields` sites (`core.rs:4605`, `:5462`, `:7112`, `:15308`).
-**Can any two of those four descend over one static occurrence in a single
-compile?** Report which, with the evidence, **before** writing route code.
+**THE DECIDING READ IS ANSWERED: YES. DO NOT RE-RUN IT.** Landed as `1a16a64d`
+(PR #1996, `main` `e1613f00`), Decision `dec_463b5d1g62n98`.
 
-- **Yes** ⇒ per-origin counters are structurally insufficient and the gap is
-  live the moment the route repair works. **Stop after the measurement.** The
-  repair class is the Architect's, below — not the ring's and not the Steward's.
-- **No** ⇒ the entry doc's multi-transport premise is unreachable, and **the doc
-  is what needs correcting** — it is the stated ground for keying rather than
-  listing, so a false premise there is load-bearing. Retain the current keyed
-  entry; no new identity is justified.
+The question was: `rebind` has one production call site (`mod.rs:4274`), reached
+from four `bound_constructor_fields` sites (`core.rs:4605`, `:5462`, `:7112`,
+`:15308`) — **can any two of those four descend over one static occurrence in a
+single compile?**
 
-**Do not inherit the expected answer.** The report expects **yes** on
-independent grounds (`mod.rs:1250`, `:6347`, `:6500` and `core.rs:2724` all
-describe a recursive producer revisiting one source occurrence) and flags that
-as inference. It is one read — take it.
+They can. A test-only event at **all six** production binder-descent sites
+records the planner origin of the eliminating occurrence. All five rows repeat
+descent over one occurrence, and **row 1 recognizes the same planner child
+origin `child(22, 0) = 21` twice.**
 
-> **ARCHITECT CONDITIONAL RULING `evt_6c9f1csfvrey7` — the admissible repair
-> class on the `yes` branch, and only on that branch.** A compiler-only
+> ⇒ **THE `no` BRANCH IS CLOSED.** *"The entry doc's multi-transport premise is
+> unreachable, so correct the doc and keep the keyed entry"* is **no longer an
+> available disposition.** It was the cheaper-looking answer and it is ruled
+> out by measurement, not by preference. **`close()`'s per-origin count is
+> structurally insufficient**, and the transport-instance repair class below is
+> the live branch.
+
+**The measurement is non-vacuous, and that was proved rather than asserted.**
+QA's deletion mutation at the composed binder site reddens the durable
+relational assertion. **Keep that mutation.** A YES from an instrument that
+cannot return NO is worth nothing, and this control is what establishes it
+could have.
+
+**What the measurement deliberately does NOT claim.** The candidate *removed* an
+unmeasured causal story from the ledger doc — it had read *"a speculative
+descent and the descent that keeps its result"* — because that is one shape
+fitting the trace and not the one observed. What the trace shows is a binder
+descending twice over one eliminating match occurrence. **Multiplicity is
+established; its cause is not.** The absence of a causal account there is
+intentional. Do not fill it in from plausibility, and do not read its absence as
+an oversight.
+
+> **ARCHITECT RULING `evt_6c9f1csfvrey7` — the admissible repair class. ITS
+> CONDITION IS NOW MET**, since the deciding read returned yes. A compiler-only
 > **transport-instance identity**, distinct from the planner-owned occurrence
 > identity: each successful `rebind(field_origin)` mints or selects a fresh
 > transport instance (for example the composite
@@ -751,6 +773,11 @@ as inference. It is one read — take it.
 > erasure authority. It does **not** authorize relaxing closeout, and it does
 > **not** authorize beginning the pending-continuation repair before the
 > measured branch is reported.
+>
+> **The branch has been reported, so that last clause is discharged** — it no
+> longer gates the route repair. **Every other prohibition above is unchanged
+> and still binds.** A ruling whose condition is met is not a ruling whose
+> limits are lifted.
 
 **Why this is `1c-0` and not a nested-scope fix: the instrument was never the
 scope, it was the counting.** This is the same error class a **fourth** time
@@ -760,7 +787,13 @@ iteration correctly narrowed the scope of the count **and kept the count**. A
 pairing needs a fact saying *which* transport was paid, and no narrowing of a
 tally produces one. **If your repair is a smaller counter, it is the fifth.**
 
-**`D2k-1c-0b` — one qualifier, folded, no node.** `mod.rs:4300` says the close
+**`D2k-1c-0b` — one qualifier, folded, no node. DELIVERED in `1a16a64d`.** The
+closeout prose now distinguishes RecursiveDescent from FunctionizedUnits and
+rests lawfulness on preflight/boundary refusal rather than the ordering claim.
+The original finding is kept below because the reasoning is what a future
+auditor needs, not the diff.
+
+`mod.rs:4300` said the close
 *"runs before emission of the root answer, which is what makes the refusal
 lawful rather than late."* True on the RecursiveDescent arm (`core.rs:2730`);
 **false on FunctionizedUnits**, where `define_root_adapter` is called
@@ -774,7 +807,13 @@ lawful rather than late?"* on the arm where the clause is false. Qualify the
 sentence to RecursiveDescent. **Do not alter the intentional causal-ledger
 ordering.**
 
-**Then, and only then, the route repair.**
+**`1c-0` and `1c-0b` are landed, so the route repair is unblocked by THIS gate
+— and it is not thereby unblocked.** The transport-instance repair still has to
+land, and an ordering finding from the measurement is with the Architect: *both
+outer eliminations complete before the row-4/5 worker-bearing constructor
+exists.* If that holds it bears on **what** the repair is, not only when it
+runs. Do not start route code against the framed pending-continuation repair
+until the Architect has ruled on it.
 
 **The defect, in one sentence:** the excluded route **loses or misattaches the
 pending outer continuation** when the producer's recursive/direct descent
