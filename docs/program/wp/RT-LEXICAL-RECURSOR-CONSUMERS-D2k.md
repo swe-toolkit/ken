@@ -302,13 +302,45 @@ static `Match` elimination that installs each field into the one lexical
 binding authority without erasing kind, so the **existing** exact-`Var` call
 arm consumes it.
 
-- **State the property as a TOTAL, never as a list of forbidden verbs.** The
-  requirement is *every constructed worker field is consumed at the exact-`Var`
-  call — none dropped, and none reaching allocation, emission or publication
-  unconsumed.* The previous wording enumerated carry, allocate, store, join,
-  project, return and publish: **every way a worker could be USED, and not one
-  of the ways it could be LOST.** A dropped field satisfies an enumeration of
-  uses vacuously, which is exactly how four rows went green.
+- **State the property as a TOTAL over the DISPOSITION SPACE, never as a list
+  of forbidden verbs.** Architect ruling `evt_5etamwj8tp2fh`: **the invariant is
+  conservation of every compiler-only static-worker occurrence**, and
+  exact-`Var` is a *terminal disposition*, not the invariant. Every recognized
+  worker at constructor field `(owner_origin, position)` receives **exactly
+  one** disposition before any runtime-value boundary:
+
+  > **each recognized worker is consumed exactly once, erased before
+  > construction under positive unobservability authority, or refused before
+  > emission; none is dropped.**
+
+  1. **Consume** — a static elimination of that exact constructor field rebinds
+     the same `StaticWorkerBinding`, and an existing exact-`Var` callee call
+     consumes it exactly once.
+  2. **Erase as proven unobservable** — lawful **only** under a whole-graph,
+     origin-keyed proof that this exact field cannot be destructured,
+     projected, carried, joined, returned or published, with the source operand
+     already the effect-free lookup of the existing static binding. **Erasure
+     happens at or before construction: no `ConstructorField::StaticWorker` may
+     be built and then ignored.** It is not transport and earns **no
+     "consumed" credit**.
+  3. **Refuse** — neither proof exists, so compilation refuses before
+     allocation or emission. An undestructured constructor that can escape
+     still denotes a value containing the callable, and with runtime
+     representation excluded, silently omitting the field is **unsound**.
+
+  **The forbidden fourth state is what `739cfde3` produced: constructed,
+  neither consumed nor authoritatively erased, then forgotten.**
+
+  The previous wording enumerated carry, allocate, store, join, project, return
+  and publish: **every way a worker could be USED, and not one of the ways it
+  could be LOST.** A dropped field satisfies an enumeration of uses vacuously,
+  which is exactly how four rows went green.
+
+- **"Zero destructures observed" is NOT disposition 2.** Absence from a
+  lowering trace proves only that *the current route* did not consume the
+  field. Erasure requires **positive** non-observation authority **plus** a
+  mutation that makes the field observable and flips the disposition to consume
+  or refuse. **An absence is not an authority.**
 - **A row that COMPILES is not a row that PASSES.** Per row, record the
   static-worker field, the bare-`Var` worker reads, **and the consumption**. A
   row that compiles with zero consumptions is a **failure**, and the handback
@@ -492,27 +524,37 @@ call arm — is now a required part of `1b-i` above, with its controls and its
 engine measurement. It was folded because producer plus preflight **without**
 this consumer is a silent accept, measured at `739cfde3`.
 
-> #### OPEN, routed to the Architect: do rows 4 and 5 have a lawful discharge?
+> #### RULED 2026-08-12 (`evt_5etamwj8tp2fh`): rows 4 and 5 STAY, and the
+> #### "never destructured" reading is a ROUTE finding, not a classification
 >
-> The implementer measured that **rows 4 and 5 constructors are never
-> destructured on the excluded lane**, so even the folded `i`+`ii` may not
-> reach the exact-`Var` consumption `AC-1` requires for those two rows.
+> The implementer measured that rows 4 and 5 constructors are **never
+> destructured on the excluded lane**. **That does not remove them from the
+> five and does not license dropping their field.**
 >
-> **`AC-1` is not narrowed here and the ring must not narrow it.** Qualifying
-> an acceptance criterion to match what was measured is a scope cut, and this
-> one would decide that two rows need no lawful consumption — a
-> soundness-adjacent call that belongs to the Architect, not to the Steward and
-> not to the ring.
+> **Their source graphs contain the opposite candidate**, visible at current
+> `origin/main`:
 >
-> The question routed is *"for a row whose constructor is never destructured,
-> what is lawful transport — is exact-`Var` consumption the right discharge at
-> all, or does it take a different shape?"* — a mechanism question, not
-> *"which node should this be?"*, which would presume the answer.
+> | row | source shape | test |
+> |---|---|---|
+> | 4 | constructs `PX8JScopeTree::Node(Var(0))`; the outer `ComputationalMatch` selects that `Node` and its selected body calls `Var(0)` | `px8j_scope_chain_observation_result` |
+> | 5 | constructs `PX8JHoleOutput::Node(Var(0))`; the outer `ComputationalMatch` selects that `Node` and calls `Var(0)` | `px8j_equal_payload_hole_placement` |
 >
-> ⇒ **Build `1b-i` for the rows that can reach consumption and measure rows 4
-> and 5 rather than forcing them.** If the ruling lands mid-turn it applies;
-> if it does not, the handback states the measurement and leaves those rows
-> owed. **An unreached row is a finding, not an omission.**
+> ⇒ *"Never destructured on the excluded lane"* is a **lowering-route
+> finding**, not a source-semantic classification. The elimination exists in the
+> source; the current route does not reach it.
+>
+> **Pair the recognized field to the later elimination by planner-owned
+> origin/position — never by constructor spelling and never by trace
+> proximity.** If that pairing cannot be reached, **the row stays RED and the
+> route gap is reported. It does not become a lawful drop.**
+>
+> **`AC-1` is NOT qualified by row and rows 4/5 are NOT removed.** For these
+> five, exact-`Var` remains the required positive endpoint unless an
+> exact-occurrence non-observation proof is produced, and the positive control
+> still expects the **consumed** arm.
+>
+> This ruling authorizes **no new representation and no new cut**. It tells the
+> measurement what distinguishes a route bug from a genuinely dead field.
 
 **`D2k-1b-iii` — route parity.** The second engine implements the identical
 distinction; neither path may preserve the worker while the other calls

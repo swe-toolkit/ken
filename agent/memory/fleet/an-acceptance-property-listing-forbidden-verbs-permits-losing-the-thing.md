@@ -39,6 +39,39 @@ is the wrong instrument.
 The total names what must be **true of every member**. The enumeration names
 what must be **absent**, and absence is unbounded.
 
+## My first replacement was ALSO too narrow, and that is the sharper lesson
+
+Having caught the verb list, I wrote the total as *"every X is consumed at
+`<site>`"* — one disposition. **The lane owner's ruling widened it, and the
+widening is the point:**
+
+> each recognized X is **consumed exactly once**, **erased before construction
+> under positive unobservability authority**, or **refused before emission**;
+> **none is dropped**.
+
+⇒ **Take the total over the DISPOSITION SPACE, not over the one disposition you
+have in mind.** Legitimate members may need a different lawful ending than the
+happy path — erasure and refusal are both correct outcomes here, and a total
+naming only *consume* would have made every refusing row look like a failure
+while still permitting the drop it was written to stop.
+
+**The closure clause is what does the work.** "None is dropped" is what makes
+the list exhaustive rather than merely longer; without it, a three-item list is
+the same instrument as a seven-item one.
+
+## An absence is not an authority
+
+The row that looked droppable was justified by *"zero destructures observed"*.
+That is not a proof of unobservability — **it proves only that the current
+route did not reach the consumer.** The source graph contained the elimination
+the whole time; the lowering route did not get there.
+
+⇒ **"We measured none" and "none can exist" are different claims, and only the
+second licenses skipping the work.** The second needs positive authority plus a
+mutation that makes the thing observable and flips the outcome. Read a zero as
+a question about your instrument's reach before you read it as a property of
+the world.
+
 ## Why it survives review
 
 A verb list reads as rigorous — it is specific, it is long, and each entry is
