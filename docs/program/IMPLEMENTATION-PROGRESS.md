@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-12 01:15:30Z — from 228 issue file(s) in `docs/program/issues/`.
+2026-08-12 01:31:26Z — from 228 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -325,6 +325,7 @@ is itself not yet `merged`/`closed`:
 - `RT-LEXICAL-ROW2-MISSING-MINT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-ROW2-MISSING-MINT` (status: ready)
+- `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-R3-FUSION-EMITTER` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress
