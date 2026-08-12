@@ -2707,7 +2707,7 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// | old `px8j` seed | builder, `oriented_present = false` | nothing | 0 |
 /// | `Exact`, applied root | builder, then the twin's OWN ordinary refusal | one key, one descriptor | 0 |
 /// | `ReHomed`, bare root | builder, then its OWN ordinary refusal | one key, one descriptor | 0 |
-/// | `Frame` / `SelectedSlot` / `Invocation` | **transport validation — no arrival** | nothing | 0 |
+/// | `Frame` / `SelectedSlot` / `Invocation` | **transport validation, refusing at its own named authority — no arrival** | nothing | 0 |
 /// | `ExactSuffix` / `CallIdentity` | builder | nothing | 0 |
 ///
 /// **The five refusal causes are TWO phases, not one.** Three refuse upstream
@@ -2716,14 +2716,36 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// shared consequence would read as satisfied while being blind to which phase
 /// actually fired. The phase is asserted per row.
 ///
-/// **Why arrival LENGTH is the discriminator.** `d2f_gate_note_arrival`, which
-/// sits beside `d2f_note_production_fusion_plane` at the single production
-/// builder call site, is an **unconditional push** — executed once per builder
-/// call with no predicate in front of it.
-/// So the vector's length counts arrivals exactly: `0` means the builder was
-/// never reached, `1` means reached once. A conditional push would make the
-/// same zero mean either "never reached" or "reached and filtered", and the
-/// three-versus-two phase split above would collapse into an unreadable zero.
+/// **What arrival LENGTH actually counts, and why it is NOT what carries the
+/// tier-3 rows.** `D2k-1d`, from Adversary `evt_1gk177jznv5rz`. An earlier
+/// revision of this doc called `d2f_gate_note_arrival` an *"unconditional push
+/// — executed once per builder call with no predicate in front of it"* and
+/// concluded that `0` means the builder was never reached. **The push has no
+/// predicate in front of it and it does have an early return in front of it:**
+/// it and `d2f_note_production_fusion_plane` both sit below
+/// `build_static_continuation_fusion_plan(...)?`, whose four error exits
+/// short-circuit them. So the length counts builder calls **that returned
+/// `Ok`**, and a `0` means "never reached" OR "reached and errored" — the third
+/// case the old dichotomy omitted, and one that genuinely occurs for these same
+/// three causes wherever the builder is called directly.
+///
+/// **So each tier-3 row asserts its refusal SENTENCE, and its count is
+/// supplementary.** The three read `0` today because the OUTER
+/// `validate_oriented_subcontinuation_transport` at the compile entry runs
+/// before the builder and returns through `?` — while the builder's own first
+/// statement is a second call of that same validator. That ordering is the real
+/// ground of the two-tier split and nothing in the tree states it, so a
+/// reordering would leave every tier-3 row reading `0` unchanged while the
+/// phase the row names inverted. The sentence is emitted by the refusing
+/// authority itself and is identical under either copy, which makes these rows
+/// independent of the ordering without legislating it. `D2k-1d` deliberately
+/// does not touch the duplicated validator; whether the outer call should exist
+/// is a separate question from whether this control depends on it.
+///
+/// **The arrived-empty pair still rests on its count, and soundly.** For
+/// `ExactSuffix` and `CallIdentity` a length of `1` is a positive fact — the
+/// builder was reached AND returned `Ok` — and no error path can be mistaken
+/// for it. It is only the zero that is ambiguous.
 ///
 /// **Where "sole production compile path" comes from, and what it rests on.**
 /// `compile_expr_into_module_with_root_projection` is the only scope holding
@@ -2749,6 +2771,11 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// agreement between two independently reached derivations. The literals are
 /// `1` (the cardinality the identity plane is defined to produce for one
 /// candidate) and `0` (the definition population before an emitter exists).
+/// `D2k-1d` adds three refusal-sentence literals, one per tier-3 cause. They
+/// are the same class as the `in-flight activation` literal already asserted on
+/// the positives: each names **which gate refused**, so it moves only when that
+/// gate's authority moves, and a cause that broke something upstream instead
+/// would fail here rather than pass as coverage.
 #[test]
 fn d2f_0_the_applied_root_production_path_gate() {
     use crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take;
@@ -2875,13 +2902,43 @@ fn d2f_0_the_applied_root_production_path_gate() {
     //
     // Every number in the refusal rows is a zero and no zero proves anything by
     // itself, so the positives' populations are operands of the same assertion.
-    let no_arrival: Vec<(D2jCause, usize)> = [
-        D2jCause::Frame,
-        D2jCause::SelectedSlot,
-        D2jCause::Invocation,
+    // `D2k-1d`: the count is supplementary, and the refusal SENTENCE is what
+    // carries these rows. `compile_cause` already returns the error; the
+    // previous revision dropped it with `.0` and kept a bare zero, which is
+    // precisely the shape that cannot tell "the validator refused" from "the
+    // compile failed earlier for an unrelated reason" -- the standard
+    // `d0_r3_...` states and `d2j_the_source_side_causes_refuse_before_any_id_exists`
+    // applies. Each row now names the authority that refused it, and that name
+    // is the same whichever copy of the validator fires, so no row here depends
+    // on the outer call preceding the builder.
+    //
+    // The expected sentences are the ones the transport validator itself emits;
+    // the two occurrence-mismatch reasons continue past this prefix with the
+    // declaration they were raised in, so `contains` is the right relation.
+    let no_arrival: Vec<(D2jCause, usize, bool, Option<CraneliftBackendError>)> = [
+        (
+            D2jCause::Frame,
+            "checked plan frame marker is missing or transplanted",
+        ),
+        (
+            D2jCause::SelectedSlot,
+            "checked computational-IH slot Runtime occurrences differ",
+        ),
+        (
+            D2jCause::Invocation,
+            "checked computational-IH call Runtime occurrences differ",
+        ),
     ]
     .into_iter()
-    .map(|cause| (cause, compile_cause(cause, "ken_d2f_gate_neg").0.len()))
+    .map(|(cause, expected)| {
+        let (arrivals, error) = compile_cause(cause, "ken_d2f_gate_neg");
+        let named_its_own_authority = matches!(
+            &error,
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "OrientedSubcontinuationPlanV1" && reason.contains(expected)
+        );
+        (cause, arrivals.len(), named_its_own_authority, error)
+    })
     .collect();
     let arrived_empty: Vec<(D2jCause, usize, usize, usize)> =
         [D2jCause::ExactSuffix, D2jCause::CallIdentity]
@@ -2909,8 +2966,11 @@ fn d2f_0_the_applied_root_production_path_gate() {
             ),
             // the unmarked seed
             (seed.oriented_present, seed.keys.len(), seed.descriptors.len(), seed.fusion_definitions),
-            // AC-6a phase A: refused upstream, never arrived
-            no_arrival.iter().map(|(_, n)| *n).collect::<Vec<_>>(),
+            // AC-6a phase A: refused at its OWN named authority, never arrived
+            no_arrival
+                .iter()
+                .map(|(_, arrivals, named, _)| (*arrivals, *named))
+                .collect::<Vec<_>>(),
             // AC-6a phase B: arrived once, resolved nothing
             arrived_empty.iter().map(|(_, a, k, d)| (*a, *k, *d)).collect::<Vec<_>>(),
         ),
@@ -2919,18 +2979,20 @@ fn d2f_0_the_applied_root_production_path_gate() {
             (true, 1, 1, 0),
             (true, 1, 1, 0),
             (false, 0, 0, 0),
-            vec![0, 0, 0],
+            vec![(0, true), (0, true), (0, true)],
             vec![(1, 0, 0), (1, 0, 0)],
         ),
         "all THREE positives must resolve exactly one key and one descriptor at definition \
          count zero, while the unmarked seed reaches the same builder and resolves nothing, \
-         three marker causes never reach it AT ALL, and two source-shape causes reach it and \
-         resolve nothing. The two refusal tiers are kept apart deliberately: an arrivals-zero \
-         row says the validator refused upstream and says NOTHING about the builder's \
-         discrimination, so it is asserted as non-arrival and never as a zero key. Only the \
-         arrived-and-empty pair is evidence about the builder, and both tiers are operands of \
-         the same assertion as the positives so that no zero stands alone -- rows \
-         {no_arrival:?} and {arrived_empty:?}"
+         three marker causes refuse at their own named authority without ever reaching the \
+         builder's Ok return, and two source-shape causes reach it and resolve nothing. The \
+         two refusal tiers are kept apart deliberately, and each tier-3 row is carried by its \
+         refusal SENTENCE rather than by its zero: an arrivals count counts builder calls that \
+         returned Ok, so a zero alone cannot tell 'refused upstream' from 'reached the builder \
+         and errored'. The named authority can, and it is the same sentence whichever copy of \
+         the transport validator fires. Only the arrived-and-empty pair is evidence about the \
+         builder, and every tier is an operand of the same assertion as the positives so that \
+         no zero stands alone -- rows {no_arrival:?} and {arrived_empty:?}"
     );
 
     // ---- the pre-emission seat, per positive, on its own root.
@@ -31973,6 +32035,16 @@ fn d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport() {
 /// descends from it, while **the identities still cannot be forged** — every
 /// recognition and transport below comes from the ledger's own issuer, whose
 /// field is private to a module this one does not descend from.
+///
+/// **Disclosure, so no reader takes these for reachable defects: the ledger
+/// states rows 1-3 construct have NO current writer.** Nothing in production
+/// produces them — `rebind` inserts into `minted` and `transitioned` back to
+/// back, and `note_consuming_call` refuses an identity it never minted — so
+/// these are not live states the compiler can enter today. The laws exist for
+/// the same reason `close()`'s own `⊆` re-check does: to catch a **future
+/// second writer** of these fields that does not go through today's call sites.
+/// Without this sentence a reader arriving at directly-built impossible ledgers
+/// can reasonably read them as defects already present.
 ///
 /// **Row 2 is why the finding's own one-line repair is not the fix.**
 /// `range(transitioned) ⊆ dom(minted)` is satisfied by two recognitions naming
