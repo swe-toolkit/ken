@@ -244,8 +244,27 @@ necessary.**
 >
 > | rows | population | seam | owner |
 > |---|---|---|---|
-> | 1-5, eight expressions | exactly `{LexicalCallArgumentRecursor}` | B-only exclusion | [[RT-LEXICAL-RECURSOR-CONSUMERS]] |
+> | 1-5, six of the eight expressions | exactly `{LexicalCallArgumentRecursor}` | B-only exclusion | [[RT-LEXICAL-RECURSOR-CONSUMERS]] |
+> | 2 | same | same | [[RT-LEXICAL-ROW2-MISSING-MINT]] |
+> | 5, the **before-hole** expression | same | same | [[RT-LEXICAL-R3-FUSION-EMITTER]] |
 > | 6, `d8d` | exactly `{MatchScrutineeRecursor}` | **A**-only exclusion | [[RT-MATCH-RECURSOR-CONSUMERS]] |
+>
+> > ### THE EIGHT ARE OWNED BY THREE NODES, NOT ONE — 2026-08-12
+> >
+> > **The population is unchanged; only its ownership split.** Rows 1-5 are
+> > still exactly eight expressions on the B-only seam. Row 2 carved out to
+> > [[RT-LEXICAL-ROW2-MISSING-MINT]], and Architect ruling `evt_7knsqyqg72103`
+> > then carved row 5's **before-hole** expression — the only member that needs
+> > static-continuation fusion — into [[RT-LEXICAL-R3-FUSION-EMITTER]],
+> > **together with its repair and discriminating-control obligations.** Row
+> > 5's *after*-hole expression stays with the parent.
+> >
+> > **This edge is why the split matters to `D3` and not just to bookkeeping.**
+> > `D3` must prove all six rows green without exclusion, which requires every
+> > one of the eight repaired — so `#6d` merging is **not** sufficient to
+> > release `D3`. All three nodes are now in `depends_on`; the carve-out left
+> > that edge declared only as a `blocks` on the child, and `gen-progress.sh`
+> > reads `depends_on`.
 >
 > **The order, and `D3` is last in it:**
 >
@@ -257,7 +276,10 @@ necessary.**
 >    PR #1609 closed before merge, `main` never modified.
 > 2. [[RT-MATCH-RECURSOR-CONSUMERS]] — **first**, because it closes the
 >    Position-A claim that correction narrows.
-> 3. [[RT-LEXICAL-RECURSOR-CONSUMERS]] — rows 1-5.
+> 3. [[RT-LEXICAL-RECURSOR-CONSUMERS]], [[RT-LEXICAL-ROW2-MISSING-MINT]] and
+>    [[RT-LEXICAL-R3-FUSION-EMITTER]] — rows 1-5, **all three**. See the
+>    ownership block under the population table; `#6d` alone does not release
+>    `D3`.
 > 4. **`D3` resumes from the resulting `main`**, jointly retires, replays the
 >    `AC-2b` dispositions, and proves all six rows green **without** exclusion.
 >
@@ -516,8 +538,9 @@ sizing.
 > **THE RE-AFFIRMATION ABOVE IS SUPERSEDED FOR `D3`, 2026-08-08 — hard stop 4.**
 > The `D3` retirement exposed six previously-green semantic controls that fail
 > closed across five refusal boundaries, all through position B's shape. That
-> repair is **not** in this node: it is [[RT-LEXICAL-RECURSOR-CONSUMERS]], which
-> now holds a `blocks` edge onto this one.
+> repair is **not** in this node: it is [[RT-LEXICAL-RECURSOR-CONSUMERS]] and
+> the two nodes since carved out of it, [[RT-LEXICAL-ROW2-MISSING-MINT]] and
+> [[RT-LEXICAL-R3-FUSION-EMITTER]]. All three are in this node's `depends_on`.
 >
 > **`D0`-`D2` is unaffected and lands on its own** (approved object `8efdfdb3`,
 > Decision `dec_6nsrbyw1wjpb`). `D3` resumes from a `main` that already carries

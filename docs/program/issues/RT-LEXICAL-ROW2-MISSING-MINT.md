@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-ROW2-MISSING-MINT
 title: "Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none

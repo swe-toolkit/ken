@@ -5,7 +5,7 @@ status: ready
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-CONTSPEC-WITNESS, RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-RECURSOR-CONSUMERS, RT-LEXICAL-ROW2-MISSING-MINT]
+depends_on: [RT-CONTSPEC-WITNESS, RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-RECURSOR-CONSUMERS, RT-LEXICAL-ROW2-MISSING-MINT, RT-LEXICAL-R3-FUSION-EMITTER]
 blocks: [RT-DESCENT-RETIRE]
 github: null
 origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDescent, migrate the remaining residual classes, do not linger half-migrated. Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2). Recut 2026-08-08 per Architect ruling evt_237tbdsacqbk4.
@@ -25,13 +25,18 @@ origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDes
 >   lands is a **bounded child** over `8efdfdb3` narrowing every class-wide claim
 >   to the exact `D1` witness — no production or test-logic change, fresh SHA,
 >   fresh QA, fresh Architect, fresh Decision.
-> - **`D3` is blocked on TWO successor nodes** —
->   [[RT-MATCH-RECURSOR-CONSUMERS]] (row 6, Position A completion) and
->   [[RT-LEXICAL-RECURSOR-CONSUMERS]] (rows 1-5) — which is why this node carries
->   `depends_on` edges onto nodes filed *after* it. The `D3` retirement exposed
->   six previously-green semantic controls failing closed across five refusal
->   boundaries; the census partitioned them into **two populations with two
->   distinct activation seams**, not one.
+> - **`D3` is blocked on FOUR successor nodes** — which is why this node carries
+>   `depends_on` edges onto nodes filed *after* it. **It was two when this
+>   line was written; rows 1-5 have since been split three ways, so the count
+>   in your memory is stale.** [[RT-MATCH-RECURSOR-CONSUMERS]] (row 6, Position
+>   A completion); [[RT-LEXICAL-RECURSOR-CONSUMERS]] (six of the eight
+>   expressions in rows 1-5); [[RT-LEXICAL-ROW2-MISSING-MINT]] (row 2); and
+>   [[RT-LEXICAL-R3-FUSION-EMITTER]] (row 5's before-hole expression).
+>   The `D3` retirement exposed six previously-green semantic controls failing
+>   closed across five refusal boundaries; the census partitioned them into
+>   **two populations with two distinct activation seams**, not one — that
+>   partition is by *seam* and is unchanged; the three-way split above is by
+>   *owner* within the B-only seam.
 > - **`10369776252861e8b15e613576256a3682c70066` is held evidence only** — not a
 >   candidate, not the repair base, not to be continued.
 > - **No new `#[ignore]` on this node, ever.** The Steward ruled the six

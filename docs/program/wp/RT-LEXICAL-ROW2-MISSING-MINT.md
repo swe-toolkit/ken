@@ -118,6 +118,39 @@ evidence this node was waiting on, and it is now in. It is still a floor.
 Repair only what `D0` attributed, at the mechanism, not at the trace. Do not
 touch the `#[cfg(test)]` emission, the enum, or the assertion.
 
+> #### `D0` HAS LANDED. THE ATTRIBUTION IS FIXED INPUT — DO NOT RE-DERIVE IT.
+>
+> **Merged 2026-08-12 at exact `3e569191`**, QA `evt_5r8mdv2hjzzxd`, Architect
+> Decision `dec_3rasp837yerxh`. The answer to §2.2's fork is **cause (i),
+> never reached**, on the **`SourceMachine`** producer path. `Composed` mints
+> normally at `siblings == 1` in the same trace.
+>
+> **The location is measured, not guessed.** The three mint sites sit in three
+> different functions; the missing one is in **`lower_source_machine`**. `D1`
+> is the branch that function takes on the functionized lane instead of the
+> specialized-selection arm, for this occurrence. Start there.
+>
+> **The one-versus-four count is `D1`'s bounded-installation question, and it
+> is NOT authority to install every absent mint.** Runtime-leader scope
+> clarification in `thr_2amp93z5apamk`, restated at merge: the functionized
+> lane mints **once** where descent mints **four times**. `D1` owns deciding
+> *which* `SourceMachine` installation this lane actually requires, because
+> that bounds the attributed repair. Installing all three absent mints
+> unconditionally is out of scope and is the tempting over-repair.
+>
+> **The `D0` sentinel is DELETED by this repair, never relaxed.** It is a
+> transition sentinel that asserts all five facts as one assertion and is
+> written to go red when `D1` lands. Deleting it is the designed retirement;
+> weakening its operands to keep it green is not.
+> `px8j_all_three_producer_paths_reach_real_consumers` is the real control.
+>
+> **The standing trap, and it is why a green suite proves nothing here.**
+> The whole `px8j` trace is `#[cfg(test)]`. Adding a `Mint` emission on the
+> `FunctionizedUnits` path to satisfy the assertion is a test-only event
+> feeding a test-only observer: the suite greens and **the lane is unchanged**.
+> What keeps this node falsifiable is that `siblings` derives from production
+> state. **A repair at the emission site is the failure mode, not the fix.**
+
 ### `D2` — discriminating controls, separate from `D1`
 
 A control set appended to an implementation deliverable is the shape that got
