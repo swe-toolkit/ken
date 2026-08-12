@@ -31407,3 +31407,110 @@ fn d2e_ac9_layout_agrees_with_the_prefix_production_assembled() {
         }
     }
 }
+
+/// **`D2k-1b-i`'s STOP, made executable.** Arming the `Construct` producer
+/// turns four of the five expressions from a fail-closed refusal into a
+/// successful compile in which the transported worker is **never consumed**.
+///
+/// `D2k-1b-i`'s own acceptance is *"no consumer becomes green here — the five
+/// still refuse"*, and this measures that it is false. The three facts are
+/// asserted together because separately each has an innocent reading:
+///
+/// - **the recognition fired** — every row records a `StaticWorkerField` at the
+///   owning constructor, so the producer really is armed and the rows are not
+///   green for some unrelated reason;
+/// - **the bare-`Var` value read never happened** — `worker_reads` is empty, so
+///   the refusal did not merely move, it stopped existing on four rows;
+/// - **row 1 ADVANCES rather than greening** — it reaches a *later, different*
+///   refusal. That is the one-variable A/B that separates *"the increment did
+///   nothing"* from *"the increment worked and revealed the next wall"*, and it
+///   is why the four greens are attributable to the arming.
+///
+/// ⇒ **The worker is provably not called on the green rows.** No
+/// `ConstructorField` refusal fired, and the only readers that do not refuse
+/// are `d9_collect` (`cfg(test)`, contributes nothing), `unwrap_terminal_ret`
+/// (hands the constructor back intact) and `same_recursive_field_shapes`
+/// (answers `false`). None of them consumes a worker, and `D2k-1b-ii` — which
+/// installs the field into the lexical binding authority so the exact-`Var`
+/// call can consume it — has not landed. **The field is built and dropped.**
+///
+/// **Promise class: TRANSITION SENTINEL, and it is named for the boundary
+/// rather than for the count.** It pins the state that makes `1b-i`
+/// unlandable *alone*. It is intended to go red the moment the consumer lands
+/// and these rows either refuse again or become green *because the worker is
+/// consumed at the exact-`Var` call* — which is `AC-1`. **Retiring event: the
+/// candidate that lands `D2k-1b-i` and `D2k-1b-ii` together.** It must not be
+/// carried forward as an invariant; a green here after that candidate is the
+/// defect, not the pass.
+#[test]
+fn d2k_1b_i_arming_the_producer_alone_drops_the_worker_on_four_of_the_five() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// `(recognized owner constructors, bare-Var worker reads, compiles)`.
+    fn armed(expression: &RuntimeExpr, symbol: &str) -> (Vec<String>, usize, bool) {
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let _restore = Restore;
+        let _ = d2k_owner_trace_take();
+        let (result, _trace) = px8j_capture_source_trace(expression, false, symbol);
+        let events = d2k_owner_trace_take();
+        let mut recognized: Vec<String> = events
+            .iter()
+            .filter_map(|event| match event {
+                D2kOwnerEvent::StaticWorkerField { constructor, .. } => Some(constructor.clone()),
+                _ => None,
+            })
+            .collect();
+        recognized.dedup();
+        let reads = events
+            .iter()
+            .filter(|event| matches!(event, D2kOwnerEvent::StaticWorkerRead { .. }))
+            .count();
+        (recognized, reads, result.is_ok())
+    }
+
+    let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
+    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
+    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::AfterReturnHole,
+    ));
+
+    let tree1 = vec!["ctor:fixture::PX8JTree1::Node".to_string()];
+    let scope = vec!["ctor:fixture::PX8JScopeTree::Node".to_string()];
+    let hole = vec!["ctor:fixture::PX8JHoleOutput::Node".to_string()];
+    // Every row is compared against a LITERAL, never against the population --
+    // the same discipline `D2k-1a` was rebuilt under. A sameness check across
+    // the five is green under a uniform move, which is the case that matters.
+    assert_eq!(
+        [
+            ("row1-owned-scope", armed(&row1, "ken_d2k1bi_row1")),
+            ("row4-depth-1", armed(&row4_d1, "ken_d2k1bi_row4_d1")),
+            ("row4-depth-2", armed(&row4_d2, "ken_d2k1bi_row4_d2")),
+            ("row4-depth-3", armed(&row4_d3, "ken_d2k1bi_row4_d3")),
+            ("row5-after-hole", armed(&row5, "ken_d2k1bi_row5")),
+        ],
+        [
+            // Row 1 is the A/B's informative side: recognized, not read, and
+            // still refusing -- at a LATER wall than the one it stood at.
+            ("row1-owned-scope", (tree1, 0, false)),
+            ("row4-depth-1", (scope.clone(), 0, true)),
+            ("row4-depth-2", (scope.clone(), 0, true)),
+            ("row4-depth-3", (scope, 0, true)),
+            ("row5-after-hole", (hole, 0, true)),
+        ],
+        "D2k-1b-i STOP: arming the producer alone must be shown to recognize the worker at its \
+         owning constructor, to remove the bare-Var read entirely, and to leave four of the five \
+         COMPILING with nothing consuming the field. If a row here refuses again, the consumer \
+         has landed and this sentinel has done its job -- retire it against AC-1 rather than \
+         restoring it."
+    );
+}

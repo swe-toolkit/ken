@@ -2490,6 +2490,25 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
         origin: StaticOriginId,
         site: &'static str,
     },
+    /// `D2k-1b-i` — a `Construct` argument was **recognized** as a static
+    /// worker and retained as a compiler-only field, instead of being read as
+    /// a value.
+    ///
+    /// **The owner/argument relation this carries is the PLANNER's, not
+    /// emission order.** `field_origin` is
+    /// `child_static_origin(owner, position)`, so a consumer of this trace
+    /// learns which constructor owns the field from the planner's own
+    /// positional child-origin range rather than from which `ConstructEntered`
+    /// happened to be emitted nearest. That distinction is not cosmetic: a
+    /// constructor argument may itself be a `Construct`, and a
+    /// nearest-preceding rule names the **inner** one while agreeing with the
+    /// planner on every non-nested fixture.
+    StaticWorkerField {
+        owner: StaticOriginId,
+        position: usize,
+        field_origin: StaticOriginId,
+        constructor: String,
+    },
 }
 
 #[cfg(test)]
@@ -2869,24 +2888,47 @@ enum ConstructorField {
     /// A statically-bound worker transported through the constructor template
     /// without becoming a value.
     ///
-    /// **NOTHING CONSTRUCTS THIS ARM AT `D2k-1b-i0`, and the resulting
-    /// `never constructed` warning is the open checkpoint staying visible** —
-    /// the same convention [`StaticWorkerBinding::route`] states for itself.
-    /// Silencing it with an `#[allow(dead_code)]` would hide the one fact that
-    /// distinguishes this increment from the armed one: `D2k-1b-i` supplies the
-    /// producer, and until it does, this arm is unreachable by construction.
+    /// **THIS ARM IS NOW CONSTRUCTED**, at the one armed producer:
+    /// `Lowering::static_worker_constructor_template`, reached from the
+    /// direct-descent `RuntimeExpr::Construct` arm after
+    /// `recognized_constructor_worker_fields` answers ahead of any
+    /// value-producing read. The `never constructed` warning that stood here as
+    /// `D2k-1b-i0`'s open checkpoint is gone, and its disappearance is the
+    /// compiler's own announcement that the checkpoint closed.
+    ///
+    /// **The warning that replaced it is the NEXT checkpoint, and it is left
+    /// visible for the same reason:** `field 0 is never read` — nothing yet
+    /// consumes the transported binding. `D2k-1b-ii` is what reads it, by
+    /// installing the field into the one lexical binding authority without
+    /// erasing its kind so the existing exact-`Var` call can consume it.
+    /// Silencing either warning with an `#[allow(dead_code)]` would hide
+    /// exactly the fact that distinguishes these increments from one another.
+    ///
+    /// > **MEASURED, and it is why arming the producer ALONE does not land:**
+    /// > with this arm constructed and nothing consuming it, four of `D2k`'s
+    /// > five expressions stop refusing and **compile with the worker silently
+    /// > dropped** — see
+    /// > `d2k_1b_i_arming_the_producer_alone_drops_the_worker_on_four_of_the_five`.
+    /// > `D2k-1b-i`'s own acceptance is *"no consumer becomes green here"*, so
+    /// > the producer and the `Match` consumer are inseparable for the same
+    /// > reason the producer and the preflight are.
     ///
     /// **The field readers' arms below are TYPE COMPLETENESS, NOT the
     /// boundary.** They are local refusals reached *during* descent, and the
     /// ruling requires a **whole-graph** refusal *before the first allocation
-    /// or emitted transfer*. `D2k-1b-i` owes that boundary and it is not
-    /// present here; nine green arms are not a preflight.
+    /// or emitted transfer*. That boundary is
+    /// `Lowering::source_aggregate_preflight` together with
+    /// [`Lowered::boundary_transfer_admissibility`], both of which run ahead of
+    /// every emission; a count of green reader arms is never evidence about it,
+    /// because the two differ in **when**, not in **how many**.
     StaticWorker(StaticWorkerBinding),
 }
 
 impl ConstructorField {
     /// The ordinary field a producer builds. Every construction site in the
-    /// tree goes through this arm at `D2k-1b-i0`.
+    /// tree goes through this arm **except** the one armed producer,
+    /// `Lowering::static_worker_constructor_template`, which is the sole
+    /// builder of the worker arm.
     fn specialized(value: Lowered) -> Self {
         ConstructorField::Specialized(value)
     }
@@ -3807,17 +3849,20 @@ fn specialized_operands_at(
 /// [`specialized_operands_at`] for the arguments of a **constructor template**,
 /// producing that template's closed [`ConstructorField`] kinds.
 ///
-/// **`D2k-1b-i0`: every operand becomes [`ConstructorField::Specialized`], with
-/// no exception.** This is the whole of the behaviour-preserving claim on the
-/// producer side — a static worker reaching a constructor argument has already
-/// refused upstream at [`LoweringEnvironmentBinding::value_at`], so no operand
-/// arriving here can be one.
+/// **Every operand becomes [`ConstructorField::Specialized`], with no
+/// exception, and that stays true with the producer armed.** A
+/// [`LoweringOperand`] is a lowered value, and recognition happens *before* an
+/// argument is lowered — so a static worker never becomes an operand and can
+/// never arrive here. An operand reaching this function that names a worker has
+/// already refused upstream at [`LoweringEnvironmentBinding::value_at`].
 ///
-/// **This is the seam `D2k-1b-i` arms, and it is deliberately one function.**
-/// That increment makes `Construct` recognize a static-worker binding *before*
-/// `value_at` and produce [`ConstructorField::StaticWorker`] here. Until then
-/// the uniform mapping is the honest statement of what the compiler does, not a
-/// placeholder: nothing upstream can hand this function a worker.
+/// **The armed seam is NOT this function**, which is the correction worth
+/// leaving: `D2k-1b-i0` predicted that `D2k-1b-i` would arm it, and arming it
+/// would have been arming the wrong end. Recognition has to happen where the
+/// *source argument* is still in hand, not where its lowered operand is — by
+/// then the value-producing read has already been taken. The armed producer is
+/// `Lowering::static_worker_constructor_template`, which builds the mixed
+/// template itself and never routes through here.
 fn specialized_constructor_fields_at(
     operands: &[LoweringOperand],
     edge: &'static str,
@@ -4546,12 +4591,25 @@ fn d9_collect(
             for arg in args {
                 match arg {
                     ConstructorField::Specialized(value) => d9_collect(value, words, origins),
-                    // A worker field contributes no runtime word and no
-                    // aggregate origin — that is precisely what "no value
-                    // representation" means. This walk is an infallible
-                    // observation, so it records the absence by contributing
-                    // nothing rather than by refusing.
-                    ConstructorField::StaticWorker(_) => {}
+                    // A worker field contributes **no runtime word** — that is
+                    // what "no value representation" means, and it is why this
+                    // arm cannot push onto `words`.
+                    //
+                    // **It does contribute an ORIGIN, and that is a
+                    // re-derivation rather than the original decision.** This
+                    // arm previously contributed nothing at all, justified by
+                    // *"this walk is an infallible observation"* — sound only
+                    // while nothing constructed a worker. Now that the producer
+                    // is armed, contributing nothing would make a template
+                    // carrying a worker observationally **identical** to one
+                    // missing that field entirely, and distinguishing operands
+                    // is this walk's whole purpose. The binding's `body_origin`
+                    // is the same fact the `Closure` arm below records, so the
+                    // observation stays faithful without inventing a word the
+                    // field does not have.
+                    ConstructorField::StaticWorker(binding) => {
+                        origins.push(binding.body_origin)
+                    }
                 }
             }
         }
@@ -7573,9 +7631,27 @@ impl<'a> Lowering<'a> {
                 // inside the store loop below would refuse only after
                 // `emit_checked_aggregate_alloc` had already run — the
                 // *"descends partway and then refuses"* shape the ruling
-                // forbids. This is local ordering, not the whole-graph
-                // boundary: `source_aggregate_preflight` already walks the
-                // spine ahead of this, and `D2k-1b-i` owes the refusal there.
+                // forbids.
+                //
+                // **Emitted instruction order is still unchanged now that
+                // this read CAN fail, and that is measured rather than assumed
+                // from unconstructibility.** The premise used to be that
+                // nothing constructed a worker; with the producer armed, the
+                // claim rests instead on reachability: every route into this
+                // function is screened whole-graph first.
+                // `transfer_into_carrier` runs `boundary_transfer_admissibility`
+                // and `source_aggregate_preflight` before calling it,
+                // `transfer_constructor_operands` runs the same pair ahead of
+                // its own allocation, this function's recursion only descends
+                // into a subgraph its parent already screened, and
+                // `emit_carrier_dynamic_constructor` is reached only from here.
+                // ⇒ A worker-bearing template cannot arrive, so this read
+                // cannot fail in production and no instruction is emitted
+                // before it either way.
+                //
+                // This is local ordering, not the whole-graph boundary — the
+                // boundary is the screening pair named above, and no count of
+                // arms like this one is ever evidence about it.
                 let arguments =
                     specialized_field_refs_at(args, "a constructor field being materialized")?;
                 let word = self.emit_checked_aggregate_alloc(
@@ -16502,12 +16578,26 @@ impl<'a> Lowering<'a> {
                 } if constructor.ends_with("::ITree::Ret") && args.len() == 1 => {
                     match args.remove(0) {
                         ConstructorField::Specialized(inner) => lowered = inner,
-                        // This function is infallible, so the conservative move
-                        // is to NOT see through the wrapper: hand the
-                        // constructor back intact and let the ordinary
-                        // value-producing consumers refuse it. Unwrapping to
-                        // the worker would hand a caller expecting a value
+                        // This function is infallible, so it cannot refuse; the
+                        // decision it CAN take is to leave the wrapper on and
+                        // keep the refusal with a consumer that is able to make
+                        // one. Unwrapping would hand a caller expecting a value
                         // something with no value representation.
+                        //
+                        // **Re-derived now that a worker really can arrive
+                        // here.** The original justification was that the read
+                        // was infallible because nothing constructed a worker;
+                        // that premise is gone, so the claim has to rest on
+                        // where the intact constructor actually lands. Both
+                        // reachable consumers fail closed on it:
+                        // `emit_process_exit_status` answers its `-3`
+                        // malformed-payload sentinel, and the scalar-pair join
+                        // either routes into that same decoder or refuses with
+                        // *"dynamic native arms must produce scalar Int
+                        // values"*. Neither can mistake the wrapper for a
+                        // value, which is what makes handing it back the
+                        // conservative move rather than merely the unchanged
+                        // one.
                         field @ ConstructorField::StaticWorker(_) => {
                             return Lowered::Constructor {
                                 constructor,
@@ -19822,9 +19912,18 @@ impl<'a> Lowering<'a> {
 /// including another worker field.** This predicate gates recursive
 /// loop-parameter reuse, and answering `true` would let two templates share a
 /// parameter run that has no representation for the worker at all. What
-/// worker-to-worker equality should mean is `D2k-1b-ii`'s question, once a
-/// worker can actually appear here; `false` is the answer that cannot be wrong
-/// while nothing constructs one.
+/// worker-to-worker equality should mean is `D2k-1b-ii`'s question.
+///
+/// **Re-derived now that a worker really can appear here.** `false` was
+/// previously justified as *"the answer that cannot be wrong while nothing
+/// constructs one"* — a premise the armed producer deletes. What `false`
+/// **licenses** is the question, and the answer is measured rather than
+/// argued: it licenses nothing, because the loop path it gates refuses a
+/// worker-bearing template outright one step later, at
+/// [`append_recursive_argument_values`]'s `"a recursive loop constructor
+/// field"` read. So the two possible answers differ only in *which* refusal a
+/// worker-bearing loop parameter receives, never in whether it receives one —
+/// and `false` is the one that cannot admit a shared parameter run.
 ///
 /// **Both arms name both kinds — there is no wildcard**, so a third field kind
 /// is a compile error here rather than silently falling into `false`.
