@@ -38,7 +38,50 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~21:3xZ. `main` = `d5912acd`.
+> ### RESUME HERE — state at 2026-08-12 ~22:0xZ. `main` = `d5912acd`.
+>
+> > **SUPERSEDING UPDATE at ~22:0xZ — read this before the ~21:3xZ text below
+> > it, which it corrects on two points.**
+> >
+> > **TIP IS NOW `766cbdf0`, 10 commits**, base `d5912acd`, still unarmed and
+> > unrouted.
+> >
+> > **`AC-D3-SELF` IS CLOSED** (`evt_6bg3en6yy4dgz`).
+> > `FusionClaimRefusal::BinderBodyResolution` refuses **before claim
+> > issuance**. **The route I recorded for it last turn was wrong** — the
+> > redirect edge is already unique by callee, so that comparison **cannot
+> > fail**; the working resolution uses the binder's **own members**, so
+> > `recursive_position` is **used** rather than compared to a copy of itself.
+> > Its control's first shape died to its own mutation proof because **a
+> > two-step rule shadows itself**: one proof per **step**, not per rule.
+> >
+> > **`AC-D3-ROUTE`'s MECHANISM IS MEASURED FALSE AND I STRUCK IT IN THE
+> > FRAME.** The classification (R3 routing defect) and **the atomic boundary
+> > are unaffected** — only the causal sentence and therefore the repair. Four
+> > probes: the fused suffix lowering returns **`Carried`** (a runtime call
+> > result, terminalizing nothing); the takeover forwards it, so **the redirect
+> > RAN and the suffix WAS consumed**; the escape backtraces to `emit_result`
+> > from the **root projection**, not inside the fused function; and
+> > `require_complete_static_worker_disposition()` **passes** just before. ⇒
+> > **the escaping worker-bearing constructor is a DIFFERENT OCCURRENCE arriving
+> > as the root answer** (field origin 29 `Exact`, 25 `ReHomed`).
+> >
+> > **WHY THAT MATTERS MORE THAN THE CORRECTION ITSELF:** read literally, the
+> > struck repair says the takeover forwards too early, so the obvious build is
+> > **to stop forwarding** — and the takeover is **correct**, so that would
+> > break working code and reintroduce the double-suffix defect at `:650` the
+> > forward exists to prevent. **A repair that would have looked ruled and been
+> > wrong.** The implementer measured instead of building. Do not undo the
+> > strike.
+> >
+> > **OPEN, with the Architect at `evt_2fanpwder54a0`:** is the second root
+> > occurrence **wrongly produced** or **wrongly selected as the answer**? Both
+> > fit every measurement and **they have opposite repairs.** Nobody has picked
+> > one and neither should you.
+> >
+> > **Held commits now:** `f3a8808b` `c0422594` `3eaa9f3f` `2a0e7d31`
+> > `f6eeabe6` `194faa93` `3d2d0d92`. The frame-predates-the-rulings hazard
+> > below **still applies and has grown.**
 >
 > > **BOTH ARCHITECT QUESTIONS ARE RULED. THE GATE RAN. THE BRANCH IS
 > > RE-RELEASED (`evt_5qex3d5c36q0k`) AND BOTH RUNTIME SEATS WOKE AND ARE
