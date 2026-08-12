@@ -1232,6 +1232,93 @@ transport-only shape.
 > still be reported **with** the live recognize/rebind/consume arm it was taken
 > on.
 >
+> ### THE `consumer_owner` VALUE IS MEASURED. `evt_767jcxjfwwczm` AT `b8164398`.
+>
+> **The literal answer is YES and it discriminates NOTHING. The section 8
+> decision is the Architect's and this block does not take it.**
+>
+> `consumer_owner` is `PredeclaredFunctionId(0)` for every unit in both rows,
+> and `Fn(0)` is also the owner of outer-match case body `16` (row 4) / `12`
+> (row 5). **They match — and `Fn(0)` is the root source body, which owns every
+> origin on the chain**: `5`, `21`/`17`, `26`/`22`, `16`/`12`, all `Fn(0)`.
+>
+> **The field is not constant by construction** — `producer_owner` does vary
+> across the five compiled plans (one unit has `producer_owner=Fn(2)` with
+> `consumer_owner=Fn(0)`), and the plans contain `Fn(1)`..`Fn(3)`. It is
+> constant **on this population**, which is exactly why the equality carries no
+> information: any `consumer_owner` derived from any origin in the outer region
+> would equal `Fn(0)`.
+>
+> **The derivation is the finding:** `consumer_owner = occurrence_authority(plan,
+> continuation_origin)?.owner` — the source-body owner of the **continuation**
+> origin (`21`/`17`), not a relation to outer match `5` or to case body `16`.
+> ⇒ **A measured property that is TRUE and does not entail what the mechanism
+> needs.** Reading the match as the consumer relation would be reading a
+> coincidence.
+>
+> **What is absent:** no member of the unit key names origin `5` or `16`.
+> Recovering either from the continuation unit means going `21 → 5`, which is
+> **parent-of**, and `occurrence_authorities` is child-indexed with no parent
+> accessor — so it needs the **reverse search the ruling forbids**.
+>
+> > **THE READ DISCLOSES ITS OWN MISSING CONTROL, AND THAT IS WHY THE RESULT IS
+> > USABLE.** These fixtures cannot separate a real consumer relation from the
+> > coarse root identity, because **every candidate answer is `Fn(0)`.** A
+> > fixture whose outer-match case body is owned by a *different* predeclared
+> > function from the continuation origin would separate them; authoring one is
+> > new fixture population and outside the bound. **Do not read this match as a
+> > positive result for consumer-ownership transfer.**
+>
+> #### CORRECTION, RE-DERIVED BY THE STEWARD: the fusion plane is NOT test-only
+>
+> The read reported *"every `install_static_continuation_fusions` call site is a
+> test"*. **That is false, and the distinction changes the disposition.** There
+> is a production call site at **`lowering/core.rs:2234`**, inside:
+>
+> ```rust
+> const D2F_EMITTER_ARMED: bool = false;
+> if D2F_EMITTER_ARMED {
+>     static_transition_plan.install_static_continuation_fusions(..)?;
+> }
+> ```
+>
+> **`FUSIONS installed=0` is correct; the reason is the gate, not absence.** The
+> block's own comment states it and anticipates this exact misreading: *"Do not
+> read `D2F_EMITTER_ARMED: false` as 'the chain is absent'. It is present and
+> running on nothing."* `preflight`, `install_fusion_owned_bodies` and
+> `define_static_continuation_fusion_bodies` all run **unconditionally on every
+> production compile**, inert by empty population rather than by the gate.
+>
+> ⇒ **This is a labelled un-wired partial (`D2f`), not an uninstalled type.**
+>
+> #### THE QUESTION THIS RAISES FOR THE ARCHITECT — flagged, NOT ruled
+>
+> `FusionRegionClaim` binds **distinct producer and consumer source
+> authorities**, the selected case body, the consuming call, and the exact
+> checked continuation prefix plus its successor `next`; and `D2f`'s ruled
+> emission is *"lower the producer once under producer authority, then switch
+> only the source-lookup authority to the consumer and lower the exact selected
+> case/suffix once"*, replacing the prefix at the call seat rather than
+> replaying it.
+>
+> **That reads as the same shape as `1c-2`'s selected consumer-ownership
+> transfer** — one `Function` consumes once, the other must not replay the
+> suffix. **This frame does not rule that they are the same mechanism.** This
+> node has been wrong five times by treating a resemblance as an identity, and
+> the question is the Architect's:
+>
+> 1. Is `1c-2`'s surviving class the mechanism `D2f` already ruled and built?
+> 2. If so, is the relation `1c-2` needs already carried by `FusionRegionClaim`,
+>    making this a **wiring** question rather than a new-projection one?
+> 3. `D2f` is held at **step 5** — a checked frame is a per-`Function`
+>    transaction and a fused region is the first construct whose frame spans
+>    two. **Does consumer-ownership transfer meet that same open question?**
+>
+> **Section 8 as written does not fire:** the value is present and matching. On
+> what the design class needs, the relation is absent from existing projection,
+> and the two routes to it are a forbidden reverse search or an un-armed plane.
+> **The dependency is reported, not added.**
+>
 > ### THE FEASIBILITY READ IS COMPLETE. `evt_1zfnezm35h4x3` AT `b8164398`.
 >
 > **Four of five items answered. The single open value is the section 8
