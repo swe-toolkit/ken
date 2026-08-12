@@ -38,7 +38,92 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~18:5xZ. `main` = `d5912acd`.
+> ### RESUME HERE — state at 2026-08-12 ~21:0xZ. `main` = `d5912acd`.
+>
+> > **RUNTIME IS SELF-DRIVING ON R3 AND THE RING'S HANDBACKS HAVE BEEN CORRECT
+> > EVERY TIME.** Do not read the length of this node as a ring problem — read
+> > it as a sizing problem, which is mine. Four serial stops on one node, each
+> > found by arming and hitting it.
+> >
+> > **THE OBJECT.** Branch `wp/RT-LEXICAL-R3-FUSION-EMITTER`, **freed**, tip
+> > **`fe5c311e`**, base `d5912acd`, **7 commits**, unarmed and unrouted.
+> > `89ee005b` stays preserved unrouted WIP. `DP`+`D1`+`D2`+`D3` merge as ONE
+> > candidate (Architect `evt_4m0q1m4zn4k79`) — no standalone `DP` or `D1`
+> > merge, no QA route on `89ee005b`. Flag `REPRESENTATION_RULE_VERSION 4 → 5`
+> > at review routing.
+> >
+> > **WHAT I RELEASED, and it does not wait on any ruling** (`evt_7r043m92mz7fb`):
+> > selector net 3 (duplicate/replay/escaped/unconsumed) plus the `D3`
+> > call-site-versus-body discriminator. Both unarmed, both already owed, both
+> > in scope under **every** disposition of the blocker below. The implementer
+> > woke on that release and is working.
+> >
+> > **THE DISCRIMINATOR'S MEASURED INPUTS, which are the whole reason it is an
+> > AC:** `consuming_call=17` while seat, `producer_body` and `redirect_callee`
+> > **all print `37`**. Three-way coincidence; folding call-site into body
+> > **type-checks**; a control whose expected values are all `37` passes under
+> > the fold and proves nothing. In the frame.
+> >
+> > **TWO QUESTIONS ARE WITH THE ARCHITECT. Neither is mine and I did not
+> > pre-empt either.**
+> >
+> > 1. **Planner-side guard** (leader routed, `evt_6pp2we806xy0p`). The ruling
+> >    requires the consuming-callee/binder relation to **resolve to**
+> >    `producer_body`; that resolution is preflight's and needs `ih_bindings` +
+> >    `SemanticIr::child_origin`, `pub(super)` to the planner. The implementer
+> >    checks the redirect producer entry against the claim's producer body
+> >    instead — a real two-route cross-check, **not the ruled relation** — and
+> >    named the gap in a comment. **`AC-D3-SELF` is NOT closed by that.** A
+> >    named limit is not a met criterion; do not read the comment as either the
+> >    closure or a ruling that the cross-check suffices.
+> > 2. **The `StaticWorkerBinding` blocker's classification** (mine to route,
+> >    `evt_7r043m92mz7fb`). The armed compile now advances past both D3
+> >    refusals and stops where a constructor field escapes to a ground value
+> >    transporting a static worker binding, which has no value representation.
+> >    **This blocks selector nets 2 and 4, controls 2 and 3, and the
+> >    inner-slot-widening witness** — every armed-path obligation.
+> >
+> > **WHY I DID NOT RULE (2), and do not rule it on resume.** The scope answer
+> > depends on a design fact: is the **arrival** at that site correct-but-
+> > unsupported, or is R3 routing something there that should not go? If the
+> > arrival is correct, the armed-path obligations are **unreachable inside
+> > R3** and the atomic object cannot satisfy its own ACs — relieving that means
+> > moving the atomicity boundary of `evt_4m0q1m4zn4k79`, **the Architect's
+> > ruling to amend, not mine to reinterpret as sizing.**
+> >
+> > **WHAT I MEASURED so the ruling rests on a fact, not the implementer's
+> > characterization** — which I checked rather than took: **R3's range does NOT
+> > touch the refusal site.** `lowering/mod.rs:3038` sits between diff hunks
+> > that stop near 2839 and resume at 13814. The construct carries its own prior
+> > `D2`/`D3` deliverables (`core.rs:12347` sole construction route,
+> > `core.rs:15631` sole consumer) from an **earlier node** — those D-labels are
+> > not R3's. So the **code** is untouched and only what **flows into** it
+> > changed. **That is consistent with both readings and settles neither.**
+> >
+> > **HANDOFF GATE: DEFERRED, NOT DROPPED** (`evt_5rqhfkvrxz6xx`). The leader
+> > asked for one; I checked preconditions, then checked the seat, and the
+> > implementer was **already working at ctx 40%** on the release. Gating a live
+> > turn resets and compacts it. **Preconditions are measured and it is now a
+> > one-step action:** all three Runtime worktrees clean, on their own
+> > `<role>/work` branches, **0 ahead of `origin/main`**, **none checked out on
+> > the WP branch** — so no `preserved/` ref would be minted and the object is
+> > not in the reset's path. Run it the moment the implementer hands back.
+> >
+> > **STILL HELD, DELIBERATELY UNPUBLISHED:** `f3a8808b` and `c0422594`
+> > (briefing + all frame amendments). Publishing moves `main` and **stales the
+> > base the leader named to its implementer by hand**; the commits unblock no
+> > product WP (`COORDINATION §10⁻` rule 3). Publish at the next substantive
+> > seam — landing the object is one.
+> >
+> > **SEAT MECHANICS, live this hour.** The runtime-leader stalled again in the
+> > documented shape: its own tick sampled the implementer mid-work, concluded
+> > "No action needed", and it did not wake for the 20:49 handback. **Compare
+> > last-turn time to handback time; the tick is what makes the ring look
+> > healthy.** The architect stranded on a `[Pasted Content 2754 chars]` for the
+> > third time — a paste needs a **second `Enter`**. Both recovered by pane
+> > rouse, neither by a convo read.
+>
+> ### RESUME HERE — earlier state at 2026-08-12 ~18:5xZ. `main` = `d5912acd`.
 >
 > > **HANDOFF GATE RAN, THEN THE RE-RELEASE — in that order, and the order is
 > > the point.** `scripts/handoff-gate-compact.sh runtime-leader
