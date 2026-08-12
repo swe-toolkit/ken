@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-R3-FUSION-EMITTER
 title: "Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,11 +11,12 @@ github: null
 origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliation returned 0 of 8 discharged across eleven merged D2f partials (runtime-leader, evt_d9n0twj6y5sp). Separability ruled by the Architect at evt_7knsqyqg72103 on a Steward question (evt_2vbhz9kgp0b44). Steward-filed (agents cannot create tracked work per COORDINATION 2).
 ---
 
-> # STOPPED 2026-08-12 — THE CUMULATIVE STOP FIRED AT `D2`
+> # THE CUMULATIVE STOP FIRED AT `D2` — RECUT BEHIND `DP`, NOW `ready`
 >
-> **Architect ruling `evt_1q7v9fcw5hd87`. Runtime is not on this node; `D2k`
-> took the ring at `evt_9tx4kt0k8epm`. Do not resume this node from its frame
-> as written.**
+> **Architect ruling `evt_1q7v9fcw5hd87`, and the recut is landed.** Runtime is
+> not on this node — `D2k` took the ring at `evt_9tx4kt0k8epm`. **Resume from
+> the recut frame, whose entry point is `DP` in section 5**, never from a
+> memory of the pre-stop deliverable order.
 >
 > **What `D2` proved, and it is a real result.** The A/B is valid causal
 > evidence: with `D2` off the suffix is outside its checked frame and the IH
@@ -63,14 +64,15 @@ origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliat
 > absorption are each separately ruled out for exactly these rows. **Descoping
 > it is not available.**
 >
-> **`status: draft` here does NOT mean unstarted, and it is not framing debt.**
-> `D0` is merged, and this node is framed more heavily than most. The tracker
-> legend offers no `blocked`, and the two honest readings of the enum are
-> *"deps unmet"* (`draft`) or *"a team is building"* (`active`) — the second is
-> false, and leaving it would hide that Runtime is on `#6d` `D2k`. **The unmet
-> dep is the Architect's confirming gate on `DP`'s design class**, requested at
-> `evt_64xdptyxrc3x6`. Do not flip this back to `active` until a seat is
-> actually on it, and do not count it as a frame owed by the Steward.
+> **`status: ready` as of the design-class confirmation.** It was briefly
+> `draft` while the one unmet dep was the Architect's confirming gate on `DP`;
+> **that gate passed at `evt_2qmknsgtmy0rj`** and the node is now deps-met and
+> unassigned. **The only thing between it and a seat is Runtime sequencing** —
+> the ring is on `#6d` `D2k`, same file set, one node at a time.
+>
+> **Do not read `ready` as "start anywhere in it."** `DP` is the entry point
+> and everything below it in section 5 is behind `DP`. **Do not flip to
+> `active` until a seat is actually on it.**
 
 > # `D0` MERGED 2026-08-12 — THE POSITIVE ROW IS NON-ZERO
 >

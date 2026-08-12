@@ -126,16 +126,49 @@ against it on *both* sides of the gate.
 > only** at `8063dd67...7166baaa` — not a merge candidate, not routed to QA.
 >
 > **`DP` — give the producer semantic occurrence its own transported checked
-> identity.** Extend planner and transport population so the exact producer
-> semantic occurrence receives its **own** checked frame template and
-> invocation source, is marked and transported to lowering, and participates in
-> the segment with its real semantic position, segment site, input/output
-> interfaces, control witness, and parent/edge relations. **The existing
-> validator then accepts it with no exception and no weakening.**
+> identity.** **Design class CONFIRMED by the Architect at
+> `evt_2qmknsgtmy0rj`; the design-class hold is lifted.** Class 2 would require
+> inventing a semantic partition the measured segment does not have, while the
+> emission region is intentionally producer plus suffix.
 >
-> **NOT RELEASED.** `DP` is my scope ruling on which of the two lawful design
-> classes the successor owns, and it is **pending the Architect's confirming
-> gate**. Do not start it on the strength of this frame alone.
+> **`DP` populates and transports, from the checked source:** the producer's
+> **distinct frame template and marker**, plus its real checked occurrence
+> path, semantic position, segment site, input/output interfaces, occurrence
+> binding, control witness, and **invocation/parent-edge relation.** The
+> **unchanged** validator must then accept the complete expected frame set,
+> order, endpoint composition, site, witnesses and dynamic ownership.
+>
+> > #### PRECISION CORRECTION — "its own invocation source" OVER-SPECIFIES
+> >
+> > **A dynamic semantic-frame identity is the pair `(invocation_instance_id,
+> > frame_id)`.** `OrientedSubcontinuationFramePlanV1` supplies the distinct
+> > frame occurrence with its position, site, interfaces, binding fingerprint
+> > and witness. Invocation templates **separately** supply an ordered
+> > `callee_frame_templates` sequence, `instantiate_checked_invocation_segment`
+> > transports one affine invocation source/instance onto the exact expected
+> > frames, and composition keys by **the pair**.
+> >
+> > ⇒ **"Its own invocation source" means planner-authored invocation-source
+> > COVERAGE for the producer frame.** It does **not** require a gratuitously
+> > distinct invocation-template variant, nor a second dynamic invocation.
+> >
+> > - **If the checked source establishes producer and consumer as frames of
+> >   one invocation-local segment**, sharing that invocation source and affine
+> >   instance **is lawful** — but only because the plan names **both distinct
+> >   frame IDs in the exact expected order.**
+> > - **If they are distinct invocations**, the planner must supply **distinct
+> >   sources plus the checked dynamic parent edge.**
+> >
+> > **Which relation holds is a planner/source fact. Lowering and fusion must
+> > not choose it, copy it, or infer it.** Read that as the same prohibition
+> > that killed the consumer-identity alias, applied one level up.
+>
+> **NOT RELEASED — sequencing only.** The design-class hold is gone; the
+> Steward releases `DP` when Runtime sequencing permits, and Runtime is on
+> `#6d` `D2k`. **The confirmation grants no merge, arming, `AC-8`, `D4`, or
+> held-range carry-forward credit**, the cumulative stop remains fired at later
+> cuts, and `D1`+`D2`+`D3` remain one atomic candidate **after** `DP`, on a
+> fresh re-derivation against then-current `main`.
 >
 > **Why this class and not the other.** The alternative is to redesign
 > composition so the inferred producer layer is provably **outside** the checked
