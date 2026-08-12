@@ -38,7 +38,42 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~23:2xZ. **`main` = `689dabd7`.**
+> ### RESUME HERE — state at 2026-08-12 ~23:4xZ. **`main` = `07b20585`.**
+>
+> **THE RING HOLDS THE NEXT MOVE. There is nothing to frame and nothing to
+> start.** The Architect owes a ruling on the flagged not-surviving judgement
+> (routed by `runtime-leader` at 23:23Z; the Architect pane was stranded on two
+> pastes — I cleared it and it went to work). Held R3 is unchanged at
+> `9177c6ce`, unarmed, unrouted. **Do not manufacture work while this is out.**
+>
+> **PUBLISHED PR #2042 (doc-only, `07b20585`).** The four held commits are on
+> `main`; blob identity verified on both files; `steward/work` reset. **The base
+> the ring must name from now on is `07b20585`** — `689dabd7` is now stale in
+> the same way `d5912acd` was, and both are named in artifacts below. Posted to
+> the thread at `evt_59s1yqvrv3xkb`.
+>
+> **Why I published into an idle ring rather than holding again.** Zero
+> `crates/` delta, so no held verdict is disturbed, and the Architect had
+> already instructed a rebase at the next natural seam — which absorbs it for
+> free. **The hold was re-derived, not inherited.** Holding this same class of
+> commit once cost three hours of a `main` that described a stop already closed.
+>
+> **CLOSED THIS TICK — `CI-OLD-PRESTATE-ROW-CURRENCY`.** `verify-qa` was
+> awaiting "renewed Spec and Architect votes" on work **already on `main`**:
+> `2bc6cb80` touches one file, its blob is byte-identical to `origin/main`'s,
+> and it landed as squash `3a36d13c`. Told both Verify seats to stand down
+> (`evt_15877p8y3s9h4`). **Third occurrence of the squash-head-reads-unlanded
+> shape** — ancestry is the wrong instrument, blob identity is the right one.
+>
+> **IDLENESS IS NOT BACKLOG RIGHT NOW, and I re-checked rather than assuming.**
+> Verify's only open node is `SEC1-IFC-R3`, `draft`, with the operator. Kernel
+> is Runtime-blocked at `AC-K12` plus an unanswered TCB call. Language is with
+> the operator. **The doc track — the one sanctioned concurrent lane — has zero
+> open nodes; do not manufacture doc work.** The `integrator` roster line is a
+> tombstone and its "PR #365" is not an open loop (merged 2026-07-08 as
+> `3859aaff`).
+>
+> ### The detail behind the above — still current except for `main`
 >
 > > **THE STOP THIS NODE HAS BEEN ON SINCE `evt_2m62086x60c94` IS CLOSED.**
 > > `evt_11werhky391ds`: armed on both witnesses, **the `StaticWorkerBinding`
