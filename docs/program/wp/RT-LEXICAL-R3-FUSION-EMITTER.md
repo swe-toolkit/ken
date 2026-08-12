@@ -422,16 +422,60 @@ nothing you inherit from `#6d`.**
 > constructor and calls the rebound field; the leaf produces the observable
 > terminal `Result::Ok(Unit)`. **A worker-bearing `D2gOut` is not the program
 > result — it is the intermediate whose outer consumer suffix R3 claimed and
-> moved.** ⇒ Reaching `ground_value` with that intermediate intact **proves the
-> fused path terminalizes the producer result before completing the claimed
-> consumer suffix.** R3 changed the flow into an unchanged site, and the flow is
-> unlawful.
+> moved.** ⇒ ~~Reaching `ground_value` with that intermediate intact **proves
+> the fused path terminalizes the producer result before completing the claimed
+> consumer suffix.**~~ **MEASURED FALSE — see the box below.** R3 changed the
+> flow into an unchanged site, and the flow is unlawful.
 >
-> **`AC-D3-ROUTE` — the repair stays inside the held atomic object:** the fused
-> path carries the intermediate through the already-authorized outer
+> **`AC-D3-ROUTE` — the repair stays inside the held atomic object:** ~~the
+> fused path carries the intermediate through the already-authorized outer
 > elimination, kind-preserving rebind, and exact worker call, **and only then**
-> emits the resulting ground value. The existing conservation relation stays
+> emits the resulting ground value.~~ **THE REPAIR IS UNDER RE-RULING — DO NOT
+> BUILD THE STRUCK TEXT.** The existing conservation relation stays
 > authoritative and **must close on the armed fused path**.
+>
+> > #### THE CLASSIFICATION HOLDS; THE CAUSAL SENTENCE UNDER IT IS MEASURED
+> > #### FALSE. Steward, 2026-08-12, from `evt_6bg3en6yy4dgz` at `766cbdf0`.
+> >
+> > **This is my correction to make because I wrote the mechanism into
+> > `AC-D3-ROUTE` above.** The struck text was a faithful transcription of the
+> > ruling; the ruling's *causal story* is what four probes contradict.
+> >
+> > **What was measured under a temporary arm:** the fused suffix lowering
+> > returns **`Carried`** — a runtime call result, **not** a compile-time
+> > constant, so it terminalizes nothing; the consumer takeover forwards that
+> > `Carried` result, so **the redirect RAN and the claimed suffix WAS
+> > consumed**; the escape's backtrace is `emit_result` called straight from the
+> > **root projection**, not from inside the fused function; and
+> > `require_complete_static_worker_disposition()` **passes** immediately
+> > before it.
+> >
+> > ⇒ **The worker-bearing constructor reaching `ground_value` is a DIFFERENT
+> > OCCURRENCE from the one the suffix consumed**, arriving as the **root
+> > answer** under `FunctionizedUnits`. Field origin **29** on `Exact`, **25**
+> > on `ReHomed`.
+> >
+> > **WHY THE STRUCK REPAIR WOULD HAVE BEEN WRONG, and this is the whole point
+> > of the strike.** Read against the stated mechanism, *"carry the intermediate
+> > through the outer elimination and only then emit"* says the takeover
+> > forwards too early, so the obvious implementation is **to stop forwarding**.
+> > Measured, **the takeover forwards a call result and is CORRECT** — changing
+> > it breaks working code and **reintroduces the double-suffix defect at `:650`
+> > that the forward exists to prevent.** ⇒ **A repair that would have looked
+> > ruled and been wrong.** The implementer stopped rather than build it; that
+> > is the correct handback and I am recording it as such.
+> >
+> > **THE OPEN QUESTION, back with the Architect at `evt_2fanpwder54a0`, and
+> > deliberately not answered here:** is the second root occurrence **wrongly
+> > produced**, or **wrongly selected as the answer**? Both readings fit every
+> > measurement above **and they have opposite repairs.** The implementer did
+> > not guess and neither will I.
+> >
+> > **UNAFFECTED EITHER WAY, so do not re-open them:** the classification (an R3
+> > routing defect, not a representation gap), the closed `RuntimeGroundValue`
+> > domain, the conservation guard itself, and **the atomic boundary** — nets
+> > 2/4, controls 2/3, the inner-slot witness, the routing discriminator and the
+> > self-edge closeout all remain owed **unshrunk**.
 >
 > **Its control is a discriminator, not a green run:** it must **fail** if the
 > producer intermediate reaches terminal emission before its claimed outer
@@ -470,8 +514,50 @@ nothing you inherit from `#6d`.**
 > `key.invocation_callee_entry`, the redirect callee entry, and the claim's
 > producer body — **refusing before claim issuance.**
 >
-> **Its control must perturb the resolved relation while frame,
-> recursive-position, result-root and redirect marginal checks stay green.**
+> > ##### CLOSED at `766cbdf0` — and the route above is NOT the one that
+> > ##### works. Steward, 2026-08-12, from `evt_6bg3en6yy4dgz`.
+> >
+> > **`AC-D3-SELF`'s open half is DISCHARGED.**
+> > `FusionClaimRefusal::BinderBodyResolution` refuses **before claim
+> > issuance**, in two steps: the consuming callee is **re-resolved through the
+> > planner's own binding authority** rather than taken from the key, and that
+> > binder is then resolved to a body required to be the one the claim redirects
+> > into.
+> >
+> > **THE SCOPED ROUTE ABOVE WAS NEARLY A RESTATEMENT, measured.** The redirect
+> > edge is **already unique by callee** and carries `caller == consumer_owner`,
+> > so the by-caller lookup returns **the same edge** and **the comparison
+> > cannot fail.** The working route uses the binder's **own members** — frame
+> > scrutinee, then the argument at its recursive position, then that argument's
+> > body — so **`recursive_position` is USED rather than compared to the key's
+> > copy of itself**, which two equal numbers satisfy without naming an argument
+> > that exists.
+> >
+> > **Discriminating evidence, not construction:** on all three `D2j` causes
+> > that install a key — `Exact (10,0) -> 37`, `ReHomed (6,0) -> 33`,
+> > `ProducerArity (10,0) -> 38` — each resolves to exactly its own
+> > `invocation_callee_entry`; **and the same resolution on each key's PRODUCER
+> > argument binding gives 34, 30 and 35**, the producer's own outgoing edge. A
+> > derivation that just returned the redirect target could not do that.
+> >
+> > **ONE comparison is written, not three**, because `InvocationTriple` already
+> > forces `redirect.callee_origin() == invocation_callee_entry` and the claim
+> > is built with `producer_body: invocation_callee_entry`. Two of the three
+> > would be **branches that cannot fail** — which read as checks while being
+> > none.
+> >
+> > **THE CONTROL'S FIRST SHAPE WAS KILLED BY ITS OWN MUTATION PROOF, and the
+> > reason generalizes.** Perturbing the binder's frame refused with the right
+> > cause and looked correct — but tautologising step 2 left the row **green**:
+> > moving the frame also desynchronised `consuming_callee`, so **step 1
+> > answered first and the resolution never ran.** A two-step rule **shadows
+> > itself**, and the classified cause cannot see it because both halves report
+> > the same cause. The perturbation now relabels callee, binding and admitted
+> > frame **together** — internally consistent and still wrong. **One mutation
+> > proof per STEP, not per rule.**
+>
+> ~~**Its control must perturb the resolved relation while frame,
+> recursive-position, result-root and redirect marginal checks stay green.**~~
 > That is what makes it independent of `BinderAgreement` rather than a second
 > spelling of it, and it needs a test-only planner switch on the
 > `DUPLICATE_STATIC_BODY_TRIPLE` pattern. **The implementer declined to author it
