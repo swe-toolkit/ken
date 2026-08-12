@@ -383,14 +383,33 @@ three `D6` candidates rejected on the sibling node. Keep them separate.
   descent-specificity **and** equally consistent with this occurrence routing
   elsewhere. A hint is not a measurement.
 
-  **Two Architect calls, and the first must not silently answer the second.**
-  (1) Is over-specification the right diagnosis, so the assertion is re-cut as
-  above? (2) Does row 2 leave `D3`'s six-row bar? The bar was retained by
-  `evt_2jnf3x8f06psz` on the ground that row 2's subject **survives** the
-  retirement. If the invariant is IH-installed-and-consumed rather than
-  path-identity, that ground reads differently — but (1) is a correction to an
-  assertion and (2) changes the **retirement acceptance surface**. Different
-  calls, and neither is the row's nor the Steward's.
+  > #### BOTH ARCHITECT CALLS ANSWERED — `evt_1rzcz31qm9y9q`, 2026-08-12
+  >
+  > They were routed deliberately apart, because (1) corrects an assertion and
+  > (2) changes the **retirement acceptance surface**. **They have different
+  > answers, so keeping them apart was load-bearing rather than procedural.**
+  >
+  > **(1) Yes — over-specification is the correct diagnosis, and the AC above
+  > is the correct replacement.** The semantic obligation is that the
+  > occurrence's recursive IH is minted, installed and consumed **on the
+  > selected lane**; it is not that the same producer-path labels populate every
+  > lane. *"Exact" is load-bearing* — this is not permission to weaken the row
+  > to *"some path mints"*, an absent enumerated path and an unenumerated path
+  > are each red, and `Mint`/`Install`/`DirectConsume` stay separately proved
+  > for the same occurrence.
+  >
+  > **(2) No — row 2 does NOT leave `D3`'s six-row bar.** `evt_2jnf3x8f06psz`'s
+  > conclusion stands with corrected grounds: what survives the retirement is
+  > the row 2 program's recursive occurrence and **its IH lifecycle**, not a
+  > requirement that both historical path labels survive. That is still what
+  > distinguishes row 2 from `#7`, whose subject disappears with the retired
+  > mechanism, where row 2's must **still execute** after it.
+  >
+  > ⇒ `D3` inherits four proofs on the real no-hook `FunctionizedUnits` tree,
+  > and may rewrite or replace the original row 2 test to obtain them. They are
+  > written into [[RT-RECURSOR-TRANSPORT]]'s frame, not left here — **this node
+  > has no production work left, so an obligation recorded only here would read
+  > as discharged.**
 
   > **Struck, retained for provenance:** *"This AC is blocked on the successor
   > measurement in `D1`'s closure block and cannot be written until it returns:
@@ -403,6 +422,12 @@ three `D6` candidates rejected on the sibling node. Keep them separate.
 - **`AC-4`** `AC-3` guard 5 still refuses on a genuinely missing recursive-IH
   authority. *Control:* the `D2` negative control, red before the guard and
   green after only because the authority is present.
+
+  **DISCHARGE ROUTED TO `D3`, 2026-08-12** (`evt_1rzcz31qm9y9q`). `D1` closed
+  with no production repair, so there is no repaired root here to hang the
+  negative control on. It is proof 4 of the four `D3` must produce on the real
+  no-hook tree, recorded in [[RT-RECURSOR-TRANSPORT]]'s frame. **Routed, not
+  waived** — it is owed in exactly one place and that place is not this node.
 - **`AC-5`** No added `#[ignore]`. *Control:* `git diff` contains none.
 - **`AC-6`** No retirement, no lane deletion, no tracker `status:` change in this
   candidate.

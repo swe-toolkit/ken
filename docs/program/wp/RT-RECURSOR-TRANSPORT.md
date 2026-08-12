@@ -288,6 +288,53 @@ necessary.**
 > merely discouraged — and **no reshaping of a fixture or absorption of a
 > refusal** to make a row pass. The six rows stay enabled and unchanged in
 > meaning.
+>
+> > ### "UNCHANGED IN MEANING" IS THE CORRECTED MEANING FOR ROW 2 — 2026-08-12
+> >
+> > Architect ruling `evt_1rzcz31qm9y9q`. **Row 2 stays on this bar**; the
+> > conclusion of `evt_2jnf3x8f06psz` stands on corrected grounds.
+> >
+> > **What changed is what row 2 asserts, not whether it is required.** Its old
+> > assertion required **both** producer-path labels to install and consume the
+> > recursive IH. That is **over-specified and withdrawn**: measured at
+> > `6a804eb7` (PR #1957, CI green), the functionized lane mints, installs and
+> > consumes row 2's recursive IH by the carried/`Composed` route. The exact
+> > installed-and-consumed multisets are **descent
+> > `{Composed, SourceMachine, SourceMachine}`, functionized `{Composed}`** —
+> > [[RT-LEXICAL-ROW2-MISSING-MINT]] `AC-2`.
+> >
+> > ⇒ **"Unchanged in meaning" for row 2 means unchanged from the corrected,
+> > lane-conditional `AC-2` meaning. It does NOT preserve the stale
+> > all-producer-path assertion**, and a `D3` that reproduces the old assertion
+> > has re-introduced a defect, not held a line.
+> >
+> > **`D3` must prove, on the real final `FunctionizedUnits` selection, with row
+> > 2 enabled and with no exclusion hook and no new `#[ignore]`:**
+> >
+> > 1. the exact installed-and-consumed path multiset is `{Composed}`;
+> > 2. that same occurrence has `Composed` `Mint`, `Install` **and**
+> >    `DirectConsume` — three separate observations, not one predicate;
+> > 3. the `SourceMachine` lifecycle is **absent** for this measured occurrence,
+> >    as the exact set requires; and
+> > 4. disabling the recursive-IH authority still makes the
+> >    [[RT-LEXICAL-RECURSOR-CONSUMERS]] `AC-3` guard-5 control **refuse**. This
+> >    is where row 2's `AC-4` negative control discharges — it is owed **here**,
+> >    not back in the row's own node, which has no production work left.
+> >
+> > **The one licence this grants, and its bound.** The original row 2 test
+> > **may be rewritten or replaced** during the required control sweep so that
+> > the no-hook final tree is the witness. That is a narrow exception to *"no
+> > reshaping of a fixture"* above, and it is bounded by the four proofs: a
+> > replacement that does not establish all four has reshaped a fixture to make
+> > a row pass, which stays banned. **"Exact" is load-bearing — an absent
+> > enumerated path and an unenumerated path are each red.** This is not
+> > permission to weaken row 2 to *"some path mints"*, which would hollow out
+> > guard 5.
+> >
+> > **Not established and not required by any of this:** whether
+> > `SourceMachine` is reachable on a functionized lane by any other occurrence.
+> > The campaign-wide reachability is unmeasured and is **neither evidence for
+> > removing row 2 nor a prerequisite for this acceptance ruling.**
 
 **Only after both executable positions are green**, retire the two residual
 variants and their test-only selector hooks.
