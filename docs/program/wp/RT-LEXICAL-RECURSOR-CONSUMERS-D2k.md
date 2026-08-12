@@ -8,6 +8,59 @@ a new node, and **[[RT-CONTSRC-CALLABLE-CONTRACT]] is not a prerequisite.**
 Fixed inputs measured at `main` **`b2ee3377`**. Re-derive them at your base;
 a merge-base goes stale without your branch moving.
 
+> # `D2k-1b-i` IS AN ACCEPTED CONSERVATION PARTIAL — 2026-08-12, Steward
+> # `evt_5605tqyn8qzv3`. `AC-1` IS OPEN AND UNQUALIFIED.
+>
+> **Read this before `AC-1`, and do not read "conservation holds" as "the five
+> are green".** Those are different claims and only the second closes the node.
+>
+> **What the candidate `11e4eae1` establishes.** The silent accept is closed:
+> rows 4 and 5 **refuse** rather than compiling after dropping a worker, the
+> ledger records no constructed field as dropped, and the forbidden fourth
+> state is unreachable on this base. `739cfde3`'s per-row transition sentinel
+> landed as a deliverable rather than staying on a `preserved/` ref. `value_at`
+> is byte-identical to `65dc74a9` (`AC-2`), zero new `#[ignore]` and no tracker
+> file touched (`AC-6`). Five Runtime paths, `+968/-127`, merge-base
+> `65dc74a9`.
+>
+> **What it does NOT establish.** It discharges **no part of `AC-1`**. All five
+> remain **unconsumed**. `AC-1` is not narrowed, not qualified by row, not
+> advanced, and the node stays `active` after this lands.
+>
+> **The refusal is the RULED disposition, not a failure.** Architect
+> `evt_5etamwj8tp2fh` stated this outcome in advance: an unreachable pairing
+> leaves the row red with the route gap reported, and it does not become a
+> lawful drop. The ring paired by planner-owned origin/position, found no
+> pairing, refused, and reported. **The increment worked.**
+>
+> ## The residual is a MEASURED ROUTE GAP, and it is an OPEN QUESTION
+>
+> | row | the elimination consumes | the worker-bearing occurrence |
+> |---|---|---|
+> | 4 | ordinary `PX8JScopeTree::Node` built at origin **31**, eliminated at origin 5 | direct-descent, origin **26**, **no elimination** |
+> | 5 | analogous, origin **22** | origin **27**, **no elimination** |
+>
+> **On the excluded lane there are two constructor occurrences, and the one
+> carrying the worker is not the one anything eliminates.**
+>
+> **This section states remaining work, in the future tense, on purpose.** An
+> accepted partial's danger is that the node's prose silently becomes a claim
+> about the past — a later reader takes "the ring measured the gap" for "the
+> gap was closed". It was not. **Nothing below has been done.**
+>
+> Whether that unpaired occurrence is a **lowering-route defect** on the
+> excluded lane or something the lane **legitimately produces** is a mechanism
+> question routed to the Architect at `evt_45j489cd5m36w` and **not yet
+> answered**. The two answers cut different successors — a route repair flips
+> two rows from refuse to consume, whereas legitimate production means `AC-1`
+> cannot be met for rows 4/5 by any route work and the criterion itself needs
+> attention. **No successor is framed until that ruling lands**, and no seat
+> may start one.
+>
+> **Excluded from this candidate and from any review of it:** changing the
+> excluded lane's lowering route to close the pairing. That is the residual,
+> not a repair to reach for in order to turn `AC-1` green before merge.
+
 ## 1. What this increment owns
 
 | cell | expressions | wall |
@@ -596,6 +649,12 @@ the existing guard controls:
 exclusion, and each is green **because the worker is transported through its
 constructor as a compiler-only field and consumed at the later exact-`Var`
 call**, not because a guard stopped firing.
+
+> **`AC-1` IS UNMET AND UNQUALIFIED as of `11e4eae1`.** All five are
+> **unconsumed**; the accepted conservation partial discharges no part of this
+> criterion. See the accepted-partial block at the head of this file for the
+> measured route gap and the open Architect question. Do not read the partial's
+> merge as progress against `AC-1`.
 
 > **`AC-1` WAS REPLACED — 2026-08-12.** It previously read *"because its
 > consumer routes to the exact-`Var` callee path"*, which is **materially
