@@ -3144,13 +3144,25 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         // `BinderAgreement` proves only marginal facts -- that the consuming
         // callee is an IH at the admitted frame and recursive position, and that
         // the result root equals the invocation callee entry. It does NOT prove
-        // that this exact callee/binder resolves to that producer body. Closing
-        // that relation is a planner-side obligation of this same held `D3`
-        // object and is owed; until it lands, nothing in this compile proves it.
+        // that this exact callee/binder resolves to that producer body.
         //
-        // What lowering keeps is exactly the independent cross-check below, and
-        // it must NOT grow into a reconstruction of the binder relation here --
-        // a redundant lowering body authority is ruled out by the same message.
+        // ---- AND THAT RELATION IS NOW CLOSED, PLANNER-SIDE. Ruled at
+        // ---- `evt_2rw6vhq8xrqcm`; landed as
+        // ---- `FusionClaimRefusal::BinderBodyResolution`.
+        //
+        // Preflight now re-resolves the consuming callee through the planner's
+        // own binding authority and resolves that binder to a body, refusing
+        // BEFORE the claim is issued unless it is the body being redirected. So
+        // by the time a claim reaches this seat the relation is a checked
+        // property of the certificate, not an assumption -- and `producer_body`
+        // is that checked common result.
+        //
+        // ⇒ **What lowering keeps is still exactly the independent cross-check
+        // below, and closing the relation upstream is not a licence to grow
+        // it.** A second body authority here was ruled out in the same message:
+        // re-deriving the binder relation in lowering would create a second
+        // planner, and `ih_bindings` and `SemanticIr::child_origin` are
+        // planner-private precisely so that cannot happen quietly.
         if fusion.redirect_callee != fusion.producer_body {
             return Err(backend_module(
                 "a fused region's redirect names a producer entry other than the claim's producer \
@@ -3182,7 +3194,8 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             .is_some()
         {
             return Err(backend_module(
-                "a fused definition already holds a call target for the body it owns, so its                  recursive suffix edge would be one of two answers to the same lookup"
+                "a fused definition already holds a call target for the body it owns, so its \
+                 recursive suffix edge would be one of two answers to the same lookup"
                     .to_string(),
             ));
         }

@@ -7946,6 +7946,15 @@ thread_local! {
     static WEAKEN_CONTINUATION_DECREASING_MEASURE: Cell<bool> = const { Cell::new(false) };
     static SUPPRESS_POST_SPECIALIZATION_DESCENT: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_STATIC_BODY_TRIPLE: Cell<bool> = const { Cell::new(false) };
+    /// Suppress ONLY the binder-to-body resolution rule in preflight.
+    ///
+    /// This exists so a control can show that its perturbation left every OTHER
+    /// preflight rule green. Asserting "the new rule refused" alone cannot say
+    /// that: a perturbed key that also trips `BinderAgreement` would refuse
+    /// under either rule, and a reader could not tell the discriminator from a
+    /// proxy. Suppressing the one rule and observing the SAME perturbed key
+    /// issue a claim is what makes the attribution exact.
+    static SUPPRESS_BINDER_BODY_RESOLUTION: Cell<bool> = const { Cell::new(false) };
     static MUTATE_PRIMARY_FUSION_KEY_DERIVATION: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
 }
@@ -8021,6 +8030,13 @@ fn envelope_defect() -> EnvelopeDefect {
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn set_primary_fusion_key_derivation_mutated(armed: bool) {
     MUTATE_PRIMARY_FUSION_KEY_DERIVATION.with(|cell| cell.set(armed));
+}
+
+/// `D3` — suppress the binder-to-body resolution rule, and nothing else, so a
+/// control can attribute its refusal to that rule rather than to a proxy.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_binder_body_resolution_suppressed(armed: bool) {
+    SUPPRESS_BINDER_BODY_RESOLUTION.with(|cell| cell.set(armed));
 }
 
 #[cfg(test)]
@@ -9302,6 +9318,18 @@ pub(in crate::cranelift_backend) enum FusionClaimRefusal {
     SelfRedirection,
     /// A checked binder or the admitted ledger root disagrees with the key.
     BinderAgreement,
+    /// The consuming callee is not the binder the key names, or that binder's
+    /// hypothesis does not resolve to the producer body.
+    ///
+    /// **This is the relation BETWEEN the two facts [`Self::BinderAgreement`]
+    /// checks, and it is why that rule is not sufficient on its own.**
+    /// `BinderAgreement` establishes two MARGINAL facts — that the key's
+    /// consuming binder sits at the admitted frame and recursive position, and
+    /// that the admitted result root equals the invocation callee entry. Each
+    /// is a statement about one operand. Neither says that the hypothesis THAT
+    /// binder names is a recursive invocation of THAT body, which is the fact
+    /// the fused self edge is emitted against.
+    BinderBodyResolution,
     /// The ordered input projection is unavailable or disagrees with the frame
     /// the ABI declared for it.
     InputAvailability,
@@ -9335,6 +9363,11 @@ impl FusionClaimRefusal {
             Self::BinderAgreement => {
                 "a static continuation fusion claim's checked binders do not agree with the key's \
                  recursive position, admitted continuation origin, or admitted result root"
+            }
+            Self::BinderBodyResolution => {
+                "a static continuation fusion claim's consuming callee is not the checked binder \
+                 its key names, or that binder's hypothesis does not resolve to the producer body \
+                 the claim redirects into"
             }
             Self::InputAvailability => {
                 "a static continuation fusion claim's ordered input projection is unavailable or \
@@ -9415,7 +9448,17 @@ impl FusionRegionClaimLedger {
         let mut claimed_frames = BTreeSet::new();
         let mut claimed_suffixes = BTreeSet::new();
 
-        for view in plan.continuation_fusions()? {
+        let views = plan.continuation_fusions()?;
+        // The planner's own binding authority, derived ONCE and only when there
+        // is a claim to check with it. A compile with no installed fusion pays
+        // nothing, which keeps this rule off the cost of every other compile.
+        let ih_bindings = if views.is_empty() {
+            BTreeMap::new()
+        } else {
+            build_checked_ih_bindings(plan)?
+        };
+
+        for view in views {
             let id = view.id();
             let key = view.key();
 
@@ -9471,6 +9514,46 @@ impl FusionRegionClaimLedger {
                 || key.admitted.result_root != key.invocation_callee_entry
             {
                 return Err(fusion_claim_error(FusionClaimRefusal::BinderAgreement));
+            }
+
+            // The binder-to-body relation, which the two rules above do NOT
+            // entail. Ruled at `evt_2rw6vhq8xrqcm`.
+            //
+            // `BinderAgreement` proves two MARGINAL facts: the key's consuming
+            // binder sits at the admitted frame and recursive position, and the
+            // admitted result root equals the invocation callee entry. Both are
+            // statements about a single operand, and a key can satisfy both
+            // while the hypothesis its binder names invokes some OTHER body --
+            // which is precisely the fact `D3` emits the definition-local fused
+            // self edge against.
+            //
+            // Two steps, because "the exact consuming callee" is half the
+            // claim. First the callee is re-resolved through the planner's own
+            // binding authority rather than taken from the key -- the key
+            // ASSERTS a `consumer_binding`, and nothing above re-derives it.
+            // Then that binder is resolved to a body and required to be the one
+            // the claim redirects into.
+            //
+            // ⇒ **Only ONE comparison is written, and the other two are
+            // entailed.** `InvocationTriple` above already forced
+            // `redirect.callee_origin() == key.invocation_callee_entry`, and
+            // the claim below is constructed with `producer_body:
+            // key.invocation_callee_entry`. So comparing the resolved body
+            // against all three would be one gate and two restatements, and a
+            // branch that cannot fail reads as a check while being none.
+            #[cfg(test)]
+            let resolution_armed = !SUPPRESS_BINDER_BODY_RESOLUTION.with(Cell::get);
+            #[cfg(not(test))]
+            let resolution_armed = true;
+            if resolution_armed {
+                if ih_bindings.get(&key.consuming_callee).copied() != Some(key.consumer_binding) {
+                    return Err(fusion_claim_error(FusionClaimRefusal::BinderBodyResolution));
+                }
+                if fusion_resolved_binder_body(plan, key.consumer_binding)?
+                    != Some(key.invocation_callee_entry)
+                {
+                    return Err(fusion_claim_error(FusionClaimRefusal::BinderBodyResolution));
+                }
             }
 
             // Ordinary input availability: the ordered projection the key
@@ -9858,6 +9941,65 @@ fn fusion_unique_static_body_triple(
         return Ok(None);
     }
     Ok(matching.into_iter().next())
+}
+
+/// Resolve one checked induction hypothesis to the body it invokes.
+///
+/// ## The relation, and why it needs its own derivation
+///
+/// A [`CheckedIhBinding`] names a **frame and a recursive position** and no
+/// body. The body it denotes is reached through the frame's own scrutinee: the
+/// hypothesis at position `p` is the recursive result for the scrutinee's
+/// argument at `p`, and that argument carries the producer as its body. So the
+/// route is scrutinee, then the argument at the binder's recursive position,
+/// then that argument's body.
+///
+/// ⇒ **The recursive position is USED here, not merely compared.** Preflight's
+/// [`FusionClaimRefusal::BinderAgreement`] only checks the position against the
+/// key's own copy of it, which two equal numbers satisfy without either naming
+/// an argument that exists. Indexing the scrutinee's arguments by it is what
+/// makes the position select something.
+///
+/// ## MEASURED
+///
+/// On the three `D2j` causes that install a key, the consumer binding resolves
+/// to exactly the key's `invocation_callee_entry` — `Exact` (10, 0) to 37,
+/// `ReHomed` (6, 0) to 33, `ProducerArity` (10, 0) to 38.
+///
+/// **And the route is not landing there by construction.** The same resolution
+/// applied to each key's PRODUCER argument binding lands on a DIFFERENT body
+/// every time — 34, 30 and 35 respectively, which is the producer's own
+/// outgoing edge rather than the one being redirected. A derivation that
+/// returned the redirect target whatever it was given could not do that.
+///
+/// ## The closure step, and why a non-closure argument REFUSES
+///
+/// On all three witnesses the argument is a [`RuntimeExpr::LexicalClosure`] and
+/// the body is its child. An argument that is not a closure has no body, so
+/// there is no hypothesis-invoked body to compare and the relation is
+/// **unproved rather than false**. Returning the argument itself would make the
+/// comparison answer a question it was not asked, so this refuses instead. The
+/// population is three witness families, and a shape outside them is refused,
+/// not guessed at.
+fn fusion_resolved_binder_body(
+    plan: &StaticTransitionPlan<'_>,
+    binding: CheckedIhBinding,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let scrutinee = plan.semantic.child_origin(binding.frame_origin, 0)?;
+    let Some(argument) = plan
+        .semantic
+        .child_origins(scrutinee)?
+        .get(binding.recursive_position as usize)
+        .copied()
+    else {
+        return Ok(None);
+    };
+    match plan.planned_occurrence_expr(argument)? {
+        RuntimeExpr::LexicalClosure { .. } => {
+            Ok(Some(plan.semantic.child_origin(argument, 0)?))
+        }
+        _ => Ok(None),
+    }
 }
 
 /// Descend the checked wrappers to the occurrence they carry.
@@ -18211,6 +18353,7 @@ mod tests {
                     FusionClaimRefusal::InvocationTriple,
                     FusionClaimRefusal::SelfRedirection,
                     FusionClaimRefusal::BinderAgreement,
+                    FusionClaimRefusal::BinderBodyResolution,
                     FusionClaimRefusal::InputAvailability,
                     FusionClaimRefusal::ResultLane,
                     FusionClaimRefusal::OverlappingClaim,
@@ -18352,6 +18495,142 @@ mod tests {
             "one claim is issued for the canonical witness with the key's own members, and each \
              ruled rule refuses on its own moved operand -- the refusals share this assertion \
              with the issued claim so none of them can hold because preflight issued nothing"
+        );
+    }
+
+    /// Preflight the witness with the key perturbed and the binder-to-body rule
+    /// suppressed, so a row can read what EVERY OTHER rule did with that key.
+    #[cfg(test)]
+    fn d2f_preflight_exact_without_resolution(
+        perturb: impl FnOnce(&mut Vec<StaticContinuationFusionKey>),
+    ) -> Result<FusionRegionClaimLedger, CraneliftBackendError> {
+        set_binder_body_resolution_suppressed(true);
+        let result = d2f_preflight_exact(perturb);
+        set_binder_body_resolution_suppressed(false);
+        result
+    }
+
+    /// **`D3` — the consuming callee's binder must RESOLVE to the producer body,
+    /// and neither marginal binder fact establishes that.**
+    ///
+    /// Ruled at `evt_2rw6vhq8xrqcm`: `BinderAgreement` proves the key's
+    /// consuming binder sits at the admitted frame and recursive position, and
+    /// that the admitted result root equals the invocation callee entry. It does
+    /// not prove the relation BETWEEN them — that the hypothesis that binder
+    /// names invokes that body — which is the fact `D3`'s definition-local fused
+    /// self edge is emitted against.
+    ///
+    /// ## Why each row is paired with a SUPPRESSED twin
+    ///
+    /// A row asserting only "the perturbed key refused" cannot distinguish this
+    /// rule from an earlier proxy: a perturbation that also trips
+    /// `BinderAgreement` refuses either way, and the classified cause would then
+    /// be reporting which rule ran FIRST rather than which rule was needed.
+    /// Suppressing this one rule and observing the SAME key **issue a claim** is
+    /// what proves the four marginal checks — frame identity, recursive
+    /// position, admitted result root, and the redirect triple — all stayed
+    /// green under that perturbation. The pairs are the control; the refusals
+    /// alone are not.
+    ///
+    /// **MEASURED** on the checked applied `Exact` witness. Moving the admitted
+    /// frame and the consuming binder's frame TOGETHER to the producer's own
+    /// `ComputationalMatch` keeps every marginal check satisfied — the two
+    /// frames still agree with each other, the positions are untouched, and the
+    /// result root and redirect are untouched — and the binder then resolves to
+    /// body 34, the producer's OWN outgoing edge, rather than to the redirected
+    /// body 37. Independently, pointing `consuming_callee` at the producer's
+    /// hypothesis occurrence 29, whose binder is a real binding and a DIFFERENT
+    /// one, refuses at the same rule while suppressing it issues.
+    /// **CLAIMED:** no fused region is claimed whose consuming callee is not the
+    /// binder its key names, or whose binder's hypothesis invokes a body other
+    /// than the one the claim redirects into.
+    /// **THE GAP:** this pins **preflight** and the planner's binding authority.
+    /// It pins no emission — no self edge is built here — and the resolution's
+    /// closure step is measured on the three `D2j` causes that install a key,
+    /// so a constructor argument outside that population is refused rather than
+    /// shown correct.
+    #[test]
+    fn d3_the_consuming_binder_must_resolve_to_the_redirected_producer_body() {
+        // The lawful witness still issues WITH the rule armed. Without this the
+        // refusals below would be equally consistent with a rule that refuses
+        // everything -- which is the shape that already cost this node one
+        // guard.
+        let lawful = d2f_refusal_of(d2f_preflight_exact(|_| ()));
+
+        // The EXACT-CALLEE half: the key keeps its own binder but points
+        // `consuming_callee` at the producer's hypothesis occurrence, whose
+        // binding is real and DIFFERENT. So this fails because the binders
+        // disagree, not because one is absent.
+        let moved_callee = |keys: &mut Vec<StaticContinuationFusionKey>| {
+            keys[0].consuming_callee = keys[0].producer_argument_origin;
+        };
+
+        // The BODY half, and it has to be a COHERENT relabel to reach the
+        // resolution at all.
+        //
+        // ⇒ **Moving the binder's frame alone does NOT test this.** That was
+        // the first shape written here, and a mutation proof killed it: with
+        // only the frame moved, `consuming_callee` no longer matches its own
+        // binding, so the callee half above answers first and the resolution
+        // never runs. The comparison it was meant to exercise could be replaced
+        // by a tautology with the row still green.
+        //
+        // So all three members move together onto the PRODUCER's hypothesis:
+        // the callee occurrence, its true binding, and the admitted frame that
+        // binding must agree with. The key is now internally consistent and
+        // still wrong -- it names a hypothesis that invokes body 34, the
+        // producer's own outgoing edge, while claiming to redirect body 37.
+        let relabelled_binder = |keys: &mut Vec<StaticContinuationFusionKey>| {
+            keys[0].consuming_callee = keys[0].producer_argument_origin;
+            keys[0].consumer_binding = keys[0].producer_argument_binding;
+            keys[0].admitted.continuation_origin =
+                keys[0].producer_argument_binding.frame_origin;
+        };
+
+        let rows = vec![
+            ("lawful witness, rule armed", lawful),
+            (
+                "consuming callee moved, rule armed",
+                d2f_refusal_of(d2f_preflight_exact(moved_callee)),
+            ),
+            (
+                "consuming callee moved, rule suppressed",
+                d2f_refusal_of(d2f_preflight_exact_without_resolution(moved_callee)),
+            ),
+            (
+                "binder relabelled to the producer's, rule armed",
+                d2f_refusal_of(d2f_preflight_exact(relabelled_binder)),
+            ),
+            (
+                "binder relabelled to the producer's, rule suppressed",
+                d2f_refusal_of(d2f_preflight_exact_without_resolution(relabelled_binder)),
+            ),
+        ];
+
+        assert_eq!(
+            rows,
+            vec![
+                ("lawful witness, rule armed", "issued".to_string()),
+                (
+                    "consuming callee moved, rule armed",
+                    "BinderBodyResolution".to_string()
+                ),
+                (
+                    "consuming callee moved, rule suppressed",
+                    "issued".to_string()
+                ),
+                (
+                    "binder relabelled to the producer's, rule armed",
+                    "BinderBodyResolution".to_string()
+                ),
+                (
+                    "binder relabelled to the producer's, rule suppressed",
+                    "issued".to_string()
+                ),
+            ],
+            "each perturbation refuses AT the binder-to-body relation, and the same key issues \
+             once that one rule is suppressed -- so the four marginal checks stayed green and \
+             the refusal is not an earlier proxy answering for them"
         );
     }
 
