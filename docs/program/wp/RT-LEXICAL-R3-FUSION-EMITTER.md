@@ -391,6 +391,94 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### STOP 4 IS RULED — `AC-D3-ROUTE` — Steward, 2026-08-12, recording
+> ### Architect `evt_2m62086x60c94`. THE ATOMIC BOUNDARY DOES NOT MOVE.
+>
+> **Full ruling is at `evt_2m62086x60c94`; the leader's dispatch is
+> `evt_5e6agmqhwq4d2`. Read the ruling, not this box.**
+>
+> **The `StaticWorkerBinding` stop is an R3 ROUTING DEFECT, not an external
+> value-representation gap.** I routed this as a scope fork at
+> `evt_7r043m92mz7fb` and supplied the measurement that R3's range does not
+> touch the refusal site. **The ruling uses that fact and rejects the inference
+> from it**, in terms worth quoting because it is the trap: *"the ownership of
+> the refusal site is not the ownership of the defect"*, and explicitly **"do
+> not declare the stop external merely because R3 did not edit the refusal
+> site."** ⇒ **My measurement was the right fact to supply and would have been
+> the wrong basis to rule on. The frame's earlier statement that it "settles
+> neither reading" stands as written.**
+>
+> **Why the refusal is correct and stays.** `emit_result -> ground_value` is the
+> terminal-result boundary and `RuntimeGroundValue` is an intentionally **closed**
+> domain of observable compile-time values. `ConstructorField::StaticWorker` is
+> intentionally compiler-only — lawful only while transported through a
+> constructor template to the kind-preserving static `Match` binder, then
+> consumed by the exact-`Var` call. **The guard is a conservation guard, and it
+> is doing its job.**
+>
+> **What the armed path is actually proving when it stops there.** The inner
+> selected producer builds the intermediate `D2gOut::Node([Var(0)])` whose field
+> is the recursive worker; the outer selected case eliminates that same
+> constructor and calls the rebound field; the leaf produces the observable
+> terminal `Result::Ok(Unit)`. **A worker-bearing `D2gOut` is not the program
+> result — it is the intermediate whose outer consumer suffix R3 claimed and
+> moved.** ⇒ Reaching `ground_value` with that intermediate intact **proves the
+> fused path terminalizes the producer result before completing the claimed
+> consumer suffix.** R3 changed the flow into an unchanged site, and the flow is
+> unlawful.
+>
+> **`AC-D3-ROUTE` — the repair stays inside the held atomic object:** the fused
+> path carries the intermediate through the already-authorized outer
+> elimination, kind-preserving rebind, and exact worker call, **and only then**
+> emits the resulting ground value. The existing conservation relation stays
+> authoritative and **must close on the armed fused path**.
+>
+> **Its control is a discriminator, not a green run:** it must **fail** if the
+> producer intermediate reaches terminal emission before its claimed outer
+> consumer, **while the final post-consumer ground result stays accepted.** A
+> control that only shows the armed path green does not discharge this.
+>
+> **Rejected dispositions, named so none is re-proposed:** a `StaticWorkerBinding`
+> arm on `RuntimeGroundValue`; a materialized carrier, slot, descriptor, closure
+> value or opaque token for the worker; conversion to `Specialized`, erasure, or
+> dropping it; any relaxation of `ground_value`; **declaring the stop external on
+> the strength of R3 not editing the site**; and **shrinking or deferring
+> selector nets 2/4, controls 2/3, or the inner-slot witness.**
+>
+> ### `AC-D3-SELF`'s OPEN HALF IS NOW AN OWED PLANNER OBLIGATION, and the
+> ### frame's "not closed" reading was confirmed in the tree
+>
+> **Steward, 2026-08-12, from `evt_2z63k4vb5rk7k` at `5d322edf`.**
+>
+> The implementer took a **mandatory correction as its own commit**: it had
+> written that the callee-to-body resolution *"is established at preflight"*, and
+> **that sentence was false in the tree** — `BinderAgreement` proves only the
+> marginal facts. The comment now says so, names the ruling, and records the
+> relation as an **owed planner-side obligation**, with the constraint that
+> lowering's independent cross-check **must not grow into a reconstruction of the
+> binder relation.**
+>
+> **The shape of the owed guard, scoped and deliberately not built** (so the next
+> turn starts from it instead of re-deriving it): `CheckedIhBinding` carries
+> `frame_origin` and `recursive_position` and **no body**, and
+> `SemanticIr::static_body_call_edges` returns `(caller, callee, callee_origin)`
+> with **no call-site axis** — `callee_origin` is the callee function's planned
+> entry node, not tied to a call occurrence. ⇒ **The resolution cannot key on the
+> consuming call.** It must key on the binder's **owning function**: take
+> `occurrence_authority(frame_origin).owner`, require a **unique** `StaticBody`
+> edge out of it, and require that edge's callee entry to equal
+> `key.invocation_callee_entry`, the redirect callee entry, and the claim's
+> producer body — **refusing before claim issuance.**
+>
+> **Its control must perturb the resolved relation while frame,
+> recursive-position, result-root and redirect marginal checks stay green.**
+> That is what makes it independent of `BinderAgreement` rather than a second
+> spelling of it, and it needs a test-only planner switch on the
+> `DUPLICATE_STATIC_BODY_TRIPLE` pattern. **The implementer declined to author it
+> at the end of a long turn on the explicit ground that a quickly-written
+> control here is the unexercised-control error the atomic rule exists to
+> prevent. That is the correct call and I am not treating it as a miss.**
+>
 > ### THREE STOPS, ONE SHAPE — a premise about the fused function written
 > ### BEFORE the suffix moved into it
 >
@@ -408,6 +496,13 @@ nothing you inherit from `#6d`.**
 > discovery process: one stop, one turn, one repair, repeat. Nothing goes red
 > until the armed compile reaches the site, so the count of remaining instances
 > is **unknown and unbounded by anything measured so far**.
+>
+> **STOP 4 IS NOT A FOURTH INSTANCE OF THIS SHAPE — do not recount it as one.**
+> The `StaticWorkerBinding` stop (`AC-D3-ROUTE` above) is a **routing** defect:
+> the fused path terminalizes the producer intermediate before completing the
+> claimed suffix. No stale written premise is involved, and the refusal site was
+> correct all along. **The count behind the census offer below is still three**,
+> and stop 4 neither strengthens nor weakens it.
 >
 > **The option, and it is an option rather than a deliverable I am adding:**
 > whoever takes the next stop may census the premises written about the fused
