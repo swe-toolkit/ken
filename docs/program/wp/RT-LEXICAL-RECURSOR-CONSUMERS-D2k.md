@@ -661,15 +661,21 @@ this consumer is a silent accept, measured at `739cfde3`.
 
 **`D2k-1c` — the pending outer continuation route repair. THE SUCCESSOR TO
 `D2k-1b-i`, and the increment that turns rows 4 and 5 from refuse to consume.**
-Authorized by Architect `evt_5ed8ee70cmrt`. **Not started.**
+Authorized by Architect `evt_5ed8ee70cmrt`. **RELEASED to the runtime ring
+2026-08-12, anchor `evt_2b1zhe78c81at`.**
 
-> **BASE: whatever `origin/main` is once `D2k-1b-i` MERGES — named as an
-> EVENT, not as a SHA, deliberately.** An earlier revision of this line pinned
-> the base to `11e4eae1`, which the Architect rejected within the hour; a
-> successor pinned to a candidate SHA silently names a dead object the moment
-> its predecessor is recut, and `1b-i` has now been recut twice. **Do not
-> substitute today's live candidate for this sentence either.** Fetch and reset
-> to `origin/main` at the moment you start.
+> **BASE: the naming event has FIRED. `D2k-1b-i` merged as PR #1992, and
+> `origin/main` is `45addeaf`** — a landed object, not a candidate.
+>
+> This line previously read *"whatever `origin/main` is once `D2k-1b-i`
+> merges — named as an EVENT, not as a SHA, deliberately,"* because an earlier
+> revision had pinned the base to `11e4eae1`, which the Architect rejected
+> within the hour. **A successor pinned to a candidate SHA silently names a
+> dead object the moment its predecessor is recut**, and `1b-i` was recut
+> twice. Naming `45addeaf` now is not a return to that mistake: the difference
+> is that the predecessor has landed, so this SHA is on `main` rather than
+> awaiting a verdict that could recut it. Still fetch and reset to
+> `origin/main` at the moment you start — it moves under you.
 
 **Fixed input:** the origin identities in the head block's ruling table. **The
 Architect measured them on exact `11e4eae1`, which is a rejected object** — the
@@ -677,6 +683,98 @@ citation records *where the measurement was taken*, and is not a base and not a
 warrant that the identities survived the recut. *Re-derive them at your base* —
 a merge-base goes stale without your branch moving, and row 5's pair was
 already wrong once.
+
+**`D2k-1c-0` — THE LEDGER'S OWN INVARIANT, AND IT COMES FIRST.** Do not write
+route-repair code until this is measured and reported. Adversary finding
+`evt_6jhcxr1yv7yrk`, triaged CONFIRMED `evt_55rzfnc1gkekq`, Architect
+conditional ruling `evt_6c9f1csfvrey7`.
+
+**The finding.** `close()` checks `entry.consumptions != entry.rebinds`
+(`mod.rs:4181`) — a **per-origin count**. The entry doc at `mod.rs:4058-4062`
+states a **pairing**: the same static occurrence can be lowered more than once,
+and each of those transports **owes its own consumption**. The two come apart
+exactly where the doc says the interesting case is. At `rebinds = 2`, a compile
+in which transport #1 is consumed twice and transport #2 is dropped gives
+`2 == 2` and closes **green**. `note_consuming_call` does not catch it either:
+it refuses on `consumptions >= rebinds`, so the second consumption of the same
+key passes. **Direction: fail-open**, and it is the forbidden fourth state —
+built, rebound, never consumed, count balanced.
+
+**Nothing shipped is wrong and this is not a defect in `1b-i`.** All five rows
+sit at `installs == 0` and refuse at the first branch, so `rebinds` is never
+non-zero in production today: no live witness, no repro. It is a claim about
+the ledger's strength that **goes live the moment this node closes the route
+gap** — precisely when rebinds start happening. That timing is why it is `1c`'s
+first deliverable rather than a follow-up node.
+
+**The control set cannot see it, and its row 3 is the near miss.** Row 3 builds
+`rebinds = 2, consumptions = 1` and asserts the refusal — a *short* count. The
+unsound case is `rebinds = 2, consumptions = 2` with both paid by one transport,
+and it is **indistinguishable at this granularity by construction**: the entry
+carries two `usize`s, so no fact in the ledger could separate them. That is the
+strongest claim the representation can support, not a gap in the rows.
+
+**THE DECIDING READ, and which way each outcome falls.** `rebind` has one
+production call site (`mod.rs:4274`), reached from four
+`bound_constructor_fields` sites (`core.rs:4605`, `:5462`, `:7112`, `:15308`).
+**Can any two of those four descend over one static occurrence in a single
+compile?** Report which, with the evidence, **before** writing route code.
+
+- **Yes** ⇒ per-origin counters are structurally insufficient and the gap is
+  live the moment the route repair works. **Stop after the measurement.** The
+  repair class is the Architect's, below — not the ring's and not the Steward's.
+- **No** ⇒ the entry doc's multi-transport premise is unreachable, and **the doc
+  is what needs correcting** — it is the stated ground for keying rather than
+  listing, so a false premise there is load-bearing. Retain the current keyed
+  entry; no new identity is justified.
+
+**Do not inherit the expected answer.** The report expects **yes** on
+independent grounds (`mod.rs:1250`, `:6347`, `:6500` and `core.rs:2724` all
+describe a recursive producer revisiting one source occurrence) and flags that
+as inference. It is one read — take it.
+
+> **ARCHITECT CONDITIONAL RULING `evt_6c9f1csfvrey7` — the admissible repair
+> class on the `yes` branch, and only on that branch.** A compiler-only
+> **transport-instance identity**, distinct from the planner-owned occurrence
+> identity: each successful `rebind(field_origin)` mints or selects a fresh
+> transport instance (for example the composite
+> `(field_origin, transport_ordinal)`), records it as outstanding, and
+> returns/carries that exact instance on the rebound `StaticWorkerBinding`. The
+> exact-`Var` consumer consumes **that instance** once; a second consumption of
+> the same instance refuses immediately; closeout refuses every still-outstanding
+> instance. **Direct bindings carry no instance.** The ledger may retain
+> `field_origin` as provenance or diagnostic metadata, but **it may not use
+> origin-level cardinality as the conservation proof.**
+>
+> Affine compiler bookkeeping only. It authorizes **no** runtime word, carrier,
+> slot, descriptor, callable identity, planner population, broad `Var` rule, or
+> erasure authority. It does **not** authorize relaxing closeout, and it does
+> **not** authorize beginning the pending-continuation repair before the
+> measured branch is reported.
+
+**Why this is `1c-0` and not a nested-scope fix: the instrument was never the
+scope, it was the counting.** This is the same error class a **fourth** time
+inside this one increment — seven forbidden verbs, then a total naming one
+disposition, then a compile-wide scalar, and now a per-origin scalar. Each
+iteration correctly narrowed the scope of the count **and kept the count**. A
+pairing needs a fact saying *which* transport was paid, and no narrowing of a
+tally produces one. **If your repair is a smaller counter, it is the fifth.**
+
+**`D2k-1c-0b` — one qualifier, folded, no node.** `mod.rs:4300` says the close
+*"runs before emission of the root answer, which is what makes the refusal
+lawful rather than late."* True on the RecursiveDescent arm (`core.rs:2730`);
+**false on FunctionizedUnits**, where `define_root_adapter` is called
+thirty-three lines above the close (`core.rs:2581` vs `:2614`) — deliberately,
+for the causal-ledger reason at `core.rs:2601-2610`. The safety does not rest on
+that clause; the same doc's next sentence carries it
+(`source_aggregate_preflight` and `boundary_transfer_admissibility` refuse ahead
+of the first allocation). **So this is a wrong reason sitting beside a right
+one**, which is what the next auditor inherits when they audit *"is the refusal
+lawful rather than late?"* on the arm where the clause is false. Qualify the
+sentence to RecursiveDescent. **Do not alter the intentional causal-ledger
+ordering.**
+
+**Then, and only then, the route repair.**
 
 **The defect, in one sentence:** the excluded route **loses or misattaches the
 pending outer continuation** when the producer's recursive/direct descent
