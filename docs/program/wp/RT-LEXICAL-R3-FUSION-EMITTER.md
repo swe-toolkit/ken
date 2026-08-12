@@ -576,6 +576,54 @@ nothing you inherit from `#6d`.**
 > **Different repairs, different discriminators, both consistent with every
 > measurement above.**
 >
+> ### RESEARCH ADVISORY — CONSUMPTION AND REACHABILITY ARE TWO DISTINCT PROOF
+> ### OBLIGATIONS. Steward, 2026-08-12, carrying `evt_77kkd21bnnekj` (full
+> ### text there) to the thread at `evt_33vnf0f1pmvgj`.
+>
+> **Prior-art framing only. Research proposed no repair, did not read
+> `crates/`, and states that it does not select Ken's mechanism. It is
+> advisory and non-blocking, and it must not be read as a ruling.**
+>
+> **The bottom line:** *"DEAD is a property of the residual executable program,
+> not a consequence of having consumed one fused edge."* Prior art establishes
+> producer deadness three ways — a rewrite replacing the whole redex so the
+> occurrence is **structurally absent**; a use-edge fusion that **retains** the
+> producer while any uses remain and erases it only when the use set is empty;
+> or a later **reachability/DCE pass** over the residual graph. **An ownership
+> model can make the first true by construction, but the fusion claim is not
+> normally the liveness certificate — the residual graph is.**
+>
+> **The discriminator that maps onto our measurements.** In GHC, a let-bound
+> producer used by both `foldr` and another consumer **does not fire the fusion
+> rule**, because fusing one use would duplicate the producer's work. ⇒ **one
+> consumer can consume a producer's result while the producer binding stays
+> live through another occurrence.** GHC keeps **fusion rewrite and binding
+> deadness as separate pipeline facts**; MLIR Linalg and OpenXLA split them the
+> same way, erasing a producer only when it is known to have no uses.
+>
+> **The named failure shape, and it is ours:** *"Incorrect residual ownership:
+> the original remains reachable even though no legitimate surviving use
+> requires it... **This is not an internally incomplete fused object. It is an
+> extra live node or root in the residual executable population.**"*
+>
+> **TRANSFER.** Our affine claim establishes **dynamic consumption** — fused
+> edge and suffix used exactly once. It does **not** establish **residual
+> unreachability** — that no executable root, standalone specialization or
+> export still reaches the original producer occurrence. **Prior art treats
+> these as two distinct proof obligations.** ⇒ The terminal refusal is
+> consistent with **an orphan residual caught after a CORRECT fusion**, rather
+> than with answer selection inside the fused object being wrong — **which is
+> why all three mechanisms aimed at answer selection had nowhere to attach.**
+>
+> **A disposition prior art contains that our option set does NOT, flagged and
+> explicitly not proposed:** GHC's answer to a producer with a surviving second
+> use is **to decline the fusion**. Our three candidate readings — route C runs
+> / its result is selected / ownership left it reachable — do not include it.
+> **Recorded so the space is closed deliberately rather than by omission.**
+>
+> **Research found no dependently-typed eliminator-fusion precedent in this
+> bounded pass that changes the conclusion, and said so rather than padding.**
+>
 > ### THE TRACE LANDED, AND IT FOUND A THIRD CONSTRUCTOR ROUTE NOBODY HAD
 > ### BEEN RULING ABOUT. Steward, 2026-08-12, from `evt_1a9t81p0j7h77` +
 > ### `evt_338x5qd0hf6fx`, under bounds `evt_41remx6xn6pda` + `evt_7qkp9qd7a2381`.
