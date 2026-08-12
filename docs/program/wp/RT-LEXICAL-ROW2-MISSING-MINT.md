@@ -264,6 +264,37 @@ touch the `#[cfg(test)]` emission, the enum, or the assertion.
 
 ### `D2` — discriminating controls, separate from `D1`
 
+> #### `D2` MERGED 2026-08-12 at exact `9e95767e`, PR #1955, CI green
+>
+> QA `evt_4vpp6pyx512ng`, Architect Decision `dec_5rwbbqmnre70f` resolved at
+> `evt_2yp78y43pd61y`. One test-only path, `+152/-23`. M6 verified by blob
+> identity from the declared merge-base `14578cf0`: one path, `MATCH`.
+>
+> **The fourth bullet is discharged. The `D0` sentinel's licence is replaced,
+> not supplemented.** The baseline zero-sibling operand is **gone from the
+> executable predicate**, and the new positive is on the excluded lane:
+> `D6aRouteEvent::ConsumerRoute { seat: SourceMachine }` has exactly one
+> production emitter, inside the carried arm of that seat — the arm that invokes
+> carried lowering and breaks before the specialized selection and before the
+> sole `SourceMachine` `Mint`. Under exclusion it fires; **the identical
+> predicate is required false on the baseline**, so the operand cannot be a
+> constant. QA forced that field red by exact mutation.
+>
+> **A false premise was removed rather than narrowed.** An earlier cast carried
+> a `CarriedEliminationEntered` cross-event operand and an origin join; both are
+> deleted from the predicate and the tuple. The prose keeps the rejected
+> ordering only as an explicit non-claim, with equal origins explaining why an
+> origin filter would still be false attribution.
+>
+> **The sentinel is corrected in place, not deleted**, because no repair landed.
+> Its retiring event is restated as whatever settles row 2 — which, after `D1`'s
+> closure, is no longer certainly a repair at the attributed cause.
+>
+> The first three bullets below are **not** discharged: they presuppose a
+> repaired root, and there is no repair. They are superseded by the successor
+> measurement in `D1`'s closure block. `AC-4`'s negative control remains owed
+> wherever row 2 finally settles.
+
 A control set appended to an implementation deliverable is the shape that got
 three `D6` candidates rejected on the sibling node. Keep them separate.
 
