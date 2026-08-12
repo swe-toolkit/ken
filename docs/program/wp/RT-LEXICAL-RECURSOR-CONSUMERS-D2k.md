@@ -223,11 +223,68 @@ does NOT authorize the repair.**
 > moved rather than reporting a tuple mismatch.
 
 **`D2k-1b` — the closed compiler-only constructor-field distinction**, per
-section 3's ruled structural properties. **Cut it so each turn lands or hard-
-stops inside about an hour** — the coupling is `Construct` producer, static
-`Match` binder, both lowering engines, and boundary preflight, and that is more
-than one turn. **Preflight refusal is not optional garnish**: a constructor
-carrying a worker field that descends partway and then refuses fails the ruling.
+section 3's ruled structural properties. The coupling is `Construct` producer,
+static `Match` binder, both lowering engines, and boundary preflight — more
+than one turn. **Cut into the three increments below**, and the cut is not free
+to fall anywhere.
+
+> ### The producer and the preflight are ONE increment, and that is forced
+>
+> **A producer without a preflight is the shape the ruling forbids.** Land
+> `Construct`'s recognition first and a constructor carrying a worker field
+> exists on `main` with no whole-graph refusal in front of it: it descends
+> until something reads the field. That is *"descends partway and then
+> refuses"*, verbatim.
+>
+> **A preflight without a producer is inert.** Nothing can build the field it
+> refuses, so it compiles green, exercises nothing, and its control passes
+> vacuously.
+>
+> ⇒ **Neither ordering is available. `1b-i` carries both.**
+
+**`D2k-1b-i` — the closed field and its fail-closed boundary, together.**
+Introduce the compiler-only constructor-field distinction — an ordinary
+specialized field versus a static-worker field — have `Construct` recognize a
+`StaticWorker` binding **before** `value_at` and retain it as that field kind,
+and land the whole-graph preflight refusal for any path that would carry,
+allocate, store, join, project, return or publish a constructor containing one.
+**No consumer becomes green here** — the five still refuse.
+
+- **State the property, not the site.** The requirement is *each of the five
+  still refuses, and nothing allocates, stores, emits or publishes a
+  constructor carrying a worker field before that refusal.* Do not assert
+  *where* the refusal now originates until you have measured it — it may move
+  to preflight or to the field's first reader, and both satisfy the ruling.
+- *Controls:* the `D2k-2` escape-mutation row (a constructor requiring runtime
+  transfer refuses **before** allocation or emission), and `AC-2`'s empty diff
+  on `value_at`.
+- *Hard stop:* the field cannot be recognized ahead of `value_at` without a
+  wildcard/default arm or a `LoweringEnvironmentBinding`-as-payload arm.
+  Section 3 forbids both — stop, do not widen.
+
+**`D2k-1b-ii` — static `Match` elimination preserves the kind**, on the engine
+the five actually route through. Elimination installs each field into the one
+lexical binding authority without erasing kind: ordinary →
+`Value(Specialized(..))`, worker → the same `StaticWorker`. The **existing**
+exact-`Var` call arm consumes it, unchanged.
+
+- **Measure which engine the five route through and name it in the handback.**
+  Do not assume it is direct descent. The other engine stays fail-closed for
+  one more increment, which is a refusal, not a partial descent.
+- *Controls:* the `D2k-2` positive row for the rows this engine covers, and the
+  phase mutation — forcing that field through ordinary value conversion
+  reproduces the `StaticWorkerBinding` refusal.
+
+**`D2k-1b-iii` — route parity.** The second engine implements the identical
+distinction; neither path may preserve the worker while the other calls
+`specialized_at` and refuses. *Control:* the `D2k-2` route-parity row.
+
+> **Every `1b` handback states the RUNNING TOTAL, not that increment's delta**
+> — new planner population, continuation-source setters, ABI/carrier/descriptor
+> entries, `#[ignore]`s and `value_at` callers, summed across `D2k-0`, `D2k-1a`
+> and every `1b` increment landed so far. Section 8's stop is about an
+> accumulating quantity, and a per-increment reading of it can never fail: that
+> is how the parent node's identical stop sat silent through eleven partials.
 
 **`D2k-2` — the successor controls**, separate from `D2k-1b` and additional to
 the existing guard controls:
@@ -340,6 +397,9 @@ the lexical-recursion consumer paths. This is the same file set as
 `--workspace`** — that is CI's gate, and `AC-7` means green in CI.
 
 **Sizing.** `#6d` closure was measured at **closer to a week** (runtime-leader
-`evt_645tm43wf1cne`) and these five expressions are the bulk of it. **`D2k-0` is
-sized as its own turn** and should land well inside one; `D2k-1` cuts per root.
-Per `§4b`: a hard stop inside an hour is a good outcome — say so and hand back.
+`evt_645tm43wf1cne`) and these five expressions are the bulk of it. `D2k-0` and
+`D2k-1a` were each sized as their own turn and each landed inside one.
+**`D2k-1b` no longer cuts per root** — there is one root, so it cuts along the
+ruling's own seams, and section 5 fixes the three increments and why the first
+two cannot be split further. Per `§4b`: a hard stop inside an hour is a good
+outcome — say so and hand back.
