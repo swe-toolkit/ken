@@ -551,6 +551,79 @@ increment to carry it.
 > the held `D1`/`D2`/`D3` range stay excluded; neither cut credits an AC or
 > closes the node.
 
+> ### ADVERSARY TRIAGE on `e48c2f90` — Steward, 2026-08-12 (`evt_2933sm5wnh2je`)
+>
+> Two confirmed defects, folded into `DP-1` rather than given a node. One
+> proposal, taken, and it lands on `DP-2`. **I reproduced both defects at the
+> shipping tree before folding them; neither is taken on report.**
+>
+> #### `DP-1` also carries two comment repairs in `core.rs`, both comment-only
+>
+> **1. The census is falsified by the sentence that states it.** `core.rs:2252`
+> pins *"MEASURED at `49072fb8`: `evt_1q7v9fcw5hd87` appears once under
+> `crates/`"* — and **spells the id it is counting**. Measured: `1` at
+> `49072fb8`, `2` at the shipping tree, where the second occurrence *is that
+> sentence*. The pin was true when taken and was falsified by its own
+> publication. A successor re-running the stated probe gets `2` and cannot
+> distinguish real drift from self-reference, which is the exact ambiguity the
+> pin exists to remove. **Second defect in the same sentence:** the trailing
+> *"— this line —"* resolves to `:2252`, while the record it means is at
+> `:2242`.
+>
+> **Repair, and prefer this form over re-pinning.** Refer to the id
+> positionally instead of spelling it — *"the Architect id named above appears
+> exactly once under `crates/`, at the head of this fence, and in four files
+> under `docs/program/`."* That fixes the deictic and makes the census
+> **self-stabilizing**: the sentence stops counting itself, so the number stays
+> correct without a re-pin at every future edit. Re-pinning to the shipping tree
+> and saying *twice* is also correct but needs maintaining forever.
+>
+> **2. The step-5 block states an instrument that cannot produce its result.**
+> It discloses *"the panic surfaces only the first"* and then reports where all
+> three roots land. Honest, and the gap is visible — but a reader re-running it
+> hits the same wall. One clause naming how the three were separated (three
+> runs, per-root isolation) makes it reproducible. Low severity.
+>
+> #### `AC-DP` — the two unlawful shapes get a control, on `DP-2`
+>
+> **The prohibition at `core.rs:2242` has never been falsifiable.** Both shapes
+> it rules unlawful are code someone must author — a fusion-only admission in
+> the mixed-frame validator, and a producer identity obtained by copying or
+> inferring rather than transporting — and **a control can red on exactly
+> those**. Until now it could not be written, because there was no producer
+> transported identity to compare against. `DP-1` lands one.
+>
+> ⇒ **`DP-2` carries a control that reds if the producer's checked identity is
+> ever obtained by copy from the consumer's rather than transported, and reds
+> if the mixed-frame guard admits under a fusion-only condition.** Grounded in
+> Architect `evt_1q7v9fcw5hd87`, which ruled both shapes unlawful; this adds no
+> ruling and reinterprets none.
+>
+> **This is why there is no follow-on node for the comment fence.** The only
+> mechanism that could protect comment text is a source-text oracle, which is
+> in the standing operator-disfavoured class. And after `DP-0` the fence's cost
+> of being crossed is **proximity, not loss** — the ruling is carried in full by
+> the node at `:39-51` and the frame at `:566-568`, both independently verified
+> by the Adversary this pass. Put the mechanism where the ruling can fail, not
+> around the prose. **Keep the fence anyway**; it costs nothing to maintain.
+>
+> **STOP CONDITION, and do not engineer around it.** If this control cannot be
+> written without inferring or comparing identity in a way the ruling itself
+> forbids, that is a **hard stop back to me** — not a weakened control and not a
+> workaround. An unfalsifiable prohibition is better than a control that
+> launders the prohibited operation into the test suite.
+>
+> #### Ledger correction, and it is the Adversary's to hold
+>
+> The false uniqueness claim **originated in the Adversary's finding**
+> (`evt_h0mzz2y4666b`) and was quoted verbatim into this frame. I wrote *"that
+> claim was mine"* in the `DP-0` handoff; the Adversary has put it back on its
+> own ledger, correctly, on the grounds that a scoped probe carrying an unscoped
+> conclusion is a defect it must keep. **What is mine is separate and stands:**
+> I adopted it without re-measuring, and my own `M3` check an hour earlier had
+> already surfaced four of the durable citations that disprove it. Both entries
+> are real and neither cancels the other.
+
 ## 6. Acceptance criteria
 
 **AC-1 — the positive is a real full-pipeline compile.** The checked `D2j`
