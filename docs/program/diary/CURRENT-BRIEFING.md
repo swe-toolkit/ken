@@ -75,6 +75,29 @@
 > merge, no standalone held `D1`/`D2` merge, no QA route on `89ee005b` (it is
 > preserved WIP negative evidence, earns no credit, is not a candidate).
 >
+> > **THE ATOMIC OBJECT IS UNDER CONSTRUCTION ON A BRANCH, NOT ON `main` — a
+> > cold resume will not see it in the log.** `wp/RT-LEXICAL-R3-FUSION-EMITTER`
+> > tip **`8cde622c811dcb081bb290fbc94490377d222833`**, base `bd170bef`, 1
+> > commit, 1 file, `+181/-0`, `lowering/core/tests/control.rs`, suite `905`
+> > passing against `904` at base.
+> >
+> > **It is NOT a candidate and takes no QA route and no credit.** Control 1
+> > only — the base singletons plus the three unarmed uncomposed roots, both
+> > halves in one assertion because either alone passes for the wrong reason.
+> > A/B run by applying the preserved `89ee005b` population and reverting it:
+> > RED with, GREEN without, and `ReHomed`'s error is the exact
+> > `expected={0,1} instantiated={0}`.
+> >
+> > **Carried gap the implementer named rather than glossed:** the inner slot
+> > stays `[1]` on **both** sides of that A/B, so the inner-slot-widening item
+> > of control 4 is **untouched by the mutation rather than met** — it needs its
+> > own witness and does not come for free. Do not read control 1 as covering it.
+> >
+> > **Next unit is the mechanism, not another control.** Controls 2 and 3 are
+> > stated over the armed composed path and have no subject until `D1`+`D2`
+> > build the splice and `D3` arms it. Hard stop at that boundary was correct
+> > and is the predicted shape.
+>
 > **How I got here:** I released `DP-1`/`DP-2` arguing the split was safe
 > because `D2F_EMITTER_ARMED` is `false`. **The flag gates the fusion emitter,
 > not every consumer of the transported sequence** — unarmed `ReHomed` refused
