@@ -344,6 +344,53 @@ nothing you inherit from `#6d`.**
 > numerically coincident — a control that passes on the `37` coincidence proves
 > nothing.
 >
+> ### MEASURED — the discriminator's fixed inputs, and the half of the ruled
+> ### guard that is NOT verified
+>
+> **Steward, 2026-08-12, from the implementer's build report
+> `evt_6d3gb569n1twy` at exact `fe5c311e`. These are measured numbers, not
+> chosen ones.**
+>
+> **The identity axes as this fixture prints them:**
+>
+> | axis | value |
+> |---|---|
+> | `consuming_call` (the authorization) | **17** |
+> | `consuming_callee` | 16 |
+> | `producer_body` | 37 |
+> | seat | 37 |
+> | `redirect_callee` | 37 |
+>
+> **So the coincidence the Architect warned about is real and it is three-way:
+> seat, `producer_body`, and `redirect_callee` all print `37`, while the
+> authorizing call site is `17`.** Folding call-site into body **type-checks**,
+> and a wrong-call-site edge is then indistinguishable from a right one. ⇒ **The
+> `AC-D3-SELF` discriminator is satisfied only by a control that separates `17`
+> from `37`.** A control whose expected values are all `37` would pass under the
+> fold and proves nothing — that is the whole reason the discriminator is an AC.
+>
+> **THE RULED GUARD IS HALF-BUILT, AND THE COMMENT BESIDE IT IS NOT A
+> DISCHARGE.** The ruling requires the checked consuming-callee/binder relation
+> to **resolve to** `claim.producer_body()` and the redirect's producer entry.
+> The implementer's first attempt compared `consuming_callee` to `producer_body`
+> **directly** — `16` against `37` — and refused every lawful region; the
+> relation **resolves**, it does not equal. That resolution is **preflight's**
+> and is **not re-derivable at the emission seam**: it needs `ih_bindings` and
+> `SemanticIr::child_origin`, which is `pub(super)` to the planner. Inventing a
+> substitute is exactly the inference the ruling forbids, so the implementer
+> did not.
+>
+> **What IS checked:** the redirect's producer entry against the claim's
+> producer body — two fields reaching the claim by different routes, so their
+> agreement is a genuine cross-check. **What is NOT checked:** the
+> callee-to-body resolution itself. It is named in a code comment rather than
+> left looking discharged, which is the right handling — **but a named limit is
+> not a met criterion.** ⇒ **`AC-D3-SELF` is not closed by the guard as built.**
+> Closing it needs either the planner-side closure the implementer offered to
+> the Architect, or an explicit Architect ruling that the cross-check is
+> sufficient and the resolution half is not owed. **Neither has happened; do not
+> read the comment as either one.**
+>
 > ### THREE STOPS, ONE SHAPE — a premise about the fused function written
 > ### BEFORE the suffix moved into it
 >
