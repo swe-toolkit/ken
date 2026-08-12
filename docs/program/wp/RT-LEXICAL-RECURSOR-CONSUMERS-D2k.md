@@ -262,6 +262,48 @@ allocate, store, join, project, return or publish a constructor containing one.
   wildcard/default arm or a `LoweringEnvironmentBinding`-as-payload arm.
   Section 3 forbids both — stop, do not widen.
 
+> ### The owner relation has a PLANNER-OWNED KEY. Use it; `D2k-1a` did not.
+>
+> Adversary `evt_7v6megkzsbapk` asked whether `D2k-1a`'s causal pairing is a
+> same-event join or a positional one. **Settled, and it lands on a different
+> component than the report named.**
+>
+> - **The refusing caller is same-event and sound.** `site` comes straight out
+>   of the `StaticWorkerRead` event. No join, nothing to check.
+> - **The OWNER is the positional one.** `control.rs:3323` binds `at` from
+>   `.enumerate()`, then takes the nearest preceding `ConstructEntered` in
+>   emission order. **Both events carry `origin: StaticOriginId` and both
+>   discard it with `..`.**
+>
+> **That was disclosed and ruled, so it is not a defect in `D2k-1a`.** The
+> resolved Decision states it in terms: *"the only remaining prefix lookup is
+> for the enclosing `Construct`, not caller attribution."* Evidence-only work
+> may rest on emission order.
+>
+> ⇒ **`1b-i` may not.** Here the producer/owner relation **is** the mechanism:
+> recognizing the binding at `Construct` means knowing which constructor owns
+> which argument. And the key already exists, planner-owned:
+>
+> ```rust
+> // core.rs:12517 -- the child's origin is DERIVED from (parent, position)
+> self.static_transition_plan.child_static_origin(parent, position)?
+> ```
+>
+> So a `Construct` at origin `P` lowers its argument `i` at
+> `child_static_origin(P, i)`. **Owner and argument are related by a planner
+> fact, not by how close together they were emitted.**
+>
+> **Why emission order is not merely weaker here.** A constructor argument may
+> itself be a `Construct`. Nearest-preceding then names the **inner**
+> constructor, and nothing in the assertion notices — it is right on the five
+> measured fixtures and silently wrong on a nested one. That is `D2k`'s own
+> §3 failure repeating: a property measured true on the population it was
+> measured on, carried forward as though it were general.
+>
+> **Key on `child_static_origin`, and do not infer the relation** — it is the
+> planner's to state, which is the same prohibition section 3 applies to the
+> consumer-identity alias, one level down.
+
 **`D2k-1b-ii` — static `Match` elimination preserves the kind**, on the engine
 the five actually route through. Elimination installs each field into the one
 lexical binding authority without erasing kind: ordinary →
@@ -300,7 +342,14 @@ the existing guard controls:
 - **non-aliasing** — ordinary constructor fields and ordinary exact-`Var` calls
   remain behaviorally unchanged;
 - **census** — no new planner population, continuation-source setter,
-  ABI/carrier/descriptor, `#[ignore]`, or `value_at` caller.
+  ABI/carrier/descriptor, `#[ignore]`, or `value_at` caller;
+- **nested-owner** — a constructor whose argument is itself a `Construct`
+  attributes the worker to the **owning** constructor, not the innermost one.
+  This is the row that fails under an emission-order bridge and passes under
+  the `child_static_origin` key, so it is what makes the `1b-i` note above
+  executable rather than advisory. **If it cannot be constructed on these
+  fixtures, say so and say why** — an unbuildable discriminating row is a
+  finding, not an omission.
 
 ## 6. Acceptance criteria
 
