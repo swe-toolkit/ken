@@ -74,6 +74,36 @@ spec-author conformance-validator`. In order the script:
 a foreground tool timeout — launch with `run_in_background: true`. Do the next
 prep while it waits; you are re-invoked when it returns.
 
+> ### DO NOT PUBLISH DURING THE GATE WINDOW. The reset is a SNAPSHOT.
+>
+> Step 3 resets every worktree to **`origin/main` as it stood when the gate
+> started.** If you publish while it runs — and the five-minute wait is exactly
+> when publishing feels free — **`main` moves and the ring is left one commit
+> behind the frame you just wrote for them.**
+>
+> Measured 2026-08-12: the gate pinned all three Runtime seats at `9fe5a3a4`
+> while a frame recut landed at `00cc425a`. The leader was about to re-release
+> from a tree that **did not contain the deliverable being released.**
+>
+> **The failure is silent in both directions.** The seats look correctly
+> reset — they *are* at a clean `origin/main`, just not the current one. The
+> frame looks correctly landed, because it is. **Nothing in either check
+> compares the two**, and the ring's next act is to read a frame it does not
+> have.
+>
+> Either finish publishing before you launch the gate, or, if something had to
+> land mid-window, verify and say so explicitly:
+>
+> ```sh
+> git rev-parse origin/main
+> for a in <members>; do git -C /workspaces/ken/.worktrees/$a rev-parse HEAD; done
+> ```
+>
+> **If they differ, that is yours to correct, not the ring's to notice.** Tell
+> the leader the exact SHAs and the `git fetch origin --prune && git reset
+> --hard origin/main` — do not assume a seat that was just reset will think to
+> re-fetch.
+
 **The script sends the compaction; it does not confirm the drop.** After it
 returns, `capture-pane` each member and confirm ctx actually fell, or a live
 `Compacting...`, or a queued `/compact`.
@@ -165,6 +195,34 @@ its members' ctx is still high, the gate was skipped. The gate is the proactive
 fix; this scan is only the backstop. **When the scan is the thing catching a
 stale enclave, the gate already failed upstream — treat that as the miss, not a
 routine catch.**
+
+## The gate is part of the RELEASE, not a step before it
+
+**Measured 2026-08-12, and the cost was a full seat-turn.** `D2k-1a` merged,
+the Runtime ring went idle, and the Steward released `D2k-1b-i` the same turn
+**without running the gate.** The implementer was at **ctx 55%** — past the
+45% this file calls *"a monitoring miss, not a normal state"* — took the
+increment, did the grounding, and handed it back **unstarted on capacity.** The
+leader then had to ask for the gate.
+
+**The rationalization was delivery pressure, and it came from a real rule.**
+`../steward.md §1` makes an idle build team the Steward's backlog, so the
+instant the merge landed the whole objective was zero gap between merge and
+kickoff. **The gate looks like a delay in exactly that moment.**
+
+⇒ **Measured, that trade is inverted: skipping five minutes of compaction cost
+a whole turn.** A ring going idle is not a reason to skip the gate — **it is
+the only quiescent seam you get**, and quiescence is this file's own
+precondition.
+
+**The sequence is compact, then kick.** If you are writing a release post and
+cannot say when that unit was last compacted, **you are the blocker, and the
+seat's capacity handback is your miss surfacing from the wrong side.**
+
+**A handback on capacity is a good handback.** The seat above refused to open
+the most soundness-adjacent increment in its sequence while fatigued, and said
+explicitly that no mechanism stop had fired so the node's record would not be
+corrupted. Read it as the gate firing late, not as a failed turn.
 
 ## Before you compact anyone: outstanding obligations
 
