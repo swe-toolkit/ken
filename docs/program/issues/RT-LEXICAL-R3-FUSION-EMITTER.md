@@ -11,6 +11,58 @@ github: null
 origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliation returned 0 of 8 discharged across eleven merged D2f partials (runtime-leader, evt_d9n0twj6y5sp). Separability ruled by the Architect at evt_7knsqyqg72103 on a Steward question (evt_2vbhz9kgp0b44). Steward-filed (agents cannot create tracked work per COORDINATION 2).
 ---
 
+> # STOPPED 2026-08-12 — THE CUMULATIVE STOP FIRED AT `D2`
+>
+> **Architect ruling `evt_1q7v9fcw5hd87`. Runtime is not on this node; `D2k`
+> took the ring at `evt_9tx4kt0k8epm`. Do not resume this node from its frame
+> as written.**
+>
+> **What `D2` proved, and it is a real result.** The A/B is valid causal
+> evidence: with `D2` off the suffix is outside its checked frame and the IH
+> marker refuses as detached; with `D2` on the existing consumer re-enters and
+> consumes the transported consumer frame, so lowering advances to the next
+> independent guard. **`D2` closes the gap it was designed to close.** It did
+> not cause the newly exposed gap and does not settle it.
+>
+> **What it exposed.** `compose_oriented_subcontinuation` builds
+> `semantic_layers` from the selected producer layer plus pending unwind
+> layers. Once **any** pending semantic layer is checked, **every** pending
+> semantic layer must carry both an exact checked frame and an invocation
+> identity. The producer eliminator here is still `semantic_pending` — **it is
+> not a control-only wrapper that may be omitted** — so the new refusal is
+> correct for the current representation.
+>
+> **Two repairs are ruled UNLAWFUL and are not to be re-proposed.**
+>
+> - **A fusion-only validator admission.** It would report one segment as
+>   checked while one of its semantic frames has no plan row, no invocation
+>   identity and no checked interface or witness. Segment checkedness is
+>   **segment-wide**; there is no existing proof boundary that could confine
+>   the exception to the consumer suffix. It would also weaken the same
+>   invariant that correctly refuses an ordinary inferred IH layer nested in a
+>   checked application. **Calling the case "fusion" does not supply the
+>   missing authority.**
+> - **Copying or inferring the consumer identity onto the producer.** They are
+>   distinct semantic occurrences; aliasing them makes one checked identity
+>   answer for two frames. Deriving a producer identity from body shape, origin
+>   coincidence, sole remaining plan row, or the fusion claim is **inference**,
+>   and this boundary deliberately accepts **transported** identities only.
+>
+> **Operational disposition.** `8063dd67...7166baaa` is preserved as held
+> `D1`+`D2` **evidence only**. Not a merge candidate, must not route to QA. **No
+> arming commit, no `AC-8` credit, no `D4` credit, no standalone `D1`/`D2`
+> merge is authorized.**
+>
+> **Owed by any successor:** correct the stale arming comment. **After `D2` the
+> live refusal is the mixed checked/inferred semantic-frame guard, not the
+> prior step-5 refusal.**
+>
+> **The recut is in section 5 of the frame.** The retirement still needs this
+> expression — `RT-RECURSOR-TRANSPORT` `D3` must prove all six rows green
+> **without** exclusion, and new `#[ignore]`, fixture reshaping and refusal
+> absorption are each separately ruled out for exactly these rows. **Descoping
+> it is not available.**
+
 > # `D0` MERGED 2026-08-12 — THE POSITIVE ROW IS NON-ZERO
 >
 > Exact `54f10ca6`, PR #1962, **CI green**, `origin/main` `36848e08`. Declared

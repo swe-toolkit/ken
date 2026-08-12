@@ -119,6 +119,48 @@ fusion candidate used a synthetic fixture and called the builder directly —
 **none of them compiled the acceptance fixture**, so the mechanism was untested
 against it on *both* sides of the gate.
 
+> ### RECUT 2026-08-12 — `DP` COMES FIRST, AND NOTHING BELOW IT IS RELEASED
+>
+> **The cumulative stop fired at `D2`** (Architect `evt_1q7v9fcw5hd87`; full
+> statement in the node). `D1` and `D2` are built and **preserved as evidence
+> only** at `8063dd67...7166baaa` — not a merge candidate, not routed to QA.
+>
+> **`DP` — give the producer semantic occurrence its own transported checked
+> identity.** Extend planner and transport population so the exact producer
+> semantic occurrence receives its **own** checked frame template and
+> invocation source, is marked and transported to lowering, and participates in
+> the segment with its real semantic position, segment site, input/output
+> interfaces, control witness, and parent/edge relations. **The existing
+> validator then accepts it with no exception and no weakening.**
+>
+> **NOT RELEASED.** `DP` is my scope ruling on which of the two lawful design
+> classes the successor owns, and it is **pending the Architect's confirming
+> gate**. Do not start it on the strength of this frame alone.
+>
+> **Why this class and not the other.** The alternative is to redesign
+> composition so the inferred producer layer is provably **outside** the checked
+> consumer segment, with an explicit validated boundary. Two things rule against
+> it. The Architect's own analysis says the producer eliminator **is** a genuine
+> semantic participant — `semantic_pending`, *"not a control-only wrapper that
+> may be omitted"* — so proving it outside the segment argues against the
+> measured fact. And the fused region deliberately puts producer and consuming
+> suffix **into one emission region**, so a partition proving them separable
+> fights the fusion design this node exists to build. `DP` supplies the missing
+> authority instead of arranging not to need it, and it is the only one of the
+> two that leaves the segment-wide checked representation untouched.
+>
+> **`DP` is the thing the stop exists to catch, so it is authorized
+> deliberately or not at all.** It is exactly *"new planner population beyond
+> what is landed."* It does not slide in as part of an emitter increment.
+>
+> **What survives unchanged:** `D0` (merged), the located seam in section 4, the
+> forbidden routes in section 3, and the atomic-candidate rule below — which
+> still governs `D1`+`D2`+`D3` once `DP` makes them buildable.
+>
+> **What any successor owes on contact:** correct the stale arming comment.
+> **After `D2` the live refusal is the mixed checked/inferred semantic-frame
+> guard, not the prior step-5 refusal.**
+
 **`D1` — the interior authority switch**, at the seam located in section 4.
 **Implemented and committed, then HELD.** Not routed to QA, not merged alone.
 
@@ -245,6 +287,15 @@ not from a fixture.
   fixture problem.
 - **A standalone inert `D1` or `D2` merge.** See the atomic-candidate ruling in
   section 5.
+- **A fusion-only admission in the mixed-frame validator**, and **copying or
+  inferring the consumer's frame or invocation identity onto the producer**
+  (Architect `evt_1q7v9fcw5hd87`). Both are ruled **unlawful**, not merely out
+  of scope, and the reasons are in the node. The short forms worth carrying:
+  segment checkedness is **segment-wide**, so no existing proof boundary can
+  confine an exception to the consumer suffix; and this boundary accepts
+  **transported** identities only, so deriving one from body shape, origin
+  coincidence, the sole remaining plan row, or the fusion claim is inference.
+  **Calling the case "fusion" does not supply the missing authority.**
 
 ## 8. Stop conditions — return to me, do not decide
 
@@ -261,16 +312,35 @@ not from a fixture.
   eleven partials, each of which was individually small enough not to trigger
   it. **Ask it at every cut, about the running total.**
 
+  > **THIS STOP HAS FIRED — 2026-08-12, at `D2`.** It is answered, not armed.
+  > `D0` needed no new population and `D1` needed none; `D2`'s adoption exposed
+  > a producer-identity gap that requires it, and `DP` in section 5 is the
+  > response. **Do not re-read this bullet as an open question**, and do not
+  > treat `DP` as having already discharged it for later cuts — the running
+  > total keeps accumulating, and `DP` is the largest single addition to it.
+  >
+  > **It fired the way the frame said it would.** Each increment was
+  > individually clean; only the total was not. The instrument that caught it
+  > was the implementer stating the **running total** in the handback rather
+  > than the increment's own delta.
+
 ## 9. Contention and sizing
 
 `crates/ken-runtime/src/cranelift_backend/lowering/core*`, `.../units.rs`, and
 the eliminator's case-body lowering path.
 
 **Runtime runs one node at a time.** [[RT-LEXICAL-ROW2-MISSING-MINT]] held this
-file set and **merged 2026-08-12** at `main` `741f66c3` — that sequencing bar is
-cleared and this node is the released successor. Re-derive the intersection at
-candidate time anyway: a merge-base goes stale without your branch moving, and
-row 2's arc landed nine PRs into `core/tests/control.rs`.
+file set and **merged 2026-08-12** at `main` `741f66c3`. Re-derive the
+intersection at candidate time anyway: a merge-base goes stale without your
+branch moving, and row 2's arc landed nine PRs into `core/tests/control.rs`.
+
+> **THIS NODE NO LONGER HOLDS THE RING — 2026-08-12.** It is stopped, and
+> `#6d` `D2k` took the file set at `evt_9tx4kt0k8epm`. **The held
+> `8063dd67...7166baaa` range will not rebase cleanly once `D2k` lands, and
+> that is accepted** — it is preserved as evidence, not as a merge candidate,
+> and `DP` rebuilds `D1`/`D2` regardless. **Whoever resumes this node
+> re-derives everything from the `main` of that day**, including section 4's
+> seam and section 2's fixed inputs. Do not carry a coordinate across the gap.
 
 `scripts/ken-cargo test -p ken-runtime --lib` plus your focused suite.
 **Never `--workspace`**; that is CI's gate.
