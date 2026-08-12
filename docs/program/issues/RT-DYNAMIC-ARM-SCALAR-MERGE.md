@@ -11,6 +11,53 @@ github: null
 origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 2026-08-09). Kernel reached the native boundary after interpreter Nat-3 and provenance-gated erasure both passed, and stopped without Runtime edits exactly as the durable D5 ruling at main 46c12adb requires. Steward-filed (agents cannot create tracked work per COORDINATION §2). Steward owns the frame and AC/control placement.
 ---
 
+> # `c2` IS AUTHORIZED — Steward, 2026-08-12. THE GATE WAS LEFT SHUT AFTER ITS
+> # CONDITION WAS MET.
+>
+> **The whole node is now shovel-ready: `c2-pre`, then `c2`.** No further
+> Steward authorization is owed on this node, and nothing here re-ranks it.
+>
+> **The gate said `c2` "returns to the Steward before assignment with its
+> `AC-K12` relationship stated" (`evt_6z7wf6dw94cym`). That statement arrived at
+> `evt_77pege8j5cv14`** — runtime-leader's answer that `c2` *partially advances
+> `AC-K12` and does not discharge it*, because it clears a refusal where
+> `AC-K12` needs an execution. **I acted on it the same day** by filing
+> [[RT-NESTED-IH-NATIVE-REALIZATION]] to own the missing capability, and then
+> did not come back and open this gate. The condition was discharged and the
+> durable record still read `unauthorized`.
+>
+> **This is the failure direction that hides an idle ring, for the third time on
+> this one chain**, and each time by a different mechanism: a missing
+> `depends_on` edge (recorded on `RT-NESTED-IH-NATIVE-REALIZATION`), a stale
+> `active` status (the block below), and now a **satisfied precondition whose
+> gate nobody reopened**. All three read to a tracker reader as *work in
+> progress*. **A precondition is discharged by the artifact that records it,
+> never by the act that satisfied it** — the seat that supplies the answer has
+> no way to open a gate it does not own, so the owner has to close the loop
+> explicitly or it stays shut silently.
+>
+> ## What `c2` may and may not claim
+>
+> - **May:** the semantic admission itself — proving the arriving operand is
+>   `StructuralNat` and clearing the real `D5` scalar-merge refusal, while
+>   retaining the unrelated-`Data`, merge-shape, and catch-all boundaries.
+> - **May NOT:** claim, advance, or partially credit **`AC-K12`**. `c2` clears a
+>   refusal; `AC-K12` requires an execution that forms a valid native artifact,
+>   passes Cranelift verification, runs, and agrees with the interpreter at Nat
+>   3. Those are different capabilities and
+>   [[RT-NESTED-IH-NATIVE-REALIZATION]] owns the second.
+> - **Sequencing is unchanged:** `c2-pre` first — it corrects a comment `c2`'s
+>   own author would otherwise read as licence — then `c2`.
+> - **Standing hard-stop instruction stands:** if the admission validator alone
+>   consumes a turn, stop with a measured population rather than pushing into
+>   the consumer migrations.
+>
+> **This is not a lane request, a re-ranking, or a pre-emption.** Runtime is on
+> `RT-LEXICAL-R3-FUSION-EMITTER` (`DP-1`, then `DP-2`), Runtime runs one node at
+> a time, and Runtime's ordering behind the `RecursiveDescent` retirement chain
+> is the operator's standing priority. Authorizing `c2` only means that when
+> Runtime next frees, nothing on this node waits on me.
+
 > # STATUS `active` -> `ready`, 2026-08-12. NOTHING WAS UN-LANDED.
 >
 > **`c1` merged at `7bfc8ae5` and stays merged.** This is a tracker correction,
@@ -94,8 +141,11 @@ origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 202
 > to the ring: if the admission validator alone consumes a turn, hard-stop with a
 > measured population rather than pushing into the consumer migrations.
 >
-> **`c2` remains unauthorized** and returns to the Steward before assignment
-> with its `AC-K12` relationship stated. `AC-K12` is not claimed or advanced here.
+> ~~**`c2` remains unauthorized** and returns to the Steward before assignment
+> with its `AC-K12` relationship stated.~~ **`c2` IS AUTHORIZED — Steward,
+> 2026-08-12. This condition is DISCHARGED**; see the authorization block at the
+> head of this node for what `c2` may and may not claim. `AC-K12` is still not
+> claimed or advanced here.
 
 > # `c2-pre` — ADDED 2026-08-10. THE FAIL-CLOSED ARGUMENT IS WRONG IN BOTH
 > # DIRECTIONS. THE PROPERTY ITSELF HOLDS.
