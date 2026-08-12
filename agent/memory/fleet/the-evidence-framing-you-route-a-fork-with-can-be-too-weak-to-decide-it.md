@@ -70,6 +70,45 @@ ask. The fork was real, the owner was the right addressee, and asking was right.
 **The defect was entirely in the strength of the evidence I attached**, and it
 cost the owner a re-derivation and put a false pair on `main`.
 
+## SECOND INSTANCE, and it upgrades this lesson from hygiene to correctness
+
+Same increment, same seat, one hop, four hours later. A report stated a
+population — *"`rebind` is reached from **four** call sites"* — and I wrote it
+into a work-package frame as the specification of a deciding read, without
+re-deriving it. The reporting seat later self-corrected: **the reach was six**,
+across two routes, and its own doc said so in as many words.
+
+**The population was not merely incomplete. It was disjoint from where the
+answer lives.** Every repeat, on every row, occurred at a site in the *omitted*
+route; **zero** occurred at any of the four named. So an instrument built to the
+frame's specification would have covered exactly the sites that cannot exhibit
+the property, measured nothing, and returned the **negative** branch — which
+routed to *"the premise is unreachable, correct the documentation."*
+
+⇒ **The wrong answer, reached by a soundly executed method, from a bad
+enumeration.** No step would have looked wrong. The measurement would have been
+clean, the mutation control would have passed, and the conclusion would have
+been false.
+
+**The quantifier was wrong too, and in the same direction.** The frame asked
+whether *any two of those four* converge on one occurrence. What decides the
+property is **one site descending twice** — multiplicity, of which convergence
+is a narrower incidental case. A specification can name a real property that is
+strictly stronger than the one you need, and then fail to find it.
+
+**What saved it was that the executing seat re-derived at its base instead of
+inheriting the frame's numbers.** That is the only reason the defect cost
+nothing, and it is not a control — it is luck that the reader happened to be
+more careful than the author.
+
+⇒ **A relayed count in a specification does not merely go unverified — it
+selects what gets looked at.** Weigh a population you are about to publish by
+asking *"if this enumeration is wrong, does the method still find the answer?"*
+For a search specification the answer is no, always. **That makes re-deriving
+the population mandatory, not diligent.**
+
 Related: [[agreement-is-not-corroboration-when-a-premise-was-inherited]] — the
 same inheritance failure inside a chain of corrections; here it happens in one
 hop, between the seat that measured and the seat that published.
+[[narrowing-a-counts-scope-never-turns-a-tally-into-a-pairing]] — the same
+increment, and the reason a count is the artifact most worth distrusting.
