@@ -40,6 +40,44 @@
 
 > ### RESUME HERE — state at 2026-08-12 ~22:0xZ. `main` = `d5912acd`.
 >
+> > **~22:3xZ — `AC-D3-ANSWER` IS MEASURED INERT. DO NOT BUILD IT.** The
+> > implementer grounded it before writing code and the grounding refuted it
+> > (`evt_1twk028k03mxe`); **no code written, `766cbdf0` unchanged.** Re-ruling
+> > requested at `evt_7snn4fr8b4yea`; **I unstranded the Architect's pane for
+> > the FIFTH time** (stacked pastes again) and it is working it.
+> >
+> > **Why it is inert:** `continuation_call_binding_for(30)` returns **`None`** —
+> > the continuation-call projection holds exactly `(36, 25)` and `(39, 10)` and
+> > **never names the claimed producer 30** — so the ruled funnel falls through
+> > to *"retain byte-identical ordinary construction"* and **the direct template
+> > still reaches root projection.** Inert on the witness **its own row 1
+> > names**.
+> >
+> > **Rows 3 and 4 are inverted:** the **fusion claim** names construct **30**;
+> > the **continuation-call relation** (what the funnel keys on) names **39**.
+> > So row 4 asks to prove non-authoritative **the construct that funnel is
+> > authoritative for**, and row 3's "no exact binding" case **is** the claimed
+> > producer. **39 never reaches that seam on the armed path at all.**
+> >
+> > **The escaping template is built INSIDE `Fusion(0)`**, producer half,
+> > `fused_authority = Some((StaticOriginId(10), PredeclaredFunctionId(3)))`,
+> > `defining_unit = Some(2)`, **claim still outstanding.**
+> >
+> > **THE FORK, with the Architect, and nobody has picked one:** is the
+> > source-machine route the **wrong route** for the fused producer half (it
+> > should lower through the generic eliminator route that already carries the
+> > funnel — making the defect **one level up**), or is it the **right seam
+> > keyed by the wrong relation**?
+> >
+> > **THE PATTERN, and the sizing consequence is mine.** This is the **second
+> > consecutive ruling refuted by grounding**, and **both times I transcribed
+> > the mechanism into the frame as an AC**. The **classification survived both
+> > refutations**; it is the mechanism layer beneath a correct classification
+> > that keeps failing. ⇒ **An AC transcribed from a ruling inherits that
+> > ruling's mechanism risk** — an unmeasured mechanism now gets a warning box
+> > **above** it, never silent inclusion beside measured criteria. And the
+> > ring's grounding-before-coding is **twice vindicated**, not over-caution.
+> >
 > > **STOP 4 IS RE-RULED at ~22:1xZ — `AC-D3-ANSWER`, Architect
 > > `evt_5rze80e6w9qz8`, durable at `9fd0731e`, leader dispatched
 > > `evt_5s5hkcjr0e2c`. The implementer is LIVE on it.** The fork is answered:
