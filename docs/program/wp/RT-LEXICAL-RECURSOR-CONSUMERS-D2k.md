@@ -290,24 +290,82 @@ wildcard or default.
 - *Hard stop:* the split forces some construction site to produce the worker
   variant. Then the two are not separable after all — say so and hand back.
 
-**`D2k-1b-i` — arm it, atomically.** Have `Construct` recognize a
-`StaticWorker` binding **before** `value_at` and produce the worker variant,
-**and** land the whole-graph preflight refusal for any path that would carry,
-allocate, store, join, project, return or publish a constructor containing one.
-With `1b-i0` landed this is small: the type exists and the readers already have
-their arms. **No consumer becomes green here** — the five still refuse.
+**`D2k-1b-i` — RECUT 2026-08-12. Producer, preflight and consumer are ONE
+atomic increment.** The node previously stopped at producer plus preflight.
+**That cut was built and measured, and it is not publishable** — the block
+below records why. `D2k-1b-ii` is folded in here and is no longer a separate
+increment.
 
-- **State the property, not the site.** The requirement is *each of the five
-  still refuses, and nothing allocates, stores, emits or publishes a
-  constructor carrying a worker field before that refusal.* Do not assert
-  *where* the refusal now originates until you have measured it — it may move
-  to preflight or to the field's first reader, and both satisfy the ruling.
+Have `Construct` recognize a `StaticWorker` binding **before** `value_at` and
+produce the worker variant; land the whole-graph preflight; **and** land the
+static `Match` elimination that installs each field into the one lexical
+binding authority without erasing kind, so the **existing** exact-`Var` call
+arm consumes it.
+
+- **State the property as a TOTAL, never as a list of forbidden verbs.** The
+  requirement is *every constructed worker field is consumed at the exact-`Var`
+  call — none dropped, and none reaching allocation, emission or publication
+  unconsumed.* The previous wording enumerated carry, allocate, store, join,
+  project, return and publish: **every way a worker could be USED, and not one
+  of the ways it could be LOST.** A dropped field satisfies an enumeration of
+  uses vacuously, which is exactly how four rows went green.
+- **A row that COMPILES is not a row that PASSES.** Per row, record the
+  static-worker field, the bare-`Var` worker reads, **and the consumption**. A
+  row that compiles with zero consumptions is a **failure**, and the handback
+  must read it that way. This is the check that would have caught the recut,
+  and the implementer already built it at `739cfde3` — land it rather than
+  rebuild it.
+- **Do not assert where the refusal originates** until measured; preflight or
+  the field's first reader both satisfy the ruling.
 - *Controls:* the `D2k-2` escape-mutation row (a constructor requiring runtime
-  transfer refuses **before** allocation or emission), and `AC-2`'s empty diff
-  on `value_at`.
+  transfer refuses **before** allocation or emission), the `D2k-2` positive row
+  for the rows this engine covers, the phase mutation (forcing the field
+  through ordinary value conversion reproduces the `StaticWorkerBinding`
+  refusal), and `AC-2`'s empty diff on `value_at`.
+- **Measure which engine the five route through and name it in the handback.**
+  Do not assume direct descent. The other engine stays fail-closed for one more
+  increment — a refusal, not a partial descent.
+- **The three predecessor controls that go red must be re-derived one by one.**
+  A control red *because the ruled semantics changed* and a control red
+  *because the repair is incomplete* look identical in a suite count. Say which
+  each is, per control, in the handback.
 - *Hard stop:* the field cannot be recognized ahead of `value_at` without a
   wildcard/default arm or a `LoweringEnvironmentBinding`-as-payload arm.
   Section 3 forbids both — stop, do not widen.
+- *Hard stop:* the atomic unit does not fit one turn. **Report it; do not split
+  it back.** Any split that leaves a worker constructed and unconsumed
+  reproduces the defect below. If you find a split that provably does not —
+  the consumer landing inert ahead of the producer is the candidate, on the
+  `1b-i0` pattern — **propose it to the Steward rather than taking it.**
+
+> #### The producer-alone cut was MEASURED and it is a SILENT ACCEPT
+>
+> `739cfde3` is evidence, not a candidate (`evt_5h71ks63e71ma`). At base
+> `04730469` it does everything the old cut asked: recognizes the worker ahead
+> of `value_at`, produces `StaticWorker`, keeps `value_at` byte-identical, uses
+> no wildcard/default or broad payload, and holds every prohibited-axis total
+> at zero.
+>
+> **It also changes outcomes.** Row 1 advances to a distinct `NativeJoinPlanV1`
+> refusal; **rows 4x3 and 5 compile successfully.** Every row records its
+> static-worker field and zero bare-`Var` worker reads — **and no field is
+> consumed.** The four green rows drop the worker rather than lawfully
+> succeeding.
+>
+> ⇒ **This is the same defect that forced `1b-i` to be atomic, one level out.**
+> `1b-i` was made atomic because a producer without a refusal admits a worker
+> into emission. A producer plus a refusal, without the **consumer**, admits a
+> worker into oblivion. Both are silent accepts; only the direction differs.
+>
+> **The old cut FORBADE its own discharge.** `1b-ii`'s static `Match`
+> elimination is the seam that installs the field for the exact-`Var` call, and
+> the cut banned it — so `1b-i` could not satisfy *"no consumer becomes green
+> here"* by any means available inside its own scope. That is a frame defect,
+> not a ring failure: the hard stop fired exactly as `§4b` intends.
+>
+> **Four green rows would have read as progress.** The arm count already had
+> this trap named — type completeness is not the boundary — and this is its
+> twin: **a green row is not a consumed field.**
 
 > #### `1b-i0`'s discharges are INDUCTIVE on the premise `1b-i` deletes
 >
@@ -426,18 +484,35 @@ their arms. **No consumer becomes green here** — the five still refuse.
 > planner's to state, which is the same prohibition section 3 applies to the
 > consumer-identity alias, one level down.
 
-**`D2k-1b-ii` — static `Match` elimination preserves the kind**, on the engine
-the five actually route through. Elimination installs each field into the one
-lexical binding authority without erasing kind: ordinary →
-`Value(Specialized(..))`, worker → the same `StaticWorker`. The **existing**
-exact-`Var` call arm consumes it, unchanged.
+**`D2k-1b-ii` — FOLDED into `D2k-1b-i` on 2026-08-12. It is not a separate
+increment.** Its content — static `Match` elimination preserving the kind
+(ordinary → `Value(Specialized(..))`, worker → the same `StaticWorker`), on the
+engine the five actually route through, consumed by the **existing** exact-`Var`
+call arm — is now a required part of `1b-i` above, with its controls and its
+engine measurement. It was folded because producer plus preflight **without**
+this consumer is a silent accept, measured at `739cfde3`.
 
-- **Measure which engine the five route through and name it in the handback.**
-  Do not assume it is direct descent. The other engine stays fail-closed for
-  one more increment, which is a refusal, not a partial descent.
-- *Controls:* the `D2k-2` positive row for the rows this engine covers, and the
-  phase mutation — forcing that field through ordinary value conversion
-  reproduces the `StaticWorkerBinding` refusal.
+> #### OPEN, routed to the Architect: do rows 4 and 5 have a lawful discharge?
+>
+> The implementer measured that **rows 4 and 5 constructors are never
+> destructured on the excluded lane**, so even the folded `i`+`ii` may not
+> reach the exact-`Var` consumption `AC-1` requires for those two rows.
+>
+> **`AC-1` is not narrowed here and the ring must not narrow it.** Qualifying
+> an acceptance criterion to match what was measured is a scope cut, and this
+> one would decide that two rows need no lawful consumption — a
+> soundness-adjacent call that belongs to the Architect, not to the Steward and
+> not to the ring.
+>
+> The question routed is *"for a row whose constructor is never destructured,
+> what is lawful transport — is exact-`Var` consumption the right discharge at
+> all, or does it take a different shape?"* — a mechanism question, not
+> *"which node should this be?"*, which would presume the answer.
+>
+> ⇒ **Build `1b-i` for the rows that can reach consumption and measure rows 4
+> and 5 rather than forcing them.** If the ruling lands mid-turn it applies;
+> if it does not, the handback states the measurement and leaves those rows
+> owed. **An unreached row is a finding, not an omission.**
 
 **`D2k-1b-iii` — route parity.** The second engine implements the identical
 distinction; neither path may preserve the worker while the other calls
