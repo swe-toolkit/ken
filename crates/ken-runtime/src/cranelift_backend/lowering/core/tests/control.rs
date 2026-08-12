@@ -2829,9 +2829,20 @@ fn d2f_0_the_applied_root_production_path_gate() {
         );
     };
 
-    // ---- the two positives, each on its own root.
+    // ---- the three positives, each on its own root.
+    //
+    // `D2k` `AC-1a` extends this gate to the THIRD positive. `ProducerArity` is
+    // a documented positive, not a refusal: `static_transition.rs`'s `D2jCause`
+    // doc says "Five are refusal causes ... and `ProducerArity` is a positive
+    // widening that makes the argument row's inventory non-degenerate", and its
+    // variant doc gives the reason -- the exact witness's producer construct has
+    // ONE child, so "the argument is the child at the recursive position" cannot
+    // discriminate position on a single-element inventory. A `ProducerArity`
+    // that refused would defeat its reason for existing.
     let (exact_arrivals, exact_error) = compile_cause(D2jCause::Exact, "ken_d2f_gate_exact");
     let (rehomed_arrivals, rehomed_error) = compile_cause(D2jCause::ReHomed, "ken_d2f_gate_rehomed");
+    let (arity_arrivals, arity_error) =
+        compile_cause(D2jCause::ProducerArity, "ken_d2f_gate_arity");
     let exact = match exact_arrivals.as_slice() {
         [only] => only.clone(),
         other => panic!("the applied exact root must reach the builder once: {}", other.len()),
@@ -2839,6 +2850,13 @@ fn d2f_0_the_applied_root_production_path_gate() {
     let rehomed = match rehomed_arrivals.as_slice() {
         [only] => only.clone(),
         other => panic!("the bare re-homed root must reach the builder once: {}", other.len()),
+    };
+    let arity = match arity_arrivals.as_slice() {
+        [only] => only.clone(),
+        other => panic!(
+            "the widened-arity root must reach the builder once: {}",
+            other.len()
+        ),
     };
 
     // ---- the old seed witness, which carries no marker at all.
@@ -2883,6 +2901,12 @@ fn d2f_0_the_applied_root_production_path_gate() {
             // the positives -- the denominator for everything below them
             (exact.oriented_present, exact.keys.len(), exact.descriptors.len(), exact.fusion_definitions),
             (rehomed.oriented_present, rehomed.keys.len(), rehomed.descriptors.len(), rehomed.fusion_definitions),
+            (
+                arity.oriented_present,
+                arity.keys.len(),
+                arity.descriptors.len(),
+                arity.fusion_definitions
+            ),
             // the unmarked seed
             (seed.oriented_present, seed.keys.len(), seed.descriptors.len(), seed.fusion_definitions),
             // AC-6a phase A: refused upstream, never arrived
@@ -2893,19 +2917,26 @@ fn d2f_0_the_applied_root_production_path_gate() {
         (
             (true, 1, 1, 0),
             (true, 1, 1, 0),
+            (true, 1, 1, 0),
             (false, 0, 0, 0),
             vec![0, 0, 0],
             vec![(1, 0, 0), (1, 0, 0)],
         ),
-        "both positives must resolve exactly one key and one descriptor at definition count \
-         zero, while the unmarked seed reaches the same builder and resolves nothing, three \
-         marker causes never reach it, and two source-shape causes reach it and resolve \
-         nothing -- rows {no_arrival:?} and {arrived_empty:?}"
+        "all THREE positives must resolve exactly one key and one descriptor at definition \
+         count zero, while the unmarked seed reaches the same builder and resolves nothing, \
+         three marker causes never reach it AT ALL, and two source-shape causes reach it and \
+         resolve nothing. The two refusal tiers are kept apart deliberately: an arrivals-zero \
+         row says the validator refused upstream and says NOTHING about the builder's \
+         discrimination, so it is asserted as non-arrival and never as a zero key. Only the \
+         arrived-and-empty pair is evidence about the builder, and both tiers are operands of \
+         the same assertion as the positives so that no zero stands alone -- rows \
+         {no_arrival:?} and {arrived_empty:?}"
     );
 
     // ---- the pre-emission seat, per positive, on its own root.
     ordinary_refusal(&exact_error, "exact");
     ordinary_refusal(&rehomed_error, "re-homed");
+    ordinary_refusal(&arity_error, "widened-arity");
 
     // ---- production must agree with the INDEPENDENT planner derivation, per cause.
     let exact_planner = planner_plane(D2jCause::Exact);
@@ -2922,12 +2953,48 @@ fn d2f_0_the_applied_root_production_path_gate() {
         "and the bare re-homed root likewise, against ITS own planner derivation"
     );
 
-    // ---- non-aliasing, by whole keys and never by id (AC-6c).
-    assert_ne!(
-        exact.keys, rehomed.keys,
-        "the two roots describe different programs, so their complete keys must differ -- \
-         established by the keys themselves, never by an id inequality, since the two planes \
-         are independent interners that both lawfully issue local id 0"
+    let arity_planner = planner_plane(D2jCause::ProducerArity);
+    assert_eq!(
+        (arity.keys.as_slice(), arity.descriptors.as_slice()),
+        (
+            arity_planner.observed_keys(),
+            arity_planner.observed_descriptors()
+        ),
+        "and the widened-arity root likewise, against ITS own planner derivation"
+    );
+
+    // ---- non-aliasing, by whole keys and never by id (AC-6c), now PAIRWISE
+    // over the three positives (`D2k` `AC-1a`).
+    //
+    // Stated over ALL PAIRS of the positive population rather than as a fixed
+    // list of `assert_ne!`s: individual inequalities are what let a later fourth
+    // positive be added while one pair silently coincides. Distinctness is a
+    // property of the population, so it is derived from the population -- add a
+    // positive to the array and it is covered with no second edit.
+    //
+    // Not a set, deliberately: `StaticContinuationFusionKey` is `Eq` and not
+    // `Ord`, and giving a planner identity a total order to let a test build a
+    // `BTreeSet` would widen a production type for a test's convenience.
+    let positives = [
+        ("exact", &exact.keys),
+        ("re-homed", &rehomed.keys),
+        ("widened-arity", &arity.keys),
+    ];
+    let coincident: Vec<(&str, &str)> = (0..positives.len())
+        .flat_map(|left| (left + 1..positives.len()).map(move |right| (left, right)))
+        .filter(|(left, right)| positives[*left].1 == positives[*right].1)
+        .map(|(left, right)| (positives[left].0, positives[right].0))
+        .collect();
+    assert_eq!(
+        coincident,
+        Vec::<(&str, &str)>::new(),
+        "the three positive roots describe three different programs, so their complete keys \
+         must be pairwise distinct -- established by the keys themselves, never by an id \
+         inequality, since the planes are independent interners that all lawfully issue local \
+         id 0. exact={:?} rehomed={:?} arity={:?}",
+        exact.keys,
+        rehomed.keys,
+        arity.keys
     );
 }
 
