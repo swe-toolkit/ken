@@ -6197,7 +6197,13 @@ impl<'a> Lowering<'a> {
                                         format!("no runtime binding for index {index}"),
                                     )
                                 })?
-                                .value_at("a source-machine Var in value position")?
+                                .value_at({
+                                    #[cfg(test)]
+                                    crate::cranelift_backend::lowering::record_d2k_owner_event(
+                                        crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs source-machine Var" },
+                                    );
+                                    "a source-machine Var in value position"
+                                })?
                                 .clone(),
                         ),
                         control,
@@ -11137,7 +11143,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     ),
                 )
             })?;
-            inputs.push(binding.value_at("a continuation capture input")?.clone());
+            inputs.push(binding.value_at({
+                #[cfg(test)]
+                crate::cranelift_backend::lowering::record_d2k_owner_event(
+                    crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs continuation capture" },
+                );
+                "a continuation capture input"
+            })?.clone());
         }
 
         let (returned, call) = self.call_declared_unit_target(
@@ -14587,11 +14599,34 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             // A `Var` here is a value-producing position, so it accepts only
             // `Value`. A static worker binding fails closed in `value_at`
             // rather than being cloned out as if it were a value.
-            RuntimeExpr::Var(index) => env
-                .get(*index as usize)
-                .ok_or_else(|| unsupported("Var", format!("no runtime binding for index {index}")))?
-                .value_at("a Var in value position")
-                .cloned(),
+            RuntimeExpr::Var(index) => {
+                #[cfg(test)]
+                {
+                    if let Some(LoweringEnvironmentBinding::StaticWorker(_)) =
+                        env.get(*index as usize)
+                    {
+                        // Paired: the caller is carried IN the read event, so
+                        // no scan can pick up a stale predecessor.
+                        crate::cranelift_backend::lowering::record_d2k_owner_event(
+                            crate::cranelift_backend::lowering::D2kOwnerEvent::StaticWorkerRead {
+                                origin: static_origin,
+                                site: "core.rs Var in value position",
+                            },
+                        );
+                    }
+                    crate::cranelift_backend::lowering::record_d2k_owner_event(
+                        crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller {
+                            site: "core.rs Var in value position",
+                        },
+                    );
+                }
+                env.get(*index as usize)
+                    .ok_or_else(|| {
+                        unsupported("Var", format!("no runtime binding for index {index}"))
+                    })?
+                    .value_at("a Var in value position")
+                    .cloned()
+            }
             RuntimeExpr::PrimitiveCall { primitive, args } => {
                 self.lower_primitive_call(builder, primitive, args, static_origin, env)
             }
@@ -14710,6 +14745,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 self.finish_planned_join(builder, merge, &join_plan, merge_kind, "If")
             }
             RuntimeExpr::Construct { constructor, args } => {
+                #[cfg(test)]
+                crate::cranelift_backend::lowering::record_d2k_owner_event(
+                    crate::cranelift_backend::lowering::D2kOwnerEvent::ConstructEntered {
+                        origin: static_origin,
+                        constructor: constructor.clone(),
+                    },
+                );
                 let lowered_args = args
                     .iter()
                     .enumerate()

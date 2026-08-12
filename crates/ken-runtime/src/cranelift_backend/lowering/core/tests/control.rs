@@ -3201,12 +3201,240 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
 /// no difference exists above the truncation. A reader who wants to raise this
 /// to certainty should re-run the probe unfiltered rather than take this row.
 ///
-/// ⇒ **One root, on this evidence.** `D2k-1` may be sized as a single repair at
+/// ⇒ **One root, on this evidence.** `D2k-1b` may be sized as a single repair at
 /// the owning consumer before the guard, rather than one cut per row.
 ///
 /// **Promise class: durable invariant.** It asserts the wall these five stand
 /// at and the edge that identifies it. It reds when a repair moves any of them
-/// off that wall, which is the intended signal, and `D2k-1` is what retires it.
+/// off that wall, which is the intended signal, and `D2k-1b` is what retires it.
+/// **`D2k-0`'s wall predicate, hoisted so exactly one copy exists.**
+///
+/// It reads whatever selector exclusion is currently in force -- it sets none
+/// itself -- which is what lets the redness control run the **same** predicate
+/// with the wrong-consumer condition removed. A redness proof written against a
+/// re-implemented twin would show only that the twin is not a constant.
+fn d2k_wall_under_current_selector(
+    expression: &RuntimeExpr,
+    symbol: &str,
+) -> Option<(String, String)> {
+    let (result, _trace) = px8j_capture_source_trace(expression, false, symbol);
+    match result {
+        Ok(_) => None,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason })) => {
+            // The edge is the prefix the caller supplied; the rest of the
+            // sentence is the chokepoint's own and is shared by construction,
+            // so it cannot discriminate anything.
+            let edge = reason
+                .split(" is a value-producing position")
+                .next()
+                .unwrap_or(&reason)
+                .to_string();
+            Some((construct.to_string(), edge))
+        }
+        Err(other) => Some(("<not-unsupported>".to_string(), format!("{other:?}"))),
+    }
+}
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1a` pre-repair checkpoint — the OWNER,
+/// asserted independently of the refusal message.**
+///
+/// `D2k-0` committed the edge, and the edge alone is not a discriminator that
+/// can establish sameness. It is parsed out of the refusal text, and
+/// `mod.rs`'s environment-value read **forwards its caller's edge** — so five
+/// distinct routes converging through that forward would present identically.
+/// Confirmed Adversary finding, Steward rider.
+///
+/// This asserts the half that was missing, on evidence that reads no message:
+///
+/// - **the enclosing `lower_expr` arm** that owns the failing read, with the
+///   constructor it is building, and
+/// - **which `value_at` caller** actually took it — carried **inside the read
+///   event itself**, so the pairing is by construction rather than by
+///   position.
+///
+/// **That pairing replaces a scan that was wrong, and the failure is worth
+/// keeping visible.** The caller was first recovered by scanning backwards
+/// from the read. This path records the read **before** its own caller, so the
+/// scan could only ever reach an **earlier** caller event — a stale
+/// predecessor from an unrelated successful read. The assertion was green and
+/// had established no adjacency at all. Architect block on `a1d36e99`.
+/// Relabelling the site would not have repaired it either: it relabels the
+/// stale predecessor too, so the operand still flips without proving which
+/// read it belongs to.
+///
+/// The forwarding-caller exclusion is now read over the **whole compile**
+/// rather than a prefix — *the forwarding caller never ran at all here*, which
+/// is stronger than *not before the read* and needs no adjacency to mean
+/// something.
+///
+/// MEASURED, per expression: the owner is **`RuntimeExpr::Construct`**, the
+/// caller is the bare-`Var` value read, and **the forwarding caller never
+/// fires**.
+///
+/// ⇒ **The static worker is a CONSTRUCTOR ARGUMENT**, not a callee. That is the
+/// discriminator's real content, and it is why this is filed as a checkpoint
+/// rather than as grounding for the repair: the frame's lawful consumer is *a
+/// `Call` whose callee is an exact `Var` bound to `StaticWorker`*, and these
+/// five have no call. The repair is stopped pending the Architect's disposition
+/// of static workers in constructor-argument position; **nothing here designs
+/// one.**
+///
+/// **`value_at` is byte-identical** (`AC-2`). Every observation sits on a
+/// *caller* or on an enclosing arm — that is precisely why the discriminator
+/// the rider asked for is constructible without weakening the guard, which was
+/// the outcome the rider left open.
+///
+/// **Promise class: durable invariant.** It states which consumer owns these
+/// reads. It reds when a repair moves them to a different owner, which is the
+/// intended signal.
+#[test]
+fn d2k_1a_the_five_static_worker_reads_are_owned_by_construct_arguments() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// `(owning constructor, refusing caller, forwarding caller ever fired)`.
+    ///
+    /// The owner is the **last `Construct` entered before** the static-worker
+    /// read, and the caller is the **last `value_at` caller tagged up to and
+    /// including** it. Both are positional facts about this compile's own
+    /// event order; neither is derived from the refusal text.
+    fn owner(
+        expression: &RuntimeExpr,
+        symbol: &str,
+    ) -> (Option<String>, Option<&'static str>, bool) {
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let _restore = Restore;
+        let _ = d2k_owner_trace_take();
+        let (_result, _trace) = px8j_capture_source_trace(expression, false, symbol);
+        let events = d2k_owner_trace_take();
+        // The caller comes OUT OF the read event, never from a scan. A
+        // backwards scan from the read can only reach EARLIER caller events,
+        // and this path records the read before its own caller -- so a scan
+        // reported a stale predecessor and was green without establishing
+        // adjacency at all. Architect block on `a1d36e99`.
+        let Some((read_at, origin_site)) =
+            events.iter().enumerate().find_map(|(at, event)| match event {
+                D2kOwnerEvent::StaticWorkerRead { site, .. } => Some((at, *site)),
+                _ => None,
+            })
+        else {
+            return (None, None, false);
+        };
+        let constructor = events[..read_at].iter().rev().find_map(|event| match event {
+            D2kOwnerEvent::ConstructEntered { constructor, .. } => Some(constructor.clone()),
+            _ => None,
+        });
+        // Whole-compile, not a prefix. The claim worth making is that the
+        // forwarding caller never ran AT ALL on this compile, which is
+        // stronger than "not before the read" and needs no adjacency.
+        let forwarded = events.iter().any(|event| {
+            matches!(
+                event,
+                D2kOwnerEvent::ValueAtCaller { site }
+                    if site.starts_with("mod.rs environment values")
+            )
+        });
+        (constructor, Some(origin_site), forwarded)
+    }
+
+    let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
+    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
+    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::AfterReturnHole,
+    ));
+
+    let var_read = Some("core.rs Var in value position");
+    // Every component is compared against a LITERAL, and none against the
+    // population. That is deliberate and it is the whole redness property:
+    // a sameness check across the five would be GREEN under a uniform move,
+    // so an owner asserted as "all five agree" would silently not red where
+    // the other two axes do. The rows stay LABELLED so a failure names which
+    // one moved instead of printing a tuple mismatch.
+    assert_eq!(
+        [
+            ("row1-owned-scope", owner(&row1, "ken_d2k1_row1")),
+            ("row4-depth-1", owner(&row4_d1, "ken_d2k1_row4_d1")),
+            ("row4-depth-2", owner(&row4_d2, "ken_d2k1_row4_d2")),
+            ("row4-depth-3", owner(&row4_d3, "ken_d2k1_row4_d3")),
+            ("row5-after-hole", owner(&row5, "ken_d2k1_row5")),
+        ],
+        [
+            ("row1-owned-scope", (Some("ctor:fixture::PX8JTree1::Node".to_string()), var_read, false)),
+            ("row4-depth-1", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), var_read, false)),
+            ("row4-depth-2", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), var_read, false)),
+            ("row4-depth-3", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), var_read, false)),
+            ("row5-after-hole", (Some("ctor:fixture::PX8JHoleOutput::Node".to_string()), var_read, false)),
+        ],
+        "D2k-1a: each failing static-worker read must be owned by a Construct arm building the \
+         recorded constructor, must be taken at the bare-Var value read, and must NOT have \
+         passed through the forwarding caller -- which is the case the edge alone could not \
+         exclude. A different owner is a second root and re-opens the sizing."
+    );
+}
+
+/// **The `D2k-0` control's redness, made executable rather than inherited.**
+///
+/// `D2k-0` claims it reds when a repair moves any of the five off the
+/// `StaticWorkerBinding` wall. **Nobody had verified that**, and an unverified
+/// redness claim is what turns evidence into a one-time reading.
+///
+/// This runs `D2k-0`'s own predicate with the wrong-consumer condition removed
+/// — the `B`-only exclusion lifted, which is what puts these expressions on the
+/// lane that does not take the failing route — and requires it to answer
+/// **`None`**: no wall, no refusal.
+///
+/// ⇒ The predicate is therefore **not a constant**. It answers "at the wall"
+/// under exclusion and "not at the wall" without it, on the same fixtures, so
+/// its green under exclusion is a measurement rather than a shape it returns
+/// for anything.
+///
+/// **Promise class: durable invariant.** It pins that the wall is a property of
+/// the excluded lane, not of the fixtures.
+#[test]
+fn d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed() {
+    // `D2k-0`'s OWN predicate, not a twin of it. A redness proof written
+    // against a re-implemented copy would show that the copy is not a
+    // constant and say nothing about the committed control.
+    fn wall_without_exclusion(expression: &RuntimeExpr, symbol: &str) -> Option<(String, String)> {
+        // No `set_selector_variant_exclusion` at all: this is the lane on which
+        // the failing route is not taken.
+        d2k_wall_under_current_selector(expression, symbol)
+    }
+    let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
+    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
+    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::AfterReturnHole,
+    ));
+    assert_eq!(
+        [
+            ("row1-owned-scope", wall_without_exclusion(&row1, "ken_d2k0_red_row1")),
+            ("row4-depth-1", wall_without_exclusion(&row4_d1, "ken_d2k0_red_row4_d1")),
+            ("row4-depth-2", wall_without_exclusion(&row4_d2, "ken_d2k0_red_row4_d2")),
+            ("row4-depth-3", wall_without_exclusion(&row4_d3, "ken_d2k0_red_row4_d3")),
+            ("row5-after-hole", wall_without_exclusion(&row5, "ken_d2k0_red_row5")),
+        ],
+        [
+            ("row1-owned-scope", None),
+            ("row4-depth-1", None),
+            ("row4-depth-2", None),
+            ("row4-depth-3", None),
+            ("row5-after-hole", None),
+        ],
+        "the D2k-0 predicate must answer None with the wrong-consumer condition removed. If it \
+         still reported a wall here it would be reporting something about the fixtures rather \
+         than about the excluded lane, and its green under exclusion would prove nothing."
+    );
+}
 #[test]
 fn d2k_0_the_five_static_worker_walls_share_one_edge_and_one_route() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
@@ -3222,25 +3450,7 @@ fn d2k_0_the_five_static_worker_walls_share_one_edge_and_one_route() {
             RecursiveDescentResidual::LexicalCallArgumentRecursor,
         ));
         let _restore = Restore;
-        let (result, _trace) = px8j_capture_source_trace(expression, false, symbol);
-        match result {
-            Ok(_) => None,
-            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                construct,
-                reason,
-            })) => {
-                // The edge is the prefix the caller supplied; the rest of the
-                // sentence is the chokepoint's own and is shared by
-                // construction, so it cannot discriminate anything.
-                let edge = reason
-                    .split(" is a value-producing position")
-                    .next()
-                    .unwrap_or(&reason)
-                    .to_string();
-                Some((construct.to_string(), edge))
-            }
-            Err(other) => Some(("<not-unsupported>".to_string(), format!("{other:?}"))),
-        }
+        d2k_wall_under_current_selector(expression, symbol)
     }
     let aggregate_row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
     let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
