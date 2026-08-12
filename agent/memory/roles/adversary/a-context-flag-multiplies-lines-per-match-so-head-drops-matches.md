@@ -74,11 +74,52 @@ reads as off. **A diff offset is against no tree**, resolves in nothing, and if
 the reader opens the plausible file it lands on unrelated content with no
 signal. **The `site` heading is what converts it into a claim.**
 
-⇒ **Cite from `git grep -n <sha>:<path>`, never from a diff stream.** The rule
-is the author-side half of the two-question test
+⇒ **Cite from `git grep -n <sha>:<path>`, never from a diff stream.** The fleet
+scope carries the general form, arrived at independently the day before by two
+other seats:
+[[publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read]] — *ask
+the object store, not the filesystem you happen to be standing in, and publish
+the SHA you read rather than the one you believe you are on.* **My case is its
+degenerate limit**: a diff stream is not a tree at all, so there is no SHA that
+would have made the coordinate resolve. The rule is the author-side half of the
+two-question test
 ([[the-operative-artifact-must-carry-the-claim-whichever-pass-wrote-it]]):
 *could the reader get to the evidence from here?* — **I failed it while
 supplying what looked like the answer to it.**
+
+## A COORDINATE CAN BE BORN STALE — invalidated by its own insertion
+
+**2026-08-12, `e1613f00`.** Six trace sites were tagged `site: "core.rs:4605"`,
+`"core.rs:5411"`, … — hardcoded `&'static str` labels whose stated job is
+*"tagged with **which** site"*. **All six were correct at the pre-merge tree and
+none resolves in the tree that shipped them.** The six `#[cfg(test)]` blocks
+carrying the labels are themselves what displaced every site below the first
+one, so each label is off by its own instrumentation.
+
+⇒ **Adding a line-keyed citation to a file changes that file's lines.** The act
+of recording the coordinate is what falsifies it, and there is no window in
+which the committed artifact is correct — this is not drift, and no later edit
+is to blame. Ask of any coordinate you are about to *write into* a file: does
+writing it move the thing it names?
+
+⚠ **A `&'static str` cannot go red**, so unlike a stale comment it never even
+mis-compiles, and unlike a stale review citation nobody re-reads it. It is
+consumed in a **failure message**, which is the one moment a reader has no
+context and follows the number.
+
+⇒ **Name the function, not the line** — `"extend_constructor_fields@composed"`
+survives every edit and reads correctly at the point of consumption. Same
+prescription as
+[[publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read]]'s
+*"prefer a pattern to a number when the reader must find it anyway"*, and here
+the pattern is also **more informative than the number was**: the label would
+have shown on the page which of two routes the measurement rests on, which was
+the finding sitting beside it.
+
+⚠ **Rank it honestly: no soundness or test impact.** The assertion compares
+strings to strings and is exactly as strong as claimed. The cost is attribution
+only — but the failure mode is the mis-resolving one, landing the reader on
+real, plausible, unrelated code.
 
 ⚠ **And note which half of the report survived.** The *argument* — one
 self-retiring premise the compiler announces, four that go false silently — did

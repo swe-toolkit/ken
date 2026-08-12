@@ -107,6 +107,43 @@ two senses, and — for a gating claim — errs in the direction nothing reds on
 **Read the other senses of your keyword before reporting a count as clean**; the
 near-miss is usually inside the same region you just counted.
 
+## A CHARACTER CLASS IS A VOCABULARY GUESS — and the outlier is what it drops
+
+**Measured 2026-08-12, auditing my own memory index after a worktree reset.**
+Verifying that every lesson file is reachable from its `README.md`, I extracted
+row targets with:
+
+```sh
+grep -o '](\([a-z0-9-]*\)\.md)'
+```
+
+**62 rows against 63 files**, with exactly one file reported unreachable:
+`an-establishing-check-can-be-DOWNSTREAM-of-the-use-…`. The index was fine. **My
+character class was `[a-z0-9-]` and that filename carries `DOWNSTREAM` in
+caps** — I had broken my own kebab-case convention for emphasis two days
+earlier, and the census I wrote could not see the file I named.
+
+⇒ **A character class is the same vocabulary guess this file is about, wearing
+regex syntax.** `[a-z0-9-]`, `\w`, `[A-Z_]+` each encode a belief about a naming
+convention, and **the member that breaks the convention is precisely the one
+worth finding** — an outlier is an outlier in its spelling too. Widen the class
+past what you believe the convention to be (`[A-Za-z0-9._-]`), then let the
+comparison find the exception.
+
+⚠ **The direction it failed matters, and I only got the cheap direction by
+luck.** A census that drops a member reports it as **missing from the index** —
+a false positive, loud and self-correcting. But that is an artifact of which
+side of the `comm` the regex fed. **Had I derived the reference count from the
+same regex family, I would have had a self-consistent `62 rows = 62 files` and
+reported clean** — the silent direction, on the exact question of whether a
+lesson is reachable at all.
+
+⇒ **The external reference count is what made my probe's defect visible**, and
+it is the section above working as intended: the Steward's independently-derived
+`files=63 rows=63` disagreed with my 62, and **a disagreement is either your bug
+or the finding — here it was mine, and I would not have known without the second
+number.** Never let the count and the population come out of one command.
+
 ## Report the correction
 
 Stating the bad first measurement in the finding costs three sentences and is

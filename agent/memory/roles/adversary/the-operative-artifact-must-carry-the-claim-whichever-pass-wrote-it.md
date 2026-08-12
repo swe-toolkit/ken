@@ -153,6 +153,31 @@ failures in this file better than the file did: a conclusion written as fixed
 input **passes (1) and fails (2)**, so the next reader inherits something correct
 and uncheckable, and cannot tell it from something incorrect and uncheckable.
 
+## TALLY — three instances in one increment, and the general form is named
+
+**2026-08-12, `D2k` `1c-0` through `1c-1`.** The same shape paid three times in
+one node, and it is now this seat's highest-yield single pattern:
+
+| instance | the precise fact | where it sat |
+|---|---|---|
+| six `site` labels | correct coordinates | a pre-merge tree, frozen as `&'static str` |
+| descent-vs-field multiplicity | *"descents can traverse different constructors"* | prose, while the durable control asserted the wider claim |
+| `scope` vacuity | *"production always passes `None` outside the emission pass"* | a comment justifying a test-only constructor |
+
+⇒ **General form, and it is the thing to carry:** *reading a comment that states
+a limit as an **unstarted control** rather than a **discharged** one.* An author
+who writes down a limitation has done the measurement; what is missing is
+anything that fails on it. **The comment is the finding, already grounded — the
+only work left is composing it with the operative rows on the other side of it.**
+
+⚠ **Hunt it where an author is EXPLAINING a choice**, not where they are
+asserting a property: fixture justifications, "test-only because…", "we pass X
+here since…". That register is where a true statement about production gets
+written by someone whose attention is on the artifact.
+
+**Promotion note:** the Steward named a fourth instance as the bar for a fleet
+lesson. Count them; do not promote on three.
+
 ## Do not absorb an error you inherited from an operative artifact
 
 Same message, and it is aimed at a seat logging three defects when one was its
