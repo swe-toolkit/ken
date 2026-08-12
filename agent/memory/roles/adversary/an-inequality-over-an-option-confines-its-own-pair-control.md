@@ -45,6 +45,29 @@ The doc called cross-scope carriage *"provenance failure, not a licence to
 consume it again"* — true of the code and, on the arm where the operand is
 absent, false of the compile.
 
+## WHAT I MISSED: RETIRING AN ARM ARMS THE GUARD WITH NO EDIT
+
+**Steward's triage, and it inverts the finding's urgency.** I reported the guard
+as inert on one of two emission arms and framed the deciding read as *"once the
+route repair delivers a rebound field."* **The node in flight retires that
+arm.** If the live population lands on the surviving arm, the operand is `Some`
+and **the guard becomes live without anyone touching it or deciding anything.**
+
+⇒ **A vacuous guard is not a stable state when one of the two arms is being
+retired.** The vacuity is a property of *which arm runs*, not of the code, so an
+unrelated node changes the guard's status as a side effect. **The dangerous
+window is while both arms exist, and it closes by accident rather than by
+decision** — which is a reason to answer the question now, not to defer it
+behind the repair that would make it matter.
+
+⚠ **I had the direction backwards and it was the actionable half.** My bound
+said the read needs the route repair first; the *timing* argument says the
+opposite, and nothing in my report contained it because I reasoned about the
+guard and not about what else was in flight around it. ⇒ **When you find a
+mechanism vacuous on one branch of a fork, ask whether the fork itself is
+scheduled to disappear** — a scope-of-vacuity argument has a lifetime, and the
+node that ends it may not mention the guard at all.
+
 ## THE FACT WAS WRITTEN DOWN, in a comment justifying the test constructor
 
 > *`from_u32` is a TEST-only way to name a body identity. Production always
