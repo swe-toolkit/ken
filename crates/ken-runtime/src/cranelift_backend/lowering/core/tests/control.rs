@@ -1527,18 +1527,110 @@ fn px8j_all_three_producer_paths_reach_real_consumers() {
 /// this is what excludes that reading. The unexcluded run answers `None` at the
 /// same call, which is the lane actually differing rather than a constant.
 ///
-/// **The discriminator has its own positive control, and it is the load-bearing
-/// part.** Cause (ii) would leave a `SourceMachine` `Mint` carrying
-/// `siblings == 0`. The unexcluded baseline **contains exactly such an event on
-/// this very fixture**, so a zero-sibling mint is demonstrably representable and
-/// demonstrably recorded here. Its total absence under exclusion is therefore
-/// *never reached*, not *reached with an empty case*. Without that control the
-/// two causes are indistinguishable from an absence.
+/// **The discriminator's ground was WRONG, and this block is its replacement.**
+/// An earlier version licensed cause (i) on the unexcluded baseline's
+/// zero-sibling `SourceMachine` `Mint`: cause (ii) would leave such an event,
+/// the baseline has one on this very fixture, so the absence under exclusion
+/// must mean *never reached*. **That witness is on the wrong lane.** The same
+/// assertion below requires `baseline_declared.is_some() == false` — the
+/// baseline is the run that did **not** reach the functionized seam — so it
+/// cannot testify about minting behaviour on the lane the excluded run takes.
+/// It is not asserted here any more, and it is not a second reason standing
+/// beside the right one.
+///
+/// **What licenses cause (i), part one: the emission site's own structure.**
+/// Measured at this base, from the source rather than from the trace. There is
+/// exactly one production `SourceMachine` `Mint`, in
+/// `lower_source_machine_with_continuation_inner`; the other three carry
+/// `Composed` and `DeferredConstructor`. No `case.recursive_positions.is_empty()`
+/// guard stands between that arm's case selection and its emission, and the
+/// event carries `siblings: case.recursive_positions.len()`.
+///
+/// One correction to the frame's version of this argument, since verifying it
+/// rather than crediting it was the point: the frame offers the guarded
+/// `Composed` mint in `lower_carried_computational_match_inner` as *the*
+/// contrast, which reads as though guarding were the norm. It is not — the
+/// other `Composed` mint is unguarded too. **The argument does not rest on the
+/// contrast and must not be stated as though it did.** It rests on the
+/// absolute structure at the one `SourceMachine` site: nothing there is
+/// conditional on the case being non-empty. ⇒ **An empty case there mints
+/// `siblings == 0` rather than minting nothing.** That is cause (ii)'s
+/// signature, and the assertion below measures its total absence.
+///
+/// Between the case selection and that emission are **three** ways out, not the
+/// one the frame's licence named: the arity refusal, the malformed-recursive-
+/// position refusal, and `computational_ih_slots_for_case(..)?`. All three are
+/// `Err`-valued, and the row's defining property is that its compile returns
+/// `Ok` — asserted below. So none of them fired, and control reaching that arm
+/// would have reached the emission.
+///
+/// **Part two, and it is the one the baseline could not give: a POSITIVE
+/// control on the excluded lane itself.**
+/// `D6aRouteEvent::ConsumerRoute { seat: D6aConsumerSeat::SourceMachine, .. }`
+/// has exactly one production emission site — inside the **carried** arm of the
+/// same computational-scrutinee seat, which breaks out of the block before the
+/// specialized selection. Observing it under exclusion says two things at once
+/// that no absence can: the seat **was** reached on the `FunctionizedUnits`
+/// lane, and the branch it took there is the one that returns before the
+/// selection the mint sits behind. **That is the entire claim, and nothing is
+/// joined to it.**
+///
+/// **A second operand stood here and was wrong — recorded because deleting it
+/// silently is how it would come back.** It asserted
+/// `any(.., CarriedEliminationEntered { .. })`, described as *"the eliminator
+/// this seat handed its frame to actually ran."* It measured no such thing.
+/// The excluded trace, read in order, is: `ConsumerRoute { seat: Composed }`,
+/// then `CarriedEliminationEntered`, then `ConsumerRoute { seat: SourceMachine }`.
+/// **The elimination event belongs to the `Composed` seat**, and an unordered
+/// `any` over the whole trace credited it to this one. Tightening the match
+/// on `static_origin` would **not** have caught it: both seats carry the *same*
+/// origin here, so the operand would have stayed green and stayed wrong.
+///
+/// ⇒ **Two independent `any(..)` observations do not compose into a sequenced
+/// claim about one seat.** Saying "reached, and then its eliminator ran" needs
+/// the second event to be seat-specific *and* ordered against the first;
+/// neither held. The route observation alone is sufficient and honest for what
+/// this sentinel needs, so it stands alone. A downstream claim may be added
+/// only by something that carries the seat in the event itself.
+///
+/// The same predicate is read on the baseline too, and required to answer
+/// **false** there. That is not a witness and not a licence — it is what keeps
+/// the operand from being a constant that would satisfy the tuple while
+/// measuring nothing.
+///
+/// ⇒ Reached, took the carried arm, and no mint of any arity anywhere. **Cause
+/// (i), argued on the lane in question and needing no witness from the other
+/// one.**
+///
+/// **WHY THE ATTRIBUTED CAUSE IS NOT REPAIRABLE AT THIS SEAT — `D1`'s
+/// measurement, recorded here because it is what the next reader needs.**
+///
+/// Cause (i) is confirmed above and it is *explained*, which is a different
+/// finding from the one `D1` was framed to expect. Measured under `B`-only
+/// exclusion on this fixture: the seat is entered **once**, and its scrutinee
+/// arrives as `LoweringOperand::Carried` — a runtime word — because the
+/// residual the exclusion functionizes is the very thing that produced the
+/// compile-time constructor on the descent lane, where the same seat is
+/// entered **three** times with `Specialized(Lowered::Constructor)`. The
+/// carried arm is therefore not a branch taken *instead of* an installation
+/// step; it is the arm whose own contract says a carried value must not be
+/// asked for a compile-time constructor template.
+///
+/// ⇒ **The number of `SourceMachine` installations this lane requires for this
+/// occurrence is zero**, and the "one mint versus four" gap is the descent
+/// lane's compile-time unrolling, not three absent steps. Two alternatives
+/// were measured and closed rather than argued: the eliminator's origin is
+/// **not** among the units this compile plans, so no missing route-to-a-unit
+/// explains it; and the `Composed` mint that does survive exclusion is emitted
+/// from a **different site** than the baseline's, so even the passing half of
+/// the row passes by a substituted mechanism.
 ///
 /// **Promise class: TRANSITION SENTINEL.** These assertions describe a defect,
 /// so they are written to go **red when `D1` repairs it** — that red is the
-/// point and must not be satisfied by relaxing the bound. **Retiring event:** the
-/// `D1` repair at the attributed cause. When it lands, this test's job passes to
+/// point and must not be satisfied by relaxing the bound. **Retiring event:**
+/// whatever settles row 2 — which the paragraph above means is no longer
+/// certainly a repair at the attributed cause, and may instead be a ruling that
+/// relocates the requirement. Either way this test's job passes to
 /// `px8j_all_three_producer_paths_reach_real_consumers` itself, which is the
 /// real acceptance control, and this sentinel is deleted rather than adjusted.
 #[test]
@@ -1575,8 +1667,12 @@ fn d0_row2_functionized_lane_never_reaches_the_source_machine_mint() {
     let expression = host_result_closure_match(recursive_computational_result_depth(2, aggregate));
 
     let baseline_epoch = b2f_open_compile_attempt();
-    let (baseline_result, baseline_trace) =
-        px8j_capture_source_trace(&expression, false, "ken_row2_d0_unexcluded");
+    let (baseline_result, baseline_trace, baseline_routes) =
+        with_d6a_route_mutation(D6aRouteMutation::Exact, || {
+            let (result, trace) =
+                px8j_capture_source_trace(&expression, false, "ken_row2_d0_unexcluded");
+            (result, trace, d6a_route_trace())
+        });
     let baseline_declared = b2f_units_declared_in_attempt(baseline_epoch);
     baseline_result.expect("the unexcluded lane still lowers");
     let baseline_mints = mints(&baseline_trace);
@@ -1584,16 +1680,44 @@ fn d0_row2_functionized_lane_never_reaches_the_source_machine_mint() {
     set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
     let _restore = Restore;
     let excluded_epoch = b2f_open_compile_attempt();
-    let (excluded_result, excluded_trace) =
-        px8j_capture_source_trace(&expression, false, "ken_row2_d0_excluded");
+    // `Exact` is the identity perturbation. It is used here for its **other**
+    // effect: it clears the route trace on the way in, so what is read back
+    // below is this compile's events and not a residue of the baseline's.
+    let (excluded_result, excluded_trace, excluded_routes) =
+        with_d6a_route_mutation(D6aRouteMutation::Exact, || {
+            let (result, trace) =
+                px8j_capture_source_trace(&expression, false, "ken_row2_d0_excluded");
+            (result, trace, d6a_route_trace())
+        });
     let excluded_declared = b2f_units_declared_in_attempt(excluded_epoch);
     excluded_result.expect("under B-only exclusion the compile still returns Ok -- the row's \
                             failure is an absent trace event, not a refusal");
     let excluded_mints = mints(&excluded_trace);
 
-    let baseline_zero_sibling_source_machine = baseline_mints
-        .iter()
-        .any(|(path, siblings)| *path == Px8jProducerPath::SourceMachine && *siblings == 0);
+    // The same-lane positive control, and it is ONE observation on purpose.
+    // The seat's carried arm is the only production emitter of a
+    // `SourceMachine`-seated `ConsumerRoute`, and that arm returns before the
+    // specialized selection the mint sits behind -- which is the whole claim.
+    // Nothing downstream is joined to it: see the doc block on why the
+    // discarded second operand was not the fact it was named for.
+    fn seat_took_carried_arm(routes: &[D6aRouteEvent]) -> bool {
+        routes.iter().any(|event| {
+            matches!(
+                event,
+                D6aRouteEvent::ConsumerRoute {
+                    seat: D6aConsumerSeat::SourceMachine,
+                    ..
+                }
+            )
+        })
+    }
+    let excluded_seat_took_carried_arm = seat_took_carried_arm(&excluded_routes);
+    // NOT a licence and not a witness about the excluded lane -- an inertness
+    // check on the operand above. A predicate that is true on every compile
+    // would satisfy the tuple while measuring nothing, so the same predicate is
+    // read on the baseline, where the seat takes the specialized arm instead
+    // and must therefore answer FALSE.
+    let baseline_seat_took_carried_arm = seat_took_carried_arm(&baseline_routes);
     let excluded_source_machine_mints = excluded_mints
         .iter()
         .filter(|(path, _)| *path == Px8jProducerPath::SourceMachine)
@@ -1609,18 +1733,23 @@ fn d0_row2_functionized_lane_never_reaches_the_source_machine_mint() {
             // seam, the unexcluded one did not
             excluded_declared.is_some(),
             baseline_declared.is_some(),
-            // the discriminator's positive control
-            baseline_zero_sibling_source_machine,
+            // the discriminator's positive control, ON THE EXCLUDED LANE,
+            // with the inertness check that keeps it from being a constant
+            excluded_seat_took_carried_arm,
+            baseline_seat_took_carried_arm,
             // the finding
             excluded_source_machine_mints,
             excluded_composed_minting,
         ),
-        (true, false, true, 0, 1),
+        (true, false, true, false, 0, 1),
         "D0: under B-only exclusion the FunctionizedUnits lane must be REACHED \
-         (declared={excluded_declared:?}, unexcluded={baseline_declared:?}) and must mint on \
-         Composed while minting nothing at all on SourceMachine. A zero-sibling SourceMachine \
-         mint in the unexcluded baseline is what makes the absence mean cause (i) rather than \
-         cause (ii). baseline={baseline_mints:?} excluded={excluded_mints:?}"
+         (declared={excluded_declared:?}, unexcluded={baseline_declared:?}); the \
+         computational-scrutinee seat must be reached ON THAT LANE and take its carried arm, \
+         which returns before the specialized selection the SourceMachine mint sits behind; \
+         and the compile must then mint on Composed while minting nothing at all, of any \
+         arity, on SourceMachine. Reached-and-took-the-other-arm is what makes the absence \
+         mean cause (i) rather than cause (ii). baseline={baseline_mints:?} \
+         excluded={excluded_mints:?}"
     );
 }
 #[test]
