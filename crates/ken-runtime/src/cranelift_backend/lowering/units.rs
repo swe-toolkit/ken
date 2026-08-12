@@ -1032,16 +1032,6 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
 ) -> Result<BTreeMap<ContinuationCallIdentity, FuncId>, CraneliftBackendError> {
     let mut resolved = BTreeMap::new();
     for call in plan.continuation_calls()? {
-        // `D3` — the callable-edge half of the same disposition the declaration
-        // and definition passes read. The one call reaching a subsumed
-        // specialization is the region's own, and the consumer's takeover
-        // answers it with the fused result instead of emitting it; preflight has
-        // already refused if any OTHER caller survived. Resolving it here would
-        // demand a `FuncId` for a specialization that was deliberately never
-        // declared, which is the `None` this function's own doc calls a reject.
-        if plan.continuation_specialization_is_fusion_owned(call.target()) {
-            continue;
-        }
         let identity = plan
             .continuation_call_binding_for(
                 call.producer_construct_origin(),
@@ -1055,6 +1045,15 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
                         .to_string(),
                 )
             })?;
+        // `D3` — omit ONLY the mapped identity, never every call whose target is
+        // subsumed. Ruled at `evt_713gc922d1d7g`, and the distinction is the
+        // point: a target-wide skip would silently drop a second caller, whereas
+        // preflight has already REFUSED any such caller. So reaching here with a
+        // subsumed target and no mapping is impossible by construction, and an
+        // unmapped identity resolves and emits exactly as before.
+        if plan.continuation_call_fusion_forward(&identity).is_some() {
+            continue;
+        }
         let target = bundle.continuation(identity.target()).ok_or_else(|| {
             backend_module(
                 "a projected causal identity names a continuation specialization that was never \
@@ -4134,6 +4133,18 @@ pub(in crate::cranelift_backend) enum CandidateDisposition {
     /// The exact deferred bridge scope completed successfully with this
     /// candidate still unconsumed.
     InlineNoCall,
+    /// **`D3` — the edge took the fused answer instead of calling.**
+    ///
+    /// Ruled at `evt_713gc922d1d7g`. Neither [`Self::DirectCall`] nor
+    /// [`Self::InlineNoCall`], and giving it its own arm is what makes the
+    /// closeout able to tell them apart: a `DirectCall` asserts an emitted call
+    /// instruction this seat must NOT have, and an `InlineNoCall` asserts the
+    /// candidate went unconsumed, which is false -- it was consumed by
+    /// forwarding.
+    ///
+    /// Exactly one mapped token is forwarded, exactly once, with no emitted call
+    /// instruction, and it must not also settle under another disposition.
+    FusionForward,
 }
 
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the binding-candidate ledger, a

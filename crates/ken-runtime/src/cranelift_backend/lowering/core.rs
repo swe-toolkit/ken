@@ -10089,6 +10089,75 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         };
         #[cfg(test)]
         d5a_trace(format!("  CLAIM bound identity={identity:?}"));
+
+        // ---- `D3` — THE FUSION FORWARD, at the existing producer-call seat and
+        // ---- BEFORE target resolution or emission. Ruled `evt_713gc922d1d7g`.
+        //
+        // The fields are lowered and the exact causal identity has resolved.
+        // When THIS identity is the one the planner mapped, the answer this edge
+        // must produce has already been returned by the redirected fusion
+        // invocation, and it is sitting in this run at the edge's own recursive
+        // position. The seat forwards that operand under the causal continuation
+        // route the direct call would have discharged.
+        //
+        // **It emits no continuation-specialization call and assembles no second
+        // ABI run.** Emitting one would execute the superseded continuation a
+        // second time; retargeting it to the fusion `FuncId` would invoke the
+        // fused region twice, double the suffix, and cross the producer-fusion
+        // ABI with the continuation-specialization ABI. Both are forbidden.
+        //
+        // **The operand is taken by EXACT position, never by shape.** "Any
+        // Carried field" is not the rule: an absent position, a different
+        // position, or a specialized template all refuse, because each would
+        // forward something other than the fused answer while looking like a
+        // success.
+        if let Some(fusion) = self
+            .static_transition_plan
+            .continuation_call_fusion_forward(&identity)
+        {
+            let Some(operand) = fields.get(recursive_position) else {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    "a fusion-forwarded causal edge names a recursive position its own lowered \
+                     field run does not have, so there is no fused answer at the position the \
+                     forward is authorized for",
+                ));
+            };
+            let LoweringOperand::Carried(word) = operand else {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    "a fusion-forwarded causal edge's recursive-position operand is a specialized \
+                     template rather than the carried answer the redirected fusion invocation \
+                     returned, so forwarding it would substitute a reconstructed value for the \
+                     fused one",
+                ));
+            };
+            // The claim stays OUTSTANDING here. This seat is not the takeover:
+            // the consumer's takeover forwards this same value later and
+            // consumes the claim once, at its own existing seat. Spending it
+            // here would leave that seat with nothing to consume.
+            let Some(ledger) = self.fusion_claims.as_ref() else {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    "a fusion-forwarded causal edge was reached with no region-claim ledger open, \
+                     so the fusion authorizing the forward cannot be checked",
+                ));
+            };
+            if ledger.claim(fusion).is_none() {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    "a fusion-forwarded causal edge names a region whose claim is already spent, \
+                     so the fused answer it would forward has already been taken over elsewhere",
+                ));
+            }
+            let word = *word;
+            self.settle_continuation_candidate(
+                &identity,
+                super::units::CandidateDisposition::FusionForward,
+            )?;
+            return Ok(Some(RoutedAnswer::direct(LoweringOperand::Carried(word))));
+        }
+
         // `D1`/`D2` — settlement is NOT here. It sits inside
         // `claim_and_call_resolved_continuation`, which both direct consumption
         // seats funnel through. See the note there.

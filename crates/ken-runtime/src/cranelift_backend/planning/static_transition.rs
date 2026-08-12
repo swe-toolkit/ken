@@ -2693,6 +2693,21 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// transaction, so a compile can never hold one disposition without the
     /// other.
     fusion_owned_continuation_specializations: BTreeSet<ContinuationSpecializationId>,
+    /// **`D3` — the ONE causal call identity each fusion forwards, one to one.**
+    ///
+    /// Ruled at `evt_713gc922d1d7g`. The region's own call to a subsumed
+    /// specialization is not a surviving standalone edge: the fusion has already
+    /// executed the producer and the suffix through the redirected producer
+    /// invocation, so emitting the specialization call would run the superseded
+    /// continuation a second time. But that classification does **not** license
+    /// dropping every call to the target.
+    ///
+    /// **This is keyed by the call's whole opaque identity, and the earlier
+    /// exclusion by continuation origin plus emission owner was too broad.** A
+    /// second call sharing that origin and owner is still *other* unless its
+    /// entire identity is the ruled one, and any other call to a subsumed
+    /// specialization refuses before mutation rather than being swept up here.
+    fusion_forwarded_calls: BTreeMap<ContinuationCallIdentity, StaticContinuationFusionId>,
     /// Whether body ownership has been installed. **Not derivable from the map's
     /// emptiness:** a plan with no fused regions installs an empty map, and a
     /// second install against it must still refuse.
@@ -11034,6 +11049,7 @@ impl<'src> Planner<'src> {
                 // validated claims, which cannot exist before the plan does.
                 fusion_owned_bodies: BTreeMap::new(),
                 fusion_owned_continuation_specializations: BTreeSet::new(),
+                fusion_forwarded_calls: BTreeMap::new(),
                 fusion_bodies_installed: false,
             },
             store_interner: BTreeMap::new(),
@@ -13911,6 +13927,8 @@ impl<'src> StaticTransitionPlan<'src> {
         let specialization_calls = self.continuation_calls()?;
         let mut scratch: BTreeMap<StaticOriginId, FusionOwnedBody> = BTreeMap::new();
         let mut subsumed: BTreeSet<ContinuationSpecializationId> = BTreeSet::new();
+        let mut forwards: BTreeMap<ContinuationCallIdentity, StaticContinuationFusionId> =
+            BTreeMap::new();
         let mut owned = BTreeSet::new();
 
         for fusion in ledger.planned().iter().copied() {
@@ -14049,27 +14067,75 @@ impl<'src> StaticTransitionPlan<'src> {
             }
             let specialization = specialization.id();
 
-            // No surviving executable route may still require its standalone
-            // `Function`. The ONE call this fusion supersedes is the one at the
-            // claim's own continuation origin under its own consumer, which the
-            // consumer's takeover intercepts and answers with the fused result.
-            // Any OTHER call reaching this specialization is a caller the fused
-            // definition does not serve, and omitting the standalone definition
-            // would leave it unresolvable at declaration time.
+            // ---- THE FUSION FORWARD, resolved by WHOLE OPAQUE IDENTITY.
             //
-            // ⇒ Refused here rather than dropped: the ruling requires a
-            // surviving caller to REFUSE, never to be silently removed.
-            let surviving_call = specialization_calls.iter().any(|call| {
-                call.target() == specialization
-                    && !(call.continuation_origin() == claim.continuation_origin()
-                        && call.emission_owner()
-                            == ContinuationEmissionOwner::Predeclared(claim.consumer_owner()))
-            });
-            if surviving_call {
+            // Ruled at `evt_713gc922d1d7g`. The region's own call is not a
+            // surviving standalone edge -- the fusion already executed the
+            // producer and suffix through the redirected producer invocation, so
+            // emitting the specialization call would run the superseded
+            // continuation twice. Treating it as an ordinary surviving caller
+            // would make every lawful fusion refuse.
+            //
+            // **But the classification does not license "drop every call to this
+            // target", and an earlier form of this check did exactly that.** It
+            // excluded on continuation origin plus emission owner, which is a
+            // coincidence key: a second call sharing both is still OTHER. So the
+            // one forwarded edge is resolved through the call's own already
+            // checked selector and mapped one to one, and every other call to a
+            // subsumed specialization refuses here, before any mutation.
+            let mut forwarded: Option<ContinuationCallIdentity> = None;
+            for call in specialization_calls.iter() {
+                if call.target() != specialization {
+                    continue;
+                }
+                let identity = self
+                    .continuation_call_binding_for(
+                        call.producer_construct_origin(),
+                        call.continuation_origin(),
+                        call.producer_alternative(),
+                        call.recursive_position(),
+                    )?
+                    .ok_or_else(|| {
+                        planner_error(
+                            "a projected causal call into a subsumed continuation specialization \
+                             has no binding under its own four-field selector, so the edge the \
+                             fusion forwards cannot be named",
+                        )
+                    })?;
+                // Joined to the SAME facts the specialization was resolved by,
+                // so the forwarded edge is this region's and not merely one that
+                // happens to enter the same target.
+                let region_owned = call.continuation_origin() == claim.continuation_origin()
+                    && call.recursive_position() == claim.recursive_position()
+                    && call.producer_alternative() == claim.producer_alternative()
+                    && call.emission_owner()
+                        == ContinuationEmissionOwner::Predeclared(claim.consumer_owner());
+                if !region_owned {
+                    return Err(planner_error(
+                        "a generated continuation specialization subsumed by a static continuation \
+                         fusion keeps another caller, so removing its standalone definition would \
+                         leave that caller unresolvable",
+                    ));
+                }
+                if forwarded.replace(identity).is_some() {
+                    return Err(planner_error(
+                        "two causal call identities enter one subsumed continuation \
+                         specialization under this region's own selector, so which edge the \
+                         fusion forwards is ambiguous",
+                    ));
+                }
+            }
+            let Some(forwarded) = forwarded else {
                 return Err(planner_error(
-                    "a generated continuation specialization subsumed by a static continuation \
-                     fusion keeps another caller, so removing its standalone definition would \
-                     leave that caller unresolvable",
+                    "a static continuation fusion subsumes a continuation specialization that no \
+                     causal call reaches, so there is no edge for the fused answer to be \
+                     forwarded to",
+                ));
+            };
+            if forwards.insert(forwarded, fusion).is_some() {
+                return Err(planner_error(
+                    "one causal call identity is forwarded by two static continuation fusions, so \
+                     which fused answer it takes is undetermined",
                 ));
             }
 
@@ -14095,6 +14161,21 @@ impl<'src> StaticTransitionPlan<'src> {
         // No caller convention can exclude that, so it is excluded here by
         // ordering: the check below is the last thing that can fail, and the two
         // commits after it are infallible.
+        // One fusion receives exactly one forwarded identity. The map is
+        // one-to-one in BOTH directions and the insert above only rejects a
+        // repeated KEY, so the reverse direction is checked here -- and it sits
+        // ABOVE the transaction line on purpose, because everything below that
+        // line must be infallible.
+        let mut receiving = BTreeSet::new();
+        for fusion in forwards.values().copied() {
+            if !receiving.insert(fusion) {
+                return Err(planner_error(
+                    "one static continuation fusion forwards two causal call identities, so which \
+                     edge takes its fused answer is undetermined",
+                ));
+            }
+        }
+
         ledger.check_body_owned(&owned)?;
         self.fusion_owned_bodies = scratch;
         // Same transaction as the producer-side map above, deliberately: a
@@ -14102,6 +14183,7 @@ impl<'src> StaticTransitionPlan<'src> {
         // a standalone body the fused definition replaces, or omit a
         // specialization whose producer body is still standalone.
         self.fusion_owned_continuation_specializations = subsumed;
+        self.fusion_forwarded_calls = forwards;
         self.fusion_bodies_installed = true;
         ledger.commit_body_owned(owned);
         Ok(())
@@ -14173,6 +14255,20 @@ impl<'src> StaticTransitionPlan<'src> {
     ) -> bool {
         self.fusion_owned_continuation_specializations
             .contains(&specialization)
+    }
+
+    /// **`D3` — the fusion this exact causal call identity forwards, if any.**
+    ///
+    /// **Probed by WHOLE identity, never by target.** A call into a subsumed
+    /// specialization that is not this exact identity does not reach here at
+    /// all: preflight refused it as a surviving caller. So an unmapped identity
+    /// resolves and emits normally, which is what keeps the forward from
+    /// becoming a target-wide filter.
+    pub(in crate::cranelift_backend) fn continuation_call_fusion_forward(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<StaticContinuationFusionId> {
+        self.fusion_forwarded_calls.get(identity).copied()
     }
 
     /// **`D5a` checkpoint 1 — the call edges that survive the retarget.**
