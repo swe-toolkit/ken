@@ -359,7 +359,8 @@ increment to carry it.
 > **Excluded:** `DP`'s population, the relation ruling, mechanism, planner,
 > ABI, arming, AC/node credit, and the held `D1`/`D2`/`D3` range.
 
-> ### `DP` IS RULED (a). THE RE-CUT IS AUTHORIZED — Architect `evt_w4nvsmrs1qhk`
+> ### `DP` IS RULED (a) — Architect `evt_w4nvsmrs1qhk`. **(a)-vs-(b) STANDS; its
+> ### POPULATION AND ITS NETS DO NOT — see the two withdrawal boxes inside.**
 >
 > **Added 2026-08-12. This supersedes `DP`'s open relation question; do not
 > re-derive the fork.** (b) is **rejected for this source**, and **no
@@ -375,15 +376,62 @@ increment to carry it.
 > second checked call occurrence, invocation template and dynamic splice edge
 > that the source does not contain.**
 >
-> **The authorized population, exactly:**
+> > # ITEMS 1 AND 2 ARE WITHDRAWN BY THE AUTHOR — Architect `evt_2f0nnwtzqy65m`,
+> > # 2026-08-12. `89ee005b` IS THE FALSIFIER.
+> >
+> > **`D2G_OUTER_SLOT.frame_templates` must NOT be expanded**, and in particular
+> > must not be populated by the transitive `ParentFrame` closure. The base
+> > uncomposed plan stays **exact**: `outer slot`/`call = [outer frame]`, `inner
+> > slot = [inner frame]`.
+> >
+> > **The unarmed `ReHomed` refusal is CORRECT.** `instantiate_checked_invocation
+> > _segment` is not too strict and **must not** be weakened, taught a fusion
+> > exception, or changed to accept subset coverage.
+> >
+> > **Why the withdrawn items were wrong.** `ParentFrame(inner, outer)` proves
+> > static checked control nesting. It does **not** prove that the outer IH
+> > call's *current dynamic carrier* contains an inner recursor layer — the
+> > checked source puts `D2G_INNER_FRAME`/`D2G_INNER_SLOT` inside the lexical
+> > closure in the outer match's **scrutinee**, while `D2G_OUTER_SLOT`/`D2G_CALL`
+> > are in the outer selected **case body**. `callee_frame_templates` is the
+> > exact sequence carried by *that* checked invocation occurrence, and the
+> > instantiator enforces equality against the frames actually instantiated.
+> >
+> > ## THE CORRECTED MEMBERSHIP LAW — this is what items 1 and 2 become
+> >
+> > > **Checked occurrence identity is planner-authored; membership in a concrete
+> > > invocation segment is established at the checked event that actually adds
+> > > that semantic layer.**
+> >
+> > For the base IH marker the event carries **one** outer layer, so membership
+> > is one frame. When checked fusion composition later splices the producer
+> > semantic layer into that same invocation-local segment, **the composition
+> > relation transports the producer's independently authored frame identity and
+> > qualifies that actual layer with the already-minted invocation source/
+> > instance.** Only then do `(instance, outer_frame)` and `(instance,
+> > inner_frame)` coexist.
+> >
+> > **Runtime may VALIDATE that relation. It may not DISCOVER it** from shape,
+> > from `ParentFrame`, from segment-site equality, or from a fusion label.
+> >
+> > ⇒ **What changed is WHEN the producer frame becomes a member, not whether.**
+> > The base call template does not promise a layer that is absent; the checked
+> > composition plan promises and transports the added member **at the splice
+> > that creates it**.
+> >
+> > **The (a)-versus-(b) result is PRESERVED and is not reopened:** still one
+> > checked call marker and one invocation instance, **no fabricated second
+> > source**. Items 3 and 4 below stand unchanged.
 >
-> 1. Expand `D2G_OUTER_SLOT.frame_templates` from the singleton outer frame to
+> ~~**The authorized population, exactly:**~~
+>
+> 1. ~~Expand `D2G_OUTER_SLOT.frame_templates` from the singleton outer frame to
 >    the complete checked invocation-local sequence containing **both** frame
->    IDs, ordered by their authoritative `semantic_position`.
-> 2. Let `D2G_CALL.callee_frame_templates` **inherit** that sequence from the
+>    IDs, ordered by their authoritative `semantic_position`.~~ **WITHDRAWN.**
+> 2. ~~Let `D2G_CALL.callee_frame_templates` **inherit** that sequence from the
 >    slot, as production already does via
 >    `callee_frame_templates = slot.frame_templates.clone()`. **Do not patch the
->    call vector independently.**
+>    call vector independently.**~~ **WITHDRAWN.**
 > 3. Keep `frame_template_id = D2G_OUTER_FRAME` as the exact slot/binder frame,
 >    and keep the call's existing `parent_frame_template_id` and
 >    `parent_segment_site_id` as the dynamic call-to-open-scope edge.
@@ -420,19 +468,45 @@ increment to carry it.
 > instantiate multiple ordered frame templates. **`DP` repairs planner
 > population, not the Runtime identity model.**
 >
-> **Required nets — these are the controls, not a wish list:**
+> > # THE FIVE NETS BELOW ARE SUPERSEDED — they were premised on the withdrawn
+> > # population. USE THIS LIST. Architect `evt_2f0nnwtzqy65m`.
+> >
+> > **These controls must be load-bearing in the recut:**
+> >
+> > 1. The unarmed, **uncomposed** `Exact` / `ReHomed` / `ProducerArity`
+> >    baselines retain their **pre-WIP** behaviour. In particular **`ReHomed`
+> >    must not acquire an expected absent inner frame** — that regression is
+> >    exactly what `89ee005b` demonstrated.
+> > 2. On the **actual armed composed path**, the producer layer carries its own
+> >    exact checked frame ID **before** the mixed-frame guard, while both frame
+> >    keys carry the **same** checked invocation source/instance.
+> > 3. **Deleting the composition-time producer membership** restores the current
+> >    mixed checked/inferred refusal.
+> > 4. Each of these stays **red**: copying the consumer frame ID; deriving
+> >    membership from Runtime shape or from `ParentFrame`; inventing a second
+> >    invocation source; accepting subset coverage; widening the inner slot.
+> > 5. **`89ee005b` remains preserved WIP negative evidence** that unconditional
+> >    rooted-closure population is unlawful. It is **not a candidate**, earns no
+> >    credit, and takes no QA route.
+> >
+> > **Note what moved in control 1.** The superseded net 2 asked that deleting
+> > the producer frame from the *slot/call sequence* restore a refusal. The new
+> > control 3 asks the same of the *composition-time membership*. The old form
+> > would now pass against a population that must never exist.
 >
-> - the positive plan carries **both** frame IDs in semantic-position order, the
+> ~~**Required nets — these are the controls, not a wish list:**~~
+>
+> - ~~the positive plan carries **both** frame IDs in semantic-position order, the
 >   call sequence **equals** the slot sequence, both dynamic frame keys carry the
->   **same** invocation source/instance, and the full endpoint chain composes;
-> - **deleting** the producer frame from the slot/call sequence restores the
->   current missing-coverage/mixed-frame refusal;
-> - **permuting** the transported frame occurrences is refused by the
->   planned-order check;
-> - a purported **second source** without its own checked invocation marker and
->   checked dynamic parent edge is refused;
-> - the **inner slot stays independently exact** rather than widened by site
->   coincidence.
+>   **same** invocation source/instance, and the full endpoint chain composes;~~
+> - ~~**deleting** the producer frame from the slot/call sequence restores the
+>   current missing-coverage/mixed-frame refusal;~~
+> - ~~**permuting** the transported frame occurrences is refused by the
+>   planned-order check;~~
+> - ~~a purported **second source** without its own checked invocation marker and
+>   checked dynamic parent edge is refused;~~
+> - ~~the **inner slot stays independently exact** rather than widened by site
+>   coincidence.~~
 >
 > **SCOPE AND CONTENTION — read before assigning.** This authorizes the
 > **elaborator-side slot population**, so it reaches
@@ -446,7 +520,50 @@ increment to carry it.
 > which remain one atomic candidate **after** `DP`. This ruling grants no
 > lowering/fusion inference, arming, or `D1`/`D2`/`D3` credit.
 
-> ### `DP` IS SIZED AND RELEASED AS TWO CUTS — Steward, 2026-08-12
+> ### THE RECUT: `DP` FOLDS INTO THE ATOMIC HELD CANDIDATE — Steward, 2026-08-12
+>
+> **This supersedes the two-cut block below in full.** Read this; the block
+> below is kept only for the withdrawn argument and its falsifier.
+>
+> **Architect `evt_2f0nnwtzqy65m` settles the repair class and the atomic
+> boundary.** `DP`'s positive **is** the live composed segment, so there is no
+> population change that can be validated on its own.
+>
+> ⇒ **`DP` IS NOT SEPARABLE. The review object is `DP` + `D1` + `D2` + `D3`**,
+> one atomic candidate — with `D4` only under the already-recorded
+> necessary-green rule.
+>
+> **Three things this forbids, each of which was previously in play:**
+>
+> - **No standalone `DP` population merge.** The thing I released this morning
+>   as `DP-1` cannot exist in any slicing.
+> - **No standalone held `D1`/`D2` merge.** That direction is closed too.
+> - **No QA route on `89ee005b`.** It is preserved negative evidence, not a
+>   candidate, and earns no credit.
+>
+> **The cumulative planner/transport stop governs the running total.** This is
+> the same stop that fired at `D2` and produced the `DP`-first recut in the
+> first place; it now governs a single larger object rather than a chain of
+> partials, and the running total keeps accumulating across it.
+>
+> **What this ruling does NOT grant:** arming, `AC-8`, `D4`, node or AC credit,
+> and approval of any held commit. It settles class and boundary only.
+>
+> **Sizing consequence, and I am not pretending otherwise.** This is materially
+> larger than anything released on this node so far, and the one-hour turn
+> target cannot be met by it — expect a sequence of hard stops inside one
+> atomic object rather than a sequence of merges. **That is the correct shape
+> here and not a sizing failure**: the alternative is a partial that cannot
+> carry its own positive control, which is precisely what was just measured.
+> Hand back at each stop; do not push through to keep the object whole.
+>
+> **Contention: the measurement below still holds** — `erasure.rs` is
+> uncontended and `KERNEL-NESTED-IND` remains structurally excluded for the
+> duration. The **surface finding also still holds and matters more now**:
+> section 9 is a floor, and the atomic object spans strictly more than `DP`
+> did.
+
+> ### `DP` WAS SIZED AND RELEASED AS TWO CUTS — Steward, 2026-08-12. SUPERSEDED.
 >
 > **This discharges the sizing and contention re-check the block above says are
 > owed, and it is what releases `DP`.** Measured against `main`

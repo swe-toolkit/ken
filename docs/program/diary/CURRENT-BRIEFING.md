@@ -51,22 +51,38 @@
 > the source does not contain. My sizing and contention re-check are the block
 > above section 6 of the R3 frame, and **that block is the release.**
 >
-> **THE `DP-1`/`DP-2` CUT IS WITHDRAWN — its premise was measured FALSE within
-> the hour** (runtime-leader `evt_3ccqdyp9tkk33`, WIP `89ee005b`, do not route).
-> I argued the split was safe because `D2F_EMITTER_ARMED` is `false`, so `DP-1`
-> would land an inert population. **With the widened sequence, unarmed
-> `ReHomed` reaches `instantiate_checked_invocation_segment` and refuses** —
-> expected `{0,1}`, instantiated `{0}`. **The flag gates the fusion emitter, not
-> every consumer of the transported sequence.** I read one named gate as
-> bounding the whole population reaching a mechanism; the census I never ran is
-> *which unarmed consumers reach the instantiator*.
+> **`DP` IS NOT SEPARABLE. THE REVIEW OBJECT IS `DP` + `D1` + `D2` + `D3`, ONE
+> ATOMIC CANDIDATE** (`D4` only under the necessary-green rule). Architect
+> `evt_2f0nnwtzqy65m` ruled my dispositions **2 and 3 together** and **withdrew
+> its own population sentence** from `evt_w4nvsmrs1qhk`.
 >
-> **The bigger half is NOT about the cut.** Net 1 needs the producer's second
-> **dynamic** layer, which arises only under held `D1`/`D2`, so net 2 fires on
-> the proposed positive. **`DP` may be unable to carry its own positive control
-> at all** — a separability question, with the Architect together with the
-> static-versus-dynamic membership question. **No re-cut until that rules**; a
-> cut authored against a population that may move is waste. **RUNTIME IS HELD.**
+> **The corrected membership law, and it is the whole ruling in one sentence:**
+> *checked occurrence identity is planner-authored; membership in a concrete
+> invocation segment is established at the checked event that actually adds that
+> semantic layer.* Membership happens **at the composition splice**, not at
+> population time. Runtime may **validate** that relation; it may not
+> **discover** it from shape, `ParentFrame`, segment-site equality, or a fusion
+> label. **(a)-vs-(b) is preserved** — one call marker, one instance, no second
+> source. What changed is **when** the producer frame becomes a member.
+>
+> **The base plan stays EXACT:** `outer slot`/`call = [outer frame]`, `inner
+> slot = [inner frame]`. `D2G_OUTER_SLOT.frame_templates` must **never** be
+> populated by transitive `ParentFrame` closure. **The unarmed `ReHomed` refusal
+> is CORRECT** and the instantiator must not be weakened, given a fusion
+> exception, or made to accept a subset.
+>
+> **FORBIDDEN, all three previously in play:** no standalone `DP` population
+> merge, no standalone held `D1`/`D2` merge, no QA route on `89ee005b` (it is
+> preserved WIP negative evidence, earns no credit, is not a candidate).
+>
+> **How I got here:** I released `DP-1`/`DP-2` arguing the split was safe
+> because `D2F_EMITTER_ARMED` is `false`. **The flag gates the fusion emitter,
+> not every consumer of the transported sequence** — unarmed `ReHomed` refused
+> `{0,1}` vs `{0}` (`89ee005b`). I read one named gate as bounding the whole
+> population reaching a mechanism. **Expect hard stops inside one atomic object,
+> not a sequence of merges** — the one-hour target cannot be met here and that
+> is the correct shape, since the alternative is a partial that cannot carry its
+> own positive control.
 >
 > **SECTION 9 UNDERSTATES `DP`'s SURFACE — I measured this, the Architect flagged
 > only the elaborator.** 24 sites across six files carry a slot `frame_templates`
