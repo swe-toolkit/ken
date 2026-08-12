@@ -38,8 +38,56 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~23:4xZ. **`main` = `07b20585`.**
+> ### RESUME HERE — state at 2026-08-12 ~23:5xZ. **`main` = `07b20585`.**
 >
+> **A FOURTH PREMISE WAS REFUTED, AND I RULED THE SEQUENCING AGAIN
+> (`evt_6j04882rsx096`): the bounded probe runs BEFORE the Architect rules.**
+> The Architect had already ruled the forward disposition
+> (`evt_713gc922d1d7g` — the region-owned call is an exact `FusionForward`, not
+> a surviving standalone call). The implementer **built it exactly as ruled**,
+> rebased onto `07b20585`, and its own fail-closed guard then measured the
+> ruled operand premise **false on both witnesses**: recursive position 0 holds
+> `Lowered::Closure`, and there is **no `Carried` anywhere in that field run**.
+> Removing the emitted specialization call removed the only value the forward
+> was to carry.
+>
+> **NEW TIP `a3c25dae`, 12 commits, base `07b20585`**, with the full 11-commit
+> rebase mapping published and a **zero-`crates/` delta** proof, so every
+> region-scoped verdict re-attaches. Unarmed, unrouted, not a candidate.
+>
+> **THE GUARD REFUSING IS THE MECHANISM WORKING** — recorded so it is not
+> re-litigated. A forward that had silently taken the closure would have been
+> the fifth inert fix and far more expensive to find. Declining to hunt the
+> fused answer elsewhere was also correct: choosing a different operand source
+> is the reserved decision, not an implementation detail.
+>
+> **THE FORK IS A QUESTION OF FACT, WHICH IS WHY THE PROBE COMES FIRST.** Has
+> the redirected fusion invocation emitted by the time the producer-call seat
+> has lowered its fields? If yes, the forward needs a **source relation** rather
+> than the ruled field position. If no, the forward seat is **upstream** of the
+> value and the **ordering** is what must change. Two branches, two different
+> repairs, one probe at the redirect seat. **Ruling blind is a one-in-two chance
+> of a fifth refuted premise at the cost of a full Architect turn plus a
+> dispatch plus a grounding turn plus a re-route.**
+>
+> **THE PATTERN, now four for four:** every mechanism prescribed for this seam
+> has been refuted by measurement — terminalization, the generic funnel, receipt
+> ordering, and now the forward's operand premise. **The classification has
+> survived all four untouched.** What keeps failing is the layer beneath it, the
+> same way each time: prescribed against the emitter's documented intent,
+> refuted by the measured control flow. The one time we measured first, it
+> retired a question three ruling cycles could not settle and surfaced route C.
+>
+> **Independent confirmation the sequencing is right:** the Architect, on its
+> own post-compaction turn and before reading my ruling, said it would *"issue
+> only the bounded causal-read disposition this evidence supports."*
+>
+> **I HOLD TWO DOC-ONLY COMMITS AND THE HOLD IS CORRECT RIGHT NOW** — freshly
+> derived, not inherited. The implementer rebased onto `07b20585` at 23:42 and
+> is mid-probe on that base; publishing would stale a rebase minutes old. **Ship
+> them the moment the ring is between turns.**
+>
+
 > **THE RING HOLDS THE NEXT MOVE. There is nothing to frame and nothing to
 > start.** The Architect owes a ruling on the flagged not-surviving judgement
 > (routed by `runtime-leader` at 23:23Z; the Architect pane was stranded on two
