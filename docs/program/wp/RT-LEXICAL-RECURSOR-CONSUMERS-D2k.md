@@ -71,7 +71,7 @@ a merge-base goes stale without your branch moving.
 >
 > | row | the worker-bearing occurrence | what the other origin actually is |
 > |---|---|---|
-> | 4 | origin **26**, `PX8JScopeTree::Node(Var(0))` — the transform `ComputationalMatch`'s result, and so the scrutinee answer **owed to** the terminal outer `ComputationalMatch` at origin 5 | origin **31** is `Node(fresh LexicalClosure …)`, built by that terminal match's selected case body **after** its exact-`Var` call — the **post-consumption result**, causally **downstream** of the required consumer |
+> | 4 | origin **26**, `PX8JScopeTree::Node(Var(0))` — the transform `ComputationalMatch`'s result, and so the scrutinee answer **owed to** the terminal outer `ComputationalMatch` at origin 5 | origin **31** — **THIS CELL'S CLASSIFICATION IS WITHDRAWN, see below.** It read: `Node(fresh LexicalClosure …)`, built by that terminal match's selected case body **after** its exact-`Var` call, the **post-consumption result**, causally **downstream** of the required consumer |
 > | 5 | owner **22**, field origin **21** on exact `11e4eae1` — the inner match's **output** `PX8JHoleOutput::Node(Var(0))`, the scrutinee answer owed to the outer match | origin **27** is the ordinary **input** `PX8JHoleInput::Node(fresh LexicalClosure …)` consumed by the inner match — **not** a second worker-bearing output |
 >
 > > **ROW 5'S ORIGINS WERE WRONG in the first version of this block, published
@@ -83,10 +83,35 @@ a merge-base goes stale without your branch moving.
 > > ruling re-derived it on the exact object. Do not carry the old pair forward
 > > from any earlier copy of this file or from convo.
 >
+> > ### ORIGIN 31'S CLASSIFICATION IS WITHDRAWN — `evt_4y754p2s8aksk`
+> >
+> > **The ruling withdraws it outright; it is no longer flagged-pending.** The
+> > premise was *"origin 31 is the downstream post-consumption result"*, and the
+> > measured stack and literal-closure shape contradict that classification:
+> > `31` is a `PX8JScopeTree::Node` whose sole argument is a literal
+> > `LexicalClosure`, lowered with **both matches still pending**
+> > (`[Comp(21) | Comp(5)]`), and row 5's positional counterpart is named
+> > `PX8JHoleInput::Node`.
+> >
+> > **`31`'s true position is UNKNOWN, not "upstream".** "Upstream" was the
+> > ring's reading of the same trace and the ruling does not adopt it either.
+> > The bounded feasibility read below re-derives `31` **by planner parent/child
+> > coordinates** and identifies the actual post-call result origin — explicitly
+> > **not** by constructor spelling and **not** by proximity in a trace, which
+> > are the two ways it was classified wrongly the first time.
+> >
+> > **Obligation 4 must not be authored from the withdrawn premise.** The
+> > obligation itself stands; see the note at obligation 4.
+>
 > ⇒ **An elimination that sees origin 31 cannot discharge the worker in origin
 > 26.** In both fixtures the source graph places the worker-bearing occurrence
 > immediately under a later computational eliminator whose selected case calls
 > the field.
+>
+> > **This `⇒` survives the withdrawal, and it is worth saying why rather than
+> > leaving a reader to wonder.** It turns on `31` not being origin `26` — a
+> > distinctness claim, measured directly. It never needed `31`'s causal
+> > direction, which is the part that was withdrawn.
 >
 > > **THE TRAILING SENTENCE HERE IS REFUTED. IT SAID: *"the excluded route is
 > > losing or misattaching that pending outer continuation when the producer's
@@ -1119,6 +1144,89 @@ surface.
 not this question. Build to `evt_3manpp82emcq6`, not to the superseded
 transport-only shape.
 
+> ### THE TRAVERSAL-BOUNDARY RULING. `evt_4y754p2s8aksk`, CHECKPOINT `3edac041`.
+>
+> **This is the current contract for `1c-2` and it supersedes the authorization
+> below.** The bounded read is **accepted** and it **does not authorize a repair
+> edit**. Runtime stays held until this frame carries the ruling — which it now
+> does — and the next Runtime action is **one more bounded read**, not route
+> code.
+>
+> **Why no repair yet, in the ruling's own terms:** the read refuted two
+> operative premises and exposed a missing producer, so **selecting one of the
+> old three shapes would repeat this node's "right what, wrong where" error.**
+> That hazard is now named in the ruling, not just in this frame.
+>
+> **The double run is adjudicated: ONE completed measurement, not two
+> implementation attempts.** The first collection lost the required unfiltered
+> backtrace, the rerun changed collection only, and the tree was fully
+> reverted. Within bound.
+>
+> #### The four unlawful shapes, now CLOSED
+>
+> 1. **No cross-Function transport.** Do not pass the recognized
+>    `Lowered::Constructor`, `StaticWorkerBinding`, recognition id, or transport
+>    id from the continuation `Function` into the unit `Function`. The binding
+>    may carry Function-local Cranelift values, and the conservation ledger
+>    **deliberately** rejects cross-body transition and consumption.
+> 2. **Pass reordering alone cannot legalize that.** It was the first of the
+>    three misses and it stays closed.
+> 3. **`StaticOriginId` on the unarmed template names it and does not create its
+>    worker field.** This is the third insufficiency, generalized: a stronger
+>    name is not a field.
+> 4. **No second recognition writer, and do not arm
+>    `finish_source_constructor`.** Either creates competing recognition
+>    authority, which `evt_3manpp82emcq6`'s one-authority requirement forbids.
+>
+> #### The surviving class: CONSUMER-OWNERSHIP TRANSFER
+>
+> **The exact pending outer match is lowered in the same continuation `Function`
+> that owns the recognized worker environment.** That `Function` performs
+> recognition → rebind → exact-`Var` consumption **once**; the ordinary unit
+> **forwards the already-consumed answer** and must **not** compile or replay
+> the suffix independently. **No worker and no template crosses the `Function`
+> boundary.**
+>
+> **This is the first candidate that answers WHERE the value is before saying
+> what happens to it** — it moves the consumer to the environment that already
+> holds the worker, rather than moving the worker to the consumer. The three
+> misses all did the latter.
+>
+> **It is CONDITIONALLY inside `D2k`, and the condition is real.** It qualifies
+> **only if** it is expressible as a **storage-independent view of facts and
+> operands the existing plan and continuation ABI already carry.** Not
+> authorized: a new planner population, an ABI slot, a continuation-source
+> setter, a runtime representation, a reverse search, a constructor-spelling
+> match, or an aggregate-occurrence match. **If the exact consumer relation or
+> any required operand is absent from the existing projection, section 8's hard
+> stop fires — report the dependency, do not add it.**
+>
+> #### The bounded feasibility read that precedes any route code
+>
+> Read-only / test-only instrumentation. Five items:
+>
+> 1. **Bind** the first worker-bearing outer selection **directly** to the exact
+>    source-machine `finish_source_constructor` completion.
+> 2. **Enumerate every existing planner relation** from child `26`/`22` and its
+>    continuation specialization to outer match origin `5` and its consumer
+>    owner.
+> 3. **Enumerate every operand the selected outer case needs**, and show whether
+>    the existing continuation envelope/slots supply it **in that continuation
+>    `Function`**. This is the item that decides the conditional above.
+> 4. **Re-derive row 4 origin `31` by planner parent/child coordinates** and
+>    identify the actual post-call result origin — **not** by spelling and
+>    **not** by trace proximity.
+> 5. **Prove whether the terminal-exit producer can receive any of the five
+>    governed occurrences.** A zero run count is **not** a reachability proof,
+>    which is why `UNARMED-A` stayed in census.
+>
+> **Bounds:** no route, plan, ABI, ledger, representation, second writer,
+> tracker, or AC change. Restore a clean tree and report the exact base.
+>
+> **`D2k-1c-1a` remains open** and is not discharged here; its scope value must
+> still be reported **with** the live recognize/rebind/consume arm it was taken
+> on.
+>
 > ### THE BOUNDED READ IS COMPLETE. `evt_72hmebjj5c9rt` AT `199fbbb0`.
 >
 > **The answer: ONE occurrence, lowered TWICE, in two traversals.**
@@ -1153,6 +1261,47 @@ transport-only shape.
 > region nothing has established, which is precisely how this node's earlier
 > enumerations sent instruments at populations that could not exhibit the
 > property.
+>
+> > ### THE ARCHITECT HAS NAMED A CANDIDATE PRODUCER. IT IS DERIVED, NOT MEASURED.
+> >
+> > `evt_4y754p2s8aksk` names the missing template producer as the source
+> > machine's **`finish_source_constructor`** completion — calls at
+> > `core.rs:6276` and `core.rs:6948`, implementation at `mod.rs:18632` — and
+> > states it is neither `lower_computational_producer_expr` site.
+> >
+> > **Read it as the hypothesis the feasibility read must confirm, not as a
+> > closed census.** The bounded trace did not instrument
+> > `finish_source_constructor`, so nothing has yet observed it producing the
+> > governed value; the naming is static grounding. **The ruling's own first
+> > read item asks the read to *bind* the worker-bearing outer selection to that
+> > completion** — an item that would be redundant if the binding were already
+> > measured. Recorded this way on purpose: this node has now put five premises
+> > into operative text that were inherited rather than derived.
+> >
+> > **Re-derived here at `de4ddd6d`, and all three coordinates hold exactly:**
+> > `mod.rs:18632` is the sole definition, and `core.rs:6276` / `core.rs:6948`
+> > are its only two call sites in the crate.
+> >
+> > **A measured fact the ruling does not state, which gives the read a cheap
+> > falsifier.** `finish_source_constructor` builds its template with
+> > `args: lowered_args.into_iter().map(ConstructorField::specialized)`
+> > (`mod.rs:18679-18682`) — **unconditionally, with no worker-field branch
+> > anywhere in the function.** So if this producer supplies the governed value,
+> > that value provably has **no worker field at birth**.
+> >
+> > ⇒ **The binding in read item 1 is falsifiable in one observation:** measure
+> > the outer-selected value's field kinds, and **if any field is ever
+> > worker-bearing at that seat, `finish_source_constructor` is not its
+> > producer.** Cheaper than confirming the positive, and it fails loudly.
+> > It also independently corroborates `installs == 0`: an all-`Specialized`
+> > template is exactly what an elimination with nothing to rebind would see.
+> >
+> > **"Fourth producer" counts the GOVERNED population, not construction
+> > sites.** Measured at `de4ddd6d`: `mod.rs` and `core.rs` carry **at least
+> > twenty** literal non-test `Lowered::Constructor` construction sites. Naming
+> > one more is not a closure argument, and the reason to keep saying so is on
+> > the record — **three enumerations of this population so far, each wider than
+> > the last, none closed.**
 >
 > **`UNARMED-A` stays in census.** Zero entries on rows 4 and 5 is evidence
 > about **this population only** and does not prove the site cannot receive the
@@ -1280,25 +1429,32 @@ obligations, verbatim in substance from the ruling:
   control's path is reached. A negative that passes because nothing arrived is
   the defect this campaign keeps re-finding.
 
-  > **THE REASON GIVEN FOR OBLIGATION 4 IS MEASURED WRONG. THE OBLIGATION
-  > STANDS; RE-DERIVE `31` BEFORE WRITING ITS CONTROL.**
+  > **OBLIGATION 4'S PREMISE IS WITHDRAWN BY THE ARCHITECT
+  > (`evt_4y754p2s8aksk`). THE OBLIGATION STANDS AND MUST NOT BE AUTHORED FROM
+  > THE WITHDRAWN PREMISE.**
   >
   > This bullet said *"31 is causally downstream of the required consumer"*, and
   > obligation 4 itself calls it *"row 4's origin-31 **post-consumption**
   > result"*. The bounded trace (`evt_72hmebjj5c9rt`) measured `31` as a
   > `PX8JScopeTree::Node` whose **sole argument is a literal `LexicalClosure`**,
-  > lowered with **both matches still pending** (`[Comp(21) | Comp(5)]`) — the
-  > shape of the **input** tree — and row 5's positional counterpart is named
-  > `PX8JHoleInput::Node`. **That reads as upstream, not downstream.**
+  > lowered with **both matches still pending** (`[Comp(21) | Comp(5)]`), and
+  > row 5's positional counterpart is named `PX8JHoleInput::Node`. The ruling
+  > withdraws the downstream classification on exactly that evidence.
   >
-  > **Why this is flagged rather than silently rewritten:** a negative control is
-  > keyed to *what the substituted value is*, so a control written against
-  > "downstream result" and a control written against "input tree" refuse
-  > different things. **Establish what `31` is from the fixture before the
-  > control is authored**, and correct obligation 4's wording in the same cut.
-  > The obligation — that `31` must never be substituted as the consumer's input
-  > — is unaffected either way, and the ring is not asserting the frame is
-  > wrong.
+  > **Do not replace it with "upstream".** That was the ring's reading of the
+  > same trace, and the ruling adopts it no more than the old one. `31`'s
+  > position is **open until the feasibility read re-derives it by planner
+  > parent/child coordinates** and names the actual post-call result origin.
+  >
+  > **What survives, and it is the whole obligation:** `31` is **not** origin
+  > `26`, and must never be substituted as the consumer's input. That is a
+  > distinctness claim and it was measured directly. **A negative control is
+  > keyed to what the substituted value IS**, so the control is not authorable
+  > until the read lands — but the obligation it discharges is not in doubt.
+  >
+  > **Fix this bullet's wording and obligation 4's in the same cut as the
+  > control**, from the read's result rather than from either discarded
+  > classification.
 - **Obligation 5 is an A/B, and the INFORMATIVE side is the one that GREENS.**
   Detaching the continuation restoring the refusal shows the mechanism is load
   bearing; it does **not** show the repair is correct. The green arm — rows 4
