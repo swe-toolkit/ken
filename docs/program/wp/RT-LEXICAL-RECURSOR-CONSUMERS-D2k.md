@@ -33,33 +33,56 @@ a merge-base goes stale without your branch moving.
 > lawful drop. The ring paired by planner-owned origin/position, found no
 > pairing, refused, and reported. **The increment worked.**
 >
-> ## The residual is a MEASURED ROUTE GAP, and it is an OPEN QUESTION
+> ## The residual is a LOWERING-ROUTE DEFECT — RULED, `evt_5ed8ee70cmrt`
 >
-> | row | the elimination consumes | the worker-bearing occurrence |
+> **Answered 2026-08-12 by the Architect, and the answer is the first of the
+> two possibilities: a route defect in both rows, not a legitimate product of
+> the lane.** `AC-1` therefore stays **open and unchanged**, and the successor
+> is a **route repair, never a criterion correction**.
+>
+> **The decisive fact is source POSITION, not "there are two occurrences".**
+> That framing — mine, in the question I asked — is too weak to distinguish the
+> two worlds, and the ruling replaces it:
+>
+> | row | the worker-bearing occurrence | what the other origin actually is |
 > |---|---|---|
-> | 4 | ordinary `PX8JScopeTree::Node` built at origin **31**, eliminated at origin 5 | direct-descent, origin **26**, **no elimination** |
-> | 5 | analogous, origin **22** | origin **27**, **no elimination** |
+> | 4 | origin **26**, `PX8JScopeTree::Node(Var(0))` — the transform `ComputationalMatch`'s result, and so the scrutinee answer **owed to** the terminal outer `ComputationalMatch` at origin 5 | origin **31** is `Node(fresh LexicalClosure …)`, built by that terminal match's selected case body **after** its exact-`Var` call — the **post-consumption result**, causally **downstream** of the required consumer |
+> | 5 | owner **22**, field origin **21** on exact `11e4eae1` — the inner match's **output** `PX8JHoleOutput::Node(Var(0))`, the scrutinee answer owed to the outer match | origin **27** is the ordinary **input** `PX8JHoleInput::Node(fresh LexicalClosure …)` consumed by the inner match — **not** a second worker-bearing output |
 >
-> **On the excluded lane there are two constructor occurrences, and the one
-> carrying the worker is not the one anything eliminates.**
+> > **ROW 5'S ORIGINS WERE WRONG in the first version of this block, published
+> > at `2635e461`, and this table REPLACES them.** It read *"the elimination
+> > consumes origin 22, the worker-bearing occurrence is origin 27"* — the two
+> > are reversed and mis-typed. **22 is the worker-bearing output, not the
+> > consumer; 27 is an ordinary input, not an unconsumed worker.** The error was
+> > mine: I relayed the ring's characterization without re-deriving it, and the
+> > ruling re-derived it on the exact object. Do not carry the old pair forward
+> > from any earlier copy of this file or from convo.
 >
-> **This section states remaining work, in the future tense, on purpose.** An
-> accepted partial's danger is that the node's prose silently becomes a claim
-> about the past — a later reader takes "the ring measured the gap" for "the
-> gap was closed". It was not. **Nothing below has been done.**
+> ⇒ **An elimination that sees origin 31 cannot discharge the worker in origin
+> 26.** In both fixtures the source graph places the worker-bearing occurrence
+> immediately under a later computational eliminator whose selected case calls
+> the field. **The excluded route is losing or misattaching that pending outer
+> continuation when the producer's recursive/direct descent returns.**
 >
-> Whether that unpaired occurrence is a **lowering-route defect** on the
-> excluded lane or something the lane **legitimately produces** is a mechanism
-> question routed to the Architect at `evt_45j489cd5m36w` and **not yet
-> answered**. The two answers cut different successors — a route repair flips
-> two rows from refuse to consume, whereas legitimate production means `AC-1`
-> cannot be met for rows 4/5 by any route work and the criterion itself needs
-> attention. **No successor is framed until that ruling lands**, and no seat
-> may start one.
+> **Refusing is safe while that route is absent, and is not the permanent
+> semantics.** Declaring the refusal permanent would reject a source program
+> whose own next eliminator supplies the lawful consumer. `11e4eae1` stays
+> sound and independently mergeable; nothing in the candidate or its QA route
+> changes.
 >
-> **Excluded from this candidate and from any review of it:** changing the
-> excluded lane's lowering route to close the pairing. That is the residual,
-> not a repair to reach for in order to turn `AC-1` green before merge.
+> **Lawful discharge remains exact-`Var` consumption for these rows:** the
+> outer static match must receive the recognized occurrence, rebind that exact
+> planner-owned field origin **without changing its kind**, and the existing
+> exact-`Var` call must consume it once. **No runtime carrier, constructor
+> slot, descriptor, broad `Var` rule, or erasure authority follows from this
+> ruling.**
+>
+> **The successor is [[#d2k-1c]], framed in section 5.** It is a route repair.
+> **Nothing in it has been done.**
+>
+> **Excluded from `11e4eae1` and from any review of it:** changing the excluded
+> lane's lowering route. That is `D2k-1c`'s work, not a repair to reach for in
+> order to turn `AC-1` green before merge.
 
 ## 1. What this increment owns
 
@@ -608,6 +631,68 @@ this consumer is a silent accept, measured at `739cfde3`.
 >
 > This ruling authorizes **no new representation and no new cut**. It tells the
 > measurement what distinguishes a route bug from a genuinely dead field.
+
+#### `D2k-1c`
+
+**`D2k-1c` — the pending outer continuation route repair. THE SUCCESSOR TO
+`D2k-1b-i`, and the increment that turns rows 4 and 5 from refuse to consume.**
+Authorized by Architect `evt_5ed8ee70cmrt`. **Not started.** Sequenced after
+`11e4eae1` merges; it builds on that base and on nothing else.
+
+**Fixed input:** the origin identities in the head block's ruling table, which
+the Architect measured on **exact `11e4eae1`**. *Re-derive them at your base* —
+a merge-base goes stale without your branch moving, and row 5's pair was
+already wrong once.
+
+**The defect, in one sentence:** the excluded route **loses or misattaches the
+pending outer continuation** when the producer's recursive/direct descent
+returns, so the outer static match never receives the worker-bearing occurrence
+it is owed.
+
+**The repair, bounded by the ruling:** the outer static match receives the
+recognized occurrence, **rebinds that exact planner-owned field origin without
+changing its kind**, and the existing exact-`Var` call consumes it **once**.
+
+**Prove it per literal row, by IDENTITIES and never by diagnostic text.** Five
+obligations, verbatim in substance from the ruling:
+
+1. worker-bearing transform result → the source outer match's scrutinee answer;
+2. the match installs the **same** field origin;
+3. its selected exact-`Var` call consumes it **exactly once**;
+4. **row 4's origin-31 post-consumption result stays distinct and is never
+   substituted as the consumer's input**;
+5. **detaching the pending outer continuation restores the current
+   `StaticWorkerBinding` refusal**, while conservation still forbids a silent
+   drop.
+
+- **Obligation 4 is the one a passing suite will not catch.** A repair that
+  "works" by feeding origin 31 to the consumer goes **green and is wrong** — 31
+  is causally downstream of the required consumer, so consuming it proves
+  nothing about origin 26. **Commit a named negative control that fails if 31
+  is ever substituted**, and a positive control proving that control's path is
+  reached. A negative that passes because nothing arrived is the defect this
+  campaign keeps re-finding.
+- **Obligation 5 is an A/B, and the INFORMATIVE side is the one that GREENS.**
+  Detaching the continuation restoring the refusal shows the mechanism is load
+  bearing; it does **not** show the repair is correct. The green arm — rows 4
+  and 5 consuming at exact-`Var` — is what carries the claim. Report both arms
+  and say which is which.
+- **Match by planner-owned origin/position throughout**, never constructor
+  spelling and never trace proximity. That is what made the previous
+  measurement wrong in row 5.
+- **Conservation is not weakened by this increment.** Every recognized worker
+  still gets exactly one disposition and none is dropped; `1b-i`'s ledger and
+  its close stay armed and must not be relaxed to let a row through.
+- *Hard stop, Architect, still in force from section 8:* if either row can be
+  repaired **only** by identifying or transporting its callee through the
+  **continuation-source projection surface**, **stop that row** and return the
+  measured dependency for a graph amendment. The ruling does not invoke that
+  surface, so firing this stop is a real finding.
+- *Hard stop:* **no new runtime carrier, constructor slot, descriptor, broad
+  `Var` rule, or erasure authority.** Verbatim from the ruling. If your repair
+  needs one, you have the wrong repair — stop, do not widen.
+- *Hard stop:* **`AC-1` is not to be corrected, narrowed, or qualified by row.**
+  This is a route repair. A candidate that changes `AC-1` is refused on sight.
 
 **`D2k-1b-iii` — route parity.** The second engine implements the identical
 distinction; neither path may preserve the worker while the other calls
