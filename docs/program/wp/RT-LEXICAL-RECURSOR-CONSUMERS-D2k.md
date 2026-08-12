@@ -1232,6 +1232,102 @@ transport-only shape.
 > still be reported **with** the live recognize/rebind/consume arm it was taken
 > on.
 >
+> ### SECTION 8 FIRES, AND THE ZERO IS FORCED. `evt_7gnhxy56b7d2` AT `769eb62f`.
+>
+> **On the binary criterion as issued — exact fusion keys for both rows, or
+> section 8 — section 8 fires.** `keys=0`, `descriptors=0`, `fusion_definitions=0`
+> on both rows; the builder was reached **exactly once per row** with
+> `oriented_present=false`. Reached and resolved nothing, not never reached.
+>
+> **`selected_case_body` and `consuming_call` do not exist to report.** There is
+> no key on either row to read them from. Row 4 does not name body `16`; row 5
+> does not name `12`; neither names anything.
+>
+> #### THE ZERO IS FORCED. IT IS UNMEASURED, NOT NEGATIVE.
+>
+> Two ordered short-circuits on `oriented: None`, re-derived here at
+> `769eb62f`:
+>
+> ```rust
+> // build_static_continuation_fusion_plan (static_transition.rs:9748)
+> let candidates = enumerate_live_fusion_candidates(plan, entry, declarations, oriented)?;
+> let Some(oriented) = oriented else { return Ok(StaticContinuationFusionPlan::default()) };
+>
+> // enumerate_live_fusion_candidates (:9901) -- ABOVE it, short-circuits FIRST
+> let Some(oriented) = oriented else { return Ok(Vec::new()) };
+> ```
+>
+> `build_checked_transport` is **after** that return, so **the enumeration
+> returned empty before reading a single planner fact about rows 4/5.**
+>
+> ⇒ **`keys=0` says nothing about whether these rows would produce fusion
+> candidates.** Do not record it as "rows 4/5 do not inhabit the fusion
+> population."
+>
+> > **THIS IS THE THIRD FORCED ZERO IN THIS NODE, AND THE PATTERN IS NOW THE
+> > FINDING.** `installs == 0` on the producer-seat guard — the branch was never
+> > entered. `FUSIONS installed=0` — the gate was off. `keys=0` — the
+> > enumeration short-circuited before looking. **Every one of the three would
+> > read as "the population lacks the property", and every one of the three
+> > actually means "the instrument never looked."**
+> >
+> > ⇒ **Before reporting any zero on this node, state which of the two it is,
+> > and name the precondition you checked to tell them apart.** The ring has
+> > now caught this itself twice running, which is why the count is three and
+> > not more.
+>
+> #### THE DEPENDENCY, NAMED — and it is not one the ruling closed
+>
+> **`D2f`'s fused-region mechanism is conditioned on an
+> `OrientedSubcontinuationPlanV1`, and rows 4/5 carry none.** The oriented plan
+> is a **decoded artifact** — `OrientedSubcontinuationPlanV1::decode(bytes)` off
+> checked package metadata, supplied by the caller and never derived inside the
+> compile.
+>
+> **It is not a projection, not a reverse search, and not a second authority.**
+> The ruling was right to close those three; this is a fourth thing and none of
+> the closures reach it.
+>
+> **The `None` is a property of the HARNESS, not of the rows.** Re-derived: the
+> production call at `lowering/core.rs:2106` passes
+> `oriented_subcontinuation_plan.as_ref()`, threaded from the compile entry;
+> rows 4/5 reach it through `test_objects.rs`, which passes `None` in that
+> position. The positive control
+> `d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin`
+> reaches `keys=1` through **the same production entry**, differing only by
+> passing `Some(oriented)`.
+>
+> #### THE CONSEQUENCE FOR `AC-1`, WHICH IS THE PART TO DECIDE
+>
+> > **`AC-1`'S FIVE REFUSING ROWS SIT ON A LANE WHERE THE RULED MECHANISM IS
+> > UNREACHABLE BY CONSTRUCTION.** If consumer-ownership transfer is the `D2f`
+> > mechanism, and that mechanism requires an oriented plan, then **the
+> > witnesses `AC-1` names cannot exhibit the repair** — not because the repair
+> > is wrong, but because the fixtures are on the lane that supplies `None`.
+> >
+> > **This is the same shape as the earlier `1c-1` finding** that the rows
+> > construct ledger states no current writer can produce. Twice now in this
+> > node, an acceptance witness has been unable to carry the mechanism's
+> > required input.
+> >
+> > **The frame does not resolve it.** `evt_5ed8ee70cmrt` ruled `AC-1` stays
+> > open and unchanged, a route repair and never a criterion correction — and
+> > that ruling predates knowing the mechanism needs a decoded artifact these
+> > rows lack. **Re-opening it is the Architect's, not this frame's.**
+>
+> **What is settled:** the relation `1c-2` needs is not carried **for this
+> population**, and section 8 fires as written.
+>
+> **What is NOT settled, and must not be read as negative:** whether
+> `FusionRegionClaim` would carry the relation for rows 4/5 **given** an
+> oriented plan. That is untested. The Architect's ruling that `D2k`
+> consumer-ownership transfer **is** the `D2f` mechanism is untouched by this
+> read — what was measured is the **artifact's absence**, not the mechanism's
+> fit. The one measurement that would settle it is a compile of rows 4/5 with an
+> oriented plan supplied, which is **new fixture population** and a scope
+> decision rather than an implementation one. The ring stopped rather than
+> create it, correctly.
+>
 > ### THE `consumer_owner` VALUE IS MEASURED. `evt_767jcxjfwwczm` AT `b8164398`.
 >
 > **The literal answer is YES and it discriminates NOTHING. The section 8
