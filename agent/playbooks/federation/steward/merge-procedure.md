@@ -53,6 +53,30 @@ match any`. Always an explicit SHA.
 > are checking whether something has *landed*, which is M6's job and M6 uses
 > blob identity for exactly that reason.
 
+> ### A commit-count mismatch is a REVIEW defect first. POST IT.
+>
+> When the count you measure disagrees with the handback, the damage lands
+> **before** the merge. A reviewer told *"one commit from `<BASE>`"* reasonably
+> anchors on `<SHA>^..<SHA>`, and on a two-commit cut **the earlier deliverable
+> is not truncated in that view — it is absent.** The review then comes back
+> complete having never looked at half the candidate.
+>
+> Measured 2026-08-12: a combined `AC-1a`/`AC-1b` candidate was handed back as
+> "one commit" when it was two. The strong form of the check is not the count
+> but the identifier —
+>
+> ```sh
+> git show <SHA> | grep -c <earlier-deliverable-test-name>   # 0
+> ```
+>
+> — zero occurrences of `AC-1b`'s test name anywhere in the last commit.
+>
+> ⇒ **Correct the range to the reviewers as a post, before they anchor**, and
+> state it explicitly as `<BASE>...<SHA>`. This is the same failure the M6 note
+> below corrects for *merge verification*; nothing carried it to *review scope*,
+> and the direction is identical — success reported over a smaller population
+> than was declared, with no error and no short-list warning.
+
 ## M3 — Cited-source check
 
 One command, not a judgment:
