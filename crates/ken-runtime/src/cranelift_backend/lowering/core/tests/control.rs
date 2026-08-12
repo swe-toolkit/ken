@@ -31701,7 +31701,7 @@ fn d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport() {
     // serves; what matters is that the relation stores WHICH call paid, so a
     // refusal can name both consumers rather than reporting a total.
     let consumer = owner;
-    // ⚠ `from_u32` is a TEST-only way to name a body identity, exactly as the
+    // `from_u32` is a TEST-only way to name a body identity, exactly as the
     // existing constructor controls use it. Production always passes
     // `defining_function_id`, which is `None` outside the emission pass.
     let body_one = Some(FuncId::from_u32(0));
@@ -31719,7 +31719,7 @@ fn d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport() {
         "a constructed field that no static elimination rebinds must refuse"
     );
 
-    // 2. ⭐ THE ARCHITECT'S PAIRED DISCRIMINATOR, RED HALF. Two constructions
+    // 2. THE ARCHITECT'S PAIRED DISCRIMINATOR, RED HALF. Two constructions
     //    of ONE planner origin -- the shape `row1` measures -- with only one
     //    rebind and one consumption. The second constructed worker has no
     //    transport and no consumption, and it must not be covered by the
@@ -31749,7 +31749,7 @@ fn d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport() {
          fourth state one link before the transport identity can see it"
     );
 
-    // 3. ⭐ THE PAIRED DISCRIMINATOR, GREEN HALF, and it is the positive
+    // 3. THE PAIRED DISCRIMINATOR, GREEN HALF, and it is the positive
     //    control for row 2: the same two constructions, each transitioned and
     //    each consumed, is conserved. Without this, row 2 passes for a ledger
     //    that refuses everything.
@@ -32061,7 +32061,7 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
     // THE DURABLE HALF, asserted over the population and as a relation, and it
     // is about RECOGNITION -- the only axis that carries the deciding read.
     //
-    // ⛔ It was binder-descent repetition, asserted per row. That inference is
+    // It was binder-descent repetition, asserted per row. That inference is
     // INVALID and QA blocked on it (`evt_2svjr85s2zbb8`): repeated descents of
     // one eliminating match occurrence may traverse DIFFERENT constructors, and
     // the route measurement then showed rows 4 and 5 do exactly that -- `Node`
@@ -32093,7 +32093,7 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
     // three depths are its scale check: one repeated eliminating occurrence per
     // level, so the repetition tracks the source graph rather than being an
     // artifact of the harness. The SECOND column is the deciding read.
-    // ⛔ A STABLE ROUTE NAME, never a line number. The label was
+    // A STABLE ROUTE NAME, never a line number. The label was
     // `core.rs:5411`, which re-aims itself at an unrelated site on any edit
     // above it and is then green for the wrong reason -- the same defect this
     // node already found in `AC-2`'s own control. `1c-0c`.
@@ -32105,7 +32105,7 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
                 "row1-owned-scope",
                 (
                     vec![(format!("{composed} eliminating StaticOriginId(5)"), 2)],
-                    // ⭐ THE WITNESS, and the only one. `row1` is the row
+                    // THE WITNESS, and the only one. `row1` is the row
                     // whose `Construct` is entered twice, so the SAME planner
                     // field origin is recognized twice from a single source
                     // occurrence. Every other row's second column is EMPTY --

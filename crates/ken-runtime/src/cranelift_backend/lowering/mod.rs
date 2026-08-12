@@ -2543,7 +2543,7 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
     /// today's population that is never — every row sits at zero installs
     /// behind the route gap. This one fires for every constructor field of
     /// every kind, so descent multiplicity is measurable on the rows as they
-    /// stand. ⛔ **Descent multiplicity is not field multiplicity**: repeated
+    /// stand. **Descent multiplicity is not field multiplicity**: repeated
     /// descents of one eliminating match occurrence may traverse different
     /// constructors, and rows 4 and 5 do.
     ///
@@ -2995,7 +2995,7 @@ enum ConstructorField {
         /// field is what lets the elimination and the conservation ledger name
         /// the same occurrence without either of them inferring the relation.
         ///
-        /// ⛔ **Provenance, not identity.** It names the *occurrence*, and one
+        /// **Provenance, not identity.** It names the *occurrence*, and one
         /// occurrence can be constructed more than once in a single compile —
         /// `D2k-1c-0` measured `row1` doing it. `recognition` below is what
         /// distinguishes those constructions.
@@ -4114,14 +4114,14 @@ struct StaticWorkerFieldLedger {
     /// **The recognitions.** One entry per *constructed* worker field, keyed by
     /// a fresh [`StaticWorkerRecognitionId`].
     ///
-    /// ⛔ **NOT keyed by `field_origin`.** It was, with `or_insert`, and that
+    /// **NOT keyed by `field_origin`.** It was, with `or_insert`, and that
     /// silently dropped the second construction of one occurrence: `recognize`,
     /// `recognize`, one `rebind`, one consumption, close **green** — with a
     /// constructed worker forgotten before any transport existed to owe for it.
     /// The candidate's own `row1` measurement said "two instances" while its
     /// ledger held one. Architect `evt_3manpp82emcq6`.
     ///
-    /// ⛔ **The CAUSE of the repeated construction is unmeasured, and nothing
+    /// **The CAUSE of the repeated construction is unmeasured, and nothing
     /// here should be read as naming one.** An earlier revision attributed it to
     /// *"a speculative descent and the descent that keeps its result"*; that is
     /// one shape that fits and it was never established. What is measured is
@@ -4188,7 +4188,7 @@ struct MintedStaticWorkerTransport {
 /// **The transport identity, opaque BECAUSE the field is private to an inner
 /// module and for no weaker reason.**
 ///
-/// ⛔ A private-field newtype declared *beside* its users refuses nothing: every
+/// A private-field newtype declared *beside* its users refuses nothing: every
 /// sibling in the same module can still write `StaticWorkerTransportId(7)`, so
 /// "only the issuer mints" would be a comment rather than a rule. The ledger and
 /// the binder both live in this module, so the type and its issuer are moved
@@ -4203,7 +4203,7 @@ mod transport_identity {
     /// An opaque compiler-only **recognition** identity: one per successful
     /// `ConstructorField::StaticWorker` construction.
     ///
-    /// ⛔ **A SEPARATE identity from the transport, and separate from the
+    /// **A SEPARATE identity from the transport, and separate from the
     /// planner origin, because it answers a third question.** The planner origin
     /// names the *occurrence*; the transport names one entry into lexical
     /// binding authority; this names one **constructed field**. Keying
@@ -4256,7 +4256,7 @@ impl StaticWorkerFieldLedger {
     /// **A producer constructed a worker field.** One recognition identity per
     /// construction, minted here and carried by that exact compiler template.
     ///
-    /// ⛔ **Never deduplicated by `field_origin`.** Two constructions of one
+    /// **Never deduplicated by `field_origin`.** Two constructions of one
     /// occurrence are two constructed workers, each owing its own transition
     /// and its own consumption; collapsing them loses the second before any
     /// transport identity exists to be short.
@@ -4468,7 +4468,7 @@ impl StaticWorkerFieldLedger {
     /// second writer of `consumed` that skips the call-side guard.
     fn close(&self) -> Result<(), CraneliftBackendError> {
         // Link one: every CONSTRUCTED field transitioned into binding
-        // authority. ⛔ Per recognition instance, never "some minted transport
+        // authority. Per recognition instance, never "some minted transport
         // shares this origin" -- that is what let a second construction of one
         // occurrence vanish while the first covered for it.
         for (recognition, recognized) in &self.recognized {
