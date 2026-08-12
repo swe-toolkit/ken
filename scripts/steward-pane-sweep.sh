@@ -20,7 +20,19 @@
 
 set -uo pipefail
 
-SEATS=${*:-"runtime-leader runtime-implementer runtime-qa architect foundation-leader foundation-implementer"}
+# DEFAULT IS EVERY RUNNING SEAT, derived from tmux -- never a hardcoded list.
+# Measured 2026-08-12: the default was six seats chosen when this was written, so
+# every argument-less tick swept 6 of 28 and reported a clean fleet on 22% of it.
+# A stranded composer is invisible to every convo read, so the seats outside the
+# list had NO instrument on them at all -- and the omission is silent, because a
+# short sweep looks exactly like a clean one. Passing seats explicitly still works
+# and is the right thing when you are chasing one ring.
+SEATS=${*:-$(tmux list-sessions -F '#{session_name}' 2>/dev/null \
+  | sed -n 's/^moot-//p' | grep -v '^steward$' | sort | tr '\n' ' ')}
+if [ -z "${SEATS// /}" ]; then
+  echo "no moot-* tmux sessions found; pass seat names explicitly" >&2
+  exit 0   # a fact-gatherer reports; it does not fail on what it finds
+fi
 
 for p in $SEATS; do
   b=$(tmux capture-pane -t "moot-$p" -p -S -200 2>/dev/null)
