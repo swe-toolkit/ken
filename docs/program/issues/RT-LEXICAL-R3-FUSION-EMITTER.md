@@ -49,6 +49,47 @@ origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliat
 > **No credit beyond `D0`.** No emitter body, no arming, no interior seam, no
 > work on the other seven expressions. **`D1` is next** — the interior seam of
 > the frame's section 4, tested against reality.
+>
+> > #### `D0` CARRIES A CONFIRMED DEFECT — repaired as a `D1` rider
+> >
+> > Adversary `evt_7gpcg8359ear`, **confirmed by the Steward against the
+> > source**. The doc at `control.rs:2963` says the two plane readings differ
+> > *"only in the argument that is genuinely different between the two lanes —
+> > `Some(oriented)` against `None`."* **They differ in all four arguments:**
+> > `:3042` passes `&planner, &entry, &declarations, Some(&oriented)`; `:3073`
+> > passes `&seed_planner, &seed_expr, &seed_declarations, None`.
+> >
+> > **The halves fail separately, and only one fails.**
+> >
+> > | claim | status |
+> > |---|---|
+> > | **one currency** — same function, same return type, so `0` and `1` are the same quantity rather than an arrival field vs a plane length | **survives**, and is a property of the signature |
+> > | the instrument is **not a constant** | survives — it demonstrably returns both |
+> > | **attribution**: that `Some(oriented)` vs `None` is what moves it | **FAILS** — with four arguments differing, the difference is equally explained by the subject |
+> >
+> > **The design is right and the licence is what overstates.** The absence row
+> > is *supposed* to be the seed `px8j` before-hole with no oriented plan — the
+> > corrected comparator inherited from `17f68eb1`. **A one-variable comparison
+> > was never available between these two rows**, so this is a false sentence
+> > about a sound structure, not a bad structure.
+> >
+> > **`D1` MUST CARRY BOTH REPAIRS:**
+> >
+> > 1. **Correct `control.rs:2963`** to state what is established and what is
+> >    not. Do not simply delete the rider — say that the shared call buys the
+> >    currency, and that attribution to `oriented` is **not** established by
+> >    these two rows.
+> > 2. **Add the missing one-variable cell:** the checked `D2j` twin with the
+> >    oriented plan **withheld** — same planner, same expression, same
+> >    declarations, `None`. **This is not decoration.** The frame's excluded
+> >    scope forbids *"making fusion independent of `oriented`"* because that
+> >    reopens `D2h`'s soundness-bearing identity (Architect
+> >    `evt_6vf66hmwv52y6`), and this cell is the only thing here that measures
+> >    that dependence. **If it resolves `0`**, attribution holds and the
+> >    sentence becomes true as originally written. **If it resolves `1`**, the
+> >    oriented plan is not what drives the plane and the positive row means
+> >    something other than what `D0` claims — **a finding that must reach the
+> >    Architect before any arming.**
 
 ## What this node is, and why it exists as a node
 
