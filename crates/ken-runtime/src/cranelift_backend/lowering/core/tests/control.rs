@@ -83,6 +83,7 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        static_worker_fields: Default::default(),
         fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
@@ -250,6 +251,7 @@ fn run_px8j_malformed_recursor_consumer(
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        static_worker_fields: Default::default(),
         fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
@@ -3287,7 +3289,7 @@ fn d2k_wall_under_current_selector(
 /// reads. It reds when a repair moves them to a different owner, which is the
 /// intended signal.
 #[test]
-fn d2k_1a_the_five_static_worker_reads_are_owned_by_construct_arguments() {
+fn d2k_1a_the_five_static_workers_are_recognized_at_their_construct_owners() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
     use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
     struct Restore;
@@ -3318,16 +3320,21 @@ fn d2k_1a_the_five_static_worker_reads_are_owned_by_construct_arguments() {
         // and this path records the read before its own caller -- so a scan
         // reported a stale predecessor and was green without establishing
         // adjacency at all. Architect block on `a1d36e99`.
-        let Some((read_at, origin_site)) =
-            events.iter().enumerate().find_map(|(at, event)| match event {
-                D2kOwnerEvent::StaticWorkerRead { site, .. } => Some((at, *site)),
-                _ => None,
-            })
-        else {
-            return (None, None, false);
-        };
-        let constructor = events[..read_at].iter().rev().find_map(|event| match event {
-            D2kOwnerEvent::ConstructEntered { constructor, .. } => Some(constructor.clone()),
+        let origin_site = events.iter().find_map(|event| match event {
+            D2kOwnerEvent::StaticWorkerRead { site, .. } => Some(*site),
+            _ => None,
+        });
+        // **RE-DERIVED at `D2k-1b-i`: the owner comes from the PRODUCER's own
+        // event, keyed by the planner.** It used to be recovered by scanning
+        // back from the read for the nearest preceding `ConstructEntered` --
+        // sound for evidence-only work, and explicitly ruled so, but not here.
+        // A constructor argument may itself be a `Construct`, and then
+        // nearest-preceding names the INNER one while agreeing with the planner
+        // on every non-nested fixture. `StaticWorkerField` carries
+        // `child_static_origin(owner, position)`, so owner and argument are
+        // related by a planner fact rather than by emission proximity.
+        let constructor = events.iter().find_map(|event| match event {
+            D2kOwnerEvent::StaticWorkerField { constructor, .. } => Some(constructor.clone()),
             _ => None,
         });
         // Whole-compile, not a prefix. The claim worth making is that the
@@ -3340,7 +3347,7 @@ fn d2k_1a_the_five_static_worker_reads_are_owned_by_construct_arguments() {
                     if site.starts_with("mod.rs environment values")
             )
         });
-        (constructor, Some(origin_site), forwarded)
+        (constructor, origin_site, forwarded)
     }
 
     let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
@@ -3351,7 +3358,21 @@ fn d2k_1a_the_five_static_worker_reads_are_owned_by_construct_arguments() {
         Px8jSelectedScopePlacement::AfterReturnHole,
     ));
 
-    let var_read = Some("core.rs Var in value position");
+    // **RE-DERIVED at `D2k-1b-i`, and this control went red because the RULED
+    // SEMANTICS CHANGED -- not because the repair is incomplete.** It asserted
+    // that each of the five *takes* a bare-`Var` value read of a static worker,
+    // at `core.rs Var in value position`. `D2k-1b`'s producer recognizes the
+    // binding **ahead of** that read, so the read it pinned is precisely what
+    // the increment deletes. Asserting it still happens would be asserting the
+    // producer never fired.
+    //
+    // **Every axis is kept, and two get stronger.** The owner is still measured
+    // per row against its own literal -- now from the producer's planner-keyed
+    // event instead of a backwards scan. The read axis inverts from *"this
+    // exact read was taken"* to *"no read was taken at all"*, which is the
+    // property the repair actually establishes. The forwarding-caller axis is
+    // unchanged.
+    let no_read: Option<&'static str> = None;
     // Every component is compared against a LITERAL, and none against the
     // population. That is deliberate and it is the whole redness property:
     // a sameness check across the five would be GREEN under a uniform move,
@@ -3367,16 +3388,18 @@ fn d2k_1a_the_five_static_worker_reads_are_owned_by_construct_arguments() {
             ("row5-after-hole", owner(&row5, "ken_d2k1_row5")),
         ],
         [
-            ("row1-owned-scope", (Some("ctor:fixture::PX8JTree1::Node".to_string()), var_read, false)),
-            ("row4-depth-1", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), var_read, false)),
-            ("row4-depth-2", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), var_read, false)),
-            ("row4-depth-3", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), var_read, false)),
-            ("row5-after-hole", (Some("ctor:fixture::PX8JHoleOutput::Node".to_string()), var_read, false)),
+            ("row1-owned-scope", (Some("ctor:fixture::PX8JTree1::Node".to_string()), no_read, false)),
+            ("row4-depth-1", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), no_read, false)),
+            ("row4-depth-2", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), no_read, false)),
+            ("row4-depth-3", (Some("ctor:fixture::PX8JScopeTree::Node".to_string()), no_read, false)),
+            ("row5-after-hole", (Some("ctor:fixture::PX8JHoleOutput::Node".to_string()), no_read, false)),
         ],
-        "D2k-1a: each failing static-worker read must be owned by a Construct arm building the \
-         recorded constructor, must be taken at the bare-Var value read, and must NOT have \
-         passed through the forwarding caller -- which is the case the edge alone could not \
-         exclude. A different owner is a second root and re-opens the sizing."
+        "D2k-1a RE-DERIVED: each row's static worker must be recognized at the Construct arm \
+         building the recorded constructor, keyed by the planner's (owner, position) origin; \
+         no bare-Var value read of a worker may be taken at all, because recognition now \
+         precedes it; and the forwarding caller must still never fire -- the case the edge \
+         alone could not exclude. A row whose read reappears is the producer having stopped \
+         firing; a different owner is a second root and re-opens the sizing."
     );
 }
 
@@ -3436,7 +3459,7 @@ fn d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed() {
     );
 }
 #[test]
-fn d2k_0_the_five_static_worker_walls_share_one_edge_and_one_route() {
+fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
     struct Restore;
     impl Drop for Restore {
@@ -3468,25 +3491,53 @@ fn d2k_0_the_five_static_worker_walls_share_one_edge_and_one_route() {
         ("row5-after-hole", wall(&row5_after, "ken_d2k0_row5")),
     ];
 
-    let expected = Some((
-        "StaticWorkerBinding".to_string(),
-        "a Var in value position".to_string(),
-    ));
+    // **RE-DERIVED at `D2k-1b-i`. This control went red because the RULED
+    // SEMANTICS CHANGED, not because the repair is incomplete.** Its retiring
+    // event was always the repair itself: it pinned that all five stood at one
+    // shared **value-read** wall with edge *"a Var in value position"*, and
+    // `D2k-1b`'s whole purpose is to recognize the binding **ahead of** that
+    // read. The edge it asserted cannot survive the increment that removes the
+    // read, so restoring it would be restoring the defect.
+    //
+    // **The durable half is kept and it is the stronger claim:** not one of the
+    // five reaches a value-producing read of a static worker any more. What
+    // each now reports is its *next* wall, and those are deliberately NOT
+    // uniform -- row 1 reaches a different construct entirely. A sameness
+    // assertion across the five would be green under a uniform move, which is
+    // the case that matters most, so each row is compared against its own
+    // literal.
+    let conservation = Some("StaticWorkerBinding".to_string());
     assert_eq!(
         five.iter()
-            .map(|(label, outcome)| (*label, outcome.clone()))
+            .map(|(label, outcome)| (
+                *label,
+                outcome.as_ref().map(|(construct, _)| construct.clone())
+            ))
             .collect::<Vec<_>>(),
         vec![
-            ("row1-owned-scope", expected.clone()),
-            ("row4-depth-1", expected.clone()),
-            ("row4-depth-2", expected.clone()),
-            ("row4-depth-3", expected.clone()),
-            ("row5-after-hole", expected.clone()),
+            // Row 1 refuses at a wall that is not this increment's, and that is
+            // the A/B's informative side rather than an inconvenience: without
+            // a row that moves for a different reason, "the five all refuse"
+            // is equally consistent with the arming having done nothing.
+            ("row1-owned-scope", Some("NativeJoinPlanV1".to_string())),
+            ("row4-depth-1", conservation.clone()),
+            ("row4-depth-2", conservation.clone()),
+            ("row4-depth-3", conservation.clone()),
+            ("row5-after-hole", conservation.clone()),
         ],
-        "D2k-0: each of the five must stand at the StaticWorkerBinding wall and must report the \
-         SAME edge. The edge is what identifies which value-producing read was taken; the rest \
-         of the sentence is the shared chokepoint's and discriminates nothing. A row reporting \
-         a different edge is a second root and re-opens the sizing."
+        "D2k-0 RE-DERIVED: with the producer armed, none of the five stands at a value-producing \
+         read of a static worker. Four now reach the conservation close, which refuses because \
+         nothing rebinds the recognized field; row 1 reaches an unrelated wall first. A row \
+         reporting the old edge would mean the recognition stopped happening."
+    );
+    assert!(
+        five.iter().all(|(_, outcome)| outcome
+            .as_ref()
+            .is_none_or(|(_, edge)| edge != "a Var in value position")),
+        "the durable half of D2k-0: not one of the five may reach the bare-Var value read again. \
+         That read is what D2k-1b recognizes ahead of, so its reappearance is the producer \
+         having stopped firing -- which no per-row wall literal above would distinguish from a \
+         row legitimately moving on."
     );
 }
 #[test]
@@ -3629,6 +3680,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        static_worker_fields: Default::default(),
         fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
@@ -31408,42 +31460,50 @@ fn d2e_ac9_layout_agrees_with_the_prefix_production_assembled() {
     }
 }
 
-/// **`D2k-1b-i`'s STOP, made executable.** Arming the `Construct` producer
-/// turns four of the five expressions from a fail-closed refusal into a
-/// successful compile in which the transported worker is **never consumed**.
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i` — the CONSERVATION measurement,
+/// per row.**
 ///
-/// `D2k-1b-i`'s own acceptance is *"no consumer becomes green here — the five
-/// still refuse"*, and this measures that it is false. The three facts are
-/// asserted together because separately each has an innocent reading:
+/// **The invariant is conservation, not exact-`Var` consumption** (Architect
+/// `evt_5etamwj8tp2fh`). Every recognized static worker at constructor field
+/// `(owner, position)` gets exactly one disposition before a runtime-value
+/// boundary: consumed once at the exact-`Var` call, erased before construction
+/// under positive unobservability authority, or refused before emission. **None
+/// is dropped.** The predecessor cut shipped exactly the dropped state — four
+/// rows compiled with the worker built and forgotten — so this test measures
+/// the disposition and never the compile.
 ///
-/// - **the recognition fired** — every row records a `StaticWorkerField` at the
-///   owning constructor, so the producer really is armed and the rows are not
-///   green for some unrelated reason;
-/// - **the bare-`Var` value read never happened** — `worker_reads` is empty, so
-///   the refusal did not merely move, it stopped existing on four rows;
-/// - **row 1 ADVANCES rather than greening** — it reaches a *later, different*
-///   refusal. That is the one-variable A/B that separates *"the increment did
-///   nothing"* from *"the increment worked and revealed the next wall"*, and it
-///   is why the four greens are attributable to the arming.
+/// **A row that COMPILES is not a row that PASSES**, which is why `compiles`
+/// is one column beside the dispositions rather than the assertion.
 ///
-/// ⇒ **The worker is provably not called on the green rows.** No
-/// `ConstructorField` refusal fired, and the only readers that do not refuse
-/// are `d9_collect` (`cfg(test)`, contributes nothing), `unwrap_terminal_ret`
-/// (hands the constructor back intact) and `same_recursive_field_shapes`
-/// (answers `false`). None of them consumes a worker, and `D2k-1b-ii` — which
-/// installs the field into the lexical binding authority so the exact-`Var`
-/// call can consume it — has not landed. **The field is built and dropped.**
+/// ## What each column is, and which are chosen versus measured
 ///
-/// **Promise class: TRANSITION SENTINEL, and it is named for the boundary
-/// rather than for the count.** It pins the state that makes `1b-i`
-/// unlandable *alone*. It is intended to go red the moment the consumer lands
-/// and these rows either refuse again or become green *because the worker is
-/// consumed at the exact-`Var` call* — which is `AC-1`. **Retiring event: the
-/// candidate that lands `D2k-1b-i` and `D2k-1b-ii` together.** It must not be
-/// carried forward as an invariant; a green here after that candidate is the
-/// defect, not the pass.
+/// - `recognized` — the owning constructors at which a worker was recognized
+///   ahead of `value_at`. **Chosen literals**, one per row.
+/// - `bare_var_reads` — value-producing reads of a static worker. Zero is the
+///   producer working: recognition happens before the read is taken.
+/// - `installs` — static eliminations that rebound the field into the lexical
+///   binding authority **without erasing its kind**. This is the consumption
+///   axis, and **it is measured, not chosen**.
+/// - `consuming_calls` — exact-`Var` calls that consumed a worker.
+/// - `outcome` — the refusal's construct, or `compiled`.
+///
+/// ## Promise class: MIXED, and the split is stated because it matters
+///
+/// - **Durable invariant**, asserted relationally below the table: no row may
+///   ever compile while a worker was recognized and nothing consumed it. That
+///   is the conservation total; it survives every extension that preserves the
+///   contract, and it is the assertion that would have caught `739cfde3`.
+/// - **Transition sentinel** on the literal rows: `installs == 0` records the
+///   measured **route gap**, not a property of the world. The eliminations
+///   these rows need exist in their source graphs; the excluded lane's route
+///   reaches a *different occurrence* of the same constructor, so the field the
+///   producer recognizes is never the field an elimination sees. **Retiring
+///   event:** the candidate that makes the elimination reach the recognized
+///   occurrence. At that point these rows install, consume, and go green under
+///   `AC-1` — and this table must be rewritten to those values rather than
+///   restored.
 #[test]
-fn d2k_1b_i_arming_the_producer_alone_drops_the_worker_on_four_of_the_five() {
+fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
     use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
     struct Restore;
@@ -31452,8 +31512,11 @@ fn d2k_1b_i_arming_the_producer_alone_drops_the_worker_on_four_of_the_five() {
             set_selector_variant_exclusion(None);
         }
     }
-    /// `(recognized owner constructors, bare-Var worker reads, compiles)`.
-    fn armed(expression: &RuntimeExpr, symbol: &str) -> (Vec<String>, usize, bool) {
+    /// `(recognized owners, bare-Var reads, installs, consuming calls, outcome)`.
+    fn disposition(
+        expression: &RuntimeExpr,
+        symbol: &str,
+    ) -> (Vec<String>, usize, usize, usize, String) {
         set_selector_variant_exclusion(Some(
             RecursiveDescentResidual::LexicalCallArgumentRecursor,
         ));
@@ -31469,48 +31532,114 @@ fn d2k_1b_i_arming_the_producer_alone_drops_the_worker_on_four_of_the_five() {
             })
             .collect();
         recognized.dedup();
-        let reads = events
-            .iter()
-            .filter(|event| matches!(event, D2kOwnerEvent::StaticWorkerRead { .. }))
-            .count();
-        (recognized, reads, result.is_ok())
+        let count = |predicate: fn(&&D2kOwnerEvent) -> bool| events.iter().filter(predicate).count();
+        let outcome = match &result {
+            Ok(_) => "compiled".to_string(),
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, .. })) => {
+                format!("refused:{construct}")
+            }
+            Err(other) => format!("refused-other:{other}"),
+        };
+        (
+            recognized,
+            count(|event| matches!(event, D2kOwnerEvent::StaticWorkerRead { .. })),
+            count(|event| matches!(event, D2kOwnerEvent::StaticWorkerBinderInstalled { .. })),
+            count(|event| matches!(event, D2kOwnerEvent::StaticWorkerCallConsumed { .. })),
+            outcome,
+        )
     }
 
-    let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
-    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
-    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
-    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
-    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
-        Px8jSelectedScopePlacement::AfterReturnHole,
-    ));
+    let rows = [
+        (
+            "row1-owned-scope",
+            disposition(
+                &host_result_closure_match(px8j_layered_recursive_result(1, 1)),
+                "ken_d2k1bi_row1",
+            ),
+        ),
+        (
+            "row4-depth-1",
+            disposition(
+                &host_result_closure_match(px8j_scope_chain_observation_result(1, 0)),
+                "ken_d2k1bi_row4_d1",
+            ),
+        ),
+        (
+            "row4-depth-2",
+            disposition(
+                &host_result_closure_match(px8j_scope_chain_observation_result(2, 0)),
+                "ken_d2k1bi_row4_d2",
+            ),
+        ),
+        (
+            "row4-depth-3",
+            disposition(
+                &host_result_closure_match(px8j_scope_chain_observation_result(3, 0)),
+                "ken_d2k1bi_row4_d3",
+            ),
+        ),
+        (
+            "row5-after-hole",
+            disposition(
+                &host_result_closure_match(px8j_equal_payload_hole_placement(
+                    Px8jSelectedScopePlacement::AfterReturnHole,
+                )),
+                "ken_d2k1bi_row5",
+            ),
+        ),
+    ];
 
+    // THE DURABLE HALF. Asserted over the population first and as a relation,
+    // because it is the one clause that must hold for every row under every
+    // future route: a recognized worker never survives into a compiled object
+    // without something having consumed it.
+    for (label, (recognized, _, installs, consuming_calls, outcome)) in &rows {
+        assert!(
+            !(outcome == "compiled" && !recognized.is_empty() && *consuming_calls == 0),
+            "{label} compiled with {} recognized static worker field(s), {installs} rebound and \
+             {consuming_calls} consumed. A row that compiles is not a row that passes: a worker \
+             built and then neither consumed nor authoritatively erased is the forbidden fourth \
+             state, and it is what the producer-alone cut shipped.",
+            recognized.len()
+        );
+    }
+
+    // THE MEASURED HALF, each component against a LITERAL and never against the
+    // population -- the discipline `D2k-1a` was rebuilt under, because a
+    // sameness check across the five is green under a uniform move.
     let tree1 = vec!["ctor:fixture::PX8JTree1::Node".to_string()];
     let scope = vec!["ctor:fixture::PX8JScopeTree::Node".to_string()];
     let hole = vec!["ctor:fixture::PX8JHoleOutput::Node".to_string()];
-    // Every row is compared against a LITERAL, never against the population --
-    // the same discipline `D2k-1a` was rebuilt under. A sameness check across
-    // the five is green under a uniform move, which is the case that matters.
+    let refused_worker = "refused:StaticWorkerBinding".to_string();
     assert_eq!(
+        rows,
         [
-            ("row1-owned-scope", armed(&row1, "ken_d2k1bi_row1")),
-            ("row4-depth-1", armed(&row4_d1, "ken_d2k1bi_row4_d1")),
-            ("row4-depth-2", armed(&row4_d2, "ken_d2k1bi_row4_d2")),
-            ("row4-depth-3", armed(&row4_d3, "ken_d2k1bi_row4_d3")),
-            ("row5-after-hole", armed(&row5, "ken_d2k1bi_row5")),
+            // Row 1 refuses EARLIER than the conservation close, at a wall that
+            // is not this increment's -- so its recognized field never reaches
+            // a disposition here. That is the A/B's informative side: without a
+            // row that moves for a different reason, "they all refuse" is
+            // equally consistent with the arming having done nothing.
+            (
+                "row1-owned-scope",
+                (tree1, 0, 0, 0, "refused:NativeJoinPlanV1".to_string())
+            ),
+            (
+                "row4-depth-1",
+                (scope.clone(), 0, 0, 0, refused_worker.clone())
+            ),
+            (
+                "row4-depth-2",
+                (scope.clone(), 0, 0, 0, refused_worker.clone())
+            ),
+            ("row4-depth-3", (scope, 0, 0, 0, refused_worker.clone())),
+            ("row5-after-hole", (hole, 0, 0, 0, refused_worker)),
         ],
-        [
-            // Row 1 is the A/B's informative side: recognized, not read, and
-            // still refusing -- at a LATER wall than the one it stood at.
-            ("row1-owned-scope", (tree1, 0, false)),
-            ("row4-depth-1", (scope.clone(), 0, true)),
-            ("row4-depth-2", (scope.clone(), 0, true)),
-            ("row4-depth-3", (scope, 0, true)),
-            ("row5-after-hole", (hole, 0, true)),
-        ],
-        "D2k-1b-i STOP: arming the producer alone must be shown to recognize the worker at its \
-         owning constructor, to remove the bare-Var read entirely, and to leave four of the five \
-         COMPILING with nothing consuming the field. If a row here refuses again, the consumer \
-         has landed and this sentinel has done its job -- retire it against AC-1 rather than \
-         restoring it."
+        "D2k-1b-i conservation: each row must recognize its worker at the owning constructor \
+         ahead of any value-producing read (bare_var_reads == 0), and then reach a disposition. \
+         installs == 0 is the measured ROUTE GAP -- the excluded lane's static eliminations \
+         consume a different occurrence of the same constructor than the one the producer \
+         recognizes -- so the lawful disposition available today is REFUSE, keyed by the \
+         planner's (owner, position) origin. If a row here installs and consumes, the route gap \
+         is closed and this table is rewritten to AC-1's green, never restored."
     );
 }

@@ -2398,6 +2398,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let mut func_ctx = FunctionBuilderContext::new();
     let mut compiler = Lowering {
         continuation_claims: None,
+        static_worker_fields: StaticWorkerFieldLedger::default(),
         // `D2f` — the preflighted ledger, moved in whole. Handed over rather
         // than rebuilt here: preflight read the plan BEFORE ownership was
         // installed, and a ledger rebuilt at this point would validate every
@@ -2605,6 +2606,12 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // invisible to the laws rather than caught by them. It declares
             // none today — that is a fact about the adapter, not a reason to
             // narrow the window.
+            //
+            // `D2k-1b-i` — the conservation close sits beside the causal and
+            // fused-region ledgers because it answers the same shape of
+            // question: an obligation opened in one descent whose discharge can
+            // only be checked once every descent is done.
+            compiler.require_complete_static_worker_disposition()?;
             super::units::close_continuation_claim_ledger(&mut compiler)?;
             // `D2f` — the fused-region ledger's four-way closeout: ownership,
             // definition, redirect and takeover are each exactly the installed
@@ -2716,6 +2723,11 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 // closed at this generated root boundary: otherwise a recursive
                 // source-machine revisit can emit one case and later classify
                 // that same subtree as dead.
+                // `D2k-1b-i` — the conservation close, ahead of every emission
+                // of the root answer below. A recognized static-worker field is
+                // consumed by an exact-`Var` call or the compilation refuses;
+                // there is no third outcome and no way to drop one.
+                compiler.require_complete_static_worker_disposition()?;
                 compiler.validate_recursive_descent_join_disposition()?;
                 compiler.require_complete_join_plan_consumption()?;
                 compiler.require_complete_dynamic_splice_edge_consumption()?;
@@ -4590,10 +4602,7 @@ impl<'a> Lowering<'a> {
                         "tree-producing match constructor arity changed",
                     ));
                 }
-                let case_env = env_with(
-                    specialized_fields_at(&args, "a tree-producing match case binder")?,
-                    producer_env,
-                );
+                let case_env = self.bound_constructor_fields(&args, producer_env);
                 let body =
                     self.case_body_occurrence(static_origin, case_index, &producer_case.body)?;
                 self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
@@ -5399,10 +5408,7 @@ impl<'a> Lowering<'a> {
                 #[cfg(test)]
                 d2e_record_binder_assembly(case, &induction_hypotheses);
                 let mut case_env = induction_hypotheses;
-                extend_specialized(
-                    &mut case_env,
-                    specialized_fields_at(&args, "a computational match case binder")?,
-                );
+                self.extend_constructor_fields(&mut case_env, &args);
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Computational(eliminator),
@@ -5453,10 +5459,7 @@ impl<'a> Lowering<'a> {
                         ),
                     ));
                 }
-                let mut case_env = env_with(
-                    specialized_fields_at(&args, "an ordinary match case binder")?,
-                    &[],
-                );
+                let mut case_env = self.bound_constructor_fields(&args, &[]);
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Ordinary(eliminator),
@@ -6348,6 +6351,10 @@ impl<'a> Lowering<'a> {
                             _ => None,
                         };
                         if let Some((binder_index, worker)) = static_worker {
+                            // `D2k-1b-i` — the source machine's terminal
+                            // disposition, counted into the same conservation
+                            // ledger as the direct descent's.
+                            self.static_worker_fields.note_consuming_call();
                             #[cfg(test)]
                             d8e_record_consumption();
                             // `D8l2` — which facet this consumption carried,
@@ -7101,13 +7108,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 ),
                                         ));
                                     }
-                                    let mut case_env = env_with(
-                                        specialized_fields_at(
-                                            &args,
-                                            "a source-machine match case binder",
-                                        )?,
-                                        &[],
-                                    );
+                                    let mut case_env = self.bound_constructor_fields(&args, &[]);
                                     case_env.extend(env);
                                     SourceMachineState::Eval {
                                         expr: self.owned_case_body_occurrence(
@@ -7620,13 +7621,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 Err(trap) => return Ok(LoweringOperand::Specialized(Lowered::Trap(trap))),
                             };
                             let mut case_env = induction_hypotheses;
-                            extend_specialized(
-                                &mut case_env,
-                                specialized_fields_at(
-                                    &args,
-                                    "a source-machine computational match case binder",
-                                )?,
-                            );
+                            self.extend_constructor_fields(&mut case_env, &args);
                             case_env.extend(frame_env);
                             let previous_selected = control.selected.clone();
                             let pending = std::mem::take(&mut control.selected.pending);
@@ -12915,7 +12910,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 // `child_occurrence` takes, never from emission proximity. A
                 // constructor argument that is itself a `Construct` therefore
                 // cannot be mistaken for this field's owner.
-                let _field_origin = self
+                let field_origin = self
                     .static_transition_plan
                     .child_static_origin(static_origin, position)?;
                 #[cfg(test)]
@@ -12923,11 +12918,20 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     crate::cranelift_backend::lowering::D2kOwnerEvent::StaticWorkerField {
                         owner: static_origin,
                         position,
-                        field_origin: _field_origin,
+                        field_origin,
                         constructor: constructor.to_string(),
                     },
                 );
-                fields.push(ConstructorField::StaticWorker(binding));
+                // The conservation ledger opens HERE, on the same planner key
+                // the field carries. Recognizing a worker is what creates the
+                // obligation, so the obligation is recorded at recognition and
+                // not at any later point that could be skipped.
+                self.static_worker_fields
+                    .recognize(static_origin, position, field_origin, constructor);
+                fields.push(ConstructorField::StaticWorker {
+                    binding,
+                    field_origin,
+                });
                 continue;
             }
             let occurrence = self.child_occurrence(static_origin, position, arg)?;
@@ -15295,10 +15299,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         ),
                     ));
                 }
-                let case_env = env_with(
-                    specialized_fields_at(&args, "a match case binder")?,
-                    env,
-                );
+                let case_env = self.bound_constructor_fields(&args, env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 self.lower_expr(builder, body, &case_env)
             }
@@ -15526,6 +15527,17 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         env.get(*index as usize)
                     {
                         let worker = worker.clone();
+                        // `D2k-1b-i` — the terminal disposition. A worker that
+                        // reaches this arm is consumed; the conservation close
+                        // counts it against the fields a static elimination
+                        // rebound.
+                        self.static_worker_fields.note_consuming_call();
+                        #[cfg(test)]
+                        crate::cranelift_backend::lowering::record_d2k_owner_event(
+                            crate::cranelift_backend::lowering::D2kOwnerEvent::StaticWorkerCallConsumed {
+                                origin: static_origin,
+                            },
+                        );
                         // **`D5a` — the checked-IH marker is consumed HERE, on
                         // the application, before a single instruction of it is
                         // emitted.** Every identity is cross-checked against the
