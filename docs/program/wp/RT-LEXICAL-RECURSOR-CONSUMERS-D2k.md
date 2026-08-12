@@ -751,22 +751,39 @@ strongest claim the representation can support, not a gap in the rows.
 > unreachable, correct the doc."* **The wrong answer, reached by a soundly
 > executed method, from a bad enumeration.**
 >
-> **The quantifier was also the wrong shape.** *Any two of those four* asks for
-> **convergence of two distinct sites**. What decides the ledger is **one site
-> descending twice** over one occurrence — multiplicity, of which convergence is
-> a narrower and incidental special case. **The ring answered the question that
-> decides the ledger, not the one this frame asked**, because it re-derived at
-> its base instead of inheriting. That is the only reason the specification's
-> defect cost nothing.
+> **The quantifier was wrong TWICE, and the second version was published here
+> before it was refuted.** *Any two of those four* asks for **convergence of two
+> distinct sites** — too narrow. This frame then replaced it with *"one site
+> descending twice over one occurrence"* — **still one abstraction level above
+> the property, and the recut refutes it at `control.rs:31920-31929`:**
+>
+> > *Repeated descents of one eliminating match occurrence can traverse
+> > **different constructors** — rows 4 and 5 descend match origin `5` over a
+> > `Node` and then a `Leaf`. Two eliminations of two different constructors say
+> > nothing about one field being rebound twice.*
+>
+> ⇒ **DESCENT MULTIPLICITY DOES NOT ENTAIL FIELD MULTIPLICITY.** What decides
+> the ledger is multiplicity of **recognition of one planner FIELD origin**.
+>
+> **The ring re-derived rather than inheriting, all three times.** That is the
+> only reason two bad specifications in a row cost nothing, and it is luck
+> rather than a control.
 
-**The question, correctly posed:** can one static occurrence be descended more
-than once in a single compile — by any of the six sites across the two rebind
-routes, including one site twice?
+**The question, correctly posed:** can **one planner field origin be recognized
+more than once** in a single compile?
 
-**It can.** A test-only event at **all six** production binder-descent sites
-records the planner origin of the eliminating occurrence. All five rows repeat
-descent over one occurrence, and **row 1 recognizes the same planner child
-origin `child(22, 0) = 21` twice.**
+**It can, and the witness is narrower than this frame previously implied.**
+**Row 1's `child(22, 0) = 21`, recognized twice, is the ENTIRE yes.** The
+descent column — all five rows repeating descent over one eliminating occurrence
+— is **real, measured, and not evidence for this property**; rows 4 and 5
+traverse a `Node` and then a `Leaf`, which is two eliminations of two different
+constructors. The instrumented event at all six binder-descent sites records the
+eliminating occurrence's planner origin, and the artifact keeps that column
+explicitly labelled as **not transport-multiplicity evidence**.
+
+> **Row 1 is the SOLE field-level witness. Do not restate this as "all five
+> rows show multiplicity."** That sentence is true of descent and false of
+> recognition, and the difference is the whole property.
 
 > ⇒ **THE `no` BRANCH IS CLOSED.** *"The entry doc's multi-transport premise is
 > unreachable, so correct the doc and keep the keyed entry"* is **no longer an
@@ -892,6 +909,43 @@ It survives every edit to `core.rs`, reads correctly in the failure message
 where the coordinate is actually consumed, and **makes the two-route structure
 visible on the page** — which is exactly what the original enumeration got
 wrong. Update both sides of the assertion together.
+
+**`D2k-1c-1` — THE THREE-LINK CHAIN HAS NO LAW ON ITS JOIN. Do this before the
+route repair.** Adversary `evt_733esjz2t4bn8`, confirmed. The relation landed at
+`b16aa1e`; this is a gap in it, not a regression.
+
+`close()` (`mod.rs:4469`) states the chain as **construct → transition →
+consume** and asserts four containments — `dom(recognized)` and
+`dom(transitioned)` each way, then `dom(minted)` and `dom(consumed)` each way.
+**Every one is keyed on its own map's keys. Nothing checks that a `transitioned`
+VALUE is a key of `minted`.**
+
+**The admitted failure state:** `transitioned[r] = T` with `T ∉ minted`. Loop 1
+passes (`r` has a transition), loop 2 passes (`r` is recognized), loops 3 and 4
+quantify over `minted`/`consumed` and **never see `T`**. ⇒ `close()` returns
+`Ok` with a recognized field whose transport was never consumed — **the
+constructed-then-forgotten state this ledger exists to make impossible.**
+Fail-open. The opposite orientation is safe: a `T ∈ minted` with no transition
+must still be consumed by loop 3.
+
+**The doc supplies the missing link as an assertion rather than a law**
+(`mod.rs:4457`): *"with `minted` in bijection with `transitioned` because one
+transition mints exactly one transport."* That is a claim about `rebind`'s body,
+**not something `close()` can fail on.**
+
+> **Not reachable today, and the artifact's own standard is the argument for
+> closing it.** `rebind` (`mod.rs:4319`) inserts into `minted` and `transitioned`
+> back to back, infallibly, with no branch between. But `close()`'s own rationale
+> (`mod.rs:4465-4468`) is that *"a law worth stating is worth being able to
+> fail"*, and it re-checks `consumed ⊆ minted` **even though the call site
+> already enforces it**. ⇒ **The redundancy standard was adopted deliberately
+> for a strictly weaker case and not applied to the load-bearing join.** Links
+> one and three have laws; the join the chain argument rests on has none.
+
+**Repair is one line, in a loop that already binds the value.** `mod.rs:4493`
+reads `for (recognition, transport) in &self.transitioned` and uses `transport`
+**only in the error message** — a `contains_key` away, in scope, no new
+traversal. Give it a row that fails without it.
 
 **`1c-0` and `1c-0b` are landed. THE ORDERING QUESTION IS ANSWERED TOO —
 Architect `evt_nmdrt6hdq34f`, and it needs NO new node and NO new authority.**
