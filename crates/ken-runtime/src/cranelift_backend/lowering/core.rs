@@ -2222,7 +2222,10 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     //      new frame is minted. That is the node's `D2`, and its A/B is causal:
     //      with the adoption off the suffix lowers outside its checked frame and
     //      the marker refuses as detached, with it on the existing consumer
-    //      consumes the transported identity and lowering advances.
+    //      consumes the transported identity and lowering advances. **That A/B
+    //      is HELD OFF `main` and was NOT re-derived here** — this sentence is
+    //      read off the held `D1`/`D2` range and the node, never off a compile
+    //      run for this comment. Nothing in this tree exercises it.
     //   6. `OrientedSubcontinuationPlanV1: oriented segment mixes checked and
     //      inferred computational frames` — **where it stops now**, in
     //      `compose_oriented_subcontinuation`. Once ANY pending semantic layer
@@ -2231,11 +2234,34 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     //      still `semantic_pending` — it is a genuine semantic participant, not
     //      a control-only wrapper that may be omitted — so this refusal is
     //      correct for the current representation rather than a gap in the
-    //      guard. Architect `evt_1q7v9fcw5hd87`; the answer is the node's `DP`,
-    //      which gives the producer occurrence its own transported checked
-    //      identity. A fusion-only admission of the guard, and copying or
-    //      inferring the consumer's identity onto the producer, are both ruled
-    //      **unlawful** rather than merely out of scope.
+    //      guard.
+    //
+    // ---- DURABLE. A RULING, NOT A MEASUREMENT. `D1`/`D2` DO NOT TOUCH IT, AND
+    // ---- THE RETIREMENT INSTRUCTION BELOW EXCLUDES IT BY NAME.
+    //
+    // Architect `evt_1q7v9fcw5hd87`. The answer to step 6 is the node's `DP`,
+    // which gives the producer occurrence its own transported checked identity.
+    // **A fusion-only admission of the guard, and copying or inferring the
+    // consumer's identity onto the producer, are both ruled `unlawful` rather
+    // than merely out of scope.**
+    //
+    // **This copy is not the authority, and it is not the only record.** The
+    // ruling is carried in full by `docs/program/issues/`
+    // `RT-LEXICAL-R3-FUSION-EMITTER.md` and by the WP frame beside it, and that
+    // is where a successor should go for its statement and its scope. MEASURED
+    // at `49072fb8`: `evt_1q7v9fcw5hd87` appears **once under `crates/`** — this
+    // line — and in four files under `docs/program/`. What this copy buys is
+    // **proximity, not authority**: someone editing this block is in the
+    // compiler, not necessarily in the node.
+    //
+    // Note WHEN it matters: `D1`/`D2` landing is exactly what makes the guard
+    // reachable, so it is the moment a successor first meets the mixed-frame
+    // refusal and reaches for one of those two shortcuts. **It becomes relevant
+    // then, not obsolete** — which is why it is fenced off from the expiring
+    // paragraph rather than sharing its fate.
+    //
+    // ---- EXPIRING. THE PARAGRAPH BELOW, UP TO THE NEXT `----` FENCE, IS THE
+    // ---- WHOLE OF WHAT `D1`/`D2` RETIRE. NOTHING ABOVE THIS FENCE.
     //
     // **Steps 5 and 6 have no committed witness in this tree, and step 6
     // cannot be reproduced by running anything here.** The `D1`/`D2` mechanism
@@ -2248,16 +2274,33 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // never entered. The checked twin's compile does not reach composition at
     // all. ⇒ Do not read a green suite as evidence about step 6 either way.
     //
-    // **What falsifies this block, and who retires it.** Its precondition is a
-    // tree state, not an invariant: `D1`/`D2` landing makes the guard reachable
-    // and every sentence above false, **and nothing will go red when it does**
-    // — a claim in a comment is not executed. `RT-LEXICAL-R3-FUSION-EMITTER`
-    // owns deleting this block at that point, as part of the same candidate
-    // that lands them.
+    // **What falsifies the paragraph above, and who retires it.** Its
+    // precondition is a tree state, not an invariant: `D1`/`D2` landing makes
+    // the guard reachable and every sentence between the two `----` fences
+    // false, **and nothing will go red when it does** — a claim in a comment is
+    // not executed. `RT-LEXICAL-R3-FUSION-EMITTER` owns deleting exactly that
+    // fenced paragraph, in the same candidate that lands them.
     //
-    // Do NOT arm this to "see how far it gets". Arming it makes the `Exact` and
-    // `ReHomed` roots refuse at step 5, which reds `d2f_0` — whose baseline
-    // assertion pins refusal 1 above.
+    // ---- END EXPIRING.
+    //
+    // Do NOT arm this to "see how far it gets". **MEASURED at `5d8f563b`, with
+    // the unarmed control run in the same pass:** arming moves all three of
+    // `d2f_0`'s positive roots off the baseline refusal the gate pins, so the
+    // gate reds — but the three do **not** agree on where they land, and the
+    // panic surfaces only the first.
+    //
+    //   - `Exact` and `ReHomed` refuse at step 5.
+    //   - `ProducerArity` **never reaches step 5.** It refuses earlier, at
+    //     `ComputationalMatch: case ctor:fixture::D2gOut::Node expects 1
+    //     constructor arguments but value has 2` — that cause's own widened
+    //     producer construct meeting the one-argument case, which is the whole
+    //     reason the cause exists.
+    //   - Unarmed, all three give refusal 1 above. That is the control, and it
+    //     is what makes the split attributable to arming.
+    //
+    // ⇒ **The step-5 population is two roots, not three.** `ProducerArity` is a
+    // positive of `d2f_0` and is **not** a step-5 witness; do not cite it as one
+    // when this warning is next revised.
     const D2F_EMITTER_ARMED: bool = false;
     if D2F_EMITTER_ARMED {
         static_transition_plan
