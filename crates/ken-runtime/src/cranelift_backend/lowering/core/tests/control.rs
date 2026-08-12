@@ -1508,6 +1508,121 @@ fn px8j_all_three_producer_paths_reach_real_consumers() {
         } if *actual_origin == origin && *selection_cursor == cursor
     )));
 }
+/// **`RT-LEXICAL-ROW2-MISSING-MINT` `D0` — the attribution, pinned.**
+///
+/// Row 2 fails under `B`-only exclusion because
+/// `px8j_all_three_producer_paths_reach_real_consumers` finds no `Mint` with
+/// `siblings > 0` for one of its two producer paths. The frame gives two
+/// candidate causes and asks which: **(i)** the emission point is never reached
+/// on the `FunctionizedUnits` path, or **(ii)** it is reached with
+/// `case.recursive_positions` empty.
+///
+/// MEASURED, at this base, under `B`-only exclusion: **cause (i), on the
+/// `SourceMachine` path.**
+///
+/// **The activation denominator is asserted, not assumed.**
+/// `b2f_units_declared_in_attempt` is attempt-scoped, so `Some(n)` means *this*
+/// compile reached the functionized emission seam and declared `n` units. An
+/// absent `Mint` on a compile that never took the lane would prove nothing, and
+/// this is what excludes that reading. The unexcluded run answers `None` at the
+/// same call, which is the lane actually differing rather than a constant.
+///
+/// **The discriminator has its own positive control, and it is the load-bearing
+/// part.** Cause (ii) would leave a `SourceMachine` `Mint` carrying
+/// `siblings == 0`. The unexcluded baseline **contains exactly such an event on
+/// this very fixture**, so a zero-sibling mint is demonstrably representable and
+/// demonstrably recorded here. Its total absence under exclusion is therefore
+/// *never reached*, not *reached with an empty case*. Without that control the
+/// two causes are indistinguishable from an absence.
+///
+/// **Promise class: TRANSITION SENTINEL.** These assertions describe a defect,
+/// so they are written to go **red when `D1` repairs it** — that red is the
+/// point and must not be satisfied by relaxing the bound. **Retiring event:** the
+/// `D1` repair at the attributed cause. When it lands, this test's job passes to
+/// `px8j_all_three_producer_paths_reach_real_consumers` itself, which is the
+/// real acceptance control, and this sentinel is deleted rather than adjusted.
+#[test]
+fn d0_row2_functionized_lane_never_reaches_the_source_machine_mint() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    use crate::cranelift_backend::lowering::units::{
+        b2f_open_compile_attempt, b2f_units_declared_in_attempt,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// Every mint in trace order, as `(path, siblings)`. Deliberately keeps
+    /// the `siblings == 0` rows: they are what separates the two causes, and a
+    /// helper that filtered them would answer the question by construction.
+    fn mints(trace: &[Px8jSourceTraceEvent]) -> Vec<(Px8jProducerPath, usize)> {
+        trace
+            .iter()
+            .filter_map(|event| match event {
+                Px8jSourceTraceEvent::Mint { path, siblings, .. } => Some((*path, *siblings)),
+                _ => None,
+            })
+            .collect()
+    }
+    let aggregate = RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Result::Ok".to_string(),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            args: Vec::new(),
+        }],
+    };
+    let expression = host_result_closure_match(recursive_computational_result_depth(2, aggregate));
+
+    let baseline_epoch = b2f_open_compile_attempt();
+    let (baseline_result, baseline_trace) =
+        px8j_capture_source_trace(&expression, false, "ken_row2_d0_unexcluded");
+    let baseline_declared = b2f_units_declared_in_attempt(baseline_epoch);
+    baseline_result.expect("the unexcluded lane still lowers");
+    let baseline_mints = mints(&baseline_trace);
+
+    set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
+    let _restore = Restore;
+    let excluded_epoch = b2f_open_compile_attempt();
+    let (excluded_result, excluded_trace) =
+        px8j_capture_source_trace(&expression, false, "ken_row2_d0_excluded");
+    let excluded_declared = b2f_units_declared_in_attempt(excluded_epoch);
+    excluded_result.expect("under B-only exclusion the compile still returns Ok -- the row's \
+                            failure is an absent trace event, not a refusal");
+    let excluded_mints = mints(&excluded_trace);
+
+    let baseline_zero_sibling_source_machine = baseline_mints
+        .iter()
+        .any(|(path, siblings)| *path == Px8jProducerPath::SourceMachine && *siblings == 0);
+    let excluded_source_machine_mints = excluded_mints
+        .iter()
+        .filter(|(path, _)| *path == Px8jProducerPath::SourceMachine)
+        .count();
+    let excluded_composed_minting = excluded_mints
+        .iter()
+        .filter(|(path, siblings)| *path == Px8jProducerPath::Composed && *siblings > 0)
+        .count();
+
+    assert_eq!(
+        (
+            // the denominator: the excluded compile reached the functionized
+            // seam, the unexcluded one did not
+            excluded_declared.is_some(),
+            baseline_declared.is_some(),
+            // the discriminator's positive control
+            baseline_zero_sibling_source_machine,
+            // the finding
+            excluded_source_machine_mints,
+            excluded_composed_minting,
+        ),
+        (true, false, true, 0, 1),
+        "D0: under B-only exclusion the FunctionizedUnits lane must be REACHED \
+         (declared={excluded_declared:?}, unexcluded={baseline_declared:?}) and must mint on \
+         Composed while minting nothing at all on SourceMachine. A zero-sibling SourceMachine \
+         mint in the unexcluded baseline is what makes the absence mean cause (i) rather than \
+         cause (ii). baseline={baseline_mints:?} excluded={excluded_mints:?}"
+    );
+}
 #[test]
 fn px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin() {
     let expression =
