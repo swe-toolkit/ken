@@ -91,6 +91,27 @@ recursive IH.** Contrast the spent exact-set oracle in `#7`, whose subject
 *disappears* with the deletion. A control whose subject survives is a control
 that must still pass.
 
+> **THIS PREMISE IS NOW UNDER MEASUREMENT — do not cite it as settled.**
+> Steward ruling `evt_26cb49zckgq4f`, 2026-08-12, on the `D1` handback.
+>
+> `D1` measured that under `B`-only exclusion the `SourceMachine` seat is
+> entered with `LoweringOperand::Carried` and returns before the mint, so the
+> functionized lane requires **zero** `SourceMachine` installations for this
+> occurrence. **If that generalizes to every recursive occurrence, then row 2's
+> subject does NOT survive the retirement and this paragraph is false** — row 2
+> would be precisely the spent oracle it contrasts itself against.
+>
+> **It is not established that it generalizes**, and the fixture cannot decide
+> it: `px8j_all_three_producer_paths_reach_real_consumers` constructs only the
+> recursive occurrence (`recursive_computational_result_depth(2, ..)`), so it
+> cannot distinguish *this occurrence routes elsewhere* from *the path is dead*.
+> The deciding measurement is in the frame's `D1` closure block, and the
+> generalization is the **Architect's** call on its result — not the row's.
+>
+> Until it returns, row 2 **stays** on `D3`'s bar. Removing it now would trade
+> an observed prospective regression for an assumption, which is the same trade
+> `evt_2jnf3x8f06psz` refused.
+
 **The B-only result is precursor evidence, not the acceptance proof.** `D3`'s
 final obligation is the unchanged row green on the **real, no-hook retirement
 tree**.
