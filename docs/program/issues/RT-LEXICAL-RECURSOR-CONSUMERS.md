@@ -50,27 +50,34 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > [[RT-DESCENT-RETIRE]]. The measured remainder for closure is **closer to a
 > week** (runtime-leader `evt_645tm43wf1cne`).
 >
-> > ### THE `StaticWorkerBinding` WALL HAS NO OWNER — question routed 2026-08-12
+> > ### THE `StaticWorkerBinding` WALL IS `D2k`, INSIDE THIS NODE — 2026-08-12
 > >
-> > `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2a.md` files it as
-> > *"successor, **unfiled here**"*, and **no successor was ever filed.** `D2a`
-> > was explicit that *"`R1` is repaired"* must never be read as *"rows 1 and 4
-> > pass"* — the advance is evidence the repair was reached, not a pass.
+> > `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2a.md` filed it as
+> > *"successor, **unfiled here**"* and **no successor was ever filed**, so five
+> > expressions sat behind an unowned repair. **Architect ruling
+> > `evt_5wvk3e8k1bjqn`** (on Steward question `evt_27chdjk4xh200`) places them
+> > here: **frame as `#6d`'s next `D2` increment, `D2k`. No new node.**
 > >
-> > **Steward question `evt_27chdjk4xh200` to the Architect:** does this repair
-> > belong to `#6d` as its next increment, or does it require
-> > [[RT-CONTSRC-CALLABLE-CONTRACT]] first? Both quote the same production
-> > fact — *a static worker binding has no value representation* — in two
-> > different components, and that node is `ready` and unblocked with
-> > `blocks: []`.
+> > **Frame: `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md`**,
+> > shovel-ready, fixed inputs at `b2ee3377`. **Sequence after
+> > [[RT-LEXICAL-R3-FUSION-EMITTER]]** — same file set, and Runtime runs one
+> > node at a time.
 > >
-> > **If it is a prerequisite, the graph is currently lying**: a `blocks: []`
-> > node would sit on the retirement critical path while rendering as *nothing
-> > depends on this*. **Declare the edge in BOTH directions if so** —
-> > `gen-progress.sh` reads `depends_on`, not `blocks`.
+> > **[[RT-CONTSRC-CALLABLE-CONTRACT]] is NOT a prerequisite**, and no graph
+> > edge is owed. The two artifacts state the same semantic fact on **different
+> > component surfaces**: here the callable fact is already expressible and
+> > installed as `LoweringEnvironmentBinding::StaticWorker`, and both the direct
+> > lowerer and the source machine already have the lawful consumer — a `Call`
+> > whose callee is an exact `Var`. **The wall says the binding reached the
+> > wrong CONSUMER SHAPE, not that the component lacks vocabulary.** The
+> > callable-contract node repairs a separate planner/projection gap in
+> > `ContinuationSourceSlotAuthority`; it stays real and `ready` and is not on
+> > this retirement path by virtue of these five walls.
 > >
-> > **Do not start the wall repair on the strength of this note.** It records
-> > an open ownership question, not a released deliverable.
+> > **The trap `D2k-0` exists to close:** all five report the same refusal
+> > sentence, but it is emitted by **one chokepoint every value read funnels
+> > through**, so a shared string is equally what five unrelated wrong-consumer
+> > routes would produce. **Prove the roots before sizing the repair.**
 
 ## What it is
 
