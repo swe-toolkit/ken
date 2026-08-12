@@ -62,8 +62,17 @@ a merge-base goes stale without your branch moving.
 >
 > **Answered 2026-08-12 by the Architect, and the answer is the first of the
 > two possibilities: a route defect in both rows, not a legitimate product of
-> the lane.** `AC-1` therefore stays **open and unchanged**, and the successor
-> is a **route repair, never a criterion correction**.
+> the lane.**
+>
+> > **THE SECOND SENTENCE OF THIS RULING IS SUPERSEDED — LATER THE SAME DAY, BY
+> > THE SAME AUTHORITY.** It read: *"`AC-1` therefore stays open and unchanged,
+> > and the successor is a route repair, never a criterion correction."*
+> > `evt_290zp8kxn9jbs` (checkpoint `16532068`) **reopened and rebound `AC-1`**,
+> > and **route work is stopped** by section 8. The superseded clause depended on
+> > the five named witnesses being able to carry the selected repair; the
+> > completed A/B measured that they cannot. **The route-defect finding above
+> > still stands** — it is only the consequence drawn for `AC-1` that changed.
+> > The binding criterion is section 6.
 >
 > **The decisive fact is source POSITION, not "there are two occurrences".**
 > That framing — mine, in the question I asked — is too weak to distinguish the
@@ -693,10 +702,16 @@ this consumer is a silent accept, measured at `739cfde3`.
 > proximity.** If that pairing cannot be reached, **the row stays RED and the
 > route gap is reported. It does not become a lawful drop.**
 >
-> **`AC-1` is NOT qualified by row and rows 4/5 are NOT removed.** For these
+> ~~**`AC-1` is NOT qualified by row and rows 4/5 are NOT removed.** For these
 > five, exact-`Var` remains the required positive endpoint unless an
 > exact-occurrence non-observation proof is produced, and the positive control
-> still expects the **consumed** arm.
+> still expects the **consumed** arm.~~
+>
+> > **SUPERSEDED 2026-08-12 by `evt_290zp8kxn9jbs`.** `AC-1` is rebound; the
+> > five rows are now **absence comparators that earn no credit**, preserved
+> > unchanged, rather than witnesses expected to reach a consumed arm. Rows 4/5
+> > are still **not removed** — that half holds, and section 8 now forbids making
+> > them green. Binding criterion: section 6.
 >
 > This ruling authorizes **no new representation and no new cut**. It tells the
 > measurement what distinguishes a route bug from a genuinely dead field.
@@ -1343,6 +1358,10 @@ transport-only shape.
 > all of this. **Re-binding `AC-1` is the Architect's call, and this frame does
 > not take it** — but the frame no longer presents the criterion as safe.
 >
+> > **HE TOOK IT, the same day: `evt_290zp8kxn9jbs`, checkpoint `16532068`.**
+> > `AC-1` is reopened and rebound and the precedent read above was the right
+> > one — the disposition matches `D2f`'s. Section 6 carries the replacement.
+>
 > > **THIRD INSTANCE ACROSS THE CAMPAIGN, TWICE AT THE SAME GATE PAIR.**
 > >
 > > | # | node | witness | why it cannot carry the input |
@@ -1877,8 +1896,14 @@ obligations, verbatim in substance from the ruling:
 - *Hard stop:* **no new runtime carrier, constructor slot, descriptor, broad
   `Var` rule, or erasure authority.** Verbatim from the ruling. If your repair
   needs one, you have the wrong repair — stop, do not widen.
-- *Hard stop:* **`AC-1` is not to be corrected, narrowed, or qualified by row.**
-  This is a route repair. A candidate that changes `AC-1` is refused on sight.
+- ~~*Hard stop:* **`AC-1` is not to be corrected, narrowed, or qualified by
+  row.**~~ **VACATED 2026-08-12 by Architect ruling `evt_290zp8kxn9jbs`,
+  checkpoint `16532068`.** It was the operative form of *"route repair, never a
+  criterion correction"*, and that instruction is superseded: it depended on the
+  five named witnesses being able to carry the selected repair, and the
+  completed A/B falsified that premise. `AC-1` is **reopened and rebound** — see
+  section 6. **The replacement hard stop is now the binding one**, and it points
+  the opposite way: no candidate may make the seed fixtures green.
 
 **`D2k-1b-iii` — route parity.** The second engine implements the identical
 distinction; neither path may preserve the worker while the other calls
@@ -1916,26 +1941,122 @@ the existing guard controls:
 
 ## 6. Acceptance criteria
 
-**`AC-1` — the five are green** on the pre-retirement tree under `B`-only
-exclusion, and each is green **because the worker is transported through its
-constructor as a compiler-only field and consumed at the later exact-`Var`
-call**, not because a guard stopped firing.
+> ### `AC-1` IS REBOUND. Architect ruling `evt_290zp8kxn9jbs`, checkpoint `16532068`.
+>
+> **The old criterion — "the five are green" — is REPLACED, not narrowed.** It
+> read that each of the five refusing rows would go green because the worker is
+> transported through its constructor as a compiler-only field and consumed at
+> the later exact-`Var` call. **Its premise was that those five witnesses can
+> carry the selected repair, and the completed A/B falsifies it:** on rows 4 and
+> 5 a supplied `Some(OrientedSubcontinuationPlanV1::default())` is admitted,
+> clears both `oriented: None` short-circuits, and **still yields zero keys with
+> the identical `StaticWorkerBinding` refusal**, while the existing marked
+> positive reaches one key through the same entry. The zero is therefore
+> non-vacuously measured. Its drop-at-transport attribution remains **derived**.
+>
+> **SECTION 8 FIRES AND ROUTE WORK STOPS.** No candidate may make these seed
+> fixtures green by supplying a default plan, adding markers or wrappers,
+> weakening the fusion key, bypassing the refusal, or accepting an empty-plane
+> no-op. Each of those either changes the fixture or claims success over a
+> mechanism that emitted nothing.
+>
+> **This rebind does NOT declare the original five repaired.** If seed-lane
+> compilation is still a product requirement it needs its own design contract,
+> because `D2f` *intentionally* requires checked transport. Do not smuggle that
+> different mechanism in under this AC.
 
-> **`AC-1` IS UNMET AND UNQUALIFIED at every `D2k-1b-i` candidate to date.**
-> All five are **unconsumed**; the accepted conservation partial discharges no
-> part of this criterion. See the accepted-partial block at the head of this
-> file for the measured route gap and the RULED route defect. Do not read the
-> partial's merge as progress against `AC-1`.
+**`AC-1a` — the checked positive resolves a real fusion.** On a full-pipeline
+checked fixture whose **unchanged** Runtime IR and **independently authored,
+non-empty** oriented plan validate together through the production entry, a
+non-empty exact fusion key/claim is resolved for the governed relation.
 
-> **`AC-1` WAS REPLACED — 2026-08-12.** It previously read *"because its
-> consumer routes to the exact-`Var` callee path"*, which is **materially
-> false**: at the measured wall there is no call, and the constructor occurrence
-> is not an application. The exact-`Var` call is still the sole callable
-> consumer — but it happens **after** a static constructor elimination rebinds
-> the field, not at the refusing site.
+*Control:* the `D2j` refusal causes as discriminating comparators on a shared
+input — `Frame`, `SelectedSlot`, `Invocation`, `ExactSuffix`, `CallIdentity`,
+`ProducerArity` each perturb one coordinate and must fail to resolve, while
+`Exact` resolves. A lone positive is green-vs-green under the swap it should
+catch (`COORDINATION §7b`).
 
-*Control:* the `D2k-2` positive and phase-mutation rows, plus the committed
-`D2k-1a` owner evidence.
+**`AC-1b` — the seeds are absence comparators and earn NO credit.** The current
+unmarked seed fixtures are preserved **unchanged** and their ordinary refusal is
+asserted honestly as an absence. Their empty plane discharges nothing.
+
+*Control:* `git diff` on the seed fixtures is empty, and every seed assertion
+names the refusal it observes rather than a fusion property it lacks.
+
+> #### THE SEMANTIC-EFFECT HALF IS NOT DISCHARGEABLE HERE, AND THAT IS MEASURED
+>
+> The ruling's requirement 1 also asks the positive to **prove the semantic
+> effect**: one recognition-to-rebind transition, one exact consumer, one suffix
+> execution, and the ruled refusal restored when that exact fusion is
+> suppressed. **Every one of those is a property of an INSTALLED fusion**, and
+> installation is gated off at `lowering/core.rs:2231-2235` behind
+> `D2F_EMITTER_ARMED: false`.
+>
+> **Arming is not a flag flip this node may make.** The gate's own comment
+> records why: *"Arming it makes the `Exact` and `ReHomed` roots refuse at step
+> 5, which reds `d2f_0`"* — and `D2f` step 5 is the open question of whether a
+> checked frame, a per-`Function` transaction, may span the two `Function`s a
+> fused region occupies. The sibling instrument states the same bound from the
+> other side: `fusion_definitions` is `0` in every row **by design**, because
+> *"a non-zero definition count here would mean something was armed ahead of its
+> gate."*
+>
+> ⇒ **Pinning the semantic effect to this node would be the fourth AC in this
+> campaign pinned to something the mechanism cannot currently produce** — the
+> exact class the forced-zero rule above exists to catch, caught this time
+> **before** the row was written rather than after a ring measured it.
+>
+> **It routes to [[RT-LEXICAL-R3-FUSION-EMITTER]]**, which is the next node in
+> the retirement order, is where arming lives, and was **already carved out of
+> this parent to carry precisely these obligations** (see the route-coverage
+> block below). It is **not** dropped, and this is a Steward split under the
+> release authority the ruling delegated, **not** a scope cut.
+>
+> **Flagged to the Architect, not blocking:** that requirement 1 presupposes an
+> armed emitter is my reading of his ruling. Confirming or reversing it is his.
+> If he intends the semantic effect to be provable without installation, `AC-1a`
+> absorbs it and the split shrinks to route coverage alone.
+
+> #### ROUTE COVERAGE HAS NO LAWFUL POPULATION ON EITHER HOLE PLACEMENT
+>
+> The ruling requires acceptance to exercise every structural route `D2k`
+> claims, **including before-hole and after-hole**, and forbids citing the `D2f`
+> checked twin for a route it does not actually execute.
+>
+> **Measured at `dec2e0c7`: the checked family has no hole-placement axis at
+> all.** `D2jCause` has exactly eight variants — `Exact`, `Frame`,
+> `SelectedSlot`, `Invocation`, `ExactSuffix`, `CallIdentity`, `ReHomed`,
+> `ProducerArity` — and **none of them is a hole placement**.
+> `d2j_entry_under` builds a `DeclarationRef` to `D2J_DECLARATION` applied to two
+> `MkUnit` arguments; the whole `D2j` fixture region contains no
+> `Px8jSelectedScopePlacement` token. The hole axis lives **only** on the `px8j`
+> seed family in `lowering/core/tests/control.rs` — which is the unmarked lane
+> that resolves zero.
+>
+> ⇒ **Neither hole route has a checked positive — not one missing, both.** The
+> single checked positive that exists is `D2jCause::Exact`, on a fixture not
+> indexed by hole placement, so under the ruling's own second sentence it cannot
+> stand in for either. **Both routes therefore REMAIN OPEN rather than passing
+> by citation**, and authoring lawful checked positives for them is new fixture
+> population.
+>
+> **It needs NO new node — it FOLDS into [[RT-LEXICAL-R3-FUSION-EMITTER]],
+> which was carved out for this exact reason and already owns it.** That node's
+> own title is *"Row 5's **before-hole** expression is the one member of the
+> eight-expression lexical-recursor population whose lawful repair requires
+> static-continuation fusion — it is carved out of
+> `RT-LEXICAL-RECURSOR-CONSUMERS` together with its repair and **discriminating-
+> control obligations**, because leaving the expression in the parent while
+> moving the machinery **would give the parent an AC it cannot discharge**."*
+>
+> ⇒ **The carve-out already diagnosed this defect, and `AC-1` kept the
+> obligation anyway.** The hole-route positives and the semantic-effect half
+> both land there, alongside arming. It is `ready`, framed, size `M`, and is the
+> next node in the retirement order — so nothing is lengthened and no new
+> constraint is invented (`ken-steward §4c`).
+>
+> `AC-1a` is qualified to the route `D2jCause::Exact` actually executes and
+> claims nothing about either hole placement.
 
 **`AC-2` — `value_at` is unchanged.** No third arm, no permissive
 `StaticWorker` arm, no wildcard. *Control:* `git diff` on
