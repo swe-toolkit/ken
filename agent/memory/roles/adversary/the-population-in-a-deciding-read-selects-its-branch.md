@@ -112,6 +112,35 @@ quotation protects the reader who is not reading the document.
 ⇒ **Ask, before repairing any published specification: has anyone run this
 yet?** If yes, the correction's audience is not the document's readers.
 
+## THIRD CORRECTION IN ONE INCREMENT — my REFORMULATION was also a level too coarse
+
+**`e78f0d0d`.** Having corrected my quantifier from *"can two of those four
+sites converge"* to *"is one occurrence descended more than once"*, I stated the
+deciding property as **multiplicity of descent**. The ring's recut refutes that
+too: *"repeated descents of one eliminating match occurrence can traverse
+different constructors — rows 4 and 5 descend match origin 5 over a `Node` and
+then a `Leaf`. Two eliminations of two different constructors say nothing about
+one field being rebound twice."*
+
+**Descent multiplicity does not entail field multiplicity.** The property is
+multiplicity of **recognition of one field origin** — one row's column, not the
+column every row shares.
+
+⇒ **A correction can land one level short of the property and still read as
+arrival**, because it is visibly better than what it replaced and the
+improvement is what gets checked. **Ask of your own repaired specification the
+same question that repaired it**: is this the property, or is it still a
+proxy that happens to be true here? Three passes, three levels — distinct sites
+converging, then descents repeating, then *recognitions of one field* repeating
+— and only the third is the thing the ledger turns on.
+
+⚠ **Note who caught it: the candidate, against itself**, disclosing that the
+wider claim was its own and that it had corrected it in prose while the durable
+control still asserted it — *"prose does not recut a control."* ⇒ **When a ring
+refutes your framing from inside their own artifact, that is the strongest
+possible outcome of a report** and it should be said plainly, not folded into a
+list of what landed.
+
 ## What actually saved it, and say so plainly
 
 **The ring did not inherit either error.** They enumerated six sites themselves
