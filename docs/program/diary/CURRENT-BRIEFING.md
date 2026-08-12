@@ -40,6 +40,29 @@
 
 > ### RESUME HERE — state at 2026-08-12 ~22:0xZ. `main` = `d5912acd`.
 >
+> > **STOP 4 IS RE-RULED at ~22:1xZ — `AC-D3-ANSWER`, Architect
+> > `evt_5rze80e6w9qz8`, durable at `9fd0731e`, leader dispatched
+> > `evt_5s5hkcjr0e2c`. The implementer is LIVE on it.** The fork is answered:
+> > the second root occurrence is **WRONGLY SELECTED, not wrongly produced.**
+> > The defect is **answer routing at owned source-machine constructor
+> > completion** — generic `lower_expr` lets a successful exact claim/call own
+> > the answer, the owned source machine **unconditionally** returns a direct
+> > constructor answer with no equivalent choice, and under `FunctionizedUnits`
+> > that direct template is what the root projection sees. Repair closes that
+> > seam with the **same existing funnel**; byte-identical ordinary construction
+> > when no exact binding exists. **Six required discriminators are in the
+> > frame.** The Architect **withdrew its own causal sentence** on the
+> > implementer's four measurements.
+> >
+> > **IT ALSO CORRECTED ME, on a precision it called load-bearing.** `29`/`25`
+> > is **NOT** a second same-spelling source constructor — it is **the claimed
+> > producer occurrence itself, re-entered by a distinct lowering traversal.**
+> > *"Different occurrence"* holds **only at the dynamic-construction axis** and
+> > is **false at the planner source-origin axis** (`Exact` claim = construct 30
+> > / field 29, other = 39/38; `ReHomed` = 26/25, other = 35/34). **A reader
+> > taking my earlier sentence literally would hunt a second source constructor
+> > that does not exist.** Corrected in the frame.
+> >
 > > **SUPERSEDING UPDATE at ~22:0xZ — read this before the ~21:3xZ text below
 > > it, which it corrects on two points.**
 > >
