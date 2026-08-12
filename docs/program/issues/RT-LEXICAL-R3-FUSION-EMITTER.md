@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-R3-FUSION-EMITTER
 title: "Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -11,12 +11,13 @@ github: null
 origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliation returned 0 of 8 discharged across eleven merged D2f partials (runtime-leader, evt_d9n0twj6y5sp). Separability ruled by the Architect at evt_7knsqyqg72103 on a Steward question (evt_2vbhz9kgp0b44). Steward-filed (agents cannot create tracked work per COORDINATION 2).
 ---
 
-> # THE CUMULATIVE STOP FIRED AT `D2` — RECUT BEHIND `DP`, NOW `ready`
+> # THE CUMULATIVE STOP FIRED AT `D2` — RECUT BEHIND `DP`, NOW RELEASED
 >
 > **Architect ruling `evt_1q7v9fcw5hd87`, and the recut is landed.** Runtime is
-> not on this node — `D2k` took the ring at `evt_9tx4kt0k8epm`. **Resume from
-> the recut frame, whose entry point is `DP` in section 5**, never from a
-> memory of the pre-stop deliverable order.
+> on this node as of 2026-08-12, `main` = `1f578a70`; the ring was held on
+> `#6d` `D2k` until `D2k-1d` merged. **Resume from the recut frame, whose entry
+> point is `DP` in section 5**, never from a memory of the pre-stop deliverable
+> order.
 >
 > **What `D2` proved, and it is a real result.** The A/B is valid causal
 > evidence: with `D2` off the suffix is outside its checked frame and the IH
@@ -64,15 +65,14 @@ origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliat
 > absorption are each separately ruled out for exactly these rows. **Descoping
 > it is not available.**
 >
-> **`status: ready` as of the design-class confirmation.** It was briefly
+> **RELEASED AND `active` — 2026-08-12, `main` = `1f578a70`.** It was briefly
 > `draft` while the one unmet dep was the Architect's confirming gate on `DP`;
-> **that gate passed at `evt_2qmknsgtmy0rj`** and the node is now deps-met and
-> unassigned. **The only thing between it and a seat is Runtime sequencing** —
-> the ring is on `#6d` `D2k`, same file set, one node at a time.
+> **that gate passed at `evt_2qmknsgtmy0rj`**, and the last thing between it and
+> a seat was Runtime sequencing, which cleared when `D2k-1d` merged. The ring is
+> on this node now.
 >
-> **Do not read `ready` as "start anywhere in it."** `DP` is the entry point
-> and everything below it in section 5 is behind `DP`. **Do not flip to
-> `active` until a seat is actually on it.**
+> **Do not read `active` as "start anywhere in it."** `DP` is the entry point
+> and everything below it in section 5 is behind `DP`.
 
 > # `D0` MERGED 2026-08-12 — THE POSITIVE ROW IS NON-ZERO
 >

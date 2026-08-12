@@ -163,12 +163,12 @@ against it on *both* sides of the gate.
 > > not choose it, copy it, or infer it.** Read that as the same prohibition
 > > that killed the consumer-identity alias, applied one level up.
 >
-> **NOT RELEASED — sequencing only.** The design-class hold is gone; the
-> Steward releases `DP` when Runtime sequencing permits, and Runtime is on
-> `#6d` `D2k`. **The confirmation grants no merge, arming, `AC-8`, `D4`, or
-> held-range carry-forward credit**, the cumulative stop remains fired at later
-> cuts, and `D1`+`D2`+`D3` remain one atomic candidate **after** `DP`, on a
-> fresh re-derivation against then-current `main`.
+> **RELEASED 2026-08-12 at `main` = `1f578a70`.** The design-class hold was
+> already gone; the remaining condition was Runtime sequencing, and it cleared
+> when `D2k-1d` merged. **The confirmation still grants no merge, arming,
+> `AC-8`, `D4`, or held-range carry-forward credit**, the cumulative stop
+> remains fired at later cuts, and `D1`+`D2`+`D3` remain one atomic candidate
+> **after** `DP`, on a fresh re-derivation against then-current `main`.
 >
 > **Why this class and not the other.** The alternative is to redesign
 > composition so the inferred producer layer is provably **outside** the checked
