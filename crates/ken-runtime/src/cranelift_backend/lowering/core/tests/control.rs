@@ -1811,6 +1811,372 @@ fn px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin() {
         "{trace:#?}"
     );
 }
+/// **`RT-LEXICAL-ROW2-MISSING-MINT` successor measurement — is the recursive IH
+/// installed and consumed on the functionized lane, or absent?**
+///
+/// **The subject, and it is the whole of it:** under `B`-only exclusion, is a
+/// recursive induction hypothesis minted, installed and consumed on the lane
+/// the fixture then takes — or is it absent?
+///
+/// Directed by the Steward ruling at `evt_26cb49zckgq4f`, merged as PR #1953,
+/// which closed `D1` with no production repair **for row 2's occurrence on the
+/// `FunctionizedUnits` lane**. The frame's `D1` section carries the closure and
+/// its measurement; read it there.
+///
+/// **Cited, not restated, and the qualifier is the whole of the care.** That
+/// result is about *this occurrence on this lane*. It is **not** a statement
+/// about the `SourceMachine` producer path, and the question of whether it
+/// generalizes is live — a durable doc comment travels further than the
+/// handback it came from and travels without its bounds, so the bound is
+/// written into the sentence rather than left to the reader.
+///
+/// ⇒ **It is deliberately not used to prefigure what follows.** The question
+/// below is open and either answer is a real outcome: absent is as admissible
+/// a result as installed-and-consumed, and nothing here should make one of
+/// them read as expected.
+///
+/// MEASURED, at this base: on the excluded lane the `Composed` (carried) route
+/// **mints, installs and consumes** one recursive IH; the `SourceMachine` route
+/// does none of the three. On the baseline both routes do all three.
+///
+/// **This artifact reports that and stops.** It takes no position on why the
+/// lane differs, on what any repair would owe, or on what the row's observation
+/// site ought to assert. Those are live questions elsewhere and an evidence
+/// candidate is the wrong place to settle them — a conclusion parked in a test's
+/// doc block is durable, unreviewed by the ring that owns it, and inherited by
+/// whoever reads the test next.
+///
+/// **Minted, installed, and consumed are kept as three observations and are
+/// never collapsed.** A lane that minted and never installed would satisfy a
+/// merged predicate while the semantics it protects were gone, and this row is
+/// exactly where that would hide. `Install` and `DirectConsume` are separate
+/// production sites — `install_recursor_invocation` and the direct-consumption
+/// seat — so both are read, and neither substitutes for the other.
+///
+/// **The predicate is proven non-constant by its own fourth cell.** The join is
+/// a `Mint` with `siblings > 0`, then an `Install` and a `DirectConsume`
+/// matched on **that mint's own `origin` and `cursor`** — those two events and
+/// no others. It is run over both producer paths on both lanes, and answers
+/// **true** three times and **false** once, so it is demonstrably capable of
+/// answering either way rather than being a shape any trace satisfies.
+///
+/// `Carrier` and `Selection` are read too, but **separately and at different
+/// strength**, because the variants are not shaped alike: `Carrier` carries an
+/// origin and a cursor, `Selection` carries **no cursor at all**. So the
+/// `Selection` check is origin-only, and is named as the weaker join it is
+/// rather than folded into a sentence claiming all four match on both keys.
+///
+/// **THE IDENTITY GAP, STATED RATHER THAN PAPERED OVER.** The question names an
+/// *occurrence*, and occurrences are named by `StaticOriginId`. **No
+/// `Px8jSourceTraceEvent` variant carries one** — every field is a
+/// `RecursorProducerOriginId` or a `ContinuationCursorId`. So this test cannot
+/// key its answer to row 2's occurrence, and does not claim to. What ties them
+/// is weaker and is written down here so nobody upgrades it by reading:
+///
+/// - The excluded compile contains **exactly one** mint that is both installed
+///   and consumed, so there is no second candidate it could be about. That is
+///   **counted across every producer path and asserted** below, not inferred
+///   from the per-path matrix — a per-path existential answers "did this path
+///   have one" and is structurally blind to a second lifecycle on another
+///   path, which is precisely the population a singleton claim ranges over.
+/// - The `D6a` route trace, which *does* carry `static_origin`, shows exactly
+///   one `SourceMachine` seat and exactly one carried elimination on that lane,
+///   at the **same** origin. That is asserted below rather than left here,
+///   because a claim in a comment is exempt from execution.
+///
+/// Note what the second bullet does **not** say. The carried elimination is the
+/// `Composed` seat's, not the `SourceMachine` seat's, and reading it as the
+/// latter is the easy mistake here because the two carry the same origin.
+/// **Same origin means same occurrence, not same seat**, and same occurrence is
+/// all that is claimed.
+///
+/// ⇒ The join is **by uniqueness across two traces, not by a shared key**.
+/// Adding a key would mean changing the trace machinery, which this branch is
+/// forbidden to do; the honest move is to name the limit.
+///
+/// **This measures ONE occurrence in ONE fixture and generalizes to neither the
+/// producer path nor the lane.** The fixture builds its subject with
+/// `recursive_computational_result_depth(2, ..)`, so a recursive occurrence is
+/// the only kind it ever constructs. Whether the `SourceMachine` recursive-IH
+/// producer has any input after retirement is a different question on different
+/// evidence, and this test is not evidence for it.
+///
+/// One datum worth keeping in view: the baseline's fourth `SourceMachine` mint
+/// carries `siblings == 0` and has **no** `Carrier`, `Install` or
+/// `DirectConsume` after it. That is the shape of a mint with nothing to
+/// install, and it is why the join filters on `siblings > 0` rather than
+/// treating every mint as an obligation.
+///
+/// **Promise class: TRANSITION SENTINEL.** The fourth cell pins an absence that
+/// is the row's current state, so this goes **red** if that state changes —
+/// which is the point, and must not be answered by relaxing the cell.
+/// **Retiring event:** whatever settles row 2. The first three cells are the
+/// durable half and should survive into whatever replaces it.
+#[test]
+fn row2_functionized_lane_installs_and_consumes_the_recursive_ih() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// Every `(origin, cursor)` a mint with `siblings > 0` was issued at, with
+    /// the producer path that issued it, in trace order. **Across all paths**
+    /// -- this is what a per-path `find_map` cannot give, and the singleton
+    /// claim below needs a population rather than a first match.
+    fn mints_with_siblings(
+        trace: &[Px8jSourceTraceEvent],
+    ) -> Vec<(
+        Px8jProducerPath,
+        RecursorProducerOriginId,
+        ContinuationCursorId,
+    )> {
+        trace
+            .iter()
+            .filter_map(|event| match event {
+                Px8jSourceTraceEvent::Mint {
+                    path,
+                    origin,
+                    cursor,
+                    siblings,
+                    ..
+                } if *siblings > 0 => Some((*path, *origin, *cursor)),
+                _ => None,
+            })
+            .collect()
+    }
+    fn installed(
+        trace: &[Px8jSourceTraceEvent],
+        origin: RecursorProducerOriginId,
+        cursor: ContinuationCursorId,
+    ) -> bool {
+        trace.iter().any(|event| {
+            matches!(
+                event,
+                Px8jSourceTraceEvent::Install {
+                    origin: actual,
+                    selection_cursor,
+                    ..
+                } if *actual == origin && *selection_cursor == cursor
+            )
+        })
+    }
+    fn consumed(
+        trace: &[Px8jSourceTraceEvent],
+        origin: RecursorProducerOriginId,
+        cursor: ContinuationCursorId,
+    ) -> bool {
+        trace.iter().any(|event| {
+            matches!(
+                event,
+                Px8jSourceTraceEvent::DirectConsume {
+                    origin: actual,
+                    selection_cursor,
+                    ..
+                } if *actual == origin && *selection_cursor == cursor
+            )
+        })
+    }
+    /// Which producer paths issued a mint that was **both** installed and
+    /// consumed, in trace order. The counted population the singleton claim
+    /// rests on, so it ranges over every path rather than one.
+    fn installed_and_consumed_paths(trace: &[Px8jSourceTraceEvent]) -> Vec<Px8jProducerPath> {
+        mints_with_siblings(trace)
+            .into_iter()
+            .filter(|(_, origin, cursor)| {
+                installed(trace, *origin, *cursor) && consumed(trace, *origin, *cursor)
+            })
+            .map(|(path, _, _)| path)
+            .collect()
+    }
+    /// `(minted, installed, consumed)` for `path`, joined on the mint's own
+    /// `origin` and `cursor`. Deliberately three fields: a lane that minted
+    /// and never installed must be distinguishable from one that did both.
+    fn lifecycle(trace: &[Px8jSourceTraceEvent], path: Px8jProducerPath) -> (bool, bool, bool) {
+        let Some((_, origin, cursor)) = mints_with_siblings(trace)
+            .into_iter()
+            .find(|(actual, _, _)| *actual == path)
+        else {
+            return (false, false, false);
+        };
+        (
+            true,
+            installed(trace, origin, cursor),
+            consumed(trace, origin, cursor),
+        )
+    }
+    let aggregate = RuntimeExpr::Construct {
+        constructor: "ctor:prelude::Result::Ok".to_string(),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(),
+            args: Vec::new(),
+        }],
+    };
+    let expression = host_result_closure_match(recursive_computational_result_depth(2, aggregate));
+
+    let (baseline_result, baseline_trace) =
+        px8j_capture_source_trace(&expression, false, "ken_row2_ih_unexcluded");
+    baseline_result.expect("the unexcluded lane still lowers");
+
+    set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
+    let _restore = Restore;
+    // `Exact` is the identity perturbation, used for its other effect: it
+    // clears the route trace on the way in, so what is read back is this
+    // compile's events and not the baseline's residue.
+    let (excluded_result, excluded_trace, excluded_routes) =
+        with_d6a_route_mutation(D6aRouteMutation::Exact, || {
+            let (result, trace) =
+                px8j_capture_source_trace(&expression, false, "ken_row2_ih_excluded");
+            (result, trace, d6a_route_trace())
+        });
+    excluded_result.expect(
+        "under B-only exclusion the compile still returns Ok -- the row's failure is an \
+         absent trace event, not a refusal",
+    );
+
+    assert_eq!(
+        (
+            lifecycle(&baseline_trace, Px8jProducerPath::Composed),
+            lifecycle(&baseline_trace, Px8jProducerPath::SourceMachine),
+            lifecycle(&excluded_trace, Px8jProducerPath::Composed),
+            lifecycle(&excluded_trace, Px8jProducerPath::SourceMachine),
+        ),
+        (
+            (true, true, true),
+            (true, true, true),
+            // THE SUBJECT: on the excluded lane the carried/Composed route
+            // separately mints, installs AND consumes its recursive IH.
+            (true, true, true),
+            // and the fourth cell, which is what proves the join above can
+            // answer `false` at all rather than being satisfied by any trace
+            (false, false, false),
+        ),
+        "successor measurement: each cell is (minted, installed, consumed) joined on the \
+         mint's own origin and cursor. The excluded Composed cell is the subject -- whether \
+         a recursive IH is separately minted, installed and consumed on the lane the \
+         fixture takes under exclusion. What that implies is not decided here. \
+         baseline={baseline_trace:#?} excluded={excluded_trace:#?}"
+    );
+
+    // ── The SINGLETON, counted rather than asserted in prose ──
+    //
+    // The four-cell matrix above is per-path and existential: it answers "did
+    // THIS path have an installed-and-consumed mint", and a `find` over one
+    // path cannot see a second lifecycle on another. The bridge below needs
+    // something stronger -- that there is no OTHER lifecycle the excluded
+    // lane's could be confused with -- so the population is counted here,
+    // across every producer path, before anything is built on it.
+    assert_eq!(
+        (
+            installed_and_consumed_paths(&baseline_trace),
+            installed_and_consumed_paths(&excluded_trace),
+        ),
+        (
+            vec![
+                Px8jProducerPath::Composed,
+                Px8jProducerPath::SourceMachine,
+                Px8jProducerPath::SourceMachine,
+            ],
+            vec![Px8jProducerPath::Composed],
+        ),
+        "every mint with siblings > 0 that was both installed and consumed, in trace order \
+         and across all producer paths. The excluded lane's list must be a SINGLETON for the \
+         identity bridge below to mean anything -- if a second lifecycle existed, the bridge \
+         would not say which one it was about. baseline={baseline_trace:#?} \
+         excluded={excluded_trace:#?}"
+    );
+
+    // ── Carrier and Selection, each on the keys ITS OWN variant exposes ──
+    //
+    // These two are read separately from the matrix, and with different
+    // strength, because the events are not shaped alike:
+    //
+    //   Carrier   { origin, cursor, .. }  -- joins on BOTH
+    //   Selection { origin }              -- carries NO cursor at all
+    //
+    // So the `Selection` check is origin-only and is weaker evidence than the
+    // others by construction. Saying "matched on origin and cursor" of all
+    // four would have been false of this one and unfalsifiable to a reader who
+    // did not go read the enum.
+    // Selected by the SAME predicate the singleton was counted with, not by
+    // trace position. `.next()` on the raw mint list would take the first mint
+    // with siblings, which is only the same event if no un-installed mint
+    // precedes it -- a fact this test does not assert and should not depend on.
+    let (_, singleton_origin, singleton_cursor) = mints_with_siblings(&excluded_trace)
+        .into_iter()
+        .find(|(_, origin, cursor)| {
+            installed(&excluded_trace, *origin, *cursor)
+                && consumed(&excluded_trace, *origin, *cursor)
+        })
+        .expect("the singleton counted above");
+    let carrier_matched = excluded_trace.iter().any(|event| {
+        matches!(
+            event,
+            Px8jSourceTraceEvent::Carrier { origin, cursor, .. }
+                if *origin == singleton_origin && *cursor == singleton_cursor
+        )
+    });
+    let selection_matched_on_origin_only = excluded_trace.iter().any(|event| {
+        matches!(
+            event,
+            Px8jSourceTraceEvent::Selection { origin } if *origin == singleton_origin
+        )
+    });
+    assert_eq!(
+        (carrier_matched, selection_matched_on_origin_only),
+        (true, true),
+        "the excluded lane's single installed-and-consumed mint also carries and is selected. \
+         Carrier is joined on origin AND cursor; Selection on origin ONLY, because that \
+         variant exposes no cursor -- a weaker join, named as one. excluded={excluded_trace:#?}"
+    );
+
+    // ── The identity tie, asserted rather than left in the doc block ──
+    //
+    // The lifecycle above is keyed on producer origins and cursors, which name
+    // no source occurrence. This is what connects it to row 2's occurrence,
+    // and it is deliberately the WEAKER of the two available statements.
+    //
+    // It says: the SourceMachine seat and the carried elimination that actually
+    // runs are at the SAME `static_origin`, and there is exactly one of each,
+    // so there is no second elimination the sole IH lifecycle could belong to.
+    //
+    // It does NOT say the elimination is the SourceMachine seat's -- it is the
+    // Composed seat's. Reading it as the former is the easy mistake, because
+    // the two carry the same origin. Same origin means same occurrence, not
+    // same seat.
+    let source_machine_seat_origins = excluded_routes
+        .iter()
+        .filter_map(|event| match event {
+            D6aRouteEvent::ConsumerRoute {
+                seat: D6aConsumerSeat::SourceMachine,
+                static_origin,
+                ..
+            } => Some(*static_origin),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let carried_elimination_origins = excluded_routes
+        .iter()
+        .filter_map(|event| match event {
+            D6aRouteEvent::CarriedEliminationEntered { static_origin, .. } => Some(*static_origin),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        (
+            source_machine_seat_origins.len(),
+            carried_elimination_origins.len(),
+            source_machine_seat_origins.first() == carried_elimination_origins.first(),
+        ),
+        (1, 1, true),
+        "the identity tie: on the excluded lane exactly one SourceMachine seat and exactly \
+         one carried elimination must run, and they must be at the same static origin -- \
+         otherwise the sole IH lifecycle above cannot be attributed to row 2's occurrence. \
+         source_machine_seats={source_machine_seat_origins:?} \
+         carried_eliminations={carried_elimination_origins:?}"
+    );
+}
 fn px8j_capture_source_trace(
     expression: &RuntimeExpr,
     delete_owned_scope: bool,
