@@ -1939,6 +1939,77 @@ the existing guard controls:
   fixtures, say so and say why** — an unbuildable discriminating row is a
   finding, not an omission.
 
+> ### `D2k-1d` — THE TIER-3 ROWS ASSERT A COUNT WHERE ONLY THE SENTENCE DISCRIMINATES
+>
+> **Added 2026-08-12 from Adversary `evt_1gk177jznv5rz`, confirmed
+> independently against the landed source rather than taken on report.** This is
+> the next Runtime cut on this node. It is test-only, needs no new fixture and
+> no new compile, and it is small — take the `1c-1` disclosure sentence below in
+> the same cut.
+>
+> **The gate's own doc states a mechanism that does not hold.**
+> `control.rs:2719-2726` says `d2f_gate_note_arrival` is *"an **unconditional
+> push** — executed once per builder call with no predicate in front of it. So
+> the vector's length counts arrivals exactly: `0` means the builder was never
+> reached."*
+>
+> Measured: the push has no **predicate** in front of it and it does have an
+> **early return** in front of it. `core.rs:2106` is
+> `build_static_continuation_fusion_plan(...)?` and **both** pushes sit below
+> that `?`. The builder returns `Result` with four error exits. So the vector's
+> length counts builder calls **that returned `Ok`**, and `0` means *never
+> reached* **or** *reached and errored*. The doc's own dichotomy — "never
+> reached" versus "reached and filtered" — omits the third case, which is the
+> one that actually occurs. Verified at the source, not relayed.
+>
+> **The true ground of the tier split is an ordering nobody wrote down.**
+> `validate_oriented_subcontinuation_transport` runs **twice with identical
+> arguments**: once at `core.rs:2034`, and again as the opening statement of
+> `enumerate_live_fusion_candidates` (`static_transition.rs:9907`), which is the
+> builder's own first call. The tier-3 rows read `0` because the **outer** copy
+> fires first — not because the push is unconditional. And "reached and errored"
+> is not hypothetical for these three: `d2j_the_source_side_causes_refuse_before_any_id_exists`
+> calls the builder directly and `expect_err`s on all three.
+>
+> **Direction: fail-open, onto the interpretation this node just added.** If the
+> outer call is ever reordered, removed, or bypassed, every tier-3 row still
+> reads `0` and the new paragraph — *"an arrivals-zero row says the validator
+> refused upstream and says NOTHING about the builder's discrimination"* —
+> becomes exactly backwards. **The builder's own refusal would be credited as
+> evidence about upstream: the forced-zero credit the correction was authored to
+> prevent, arriving on the tier the correction created.** No live defect today;
+> `transport_validated?;` at `core.rs:2040` does precede the builder.
+>
+> **The standard is already stated twice in this tree and applied to the wrong
+> rows.** `d0_r3_...` (`control.rs:3046-3050`): *"A count alone could not tell
+> 'the validator refused' from 'the compile failed earlier for an unrelated
+> reason'."* And `d2j_the_source_side_causes_refuse_before_any_id_exists`
+> requires each refusal to name its own gate. Yet tier-3 is
+> `compile_cause(cause, "ken_d2f_gate_neg").0` — **`.0` discards the error the
+> helper already returns** — while the sentence-checking idiom sits four lines
+> below, applied to the **positives**, whose non-vacuity `keys.len() == 1`
+> already carries.
+>
+> **Deliverable.** Assert the refusal **sentence** on the three tier-3 causes,
+> from the error the gate already holds. The expected sentences are landed at
+> `static_transition.rs:17750-17758`. Then **correct the gate's doc** so it
+> states the real ground — the outer validator precedes the builder — rather
+> than a property of the push. A doc that teaches a reader how to read a zero is
+> load-bearing; leave it false and the next reader re-derives the wrong
+> dichotomy.
+>
+> **Do not "fix" the duplicated validator.** Whether the outer call should be
+> removed, and what `mrc_census_validator`'s `cfg`-gated consumer means for it,
+> is not this cut's question. Assert the sentence; make the control independent
+> of the ordering rather than legislating the ordering.
+>
+> **Refuted by the same pass and not to be re-raised:** `AC-1b`'s arrivals half
+> is **not** a forced zero (the two pushes are adjacent with nothing fallible
+> between them, so `planes == vec![0]` entails exactly one arrival); the two
+> recorders do not contaminate across tests (both `thread_local!`, drained
+> before, no thread spawned); and the three tier-3 causes do **not** in fact
+> reach the builder.
+
 ## 6. Acceptance criteria
 
 > ### `AC-1` IS REBOUND. Architect ruling `evt_290zp8kxn9jbs`, checkpoint `16532068`.
