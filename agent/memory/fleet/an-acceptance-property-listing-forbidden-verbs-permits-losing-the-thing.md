@@ -103,4 +103,15 @@ needed a whole turn to surface.
   could not pass by any means available to it. The hard stop was the correct
   outcome and it is what surfaced this.
 
+## The sequence did not stop here
+
+The verb list and the one-disposition total are instances **1 and 2** of one
+error class inside this single increment. Two more followed, both counting
+instruments: a compile-wide scalar, then a per-origin scalar. Each narrowed the
+scope of the count and kept the count.
+
+⇒ **A total over a population is the right repair for an enumeration of uses,
+and it is still the wrong instrument for a per-member pairing.** See
+[[narrowing-a-counts-scope-never-turns-a-tally-into-a-pairing]].
+
 Related: [[a-negative-check-passes-for-any-reason-so-it-needs-a-positive-control]].
