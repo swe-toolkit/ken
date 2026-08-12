@@ -576,6 +576,41 @@ nothing you inherit from `#6d`.**
 > **Different repairs, different discriminators, both consistent with every
 > measurement above.**
 >
+> ### THE ATOMIC BOUNDARY IS RE-PRICED AND DOES NOT SHRINK — SETTLED.
+> ### Architect `evt_6xb2jnracee7x`, re-priced against `main` = `689dabd7`.
+>
+> **The Steward asked (`evt_2v4sdvr74yme2`) whether in-tree unarmed controls had
+> satisfied `evt_4m0q1m4zn4k79`'s "may not merge unexercised" precondition for
+> part of the object. The answer is no. This is CLOSED — do not re-raise it.**
+>
+> **THE CRITERION, and it is the reusable part: a unit-tested component law is
+> NOT the positive for the behavior-changing production slice that depends on
+> it.** Every control cited exercises an invariant **directly**, not the
+> production route that invariant governs:
+>
+> | control | what it actually exercises |
+> |---|---|
+> | control 1 | a full-pipeline **negative baseline** — never exercises the composed positive |
+> | `dp_composition_time_membership...` | validates and round-trips a **manually populated** `composed_frame_templates`; **`DP`'s production positive is still behind the arm** |
+> | selector net 3 | the ledger's ordinary/one-spend/replay/forged/monotone laws — its own comment says the **unconsumed refusal** lives in armed splice closeout |
+> | `AC-D3-SELF` | installs a plane, preflights, calls `fusion_self_edge_identities` — **emits no fusion definition, exercises no recursive self edge** |
+> | binder-to-body | installs its plane directly; production runs `preflight` over an **empty** installed population while `D2F_EMITTER_ARMED` is false |
+>
+> **STILL-UNEXERCISED PRODUCTION OBLIGATIONS, as ruled:** `DP` source-authored
+> membership on the live composed segment; `D1` authority switching; `D2`
+> checked-frame adoption; production fusion installation, claim issuance,
+> ownership, definition, redirect, takeover and closeout; selector nets 1/2/4
+> plus the armed half of net 3 and the inner-slot witness; the emitted recursive
+> self edge; the exact route-C continuation-specialization disposition;
+> `AC-8`/`AC-9`/`AC-10`; and `D4` under the necessary-green rule.
+>
+> **No partial cut from `766cbdf0` is authorized.** The first test-only baseline
+> commit could be copied out harmlessly, but it **shrinks no executable
+> dependency and does not warrant another candidate or review hop.**
+>
+> **RING INSTRUCTION:** continue the ruled route-C implementation; **rebase the
+> whole held range onto current `main` at the next natural seam; ARM LAST.**
+>
 > ### RESEARCH ADVISORY — CONSUMPTION AND REACHABILITY ARE TWO DISTINCT PROOF
 > ### OBLIGATIONS. Steward, 2026-08-12, carrying `evt_77kkd21bnnekj` (full
 > ### text there) to the thread at `evt_33vnf0f1pmvgj`.

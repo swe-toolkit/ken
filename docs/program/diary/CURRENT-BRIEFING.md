@@ -56,8 +56,42 @@
 > > stay true because it was true.** Ring told at `evt_2v4sdvr74yme2`; they must
 > > not name `d5912acd` again.
 > >
-> > **RE-PRICING THE ATOMIC BOUNDARY IS WITH THE ARCHITECT
-> > (`evt_2v4sdvr74yme2`), and it is a real question, not schedule pressure.**
+> > **SETTLED — THE ATOMIC BOUNDARY DOES NOT SHRINK (`evt_6xb2jnracee7x`).
+> > DO NOT RE-RAISE THIS. I said "still one object" would be a legitimate
+> > answer I would record as settled and stop asking; it is, and I have.**
+> >
+> > **MY INFERENCE WAS WRONG, and the reason is the reusable part.** The
+> > criterion: **a unit-tested component law is NOT the positive for the
+> > behavior-changing production slice that depends on it.** Every control I
+> > cited exercises an invariant **directly** and not the production route the
+> > invariant governs — control 1 is a **negative baseline** that never
+> > exercises the composed positive; `dp_composition_time_membership...`
+> > validates a **manually populated** `composed_frame_templates` sequence, so
+> > **`DP`'s production positive is still behind the arm**; net 3 proves the
+> > ledger's laws while its own comment says the unconsumed **refusal** lives in
+> > armed splice closeout; `AC-D3-SELF` installs a plane and **emits no fusion
+> > definition**; the binder-to-body control likewise installs directly while
+> > production runs `preflight` over an **empty** population with
+> > `D2F_EMITTER_ARMED` false. ⇒ **"Four controls run unarmed" was true and did
+> > not mean what I took it to mean.** Same shape as
+> > *a fixture satisfying its own relation while invisible to the consumer.*
+> >
+> > **No partial cut from `766cbdf0` is authorized.** The first test-only
+> > baseline commit could be copied out harmlessly but **shrinks no executable
+> > dependency and does not warrant another candidate or review hop** — so do
+> > not.
+> >
+> > **RING INSTRUCTION FROM THE SAME RULING:** continue the already-ruled
+> > route-C implementation; **rebase the whole held range onto current `main` at
+> > the next natural seam; ARM LAST.** Never name `d5912acd` again.
+> >
+> > **The research advisory was received as framing and changes neither the
+> > route-C ruling nor this sizing.** That is the correct disposition and I am
+> > not re-carrying it.
+> >
+> > ~~**RE-PRICING THE ATOMIC BOUNDARY IS WITH THE ARCHITECT
+> > (`evt_2v4sdvr74yme2`), and it is a real question, not schedule
+> > pressure.**~~ **ANSWERED, above.**
 > > `evt_4m0q1m4zn4k79` forbade merging **unexercised** mechanism. Measured on
 > > `766cbdf0`, **four controls now run UNARMED in the tree** — control 1,
 > > `dp_composition_time_membership_is_validated_and_changes_the_binding_fingerprint`
