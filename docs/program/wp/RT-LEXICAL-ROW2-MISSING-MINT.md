@@ -130,6 +130,51 @@ touch the `#[cfg(test)]` emission, the enum, or the assertion.
 > is the branch that function takes on the functionized lane instead of the
 > specialized-selection arm, for this occurrence. Start there.
 >
+> ##### THE LICENCE IS THE EMISSION SITE'S STRUCTURE, NOT THE SENTINEL'S POSITIVE
+>
+> **Corrected 2026-08-12 from Adversary `evt_42kas9r9vx0g0`, confirmed. An
+> earlier version of this block stated the attribution and not its ground, and
+> the ground a reader would have inherited is the wrong one.**
+>
+> The sentinel's positive control, `baseline_zero_sibling_source_machine`, is
+> measured on the **baseline** run — the run the same assertion requires to
+> have **not** reached the functionized seam (`baseline_declared.is_some()`
+> required `false`). **It is a neighbouring-path witness and does not on its
+> own license a claim about minting on the functionized lane.** Do not cite it
+> as the ground, and do not treat the merge as having settled it.
+>
+> **What does license cause (i), measured at `2ced8796` from the git objects:**
+>
+> - There is **exactly one** production `SourceMachine` mint site,
+>   `core.rs:7516`, in `lower_source_machine_with_continuation_inner`. The
+>   other three are `Composed` (`:5316`, `:14174`) and `DeferredConstructor`
+>   (`:5882`). There is no second site a functionized lane could own, so
+>   lane-independence is the absence of an alternative rather than an
+>   assumption.
+> - **That site is NOT wrapped in an emptiness guard**, and the contrast is
+>   real: the `Composed` mint at `:14174` **is** wrapped by
+>   `if !case.recursive_positions.is_empty()` at `:14166`. At `:7516` the
+>   emission is unconditional once control arrives and carries
+>   `siblings: case.recursive_positions.len()`.
+>
+> ⇒ **An empty case at `:7516` mints with `siblings == 0` rather than minting
+> nothing** — that is cause (ii)'s signature, and it is absent. Zero
+> `SourceMachine` mints of every arity therefore means the site was **not
+> reached**.
+>
+> **The one early exit, chased rather than left open.**
+> `computational_ih_slots_for_case(case, frame.checked_frame_id)?` at `:7513`
+> could skip the emission on `Err`. Row 2's defining property is that its
+> compile returns `Ok`, so no `Err` propagated on the observed run — had the
+> site been entered, the mint would have fired. **The caveat closes the
+> argument rather than opening it.**
+>
+> **Bounds, and they are the Steward's:** this is a structural read of the
+> site, executed nothing, one seat. **`D2` must verify it rather than credit
+> it**, and `D2` owns committing it as the replacement licence — see `D2`'s
+> fourth bullet. **Replace the stated ground; do not leave the baseline
+> positive standing beside it as though the two were alternatives.**
+>
 > **The one-versus-four count is `D1`'s bounded-installation question, and it
 > is NOT authority to install every absent mint.** Runtime-leader scope
 > clarification in `thr_2amp93z5apamk`, restated at merge: the functionized
@@ -162,6 +207,17 @@ three `D6` candidates rejected on the sibling node. Keep them separate.
   recursive-IH authority still refuses after the repair.
 - The unexcluded run and the same-family rows stay green and unchanged in
   meaning.
+- **Re-ground `D0`'s cause-(i) licence, and replace it rather than adding to
+  it.** The merged sentinel states its ground as the baseline's zero-sibling
+  `SourceMachine` mint; that witness is on the lane the excluded run does not
+  take, so it does not license the attribution by itself (Adversary
+  `evt_42kas9r9vx0g0`, Steward ruling `evt_26f4pmjxchqzp`). Verify the
+  structural argument in `D1`'s licence block — single emission site, no
+  emptiness guard, `siblings` from `.len()` — and commit **that** as the
+  stated ground, correcting the sentinel's doc block in place. **A wrong
+  reason left standing beside a right one is what the next reader inherits.**
+  If the structural read does not survive your check, that is a stop: the
+  attribution loses its ground and `D1`'s premise is back open.
 
 ## 4. Acceptance criteria
 
