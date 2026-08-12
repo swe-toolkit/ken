@@ -576,6 +576,80 @@ nothing you inherit from `#6d`.**
 > **Different repairs, different discriminators, both consistent with every
 > measurement above.**
 >
+> ### THIRD MECHANISM, THIRD REFUTATION — and my sequencing ruling
+> ### `evt_41remx6xn6pda`: THE CAUSAL TRACE RUNS BEFORE THE NEXT MECHANISM
+>
+> **Steward, 2026-08-12, from `evt_7kke2mm0sncgw`. The re-ruling
+> `evt_26ganh9p86xw8` replaced the inert funnel with a fusion-scoped,
+> instance-paired ANSWER RECEIPT. Its relation separation is MEASURED CORRECT
+> and stands** — `30`/`26` authoritative only through the fusion projection,
+> `39`/`35` and `36`/`32` only through `continuation_call_binding_for`, neither
+> substitutable. **What fails is step 2 against step 3.**
+>
+> **THE RECEIPT CANNOT EXIST AT THE SEAT RULED TO CONSUME IT.** Step 2 mints it
+> *"when the exact claimed `Var` consumer call completes"*; step 3 has the owned
+> source-machine completion select it. **That requires the call to PRECEDE the
+> constructor completion. Measured, it is strictly the other way** — one armed
+> monotone counter, both witnesses:
+>
+> ```
+> [0] srcmachine-construct-complete origin=30 fused_auth=Some((10, unit 3))
+> [1] [2] [3] ih-call-mint
+> [4] srcmachine-construct-complete origin=26 fused_auth=Some((6, unit 1))
+> [5] [6] [7] ih-call-mint
+> ```
+>
+> There is **exactly ONE** source-machine completion of the claimed producer
+> inside the fused body per compile, and **every IH call mint follows it.** ⇒ At
+> the only seat step 3 can act **no receipt has been minted**, the "no matching
+> receipt" fallback is **the branch that always runs**, the reconstructed
+> template still reaches root emission, **and all six controls pass vacuously.**
+> **The inert-fix shape again, one layer in — and this time the controls would
+> not catch it, because they are written against a mechanism that never fires.**
+>
+> **WHY, and it is not an ordering accident.** At that completion the
+> continuation chain is `origin=30, fused body: next=["Terminal"]` — **no
+> pending `ComputationalMatchScrutinee` on that machine's stack.** The outer
+> eliminator is pending as *authority* (`fused_auth` is set) but is **not on this
+> machine's stack**, so the constructed template **is that machine's final
+> answer**, and nothing downstream can consume it — which is also why no later
+> receipt could be applied retroactively. Contrast a genuinely consumed
+> construct: `PX8J construct 28: next=["ComputationalMatchScrutinee",
+> "ApplyRecursorSelection", "Terminal"]`.
+>
+> **THE CONTROL THAT STOPS THE OVER-CLAIM, produced against the implementer's
+> own tidier story and worth more than the finding:** the **same** construct 30,
+> same fixture, **no installed fusion**, is **also** `next=["Terminal"]` **and
+> that compile does not escape.** ⇒ **"Terminal at the producer's constructor"
+> is NORMAL and is not by itself the defect.** What differs under fusion is that
+> this machine's terminal answer becomes the fused function's answer while the
+> suffix's correct `Carried` is produced on a **different route** — the one the
+> takeover forwards, which remains correct.
+>
+> **THE QUESTION THE THIRD REFUTATION LEAVES STANDING, and it is the one to
+> rule:** at that seat, **are the producer machine and the suffix ONE machine,
+> or TWO with a defined answer join?** **Every repair proposed so far — funnel
+> reuse and receipt selection alike — presumes they are already one machine with
+> a selection point, and measured they are not.**
+>
+> **The two adaptations the implementer declined, both correctly, both the
+> reserved decision:** deferring the constructor's answer so a later receipt can
+> replace it — a **promise-and-patch** mechanism, not the *"select that returned
+> answer"* that was authorized, and it settles the fused body's answer **after
+> its own machine terminated**; or pushing the outer eliminator onto the producer
+> machine's stack, which **changes which route runs the suffix** and risks the
+> `:650` double-suffix defect and a **second spend of the affine claim** — this
+> node has produced each once already.
+>
+> **MY SEQUENCING RULING (`evt_41remx6xn6pda`), and it is sequencing only.** The
+> implementer runs and posts a **bounded causal trace of the fused body's
+> machine structure BEFORE the next mechanism is chosen**: scoped to the
+> one-machine-or-two question, both witnesses, carrying the consumed-construct
+> contrast **and** the no-fusion control, **measuring only — no proposed
+> repair.** The Architect rules **against the trace rather than ahead of it**,
+> and may re-bound the trace instead. **This reorders evidence and decision. It
+> shrinks no scope, adds no party, and adds no review hop.**
+>
 > ### THIS IS THE SECOND CONSECUTIVE RULING REFUTED BY GROUNDING BEFORE
 > ### IMPLEMENTATION — and both times the frame carried the refuted mechanism
 >

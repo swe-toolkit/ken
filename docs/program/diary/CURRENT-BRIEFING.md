@@ -40,6 +40,44 @@
 
 > ### RESUME HERE — state at 2026-08-12 ~22:0xZ. `main` = `d5912acd`.
 >
+> > **~22:5xZ — THIRD MECHANISM, THIRD REFUTATION. I RULED THE SEQUENCING:
+> > the causal trace runs BEFORE the next mechanism (`evt_41remx6xn6pda`).**
+> >
+> > The receipt re-ruling (`evt_26ganh9p86xw8`) got the **relation separation
+> > right — that part is measured correct and stands.** What fails is **step 2
+> > against step 3: the receipt cannot exist at the seat ruled to consume it.**
+> > One armed monotone counter: the claimed producer's source-machine completion
+> > is `[0]` (`Exact`) and `[4]` (`ReHomed`), and **every IH call mint follows
+> > it**. There is exactly one such completion per compile ⇒ the "no receipt"
+> > fallback **always** runs, the template still reaches root, **and all six
+> > controls pass vacuously** — the inert shape again, one layer in, and this
+> > time **the controls could not catch it.**
+> >
+> > **Why:** at that completion `next=["Terminal"]` — the outer eliminator is
+> > pending as *authority* but **not on that machine's stack**, so the template
+> > **is** that machine's final answer and nothing downstream can consume it.
+> > **The control that stops the over-claim:** the same construct 30 with **no
+> > fusion** is *also* `Terminal` **and does not escape** ⇒ Terminal there is
+> > **normal**, not the defect. The implementer produced that against its own
+> > tidier story.
+> >
+> > **THE STANDING QUESTION:** are the producer machine and the suffix **one
+> > machine, or two with a defined answer join?** Every repair so far —
+> > funnel reuse, receipt selection — **presumes one machine with a selection
+> > point, and measured they are not.** Nobody has picked; do not pick.
+> >
+> > **WHAT I AUTHORIZED, sequencing only:** a bounded causal trace of the fused
+> > body's machine structure, both witnesses, carrying the consumed-construct
+> > contrast **and** the no-fusion control, **measure-only, no proposed repair**;
+> > the Architect rules **against** it rather than ahead of it, and may re-bound
+> > it. **No scope shrunk, no party added, no review hop added.** Three
+> > mechanisms have each cost a full Architect turn plus dispatch plus grounding,
+> > and each was refuted by **one probe costing minutes.**
+> >
+> > **Architect strand count is now SIX; I unstranded it again at ~22:5x, and I
+> > posted the authorization BEFORE waking it so it would not produce a fourth
+> > mechanism first.** That ordering is deliberate — repeat it.
+> >
 > > **~22:3xZ — `AC-D3-ANSWER` IS MEASURED INERT. DO NOT BUILD IT.** The
 > > implementer grounded it before writing code and the grounding refuted it
 > > (`evt_1twk028k03mxe`); **no code written, `766cbdf0` unchanged.** Re-ruling
