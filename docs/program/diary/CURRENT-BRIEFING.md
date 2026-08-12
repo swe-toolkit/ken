@@ -38,10 +38,34 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~15:2xZ. `main` = `34977ff9`.
+> ### RESUME HERE — state at 2026-08-12 ~17:4xZ. `main` = `8b142d01`.
 >
-> **`AC-1` HAS BEEN REBOUND and Runtime is working again. Nothing is owed by
-> me. Zero open PRs.** Candidate `7a018ef6` is with Runtime QA.
+> **WIP AUDIT CLOCK: NOT ARMED AGAINST ANY SEAT.** No implementation seat is
+> working. `DP` is a genuine hard stop (resets the clock) and the last candidate
+> handoff was 16:55Z (also a reset). Re-arm the deadline the moment a seat is
+> kicked, anchored on that kickoff's `evt_`, never as a count.
+>
+> **RUNTIME is on `RT-LEXICAL-R3-FUSION-EMITTER`.** Its thread anchor is the
+> root post `evt_391zsaw72wmna`, thread `thr_7fz4j2x2pgzvb` — **not** the D2k
+> thread, where my original `DP` kick wrongly went and was reissued from.
+> `thr_49738q826cs1t` stays D2k's and is still open.
+>
+> **`DP` ITSELF IS ARCHITECT-BLOCKED, and that is a good hard stop, not a
+> stall.** The checked source gives producer frame `1` a `ParentFrame(0)` and
+> the same segment site as consumer frame `0`, but **no invocation marker**;
+> production `erasure.rs:1453`/`:1473` derive every IH callee sequence from a
+> one-frame slot template, so **no computational-IH invocation can cover a
+> second frame today**. The implementer refused to pick between (a) one
+> invocation-local segment covering both ordered frames and (b) distinct
+> invocation sources plus the checked parent edge — correctly, since the frame
+> forbids lowering and fusion from choosing, copying or inferring that relation.
+> Routed to the Architect at `evt_3rbr783yqtr36`. **Not the Steward's call.**
+>
+> **EITHER ANSWER IS A STEWARD-OWNED RE-CUT — say so before anyone waits.**
+> (a) reaches into `crates/ken-elaborator/src/erasure.rs`, outside this frame's
+> section 9 contention set and on another crate's review surface; (b) or an
+> authorized checked-source cut is `AC-10`-shaped fixture population. Neither
+> starts inside this frame.
 >
 > **RUNTIME — `RT-LEXICAL-RECURSOR-CONSUMERS-D2k`.** Anchor
 > `thr_49738q826cs1t`. The frame is the durable record and carries the full
@@ -54,11 +78,43 @@
 > seeds preserved as absence comparators, zero credit). `D2k-1c-1a` is open and
 > unmeasured, and still needs the live recognize/rebind/consume arm.
 >
-> **The candidate under review is `7a018ef6`, base `34977ff9`, `+203/-11`, one
-> Runtime test path, `904/0/4`.** Its cut is **two commits** — `2ad07ab9` is
-> `AC-1b` and `7a018ef6` is `AC-1a` — and the handback declared one. **Review
-> and verify it as `34977ff9...7a018ef6`:** anchored on `7a018ef6^`, `AC-1b`'s
-> test name occurs zero times, so it reads as absent rather than truncated.
+> **MERGED: the R3 comment-only accepted partial, exact `112c07f5`, as PR
+> #2028.** Range `21307d7f...112c07f5`, one commit, one Runtime path
+> (`lowering/core.rs`), `+43/-13`, **every changed line a `//` comment**. It
+> superseded `754e8c4e`, which was never routed. QA `evt_angdenz40e57`,
+> Architect `evt_1farww1aqrbzj`, Decision `dec_31mc34k79wt2n` resolved.
+> Adversary notified at `evt_36jxatgr8kk1w`; ring closed at `evt_6p3ezb3zamwrr`.
+>
+> > **THE TWO DISCRIMINATORS DIFFER NOW, AND I GOT THIS WRONG BEFORE PUBLISH.**
+> > I twice told the ring this was a CODE merge taking a full CI poll, reasoning
+> > from *"something under `crates/` moved"*. The operator widened `--doc-only`
+> > on 2026-08-12 to cover **comment-only changes inside `.rs` files** — the
+> > discriminator there is the **content of the diff**, not the file extension,
+> > and it must be established mechanically in **both** directions, plus a check
+> > for an added `///` fence, since a doctest is a compiled test wearing a
+> > comment's syntax. *"Anything under `crates/` moved"* decides **M8 only.**
+> > This candidate was therefore `--doc-only` (about two minutes, no CI poll)
+> > **and** still owed the Adversary its notification. Do not fuse them again.
+>
+> **`M3` IS ALREADY DONE AND CLEAN ON THIS CANDIDATE — do not redo it.** The
+> comment cites Architect `evt_1q7v9fcw5hd87`. A `get_thread` on that id returns
+> `Thread not found`, which is the **expected** result for any non-root event and
+> is **not evidence either way** — do not read it as a missing citation. It is
+> corroborated by four durable citations on `main`, and the two load-bearing ones
+> carry the exact claims the comment attributes. Both are in the R3 frame
+> `docs/program/wp/RT-LEXICAL-R3-FUSION-EMITTER.md`:
+> **`:124`** (the cumulative stop fired at `D2`) and **`:370-380`** (a
+> fusion-only admission, and copying or inferring the consumer identity onto the
+> producer, both ruled **unlawful**). Posted `evt_3ad99t706j226`.
+>
+> **That merge takes NO `DP`, AC, node-closure or arming credit.** The node
+> stays `active` with `DP` unstarted and `D2F_EMITTER_ARMED` false.
+>
+> **`D2k-1e` is framed and landed at `58c82ba8` and is QUEUED BEHIND `DP`** —
+> do not start it and do not fold it in. It belongs to the D2k node and its
+> thread. It closes the Adversary's `evt_4n9x6a46whzqp`: `D2k-1d` repaired the
+> reason and left the claim it supported, so *"The phase is asserted per row"*
+> at `control.rs:2717` was weakly true before it and is **false after it**.
 >
 > **Two obligations were split out to `RT-LEXICAL-R3-FUSION-EMITTER` as its own
 > `AC-9`/`AC-10`** (no new node): the semantic-effect half needs an **installed**
