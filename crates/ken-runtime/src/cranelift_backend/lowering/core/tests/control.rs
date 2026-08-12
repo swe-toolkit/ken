@@ -32323,3 +32323,128 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
          pairing built on it."
     );
 }
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k` `AC-1b` — the unmarked seeds are
+/// ABSENCE COMPARATORS and earn no fusion credit.**
+///
+/// `AC-1` was rebound because its five witnesses cannot carry the selected
+/// repair's required input: they are seed-lane compiles with no checked package,
+/// so no oriented plan can be decoded for them, and the completed A/B measured
+/// that even a supplied empty plan is admitted and still resolves zero keys.
+/// This control keeps them in the suite as what they actually are.
+///
+/// **The two halves are asserted TOGETHER, on purpose.** Each row states
+///
+/// - **the refusal it OBSERVES**, and
+/// - **the fusion plane it LACKS** — no oriented plan present, no resolved key,
+///   an empty resolved plane.
+///
+/// Separating them is how a zero becomes evidence for something it does not
+/// support. A seed that resolves nothing is indistinguishable from a compile
+/// that never ran, so the plane is only meaningful **beside the refusal that
+/// proves the compile reached a wall**. That pairing is this control's whole
+/// content; neither half discharges any fusion property, and the assertion
+/// message says so rather than leaving a reader to infer it.
+///
+/// **The wall half is REUSED from [`d2k_wall_under_current_selector`], not
+/// re-derived**, so this row cannot drift from `D2k-0`'s. What is asserted is
+/// the refusal's **construct**, per row against its own literal — deliberately
+/// not its reason, which names constructor origins that renumber under
+/// unrelated planner changes, and not its edge, which `D2k-1b` retired by
+/// recognizing the binding ahead of the value read.
+///
+/// **Row 1 sits at a different wall and that is kept, not smoothed.** It reaches
+/// `NativeJoinPlanV1` before this increment's conservation close. A uniform
+/// expectation across the five would go green under a uniform move, which is
+/// exactly the case worth catching.
+///
+/// **This test claims NOTHING about fusion working.** The positive that gives
+/// a resolved plane its meaning is the checked twin, on a different fixture
+/// family, and it is deliberately not cited here as though it covered these
+/// rows — that citation is the defect `AC-1`'s rebind exists to prevent.
+///
+/// **Promise class: durable invariant.** It asserts a relation — refusal
+/// observed together with plane absent — over the whole seed population. It reds
+/// if a seed starts resolving a plane, which would mean a forbidden route made
+/// these fixtures green, and it reds if a seed stops refusing, which is
+/// `D2k-1b`'s repair and is the event that retires it.
+#[test]
+fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
+    use crate::cranelift_backend::lowering::core::{
+        d2f_gate_arrivals_take, d2f_production_fusion_planes_take, set_selector_variant_exclusion,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// `(refusing construct, any oriented plan present, resolved keys, resolved
+    /// planes)` for one seed row, under the same wrong-consumer exclusion every
+    /// other `D2k` control runs.
+    fn seed_row(
+        expression: &RuntimeExpr,
+        symbol: &str,
+    ) -> (Option<String>, bool, usize, Vec<usize>) {
+        set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
+        let _restore = Restore;
+        let _ = d2f_gate_arrivals_take();
+        let _ = d2f_production_fusion_planes_take();
+        let refusal = d2k_wall_under_current_selector(expression, symbol);
+        let planes = d2f_production_fusion_planes_take();
+        // Drained ONCE. Taking this twice would leave the second read empty
+        // and make the key count zero for the wrong reason.
+        let arrivals = d2f_gate_arrivals_take();
+        (
+            refusal.map(|(construct, _edge)| construct),
+            arrivals.iter().any(|arrival| arrival.oriented_present),
+            arrivals.iter().map(|arrival| arrival.keys.len()).sum(),
+            planes,
+        )
+    }
+
+    let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
+    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
+    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::AfterReturnHole,
+    ));
+    // The absence, written once: no oriented plan reached the builder, no key
+    // resolved, and the one plane the builder built was empty.
+    let absent = (false, 0usize, vec![0usize]);
+    let conservation = Some("StaticWorkerBinding".to_string());
+
+    assert_eq!(
+        [
+            ("row1-owned-scope", seed_row(&row1, "ken_d2k1b_row1")),
+            ("row4-depth-1", seed_row(&row4_d1, "ken_d2k1b_row4_d1")),
+            ("row4-depth-2", seed_row(&row4_d2, "ken_d2k1b_row4_d2")),
+            ("row4-depth-3", seed_row(&row4_d3, "ken_d2k1b_row4_d3")),
+            ("row5-after-hole", seed_row(&row5, "ken_d2k1b_row5")),
+        ]
+        .map(|(label, (construct, present, keys, planes))| {
+            (label, construct, (present, keys, planes))
+        }),
+        [
+            (
+                "row1-owned-scope",
+                Some("NativeJoinPlanV1".to_string()),
+                absent.clone(),
+            ),
+            ("row4-depth-1", conservation.clone(), absent.clone()),
+            ("row4-depth-2", conservation.clone(), absent.clone()),
+            ("row4-depth-3", conservation.clone(), absent.clone()),
+            ("row5-after-hole", conservation.clone(), absent.clone()),
+        ],
+        "AC-1b: each unmarked seed must REACH a refusal and, on that same compile, carry NO \
+         oriented plan, resolve NO fusion key, and leave the built plane empty. The absence is \
+         recorded BESIDE the refusal that proves the compile ran, because a zero plane on its \
+         own is indistinguishable from a compile that never happened. Nothing here discharges \
+         any fusion property: these rows are absence comparators and the checked twin on a \
+         different fixture family is the only positive. A row that starts resolving a plane \
+         means a forbidden route made a seed green by supplying a plan, adding markers or \
+         weakening the key; a row that stops refusing is D2k-1b's repair and retires this \
+         control."
+    );
+}
