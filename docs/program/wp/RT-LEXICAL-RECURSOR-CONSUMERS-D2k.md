@@ -790,18 +790,44 @@ established; its cause is not.** The absence of a causal account there is
 intentional. Do not fill it in from plausibility, and do not read its absence as
 an oversight.
 
-> **ARCHITECT RULING `evt_6c9f1csfvrey7` — the admissible repair class. ITS
-> CONDITION IS NOW MET**, since the deciding read returned yes. A compiler-only
-> **transport-instance identity**, distinct from the planner-owned occurrence
-> identity: each successful `rebind(field_origin)` mints or selects a fresh
-> transport instance (for example the composite
-> `(field_origin, transport_ordinal)`), records it as outstanding, and
-> returns/carries that exact instance on the rebound `StaticWorkerBinding`. The
-> exact-`Var` consumer consumes **that instance** once; a second consumption of
-> the same instance refuses immediately; closeout refuses every still-outstanding
-> instance. **Direct bindings carry no instance.** The ledger may retain
-> `field_origin` as provenance or diagnostic metadata, but **it may not use
-> origin-level cardinality as the conservation proof.**
+> ### THE REPAIR CLASS IS TWO IDENTITIES, NOT ONE. `evt_3manpp82emcq6` SUPERSEDES `evt_6c9f1csfvrey7`.
+>
+> **A transport identity minted at `rebind` is NOT sufficient, and a candidate
+> built to the earlier ruling alone is built to a superseded contract.** The
+> earlier block is retained below the line for provenance only.
+>
+> **Recognition-instance identity.** Repeated successful worker-field
+> **constructions** of one planner origin require an opaque **recognition
+> instance**, carried by the compiler template. That is a second identity, minted
+> earlier than the transport, and the planner origin is **neither** of them.
+>
+> **The transition, in order.** `rebind` must **transition that exact recognition
+> instance once**, and **only then** mint the transport identity. The exact-`Var`
+> consumer consumes that transport once; a second consumption refuses
+> immediately.
+>
+> **Close proves BOTH halves:** every recognized instance transitioned, **and**
+> every minted transport was consumed. Neither alone closes.
+>
+> **The discriminating counterexample: double-recognize / single-rebind MUST BE
+> RED.** That is the row a transport-only design passes, because it mints one
+> transport for one rebind and balances. **It is the row that distinguishes this
+> ruling from the superseded one — if it is green, you built the old contract.**
+>
+> **Direct bindings carry no instance.** `field_origin` remains **provenance**,
+> not either identity, and **origin-level cardinality may never be the
+> conservation proof.**
+>
+> ---
+>
+> *Superseded, retained for provenance —* **`evt_6c9f1csfvrey7`:** a compiler-only
+> transport-instance identity where each successful `rebind(field_origin)` mints
+> or selects a fresh transport instance (for example the composite
+> `(field_origin, transport_ordinal)`), records it outstanding, and carries it on
+> the rebound `StaticWorkerBinding`, with closeout refusing every still-
+> outstanding instance. **Correct as far as it goes and incomplete: it has no
+> recognition instance, so it cannot see a second recognition that never
+> rebinds.**
 >
 > Affine compiler bookkeeping only. It authorizes **no** runtime word, carrier,
 > slot, descriptor, callable identity, planner population, broad `Var` rule, or
@@ -867,13 +893,33 @@ where the coordinate is actually consumed, and **makes the two-route structure
 visible on the page** — which is exactly what the original enumeration got
 wrong. Update both sides of the assertion together.
 
-**`1c-0` and `1c-0b` are landed, so the route repair is unblocked by THIS gate
-— and it is not thereby unblocked.** The transport-instance repair still has to
-land, and an ordering finding from the measurement is with the Architect: *both
-outer eliminations complete before the row-4/5 worker-bearing constructor
-exists.* If that holds it bears on **what** the repair is, not only when it
-runs. Do not start route code against the framed pending-continuation repair
-until the Architect has ruled on it.
+**`1c-0` and `1c-0b` are landed. THE ORDERING QUESTION IS ANSWERED TOO —
+Architect `evt_nmdrt6hdq34f`, and it needs NO new node and NO new authority.**
+
+The measurement was that *both outer eliminations complete before the row-4/5
+worker-bearing constructor exists*, and the concern was that it might change
+**what** the repair is. It does not. The ruled mechanism:
+
+> The outer match **remains pending without executing its selected case**. The
+> producer's descent returns the **recognized instance**. **That same match
+> resumes exactly once**, performs the **recognition → rebind → transport**
+> transition, and its **existing** exact-`Var` call consumes **once**.
+
+**Still prohibited, and this list is the ruling's, not a summary of it:** early
+elimination plus replay, suffix duplication, origin-31 substitution, runtime
+materialization, rollback or discard, and the continuation-source projection
+surface.
+
+> **"Resumes exactly once" is the load-bearing clause.** Early-elimination-plus-
+> replay reaches the same end state and is **forbidden** — a repair that
+> eliminates first and replays the case would satisfy a naive consumption count
+> while executing the case twice. **Do not read the prohibition list as
+> defensive boilerplate; the first two entries name the shortcut this ruling
+> exists to exclude.**
+
+**The remaining gate on route code is the recognition-instance contract above**,
+not this question. Build to `evt_3manpp82emcq6`, not to the superseded
+transport-only shape.
 
 **The defect, in one sentence:** the excluded route **loses or misattaches the
 pending outer continuation** when the producer's recursive/direct descent
