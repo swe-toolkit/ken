@@ -510,7 +510,7 @@ increment to carry it.
 > **The five required nets are the bulk of the work, not the mechanism.** That
 > is what puts `DP` past the one-hour turn and why it is cut.
 >
-> #### The cut, and the seam is not negotiable
+> #### The cut — WITHDRAWN 2026-08-12, see the box below before using any of it
 >
 > **`DP-1` — the population, plus nets 1 and 2.** The derivation at `:1453`,
 > the positive net (both frame IDs in semantic-position order, call sequence
@@ -529,18 +529,54 @@ increment to carry it.
 > one level down. A positive with no deletion control passes for any reason,
 > including the mechanism never being reached.
 >
-> **Why splitting is safe here, and it is a real argument rather than a
+> > # THE SPLIT IS WITHDRAWN. ITS PREMISE WAS MEASURED FALSE AT `89ee005b`.
+> >
+> > **Steward, 2026-08-12, on runtime-leader's hard stop `evt_3ccqdyp9tkk33`.**
+> > Everything in the two paragraphs below this box is **struck**. It is left
+> > standing rather than deleted because the argument it makes is the one a
+> > successor would otherwise rebuild from scratch, and its falsifier is worth
+> > more than its absence.
+> >
+> > **What I claimed:** `D2F_EMITTER_ARMED` is `false`, therefore `DP-1` lands
+> > an inert population and nothing executes the transported sequence between
+> > the cuts.
+> >
+> > **What was measured:** with the widened outer-slot/call sequence, **unarmed
+> > `ReHomed` reaches `instantiate_checked_invocation_segment` and refuses** —
+> > expected frames `{0,1}`, instantiated `{0}`. The arming flag gates the
+> > **fusion emitter**; it does not gate every consumer of the transported
+> > sequence. **`DP-1` alone is a regression, not an inert change.**
+> >
+> > **The error shape, and it is one I hold a lesson on:** I read a single named
+> > gate as bounding the whole population that reaches a mechanism. `D2F_EMITTER_
+> > ARMED: false` was evidence about *one* path and I used it as evidence about
+> > *all* paths. The census I never ran is *which unarmed consumers reach the
+> > instantiator* — and the answer is at least one.
+> >
+> > **The second failure is larger and is NOT about the split.** Net 1 requires
+> > the producer's second **dynamic** layer, which arises only under the held
+> > `D1`/`D2`; net 2 therefore fires on the proposed positive. ⇒ **`DP` may not
+> > be able to carry its own positive control at all**, which is a question
+> > about `DP`'s separability from `D1`/`D2`, not about how `DP` is cut. It is
+> > with the Architect.
+> >
+> > **No re-cut until the Architect rules** the static-versus-dynamic membership
+> > question, because the answer determines whether the authorized population is
+> > right — and a cut authored against a population that may move is waste.
+> > `89ee005b` is **WIP evidence, not a candidate**; do not route it.
+
+> ~~**Why splitting is safe here, and it is a real argument rather than a
 > convenience.** `D2F_EMITTER_ARMED` is `false` at `core.rs:2304` and the guard
 > is measured unreached, so `DP-1` lands an **inert** widened population:
 > nothing in production executes the transported sequence between the two cuts.
 > What `DP-2` adds is proof that the population is *exact* rather than merely
 > *sufficient*, and net 5 is specifically the guard against the site-coincidence
-> over-generalization the ruling above forbids.
+> over-generalization the ruling above forbids.~~
 >
-> ⇒ **`DP-2` is released at the same moment as `DP-1` and takes the lane
+> ⇒ ~~**`DP-2` is released at the same moment as `DP-1` and takes the lane
 > directly after it.** No other node comes between them. If `DP-1` hands back
 > and `DP-2` does not follow, that is a stall to report to me, not a stopping
-> point.
+> point.~~
 >
 > **A `DP-1` hard stop inside the hour is a good outcome.** Say so and hand
 > back. The sizing target is not an acceptance criterion and no AC is derived
