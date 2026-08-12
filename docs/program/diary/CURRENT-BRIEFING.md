@@ -38,9 +38,133 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~18:2xZ. `main` = `cf955abd`.
+> ### RESUME HERE — state at 2026-08-12 ~18:5xZ. `main` = `d5912acd`.
 >
-> **RUNTIME IS WORKING `DP-1`. Do not nudge it; the frontier is moving.** Three
+> > **HANDOFF GATE RAN, THEN THE RE-RELEASE — in that order, and the order is
+> > the point.** `scripts/handoff-gate-compact.sh runtime-leader
+> > runtime-implementer runtime-qa` at ~18:5xZ, on runtime-leader's own request
+> > (`evt_5fvg2z9spef4h`) after the planned control-1 stop.
+> >
+> > **Preconditions I checked before launching, because the reset is
+> > destructive:** all three worktrees clean, each on its own `<role>/work`
+> > branch, **none checked out on `wp/RT-LEXICAL-R3-FUSION-EMITTER`**, and none
+> > ahead of `origin/main` — so no `preserved/` ref was minted and **the atomic
+> > object at `8cde622c` was never in the reset's path.** Nothing owed in
+> > flight by any of the three.
+> >
+> > **I published NOTHING during the gate window.** `main` was `d5912acd` when
+> > the gate started and `d5912acd` when it returned, so the three seats are
+> > reset to the *current* `main`, not a snapshot of an older one. Stated
+> > explicitly because that skew is silent in both directions.
+>
+> > **LANGUAGE RING IS DOWN — `language-implementer` stopped on a provider
+> > content refusal at ~19:0xZ, reported to `language-leader` at
+> > `evt_73ymsgtq0rxb6`.** It had committed `8e9baa18` (parser depth control,
+> > `+30`) and its test came back **`FAILED. 0 passed; 1 failed`** before the
+> > refusal ended the turn with no post. Branch `wp/LANG-SURFACE-RECORD-LITERAL`
+> > at `8e9baa18`, 3 over base `57688110`, tree clean — nothing lost, because the
+> > seat had been ordered commit-first. **Do not re-prompt that seat to explain
+> > the failure; the refusal fires on SUBJECT and will re-trip.** The red test is
+> > Language's to diagnose, not mine.
+> >
+> > **The catch was late and the reason was my own instrument.**
+> > `scripts/steward-pane-sweep.sh` scored LIVE on the regex `…|esc to
+> > interrupt|▰`, and the bare ellipsis matched **`… +617 lines (ctrl + t to view
+> > transcript)`** — a truncation marker in stale tool output, not a spinner. A
+> > stopped seat read as busy. **Fixed by stripping the `… +N lines` form before
+> > the test**, verified with both controls: the dead seat no longer reads LIVE
+> > and `runtime-implementer`, genuinely working, still does.
+> >
+> > **THE HOLD IS LEGITIMATE AND ALREADY WITH THE OPERATOR — do not re-raise
+> > it.** After the rouse, language-leader posted `evt_7nta6rbkmfbtp` into
+> > `thr_1j4sgf8wve5hh`: ring paused, work preserved, *"awaiting the operator's
+> > lane/provider decision from `evt_5vwmmrr2w7ces`; no further implementer
+> > prompt or reset is authorized."* That is a `COORDINATION §1a` hold with a
+> > real address — named event, named owner — so it is a legitimate wait, not a
+> > stall, and the leader's read is correct.
+> >
+> > **What does NOT reconcile, and it is the operator's to look at rather than
+> > mine to decide.** My own superseded block at line ~327 records *"LANGUAGE is
+> > with the operator (`evt_5vwmmrr2w7ces`) and stood down"* — dated 2026-08-10.
+> > **Yet the ring built three commits today**, the last minutes before the
+> > refusal. So either the operator ruled and no artifact records it, or the ring
+> > resumed under a hold that was never lifted on the record. **This is the
+> > "gate nobody reopened" shape running the other way:** the failure this fleet
+> > keeps hitting is a satisfied precondition left shut, and this is work
+> > proceeding while the durable record still says stood-down. Both directions
+> > are invisible to a tracker reader, and neither is fixed by re-asking.
+> >
+> > **I am NOT re-raising the decision** — it is already with the operator, and
+> > re-asking a question they hold is the thing my own do-not-re-raise list
+> > exists to prevent. Recorded here because their view is this file.
+> >
+> > ### THE WAKE PATH IS THE FLEET'S WEAKEST LINK TODAY — four catches, one shape
+> >
+> > **Every one of these was found by reading a pane, never by a convo read.**
+> >
+> > 1. `language-leader` — mention did not wake it; pane rouse did.
+> > 2. `runtime-leader`, twice — **its own watchdog tick sampled the implementer
+> >    mid-work, concluded "no gap detected", and then did not wake for the
+> >    handback that arrived minutes later.** The tick actively makes this worse:
+> >    the leader has just affirmatively concluded all is well. **Always compare
+> >    a leader's last-turn time against the handback timestamp.**
+> > 3. `architect` — sat with **two** stranded pastes
+> >    (`[Pasted Content 1730 chars][Pasted Content 1098 chars]`), last completed
+> >    turn ~18:30, while the Runtime ring's fork waited on it. One `Enter`
+> >    submitted both and it woke and re-oriented.
+> >
+> > **THE UNCONDITIONAL RE-SWEEP PAID OFF ON ITS FIRST REAL USE, ~20:3xZ.** It
+> > caught a second Architect strand — `[Pasted Content 2754 chars]…</channel>`,
+> > a truncated notification sitting unsubmitted while its last turn had
+> > completed. **The conditional version would have missed it**: the Architect
+> > was not obviously mentioned in the events I had just read, so I would not
+> > have triggered the condition. One `Enter` cleared it and the seat went
+> > `LIVE`. Keep the step unconditional.
+> >
+> > **My own rule would have caught (3) and I skipped it.** The tick says
+> > *re-sweep after any post mentioning the architect*; I found it only because I
+> > chose to verify the routing had landed. **A conditional step is one I have
+> > now demonstrated I skip, so the tick now ends with an UNCONDITIONAL
+> > re-sweep** — the sweep is cheap and the condition is what fails.
+> >
+> > **Rouse mechanics, learned the hard way this hour:** keep a pane rouse
+> > **under about 1000 characters**. Over that it arrives as
+> > `[Pasted Content N chars]` and the first `Enter` accepts the paste rather
+> > than submitting — **a second `Enter` is required.** Shorter rouses submitted
+> > on one.
+> >
+> > **And read panes WIDE.** Three times this hour a `tail -5`/`tail -8` caught a
+> > working seat between renders and read as idle or failed. `capture-pane -p -S
+> > -40 | tail -20` is the floor. This is the same positional trap as the
+> > `Compacting` bar: the window structurally cannot answer, and it returns a
+> > confident wrong answer rather than "unknown".
+> >
+> > **THE CONVO MENTION DID NOT WAKE THE LEADER — a pane rouse did.** Fifteen
+> > minutes after `evt_73ymsgtq0rxb6` both Language seats still sat at an empty
+> > composer and the leader had posted nothing. Roused at ~19:2xZ with
+> > `send-keys -l <text>`, `sleep 2`, **separate** `Enter`, pointing it at the
+> > event id rather than restating the report; it went `Working` within seconds.
+> > **Escalate a silent mention to a pane rouse, not to a second post** — a
+> > re-post lands exactly the way the first one did. Graduated recovery per
+> > `COORDINATION §13`, and the pane is the only instrument that showed the gap.
+> >
+> > **The fix removes a false positive and does NOT give Codex seats a liveness
+> > signal — they print `(no-footer)` whether working or dead.** For those seats
+> > the instruments are the pane BODY and the seat's convo activity. Recorded in
+> > the script header so `(no-footer)` is read as "cannot see", never as "fine".
+> > Language had also posted **nothing to the space since before 15:00Z**, which
+> > is the other half of why nobody noticed.
+>
+> > **THIS BRIEFING COMMIT IS DELIBERATELY UNPUBLISHED — publish it at the next
+> > substantive seam, not on its own.** `COORDINATION §10⁻` rule 3: a process
+> > merge must name the product WP it unblocks or wait, and this one unblocks
+> > nothing. It is also live: runtime-leader told the implementer to rebase the
+> > atomic branch onto **`origin/main = d5912acd` by name**, so moving `main`
+> > for a diary-only delta would make the ring's own instruction read stale for
+> > no gain.
+>
+> **RUNTIME IS BUILDING THE ATOMIC OBJECT'S NEXT UNIT — the `DP`+`D1`/`D2`
+> composition splice.** Do not nudge it; the frontier is moving. Three
 > publishes this arc: `e48c2f90` (`DP-0`, PR #2033), `75e693f6` (the `DP`
 > sizing ruling, PR #2034), `cf955abd` (the Adversary triage, PR #2035).
 >
@@ -75,11 +199,146 @@
 > merge, no standalone held `D1`/`D2` merge, no QA route on `89ee005b` (it is
 > preserved WIP negative evidence, earns no credit, is not a candidate).
 >
+> > ### RULED AND DISPATCHED — `D3` SELECTOR. Runtime is building it.
+> >
+> > **Architect `evt_4g2hmsr8tb3bm` (20:04Z), leader dispatched
+> > `evt_255qnj0b773ja`, implementer building.** The ruling and its **five
+> > selector nets are now written into the frame as `AC-D3-SEL`** — that is a
+> > frame amendment and it was mine to author, not the ring's to fold in.
+> >
+> > **The ruling:** an affine capability issued by the checked
+> > fusion-composition splice and bound to **that splice's specific pending
+> > semantic edge**, consumed at most once by the segment that actually consumes
+> > the edge. **Forbidden:** an ambient body flag, a counter, a global or
+> > body-scoped "next call wins", a Runtime-shape search, and **retaining
+> > `fused_composition_extent`**.
+> >
+> > **MY FLAGGED TENSION WAS ANSWERED, AND FLAGGING RATHER THAN RULING IS WHY
+> > IT WAS USEFUL.** `evt_2f0nnwtzqy65m` does **not** forbid the corrected
+> > shape — the capability contributes no frame ID and proves no membership.
+> > **But it does forbid the raw formulation** the implementer offered: a permit
+> > grounded only in "we are in a fused body" or "first compose observed" makes
+> > execution order the authority. The answer was neither yes nor no, and a
+> > pre-emptive reading of my own would have destroyed it.
+> >
+> > **Not a planner per-occurrence key now** — it would duplicate authority the
+> > fusion claim and pending edge already carry. Escalating to one is a **new
+> > hard stop**, never licence to use the coarse permit.
+> >
+> > **SELECTOR NET 1 IS BUILT AND MEASURED WORKING** (`evt_2ffgnktmm34ta`,
+> > 20:17Z). In one fused body `inst=1 layers=[1,0]` selects `Composed`
+> > `expected={0,1}` and `inst=2 layers=[0]` selects `Ordinary` `expected={0}` —
+> > the required net exactly. **`fused_composition_extent` is GONE** as the
+> > ruling demands. All four capability refusals are in: replay/double-consume,
+> > unconsumed/escaped, failed descent (**withdrawn, not consumed** — withdrawal
+> > mints no receipt), and two splices on one segment.
+> >
+> > **One rot risk the implementer flagged unprompted, worth keeping:**
+> > `ComputationalEliminatorFrame` is `Copy`, so **the id alone is not affine**
+> > — a copied edge carries a copied id. Membership in
+> > `outstanding_splice_capabilities` is the single spendable fact, and the
+> > issuer is monotone so a spent id can never be answered by a later issue.
+> >
+> > **HELD at `da0e2ba2`, base `d5912acd`, 6 commits, unarmed, unrouted**;
+> > `ken-runtime` 906/0/4, `ken-elaborator` 122/0. **Still owed: selector nets
+> > 2, 3, 4; controls 2 and 3; the inner-slot-widening witness** — none earned by
+> > the selector work. **Net 3 is buildable WITHOUT arming**, straight against
+> > the capability ledger, and is the named next unit.
+> >
+> > **STOP 3 IS RULED AND DISPATCHED — the ring is fully self-driving.**
+> > Leader routed `evt_7dp6b7ja5fp58` (20:31), Architect ruled
+> > `evt_4x3291v9dx0vb` (20:40), leader dispatched `evt_6fzg11hpvfp4w` (20:41),
+> > implementer building. **No rouse was needed at any hop** — the wake path
+> > worked unaided this round, so it is unreliable rather than broken.
+> >
+> > **The ruling: the moved suffix's claimed IH invocation is a RECURSIVE CALL
+> > TO THE SAME `Fusion(id)`** — not a no-op/current-result substitution, not a
+> > call to the standalone producer. No new planner population; the preflighted
+> > `FusionRegionClaim` already carries every identity. **Written into the frame
+> > as `AC-D3-SELF`**, with the rejected repairs named so none is re-proposed.
+> >
+> > **The trap in that AC, and it is the reason I wrote it rather than leaving
+> > it to the ring:** this fixture prints `37` for more than one axis, so a
+> > control that passes on that numeric coincidence proves nothing. `AC-D3-SELF`
+> > requires a **discriminator separating call-site identity from body/callee
+> > identity**, and forbids keying on the coincidence or on "missing target
+> > while in a fused body".
+> >
+> > **NEW HARD STOP, and it is the THIRD instance of one shape** — a premise
+> > about the fused function written before `D1`/`D2` moved the suffix into it.
+> > `define_static_continuation_fusion_bodies` declares only the producer's
+> > edges; the armed compile now hits `call_declared_unit(StaticOriginId(37))`
+> > against `unit_calls = [34]`. **Recorded as a table in the frame** with the
+> > two measured facts that close off the obvious repair (the consumer's static
+> > body edge set is EMPTY, and reaching seat 37 inside the fused body is a
+> > question about what the suffix lowers to, not about edge tables). **Each
+> > instance was found by arming and hitting it, so the remaining count is
+> > unknown** — I offered a census as an option and deliberately did NOT make it
+> > an AC.
+> >
+> > **The fork:** one fused function builds **two** checked segments — composed
+> > (`layers=[inner,outer]`, needs `{0,1}`) and ordinary (`layers=[outer]`, needs
+> > `{0}`). `DP`'s body-extent selector marks **both** composed, so the ordinary
+> > one refuses with `expected={0,1} instantiated={0}`. **The validator is
+> > behaving correctly and the selector is too coarse.** Three discriminators
+> > were measured and eliminated: Runtime segment shape (forbidden and circular
+> > — it is subset coverage renamed), `D1`'s per-phase authority (**measured
+> > identical at both composes**), and `RecursorProducerOriginId` (a
+> > lowering-minted counter, not a plan key). Remaining: **(a)** an affine
+> > one-shot permit armed by the splice, fail-closed but resting on an ordering
+> > premise, or **(b)** a planner-authored per-occurrence key naming the composed
+> > segment from the checked source.
+> >
+> > **The routing call was mine and I made it: soundness/design ⇒ Architect**,
+> > not me and not the leader. **I flagged one tension WITHOUT ruling on it** and
+> > the leader carried it verbatim: does `evt_2f0nnwtzqy65m`'s prohibition on
+> > Runtime discovering membership from Runtime context already exclude (a) one
+> > level down? **That reading is the Architect's, not mine — do not pre-empt
+> > it.** The implementer declining to settle it alone was correct: it had just
+> > been burned by a false ordering premise on the same turn (`D3` defect 1, a
+> > fused region taking over its own suffix), and trading one ordering premise
+> > for another is not an implementer's call.
+> >
 > > **THE ATOMIC OBJECT IS UNDER CONSTRUCTION ON A BRANCH, NOT ON `main` — a
 > > cold resume will not see it in the log.** `wp/RT-LEXICAL-R3-FUSION-EMITTER`
-> > tip **`8cde622c811dcb081bb290fbc94490377d222833`**, base `bd170bef`, 1
-> > commit, 1 file, `+181/-0`, `lowering/core/tests/control.rs`, suite `905`
-> > passing against `904` at base.
+> > tip **`8caaa5d6`** (was `69f671d2` before the `D3` defect-1 repair),
+> > base `d5912acd`, **5 commits**; the `DP` measurement below was taken at
+> > `69f671d2`, **4 commits, 10 files, `+835/-26`**,
+> > handback `evt_5pfgetdgv3bkf` at 19:32Z. `DP`+`D1`+`D2` are built, measured,
+> > **unarmed and unrouted**. Suite `906` passing against `905`; `ken-elaborator`
+> > clean; production-profile build of both crates clean, so nothing is
+> > `cfg(test)`-only. **`D3` arming is authorized next** (runtime-leader,
+> > ~19:4xZ), with controls 2 and 3 following on the armed composed path.
+> >
+> > **Superseded tips, both of which a compaction will happily carry forward:**
+> > `8cde622c` (base `bd170bef`) → `a23a0393` → now `69f671d2`. I verified the
+> > first rebase myself with `git patch-id --stable` — identical
+> > (`2b7bb356e0db117c…`) — and the implementer reported the same for `D1`
+> > (`4dd1e63c`→`7f31b267`) and `D2` (`7166baaa`→`32a5dc3e`). **Cite
+> > `69f671d2`.**
+> >
+> > **`REPRESENTATION_RULE_VERSION` went 4 → 5** (length-prefixed sequence in the
+> > encoding). Flag it at review routing — a representation-rule bump is the kind
+> > of change a conformance reader wants to know about, and nothing in the frame
+> > anticipated it.
+> >
+> > **THE MEASUREMENT CORRECTED THE FRAME, and the frame correction is MINE and
+> > is now written.** An armed probe run before any code showed the producer
+> > layer **already carries its own checked frame id** — `(frame=Some(1),
+> > invocation=None)` and `(frame=Some(0), invocation=Some(1))`. `DP` does not
+> > mint an identity; what was absent is **invocation-source coverage**. The
+> > frame's leading DP sentence said *"give the producer semantic occurrence its
+> > own transported checked identity"*, which contradicts its own PRECISION
+> > CORRECTION eleven lines below it. **Struck in place and replaced**, with the
+> > probe box, in section 5 — the withdrawn-claim-in-the-leading-sentence shape,
+> > invisible to a line-local read.
+> >
+> > **Second measurement, and it is the stronger one:** one call template is
+> > entered **twice in a single compile** — composed via
+> > `lower_fused_producer_through_suffix`, ordinary via `define_unit_bodies`.
+> > Widening the shared base refuses the second with `expected={0, 1}
+> > instantiated={0}` — **the same refusal `89ee005b` produced, reached by a
+> > second independent route.** No template-level widening can satisfy both.
 > >
 > > **It is NOT a candidate and takes no QA route and no credit.** Control 1
 > > only — the base singletons plus the three unarmed uncomposed roots, both
@@ -124,6 +383,14 @@
 > `RT-NESTED-IH-NATIVE-REALIZATION` (`draft`), both **Runtime** nodes, and
 > Runtime runs one node at a time.
 >
+> **Re-measured at the re-release: the one other ring in flight is Language, and
+> the intersection is EMPTY.** `language-implementer` is live on
+> `wp/LANG-SURFACE-RECORD-LITERAL` (3 commits, base `57688110`). It touches
+> `crates/ken-elaborator/` — **the same crate as `DP`** — but the files are
+> disjoint: `ast/elab/lossless/modules/parser/resolve.rs` plus tests, versus
+> `DP`'s `erasure.rs`. Same crate is a CI compile coupling, not a merge
+> contention; the silent-union hazard is per-file and there is no shared file.
+>
 > **My commit `80f22449` says "KERNEL-NESTED-IND is unblocked" and that subject
 > is narrower than it reads.** One dependency edge closed; two remain open. The
 > kernel-leader's *"still Runtime-blocked at `AC-K12`"* is **correct** — do not
@@ -131,9 +398,13 @@
 > `RT-NESTED-IH-NATIVE-REALIZATION` at `draft` is the framing debt in front of
 > them. **That is the next backlog item after `DP`.**
 >
-> **WIP AUDIT CLOCK: ARMED on Runtime from the `DP` release, `evt_37166e7aq0xts`
-> (~18:16Z).** A routine progress post does not reset it. Resets on a hard stop,
-> an Architect ruling, a candidate handoff, or the `DP-1`→`DP-2` transition.
+> **WIP AUDIT CLOCK: RE-ARMED on Runtime from the post-gate re-release
+> (~18:5xZ), superseding the `DP`-release arming at `evt_37166e7aq0xts`.** A
+> routine progress post does not reset it. Resets on a hard stop, an Architect
+> ruling, or a candidate handoff. **Expect it to fire without a merge** — this
+> object lands whole or not at all, so a long WIP is the designed shape here,
+> not by itself a stall. Diagnose on whether the ring can name its next
+> construction, never on elapsed time alone.
 >
 > **`DP-1` also carries two comment repairs and `DP-2` one added AC**, from the
 > Adversary pass `evt_2933sm5wnh2je`, both reproduced by me before folding. The

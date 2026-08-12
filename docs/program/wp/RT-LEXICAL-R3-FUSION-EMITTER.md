@@ -125,18 +125,56 @@ against it on *both* sides of the gate.
 > statement in the node). `D1` and `D2` are built and **preserved as evidence
 > only** at `8063dd67...7166baaa` — not a merge candidate, not routed to QA.
 >
-> **`DP` — give the producer semantic occurrence its own transported checked
-> identity.** **Design class CONFIRMED by the Architect at
+> > #### MEASURED CORRECTION — `DP` DOES NOT MINT AN IDENTITY. IT ADDS COVERAGE.
+> >
+> > **Steward, 2026-08-12, on runtime-implementer's armed probe
+> > `evt_5pfgetdgv3bkf`, which was run BEFORE anything was written.** On the
+> > `D2j` `Exact` twin the layers came back `(frame=Some(1), invocation=None)`
+> > and `(frame=Some(0), invocation=Some(1))`. **The producer layer ALREADY
+> > carries its own checked frame id** — the checked source authors it, with its
+> > own semantic position, slot and `ParentFrame` witness. **What was absent is
+> > invocation-source COVERAGE**, nothing else.
+> >
+> > **The two struck phrasings below are the defect.** Both read as `DP`
+> > creating the producer's identity, which would put `DP` in the business of
+> > authoring what the planner already authored — the exact inference the
+> > Architect's membership law forbids Runtime from making. **The PRECISION
+> > CORRECTION further down was right all along and is now confirmed by
+> > measurement**, so this box aligns the leading sentence with it rather than
+> > changing any ruling.
+> >
+> > **Why it had to be corrected here specifically:** a reader who greps for the
+> > deliverable finds the headline, not the qualifier eleven lines later. A
+> > superseded claim that survives in the leading sentence is invisible to a
+> > line-local read.
+> >
+> > **Second measurement from the same probe, load-bearing for the shape:** one
+> > call template is entered **twice in a single compile** — instance 1 from
+> > `lower_fused_producer_through_suffix` with a two-layer composed segment,
+> > instance 2 from `define_unit_bodies` with a one-layer ordinary one.
+> > Widening the shared base covers the first and refuses the second with
+> > `expected={0, 1} instantiated={0}` — **the same refusal `89ee005b`
+> > produced, reached by a second independent route.** No template-level
+> > widening can satisfy both shapes.
+>
+> ~~**`DP` — give the producer semantic occurrence its own transported checked
+> identity.**~~ **`DP` — establish the already-authored producer frame's
+> membership in the concrete invocation segment, at the composition splice.**
+> **Design class CONFIRMED by the Architect at
 > `evt_2qmknsgtmy0rj`; the design-class hold is lifted.** Class 2 would require
 > inventing a semantic partition the measured segment does not have, while the
 > emission region is intentionally producer plus suffix.
 >
-> **`DP` populates and transports, from the checked source:** the producer's
+> ~~**`DP` populates and transports, from the checked source:** the producer's
 > **distinct frame template and marker**, plus its real checked occurrence
 > path, semantic position, segment site, input/output interfaces, occurrence
-> binding, control witness, and **invocation/parent-edge relation.** The
-> **unchanged** validator must then accept the complete expected frame set,
-> order, endpoint composition, site, witnesses and dynamic ownership.
+> binding, control witness, and **invocation/parent-edge relation.**~~ **`DP`
+> transports, from the checked source, the invocation-source coverage for a
+> frame identity the checked source has already authored** — the frame
+> template, marker, occurrence path, semantic position, slot and `ParentFrame`
+> witness are read, never minted. The **unchanged** validator must then accept
+> the complete expected frame set, order, endpoint composition, site, witnesses
+> and dynamic ownership.
 >
 > > #### PRECISION CORRECTION — "its own invocation source" OVER-SPECIFIES
 > >
@@ -204,6 +242,151 @@ point. Built on top of the held `D1`, and **held with it.**
 implementation step**, taken only after `D0`'s positive row is non-zero and
 `D1` and `D2` are implemented. **Arming is authorized by this frame and by
 nothing you inherit from `#6d`.**
+
+> ### `D3` GAINED A SELECTOR, AND ITS FIVE NETS ARE ACCEPTANCE — Steward,
+> ### 2026-08-12, recording Architect `evt_4g2hmsr8tb3bm`
+>
+> **Why `D3` is no longer just the arming flip.** Arming exposed that one fused
+> function builds **two** checked segments — composed (`layers=[inner,outer]`,
+> needs `{0,1}`) and ordinary (`layers=[outer]`, needs `{0}`) — and `DP`'s
+> body-extent selector marks **both** composed, so the ordinary one refuses
+> `expected={0,1} instantiated={0}`. **The validator is correct and fail-closed;
+> the selector is too coarse.** Measured and eliminated first: Runtime segment
+> shape (forbidden, and circular — subset coverage renamed), `D1`'s per-phase
+> authority (**identical at both composes**), `RecursorProducerOriginId` (a
+> lowering-minted counter, not a plan key).
+>
+> **THE RULING — an affine capability bound to the concrete edge, NOT to the
+> body.** Issued by the already-checked fusion-composition splice and carried on
+> **that splice's specific pending semantic edge/eliminator**. The segment that
+> actually consumes that edge consumes the capability and is checked `Composed`;
+> every other segment, including the second `[outer]` one in the same fused
+> function, stays `Ordinary`. Preserve it through the producer-through-suffix
+> descent; consume it **at most once**; restore and close the scope on **both**
+> success and error.
+>
+> **The line the ruling draws, and it is the whole point.**
+> `evt_2f0nnwtzqy65m` does **not** prohibit this shape: the capability
+> contributes **no frame ID and proves no membership**, and the checked plan
+> remains sole author of `ordinary_frame_templates` and
+> `composed_frame_templates`. It proves only *which dynamic construction is the
+> checked splice*. **But a permit whose only provenance is "we are in a fused
+> body" or "this is the first compose observed" WOULD violate that ruling** — it
+> makes execution order the authority for applicability. **Fail-closed exact
+> coverage is a necessary net and does not turn an unbound ordering guess into
+> an identity.**
+>
+> **Explicitly forbidden:** an ambient body flag, a counter, a global or
+> body-scoped "next call wins" slot, a search for the first segment whose
+> Runtime shape fits, and **retaining `fused_composition_extent`**.
+>
+> **Why not a planner per-occurrence key now:** the fusion claim plus that
+> particular pending edge already distinguish the construction, so a new planner
+> key would duplicate authority. **Escalate to one only if implementation proves
+> the capability cannot be attached to and recovered from that exact edge
+> without falling back to next-event ordering — and that is a NEW HARD STOP, not
+> licence to use the coarse permit.**
+>
+> **`AC-D3-SEL` — the five selector nets, in this same held atomic object:**
+>
+> 1. The `[inner, outer]` segment consumes exactly one splice capability and
+>    selects `Composed`; the `[outer]` segment selects `Ordinary`.
+> 2. Deleting the capability restores the existing exact/mixed refusal — it does
+>    **not** silently select `Composed` from frame shape.
+> 3. Duplicate, replayed, escaped, and unconsumed capabilities all red.
+> 4. An unrelated ordinary segment inserted **before** the target cannot steal
+>    the capability or be accepted as `Composed`.
+> 5. Controls 2 and 3 and the **inner-slot-widening witness** remain owed
+>    unchanged — none of them is earned by this selector work.
+>
+> ### STOP 3 IS RULED — `AC-D3-SELF` — Steward, 2026-08-12, recording
+> ### Architect `evt_4x3291v9dx0vb`
+>
+> **Full ruling is at `evt_4x3291v9dx0vb`; the leader's dispatch is
+> `evt_6fzg11hpvfp4w`. Read the ruling, not this box** — what is here is the
+> part that binds acceptance.
+>
+> **The moved suffix's claimed IH invocation is a RECURSIVE CALL TO THE SAME
+> `Fusion(id)` DEFINITION.** Not a no-op or current-result substitution, and
+> not a call back to the standalone producer. The producer body was lowered
+> inline for the **current** invocation, which does not discharge this **child**
+> invocation: dropping the call drops recursion, and targeting the fusion-owned
+> producer body would run the producer without the moved suffix and violate body
+> ownership.
+>
+> **No new planner population is owed** — the preflighted `FusionRegionClaim`
+> already transports every identity needed. This is `D3` emission wiring inside
+> the held atomic object.
+>
+> **The internal self edge is NOT a second external redirect.** The existing
+> consumer-to-fusion redirect remains the sole external affine redirect; the
+> recursive self edge is a distinct definition-local obligation of the same
+> claim and **does not consume the region claim a second time.**
+>
+> **KEEP CALL-SITE IDENTITY DISTINCT FROM BODY/CALLEE IDENTITY, even though
+> this fixture prints `37` for more than one axis.** `call_declared_unit` looks
+> up a retained callee/body coordinate; the authorization is the exact
+> `consuming_call` occurrence. **Keying both by the numeric coincidence at `37`,
+> or by "missing target while in a fused body", is unlawful.** If the exact call
+> occurrence is not available at the emission seam, **thread the existing source
+> occurrence there — never infer it from lookup failure or body shape.**
+>
+> **Rejected repairs, named so none is re-proposed:** union with the consumer
+> edge table; restoring the standalone producer edge; identity or current-value
+> forwarding; a generic self-call fallback on a missing `unit_calls` entry; an
+> ambient "inside fusion" switch.
+>
+> **`AC-D3-SELF` — closeout must require the exact internal recursive edge for
+> each claimed consuming call, and reject each of:** omission; duplication; a
+> different consuming call; a different `Fusion` target; the standalone-producer
+> target; a producer-frame contract. **Plus a discriminator separating call-site
+> identity from body/callee identity**, since this witness leaves them
+> numerically coincident — a control that passes on the `37` coincidence proves
+> nothing.
+>
+> ### THREE STOPS, ONE SHAPE — a premise about the fused function written
+> ### BEFORE the suffix moved into it
+>
+> **Steward, 2026-08-12, recording a pattern the implementer named at
+> `evt_2ffgnktmm34ta` rather than treating its third instance as a one-off.**
+>
+> | # | the stale premise | how it surfaced |
+> |---|---|---|
+> | 1 | *"the takeover cannot run before the body it sits in is defined"* | `D3` defect 1 — a fused region took over its own suffix and consumed its own claim |
+> | 2 | the redirect's ordering clause | `claim_present=false` at every caller |
+> | 3 | *"Not the consumer's edges — the consumer's redirected invocation is the edge that reaches this function, not one inside it"* | `call_declared_unit(StaticOriginId(37))` against `unit_calls = [34]` |
+>
+> **`D1`/`D2` moving the suffix inside the fused function falsifies all three,
+> and each was discovered by ARMING and hitting it.** That is a serial
+> discovery process: one stop, one turn, one repair, repeat. Nothing goes red
+> until the armed compile reaches the site, so the count of remaining instances
+> is **unknown and unbounded by anything measured so far**.
+>
+> **The option, and it is an option rather than a deliverable I am adding:**
+> whoever takes the next stop may census the premises written about the fused
+> function before the suffix moved in, instead of waiting for the next one to
+> fire. Three for three is enough to suspect a fourth. **I am not mandating it
+> and not making it an AC** — it may be cheaper to keep taking the stops, and
+> that judgment needs the code in front of you. **What I am fixing is that the
+> third instance should not read as bad luck.**
+>
+> **Do not read the two measured facts on stop 3 as a repair route.** The
+> consumer's own static-body edge set is **empty** — body ownership removed seat
+> 37's edge, which is the hole the redirect exists to fill — so declaring
+> consumer edges into the fused function supplies nothing. And reaching seat 37
+> inside the fused body means the suffix is invoking a producer the dispatcher
+> already lowered inline, which is **a question about what the suffix lowers
+> to**, not about edge tables. The implementer measured both and declined to
+> guess; that is the correct handback shape.
+>
+> **Routing note, mine.** The implementer named this fork and declined to settle
+> it, having just been burned by a false ordering premise on the same turn
+> (`D3` defect 1: a fused region taking over its own suffix and consuming its
+> own claim). **That was correct.** I ruled only the routing — soundness/design
+> goes to the Architect — and flagged the `evt_2f0nnwtzqy65m` tension **without
+> resolving it**. The ruling came back neither "forbidden" nor "fine" but
+> "the raw formulation is forbidden, here is the lawful correction," which is
+> the answer a pre-emptive reading of my own would have destroyed.
 
 **`D4` — the before-hole expression is repaired and green** under `B`-only
 exclusion at the pre-retirement base. **If arming plus `D2` necessarily makes

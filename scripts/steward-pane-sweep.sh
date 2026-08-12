@@ -17,6 +17,14 @@
 #
 # (no-footer) is a rendering state, not idle. Codex seats render no timing footer in
 # either direction and always land there; that is expected and is NOT evidence of idleness.
+#
+# READ THAT LAST LINE AS A LIMIT, NOT A CAVEAT: for a Codex seat this script supplies
+# NO liveness signal in either direction. A working Codex seat and one that died on a
+# provider content refusal both print (no-footer). The 2026-08-12 language-implementer
+# stall was found by reading the pane body, not by this column -- and the only reason
+# to look was that the (then-broken) LIVE column disagreed with the space being silent.
+# So for Codex seats the real instruments are the pane BODY and the seat's convo
+# activity; treat (no-footer) as "this script cannot see", never as "fine".
 
 set -uo pipefail
 
@@ -42,7 +50,16 @@ for p in $SEATS; do
   fi
   f=$(printf '%s' "$b" | tail -14)
 
-  if printf '%s' "$f" | grep -qE '…|esc to interrupt|▰'; then
+  # The bare ellipsis is a LIVE signal ONLY when it is a spinner. It is also the
+  # transcript-truncation marker inside stale TOOL OUTPUT -- measured 2026-08-12,
+  # when `… +617 lines (ctrl + t to view transcript)` in a finished turn's output
+  # made a seat that had stopped on a provider content refusal read as LIVE. That
+  # is the false-BUSY direction COORDINATION 1a names as the cheapest stall to
+  # detect and the most expensive to miss: nothing else was watching that seat.
+  # Strip the truncation form before testing, rather than dropping the ellipsis
+  # signal entirely -- some renderers show only a spinner ellipsis.
+  if printf '%s' "$f" | grep -vE '…[[:space:]]*\+[0-9]+ lines' \
+     | grep -qE '…|esc to interrupt|▰'; then
     s=LIVE
   elif printf '%s' "$f" | grep -qE ' for [0-9]+m ?[0-9]*s'; then
     s=DONE
