@@ -4848,6 +4848,43 @@ impl<'a> Lowering<'a> {
         let Some(defining) = self.defining_unit else {
             return Ok(None);
         };
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — A REGION DOES NOT TAKE
+        // ---- ITSELF OVER, and without this it does.
+        //
+        // The selection below keys on `consumer_owner`, and the fused body
+        // lowers the consumer's suffix under the consumer's identity — that is
+        // `D1`, working as designed. So inside the fused function the region's
+        // own suffix presents as an eligible takeover of the region it is
+        // *currently defining*, and the claim is spent there.
+        //
+        // MEASURED, armed, before this guard existed: the takeover fired with
+        // `defining_unit = consumer`, `seat = StaticOriginId(37)`,
+        // `continuation_origin = StaticOriginId(10)` during
+        // `define_static_continuation_fusion_bodies`, which runs BEFORE
+        // `define_unit_bodies`. By the time the consumer's own unit was
+        // defined the claim was gone, `redirect_fused_producer_invocations`
+        // inserted nothing, and the seat refused with *"retained body
+        // StaticOriginId(37) has no graph-derived call target in this unit"*.
+        // The seat named by that refusal is the claim's own seat, which is what
+        // ties the two halves together.
+        //
+        // **The existing guard could not see this.** Its doc says the consumer
+        // identity is what stops a region *"being taken over inside another
+        // unit that happens to share a continuation origin"* — a rule about a
+        // DIFFERENT unit. The fused body is not a different unit; it is the same
+        // consumer identity in a second function, which is precisely the case
+        // the ownership check cannot distinguish.
+        //
+        // Keyed on the region, never on "am I in a fused body": `D1`'s
+        // `fused_consumer_authority` names the one `continuation_origin` this
+        // body is defining. A different region's suffix reached from inside this
+        // one is still eligible, and still takes over.
+        if self
+            .fused_consumer_authority
+            .is_some_and(|(origin, _)| origin == continuation_origin)
+        {
+            return Ok(None);
+        }
         let Some(ledger) = self.fusion_claims.as_ref() else {
             return Ok(None);
         };
