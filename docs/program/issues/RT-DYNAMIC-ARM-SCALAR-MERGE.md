@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 depends_on: []
-blocks: []
+blocks: [KERNEL-NESTED-IND, RT-NESTED-IH-NATIVE-REALIZATION]
 github: null
 origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 2026-08-09). Kernel reached the native boundary after interpreter Nat-3 and provenance-gated erasure both passed, and stopped without Runtime edits exactly as the durable D5 ruling at main 46c12adb requires. Steward-filed (agents cannot create tracked work per COORDINATION §2). Steward owns the frame and AC/control placement.
 ---
@@ -189,6 +189,25 @@ origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 202
 >    Runtime-owned, and two Kernel seats are idle behind it. Discharges,
 >    partially advances, or orthogonal -- and if not discharged, what still
 >    stands between them.
+>
+>    **DISCHARGED 2026-08-12** — runtime-leader `evt_77pege8j5cv14`, on Steward
+>    request `evt_6pmftb5fpxrkm`. **`c2` PARTIALLY ADVANCES `AC-K12`; it does
+>    NOT discharge it.** It clears the real `D5` scalar-merge refusal by proving
+>    the arriving operand is `StructuralNat`, retaining the unrelated-`Data`,
+>    merge-shape and catch-all boundaries. `AC-K12` still needs the nested-IH
+>    computation to form a valid native artifact, pass Cranelift verification,
+>    execute natively, and agree with the interpreter at Nat 3, with its carried
+>    control no longer ignored.
+>
+>    **The remainder is cut as [[RT-NESTED-IH-NATIVE-REALIZATION]]** — native
+>    realization of the full nested-IH continuation beyond scalar admission
+>    (emitted definition, ABI/owner wiring, execution surviving the verifier and
+>    agreeing with the interpreter). **Not a third slice here:** it is the
+>    unbounded question, and folding it behind `c2`'s bounded one is precisely
+>    what made slice `a` too wide.
+>
+>    ⇒ **`c2`'s pre-assignment conditions are now both met. Nothing on the
+>    Steward stands between `c2` and assignment when the lane reaches it.**
 >
 > # `D0` AND `D1a` ARE DONE.
 >
