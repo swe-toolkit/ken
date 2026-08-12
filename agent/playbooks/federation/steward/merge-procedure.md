@@ -311,6 +311,26 @@ Your operational docs — the progress tracker, `agent/` playbook and
    fails when the tracker already matches. **This is the only copy of this
    procedure** — it also applies to every ring candidate you publish, so
    `origin/main` preserves the current progress file durably.
+
+   > **`git checkout <ref> -- <path>` HERE IS SAFE ONLY BECAUSE YOU HAVE NOT
+   > EDITED THE TRACKER ON THIS BRANCH. Do not generalize the idiom.**
+   >
+   > It is a checkout, not a merge: it takes the ref's blob wholesale and
+   > **destroys your uncommitted work in that path**. Measured 2026-08-12 — the
+   > Steward reached for this same line to carry a frame edit onto a corpus
+   > branch and **reverted the edit it was trying to publish.**
+   >
+   > **The failure is silent in the worst direction.** `git status` comes back
+   > empty, which reads as *"the switch carried everything cleanly"* rather than
+   > *"your change is gone"*; the branch then publishes an empty or no-op
+   > candidate, the publisher succeeds, blob identity passes on a file that never
+   > changed, and you announce a correction that is not on `main`. **Every
+   > post-condition in this file passes.**
+   >
+   > ⇒ **Carry your own edits by `cherry-pick`, or by re-making them on the
+   > corpus branch.** Reserve this command for a path you have not touched, and
+   > if you have already run it, the check is `grep` for the text you wrote —
+   > not `git status`.
 4. **Publish with the scripted publisher path** (M4 and M5) unless the operator
    routes otherwise.
 5. **Sweep only after the merge is confirmed** — M6's blob-identity loop. The
