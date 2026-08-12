@@ -74,10 +74,72 @@ LoweringEnvironmentBinding::StaticWorker(_) => Err(unsupported(
 > **A front-loaded judgment carried into a frame is only as good as the
 > population it was measured on.**
 >
-> **`D2k-1`'s repair scope is OPEN and stopped.** The Architect is grounding the
-> disposition of static workers as constructor arguments (`evt_78agvsvb0z450`).
-> **The ring must not broaden the repair to cover it**, and the section below
-> stands only as the record of what was believed, not as an instruction.
+> **The section below stands only as the record of what was believed, not as an
+> instruction.** `AC-1` is materially false for the same reason and is replaced
+> in section 6.
+>
+> ### THE RULED LAWFUL CLASS — Architect `evt_4krvq67427n5z`
+>
+> **A compiler-only static constructor-template field** that preserves a
+> `StaticWorkerBinding` until a later **static constructor elimination** rebinds
+> that field and the **existing exact-`Var` call arm** consumes it.
+>
+> **Why the source shape is not the defect.** A source constructor argument is
+> syntactically a value position, but a specialized `Lowered::Constructor` is a
+> **compiler template, not necessarily a materialized runtime aggregate.**
+> Today its `args: Vec<Lowered>` bakes in the assumption that every statically
+> eliminated field is an ordinary value; **the five rows expose the missing
+> compiler-only field distinction.** The planning side already describes this
+> exact realization — one closure occurrence realized as a `StaticWorkerBinding`
+> stored into the producer constructor, later becoming the worker call.
+> **Rejecting that source shape would contradict the planned population and
+> remove the recursive callable transport these fixtures measure.**
+>
+> **Three classes ruled WRONG — do not re-propose:**
+>
+> 1. **Not a deferred application.** There is no application at the constructor
+>    occurrence; the constructor transports the recursive callable through a
+>    case binder, and the later `Call { callee: Var(..) }` is the application.
+>    Inventing a call earlier changes evaluation and source semantics **and
+>    would require the new planner population the stop forbids.**
+> 2. **Not [[RT-CONTSRC-CALLABLE-CONTRACT]].** No continuation-source
+>    projection is involved. That node needs planner-owned callable identity on
+>    the projection surface; `StaticWorkerBinding` deliberately carries none.
+>    **Adjacent precedent, not that component.**
+> 3. **Not a runtime materialization.** No carrier word, ABI slot, tag,
+>    descriptor, environment pointer, callable identity, or planner-owned
+>    storage.
+>
+> **The admissible representation is a CLOSED compiler-only constructor-field
+> distinction, narrower than `LoweringOperand`:** an ordinary specialized field
+> versus a static-worker field. **The Architect ruled the semantic boundary, not
+> a type name or enum layout.** Required structural properties:
+>
+> - **`Construct` recognizes the static-worker binding BEFORE `value_at`** and
+>   retains it as a compiler-only field; every other constructor argument
+>   follows the existing path unchanged.
+> - **Static `Match` elimination installs each field into the one lexical
+>   binding authority without erasing its kind:** ordinary →
+>   `Value(Specialized(..))`; worker → the same `StaticWorker`. **The later
+>   exact-`Var` call remains the sole callable consumer.**
+> - **Direct descent and the source machine implement the same distinction.**
+>   One path may not preserve the worker while the other calls `specialized_at`
+>   and refuses.
+> - **Any constructor containing a worker field is NON-MATERIALIZABLE.** A path
+>   that would carry, allocate, store, join, project, return or publish it must
+>   refuse in **whole-graph preflight, before the first allocation or emitted
+>   transfer.** It may not descend partway and then refuse.
+> - **`value_at` remains byte-identical and exhaustive.** A worker used as an
+>   ordinary field value, result, scrutinee, primitive/effect argument, or call
+>   argument still refuses.
+> - **No wildcard/default conversion and no broad
+>   `LoweringEnvironmentBinding`-as-constructor-payload arm** — that would admit
+>   `Carried` values into a template and widen the contract beyond the measured
+>   need.
+>
+> **This is broader than "one before-guard owner repair."** It necessarily
+> couples the `Construct` producer, the static `Match` binder, **both** lowering
+> engines, and boundary preflight.
 
 **Architect `evt_5wvk3e8k1bjqn`, and this is the whole reason the increment is
 small.** At this wall the callable fact is **already expressible and already
@@ -130,20 +192,75 @@ distinct roots the five have. **No repair in this deliverable.** If the answer
 is more than one root, post it and stop for a sizing call — that is a good
 outcome, not a failure.
 
-**`D2k-1` — the repair, at the owning consumer, before the guard.** Scoped to
-the roots `D2k-0` proved. One root per increment if there is more than one.
+> ### `D2k-1` IS RE-SPECIFIED — 2026-08-12, Architect `evt_4krvq67427n5z`
+>
+> **The old `D2k-1` — "the repair, at the owning consumer, before the guard" —
+> is withdrawn. Its premise is measured false** (section 3). Do not reconstruct
+> it from a memory of this frame.
 
-**`D2k-2` — discriminating controls**, separate from `D2k-1`: a committed
-negative per repaired route proving the guard is still **present, reached and
-refusing** for every value use that is not the repaired consumer.
+**`D2k-1a` — the message-independent evidence. AUTHORIZED NOW, evidence only.**
+Commit the per-expression `RuntimeExpr::Construct` owner and the caller tags
+excluding the forwarding caller, and **execute the claimed edge/refusal redness
+control** so that property becomes executable rather than inherited prose.
+`value_at` stays byte-identical. **This makes `D2k-0`'s "one root" durable; it
+does NOT authorize the repair.**
+
+> **BINDING ON THE EDIT — every component compared against a LITERAL, none
+> against the population.** Adversary `evt_3xn73gyttdm5g`. The existing expected
+> side is a literal anchor (`"StaticWorkerBinding"`, `"a Var in value
+> position"`), and **that is why the redness property holds in all three
+> directions** — one row moving, **all five moving uniformly**, and a row that
+> starts lowering returning `None` against `Some(..)`.
+>
+> ⇒ **Add the owner as *"each owner equals `RuntimeExpr::Construct`"*, NEVER as
+> *"all five owners agree."*** A sameness check across the population is **green
+> under a uniform move**, which is the case that matters most and the one the
+> current assertion deliberately avoids. Landing it that way makes the control
+> **mixed** — two axes that red on a uniform change and one that does not, with
+> nothing marking the difference.
+>
+> **Preserve the labelled-pair comparison too**: failures name *which row*
+> moved rather than reporting a tuple mismatch.
+
+**`D2k-1b` — the closed compiler-only constructor-field distinction**, per
+section 3's ruled structural properties. **Cut it so each turn lands or hard-
+stops inside about an hour** — the coupling is `Construct` producer, static
+`Match` binder, both lowering engines, and boundary preflight, and that is more
+than one turn. **Preflight refusal is not optional garnish**: a constructor
+carrying a worker field that descends partway and then refuses fails the ruling.
+
+**`D2k-2` — the successor controls**, separate from `D2k-1b` and additional to
+the existing guard controls:
+
+- **positive** — each of the five transports the worker through its constructor
+  and later consumes it at the exact-`Var` call;
+- **phase mutation** — forcing that field through ordinary value conversion
+  reproduces the `StaticWorkerBinding` refusal;
+- **escape mutation** — making the constructor require runtime transfer refuses
+  **before** allocation or emission;
+- **route parity** — direct descent and the source machine preserve and consume
+  the same field kind;
+- **non-aliasing** — ordinary constructor fields and ordinary exact-`Var` calls
+  remain behaviorally unchanged;
+- **census** — no new planner population, continuation-source setter,
+  ABI/carrier/descriptor, `#[ignore]`, or `value_at` caller.
 
 ## 6. Acceptance criteria
 
 **`AC-1` — the five are green** on the pre-retirement tree under `B`-only
-exclusion, and each is green **because its consumer routes to the exact-`Var`
-callee path**, not because a guard stopped firing. *Control:* per expression,
-the committed route evidence from `D2k-0` plus a mutation that restores the
-wrong consumer shape and reproduces its exact refusal.
+exclusion, and each is green **because the worker is transported through its
+constructor as a compiler-only field and consumed at the later exact-`Var`
+call**, not because a guard stopped firing.
+
+> **`AC-1` WAS REPLACED — 2026-08-12.** It previously read *"because its
+> consumer routes to the exact-`Var` callee path"*, which is **materially
+> false**: at the measured wall there is no call, and the constructor occurrence
+> is not an application. The exact-`Var` call is still the sole callable
+> consumer — but it happens **after** a static constructor elimination rebinds
+> the field, not at the refusing site.
+
+*Control:* the `D2k-2` positive and phase-mutation rows, plus the committed
+`D2k-1a` owner evidence.
 
 **`AC-2` — `value_at` is unchanged.** No third arm, no permissive
 `StaticWorker` arm, no wildcard. *Control:* `git diff` on
@@ -190,6 +307,18 @@ candidate. *Control:* `git diff`.
 - **`D2k-0` returns more than one root.** Post the table and stop for sizing.
 - **The repair cannot be expressed before the guard** without a signature change
   rippling beyond the owning consumer.
+
+  > **THIS STOP FIRED — 2026-08-12, and it is answered, not armed.** The measured
+  > `Construct` owner showed the repair needs the `Construct` producer, the
+  > static `Match` binder, **both** lowering engines and boundary preflight.
+  > Architect `evt_4krvq67427n5z` recut it into `D2k-1b`. **Do not re-read this
+  > bullet as open**, and do not treat the recut as having discharged it —
+  > `D2k-1b`'s own stop is below.
+
+- **`D2k-1b` cannot express the closed compiler-only field** without runtime
+  representation, new planner population, continuation-source transport, or a
+  ripple **beyond the recut's explicitly enumerated constructor / match /
+  preflight consumers.** Stop again and return the measured dependency.
 - **A fifth `value_at` caller exists at your base.** Scope signal.
 
 ## 9. Contention and sizing
