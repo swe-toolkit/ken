@@ -246,9 +246,18 @@ to fall anywhere.
 >
 > `1b-i` was handed back **unstarted on capacity**, with grounding
 > (`evt_12smbvsmxxk9d`): `Lowered::Constructor` is mentioned at **87 sites**,
-> **9 of which read `args`**. Changing that element type touches the nine plus
+> **9 of which read `args`**. Changing that element type touches those plus
 > every construction site, and section 3 forbids a wildcard or default arm —
-> so **each of the nine is an explicit decision, not a mechanical edit.**
+> so **each reader is an explicit decision, not a mechanical edit.**
+>
+> **The nine was a lower bound, and the real figure is 22.** When the type
+> actually changed, the compiler enumerated **22 reader decision points** — 9 in
+> `core.rs`, 10 reached in `mod.rs` through accessors, and 3 more that handle
+> the kind without refusing (`evt_5qejxwewrhz8`). A pattern-bind grep answers
+> *who names the field*; the question is *who depends on its element type*, and
+> those differ by everything routed through a signature. **The split was right
+> and the number that justified it was low by a factor of two** — recorded
+> because it is the input any future sizing of this shape will reach for.
 >
 > **The atomicity ruling is untouched. What moves is the type migration.** The
 > bulk of the work is introducing the two-variant field type; the part that
@@ -299,6 +308,38 @@ their arms. **No consumer becomes green here** — the five still refuse.
 - *Hard stop:* the field cannot be recognized ahead of `value_at` without a
   wildcard/default arm or a `LoweringEnvironmentBinding`-as-payload arm.
   Section 3 forbids both — stop, do not widen.
+
+> #### THREE of `1b-i0`'s discharges are INDUCTIVE on the premise `1b-i` deletes
+>
+> `1b-i0` is accepted as *behaviour is unchanged*, and it earns that honestly —
+> **because nothing constructs the worker variant.** Three of its decisions were
+> disclosed as resting on exactly that (`evt_5qejxwewrhz8`), each in the
+> implementer's own words:
+>
+> - `emit_carrier_transfer` now reads its fields **before**
+>   `emit_checked_aggregate_alloc`. *"Emitted instruction order is unchanged
+>   today because the read cannot fail."*
+> - `same_recursive_field_shapes` answers `false`, which *"cannot be wrong while
+>   nothing constructs a worker."*
+> - `unwrap_terminal_ret` hands the constructor back **intact** rather than
+>   unwrapping it, on the ground that the read is infallible.
+>
+> **`1b-i`'s whole purpose is to make the worker variant constructible.** The
+> instant it lands, every one of those three premises is false: the read *can*
+> fail, a worker *can* be constructed, and the infallibility is gone. **Each
+> becomes load-bearing rather than inert on the same commit.**
+>
+> ⇒ **Re-verify all three inside `1b-i`; do not inherit them.** They are not
+> defects — the ordering move is the ruling's own *"refuse before you allocate"*
+> shape, pre-positioned. **The hazard is that they were justified once, in
+> writing, under a premise `1b-i` removes, and nothing in the diff will say so.**
+> A reviewer reading `1b-i0`'s handback will find each one argued and settled.
+>
+> Concretely, `1b-i` must state: whether `emit_carrier_transfer`'s emitted
+> instruction order is *still* unchanged once the read can fail; what
+> `same_recursive_field_shapes` returning `false` licenses when a worker really
+> can be present; and whether handing back an intact constructor is still right
+> when the thing inside it has no value representation.
 
 > ### The owner relation has a PLANNER-OWNED KEY. Use it; `D2k-1a` did not.
 >
