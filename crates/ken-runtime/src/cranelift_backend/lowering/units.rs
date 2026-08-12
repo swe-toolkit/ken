@@ -2885,10 +2885,20 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
 ///
 /// **That is a known gap, not the design, and it is EXCLUDED from this cut.**
 /// The consumer's case bodies are therefore lowered against the producer's
-/// source-lookup authority. It is inert here only because the emitter is
-/// un-wired (`D2F_EMITTER_ARMED`), so this function defines zero bodies on every
-/// compile; armed and left this way it would be a wrong program rather than a
-/// missing one, because the binders would resolve — to the wrong terms.
+/// source-lookup authority. Armed and left this way it would be a wrong program
+/// rather than a missing one, because the binders would resolve — to the wrong
+/// terms.
+///
+/// **What makes that harmless today is the EMPTY FUSION POPULATION, and not
+/// `D2F_EMITTER_ARMED`.** This function is called unconditionally on every
+/// production compile; it is only the *installer* that the constant gates. So it
+/// defines zero bodies because `continuation_fusions()` yields nothing to
+/// iterate, which is a consequence of the gated install rather than a property
+/// of this call site. An earlier wording named the constant as the reason, which
+/// let an auditor confirm `false` and stop one hop short of the guarantee that
+/// actually holds. **The reachable-empty path is deliberate** — guarding this
+/// call as well would make the zero-fusion case take a different path from the
+/// non-zero case, which is the shape the node is trying to keep exercised.
 ///
 /// **The excluded repair, named so it is not re-derived:** the ambient authority
 /// must move `Predeclared(producer) -> Predeclared(consumer) -> producer` across
