@@ -14,14 +14,39 @@ a merge-base goes stale without your branch moving.
 > **Read this before `AC-1`, and do not read "conservation holds" as "the five
 > are green".** Those are different claims and only the second closes the node.
 >
-> **What the candidate `11e4eae1` establishes.** The silent accept is closed:
-> rows 4 and 5 **refuse** rather than compiling after dropping a worker, the
-> ledger records no constructed field as dropped, and the forbidden fourth
-> state is unreachable on this base. `739cfde3`'s per-row transition sentinel
-> landed as a deliverable rather than staying on a `preserved/` ref. `value_at`
-> is byte-identical to `65dc74a9` (`AC-2`), zero new `#[ignore]` and no tracker
-> file touched (`AC-6`). Five Runtime paths, `+968/-127`, merge-base
-> `65dc74a9`.
+> > **`11e4eae1` WAS REJECTED — Architect `evt_p5jmqjnagkhs`, 09:41Z. THE LIVE
+> > CANDIDATE IS `71ce24c8`.** Every SHA below that reads `11e4eae1` is a
+> > historical citation of where a measurement was taken, **never a base to
+> > build on**. The rejection was correct and its defect is the same shape this
+> > whole increment exists to close, one level down: `note_consuming_call()`
+> > incremented **one compile-wide scalar**, so `close()` accepted whenever
+> > `consuming_calls >= entries.len()`. A rebound field could be dropped while
+> > another was called twice, or an unrelated pre-existing static-worker call
+> > could pay the debt. ⇒ **A COUNT OVER A POPULATION IS NOT A PAIRING WITHIN
+> > IT** — the third time that error class has been caught in this increment,
+> > after the verb list and after the single-disposition total.
+>
+> **What the live candidate `71ce24c8` establishes.** The silent accept is
+> closed: rows 4 and 5 **refuse** rather than compiling after dropping a
+> worker, and no constructed field is dropped. Consumption is now
+> **occurrence-keyed**: `StaticWorkerBinding.transported_field` is
+> `Some(child_static_origin(owner, position))` **only** where a static
+> elimination rebinds out of a constructor field, so a directly-bound worker is
+> `None` and discharges nothing; the ledger closes on **equality per field
+> origin**, refuses excess consumption on the spot, and fails closed in both
+> unknown-origin directions. `739cfde3`'s per-row sentinel landed as a
+> deliverable rather than staying on a `preserved/` ref. Three non-merge
+> commits, five Runtime paths, `+1224/-127`, merge-base `578bfe44`.
+>
+> **The five could not have witnessed the wider claim, and that is why the
+> recut carries its own control.** All five refuse at the *first* closeout
+> branch, so their sentinel witnesses the drop and nothing else. The pairing
+> control exercises the later branches directly — including the rejected shape
+> stated outright, one field dropped while another is called twice — with
+> origins taken from the planner's own positional child table so the key under
+> test is production's. Two mutations red two *different* rows, and under the
+> second the per-row disposition test **stays green**: the rejection's point
+> made executable.
 >
 > **What it does NOT establish.** It discharges **no part of `AC-1`**. All five
 > remain **unconsumed**. `AC-1` is not narrowed, not qualified by row, not
@@ -66,9 +91,9 @@ a merge-base goes stale without your branch moving.
 >
 > **Refusing is safe while that route is absent, and is not the permanent
 > semantics.** Declaring the refusal permanent would reject a source program
-> whose own next eliminator supplies the lawful consumer. `11e4eae1` stays
-> sound and independently mergeable; nothing in the candidate or its QA route
-> changes.
+> whose own next eliminator supplies the lawful consumer. The conservation
+> partial stays sound and independently mergeable on its own merits; the route
+> ruling changes nothing in the candidate or its QA route.
 >
 > **Lawful discharge remains exact-`Var` consumption for these rows:** the
 > outer static match must receive the recognized occurrence, rebind that exact
@@ -80,9 +105,9 @@ a merge-base goes stale without your branch moving.
 > **The successor is [[#d2k-1c]], framed in section 5.** It is a route repair.
 > **Nothing in it has been done.**
 >
-> **Excluded from `11e4eae1` and from any review of it:** changing the excluded
-> lane's lowering route. That is `D2k-1c`'s work, not a repair to reach for in
-> order to turn `AC-1` green before merge.
+> **Excluded from the conservation partial and from any review of it:**
+> changing the excluded lane's lowering route. That is `D2k-1c`'s work, not a
+> repair to reach for in order to turn `AC-1` green before merge.
 
 ## 1. What this increment owns
 
@@ -636,11 +661,20 @@ this consumer is a silent accept, measured at `739cfde3`.
 
 **`D2k-1c` — the pending outer continuation route repair. THE SUCCESSOR TO
 `D2k-1b-i`, and the increment that turns rows 4 and 5 from refuse to consume.**
-Authorized by Architect `evt_5ed8ee70cmrt`. **Not started.** Sequenced after
-`11e4eae1` merges; it builds on that base and on nothing else.
+Authorized by Architect `evt_5ed8ee70cmrt`. **Not started.**
 
-**Fixed input:** the origin identities in the head block's ruling table, which
-the Architect measured on **exact `11e4eae1`**. *Re-derive them at your base* —
+> **BASE: whatever `origin/main` is once `D2k-1b-i` MERGES — named as an
+> EVENT, not as a SHA, deliberately.** An earlier revision of this line pinned
+> the base to `11e4eae1`, which the Architect rejected within the hour; a
+> successor pinned to a candidate SHA silently names a dead object the moment
+> its predecessor is recut, and `1b-i` has now been recut twice. **Do not
+> substitute today's live candidate for this sentence either.** Fetch and reset
+> to `origin/main` at the moment you start.
+
+**Fixed input:** the origin identities in the head block's ruling table. **The
+Architect measured them on exact `11e4eae1`, which is a rejected object** — the
+citation records *where the measurement was taken*, and is not a base and not a
+warrant that the identities survived the recut. *Re-derive them at your base* —
 a merge-base goes stale without your branch moving, and row 5's pair was
 already wrong once.
 
@@ -735,11 +769,11 @@ exclusion, and each is green **because the worker is transported through its
 constructor as a compiler-only field and consumed at the later exact-`Var`
 call**, not because a guard stopped firing.
 
-> **`AC-1` IS UNMET AND UNQUALIFIED as of `11e4eae1`.** All five are
-> **unconsumed**; the accepted conservation partial discharges no part of this
-> criterion. See the accepted-partial block at the head of this file for the
-> measured route gap and the open Architect question. Do not read the partial's
-> merge as progress against `AC-1`.
+> **`AC-1` IS UNMET AND UNQUALIFIED at every `D2k-1b-i` candidate to date.**
+> All five are **unconsumed**; the accepted conservation partial discharges no
+> part of this criterion. See the accepted-partial block at the head of this
+> file for the measured route gap and the RULED route defect. Do not read the
+> partial's merge as progress against `AC-1`.
 
 > **`AC-1` WAS REPLACED — 2026-08-12.** It previously read *"because its
 > consumer routes to the exact-`Var` callee path"*, which is **materially
