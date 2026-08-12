@@ -446,6 +446,111 @@ increment to carry it.
 > which remain one atomic candidate **after** `DP`. This ruling grants no
 > lowering/fusion inference, arming, or `D1`/`D2`/`D3` credit.
 
+> ### `DP` IS SIZED AND RELEASED AS TWO CUTS — Steward, 2026-08-12
+>
+> **This discharges the sizing and contention re-check the block above says are
+> owed, and it is what releases `DP`.** Measured against `main`
+> `e48c2f90`. Do not re-derive the fork above; this block decides only the cut,
+> the surface, and the order.
+>
+> #### The contention re-check, and the block above understates the surface
+>
+> **The Architect named the elaborator. It is not the only path outside section
+> 9.** Measured by enumerating every site that constructs or compares a slot
+> `frame_templates` or a `callee_frame_templates` — 24 sites, six files:
+>
+> | file | in section 9? | why `DP` reaches it |
+> |---|---|---|
+> | `ken-elaborator/src/erasure.rs` | **no** — other crate | the producer; `:1453` `frame_templates: vec![frame_id]` is the singleton this replaces |
+> | `ken-runtime/src/oriented_subcontinuation_plan.rs` | **no** | both binding fingerprints consume the sequence, and the `call == slot` equality check lives here |
+> | `ken-runtime/src/cranelift_backend/lowering/mod.rs` | **no** | the transport-side sequence comparison |
+> | `ken-runtime/src/cranelift_backend/planning/static_transition.rs` | **no** | the entire `D2G_*` fixture, 49 references, all in this one file |
+> | `ken-runtime/src/cranelift_backend/lowering/core/tests/control.rs` | **yes**, under `core*` | where the five nets land |
+> | `ken-runtime/src/cranelift_backend/test_objects.rs` | **no** | one constructed slot |
+>
+> ⇒ **Section 9 is stated as `lowering/core*`, `units.rs`, and the eliminator
+> case-body path, and four of those six files are outside it.** Read section 9
+> as a floor for this node, not as its surface. Re-derive the intersection at
+> candidate time as section 9 already instructs.
+>
+> **Live contention is empty, measured rather than asserted.** No worktree in
+> the repo holds an uncommitted edit to `ken-elaborator/src/erasure.rs`. Two
+> `.claude/worktrees/agent-*` scratch trees hold uncommitted elaborator edits —
+> `ast.rs`, `elab.rs`, `lexer.rs`, `parser.rs`, `resolve.rs`, `extract.rs`,
+> `lib.rs`, and an untracked `numbers.rs` — and **none of them is `erasure.rs`**.
+> They are abandoned subagent trees, not seat trees.
+>
+> **The one latent collision, named so it is not rediscovered.**
+> [[KERNEL-NESTED-IND]] `D5` claims `ken-elaborator/src/erasure.rs` explicitly,
+> and its lane surface is defined as *"every path an `AC-K12` stage traverses,
+> minus `crates/ken-runtime`"* — which contains the elaborator by construction.
+> **Kernel cannot collide today:** it is idle and its node is blocked behind
+> [[RT-DYNAMIC-ARM-SCALAR-MERGE]] (`ready`, unstarted) and
+> [[RT-NESTED-IH-NATIVE-REALIZATION]] (`draft`). Both are Runtime nodes, and
+> **Runtime runs one node at a time**, so neither can start while `DP` holds the
+> lane. The collision is therefore structurally excluded for `DP`'s duration
+> rather than merely absent right now. If `DP` outlives that, it is my problem,
+> not the ring's.
+>
+> #### Sizing: the mechanism is small, the nets are the work
+>
+> The population edit is **one site**. `erasure.rs:1453` is a literal
+> `vec![frame_id]`, and the derivation it becomes — the frames rooted at the
+> slot frame by `ParentFrame` witness, ordered by `semantic_position` — is a
+> mirror of a traversal `oriented_subcontinuation_plan.rs` **already performs
+> and already validates** (the `by_id` / parent-chain-to-`DistinguishedRoot`
+> walk, and the existing `frames.sort_by_key(semantic_position)`). Both fields
+> are already on the frame. **This is not new machinery.**
+>
+> The ripple is mechanical and bounded: `slot.frame_templates` is a fingerprint
+> input, so both the slot and the call binding fingerprints move, and the
+> `call.callee_frame_templates != slot.frame_templates` checks follow the clone
+> automatically.
+>
+> **The five required nets are the bulk of the work, not the mechanism.** That
+> is what puts `DP` past the one-hour turn and why it is cut.
+>
+> #### The cut, and the seam is not negotiable
+>
+> **`DP-1` — the population, plus nets 1 and 2.** The derivation at `:1453`,
+> the positive net (both frame IDs in semantic-position order, call sequence
+> equals slot sequence, both dynamic frame keys carrying the same invocation
+> source/instance, full endpoint chain composing), and the deletion net
+> (removing the producer frame from the sequence restores the current
+> missing-coverage/mixed-frame refusal).
+>
+> **`DP-2` — nets 3, 4, and 5.** Permutation refused by the planned-order
+> check; a purported second source without its own checked invocation marker
+> and checked dynamic parent edge refused; the inner slot staying independently
+> exact rather than widened by site coincidence.
+>
+> **Nets 1 and 2 ship together or not at all.** Net 1 alone is a population
+> that is present and proves nothing — the exact shape `AC-2` exists to catch,
+> one level down. A positive with no deletion control passes for any reason,
+> including the mechanism never being reached.
+>
+> **Why splitting is safe here, and it is a real argument rather than a
+> convenience.** `D2F_EMITTER_ARMED` is `false` at `core.rs:2304` and the guard
+> is measured unreached, so `DP-1` lands an **inert** widened population:
+> nothing in production executes the transported sequence between the two cuts.
+> What `DP-2` adds is proof that the population is *exact* rather than merely
+> *sufficient*, and net 5 is specifically the guard against the site-coincidence
+> over-generalization the ruling above forbids.
+>
+> ⇒ **`DP-2` is released at the same moment as `DP-1` and takes the lane
+> directly after it.** No other node comes between them. If `DP-1` hands back
+> and `DP-2` does not follow, that is a stall to report to me, not a stopping
+> point.
+>
+> **A `DP-1` hard stop inside the hour is a good outcome.** Say so and hand
+> back. The sizing target is not an acceptance criterion and no AC is derived
+> from it.
+>
+> **Unchanged by this block:** the authorized population and the five nets are
+> the Architect's and are quoted, not reinterpreted; arming, `AC-8`, `D4`, and
+> the held `D1`/`D2`/`D3` range stay excluded; neither cut credits an AC or
+> closes the node.
+
 ## 6. Acceptance criteria
 
 **AC-1 — the positive is a real full-pipeline compile.** The checked `D2j`
