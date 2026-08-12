@@ -74,8 +74,15 @@ reads as off. **A diff offset is against no tree**, resolves in nothing, and if
 the reader opens the plausible file it lands on unrelated content with no
 signal. **The `site` heading is what converts it into a claim.**
 
-⇒ **Cite from `git grep -n <sha>:<path>`, never from a diff stream.** The rule
-is the author-side half of the two-question test
+⇒ **Cite from `git grep -n <sha>:<path>`, never from a diff stream.** The fleet
+scope carries the general form, arrived at independently the day before by two
+other seats:
+[[publish-a-coordinate-from-the-git-object-and-name-the-sha-you-read]] — *ask
+the object store, not the filesystem you happen to be standing in, and publish
+the SHA you read rather than the one you believe you are on.* **My case is its
+degenerate limit**: a diff stream is not a tree at all, so there is no SHA that
+would have made the coordinate resolve. The rule is the author-side half of the
+two-question test
 ([[the-operative-artifact-must-carry-the-claim-whichever-pass-wrote-it]]):
 *could the reader get to the evidence from here?* — **I failed it while
 supplying what looked like the answer to it.**
