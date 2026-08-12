@@ -51,12 +51,22 @@
 > the source does not contain. My sizing and contention re-check are the block
 > above section 6 of the R3 frame, and **that block is the release.**
 >
-> **The cut: `DP-1` = population + nets 1 and 2; `DP-2` = nets 3, 4, 5.** Nets 1
-> and 2 ship together — net 1 alone is a population that is present and proves
-> nothing, which is `AC-2`'s shape one level down. Splitting is safe only
-> because `D2F_EMITTER_ARMED` is `false` and the guard is measured unreached, so
-> `DP-1` lands an **inert** population. **`DP-2` takes the lane directly after
-> `DP-1` with no node between them**; if it does not follow, that is a stall.
+> **THE `DP-1`/`DP-2` CUT IS WITHDRAWN — its premise was measured FALSE within
+> the hour** (runtime-leader `evt_3ccqdyp9tkk33`, WIP `89ee005b`, do not route).
+> I argued the split was safe because `D2F_EMITTER_ARMED` is `false`, so `DP-1`
+> would land an inert population. **With the widened sequence, unarmed
+> `ReHomed` reaches `instantiate_checked_invocation_segment` and refuses** —
+> expected `{0,1}`, instantiated `{0}`. **The flag gates the fusion emitter, not
+> every consumer of the transported sequence.** I read one named gate as
+> bounding the whole population reaching a mechanism; the census I never ran is
+> *which unarmed consumers reach the instantiator*.
+>
+> **The bigger half is NOT about the cut.** Net 1 needs the producer's second
+> **dynamic** layer, which arises only under held `D1`/`D2`, so net 2 fires on
+> the proposed positive. **`DP` may be unable to carry its own positive control
+> at all** — a separability question, with the Architect together with the
+> static-versus-dynamic membership question. **No re-cut until that rules**; a
+> cut authored against a population that may move is waste. **RUNTIME IS HELD.**
 >
 > **SECTION 9 UNDERSTATES `DP`'s SURFACE — I measured this, the Architect flagged
 > only the elaborator.** 24 sites across six files carry a slot `frame_templates`
