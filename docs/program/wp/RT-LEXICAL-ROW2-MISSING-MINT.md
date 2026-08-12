@@ -115,6 +115,65 @@ evidence this node was waiting on, and it is now in. It is still a floor.
 
 ### `D1` — the bounded repair at the attributed cause
 
+> #### `D1` IS CLOSED WITH NO PRODUCTION REPAIR
+>
+> Steward ruling `evt_26cb49zckgq4f`, 2026-08-12, on the `D1` handback.
+>
+> **The bounded-installation question was answered by measurement, and the
+> answer is zero.** Under `B`-only exclusion the `SourceMachine` seat is entered
+> **once**, with `LoweringOperand::Carried` — a runtime word — and returns before
+> the specialized-constructor selection the mint sits behind. That arm is **not
+> a branch taken instead of an installation step**: its own contract is that a
+> carried value has no compile-time `Lowered::Constructor` to read, and
+> `core.rs:7425` refuses exactly that. Descent's three entries at the same seat
+> are compile-time unrolling.
+>
+> ⇒ **There is no missing step at the attributed cause. No mechanism is to be
+> built here.** A required count of zero is a legitimate answer to a bounded
+> question, not a failure to locate the repair.
+>
+> Two alternatives were closed by measurement rather than argument: the compile
+> plans three units at origins 33, 17 and 31 and **the eliminator's origin is
+> not among them**, so no unit's call went unemitted; and the surviving
+> `Composed` mint comes from the **carried** site, not the baseline's
+> specialized site.
+>
+> ##### WHAT IS *NOT* RULED, AND MUST NOT BE INHERITED AS THOUGH IT WERE
+>
+> **`SourceMachine` is NOT ruled descent-specific.** One occurrence in one
+> fixture does not generalize to the producer path.
+> `px8j_all_three_producer_paths_reach_real_consumers` builds its subject with
+> `recursive_computational_result_depth(2, ..)`, so **the only occurrence it
+> ever constructs is the recursive one** — the fixture cannot distinguish *this
+> occurrence routes elsewhere* from *the path is dead*.
+>
+> That distinction is the whole distance between a row close and a campaign
+> fact. If every recursive occurrence routes to the carried arm under
+> functionization, retiring `RecursiveDescent` removes the `SourceMachine`
+> recursive-IH producer's only input — **and it would also make this node's own
+> reason for blocking `D3` false** (see *Sequencing* in the tracker node: row 2
+> is on the bar because its subject *survives* the retirement, expressly
+> contrasted against `#7`'s spent oracle). That may turn out to be so. It is not
+> established, and it would reverse Architect ruling `evt_2jnf3x8f06psz`.
+>
+> ##### THE SUCCESSOR MEASUREMENT — Runtime's, and it is not a repair turn
+>
+> > On the functionized lane, is the recursive IH for the occurrence
+> > `SourceMachine` would have handled actually installed **and consumed** — by
+> > the carried/`Composed` path — or is it absent?
+>
+> **Absent** ⇒ a real semantic regression; row 2 stays on `D3`'s bar.
+> **Present** ⇒ the assertion is **over-specified** — it pins *which producer
+> path mints* where the invariant is that a recursive occurrence gets an IH
+> installed and consumed — and the row's subject is re-cut. Either way the
+> campaign question (*is the `SourceMachine` recursive-IH producer reachable on
+> the functionized lane by any occurrence?*) goes to the **Architect on that
+> evidence**, not as an open question and not as a row-level close.
+
+The text below described the repair `D1` was expected to make. It is retained
+because `D0`'s licence lives inside it and `D2` is grounded on that licence.
+**Read it as the attribution's record, not as an outstanding instruction.**
+
 Repair only what `D0` attributed, at the mechanism, not at the trace. Do not
 touch the `#[cfg(test)]` emission, the enum, or the assertion.
 
@@ -151,23 +210,30 @@ touch the `#[cfg(test)]` emission, the enum, or the assertion.
 >   (`:5882`). There is no second site a functionized lane could own, so
 >   lane-independence is the absence of an alternative rather than an
 >   assumption.
-> - **That site is NOT wrapped in an emptiness guard**, and the contrast is
->   real: the `Composed` mint at `:14174` **is** wrapped by
->   `if !case.recursive_positions.is_empty()` at `:14166`. At `:7516` the
->   emission is unconditional once control arrives and carries
+> - **That site is NOT wrapped in an emptiness guard.** At `:7516` the emission
+>   is unconditional once control arrives and carries
 >   `siblings: case.recursive_positions.len()`.
+>
+>   **Read this as an absolute property of the one site, not as a contrast.**
+>   An earlier version offered the guarded `Composed` mint at `:14174` as *the*
+>   contrast, which reads as though guarding were the norm — **it is not; the
+>   other `Composed` mint is unguarded too** (`D1` handback, 2026-08-12). The
+>   argument does not need a sibling to compare against and is weaker when
+>   stated as one.
 >
 > ⇒ **An empty case at `:7516` mints with `siblings == 0` rather than minting
 > nothing** — that is cause (ii)'s signature, and it is absent. Zero
 > `SourceMachine` mints of every arity therefore means the site was **not
 > reached**.
 >
-> **The one early exit, chased rather than left open.**
-> `computational_ih_slots_for_case(case, frame.checked_frame_id)?` at `:7513`
-> could skip the emission on `Err`. Row 2's defining property is that its
-> compile returns `Ok`, so no `Err` propagated on the observed run — had the
-> site been entered, the mint would have fired. **The caveat closes the
-> argument rather than opening it.**
+> **The fallible exits, chased rather than left open. There are THREE, not
+> one** — corrected from the `D1` handback, 2026-08-12. Besides
+> `computational_ih_slots_for_case(case, frame.checked_frame_id)?` at `:7513`,
+> the window carries the arity refusal and the malformed-recursive-position
+> refusal. **All three are `Err`-valued**, and row 2's defining property is
+> that its compile returns `Ok`, so none of them fired on the observed run —
+> had the site been entered, the mint would have. **The caveat closes the
+> argument rather than opening it, and it closes wider than first stated.**
 >
 > **Bounds, and they are the Steward's:** this is a structural read of the
 > site, executed nothing, one seat. **`D2` must verify it rather than credit
@@ -224,9 +290,35 @@ three `D6` candidates rejected on the sibling node. Keep them separate.
 - **`AC-1`** `D0` names cause (i) or (ii) with a stated activation denominator,
   and names which producer path fails. *Control:* the handback carries the
   denominator, not just the verdict.
-- **`AC-2`** Row 2 passes under `B`-only exclusion. *Control:*
-  `px8j_all_three_producer_paths_reach_real_consumers` green with
-  `RecursiveDescent` excluded.
+- **`AC-2`** — **STRUCK AND REPLACED, Steward, 2026-08-12** (`evt_26cb49zckgq4f`).
+
+  > **Struck: *"Row 2 passes under `B`-only exclusion. Control:
+  > `px8j_all_three_producer_paths_reach_real_consumers` green with
+  > `RecursiveDescent` excluded."***
+  >
+  > **It became dischargeable only by the two things this frame forbids.**
+  > `D1` measured that the functionized lane requires **zero** `SourceMachine`
+  > installations for this occurrence, so greening that control needs either a
+  > fixture whose occurrence the exclusion does not functionize — changing the
+  > assertion's subject, which `D1`'s licence forbids — or an added emission,
+  > which §2.1 names as *the* failure mode. An acceptance criterion whose only
+  > two discharges are both banned by its own frame is a defective criterion.
+  > **This one is the Steward's; it is replaced, not to be satisfied.**
+
+  **`AC-2` (replacement)** The row's producer-path assertion is re-cut
+  **lane-conditionally, with each side an exact enumerated set** — under
+  descent, the paths descent routes to; under functionization, the paths that
+  lane routes to. *Control:* the re-cut assertion is red if any enumerated path
+  is absent **and** red if an unenumerated path appears.
+
+  **It stays absolute; it does not become existential.** Relaxing to *"some
+  path mints"* would weaken the adjacent guard §2.3 protects —
+  `RT-LEXICAL-RECURSOR-CONSUMERS` `AC-3` guard 5, *a missing recursive-IH
+  authority still refuses*. A discriminator is not a substitute for the matrix.
+
+  **This AC is blocked on the successor measurement in `D1`'s closure block**
+  and cannot be written until it returns: which paths belong in the
+  functionized set is exactly what that measurement decides.
 - **`AC-3`** No repair lands in the `#[cfg(test)]` trace machinery. *Control:*
   `git diff` on the candidate touches neither the `Px8jSourceTraceEvent`
   declaration, nor `px8j_record_source_event`, nor any `Mint` emission
