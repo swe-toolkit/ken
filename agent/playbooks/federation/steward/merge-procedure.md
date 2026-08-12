@@ -65,6 +65,30 @@ scripts/scripted-pr-automerge.sh \
 - **doc-only** — about two minutes; foreground is fine.
 - **code** — `run_in_background: true`, always. It waits 581 to 718 seconds
   before its first poll, which exceeds a foreground tool timeout.
+
+> ### A COMMENT-ONLY change qualifies as `--doc-only`, even in `.rs` files
+>
+> Operator, 2026-08-12. The discriminator is the **content of the diff**, not
+> the file extension. A candidate that changes only comments is a doc change
+> that happens to live in a code file, and paying a full CI poll for it is
+> waste — measured on `e503ac73`, where a comment-only Runtime candidate spent
+> ten-plus minutes in the code path.
+>
+> **Establish it mechanically before you pass the flag**, because "comment-only"
+> is a claim about every hunk and the handback's word for it is not evidence:
+>
+> ```sh
+> git diff -U0 <BASE>...<SHA> | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' \
+>   | sed -E 's/^[+-]//' | grep -vE '^\s*(//|///|//!|\*|/\*)' | grep -vE '^\s*$'
+> ```
+>
+> Empty output both directions means comment-only. Non-empty means it is a code
+> merge, whatever the handoff called it.
+>
+> **One Rust-specific caveat.** A `///` comment can carry a **doctest**, so a
+> comment-only diff that adds a fenced code block inside `///` adds a compiled,
+> executed test. That is a code change wearing a comment's syntax. Check for an
+> added fence before treating a `///` diff as doc-only.
 - **Never `git fetch` while it runs** — a lost ref-CAS reads as unverified.
 - **Never pipe its output through `grep`** — block buffering swallows the poll
   lines.
@@ -145,8 +169,30 @@ A step, not a courtesy.
 
 **Doc-only merges do not concern the Adversary** (operator, 2026-07-29). Do not
 notify it for them. Frames, tracker flips, node registrations, counters, and
-corpus edits are not its surface. **`--doc-only` on the publisher is exactly
-the discriminator** — if you passed it, skip M8.
+corpus edits are not its surface.
+
+> ### `--doc-only` STOPPED being this step's discriminator on 2026-08-12
+>
+> It used to read *"`--doc-only` on the publisher is exactly the discriminator
+> — if you passed it, skip M8."* That was sound only while the flag meant
+> "touches no code file." **The operator widened it that day to cover
+> comment-only changes inside `.rs` files** (see M5), and the moment it widened,
+> this step started silently skipping merges that land inside the Adversary's
+> surface.
+>
+> **The direction of the failure is the bad one:** it suppresses a notification
+> rather than sending a spurious one, and a seat that is never told is
+> indistinguishable from a seat with nothing to report.
+>
+> **Ask the question directly instead of reading a flag:** did this candidate
+> change any file under `crates/`? If yes, run M8 — even if you passed
+> `--doc-only`. Comments in code are frequently where the safety reasoning
+> lives; `units.rs:2889` was a comment bounding a lowering the ring itself
+> called *"a wrong program rather than a missing one"* if armed as written.
+>
+> **The reusable shape:** a discriminator that piggybacks on another flag
+> inherits every later widening of that flag, and nothing about the widening
+> looks like a change to this step.
 
 For a code merge, look the id up at post time (`scripts/moot-actor-id.sh
 adversary`) and post:

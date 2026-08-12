@@ -26,15 +26,40 @@ context and the five traps that bind every node in this arc.
 `D2` `8efdfdb3fb39fc6e66708635cdf11269758d77ed`; your base is later by
 construction. **Anchors to re-find, not values to trust.**
 
-| row | fixture family | expressions | complete set | lane unexcluded | lane, B-only exclusion |
-|---|---|---|---|---|---|
-| 1 | `owned_scope_deletion` | 1 | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
-| 2 | `all_three_producer_paths` | 1 | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
-| 3 | `siblings_share_an_origin` | 1 | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
-| 4 | `scope_segments` depth 1, 2, 3 | 3 | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
-| 5 | `selected_scope` before / after hole | 2 | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
+| row | fixture family | expressions | owner | complete set | lane unexcluded | lane, B-only exclusion |
+|---|---|---|---|---|---|---|
+| 1 | `owned_scope_deletion` | 1 | **this node** | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
+| 2 | `all_three_producer_paths` | 1 | [[RT-LEXICAL-ROW2-MISSING-MINT]] | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
+| 3 | `siblings_share_an_origin` | 1 | **this node** | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
+| 4 | `scope_segments` depth 1, 2, 3 | 3 | **this node** | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
+| 5 | `selected_scope` **after** hole | 1 | **this node** | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
+| 5 | `selected_scope` **before** hole | 1 | [[RT-LEXICAL-R3-FUSION-EMITTER]] | `{LexicalCallArgumentRecursor}` | `RecursiveDescent` | **`FunctionizedUnits`** |
 
-**Eight expressions, five families.** Every activation denominator is a real
+> ### THIS NODE OWNS SIX OF THE EIGHT. Amended 2026-08-12, Steward.
+>
+> The population was measured as **eight expressions across five families** and
+> that measurement stands. **Two have since been carved out to their own nodes,
+> and the `owner` column above is now the operative statement of what this frame
+> must discharge.** Deliverables and acceptance criteria below apply to **the six
+> this node owns**; they do not reach the other two.
+>
+> **Row 5 splits, which the old single row hid.** Its two expressions have
+> different repairs: the **after**-hole expression is at the
+> `StaticWorkerBinding` wall like rows 1 and 4, while the **before**-hole
+> expression is the **only member of the whole population whose lawful repair
+> requires static-continuation fusion** (Architect `evt_7knsqyqg72103`) — the
+> producer owner lacks the downstream call arguments so eager forcing changes
+> CBV, the recursor closure is a live activation so transferring it weakens
+> `AC-3` guard 2, and producer and consuming suffix live in different units.
+>
+> **The expression moved WITH its repair and its discriminating-control
+> obligations, and that coupling is load-bearing.** Moving the fusion machinery
+> out while leaving the expression here would leave this frame an acceptance
+> surface it cannot discharge — `D2`/`D3` and `AC-2` would require activating a
+> fusion emitter that is no longer this node's to build.
+
+**Eight expressions, five families, as originally measured.** Every activation
+denominator is a real
 compile through `px8j_capture_source_trace`, and **every unexcluded compile
 returns `Ok`** — so each row's red is produced by the lane change, not by a
 fixture that was already broken. **None of the nine measured expressions is
