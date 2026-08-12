@@ -723,12 +723,47 @@ strongest claim the representation can support, not a gap in the rows.
 **THE DECIDING READ IS ANSWERED: YES. DO NOT RE-RUN IT.** Landed as `1a16a64d`
 (PR #1996, `main` `e1613f00`), Decision `dec_463b5d1g62n98`.
 
-The question was: `rebind` has one production call site (`mod.rs:4274`), reached
-from four `bound_constructor_fields` sites (`core.rs:4605`, `:5462`, `:7112`,
-`:15308`) — **can any two of those four descend over one static occurrence in a
-single compile?**
+> ### AS ORIGINALLY POSED, THIS READ WAS WRONG IN BOTH POPULATION AND QUANTIFIER — AND ANSWERING IT AS WRITTEN RETURNS `no`
+>
+> It read: *"`rebind` has one production call site, reached from **four**
+> `bound_constructor_fields` sites (`core.rs:4605`, `:5462`, `:7112`, `:15308`)
+> — can **any two of those four** descend over one static occurrence in a single
+> compile?"* Both halves are wrong. Adversary self-correction
+> `evt_7ff4exbfjba0t`; **re-derived here rather than relayed, which is how the
+> error got in.**
+>
+> **The population is six, across two routes.** The rebind site
+> `constructor_field_bindings` has **two** callers, not one — `mod.rs:4260` and
+> `mod.rs:4273` — and its own doc says so: *"both binder shapes above spell the
+> kind-preservation identically … so the conservation ledger is marked exactly
+> where the rebinding happens rather than at each caller."*
+>
+> | route | descent sites |
+> |---|---|
+> | `bound_constructor_fields` | `core.rs:4610`, `:5477`, `:7132`, `:15338` |
+> | `extend_constructor_fields` | `core.rs:5421`, `:7650` |
+>
+> **This is not a harmless overcount. Every repeat on every one of the five rows
+> is at `extend_constructor_fields`** — the control binds it as `composed` — and
+> **zero rows repeat at any of the original four.** An instrument built on the
+> four-site population would have covered exactly the sites that do not repeat,
+> measured nothing, and returned the **`no`** branch: *"the premise is
+> unreachable, correct the doc."* **The wrong answer, reached by a soundly
+> executed method, from a bad enumeration.**
+>
+> **The quantifier was also the wrong shape.** *Any two of those four* asks for
+> **convergence of two distinct sites**. What decides the ledger is **one site
+> descending twice** over one occurrence — multiplicity, of which convergence is
+> a narrower and incidental special case. **The ring answered the question that
+> decides the ledger, not the one this frame asked**, because it re-derived at
+> its base instead of inheriting. That is the only reason the specification's
+> defect cost nothing.
 
-They can. A test-only event at **all six** production binder-descent sites
+**The question, correctly posed:** can one static occurrence be descended more
+than once in a single compile — by any of the six sites across the two rebind
+routes, including one site twice?
+
+**It can.** A test-only event at **all six** production binder-descent sites
 records the planner origin of the eliminating occurrence. All five rows repeat
 descent over one occurrence, and **row 1 recognizes the same planner child
 origin `child(22, 0) = 21` twice.**
@@ -806,6 +841,31 @@ one**, which is what the next auditor inherits when they audit *"is the refusal
 lawful rather than late?"* on the arm where the clause is false. Qualify the
 sentence to RecursiveDescent. **Do not alter the intentional causal-ledger
 ordering.**
+
+**`D2k-1c-0c` — the six `site` labels are stale, and they were BORN stale.
+Folded into the transport-instance re-cut, not a node.** Adversary
+`evt_7ff4exbfjba0t`, Steward triage `evt_5feyj9sy1s9dg`, confirmed by
+re-derivation against the tree.
+
+Every one of the six `site: &'static str` labels was correct at `c9f4c4d7` and
+**none resolves in the commit that shipped it**: `core.rs:4605` lands on
+`#[cfg(test)]`, `:5411` on an induction-hypothesis push, `:5462` on a
+`return Err(unsupported(`, `:7112` on an unrelated call, `:7625` on `)),`, and
+`:15308` on `.iter()`. **Inserting the labels is what invalidated them** — six
+`#[cfg(test)]` blocks went in above the sites they name, so each is displaced by
+its own instrumentation, and a `&'static str` cannot go red.
+
+**No soundness or test impact** — the assertion compares strings to strings, so
+both halves are exactly as strong as reported. **The cost is attribution, in its
+worse form: these MIS-resolve rather than fail to resolve.** A reader who opens
+`core.rs:5411` finds real, plausible, unrelated code, and believes it.
+
+**Repair: name the function, not the line** —
+`"bound_constructor_fields@producer-env"`, `"extend_constructor_fields@composed"`.
+It survives every edit to `core.rs`, reads correctly in the failure message
+where the coordinate is actually consumed, and **makes the two-route structure
+visible on the page** — which is exactly what the original enumeration got
+wrong. Update both sides of the assertion together.
 
 **`1c-0` and `1c-0b` are landed, so the route repair is unblocked by THIS gate
 — and it is not thereby unblocked.** The transport-instance repair still has to
