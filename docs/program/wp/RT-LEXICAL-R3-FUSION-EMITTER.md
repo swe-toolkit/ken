@@ -280,7 +280,31 @@ increment to carry it.
 >
 > **Measured at `8b142d01`: `git grep evt_1q7v9fcw5hd87` over `crates/` returns
 > exactly one hit, line 2234, and the `unlawful` prohibition appears once, at
-> 2238. This block is the only in-tree record of both.**
+> 2238. This block is the only record of both *in the source tree*.**
+>
+> > **CORRECTION 2026-08-12, and the false claim was mine.** This block first
+> > read *"the only **in-tree** record of both"*. **That is false**, and
+> > Runtime QA blocked `49072fb8` on the same sentence after it was carried
+> > into `core.rs`. Measured at `db265561`, `evt_1q7v9fcw5hd87` appears in
+> > **five files, eight occurrences**: `core.rs`, this frame (4), the node,
+> > the `D2k` frame, and the briefing. **The node at
+> > `docs/program/issues/RT-LEXICAL-R3-FUSION-EMITTER.md:15-50` records the
+> > same ruling and both unlawful shortcuts.**
+> >
+> > **The defect is the same shape as Finding 1 itself: a correct measurement
+> > with an over-broad conclusion bolted on.** The grep was scoped `-- crates/`
+> > and said so; the conclusion silently widened `crates/` to *"in-tree"*. I
+> > had already found four of those durable citations an hour earlier doing
+> > the `M3` check on `112c07f5` and cited them in `evt_3ad99t706j226` — **the
+> > disconfirming evidence was already mine when I wrote the claim.**
+> >
+> > **What survives, and it is why `DP-0` is still right.** Retiring the
+> > prohibition from `core.rs` still removes it from **the source tree**,
+> > where the successor who meets the mixed-frame refusal is reading. Losing
+> > the in-code copy is a real loss even though `docs/` retains it. **The
+> > severity is lower than I framed it; the repair is unchanged.** State it
+> > non-exclusively — the fence is a provenance boundary, and a false
+> > uniqueness claim misdirects the next successor's source of authority.
 >
 > ⇒ **The prohibition is scheduled for deletion at precisely the moment it
 > becomes relevant.** `D1`/`D2` landing is what makes the guard reachable,
@@ -334,6 +358,93 @@ increment to carry it.
 >
 > **Excluded:** `DP`'s population, the relation ruling, mechanism, planner,
 > ABI, arming, AC/node credit, and the held `D1`/`D2`/`D3` range.
+
+> ### `DP` IS RULED (a). THE RE-CUT IS AUTHORIZED — Architect `evt_w4nvsmrs1qhk`
+>
+> **Added 2026-08-12. This supersedes `DP`'s open relation question; do not
+> re-derive the fork.** (b) is **rejected for this source**, and **no
+> `AC-10`-shaped source cut is owed** — the current checked source is
+> sufficient to decide the relation.
+>
+> **The decisive fact is the checked invocation census, not segment-site
+> equality.** The source has two distinct checked frame occurrences but exactly
+> **one** checked computational-IH invocation occurrence, `D2G_CALL`, rooted at
+> `D2G_OUTER_SLOT`. The producer carries `D2G_INNER_SLOT`, which is a checked
+> IH **binder template** — not a call marker and not an invocation source, so a
+> second dynamic invocation cannot be minted from it. **(b) would invent a
+> second checked call occurrence, invocation template and dynamic splice edge
+> that the source does not contain.**
+>
+> **The authorized population, exactly:**
+>
+> 1. Expand `D2G_OUTER_SLOT.frame_templates` from the singleton outer frame to
+>    the complete checked invocation-local sequence containing **both** frame
+>    IDs, ordered by their authoritative `semantic_position`.
+> 2. Let `D2G_CALL.callee_frame_templates` **inherit** that sequence from the
+>    slot, as production already does via
+>    `callee_frame_templates = slot.frame_templates.clone()`. **Do not patch the
+>    call vector independently.**
+> 3. Keep `frame_template_id = D2G_OUTER_FRAME` as the exact slot/binder frame,
+>    and keep the call's existing `parent_frame_template_id` and
+>    `parent_segment_site_id` as the dynamic call-to-open-scope edge.
+> 4. Keep the producer as its own frame — own frame ID, marker, occurrence path,
+>    semantic position, interfaces, fingerprint, and `ParentFrame(D2G_OUTER_FRAME)`
+>    witness. **One** call marker mints **one** fresh affine invocation instance,
+>    and `instantiate_checked_invocation_segment` transports that single
+>    source/instance onto both expected frame IDs. Dynamic identity stays the two
+>    distinct pairs `(instance, outer_frame)` and `(instance, inner_frame)`.
+>    **Nothing is aliased.**
+>
+> **This does NOT read `ParentFrame` as an invocation identity.** The checked
+> frame relation supplies the static rooted segment and its endpoint/order
+> facts; the sole checked call occurrence supplies the dynamic invocation
+> source; **the planner joins those two checked facts** by authoring the slot's
+> reusable callee sequence. **Lowering and fusion still infer nothing** — they
+> may only validate and instantiate the sequence the plan transported. The
+> original prohibition is intact.
+>
+> **The adjacent `erasure.rs:1469-1476` prohibition is NOT triggered**, and the
+> implementer's reported distinction holds: it forbids manufacturing callee
+> membership from the caller/enclosing-parent edge, and the `DP` producer frame
+> is not an enclosing caller endpoint but the distinct checked child frame
+> already inside the outer slot's rooted segment. **Do not generalize this** to
+> *"every frame with the same `segment_site_id` belongs to every slot"* — the
+> population is the exact source-derived sequence rooted at this slot, and
+> `D2G_INNER_SLOT` does **not** acquire an outer-frame invocation by site
+> coincidence.
+>
+> **This is a represented mechanism, not a new Runtime shape.**
+> `callee_frame_templates` and slot `frame_templates` are already vectors, both
+> invocation kinds pass through the same exact-frame instantiator, and the
+> existing two-frame RTFP control proves one affine invocation can lawfully
+> instantiate multiple ordered frame templates. **`DP` repairs planner
+> population, not the Runtime identity model.**
+>
+> **Required nets — these are the controls, not a wish list:**
+>
+> - the positive plan carries **both** frame IDs in semantic-position order, the
+>   call sequence **equals** the slot sequence, both dynamic frame keys carry the
+>   **same** invocation source/instance, and the full endpoint chain composes;
+> - **deleting** the producer frame from the slot/call sequence restores the
+>   current missing-coverage/mixed-frame refusal;
+> - **permuting** the transported frame occurrences is refused by the
+>   planned-order check;
+> - a purported **second source** without its own checked invocation marker and
+>   checked dynamic parent edge is refused;
+> - the **inner slot stays independently exact** rather than widened by site
+>   coincidence.
+>
+> **SCOPE AND CONTENTION — read before assigning.** This authorizes the
+> **elaborator-side slot population**, so it reaches
+> `crates/ken-elaborator/src/erasure.rs`, which is **outside this frame's
+> section 9 contention set and on another crate's review surface**. That is the
+> reason the Architect routed the re-cut to the Steward rather than back to the
+> ring. **Sizing and the contention re-check are owed by the Steward before this
+> is released**; it is not startable on the strength of this block alone.
+>
+> **Still excluded:** arming, `AC-8`, `D4`, and the held `D1`/`D2`/`D3` range,
+> which remain one atomic candidate **after** `DP`. This ruling grants no
+> lowering/fusion inference, arming, or `D1`/`D2`/`D3` credit.
 
 ## 6. Acceptance criteria
 
