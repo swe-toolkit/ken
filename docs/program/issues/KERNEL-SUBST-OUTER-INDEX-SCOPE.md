@@ -136,11 +136,40 @@ totality boundary; it does not claim another caller is defective.
 
 ## Why draft rather than ready
 
-**It needs a ruling before it can be framed, and it blocks nobody.** Both build
-lanes are working on unrelated nodes. Filing it `ready` would claim a shovel-ready
-frame exists; filing it `draft` records the measurement durably and routes the
-question, which is the honest state. Same disposition as
+**It needs a ruling before it can be framed, and it blocks nobody.** ~~Both build
+lanes are working on unrelated nodes.~~ Filing it `ready` would claim a
+shovel-ready frame exists; filing it `draft` records the measurement durably and
+routes the question, which is the honest state. Same disposition as
 [[LANG-SORT-META-CAPABILITY]].
+
+> ### THE PREMISE THAT SENT THIS TO THE OPERATOR HAS CHANGED — Steward,
+> ### 2026-08-12
+>
+> **Both Architect questions are RULED. The sole remaining gate is the operator
+> TCB call forwarded 2026-08-10 at `evt_561jx5e0ffy40`, and it is unanswered.**
+> Nothing above is reopened; what changed is the cost of leaving it open.
+>
+> **The struck sentence was true when written and is false now.** Measured
+> 2026-08-12 ~21:0xZ: **the Kernel ring is idle on all three seats** —
+> leader, implementer and QA all report awaiting an explicitly released
+> deliverable. [[KERNEL-NESTED-IND]] stays correctly `active` with its only open
+> criterion `AC-K12`, which is **Runtime-blocked** behind
+> [[RT-DYNAMIC-ARM-SCALAR-MERGE]] and [[RT-NESTED-IH-NATIVE-REALIZATION]] and
+> which the Steward ruling in that node forbids releasing a lane against.
+>
+> ⇒ **Kernel's idleness is a genuine block, not framing debt** — and this node
+> is the one kernel-adjacent item whose gate is **not** Runtime. That does not
+> make it urgent and it does not change a single technical fact above. **It
+> changes only the answer to "what does waiting cost", from "nothing" to "the
+> one lever that is not behind Runtime."**
+>
+> **Be accurate about what authorization would buy:** `owner` here is
+> `spec-enclave`, so an all-clear yields a **framable** node, not an immediately
+> releasable Kernel WP — and the Architect's no-interim-partial ruling means the
+> typed refusal and the full 29-site caller migration are framed and land
+> together. Whether that work sits in Kernel's lane is a framing call that has
+> not been made. **Do not restate this as "authorizing it puts Kernel back to
+> work."**
 
 **The alternative disposition is legitimate and should be considered on the
 merits:** state the reachability claim with its scope wherever it is recorded,

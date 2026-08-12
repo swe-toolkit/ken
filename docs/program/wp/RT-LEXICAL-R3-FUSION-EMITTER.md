@@ -125,18 +125,56 @@ against it on *both* sides of the gate.
 > statement in the node). `D1` and `D2` are built and **preserved as evidence
 > only** at `8063dd67...7166baaa` — not a merge candidate, not routed to QA.
 >
-> **`DP` — give the producer semantic occurrence its own transported checked
-> identity.** **Design class CONFIRMED by the Architect at
+> > #### MEASURED CORRECTION — `DP` DOES NOT MINT AN IDENTITY. IT ADDS COVERAGE.
+> >
+> > **Steward, 2026-08-12, on runtime-implementer's armed probe
+> > `evt_5pfgetdgv3bkf`, which was run BEFORE anything was written.** On the
+> > `D2j` `Exact` twin the layers came back `(frame=Some(1), invocation=None)`
+> > and `(frame=Some(0), invocation=Some(1))`. **The producer layer ALREADY
+> > carries its own checked frame id** — the checked source authors it, with its
+> > own semantic position, slot and `ParentFrame` witness. **What was absent is
+> > invocation-source COVERAGE**, nothing else.
+> >
+> > **The two struck phrasings below are the defect.** Both read as `DP`
+> > creating the producer's identity, which would put `DP` in the business of
+> > authoring what the planner already authored — the exact inference the
+> > Architect's membership law forbids Runtime from making. **The PRECISION
+> > CORRECTION further down was right all along and is now confirmed by
+> > measurement**, so this box aligns the leading sentence with it rather than
+> > changing any ruling.
+> >
+> > **Why it had to be corrected here specifically:** a reader who greps for the
+> > deliverable finds the headline, not the qualifier eleven lines later. A
+> > superseded claim that survives in the leading sentence is invisible to a
+> > line-local read.
+> >
+> > **Second measurement from the same probe, load-bearing for the shape:** one
+> > call template is entered **twice in a single compile** — instance 1 from
+> > `lower_fused_producer_through_suffix` with a two-layer composed segment,
+> > instance 2 from `define_unit_bodies` with a one-layer ordinary one.
+> > Widening the shared base covers the first and refuses the second with
+> > `expected={0, 1} instantiated={0}` — **the same refusal `89ee005b`
+> > produced, reached by a second independent route.** No template-level
+> > widening can satisfy both shapes.
+>
+> ~~**`DP` — give the producer semantic occurrence its own transported checked
+> identity.**~~ **`DP` — establish the already-authored producer frame's
+> membership in the concrete invocation segment, at the composition splice.**
+> **Design class CONFIRMED by the Architect at
 > `evt_2qmknsgtmy0rj`; the design-class hold is lifted.** Class 2 would require
 > inventing a semantic partition the measured segment does not have, while the
 > emission region is intentionally producer plus suffix.
 >
-> **`DP` populates and transports, from the checked source:** the producer's
+> ~~**`DP` populates and transports, from the checked source:** the producer's
 > **distinct frame template and marker**, plus its real checked occurrence
 > path, semantic position, segment site, input/output interfaces, occurrence
-> binding, control witness, and **invocation/parent-edge relation.** The
-> **unchanged** validator must then accept the complete expected frame set,
-> order, endpoint composition, site, witnesses and dynamic ownership.
+> binding, control witness, and **invocation/parent-edge relation.**~~ **`DP`
+> transports, from the checked source, the invocation-source coverage for a
+> frame identity the checked source has already authored** — the frame
+> template, marker, occurrence path, semantic position, slot and `ParentFrame`
+> witness are read, never minted. The **unchanged** validator must then accept
+> the complete expected frame set, order, endpoint composition, site, witnesses
+> and dynamic ownership.
 >
 > > #### PRECISION CORRECTION — "its own invocation source" OVER-SPECIFIES
 > >
@@ -204,6 +242,729 @@ point. Built on top of the held `D1`, and **held with it.**
 implementation step**, taken only after `D0`'s positive row is non-zero and
 `D1` and `D2` are implemented. **Arming is authorized by this frame and by
 nothing you inherit from `#6d`.**
+
+> ### `D3` GAINED A SELECTOR, AND ITS FIVE NETS ARE ACCEPTANCE — Steward,
+> ### 2026-08-12, recording Architect `evt_4g2hmsr8tb3bm`
+>
+> **Why `D3` is no longer just the arming flip.** Arming exposed that one fused
+> function builds **two** checked segments — composed (`layers=[inner,outer]`,
+> needs `{0,1}`) and ordinary (`layers=[outer]`, needs `{0}`) — and `DP`'s
+> body-extent selector marks **both** composed, so the ordinary one refuses
+> `expected={0,1} instantiated={0}`. **The validator is correct and fail-closed;
+> the selector is too coarse.** Measured and eliminated first: Runtime segment
+> shape (forbidden, and circular — subset coverage renamed), `D1`'s per-phase
+> authority (**identical at both composes**), `RecursorProducerOriginId` (a
+> lowering-minted counter, not a plan key).
+>
+> **THE RULING — an affine capability bound to the concrete edge, NOT to the
+> body.** Issued by the already-checked fusion-composition splice and carried on
+> **that splice's specific pending semantic edge/eliminator**. The segment that
+> actually consumes that edge consumes the capability and is checked `Composed`;
+> every other segment, including the second `[outer]` one in the same fused
+> function, stays `Ordinary`. Preserve it through the producer-through-suffix
+> descent; consume it **at most once**; restore and close the scope on **both**
+> success and error.
+>
+> **The line the ruling draws, and it is the whole point.**
+> `evt_2f0nnwtzqy65m` does **not** prohibit this shape: the capability
+> contributes **no frame ID and proves no membership**, and the checked plan
+> remains sole author of `ordinary_frame_templates` and
+> `composed_frame_templates`. It proves only *which dynamic construction is the
+> checked splice*. **But a permit whose only provenance is "we are in a fused
+> body" or "this is the first compose observed" WOULD violate that ruling** — it
+> makes execution order the authority for applicability. **Fail-closed exact
+> coverage is a necessary net and does not turn an unbound ordering guess into
+> an identity.**
+>
+> **Explicitly forbidden:** an ambient body flag, a counter, a global or
+> body-scoped "next call wins" slot, a search for the first segment whose
+> Runtime shape fits, and **retaining `fused_composition_extent`**.
+>
+> **Why not a planner per-occurrence key now:** the fusion claim plus that
+> particular pending edge already distinguish the construction, so a new planner
+> key would duplicate authority. **Escalate to one only if implementation proves
+> the capability cannot be attached to and recovered from that exact edge
+> without falling back to next-event ordering — and that is a NEW HARD STOP, not
+> licence to use the coarse permit.**
+>
+> **`AC-D3-SEL` — the five selector nets, in this same held atomic object:**
+>
+> 1. The `[inner, outer]` segment consumes exactly one splice capability and
+>    selects `Composed`; the `[outer]` segment selects `Ordinary`.
+> 2. Deleting the capability restores the existing exact/mixed refusal — it does
+>    **not** silently select `Composed` from frame shape.
+> 3. Duplicate, replayed, escaped, and unconsumed capabilities all red.
+> 4. An unrelated ordinary segment inserted **before** the target cannot steal
+>    the capability or be accepted as `Composed`.
+> 5. Controls 2 and 3 and the **inner-slot-widening witness** remain owed
+>    unchanged — none of them is earned by this selector work.
+>
+> ### STOP 3 IS RULED — `AC-D3-SELF` — Steward, 2026-08-12, recording
+> ### Architect `evt_4x3291v9dx0vb`
+>
+> **Full ruling is at `evt_4x3291v9dx0vb`; the leader's dispatch is
+> `evt_6fzg11hpvfp4w`. Read the ruling, not this box** — what is here is the
+> part that binds acceptance.
+>
+> **The moved suffix's claimed IH invocation is a RECURSIVE CALL TO THE SAME
+> `Fusion(id)` DEFINITION.** Not a no-op or current-result substitution, and
+> not a call back to the standalone producer. The producer body was lowered
+> inline for the **current** invocation, which does not discharge this **child**
+> invocation: dropping the call drops recursion, and targeting the fusion-owned
+> producer body would run the producer without the moved suffix and violate body
+> ownership.
+>
+> **No new planner population is owed** — the preflighted `FusionRegionClaim`
+> already transports every identity needed. This is `D3` emission wiring inside
+> the held atomic object.
+>
+> **The internal self edge is NOT a second external redirect.** The existing
+> consumer-to-fusion redirect remains the sole external affine redirect; the
+> recursive self edge is a distinct definition-local obligation of the same
+> claim and **does not consume the region claim a second time.**
+>
+> **KEEP CALL-SITE IDENTITY DISTINCT FROM BODY/CALLEE IDENTITY, even though
+> this fixture prints `37` for more than one axis.** `call_declared_unit` looks
+> up a retained callee/body coordinate; the authorization is the exact
+> `consuming_call` occurrence. **Keying both by the numeric coincidence at `37`,
+> or by "missing target while in a fused body", is unlawful.** If the exact call
+> occurrence is not available at the emission seam, **thread the existing source
+> occurrence there — never infer it from lookup failure or body shape.**
+>
+> **Rejected repairs, named so none is re-proposed:** union with the consumer
+> edge table; restoring the standalone producer edge; identity or current-value
+> forwarding; a generic self-call fallback on a missing `unit_calls` entry; an
+> ambient "inside fusion" switch.
+>
+> **`AC-D3-SELF` — closeout must require the exact internal recursive edge for
+> each claimed consuming call, and reject each of:** omission; duplication; a
+> different consuming call; a different `Fusion` target; the standalone-producer
+> target; a producer-frame contract. **Plus a discriminator separating call-site
+> identity from body/callee identity**, since this witness leaves them
+> numerically coincident — a control that passes on the `37` coincidence proves
+> nothing.
+>
+> ### MEASURED — the discriminator's fixed inputs, and the half of the ruled
+> ### guard that is NOT verified
+>
+> **Steward, 2026-08-12, from the implementer's build report
+> `evt_6d3gb569n1twy` at exact `fe5c311e`. These are measured numbers, not
+> chosen ones.**
+>
+> **The identity axes as this fixture prints them:**
+>
+> | axis | value |
+> |---|---|
+> | `consuming_call` (the authorization) | **17** |
+> | `consuming_callee` | 16 |
+> | `producer_body` | 37 |
+> | seat | 37 |
+> | `redirect_callee` | 37 |
+>
+> **So the coincidence the Architect warned about is real and it is three-way:
+> seat, `producer_body`, and `redirect_callee` all print `37`, while the
+> authorizing call site is `17`.** Folding call-site into body **type-checks**,
+> and a wrong-call-site edge is then indistinguishable from a right one. ⇒ **The
+> `AC-D3-SELF` discriminator is satisfied only by a control that separates `17`
+> from `37`.** A control whose expected values are all `37` would pass under the
+> fold and proves nothing — that is the whole reason the discriminator is an AC.
+>
+> **THE RULED GUARD IS HALF-BUILT, AND THE COMMENT BESIDE IT IS NOT A
+> DISCHARGE.** The ruling requires the checked consuming-callee/binder relation
+> to **resolve to** `claim.producer_body()` and the redirect's producer entry.
+> The implementer's first attempt compared `consuming_callee` to `producer_body`
+> **directly** — `16` against `37` — and refused every lawful region; the
+> relation **resolves**, it does not equal. That resolution is **preflight's**
+> and is **not re-derivable at the emission seam**: it needs `ih_bindings` and
+> `SemanticIr::child_origin`, which is `pub(super)` to the planner. Inventing a
+> substitute is exactly the inference the ruling forbids, so the implementer
+> did not.
+>
+> **What IS checked:** the redirect's producer entry against the claim's
+> producer body — two fields reaching the claim by different routes, so their
+> agreement is a genuine cross-check. **What is NOT checked:** the
+> callee-to-body resolution itself. It is named in a code comment rather than
+> left looking discharged, which is the right handling — **but a named limit is
+> not a met criterion.** ⇒ **`AC-D3-SELF` is not closed by the guard as built.**
+> Closing it needs either the planner-side closure the implementer offered to
+> the Architect, or an explicit Architect ruling that the cross-check is
+> sufficient and the resolution half is not owed. **Neither has happened; do not
+> read the comment as either one.**
+>
+> ### STOP 4 IS RULED — `AC-D3-ROUTE` — Steward, 2026-08-12, recording
+> ### Architect `evt_2m62086x60c94`. THE ATOMIC BOUNDARY DOES NOT MOVE.
+>
+> **Full ruling is at `evt_2m62086x60c94`; the leader's dispatch is
+> `evt_5e6agmqhwq4d2`. Read the ruling, not this box.**
+>
+> **The `StaticWorkerBinding` stop is an R3 ROUTING DEFECT, not an external
+> value-representation gap.** I routed this as a scope fork at
+> `evt_7r043m92mz7fb` and supplied the measurement that R3's range does not
+> touch the refusal site. **The ruling uses that fact and rejects the inference
+> from it**, in terms worth quoting because it is the trap: *"the ownership of
+> the refusal site is not the ownership of the defect"*, and explicitly **"do
+> not declare the stop external merely because R3 did not edit the refusal
+> site."** ⇒ **My measurement was the right fact to supply and would have been
+> the wrong basis to rule on. The frame's earlier statement that it "settles
+> neither reading" stands as written.**
+>
+> **Why the refusal is correct and stays.** `emit_result -> ground_value` is the
+> terminal-result boundary and `RuntimeGroundValue` is an intentionally **closed**
+> domain of observable compile-time values. `ConstructorField::StaticWorker` is
+> intentionally compiler-only — lawful only while transported through a
+> constructor template to the kind-preserving static `Match` binder, then
+> consumed by the exact-`Var` call. **The guard is a conservation guard, and it
+> is doing its job.**
+>
+> **What the armed path is actually proving when it stops there.** The inner
+> selected producer builds the intermediate `D2gOut::Node([Var(0)])` whose field
+> is the recursive worker; the outer selected case eliminates that same
+> constructor and calls the rebound field; the leaf produces the observable
+> terminal `Result::Ok(Unit)`. **A worker-bearing `D2gOut` is not the program
+> result — it is the intermediate whose outer consumer suffix R3 claimed and
+> moved.** ⇒ ~~Reaching `ground_value` with that intermediate intact **proves
+> the fused path terminalizes the producer result before completing the claimed
+> consumer suffix.**~~ **MEASURED FALSE — see the box below.** R3 changed the
+> flow into an unchanged site, and the flow is unlawful.
+>
+> **`AC-D3-ROUTE` — the repair stays inside the held atomic object:** ~~the
+> fused path carries the intermediate through the already-authorized outer
+> elimination, kind-preserving rebind, and exact worker call, **and only then**
+> emits the resulting ground value.~~ **THE REPAIR IS UNDER RE-RULING — DO NOT
+> BUILD THE STRUCK TEXT.** The existing conservation relation stays
+> authoritative and **must close on the armed fused path**.
+>
+> > #### THE CLASSIFICATION HOLDS; THE CAUSAL SENTENCE UNDER IT IS MEASURED
+> > #### FALSE. Steward, 2026-08-12, from `evt_6bg3en6yy4dgz` at `766cbdf0`.
+> >
+> > **This is my correction to make because I wrote the mechanism into
+> > `AC-D3-ROUTE` above.** The struck text was a faithful transcription of the
+> > ruling; the ruling's *causal story* is what four probes contradict.
+> >
+> > **What was measured under a temporary arm:** the fused suffix lowering
+> > returns **`Carried`** — a runtime call result, **not** a compile-time
+> > constant, so it terminalizes nothing; the consumer takeover forwards that
+> > `Carried` result, so **the redirect RAN and the claimed suffix WAS
+> > consumed**; the escape's backtrace is `emit_result` called straight from the
+> > **root projection**, not from inside the fused function; and
+> > `require_complete_static_worker_disposition()` **passes** immediately
+> > before it.
+> >
+> > ⇒ **The worker-bearing constructor reaching `ground_value` is a DIFFERENT
+> > OCCURRENCE from the one the suffix consumed**, arriving as the **root
+> > answer** under `FunctionizedUnits`. Field origin **29** on `Exact`, **25**
+> > on `ReHomed`.
+> >
+> > **WHY THE STRUCK REPAIR WOULD HAVE BEEN WRONG, and this is the whole point
+> > of the strike.** Read against the stated mechanism, *"carry the intermediate
+> > through the outer elimination and only then emit"* says the takeover
+> > forwards too early, so the obvious implementation is **to stop forwarding**.
+> > Measured, **the takeover forwards a call result and is CORRECT** — changing
+> > it breaks working code and **reintroduces the double-suffix defect at `:650`
+> > that the forward exists to prevent.** ⇒ **A repair that would have looked
+> > ruled and been wrong.** The implementer stopped rather than build it; that
+> > is the correct handback and I am recording it as such.
+> >
+> > ~~**THE OPEN QUESTION, back with the Architect at `evt_2fanpwder54a0`, and
+> > deliberately not answered here:** is the second root occurrence **wrongly
+> > produced**, or **wrongly selected as the answer**?~~ **ANSWERED — it is
+> > WRONGLY SELECTED. `AC-D3-ANSWER` below.** The implementer did not guess and
+> > neither did I; the fork was real and the Architect resolved it.
+> >
+> > **CORRECT MY "DIFFERENT OCCURRENCE" ABOVE BEFORE YOU ACT ON IT — the
+> > Architect called this precision load-bearing** (`evt_5rze80e6w9qz8`).
+> > **`29`/`25` is NOT a second same-spelling source constructor.** It is **the
+> > claimed producer source occurrence ITSELF, entered again by a distinct
+> > lowering traversal / dynamic construction.** ⇒ *"different occurrence"* is
+> > true **only at the dynamic construction / route-instance axis**, and **false
+> > at the planner source-origin axis.** The planner coordinates on `766cbdf0`:
+> >
+> > | case | claimed producer | the OTHER same-spelling construct |
+> > |---|---|---|
+> > | `Exact` | construct **30** / field **29** | construct 39 / field 38 |
+> > | `ReHomed` | construct **26** / field **25** | construct 35 / field 34 |
+> >
+> > **Constructor spelling and origin equality remain non-selectors**, and
+> > **repeated entry of one static field origin stays legal and
+> > instance-scoped.** Anyone reading my earlier sentence as "hunt for a second
+> > source constructor" is hunting the wrong thing.
+> >
+> > **UNAFFECTED EITHER WAY, so do not re-open them:** the classification (an R3
+> > routing defect, not a representation gap), the closed `RuntimeGroundValue`
+> > domain, the conservation guard itself, and **the atomic boundary** — nets
+> > 2/4, controls 2/3, the inner-slot witness, the routing discriminator and the
+> > self-edge closeout all remain owed **unshrunk**.
+>
+> ### DO NOT BUILD `AC-D3-ANSWER` AS WRITTEN — ITS MECHANISM IS MEASURED
+> ### INERT AND ITS ROWS 3/4 ARE INVERTED. Steward, 2026-08-12, from
+> ### `evt_1twk028k03mxe`; re-ruling requested at `evt_7snn4fr8b4yea`.
+>
+> **This box sits ABOVE the AC because the AC below reads as buildable and is
+> not.** The implementer grounded the ruling **before** implementing, and the
+> grounding refuted the prescribed mechanism. **No code was written; the held
+> object is unchanged at `766cbdf0`.** Stopping there is the condition the
+> leader authorized.
+>
+> **MEASUREMENT 1 — THE RULED FUNNEL HAS NOTHING TO RESOLVE FOR THE CLAIMED
+> PRODUCER.** `claim_and_call_continuation` resolves through
+> `continuation_call_binding_for(producer_construct_origin, ...)`. Armed, on
+> `Exact`, the planner's continuation-call projection contains **exactly two
+> entries and neither names construct 30**:
+>
+> ```
+> (producer_construct=36, continuation=25, alt=0, pos=0)
+> (producer_construct=39, continuation=10, alt=0, pos=0)
+> ```
+>
+> ⇒ For construct **30** the funnel returns `None` at the binding lookup, the
+> repair falls through to *"retain byte-identical ordinary direct
+> construction"*, **and the direct template still reaches root projection.**
+> **The prescribed fix is INERT on the very witness its own discriminator row 1
+> names.**
+>
+> **MEASUREMENT 2 — THE ROLES ARE INVERTED; two DIFFERENT relations name the
+> two constructs and each is authoritative for its own.**
+>
+> | relation | names |
+> |---|---|
+> | **`Fusion` claim** | `producer_construct_origin = 30`, `consuming_call = 17`, `producer_body = 37` |
+> | **continuation call** — *the relation the ruled funnel keys on* | `producer_construct_origin = 39`, `continuation_origin = 10` |
+>
+> `ReHomed` is the same shape: fusion-claim producer **26**, continuation-call
+> producers **35** and **32**. ⇒ **Row 4 asks me to prove non-authoritative the
+> one construct the prescribed funnel IS authoritative for**, and **row 3's "no
+> exact binding" case is the CLAIMED producer**, not the other one. **Rows 3 and
+> 4 must be restated against these coordinates before either can be built.**
+>
+> **MEASUREMENT 3 — WHERE THE ESCAPING TEMPLATE IS ACTUALLY BUILT, which
+> narrows the defect.** The construct-30 completion at that seam runs with
+> `fused_authority = Some((StaticOriginId(10), PredeclaredFunctionId(3)))` and
+> `defining_unit = Some(2)` — **inside the `Fusion(0)` definition, on the
+> producer half, with the region claim still outstanding.** So this is **not a
+> stray traversal outside the fused object**: the fused body itself completes
+> the producer's constructor through the source-machine route and hands back a
+> direct specialized template, while the suffix separately returns `Carried`.
+> **Construct 39 never reaches this seam on the armed path at all** — it is the
+> consumer's scrutinee the fused call replaced — **which is why a row keyed on
+> 39 cannot discriminate anything here.**
+>
+> **WHAT THE IMPLEMENTER DECLINED TO DO, and it was right to.** Substituting the
+> fusion claim for the continuation-call relation as the funnel key is the
+> obvious move and is **exactly the choice the ruling reserves**: it would make
+> the source-machine constructor completion consult `FusionRegionClaim` and
+> select an answer from it — **a new answer-selection authority inside the fused
+> body**, not the *"existing funnel"* the ruling authorized reusing. It also has
+> to interact with the **affine claim, which is outstanding at that point and
+> must not be spent twice**, and with the takeover that already forwards the
+> correct `Carried`. **Getting it wrong reintroduces the double-suffix defect at
+> `:650` or spends the claim at the wrong seat — this node has already produced
+> each of those once.**
+>
+> **THE FORK, stated as a fork and not a recommendation, with the Architect:**
+>
+> 1. **Should the fused body's producer half reach the source-machine
+>    constructor route AT ALL**, or should the producer construct inside
+>    `Fusion(0)` lower through the **generic eliminator route** that already has
+>    the claim/call funnel and the eliminator frame?
+>    `lower_fused_producer_through_suffix` invokes the generic route, **so a
+>    producer construct arriving at the source-machine seam may itself be the
+>    routing defect, one level up from answer selection.**
+> 2. **If the source-machine seam is the right place, which relation keys it**,
+>    given the continuation-call relation demonstrably does not name the claimed
+>    producer?
+>
+> **Different repairs, different discriminators, both consistent with every
+> measurement above.**
+>
+> ### THE TRACE LANDED, AND IT FOUND A THIRD CONSTRUCTOR ROUTE NOBODY HAD
+> ### BEEN RULING ABOUT. Steward, 2026-08-12, from `evt_1a9t81p0j7h77` +
+> ### `evt_338x5qd0hf6fx`, under bounds `evt_41remx6xn6pda` + `evt_7qkp9qd7a2381`.
+>
+> **Read this box before any of the stop-4 boxes below it. It retires the
+> question they were all built on.**
+>
+> **THE ONE-MACHINE-OR-TWO QUESTION IS ANSWERED AND RETIRED: one machine,
+> joined, and CORRECT.** The fused body starts one machine for the producer's
+> selected case body; construct **30** completes inside it with
+> `next=["Terminal"]` — **and that `Terminal` IS the `ResumeOuter` the machine
+> was started with**, so it resumes the pending outer eliminator, which runs the
+> suffix as nested machines under the **consumer's** defining unit. The
+> producer's machine then exits carrying the suffix's result and the fused body
+> exits `Carried`. ⇒ **The join exists, it is the `Terminal`/`ResumeOuter`, and
+> nothing about it is broken.**
+>
+> ⇒ **AND IT RETIRES THE SHARED PREMISE OF EVERY REPAIR SO FAR:** there is **no
+> point in that nesting at which two candidate answers coexist and one is
+> selected.** **There is no answer selection to repair at any fused seat** —
+> which is exactly why a funnel and a receipt each **had nowhere to attach.**
+> Three mechanisms failed for one reason.
+>
+> **THE ESCAPE IS A THIRD PRODUCTION OF THE SAME SOURCE OCCURRENCE, BY A ROUTE
+> NOBODY HAS RULED ON.** The three constructor-completion routes:
+>
+> | route | what it is | verdict |
+> |---|---|---|
+> | **A** | `lower_computational_producer_expr`'s `Construct` arm — the generic funnel with `claim_and_call_continuation` | every ruling so far aimed here |
+> | **B** | the owned source-machine `ConstructArgument` completion | ...or here |
+> | **C** | **`lower_expr`'s `RuntimeExpr::Construct` arm** — documented in place as *"the ONE armed producer"*, **the sole builder of the `StaticWorker` arm** via `static_worker_constructor_template` | **this is the one that escapes** |
+>
+> **Route C is the only one of the three that can produce a `StaticWorker` field
+> at all** — its own comment records that route A's two `Construct` producers
+> stay fail-closed at `value_at`.
+>
+> **WHERE AND WHEN IT FIRES, which is what makes it a separate object.** Route C
+> emits at `machine_depth=0`, `fused_auth=None`, in **root-projection entry
+> `block3`**, with the enclosing emission identified by backtrace as
+> **`compile_expr_into_module_with_root_projection`** — **not a unit body and
+> not the fused definition.** It runs **after** the fused body exited `Carried`
+> and **after** the takeover forwarded `Carried`. **At that point the affine
+> claim is already SPENT and the fused definition is already complete**, so
+> route C is **downstream of the entire affine lifecycle rather than racing
+> it.**
+>
+> **Answer sinks, both traced:** the fused definition's result-store input is
+> `Carried` on **both** witnesses; **route B's direct template is consumed
+> inside the machine and never reaches a sink at all**; route C's template goes
+> straight to `emit_result`/`ground_value` with **no other consumer**, never
+> entering the fused definition. ⇒ **Independent emissions in DIFFERENT
+> FUNCTIONS — not alternative CFG arms, not sequential values on one lineage.**
+>
+> **A TRAP THE IMPLEMENTER FLAGGED BEFORE ANYONE COULD FALL INTO IT:** at the
+> route-C emission `defining=2` is **ambient carrier state, NOT the enclosing
+> emission** — **the backtrace is the authority and the two disagree.** ⇒ **Do
+> not key anything at that seat on `defining_unit`.**
+>
+> **WHAT IS STILL OPEN, and it is narrower than anything before it:** why does
+> the root projection lower the claimed producer occurrence **at all** after
+> body ownership and fused consumption — and is the defect that **route C
+> runs**, that **its result is selected as the program answer**, or that
+> **ownership left the occurrence reachable from the root**? **Different
+> repairs. Nobody has probed or picked between them.** The Architect is
+> grounding the root projection's ownership/selection contract
+> (`evt_7z2jq0k1g42np`).
+>
+> **THE SEQUENCING RULING IS VINDICATED AND SHOULD BE REUSED.** The Architect
+> accepted evidence-first without argument (`evt_5mj370jt0ax14`: *"no fourth
+> repair ruling will issue before the causal trace"*), **tightened the trace's
+> bounds instead of ruling** (`evt_7qkp9qd7a2381`), and **one trace in two cuts
+> retired a question three full ruling cycles could not settle** — and surfaced
+> a route that was never in anyone's field of view. **Cost: one implementer turn.**
+>
+> ### THIRD MECHANISM, THIRD REFUTATION — and my sequencing ruling
+> ### `evt_41remx6xn6pda`: THE CAUSAL TRACE RUNS BEFORE THE NEXT MECHANISM
+>
+> **Steward, 2026-08-12, from `evt_7kke2mm0sncgw`. The re-ruling
+> `evt_26ganh9p86xw8` replaced the inert funnel with a fusion-scoped,
+> instance-paired ANSWER RECEIPT. Its relation separation is MEASURED CORRECT
+> and stands** — `30`/`26` authoritative only through the fusion projection,
+> `39`/`35` and `36`/`32` only through `continuation_call_binding_for`, neither
+> substitutable. **What fails is step 2 against step 3.**
+>
+> **THE RECEIPT CANNOT EXIST AT THE SEAT RULED TO CONSUME IT.** Step 2 mints it
+> *"when the exact claimed `Var` consumer call completes"*; step 3 has the owned
+> source-machine completion select it. **That requires the call to PRECEDE the
+> constructor completion. Measured, it is strictly the other way** — one armed
+> monotone counter, both witnesses:
+>
+> ```
+> [0] srcmachine-construct-complete origin=30 fused_auth=Some((10, unit 3))
+> [1] [2] [3] ih-call-mint
+> [4] srcmachine-construct-complete origin=26 fused_auth=Some((6, unit 1))
+> [5] [6] [7] ih-call-mint
+> ```
+>
+> There is **exactly ONE** source-machine completion of the claimed producer
+> inside the fused body per compile, and **every IH call mint follows it.** ⇒ At
+> the only seat step 3 can act **no receipt has been minted**, the "no matching
+> receipt" fallback is **the branch that always runs**, the reconstructed
+> template still reaches root emission, **and all six controls pass vacuously.**
+> **The inert-fix shape again, one layer in — and this time the controls would
+> not catch it, because they are written against a mechanism that never fires.**
+>
+> **WHY, and it is not an ordering accident.** At that completion the
+> continuation chain is `origin=30, fused body: next=["Terminal"]` — **no
+> pending `ComputationalMatchScrutinee` on that machine's stack.** The outer
+> eliminator is pending as *authority* (`fused_auth` is set) but is **not on this
+> machine's stack**, so the constructed template **is that machine's final
+> answer**, and nothing downstream can consume it — which is also why no later
+> receipt could be applied retroactively. Contrast a genuinely consumed
+> construct: `PX8J construct 28: next=["ComputationalMatchScrutinee",
+> "ApplyRecursorSelection", "Terminal"]`.
+>
+> **THE CONTROL THAT STOPS THE OVER-CLAIM, produced against the implementer's
+> own tidier story and worth more than the finding:** the **same** construct 30,
+> same fixture, **no installed fusion**, is **also** `next=["Terminal"]` **and
+> that compile does not escape.** ⇒ **"Terminal at the producer's constructor"
+> is NORMAL and is not by itself the defect.** What differs under fusion is that
+> this machine's terminal answer becomes the fused function's answer while the
+> suffix's correct `Carried` is produced on a **different route** — the one the
+> takeover forwards, which remains correct.
+>
+> **THE QUESTION THE THIRD REFUTATION LEAVES STANDING, and it is the one to
+> rule:** at that seat, **are the producer machine and the suffix ONE machine,
+> or TWO with a defined answer join?** **Every repair proposed so far — funnel
+> reuse and receipt selection alike — presumes they are already one machine with
+> a selection point, and measured they are not.**
+>
+> **The two adaptations the implementer declined, both correctly, both the
+> reserved decision:** deferring the constructor's answer so a later receipt can
+> replace it — a **promise-and-patch** mechanism, not the *"select that returned
+> answer"* that was authorized, and it settles the fused body's answer **after
+> its own machine terminated**; or pushing the outer eliminator onto the producer
+> machine's stack, which **changes which route runs the suffix** and risks the
+> `:650` double-suffix defect and a **second spend of the affine claim** — this
+> node has produced each once already.
+>
+> **MY SEQUENCING RULING (`evt_41remx6xn6pda`), and it is sequencing only.** The
+> implementer runs and posts a **bounded causal trace of the fused body's
+> machine structure BEFORE the next mechanism is chosen**: scoped to the
+> one-machine-or-two question, both witnesses, carrying the consumed-construct
+> contrast **and** the no-fusion control, **measuring only — no proposed
+> repair.** The Architect rules **against the trace rather than ahead of it**,
+> and may re-bound the trace instead. **This reorders evidence and decision. It
+> shrinks no scope, adds no party, and adds no review hop.**
+>
+> ### THIS IS THE SECOND CONSECUTIVE RULING REFUTED BY GROUNDING BEFORE
+> ### IMPLEMENTATION — and both times the frame carried the refuted mechanism
+>
+> **Steward, 2026-08-12. Recording it because the sizing consequence is mine.**
+>
+> Stop 4 has now been ruled twice and refuted twice: `evt_2m62086x60c94`'s
+> causal sentence fell to four probes, and `evt_5rze80e6w9qz8`'s prescribed
+> funnel is inert on its own witness. **Both times I transcribed the mechanism
+> into this frame as an AC, and both times a seat reading my box would have
+> built the wrong thing.** The classification has survived both refutations
+> unchanged; **it is the causal/mechanism layer beneath a correct
+> classification that keeps failing.**
+>
+> ⇒ **Two standing consequences.** For the ring: **ground a prescribed mechanism
+> against the armed coordinates before writing code, and report the refutation
+> rather than substituting a mechanism of your own** — that is now twice
+> vindicated and is not over-caution. For me: **an AC transcribed from a ruling
+> inherits that ruling's mechanism risk**, so a mechanism I did not measure gets
+> a box like this one **above** it, not silent inclusion beside criteria that
+> are measured.
+>
+> ### `AC-D3-ANSWER` — STOP 4 RE-RULED. Steward, 2026-08-12, recording
+> ### Architect `evt_5rze80e6w9qz8`, durable at `9fd0731e`.
+> ### SUPERSEDED IN ITS MECHANISM — read the box above first.
+>
+> **Leader's dispatch is `evt_5s5hkcjr0e2c`. This SUPERSEDES the struck
+> `AC-D3-ROUTE` repair; the classification and the atomic boundary are
+> unchanged.**
+>
+> **The defect is ANSWER ROUTING at owned source-machine constructor
+> completion** — not unlawful source production, and **not a fault in the fused
+> takeover.** The Architect withdrew its own causal sentence: the fused call
+> returning `Carried`, the takeover forwarding it, suffix consumption and the
+> worker-disposition close are **all correct and must remain unchanged.**
+>
+> **The two construction routes, which is the whole mechanism:**
+>
+> 1. **Generic `lower_expr`** lowers the constructor fields, attempts the exact
+>    continuation claim/call, constructs the ordinary fallback, then selects
+>    `continuation_result.unwrap_or_else(|| RoutedAnswer::direct(produced))`.
+>    ⇒ **a successful claimed call OWNS the answer.**
+> 2. **The owned source machine** lowers the same `Construct` through
+>    `SourceContinuation::ConstructArgument` and then **unconditionally** returns
+>    `RoutedAnswer::direct(finish_source_constructor(...))`. ⇒ **it has no
+>    equivalent exact-call answer choice at all.**
+>
+> Under `FunctionizedUnits`, **route 2 is the direct specialized value the root
+> projection sees.** Entering the producer occurrence, lowering its fields, and
+> having an ordinary fallback are all lawful. **What is wrong is that fallback
+> remaining the SELECTED answer when the exact plan-authored claim resolves and
+> its call result exists.**
+>
+> **`AC-D3-ANSWER` — the lawful repair boundary.** Close the owned
+> source-machine constructor-completion seam with **the same authoritative
+> claim/call decision generic `lower_expr` already uses**: after all fields are
+> lowered, resolve the exact continuation identity **from the planner relation**
+> and pass through the **existing** claim/call/settlement funnel. If the exact
+> call succeeds, its returned `RoutedAnswer` — **including the `Carried` result
+> and its checked route** — replaces the direct constructor fallback. If no
+> exact binding exists, ordinary source-machine construction stays
+> **byte-for-byte** the direct fallback. **Prefer one shared constructor-answer
+> funnel over two independently maintained spellings, if that can be done
+> without widening the surface.**
+>
+> **This is selection AFTER lawful evaluation, not "do not produce origin
+> 29/25."** Keep source-occurrence entry, field lowering, recognition, rebind,
+> exact consumption, and the ordinary fallback.
+>
+> **Forbidden, and the first five are the tempting ones:** suppressing the
+> constructor by source origin, constructor name, root status, or fusion-body
+> context; stopping or delaying consumer takeover; replaying the suffix;
+> changing `FunctionizedUnits` root pairing; turning `StaticWorker` into a value
+> or carrier; weakening `ground_value`.
+>
+> **WHY THE LEDGER PASSING IS NOT A CONTRADICTION, and why it must not be made
+> to carry this.** `require_complete_static_worker_disposition()` succeeding
+> before the escape is **consistent** with the diagnosis: that ledger proves
+> **recognition → transition → consumption**. It does **not** prove that a
+> compiler template containing the now-consumed field was not **selected later
+> as an answer**. ⇒ **R3 adds the answer-exclusivity control; it does not
+> burden the conservation ledger with a routing fact.**
+>
+> **THE SIX REQUIRED DISCRIMINATORS, in this same held atomic object:**
+>
+> 1. On armed `Exact` **and** `ReHomed`, the owned source-machine completion for
+>    the claimed producer **reaches the exact claim/call funnel and selects its
+>    returned `Carried` answer**; the direct producer template **does not reach
+>    root emission**.
+> 2. **Mutating only the final choice** to prefer the direct constructed
+>    template despite a successful call **must red**, while the existing
+>    worker-disposition close **stays green**. This is what separates answer
+>    routing from conservation.
+> 3. A row with **no exact continuation binding** still returns the ordinary
+>    direct constructor — proving this is **not global suppression**.
+> 4. The control **pins the planner claim coordinates** above and keeps the
+>    other same-spelling construct (**39/38** or **35/34**) **non-authoritative**.
+> 5. **Repeated entry of one static field origin stays permitted and
+>    instance-scoped** — **no origin-level "already handled" bit** may discharge
+>    a later construction.
+> 6. The final post-consumer ground result **remains accepted**, and a
+>    worker-bearing producer fallback at root **remains refused by the unchanged
+>    terminal guard**.
+>
+> **Its control is a discriminator, not a green run:** it must **fail** if the
+> producer intermediate reaches terminal emission before its claimed outer
+> consumer, **while the final post-consumer ground result stays accepted.** A
+> control that only shows the armed path green does not discharge this.
+>
+> **Rejected dispositions, named so none is re-proposed:** a `StaticWorkerBinding`
+> arm on `RuntimeGroundValue`; a materialized carrier, slot, descriptor, closure
+> value or opaque token for the worker; conversion to `Specialized`, erasure, or
+> dropping it; any relaxation of `ground_value`; **declaring the stop external on
+> the strength of R3 not editing the site**; and **shrinking or deferring
+> selector nets 2/4, controls 2/3, or the inner-slot witness.**
+>
+> ### `AC-D3-SELF`'s OPEN HALF IS NOW AN OWED PLANNER OBLIGATION, and the
+> ### frame's "not closed" reading was confirmed in the tree
+>
+> **Steward, 2026-08-12, from `evt_2z63k4vb5rk7k` at `5d322edf`.**
+>
+> The implementer took a **mandatory correction as its own commit**: it had
+> written that the callee-to-body resolution *"is established at preflight"*, and
+> **that sentence was false in the tree** — `BinderAgreement` proves only the
+> marginal facts. The comment now says so, names the ruling, and records the
+> relation as an **owed planner-side obligation**, with the constraint that
+> lowering's independent cross-check **must not grow into a reconstruction of the
+> binder relation.**
+>
+> **The shape of the owed guard, scoped and deliberately not built** (so the next
+> turn starts from it instead of re-deriving it): `CheckedIhBinding` carries
+> `frame_origin` and `recursive_position` and **no body**, and
+> `SemanticIr::static_body_call_edges` returns `(caller, callee, callee_origin)`
+> with **no call-site axis** — `callee_origin` is the callee function's planned
+> entry node, not tied to a call occurrence. ⇒ **The resolution cannot key on the
+> consuming call.** It must key on the binder's **owning function**: take
+> `occurrence_authority(frame_origin).owner`, require a **unique** `StaticBody`
+> edge out of it, and require that edge's callee entry to equal
+> `key.invocation_callee_entry`, the redirect callee entry, and the claim's
+> producer body — **refusing before claim issuance.**
+>
+> > ##### CLOSED at `766cbdf0` — and the route above is NOT the one that
+> > ##### works. Steward, 2026-08-12, from `evt_6bg3en6yy4dgz`.
+> >
+> > **`AC-D3-SELF`'s open half is DISCHARGED.**
+> > `FusionClaimRefusal::BinderBodyResolution` refuses **before claim
+> > issuance**, in two steps: the consuming callee is **re-resolved through the
+> > planner's own binding authority** rather than taken from the key, and that
+> > binder is then resolved to a body required to be the one the claim redirects
+> > into.
+> >
+> > **THE SCOPED ROUTE ABOVE WAS NEARLY A RESTATEMENT, measured.** The redirect
+> > edge is **already unique by callee** and carries `caller == consumer_owner`,
+> > so the by-caller lookup returns **the same edge** and **the comparison
+> > cannot fail.** The working route uses the binder's **own members** — frame
+> > scrutinee, then the argument at its recursive position, then that argument's
+> > body — so **`recursive_position` is USED rather than compared to the key's
+> > copy of itself**, which two equal numbers satisfy without naming an argument
+> > that exists.
+> >
+> > **Discriminating evidence, not construction:** on all three `D2j` causes
+> > that install a key — `Exact (10,0) -> 37`, `ReHomed (6,0) -> 33`,
+> > `ProducerArity (10,0) -> 38` — each resolves to exactly its own
+> > `invocation_callee_entry`; **and the same resolution on each key's PRODUCER
+> > argument binding gives 34, 30 and 35**, the producer's own outgoing edge. A
+> > derivation that just returned the redirect target could not do that.
+> >
+> > **ONE comparison is written, not three**, because `InvocationTriple` already
+> > forces `redirect.callee_origin() == invocation_callee_entry` and the claim
+> > is built with `producer_body: invocation_callee_entry`. Two of the three
+> > would be **branches that cannot fail** — which read as checks while being
+> > none.
+> >
+> > **THE CONTROL'S FIRST SHAPE WAS KILLED BY ITS OWN MUTATION PROOF, and the
+> > reason generalizes.** Perturbing the binder's frame refused with the right
+> > cause and looked correct — but tautologising step 2 left the row **green**:
+> > moving the frame also desynchronised `consuming_callee`, so **step 1
+> > answered first and the resolution never ran.** A two-step rule **shadows
+> > itself**, and the classified cause cannot see it because both halves report
+> > the same cause. The perturbation now relabels callee, binding and admitted
+> > frame **together** — internally consistent and still wrong. **One mutation
+> > proof per STEP, not per rule.**
+>
+> ~~**Its control must perturb the resolved relation while frame,
+> recursive-position, result-root and redirect marginal checks stay green.**~~
+> That is what makes it independent of `BinderAgreement` rather than a second
+> spelling of it, and it needs a test-only planner switch on the
+> `DUPLICATE_STATIC_BODY_TRIPLE` pattern. **The implementer declined to author it
+> at the end of a long turn on the explicit ground that a quickly-written
+> control here is the unexercised-control error the atomic rule exists to
+> prevent. That is the correct call and I am not treating it as a miss.**
+>
+> ### THREE STOPS, ONE SHAPE — a premise about the fused function written
+> ### BEFORE the suffix moved into it
+>
+> **Steward, 2026-08-12, recording a pattern the implementer named at
+> `evt_2ffgnktmm34ta` rather than treating its third instance as a one-off.**
+>
+> | # | the stale premise | how it surfaced |
+> |---|---|---|
+> | 1 | *"the takeover cannot run before the body it sits in is defined"* | `D3` defect 1 — a fused region took over its own suffix and consumed its own claim |
+> | 2 | the redirect's ordering clause | `claim_present=false` at every caller |
+> | 3 | *"Not the consumer's edges — the consumer's redirected invocation is the edge that reaches this function, not one inside it"* | `call_declared_unit(StaticOriginId(37))` against `unit_calls = [34]` |
+>
+> **`D1`/`D2` moving the suffix inside the fused function falsifies all three,
+> and each was discovered by ARMING and hitting it.** That is a serial
+> discovery process: one stop, one turn, one repair, repeat. Nothing goes red
+> until the armed compile reaches the site, so the count of remaining instances
+> is **unknown and unbounded by anything measured so far**.
+>
+> **STOP 4 IS NOT A FOURTH INSTANCE OF THIS SHAPE — do not recount it as one.**
+> The `StaticWorkerBinding` stop (`AC-D3-ROUTE` above) is a **routing** defect:
+> the fused path terminalizes the producer intermediate before completing the
+> claimed suffix. No stale written premise is involved, and the refusal site was
+> correct all along. **The count behind the census offer below is still three**,
+> and stop 4 neither strengthens nor weakens it.
+>
+> **The option, and it is an option rather than a deliverable I am adding:**
+> whoever takes the next stop may census the premises written about the fused
+> function before the suffix moved in, instead of waiting for the next one to
+> fire. Three for three is enough to suspect a fourth. **I am not mandating it
+> and not making it an AC** — it may be cheaper to keep taking the stops, and
+> that judgment needs the code in front of you. **What I am fixing is that the
+> third instance should not read as bad luck.**
+>
+> **Do not read the two measured facts on stop 3 as a repair route.** The
+> consumer's own static-body edge set is **empty** — body ownership removed seat
+> 37's edge, which is the hole the redirect exists to fill — so declaring
+> consumer edges into the fused function supplies nothing. And reaching seat 37
+> inside the fused body means the suffix is invoking a producer the dispatcher
+> already lowered inline, which is **a question about what the suffix lowers
+> to**, not about edge tables. The implementer measured both and declined to
+> guess; that is the correct handback shape.
+>
+> **Routing note, mine.** The implementer named this fork and declined to settle
+> it, having just been burned by a false ordering premise on the same turn
+> (`D3` defect 1: a fused region taking over its own suffix and consuming its
+> own claim). **That was correct.** I ruled only the routing — soundness/design
+> goes to the Architect — and flagged the `evt_2f0nnwtzqy65m` tension **without
+> resolving it**. The ruling came back neither "forbidden" nor "fine" but
+> "the raw formulation is forbidden, here is the lawful correction," which is
+> the answer a pre-emptive reading of my own would have destroyed.
 
 **`D4` — the before-hole expression is repaired and green** under `B`-only
 exclusion at the pre-retirement base. **If arming plus `D2` necessarily makes
