@@ -1280,12 +1280,39 @@ transport-only shape.
 > > contract is that a producer whose transport cannot be resolved from all
 > > three wrapper authorities is not a candidate and never reaches a key.
 > >
-> > **This is the FOURTH forced zero, and it is DERIVED, not measured** — from
-> > the validator, the transport builder and the key's contract; nobody ran it.
-> > **"Cannot reach the enumerator" and "reaches it and dead-ends at transport"
-> > look identical from outside and are different claims.** Recorded now because
-> > a later seat will otherwise notice the `Ok` arm, conclude the closure has a
-> > hole, and spend a cycle on a route that dead-ends one layer down.
+> > **This is the FOURTH forced zero. It was DERIVED when written and is now
+> > MEASURED** (`evt_6xywtcrdyq08s`, base `5a1e2ced`). **"Cannot reach the
+> > enumerator" and "reaches it and dead-ends at transport" look identical from
+> > outside and are different claims** — which is why it was worth the run
+> > rather than a later seat noticing the `Ok` arm, concluding the closure has a
+> > hole, and spending a cycle on a route that dead-ends one layer down.
+> >
+> > **The A/B varied one argument and nothing else** — both arms replicate
+> > `emit_process_entrypoint_object_with_cranelift`'s argument list exactly,
+> > differing only in the final `oriented_subcontinuation_plan`:
+> >
+> > | row | arm | `oriented_present` | keys | compile |
+> > |---|---|---|---|---|
+> > | 4 | `None` | false | 0 | `StaticWorkerBinding` refusal |
+> > | 4 | `Some(empty)` | **true** | **0** | identical refusal |
+> > | 5 | `None` | false | 0 | `StaticWorkerBinding` refusal |
+> > | 5 | `Some(empty)` | **true** | **0** | identical refusal |
+> >
+> > **No `OrientedSubcontinuationPlanV1` refusal on either `Some(empty)` arm** —
+> > the `(markers empty, Some(empty)) → Ok` arm fired on the real rows, not just
+> > in the match statement, and the builder resolved zero keys anyway.
+> >
+> > **This zero is not a fifth forced one.** The instrument's positive control
+> > exists in the suite — `d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin`
+> > reaches `keys=1` through the same entry with a non-empty plan on marked IR.
+> > The difference is the plan's contents, not the harness.
+> >
+> > **HALF THE CLOSURE SENTENCE IS STILL DERIVED, AND IT IS THE HALF A LATER
+> > SEAT WOULD BUILD ON.** Measured: the plan is admitted and resolves nothing.
+> > **Not measured: that the dead-end is specifically at transport resolution.**
+> > That attribution rests on `build_checked_transport` producing an empty map
+> > plus the key's own contract. Locating the exact drop point needs a probe
+> > inside the enumerator, which is instrumentation and was outside the bound.
 > >
 > > **Disposition unchanged: no candidate, no key, section 8 unaffected.**
 >
