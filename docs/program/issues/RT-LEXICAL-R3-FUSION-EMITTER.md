@@ -90,6 +90,44 @@ origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliat
 > >    oriented plan is not what drives the plane and the positive row means
 > >    something other than what `D0` claims — **a finding that must reach the
 > >    Architect before any arming.**
+> >
+> > ### THE CELL ANSWERED NEITHER FORK BRANCH — resolved 2026-08-12
+> >
+> > **Measured: it refuses.** `OrientedSubcontinuationPlanV1` / *"checked
+> > subcontinuation markers have no checked plan metadata"*. Not plane `0`, not
+> > plane `1`. **The two-way fork above was wrong about the shape of the
+> > answer**, and the implementer asserted the refusal as a refusal rather than
+> > re-mapping it onto the zero branch — which is what kept the mechanism
+> > visible instead of reading as a clean plane-`0` confirmation.
+> >
+> > **Architect disposition `evt_4m0q1m4zn4k79`: this is NOT the `D2h` stop.**
+> > `build_static_continuation_fusion_plan` enters
+> > `enumerate_live_fusion_candidates`, whose first operation is
+> > `validate_oriented_subcontinuation_transport(entry, declarations,
+> > oriented)`. The checked twin still carries its markers, so with `None` that
+> > validation refuses **before transport construction, candidate enumeration,
+> > key derivation, interning, ID, or descriptor.** No fusion can form through a
+> > lawful checked input without oriented metadata.
+> >
+> > **The bound on the claim, and it is narrow.** This is stronger than plane
+> > `0` **on the fail-closed plan-dependence axis only.** It is **not** a
+> > plane-cardinality attribution result, because **no plane is returned.**
+> > Prose saying "more strongly than plane `0`" without naming that axis
+> > overstates it.
+> >
+> > **Preserve it as a refusal; never relabel it plane `0`.** `px8j` remains the
+> > separate, valid, unmarked `None` → plane `0` comparator.
+>
+> > #### `D1` DOES NOT MERGE ALONE — atomic `D1`+`D2`+`D3` candidate
+> >
+> > Architect `evt_4m0q1m4zn4k79` on exact `33a77bd4`, which **remains held.**
+> > The mechanism is structurally coherent, but with the installer unarmed the
+> > production population is empty and none of it fires — **green compilation of
+> > inert scaffolding is not a discharge.** `D1` is held, `D2` builds on it,
+> > `D3` arming is the last implementation step, and one candidate spanning all
+> > three (plus `D4` if arming greens it) goes to review with a live armed
+> > control. Frame amended at `docs/program/wp/RT-LEXICAL-R3-FUSION-EMITTER.md`
+> > section 5 and `AC-8`.
 
 ## What this node is, and why it exists as a node
 
