@@ -1024,9 +1024,19 @@ side of the distinction where the comparison has content.
 not a licence to consume it again."* If the worker-bearing population lands on
 `RecursiveDescent`, that sentence is true of the code and false of the compile.
 
-**THE DECIDING READ, once the route repair delivers a rebound field: is
-`defining_function_id` `Some` at the recognize / rebind / consume triple on the
-path the five rows take?**
+**THE DECIDING READ: is `defining_function_id` `Some` at the recognize / rebind
+/ consume triple on the path the five rows take?**
+
+> **TAKE IT AS PART OF `1c-2`'s VALIDATION, NOT AFTER IT.** This block first
+> said *"once the route repair delivers a rebound field"*, which reads as
+> afterwards and is wrong. The read needs a rebound field, so it cannot start
+> earlier — but **if the worker-bearing population lands on `FunctionizedUnits`,
+> the field becomes `Some` and the guard goes live in the same increment that
+> answers the read.** The answer and the state it describes move together, so a
+> read taken after the arm moves is a true measurement of a different world.
+> **Report the value together with the route arm it was taken on**, or the
+> number cannot be interpreted later. Raised by the ring at `evt_7s6chq5grr9em`,
+> against its own instinct to sequence it afterwards.
 
 - **`None`** ⇒ both refusals are vacuous on the live population and the control
   set measures a distinction production never presents.
