@@ -495,8 +495,111 @@ nothing you inherit from `#6d`.**
 > > 2/4, controls 2/3, the inner-slot witness, the routing discriminator and the
 > > self-edge closeout all remain owed **unshrunk**.
 >
+> ### DO NOT BUILD `AC-D3-ANSWER` AS WRITTEN — ITS MECHANISM IS MEASURED
+> ### INERT AND ITS ROWS 3/4 ARE INVERTED. Steward, 2026-08-12, from
+> ### `evt_1twk028k03mxe`; re-ruling requested at `evt_7snn4fr8b4yea`.
+>
+> **This box sits ABOVE the AC because the AC below reads as buildable and is
+> not.** The implementer grounded the ruling **before** implementing, and the
+> grounding refuted the prescribed mechanism. **No code was written; the held
+> object is unchanged at `766cbdf0`.** Stopping there is the condition the
+> leader authorized.
+>
+> **MEASUREMENT 1 — THE RULED FUNNEL HAS NOTHING TO RESOLVE FOR THE CLAIMED
+> PRODUCER.** `claim_and_call_continuation` resolves through
+> `continuation_call_binding_for(producer_construct_origin, ...)`. Armed, on
+> `Exact`, the planner's continuation-call projection contains **exactly two
+> entries and neither names construct 30**:
+>
+> ```
+> (producer_construct=36, continuation=25, alt=0, pos=0)
+> (producer_construct=39, continuation=10, alt=0, pos=0)
+> ```
+>
+> ⇒ For construct **30** the funnel returns `None` at the binding lookup, the
+> repair falls through to *"retain byte-identical ordinary direct
+> construction"*, **and the direct template still reaches root projection.**
+> **The prescribed fix is INERT on the very witness its own discriminator row 1
+> names.**
+>
+> **MEASUREMENT 2 — THE ROLES ARE INVERTED; two DIFFERENT relations name the
+> two constructs and each is authoritative for its own.**
+>
+> | relation | names |
+> |---|---|
+> | **`Fusion` claim** | `producer_construct_origin = 30`, `consuming_call = 17`, `producer_body = 37` |
+> | **continuation call** — *the relation the ruled funnel keys on* | `producer_construct_origin = 39`, `continuation_origin = 10` |
+>
+> `ReHomed` is the same shape: fusion-claim producer **26**, continuation-call
+> producers **35** and **32**. ⇒ **Row 4 asks me to prove non-authoritative the
+> one construct the prescribed funnel IS authoritative for**, and **row 3's "no
+> exact binding" case is the CLAIMED producer**, not the other one. **Rows 3 and
+> 4 must be restated against these coordinates before either can be built.**
+>
+> **MEASUREMENT 3 — WHERE THE ESCAPING TEMPLATE IS ACTUALLY BUILT, which
+> narrows the defect.** The construct-30 completion at that seam runs with
+> `fused_authority = Some((StaticOriginId(10), PredeclaredFunctionId(3)))` and
+> `defining_unit = Some(2)` — **inside the `Fusion(0)` definition, on the
+> producer half, with the region claim still outstanding.** So this is **not a
+> stray traversal outside the fused object**: the fused body itself completes
+> the producer's constructor through the source-machine route and hands back a
+> direct specialized template, while the suffix separately returns `Carried`.
+> **Construct 39 never reaches this seam on the armed path at all** — it is the
+> consumer's scrutinee the fused call replaced — **which is why a row keyed on
+> 39 cannot discriminate anything here.**
+>
+> **WHAT THE IMPLEMENTER DECLINED TO DO, and it was right to.** Substituting the
+> fusion claim for the continuation-call relation as the funnel key is the
+> obvious move and is **exactly the choice the ruling reserves**: it would make
+> the source-machine constructor completion consult `FusionRegionClaim` and
+> select an answer from it — **a new answer-selection authority inside the fused
+> body**, not the *"existing funnel"* the ruling authorized reusing. It also has
+> to interact with the **affine claim, which is outstanding at that point and
+> must not be spent twice**, and with the takeover that already forwards the
+> correct `Carried`. **Getting it wrong reintroduces the double-suffix defect at
+> `:650` or spends the claim at the wrong seat — this node has already produced
+> each of those once.**
+>
+> **THE FORK, stated as a fork and not a recommendation, with the Architect:**
+>
+> 1. **Should the fused body's producer half reach the source-machine
+>    constructor route AT ALL**, or should the producer construct inside
+>    `Fusion(0)` lower through the **generic eliminator route** that already has
+>    the claim/call funnel and the eliminator frame?
+>    `lower_fused_producer_through_suffix` invokes the generic route, **so a
+>    producer construct arriving at the source-machine seam may itself be the
+>    routing defect, one level up from answer selection.**
+> 2. **If the source-machine seam is the right place, which relation keys it**,
+>    given the continuation-call relation demonstrably does not name the claimed
+>    producer?
+>
+> **Different repairs, different discriminators, both consistent with every
+> measurement above.**
+>
+> ### THIS IS THE SECOND CONSECUTIVE RULING REFUTED BY GROUNDING BEFORE
+> ### IMPLEMENTATION — and both times the frame carried the refuted mechanism
+>
+> **Steward, 2026-08-12. Recording it because the sizing consequence is mine.**
+>
+> Stop 4 has now been ruled twice and refuted twice: `evt_2m62086x60c94`'s
+> causal sentence fell to four probes, and `evt_5rze80e6w9qz8`'s prescribed
+> funnel is inert on its own witness. **Both times I transcribed the mechanism
+> into this frame as an AC, and both times a seat reading my box would have
+> built the wrong thing.** The classification has survived both refutations
+> unchanged; **it is the causal/mechanism layer beneath a correct
+> classification that keeps failing.**
+>
+> ⇒ **Two standing consequences.** For the ring: **ground a prescribed mechanism
+> against the armed coordinates before writing code, and report the refutation
+> rather than substituting a mechanism of your own** — that is now twice
+> vindicated and is not over-caution. For me: **an AC transcribed from a ruling
+> inherits that ruling's mechanism risk**, so a mechanism I did not measure gets
+> a box like this one **above** it, not silent inclusion beside criteria that
+> are measured.
+>
 > ### `AC-D3-ANSWER` — STOP 4 RE-RULED. Steward, 2026-08-12, recording
 > ### Architect `evt_5rze80e6w9qz8`, durable at `9fd0731e`.
+> ### SUPERSEDED IN ITS MECHANISM — read the box above first.
 >
 > **Leader's dispatch is `evt_5s5hkcjr0e2c`. This SUPERSEDES the struck
 > `AC-D3-ROUTE` repair; the classification and the atomic boundary are
