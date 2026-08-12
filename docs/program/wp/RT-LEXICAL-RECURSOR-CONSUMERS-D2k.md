@@ -942,10 +942,42 @@ transition mints exactly one transport."* That is a claim about `rebind`'s body,
 > for a strictly weaker case and not applied to the load-bearing join.** Links
 > one and three have laws; the join the chain argument rests on has none.
 
-**Repair is one line, in a loop that already binds the value.** `mod.rs:4493`
-reads `for (recognition, transport) in &self.transitioned` and uses `transport`
-**only in the error message** — a `contains_key` away, in scope, no new
-traversal. Give it a row that fails without it.
+> ### THE ONE-LINE REPAIR THIS FRAME PRESCRIBED IS INSUFFICIENT
+>
+> Measured, not argued, and the landed law is strictly stronger.
+>
+> This block used to end: *"Repair is one line, in a loop that already binds the
+> value. `mod.rs:4493` reads `for (recognition, transport) in
+> &self.transitioned` and uses `transport` **only in the error message** — a
+> `contains_key` away, in scope, no new traversal."* **Do not build that. It is
+> the mutation the landed controls red.**
+>
+> `range(transitioned) ⊆ dom(minted)` is **satisfied by
+> `transitioned[r1] = transitioned[r2] = T`** — two constructed fields
+> transitioning to one minted transport, discharged by that transport's single
+> lawful consumption. Loops one and two pass, the containment passes, `T` is
+> consumed. ⇒ **green close, one worker forgotten.** The admitted state is not
+> closed; it is moved sideways.
+>
+> **The law is the agreeing bijection, not the containment:**
+> `minted[transitioned[r]].recognition == r`, and the converse over `minted`.
+> Injectivity is then a consequence rather than a second check. Three refusals,
+> each with a row that fails without it: forward existence, forward agreement,
+> and the converse.
+>
+> **Why the frame got it wrong, stated because it is the fourth instance in this
+> node.** The finding named **one** admitted state and prescribed the check that
+> closes **that state**. This frame published the prescription. **A repair
+> specified to close a named counterexample closes the counterexample, not the
+> class** — the property is *a transition and its transport must name each
+> other*, and the containment is a strictly weaker shadow of it. Derive the law
+> from the property and check that the named state falls out; do not derive the
+> law from the state.
+
+**Give it rows that fail without it, and build them against the maps directly.**
+A row that reaches the admitted state by calling `rebind` proves the adjacency
+of its two inserts, **not the law** — and the whole finding is that `close()`
+cannot fail when that adjacency does not hold.
 
 **`1c-0` and `1c-0b` are landed. THE ORDERING QUESTION IS ANSWERED TOO —
 Architect `evt_nmdrt6hdq34f`, and it needs NO new node and NO new authority.**
