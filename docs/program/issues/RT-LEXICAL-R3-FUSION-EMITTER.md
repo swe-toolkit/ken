@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-R3-FUSION-EMITTER
 title: "Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge"
-status: active
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -62,6 +62,15 @@ origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliat
 > **without** exclusion, and new `#[ignore]`, fixture reshaping and refusal
 > absorption are each separately ruled out for exactly these rows. **Descoping
 > it is not available.**
+>
+> **`status: draft` here does NOT mean unstarted, and it is not framing debt.**
+> `D0` is merged, and this node is framed more heavily than most. The tracker
+> legend offers no `blocked`, and the two honest readings of the enum are
+> *"deps unmet"* (`draft`) or *"a team is building"* (`active`) — the second is
+> false, and leaving it would hide that Runtime is on `#6d` `D2k`. **The unmet
+> dep is the Architect's confirming gate on `DP`'s design class**, requested at
+> `evt_64xdptyxrc3x6`. Do not flip this back to `active` until a seat is
+> actually on it, and do not count it as a frame owed by the Steward.
 
 > # `D0` MERGED 2026-08-12 — THE POSITIVE ROW IS NON-ZERO
 >
