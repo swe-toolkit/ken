@@ -38,53 +38,73 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~18:0xZ. `main` = `5d8f563b`.
+> ### RESUME HERE — state at 2026-08-12 ~18:2xZ. `main` = `cf955abd`.
 >
-> **RELEASED AND WITH THE RING: `DP-0`** (`evt_6dhg3f216pyf0`, base `5d8f563b`,
-> frame blob `5b900ed2`, the `DP-0` block above section 6 of the R3 frame).
-> Comment-only, one file, `lowering/core.rs`. It closes the Adversary's
-> `evt_h0mzz2y4666b`, whose three findings I verified at the landed source
-> before framing.
+> **RUNTIME IS WORKING `DP-1`. Do not nudge it; the frontier is moving.** Three
+> publishes this arc: `e48c2f90` (`DP-0`, PR #2033), `75e693f6` (the `DP`
+> sizing ruling, PR #2034), `cf955abd` (the Adversary triage, PR #2035).
 >
-> **Finding 1 is my own defect and is the reason it jumped the queue.** I
-> required a retirement clause on the previous partial — correctly: a
-> tree-state claim must name its falsifier and owner, because nothing reddens
-> when it expires. **The scoping words were wrong.** *"Every sentence above"*
-> and *"deleting this block"* sweep in `core.rs:2234` (the Architect ruling
-> citation) and `:2238` (*"ruled unlawful rather than merely out of scope"*),
-> **neither of which `D1`/`D2` falsify**, and a grep over `crates/` at
-> `8b142d01` returns exactly one hit for each — that block is the only in-tree
-> record of both. So the prohibition is deleted **at the exact moment it
-> becomes relevant**, since `D1`/`D2` landing is what makes the guard
-> reachable. Fail-open. The cut: **a measurement of a tree state expires; a
-> ruling about what is lawful does not.**
+> **`DP` IS RULED, SIZED AND RELEASED — the Architect-blocked stop is CLEARED.**
+> Ruled **(a)** at `evt_w4nvsmrs1qhk`: one checked computational-IH invocation
+> occurrence exists (`D2G_CALL`), the producer's `D2G_INNER_SLOT` is a binder
+> template and not an invocation source, so (b) would invent a call occurrence
+> the source does not contain. My sizing and contention re-check are the block
+> above section 6 of the R3 frame, and **that block is the release.**
 >
-> **WIP AUDIT CLOCK: NOT ARMED AGAINST ANY SEAT.** No implementation seat is
-> working. `DP` is a genuine hard stop (resets the clock) and the last candidate
-> handoff was 16:55Z (also a reset). Re-arm the deadline the moment a seat is
-> kicked, anchored on that kickoff's `evt_`, never as a count.
+> **The cut: `DP-1` = population + nets 1 and 2; `DP-2` = nets 3, 4, 5.** Nets 1
+> and 2 ship together — net 1 alone is a population that is present and proves
+> nothing, which is `AC-2`'s shape one level down. Splitting is safe only
+> because `D2F_EMITTER_ARMED` is `false` and the guard is measured unreached, so
+> `DP-1` lands an **inert** population. **`DP-2` takes the lane directly after
+> `DP-1` with no node between them**; if it does not follow, that is a stall.
+>
+> **SECTION 9 UNDERSTATES `DP`'s SURFACE — I measured this, the Architect flagged
+> only the elaborator.** 24 sites across six files carry a slot `frame_templates`
+> or a `callee_frame_templates`, and **four of the six are outside section 9**:
+> `ken-elaborator/src/erasure.rs`, `oriented_subcontinuation_plan.rs` (both
+> binding fingerprints consume the sequence), `lowering/mod.rs`, and
+> `planning/static_transition.rs` (the whole `D2G_*` fixture, 49 refs, one file).
+> Section 9 is a **floor** for this node, not its surface.
+>
+> **Contention is empty and STRUCTURALLY excluded for `DP`'s duration, not just
+> absent today.** No worktree holds an uncommitted edit to `erasure.rs` (two
+> `.claude/worktrees/agent-*` scratch trees hold other elaborator files; none is
+> that one). [[KERNEL-NESTED-IND]] `D5` **does** claim `erasure.rs` and defines
+> its lane as every path an `AC-K12` stage traverses minus `crates/ken-runtime`
+> — but Kernel is blocked behind `RT-DYNAMIC-ARM-SCALAR-MERGE` (`ready`) and
+> `RT-NESTED-IH-NATIVE-REALIZATION` (`draft`), both **Runtime** nodes, and
+> Runtime runs one node at a time.
+>
+> **My commit `80f22449` says "KERNEL-NESTED-IND is unblocked" and that subject
+> is narrower than it reads.** One dependency edge closed; two remain open. The
+> kernel-leader's *"still Runtime-blocked at `AC-K12`"* is **correct** — do not
+> "fix" it. Kernel and Foundation are both idle behind that same chain, and
+> `RT-NESTED-IH-NATIVE-REALIZATION` at `draft` is the framing debt in front of
+> them. **That is the next backlog item after `DP`.**
+>
+> **WIP AUDIT CLOCK: ARMED on Runtime from the `DP` release, `evt_37166e7aq0xts`
+> (~18:16Z).** A routine progress post does not reset it. Resets on a hard stop,
+> an Architect ruling, a candidate handoff, or the `DP-1`→`DP-2` transition.
+>
+> **`DP-1` also carries two comment repairs and `DP-2` one added AC**, from the
+> Adversary pass `evt_2933sm5wnh2je`, both reproduced by me before folding. The
+> census at `core.rs:2252` **spells the id it counts** — `1` at its pinned
+> `49072fb8`, `2` at the shipping tree where the second hit *is that sentence*.
+> Repair positionally, not by re-pinning: a census that stops counting itself
+> needs no custodian. `DP-2` gains a control that reds if the producer identity
+> is ever obtained by copy rather than transport, with a **hard stop** if it
+> cannot be written without the inference the ruling forbids.
 >
 > **RUNTIME is on `RT-LEXICAL-R3-FUSION-EMITTER`.** Its thread anchor is the
 > root post `evt_391zsaw72wmna`, thread `thr_7fz4j2x2pgzvb` — **not** the D2k
 > thread, where my original `DP` kick wrongly went and was reissued from.
 > `thr_49738q826cs1t` stays D2k's and is still open.
 >
-> **`DP` ITSELF IS ARCHITECT-BLOCKED, and that is a good hard stop, not a
-> stall.** The checked source gives producer frame `1` a `ParentFrame(0)` and
-> the same segment site as consumer frame `0`, but **no invocation marker**;
-> production `erasure.rs:1453`/`:1473` derive every IH callee sequence from a
-> one-frame slot template, so **no computational-IH invocation can cover a
-> second frame today**. The implementer refused to pick between (a) one
-> invocation-local segment covering both ordered frames and (b) distinct
-> invocation sources plus the checked parent edge — correctly, since the frame
-> forbids lowering and fusion from choosing, copying or inferring that relation.
-> Routed to the Architect at `evt_3rbr783yqtr36`. **Not the Steward's call.**
->
-> **EITHER ANSWER IS A STEWARD-OWNED RE-CUT — say so before anyone waits.**
-> (a) reaches into `crates/ken-elaborator/src/erasure.rs`, outside this frame's
-> section 9 contention set and on another crate's review surface; (b) or an
-> authorized checked-source cut is `AC-10`-shaped fixture population. Neither
-> starts inside this frame.
+> > **A PUBLISHER `GraphQL: Base branch was modified` CAN BE A FALSE FAILURE.**
+> > PR #2035 returned it and **the merge had landed** — `cf955abd`, blob
+> > identical — while GitHub left the PR record `OPEN`. Decide with M6 blob
+> > identity, never the error text. Then **close the orphan**: an abandoned PR
+> > whose content is already on `main` ages into a revert.
 >
 > **RUNTIME — `RT-LEXICAL-RECURSOR-CONSUMERS-D2k`.** Anchor
 > `thr_49738q826cs1t`. The frame is the durable record and carries the full
