@@ -32587,3 +32587,184 @@ fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
          control."
     );
 }
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` — control 1 of the atomic `DP`+`D1`+`D2`+`D3`
+/// object. The BASE uncomposed population law, and the regression net for
+/// `89ee005b`.**
+///
+/// Architect `evt_2f0nnwtzqy65m`, which **withdrew** the earlier authorized
+/// population. The base checked plan must keep the singleton sequences it has
+/// today: the outer slot and its call name **only** the outer frame, and the
+/// inner slot names **only** the inner frame. The producer's membership is
+/// transported at the **composition splice that creates it**, never promised in
+/// advance by a base call template that describes a layer no uncomposed segment
+/// contains.
+///
+/// **This test exists because the opposite was built and measured.** `89ee005b`
+/// populated the outer slot with the rooted `ParentFrame` closure — statically
+/// true, and it made `ReHomed` refuse with
+/// *"does not carry its exact checked frame sequence: expected={0, 1}
+/// instantiated={0}"*. `ReHomed` reaches `instantiate_checked_invocation_segment`
+/// **unarmed**, with a one-layer segment, so a base template that promises the
+/// inner frame is promising a layer that is not there. That commit is preserved
+/// as negative evidence and is not a candidate.
+///
+/// ⇒ **`ParentFrame` proves static nesting only, never dynamic segment
+/// membership.** The two are different relations and this control is what keeps
+/// them apart, because the static one is *true* and therefore tempting.
+///
+/// **Both halves are asserted together and that is deliberate.** The population
+/// law alone would pass against a plan nobody consumes; the refusal alone would
+/// pass for any reason, including a compile that failed earlier. Together they
+/// say: the base sequences are singletons **and** the three roots still reach
+/// exactly the ordinary refusal that fact produces.
+///
+/// **Nothing here is keyed on a fixture constant.** The roles are derived from
+/// the plan's own control witnesses — root is `DistinguishedRoot`, producer is
+/// its `ParentFrame` child — so renumbering the fixture cannot make this pass by
+/// coincidence, and the test states the *law* rather than the fixture's current
+/// integers.
+///
+/// **Promise class: durable invariant.** The base uncomposed population is a
+/// singleton per slot for as long as membership is composition-time; the
+/// literals are `1` (a singleton's length) and the refusal sentence each root
+/// already produces. It does **not** go red when the atomic object arms — the
+/// composed path adds membership at the splice and leaves these base templates
+/// alone. A red here means base population crept back, which is the thing
+/// `89ee005b` demonstrated is unlawful.
+#[test]
+fn r3_the_base_uncomposed_slot_population_stays_singleton_and_rehomed_expects_no_inner_frame() {
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause, D2J_DECLARATION};
+
+    /// One cause through the production entry, unarmed and uncomposed.
+    fn compile_cause(cause: D2jCause, symbol: &str) -> Option<CraneliftBackendError> {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+            crate::cranelift_backend::artifact::new_object_module_for_lowering_tests("ken-r3-base")
+                .expect("object module"),
+            symbol,
+            cranelift_module::Linkage::Export,
+            &entry,
+            &crate::NativeSeedEnvironment::empty(),
+            declarations,
+            None,
+            false,
+            None,
+            None,
+            Some(oriented),
+        )
+        .err()
+    }
+
+    let mut rows = Vec::new();
+    for (cause, symbol) in [
+        (D2jCause::Exact, "ken_r3_base_exact"),
+        (D2jCause::ReHomed, "ken_r3_base_rehomed"),
+        (D2jCause::ProducerArity, "ken_r3_base_arity"),
+    ] {
+        let (_, _, oriented) = d2j_checked_fixture_under(cause);
+
+        // Roles by control witness, never by fixture constant.
+        let root = oriented
+            .frames
+            .iter()
+            .find(|frame| frame.control_witness == crate::OrientedControlWitnessV1::DistinguishedRoot)
+            .expect("the checked twin has a distinguished root frame");
+        let producer = oriented
+            .frames
+            .iter()
+            .find(|frame| {
+                frame.control_witness
+                    == crate::OrientedControlWitnessV1::ParentFrame(root.frame_id)
+            })
+            .expect("the checked twin has a producer frame parented to the root");
+
+        let outer_slot = oriented
+            .computational_ih_slots
+            .iter()
+            .find(|slot| slot.frame_template_id == root.frame_id)
+            .expect("the root frame has its own binder slot");
+        let inner_slot = oriented
+            .computational_ih_slots
+            .iter()
+            .find(|slot| slot.frame_template_id == producer.frame_id)
+            .expect("the producer frame has its own binder slot");
+        let call = match oriented.computational_ih_calls.as_slice() {
+            [only] => only.clone(),
+            other => panic!("the twin carries exactly one checked IH call: {}", other.len()),
+        };
+
+        rows.push((
+            cause,
+            outer_slot.frame_templates.clone(),
+            inner_slot.frame_templates.clone(),
+            call.callee_frame_templates.clone(),
+            compile_cause(cause, symbol),
+        ));
+    }
+
+    let observed: Vec<(D2jCause, Vec<u64>, Vec<u64>, Vec<u64>, bool)> = rows
+        .iter()
+        .map(|(cause, outer, inner, callee, error)| {
+            let ordinary = matches!(
+                error,
+                Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                    if *construct == "ComputationalMatch"
+                        && reason.contains("in-flight activation")
+            );
+            (*cause, outer.clone(), inner.clone(), callee.clone(), ordinary)
+        })
+        .collect();
+
+    let (root_id, producer_id) = {
+        let (_, _, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let root = oriented
+            .frames
+            .iter()
+            .find(|frame| frame.control_witness == crate::OrientedControlWitnessV1::DistinguishedRoot)
+            .expect("root frame")
+            .frame_id;
+        let producer = oriented
+            .frames
+            .iter()
+            .find(|frame| {
+                frame.control_witness == crate::OrientedControlWitnessV1::ParentFrame(root)
+            })
+            .expect("producer frame")
+            .frame_id;
+        (root, producer)
+    };
+
+    let expected: Vec<(D2jCause, Vec<u64>, Vec<u64>, Vec<u64>, bool)> = [
+        D2jCause::Exact,
+        D2jCause::ReHomed,
+        D2jCause::ProducerArity,
+    ]
+    .into_iter()
+    .map(|cause| {
+        (
+            cause,
+            vec![root_id],
+            vec![producer_id],
+            vec![root_id],
+            true,
+        )
+    })
+    .collect();
+
+    assert_eq!(
+        observed, expected,
+        "the BASE uncomposed plan must keep singleton sequences -- outer slot and its call naming \
+         only the root frame, inner slot naming only the producer frame -- and all three roots must \
+         still reach the ordinary in-flight-activation refusal. A callee sequence containing the \
+         producer frame here promises a layer no uncomposed segment carries: it is what made \
+         ReHomed refuse with \"does not carry its exact checked frame sequence\" at 89ee005b, which \
+         is preserved as negative evidence. Membership is transported at the composition splice \
+         that creates it; ParentFrame proves static nesting only, never dynamic segment membership. \
+         Rows are (cause, outer slot, inner slot, call callee, reached the ordinary refusal). \
+         errors={:?}",
+        rows.iter().map(|(cause, _, _, _, error)| (cause, error)).collect::<Vec<_>>()
+    );
+}
