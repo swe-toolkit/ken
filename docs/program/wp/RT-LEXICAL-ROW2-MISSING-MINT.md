@@ -336,20 +336,66 @@ three `D6` candidates rejected on the sibling node. Keep them separate.
   > two discharges are both banned by its own frame is a defective criterion.
   > **This one is the Steward's; it is replaced, not to be satisfied.**
 
-  **`AC-2` (replacement)** The row's producer-path assertion is re-cut
-  **lane-conditionally, with each side an exact enumerated set** — under
-  descent, the paths descent routes to; under functionization, the paths that
-  lane routes to. *Control:* the re-cut assertion is red if any enumerated path
-  is absent **and** red if an unenumerated path appears.
+  **`AC-2` (replacement) — the sets are MEASURED now, at `6a804eb7` (PR #1957,
+  CI green).** For row 2's occurrence, the row's producer-path assertion is
+  re-cut **lane-conditionally, each side an exact enumerated set**:
+
+  | lane | installed-and-consumed producer paths |
+  |---|---|
+  | descent (baseline) | exactly `{Composed, SourceMachine, SourceMachine}` |
+  | functionized (excluded) | exactly `{Composed}` |
+
+  *Control:* red if any enumerated path is absent **and** red if an unenumerated
+  path appears.
+
+  **`Mint`, `Install` and `DirectConsume` stay three separate observations.** A
+  seat can compute a route on a path whose eliminator never runs, so *an IH
+  exists* and *it was consumed* must not collapse into one predicate. The
+  measured cells are `(minted, installed, consumed)` triples, and the fourth —
+  functionized `SourceMachine` at `(false, false, false)` — is what proves the
+  join can answer `false` rather than being satisfied by any trace.
+
+  **State the identity bound in the AC, not only in the test.** No `Px8j` event
+  carries a `StaticOriginId`, so the tie to row 2's occurrence is **uniqueness
+  across traces**, not a same-event key. **Same static origin means same
+  occurrence, not same seat** — the carried elimination is the `Composed`
+  seat's. That is the easy misreading and it must stay named.
 
   **It stays absolute; it does not become existential.** Relaxing to *"some
   path mints"* would weaken the adjacent guard §2.3 protects —
   `RT-LEXICAL-RECURSOR-CONSUMERS` `AC-3` guard 5, *a missing recursive-IH
   authority still refuses*. A discriminator is not a substitute for the matrix.
 
-  **This AC is blocked on the successor measurement in `D1`'s closure block**
-  and cannot be written until it returns: which paths belong in the
-  functionized set is exactly what that measurement decides.
+  **UNBLOCKED — the successor measurement returned, and it fires the PRESENT
+  branch.** On the functionized lane the recursive IH for row 2's occurrence
+  **is** separately minted, installed and consumed, by the carried/`Composed`
+  route. **Row 2 is not a semantic regression.** The assertion is
+  **over-specified**: it pins *which producer path mints* where the invariant is
+  that a recursive occurrence gets an IH installed and consumed.
+
+  **What the measurement does NOT settle, and must not be read as settling.**
+  Whether the `SourceMachine` producer path is reachable on the functionized
+  lane by **any** occurrence. The object is occurrence-bounded by construction
+  and grants no producer-path conclusion; the one-fixture limit still binds,
+  because `recursive_computational_result_depth(2, ..)` builds only the
+  recursive occurrence. Baseline showing **two** `SourceMachine` lifecycles
+  against the excluded lane's **zero** is a hint consistent with
+  descent-specificity **and** equally consistent with this occurrence routing
+  elsewhere. A hint is not a measurement.
+
+  **Two Architect calls, and the first must not silently answer the second.**
+  (1) Is over-specification the right diagnosis, so the assertion is re-cut as
+  above? (2) Does row 2 leave `D3`'s six-row bar? The bar was retained by
+  `evt_2jnf3x8f06psz` on the ground that row 2's subject **survives** the
+  retirement. If the invariant is IH-installed-and-consumed rather than
+  path-identity, that ground reads differently — but (1) is a correction to an
+  assertion and (2) changes the **retirement acceptance surface**. Different
+  calls, and neither is the row's nor the Steward's.
+
+  > **Struck, retained for provenance:** *"This AC is blocked on the successor
+  > measurement in `D1`'s closure block and cannot be written until it returns:
+  > which paths belong in the functionized set is exactly what that measurement
+  > decides."*
 - **`AC-3`** No repair lands in the `#[cfg(test)]` trace machinery. *Control:*
   `git diff` on the candidate touches neither the `Px8jSourceTraceEvent`
   declaration, nor `px8j_record_source_event`, nor any `Mint` emission
