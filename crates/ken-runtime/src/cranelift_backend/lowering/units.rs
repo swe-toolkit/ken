@@ -3134,11 +3134,23 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         // the consuming call is `17`, its callee occurrence `16`, and the
         // producer body `37`. The callee reaches the body through an IH
         // BINDING, and `CheckedIhBinding` names a `frame_origin` and a recursive
-        // position -- not a body -- so that resolution is established at
-        // preflight and is not re-derivable at this seam: it needs
-        // `ih_bindings` and `SemanticIr::child_origin`, which is `pub(super)` to
-        // the planner. An earlier draft of this guard compared the two ids
-        // directly and refused every lawful region.
+        // position -- not a body. An earlier draft of this guard compared the
+        // two ids directly and refused every lawful region.
+        //
+        // ---- CORRECTION. An earlier revision of THIS comment said that
+        // ---- resolution "is established at preflight". That was FALSE.
+        //
+        // Architect, relayed at `evt_45xd3px862ejs`: preflight's
+        // `BinderAgreement` proves only marginal facts -- that the consuming
+        // callee is an IH at the admitted frame and recursive position, and that
+        // the result root equals the invocation callee entry. It does NOT prove
+        // that this exact callee/binder resolves to that producer body. Closing
+        // that relation is a planner-side obligation of this same held `D3`
+        // object and is owed; until it lands, nothing in this compile proves it.
+        //
+        // What lowering keeps is exactly the independent cross-check below, and
+        // it must NOT grow into a reconstruction of the binder relation here --
+        // a redundant lowering body authority is ruled out by the same message.
         if fusion.redirect_callee != fusion.producer_body {
             return Err(backend_module(
                 "a fused region's redirect names a producer entry other than the claim's producer \
