@@ -40,6 +40,61 @@
 
 > ### RESUME HERE — state at 2026-08-12 ~23:2xZ. **`main` = `689dabd7`.**
 >
+> > **THE STOP THIS NODE HAS BEEN ON SINCE `evt_2m62086x60c94` IS CLOSED.**
+> > `evt_11werhky391ds`: armed on both witnesses, **the `StaticWorkerBinding`
+> > refusal is GONE** — route C is no longer reached and `ground_value` is never
+> > handed the worker-bearing intermediate. Disarmed before commit.
+> >
+> > **NEW TIP `9177c6ce`, 11 commits, BASE `689dabd7`** — the implementer
+> > rebased and published the full old→new SHA mapping. **Verified: the rebase
+> > delta is FOUR FILES, all four mine from PR #2041, ZERO `crates/` delta** ⇒
+> > every region-scoped verdict in the thread **re-attaches** rather than
+> > needing to be re-earned. The path intersection was empty exactly as claimed.
+> >
+> > **THE FINDING, not a detail:** the disposition **must not key on the
+> > producer construct.** The claim names the fusion's producer (30/26) while
+> > the specialization it subsumes names the **generic continuation producer**
+> > (39/35) — matching on construct resolves **nothing** and would install,
+> > report success, and change nothing. The join is the **worker/body**
+> > relation. **Mutation proof:** keying on producer construct reds the control
+> > with *"a static continuation fusion subsumes no generated continuation
+> > specialization"* — the inert-install failure caught by a test instead of a
+> > fifth turn.
+> >
+> > **FOUR projections, not three** — `verify_emitted_continuation_calls` also
+> > required a declared `Function` per planned specialization, **found because
+> > the armed compile refused there, not by inspection.**
+> >
+> > **A JUDGEMENT THE IMPLEMENTER MADE AND FLAGGED — THIS NEEDS THE ARCHITECT
+> > AND MUST NOT GET BURIED.** The ruling says a **surviving** caller must make
+> > preflight refuse. The consumer's own unit still calls the subsumed
+> > specialization (cut-2 row 11), and the `Carried` the takeover forwards **is
+> > that call's result.** The implementer classified the region's **own** call
+> > as **not surviving** — it is the call the fusion exists to subsume — and
+> > excluded exactly it, so preflight installs and the refusal lands at
+> > emission. **Had it classified that call as surviving, preflight would refuse
+> > on both witnesses and the ruling's own discriminator 1 would be
+> > unreachable.** Both readings are defensible from the text, **they differ in
+> > observable behaviour**, and inverting is **three lines**.
+> >
+> > **NEW BOUNDARY, reported not repaired:** nothing yet replaces that call's
+> > emission with the fused result; the takeover intercepts at origin 10 **after**
+> > the call is emitted. Making the consumer not emit it is **emission routing**,
+> > outside the authorized disposition — so it stopped.
+> >
+> > **CONTROL GAP, stated in the test rather than left to be inferred: this
+> > witness CANNOT discriminate identity keying from body keying** — its two
+> > specializations have different worker bodies (34, 37), so a body-keyed
+> > filter stays green. The disposition is identity-keyed **because the ruling
+> > requires it, not because anything here proves it.** The same-body row needs
+> > a fixture **the D2j family does not contain.**
+> >
+> > **Validation:** `-p ken-runtime --lib` 910/0/4, re-run **after** the rebase.
+> >
+> > **STILL OWED:** the caller-side replacement; armed discriminators 1/3/5;
+> > discriminator 4's same-body fixture; selector nets 2/4; controls 2/3;
+> > inner-slot witness; self-edge closeout.
+>
 > > **PUBLISHED. `main` MOVED `d5912acd` → `689dabd7` (doc-only PR #2041) — the
 > > first merge in three hours.** It carried 14 commits of rulings,
 > > refutations and corrections that existed only on `steward/work` while the
