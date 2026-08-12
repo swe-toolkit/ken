@@ -1259,9 +1259,39 @@ transport-only shape.
 >    exact fixture.
 >
 > ⇒ **"Supply `Some(oriented)` for rows 4/5" is not a harness edit and not
-> merely a scope call — on the sibling fixture it was ruled impossible.** Every
-> route is closed: `None` yields nothing, non-empty rejects, empty carries no
-> coordinate, and marking them makes them different fixtures.
+> merely a scope call — on the sibling fixture it was ruled impossible.**
+>
+> > **PRECISION ON THE EMPTY-PLAN ARM — IT RETURNS `Ok`, AND SAYING OTHERWISE
+> > MANUFACTURES A FALSE OPENING.** Re-derived from the validator's own match
+> > at `planning.rs:822-845`, all five arms:
+> >
+> > | markers empty | plan | outcome |
+> > |---|---|---|
+> > | true | `None` | `Ok` — lawful seed IR |
+> > | false | `None` | Err — markers have no checked plan metadata |
+> > | true | `Some(empty)` | **`Ok`** |
+> > | true | `Some(non-empty)` | Err — checked plan has no Runtime frame markers |
+> > | false | `Some(_)` | falls through to full validation |
+> >
+> > ⇒ **`Some(empty_plan)` PASSES validation and clears BOTH `oriented: None`
+> > short-circuits.** The enumerator then really does run on rows 4/5's planner
+> > facts. **It still yields zero, one layer lower:** `build_checked_transport`
+> > on an empty plan produces an empty map, and `StaticContinuationFusionKey`'s
+> > contract is that a producer whose transport cannot be resolved from all
+> > three wrapper authorities is not a candidate and never reaches a key.
+> >
+> > **This is the FOURTH forced zero, and it is DERIVED, not measured** — from
+> > the validator, the transport builder and the key's contract; nobody ran it.
+> > **"Cannot reach the enumerator" and "reaches it and dead-ends at transport"
+> > look identical from outside and are different claims.** Recorded now because
+> > a later seat will otherwise notice the `Ok` arm, conclude the closure has a
+> > hole, and spend a cycle on a route that dead-ends one layer down.
+> >
+> > **Disposition unchanged: no candidate, no key, section 8 unaffected.**
+>
+> So the accurate closure is: `None` yields nothing; **`Some(empty)` is admitted
+> and resolves nothing**; `Some(non-empty)` rejects on unmarked IR; and marking
+> them changes the occurrence tree, so they are no longer the exact fixtures.
 >
 > **This is the correction to my own framing of the dependency.** I wrote that
 > the `None` belongs to the harness rather than the rows, which is true of the
