@@ -115,7 +115,7 @@ contract.
 ### surface/literals/invalid-escape-span-precedes-unterminated
 - spec: `31 §3` (`InvalidEscape` span and committed-escape precedence)
 - given: three incomplete ordinary literals: a String whose closing quote
-  arrives after `\u{41`, a String whose line boundary arrives immediately after
+  arrives after `\u{41`, a Char whose line boundary arrives immediately after
   a backslash, and a byte string whose input ends after `\x4`. Pair them with
   ordinary String, Char, and byte-string literals that end without a closing
   delimiter but have no pending escape production.
