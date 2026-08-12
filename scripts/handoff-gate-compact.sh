@@ -11,7 +11,8 @@ sequence to that agent's moot tmux session, then waits five minutes by default.
 
 Agent names may be passed as either "language-leader" or "moot-language-leader".
 The script fails before making changes if any named agent worktree or tmux
-session cannot be resolved.
+session cannot be resolved, or if any named worktree has uncommitted changes --
+the reset would destroy them and the preserved/ ref covers commits only.
 USAGE
 }
 
@@ -192,6 +193,38 @@ for raw_agent in "${agents[@]}"; do
   resolved_agents+=("$agent")
   resolved_worktrees+=("$worktree")
 done
+
+# SAFETY: refuse the whole run if any named worktree is dirty.
+#
+# `reset_agent` runs `git reset --hard`, which destroys uncommitted work. Its
+# `preserved/` ref covers COMMITS ONLY, so a seat holding uncommitted
+# instrumentation has nothing to recover from -- measured 2026-08-12, when this
+# script was run against a seat whose WP branch was checked out with live
+# throwaway instrumentation and overwrote three files mid-read.
+#
+# This is a precondition on a destructive action, not a judgment about the
+# work: the caller's own pre-check can be minutes stale, and a seat can switch
+# branches or start writing in between. Fail before touching anything, in the
+# same class as an unresolvable worktree or tmux session.
+#
+# It does NOT close the window completely -- a seat can dirty its tree in the
+# seconds between this check and the reset. It converts the common case (a seat
+# already working when the gate is called) from silent destruction into a
+# refusal.
+dirty_agents=()
+for i in "${!resolved_agents[@]}"; do
+  worktree="${resolved_worktrees[$i]}"
+  if [ -n "$(git -C "$worktree" status --porcelain 2>/dev/null)" ]; then
+    dirty_agents+=("${resolved_agents[$i]}")
+    printf 'error: %s has uncommitted changes in %s (branch %s):\n' \
+      "${resolved_agents[$i]}" "$worktree" \
+      "$(git -C "$worktree" rev-parse --abbrev-ref HEAD 2>/dev/null || printf '?')" >&2
+    git -C "$worktree" status --porcelain 2>/dev/null | sed 's/^/  /' >&2
+  fi
+done
+if [ "${#dirty_agents[@]}" -gt 0 ]; then
+  die "refusing to reset a dirty worktree: ${dirty_agents[*]} -- the seat is mid-work. Let it reach a clean stop, or have it commit, then re-run."
+fi
 
 git fetch origin >/dev/null
 git rev-parse --verify --quiet "$origin_main^{commit}" >/dev/null ||
