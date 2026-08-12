@@ -38,30 +38,48 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~14:4xZ. `main` = `dec2e0c7`.
+> ### RESUME HERE — state at 2026-08-12 ~15:2xZ. `main` = `34977ff9`.
 >
-> **`D2k-1c-2` is with the Architect and Runtime is correctly held on it.
-> Nothing is owed by me. Zero open PRs.**
+> **`AC-1` HAS BEEN REBOUND and Runtime is working again. Nothing is owed by
+> me. Zero open PRs.** Candidate `7a018ef6` is with Runtime QA.
 >
-> **RUNTIME — `RT-LEXICAL-RECURSOR-CONSUMERS-D2k`, sub-node `1c-2`.** Anchor
+> **RUNTIME — `RT-LEXICAL-RECURSOR-CONSUMERS-D2k`.** Anchor
 > `thr_49738q826cs1t`. The frame is the durable record and carries the full
-> text; read it, not this block. Two questions sit with the Architect
-> (`evt_65y6104g0s48w`): does the mechanism **require** an oriented plan for
-> this population — what was measured is the artifact's absence, not the
-> mechanism's fit — and is `evt_5ed8ee70cmrt`'s *"route repair, never a
-> criterion correction"*, which predates all of this, still binding on `AC-1`.
-> **Re-opening `AC-1` is the Architect's, not mine.** `D2k-1c-1a` is open and
+> text; read it, not this block. The Architect rebound `AC-1`
+> (`evt_290zp8kxn9jbs`, checkpoint 16532068), **superseding his own earlier
+> *"route repair, never a criterion correction"*** once measurement falsified its
+> premise: the five named witnesses cannot carry the repair's required input.
+> **Route work stops and the frame's section 8 fires.** The rebound criterion is
+> `AC-1a` (a checked positive resolving a real fusion) and `AC-1b` (the five
+> seeds preserved as absence comparators, zero credit). `D2k-1c-1a` is open and
 > unmeasured, and still needs the live recognize/rebind/consume arm.
 >
-> **The node's four forced zeros, all now recorded in the frame.** `installs==0`
+> **The candidate under review is `7a018ef6`, base `34977ff9`, `+203/-11`, one
+> Runtime test path, `904/0/4`.** Its cut is **two commits** — `2ad07ab9` is
+> `AC-1b` and `7a018ef6` is `AC-1a` — and the handback declared one. **Review
+> and verify it as `34977ff9...7a018ef6`:** anchored on `7a018ef6^`, `AC-1b`'s
+> test name occurs zero times, so it reads as absent rather than truncated.
+>
+> **Two obligations were split out to `RT-LEXICAL-R3-FUSION-EMITTER` as its own
+> `AC-9`/`AC-10`** (no new node): the semantic-effect half needs an **installed**
+> fusion, which that node owns; and neither hole route has a lawful checked
+> positive, because `D2jCause` has no hole axis at all — that axis is `px8j`
+> seed-only.
+>
+> **The node's FIVE forced zeros, all recorded in the frame.** `installs==0`
 > (branch never entered), `FUSIONS installed=0` (gate off, `D2F_EMITTER_ARMED:
 > false` — a labelled un-wired partial, **not** an absent chain), `keys=0`
 > (enumeration short-circuited on `oriented: None` before reading one planner
-> fact), and `Some(empty)` **admitted and resolving nothing** — measured
-> 2026-08-12 (`evt_6xywtcrdyq08s`), the only one of the four with a demonstrated
-> non-zero positive control. **All four read as "the population lacks the
-> property"; all four mean "the instrument never looked."** Any zero on this
-> node must state which it is and name the precondition that tells them apart.
+> fact), `Some(empty)` **admitted and resolving nothing** — measured 2026-08-12
+> (`evt_6xywtcrdyq08s`), the only one with a demonstrated non-zero positive
+> control — and **three `D2jCause` variants refused at the validator that never
+> reach the builder at all.** That fifth one was caught inside an acceptance
+> criterion: a uniform "must fail to resolve" would have credited three never-ran
+> zeros as evidence the mechanism discriminates. **All five read as "the
+> population lacks the property"; all five mean "the instrument never looked."**
+> Any zero on this node must state which it is and name the precondition that
+> tells them apart — and a never-arrived row is asserted **as non-arrival**,
+> never as a zero key.
 >
 > **The standing lesson this node produced, and it is three instances deep.**
 > `D2f` `AC-1`/`AC-2`, `D2k-1c-1`, and `D2k-1c-2` `AC-1` each pinned acceptance
@@ -89,7 +107,11 @@
 > is exempt but has zero nodes left, so do not manufacture doc work. **The
 > `integrator` roster line is a tombstone** — offline, absent from
 > `actors.json`, no pane. Its status is stale by construction, never a stall,
-> and its "PR #365 awaiting Steward routing" is not an open loop.
+> and its "PR #365 awaiting Steward routing" is not an open loop — **#365 merged
+> on 2026-07-08 as squash `3859aaff`.** Neither recorded head is an ancestor of
+> `main`, because a squash-merged head never is; that ancestry answer looks
+> identical for a merged PR and an abandoned one, which is how the claim survived
+> for weeks. **Ask the PR object for `merged`; never infer it from ancestry.**
 >
 > **Retirement order, all `ready` and framed:** `D2k` (active) →
 > `RT-LEXICAL-R3-FUSION-EMITTER` → `RT-RECURSOR-TRANSPORT` →
