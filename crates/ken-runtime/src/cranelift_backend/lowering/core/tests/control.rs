@@ -86,7 +86,8 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        fused_composition_extent: false,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -256,7 +257,8 @@ fn run_px8j_malformed_recursor_consumer(
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        fused_composition_extent: false,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -387,6 +389,7 @@ fn run_px8j_malformed_recursor_consumer(
             cursor,
             None,
             None,
+            SegmentComposition::Ordinary,
         ),
     };
     let active = ActiveContinuationFrame {
@@ -458,6 +461,7 @@ fn oriented_dynamic_sibling_fixture() -> (
         ContinuationCursorId(13),
         None,
         None,
+        SegmentComposition::Ordinary,
     );
     segment.dynamic_splice_edges = vec![DynamicSpliceEdgeId(71), DynamicSpliceEdgeId(72)];
     let edges = vec![
@@ -515,7 +519,6 @@ fn oriented_same_depth_siblings_require_exact_dynamic_edges() {
         ContinuationActivationId(14),
         segment,
         edges,
-        SegmentComposition::Ordinary,
     )
     .expect("exact child-to-parent edges keep same-depth siblings separate");
     assert_eq!(
@@ -542,7 +545,6 @@ fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
                 ContinuationActivationId(14),
                 segment,
                 edges,
-                SegmentComposition::Ordinary,
             ) {
                 Ok(_) => panic!("a malformed dynamic splice graph must reject before CFG"),
                 Err(error) => error,
@@ -1127,6 +1129,7 @@ fn run_px8j_source_machine_install(
         ContinuationCursorId(20),
         None,
         None,
+        SegmentComposition::Ordinary,
     );
     assert!(!recursor_invocation_is_checked(&invocation));
 
@@ -1209,7 +1212,6 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         deleted,
         Vec::new(),
-        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("deleting only an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1232,7 +1234,6 @@ fn oriented_open_control_obligations_are_affine_and_mint_exact() {
         ContinuationActivationId(8),
         duplicated,
         Vec::new(),
-        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("duplicating an inherited exit obligation must reject"),
         Err(error) => error,
@@ -1255,7 +1256,6 @@ fn oriented_endpoint_corruption_and_affine_reuse_fail_closed() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
-        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("endpoint corruption must reject before installation"),
         Err(error) => error,
@@ -1337,6 +1337,7 @@ fn oriented_five_control_invocation() -> RecursorInvocationSegment {
         ContinuationCursorId(7),
         None,
         None,
+        SegmentComposition::Ordinary,
     );
     for layer in &mut invocation.unwind.later_wrappers_in_construction_order[..2] {
         layer.checked_invocation_source = Some(InvocationTemplateRef::SameSccCall(999));
@@ -2222,7 +2223,6 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         replayed,
         Vec::new(),
-        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("an inherited open scope cannot replay its semantic transformer"),
         Err(error) => error,
@@ -2241,7 +2241,6 @@ fn oriented_phase_misclassification_recovers_endpoint_and_missing_semantic_rejec
         ContinuationActivationId(8),
         omitted,
         Vec::new(),
-        SegmentComposition::Ordinary,
     ) {
         Ok(_) => panic!("a pending selection cannot be omitted from semantic work"),
         Err(error) => error,
@@ -2276,6 +2275,7 @@ fn nested_computational_inner_missing_selects_exact_inner_default() {
     };
     let frames = [
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &inner_cases,
             default: &inner_default,
             env: &[],
@@ -2290,6 +2290,7 @@ fn nested_computational_inner_missing_selects_exact_inner_default() {
             answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
         },
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &outer_cases,
             default: &outer_default,
             env: &[],
@@ -2566,6 +2567,7 @@ fn oriented_test_invocation() -> RecursorInvocationSegment {
         ContinuationCursorId(7),
         None,
         None,
+        SegmentComposition::Ordinary,
     )
 }
 #[test]
@@ -3831,6 +3833,7 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
     };
     let frames = [
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &inner_cases,
             default: &inner_default,
             env: &[],
@@ -3845,6 +3848,7 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
             answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
         },
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &outer_cases,
             default: &outer_default,
             env: &[],
@@ -3917,7 +3921,8 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        fused_composition_extent: false,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -3995,7 +4000,6 @@ fn oriented_segment_keeps_semantic_and_control_axes_independent() {
         ContinuationActivationId(8),
         oriented_test_invocation(),
         Vec::new(),
-        SegmentComposition::Ordinary,
     )
     .unwrap();
     assert_eq!(
@@ -4039,7 +4043,6 @@ fn oriented_fresh_ih_semantics_retain_all_inherited_control_obligations() {
         ContinuationActivationId(8),
         oriented_five_control_invocation(),
         Vec::new(),
-        SegmentComposition::Ordinary,
     )
     .unwrap();
     assert_eq!(
@@ -9366,6 +9369,7 @@ fn rtfp_segment(
         ContinuationCursorId(7),
         None,
         None,
+        SegmentComposition::Ordinary,
     )
 }
 
@@ -9380,7 +9384,6 @@ fn rtfp_compose(
         ContinuationActivationId(8),
         segment,
         Vec::new(),
-        SegmentComposition::Ordinary,
     )
 }
 

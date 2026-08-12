@@ -3227,17 +3227,6 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     fusion.continuation_origin,
                     fusion.consumer_owner,
                 ));
-                // `RT-LEXICAL-R3-FUSION-EMITTER` `DP` — mark this body as the
-                // extent in which a checked segment is a COMPOSED one, for the
-                // same extent and with the same restore discipline as the
-                // switch above.
-                //
-                // This carries no membership. It selects which of the checked
-                // source's two authored sequences the segment is measured
-                // against; with `composed_frame_templates` empty the two are the
-                // same sequence and this is inert.
-                let enclosing_composition =
-                    std::mem::replace(&mut compiler.fused_composition_extent, true);
                 let lowered = fuse_producer_through_consumer_suffix(
                     compiler,
                     &mut builder,
@@ -3248,7 +3237,6 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     &captures,
                 );
                 compiler.fused_consumer_authority = enclosing_switch;
-                compiler.fused_composition_extent = enclosing_composition;
                 ambient.release(compiler);
                 lowered?
             };

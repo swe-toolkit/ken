@@ -2478,7 +2478,8 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         // region against the population its own install already narrowed.
         fusion_claims: Some(fusion_claims),
         fused_consumer_authority: None,
-        fused_composition_extent: false,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -3230,6 +3231,7 @@ impl<'a> Lowering<'a> {
             producer_env,
             &[EliminatorFrame::Computational(
                 ComputationalEliminatorFrame {
+                    splice_capability: None,
                     cases,
                     default,
                     env: eliminator_env,
@@ -3424,7 +3426,6 @@ impl<'a> Lowering<'a> {
                                         activation,
                                         invocation,
                                         dynamic_splice_edges,
-                                        self.segment_composition(),
                                     )?;
                                     let frames = installed_oriented_eliminator_frames(&installed);
                                     let mut composed = Vec::with_capacity(frames.len() + 2);
@@ -3667,7 +3668,6 @@ impl<'a> Lowering<'a> {
                             activation,
                             invocation,
                             dynamic_splice_edges,
-                            self.segment_composition(),
                         )?;
                         let mut composed = installed_oriented_eliminator_frames(&installed);
                         composed.push(EliminatorFrame::InvocationReturn);
@@ -4086,6 +4086,7 @@ impl<'a> Lowering<'a> {
                                 crate::cranelift_backend::lowering::D8mBridgeArm::Computational,
                             );
                             EliminatorFrame::Computational(ComputationalEliminatorFrame {
+                                splice_capability: None,
                                 cases,
                                 default,
                                 env: &[],
@@ -4166,6 +4167,7 @@ impl<'a> Lowering<'a> {
                                 checked
                             };
                             EliminatorFrame::Computational(ComputationalEliminatorFrame {
+                                splice_capability: None,
                                 cases,
                                 default,
                                 env: &[],
@@ -4702,6 +4704,7 @@ impl<'a> Lowering<'a> {
                 let checked = self.checked_computational_frame(inner_cases, inner_default)?;
                 composed.push(EliminatorFrame::Computational(
                     ComputationalEliminatorFrame {
+                        splice_capability: None,
                         cases: inner_cases,
                         default: inner_default,
                         env: producer_env,
@@ -4984,7 +4987,23 @@ impl<'a> Lowering<'a> {
         // marker active and is refused rather than silently emitting.
         self.enter_checked_subcontinuation_frame(checked_frame_id)?;
         let checked = self.checked_computational_frame(cases, default)?;
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ISSUE THE AFFINE SPLICE
+        // ---- CAPABILITY, here and nowhere else.
+        //
+        // This is the checked fusion-composition splice: the claim's own frame
+        // identity has just been re-entered above, and the edge built below is
+        // the pending semantic edge that identity travels on. The capability is
+        // bound to THAT edge, so the segment which consumes the edge is the
+        // segment the checked plan's composed sequence applies to.
+        //
+        // **It is not an ambient flag and not a counter.** Every other edge in
+        // this same fused body carries `None`, gets `Ordinary`, and is measured
+        // against the ordinary sequence — including the second `[outer]` segment
+        // this body builds, which is the case the previous body-scoped selector
+        // got wrong (Architect `evt_4g2hmsr8tb3bm`).
+        let splice_capability = self.issue_splice_capability();
         let frame = ComputationalEliminatorFrame {
+            splice_capability: Some(splice_capability),
             cases,
             default,
             env: captures,
@@ -4998,12 +5017,39 @@ impl<'a> Lowering<'a> {
             checked_invocation_depth: checked.invocation_depth,
             answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
         };
-        self.lower_computational_producer_expr(
+        let lowered = self.lower_computational_producer_expr(
             builder,
             producer,
             parameters,
             &[EliminatorFrame::Computational(frame)],
-        )
+        );
+        // ---- `D3` — CLOSE THE CAPABILITY'S SCOPE, on success AND on error.
+        //
+        // Three outcomes, and only one of them is the splice doing its job:
+        //
+        //   - spent, and the descent succeeded: the edge joined a segment and
+        //     that segment holds the receipt. Nothing to do.
+        //   - still outstanding: the splice issued a capability no segment
+        //     consumed, so the composed sequence the plan authored describes a
+        //     construction that never happened. Refused, not swept up — an
+        //     ESCAPED capability is exactly the state that would let a later,
+        //     unrelated edge be measured as composed if the id ever leaked.
+        //   - the descent failed: the capability is withdrawn so it cannot
+        //     outlive its splice, and the original error is what propagates.
+        //     Withdrawal is not consumption and mints no receipt.
+        let outstanding = self
+            .outstanding_splice_capabilities
+            .remove(&splice_capability);
+        match (lowered, outstanding) {
+            (Ok(lowered), false) => Ok(lowered),
+            (Ok(_), true) => Err(unsupported(
+                "StaticContinuationFusion",
+                "a fusion-composition splice issued a capability that no dynamic invocation \
+                 segment consumed, so the checked composed sequence describes a construction this \
+                 body never built",
+            )),
+            (Err(error), _) => Err(error),
+        }
     }
 
     fn lower_computational_match_value_composed(
@@ -5545,6 +5591,7 @@ impl<'a> Lowering<'a> {
                         splice_caller,
                         None,
                         None,
+                        eliminator.splice_capability,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
@@ -6147,6 +6194,7 @@ impl<'a> Lowering<'a> {
                         deferred.splice_caller,
                         None,
                         None,
+                        frame.splice_capability,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(
@@ -7517,6 +7565,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             if let LoweringOperand::Carried(word) = &value {
                                 let word = *word;
                                 let frame = ComputationalEliminatorFrame {
+                                    splice_capability: None,
                                     cases: &cases,
                                     default: &default,
                                     env: &env,
@@ -7725,6 +7774,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 }
                             }
                             let frame = ComputationalEliminatorFrame {
+                                splice_capability: None,
                                 cases: &cases,
                                 default: &default,
                                 env: &env,
@@ -7811,6 +7861,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             control.selected_lineage.as_slice(),
                                         )),
                                         None,
+                                        frame.splice_capability,
                                     )?;
                                     #[cfg(test)]
                                     px8j_record_recursor_carrier(
@@ -14649,6 +14700,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         splice_caller,
                         None,
                         self.recursive_position_unit_body(eliminator.static_origin, position)?,
+                        eliminator.splice_capability,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
@@ -16100,7 +16152,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                             activation,
                             invocation,
                             dynamic_splice_edges,
-                            self.segment_composition(),
                         )?;
                         let mut frames = installed_oriented_eliminator_frames(&installed);
                         frames.push(EliminatorFrame::InvocationReturn);

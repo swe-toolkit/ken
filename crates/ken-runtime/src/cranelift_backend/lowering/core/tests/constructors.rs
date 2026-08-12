@@ -215,7 +215,8 @@ fn run_dynamic_constructor_dispatch_fixture(
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        fused_composition_extent: false,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -1931,7 +1932,8 @@ fn bare_carrier_test_lowering<'src>(
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        fused_composition_extent: false,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -4271,6 +4273,7 @@ fn ac_c4_recursor_capsule(residual: LoweringOperand) -> Lowered {
             cursor,
             None,
             None,
+            SegmentComposition::Ordinary,
         ),
     }
 }
