@@ -2839,6 +2839,104 @@ pub(crate) enum NativeIntLoweringMutation {
     SuppressTerminalExport,
     CorruptTerminalExport,
 }
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i0` — one field of a specialized
+/// [`Lowered::Constructor`] template.**
+///
+/// A specialized constructor is a **compiler template, not necessarily a
+/// materialized runtime aggregate**. Its fields used to be `Vec<Lowered>`,
+/// which baked in the assumption that every statically eliminated field is an
+/// ordinary value. The five `#6d` walls measured by `D2k-0` are exactly the
+/// population that assumption excludes: a lexical static worker reaching a
+/// constructor argument, which is a value-producing position **by
+/// construction** and therefore refuses at
+/// [`LoweringEnvironmentBinding::value_at`].
+///
+/// This sum is the closed compiler-only distinction the Architect ruled
+/// (`evt_4krvq67427n5z`): **an ordinary specialized field versus a static-worker
+/// field**, and nothing wider. It is narrower than [`LoweringOperand`] on
+/// purpose — a `LoweringEnvironmentBinding`-as-payload arm would admit
+/// `Carried` values into a template and widen the contract past the measured
+/// need, which the ruling forbids.
+///
+/// **There is deliberately no wildcard or default conversion.** A future
+/// third arm must be a compile error at every field reader, exactly as
+/// `value_at`'s own exhaustive match is an asset rather than an obstacle.
+#[derive(Clone)]
+enum ConstructorField {
+    /// An ordinary specialized field: a value this constructor materializes.
+    /// Every field the lowering engines build today is this arm.
+    Specialized(Lowered),
+    /// A statically-bound worker transported through the constructor template
+    /// without becoming a value.
+    ///
+    /// **NOTHING CONSTRUCTS THIS ARM AT `D2k-1b-i0`, and the resulting
+    /// `never constructed` warning is the open checkpoint staying visible** —
+    /// the same convention [`StaticWorkerBinding::route`] states for itself.
+    /// Silencing it with an `#[allow(dead_code)]` would hide the one fact that
+    /// distinguishes this increment from the armed one: `D2k-1b-i` supplies the
+    /// producer, and until it does, this arm is unreachable by construction.
+    ///
+    /// **The field readers' arms below are TYPE COMPLETENESS, NOT the
+    /// boundary.** They are local refusals reached *during* descent, and the
+    /// ruling requires a **whole-graph** refusal *before the first allocation
+    /// or emitted transfer*. `D2k-1b-i` owes that boundary and it is not
+    /// present here; nine green arms are not a preflight.
+    StaticWorker(StaticWorkerBinding),
+}
+
+impl ConstructorField {
+    /// The ordinary field a producer builds. Every construction site in the
+    /// tree goes through this arm at `D2k-1b-i0`.
+    fn specialized(value: Lowered) -> Self {
+        ConstructorField::Specialized(value)
+    }
+
+    /// The refusal a field reader raises when it reaches a static-worker field
+    /// in a position that requires a value.
+    ///
+    /// **This is a shared REFUSAL TEXT, not a shared decision.** Each reader
+    /// still decides what its own worker case does and supplies its own `edge`;
+    /// this only spares one sentence from being copied at every site. A reader
+    /// that should do something other than refuse must not call it.
+    fn static_worker_refusal(edge: &str) -> CraneliftBackendError {
+        unsupported(
+            "StaticWorkerBinding",
+            format!(
+                "{edge} requires an ordinary specialized constructor field, and this field \
+                 transports a static worker binding, which has no value representation"
+            ),
+        )
+    }
+
+    /// The ordinary field behind this kind, or a refusal naming the reader.
+    ///
+    /// **`edge` is the reader's own, exactly as it is for
+    /// [`LoweringEnvironmentBinding::value_at`].** That is what makes a refusal
+    /// identify *which* field read was taken rather than merely reporting that
+    /// one was — the property section 2 of the frame records as an asset of the
+    /// existing chokepoint. Passing a generic edge here throws that away.
+    ///
+    /// **The match is exhaustive with no wildcard**, so a future third field
+    /// kind is a compile error at this accessor rather than a silent escape
+    /// through it.
+    fn specialized_at(&self, edge: &str) -> Result<&Lowered, CraneliftBackendError> {
+        match self {
+            ConstructorField::Specialized(value) => Ok(value),
+            ConstructorField::StaticWorker(_) => Err(Self::static_worker_refusal(edge)),
+        }
+    }
+
+    /// The owned ordinary field behind this kind, or a refusal naming the
+    /// reader. The by-value twin of [`ConstructorField::specialized_at`], for
+    /// readers that consume the template rather than borrow it.
+    fn into_specialized_at(self, edge: &str) -> Result<Lowered, CraneliftBackendError> {
+        match self {
+            ConstructorField::Specialized(value) => Ok(value),
+            ConstructorField::StaticWorker(_) => Err(Self::static_worker_refusal(edge)),
+        }
+    }
+}
+
 #[derive(Clone)]
 enum Lowered {
     Int {
@@ -2915,7 +3013,10 @@ enum Lowered {
         /// `PersistentGround` would reinstate the unproven persistent lane for
         /// precisely the producers the population still misses.
         occurrence: Option<AggregateOccurrenceId>,
-        args: Vec<Lowered>,
+        /// **`D2k-1b-i0` — the fields are a closed compiler-only kind, not bare
+        /// [`Lowered`].** See [`ConstructorField`] for why the old
+        /// `Vec<Lowered>` was the assumption the five `#6d` walls violate.
+        args: Vec<ConstructorField>,
     },
     Record {
         /// **`RT-DECL-CLOSURE-PORT` `D7` — the planner-issued aggregate
@@ -3703,6 +3804,69 @@ fn specialized_operands_at(
         .collect()
 }
 
+/// [`specialized_operands_at`] for the arguments of a **constructor template**,
+/// producing that template's closed [`ConstructorField`] kinds.
+///
+/// **`D2k-1b-i0`: every operand becomes [`ConstructorField::Specialized`], with
+/// no exception.** This is the whole of the behaviour-preserving claim on the
+/// producer side — a static worker reaching a constructor argument has already
+/// refused upstream at [`LoweringEnvironmentBinding::value_at`], so no operand
+/// arriving here can be one.
+///
+/// **This is the seam `D2k-1b-i` arms, and it is deliberately one function.**
+/// That increment makes `Construct` recognize a static-worker binding *before*
+/// `value_at` and produce [`ConstructorField::StaticWorker`] here. Until then
+/// the uniform mapping is the honest statement of what the compiler does, not a
+/// placeholder: nothing upstream can hand this function a worker.
+fn specialized_constructor_fields_at(
+    operands: &[LoweringOperand],
+    edge: &'static str,
+) -> Result<Vec<ConstructorField>, CraneliftBackendError> {
+    Ok(specialized_operands_at(operands, edge)?
+        .into_iter()
+        .map(ConstructorField::specialized)
+        .collect())
+}
+
+/// The ordinary values behind a constructor template's fields, or a refusal
+/// naming the reader.
+///
+/// **The read direction of [`specialized_constructor_fields_at`]**, for the
+/// static `Match` elimination sites that install a constructor's fields into
+/// the one lexical binding authority.
+///
+/// **This is a per-reader refusal, and it is NOT the boundary.** It is reached
+/// *during* descent, which is exactly the *"descends partway and then refuses"*
+/// shape the ruling forbids as a substitute for whole-graph preflight.
+/// `D2k-1b-i` owes that preflight ahead of every site that calls this.
+///
+/// **`D2k-1b-ii` replaces callers of this, it does not extend it.** That
+/// increment installs each field into the binding authority *without erasing
+/// its kind* — ordinary becomes `Value(Specialized(..))` and worker becomes the
+/// same `StaticWorker` — so a site that must preserve the worker stops
+/// converting to [`Lowered`] at all rather than converting it more cleverly.
+fn specialized_fields_at(
+    fields: &[ConstructorField],
+    edge: &'static str,
+) -> Result<Vec<Lowered>, CraneliftBackendError> {
+    fields
+        .iter()
+        .map(|field| field.specialized_at(edge).cloned())
+        .collect()
+}
+
+/// [`specialized_fields_at`] without the clone, for readers that only borrow
+/// the fields — a preflight walk, a shape comparison, a tag read.
+fn specialized_field_refs_at<'a>(
+    fields: &'a [ConstructorField],
+    edge: &'static str,
+) -> Result<Vec<&'a Lowered>, CraneliftBackendError> {
+    fields
+        .iter()
+        .map(|field| field.specialized_at(edge))
+        .collect()
+}
+
 /// [`specialized_operands_at`] for a **lexical environment** rather than a bare
 /// operand list.
 ///
@@ -4380,7 +4544,15 @@ fn d9_collect(
         }
         Lowered::Constructor { args, .. } => {
             for arg in args {
-                d9_collect(arg, words, origins);
+                match arg {
+                    ConstructorField::Specialized(value) => d9_collect(value, words, origins),
+                    // A worker field contributes no runtime word and no
+                    // aggregate origin — that is precisely what "no value
+                    // representation" means. This walk is an infallible
+                    // observation, so it records the absence by contributing
+                    // nothing rather than by refusing.
+                    ConstructorField::StaticWorker(_) => {}
+                }
             }
         }
         Lowered::Record { fields, .. } => {
@@ -5180,14 +5352,15 @@ impl<'a> Lowering<'a> {
         match value {
             // ── the two source aggregates: reconciled AT THIS NODE ────────
             Lowered::Constructor { args, .. } => {
-                let children: Vec<&Lowered> = args.iter().collect();
+                let children =
+                    specialized_field_refs_at(args, "a constructor field crossing the boundary")?;
                 self.reconcile_source_aggregate(
                     value,
                     PlannedAggregateShape::Constructor,
                     &children,
                     None,
                 )?;
-                for arg in args {
+                for arg in &children {
                     self.source_aggregate_preflight(arg)?;
                 }
                 Ok(())
@@ -7395,16 +7568,26 @@ impl<'a> Lowering<'a> {
                         })?,
                 }
                 .tag_abi_word()?;
+                // The fields are read BEFORE the allocation, deliberately. This
+                // arm materializes the constructor, so a field read placed
+                // inside the store loop below would refuse only after
+                // `emit_checked_aggregate_alloc` had already run — the
+                // *"descends partway and then refuses"* shape the ruling
+                // forbids. This is local ordering, not the whole-graph
+                // boundary: `source_aggregate_preflight` already walks the
+                // spine ahead of this, and `D2k-1b-i` owes the refusal there.
+                let arguments =
+                    specialized_field_refs_at(args, "a constructor field being materialized")?;
                 let word = self.emit_checked_aggregate_alloc(
                     builder,
                     GovernedAllocationSite::SourceConstructor,
                     occurrence,
                     PlannedAggregateShape::Constructor,
                     class,
-                    args.len(),
+                    arguments.len(),
                 )?;
                 self.emit_carrier_store_tag_id(builder, word, identity)?;
-                for (position, argument) in args.iter().enumerate() {
+                for (position, argument) in arguments.into_iter().enumerate() {
                     let child = self.emit_carrier_transfer(builder, origin, argument)?;
                     self.emit_carrier_store_field(builder, word, position, child)?;
                 }
@@ -10186,7 +10369,9 @@ impl Lowered {
 
             // ── recursive carriers: recurse into EVERY child position ─────
             Lowered::Constructor { args, .. } => {
-                for arg in args {
+                for arg in
+                    specialized_field_refs_at(args, "a constructor field crossing the boundary")?
+                {
                     arg.boundary_transfer_admissibility()?;
                 }
                 Ok(())
@@ -11949,7 +12134,11 @@ impl<'a> Lowering<'a> {
                 constructor,
                 synthesized_identity: Some(self.synthesized_fixed_identity(role)?),
                 occurrence: None,
-                args: args.into_iter().map(SynthesizedArgument::into_lowered).collect(),
+                args: args
+                    .into_iter()
+                    .map(SynthesizedArgument::into_lowered)
+                    .map(ConstructorField::specialized)
+                    .collect(),
             });
         };
         // ⛔ **`?`, never `.ok()`.** With a live emission owner, every
@@ -11999,7 +12188,11 @@ impl<'a> Lowering<'a> {
             occurrence,
             // The provenance has done its work; what the template holds is the
             // ordinary child, so nothing downstream sees a second carrier.
-            args: args.into_iter().map(SynthesizedArgument::into_lowered).collect(),
+            args: args
+                    .into_iter()
+                    .map(SynthesizedArgument::into_lowered)
+                    .map(ConstructorField::specialized)
+                    .collect(),
         })
     }
 
@@ -12668,7 +12861,11 @@ fn resource_open_mode_tag(value: &Lowered) -> Option<i64> {
     } else if constructor.ends_with("::ResourceMetadata") && args.is_empty() {
         Some(1)
     } else if constructor.ends_with("::ResourceWriteCreate") && args.len() == 1 {
-        create_policy_tag(&args[0]).map(|tag| tag + 2)
+        // A worker field means this is not a recognized open mode. `None` is
+        // the conservative answer for an `Option`-returning classifier: the
+        // caller treats it as unrecognized rather than as a known tag.
+        create_policy_tag(args[0].specialized_at("a resource open mode field").ok()?)
+            .map(|tag| tag + 2)
     } else {
         None
     }
@@ -12686,14 +12883,18 @@ fn lowered_char_list(value: &Lowered) -> Option<Vec<u8>> {
     if !constructor.ends_with("::Cons") || args.len() != 2 {
         return None;
     }
+    // A worker in either field means this is not a statically known char list.
+    // `None` is the conservative answer here for the same reason as in
+    // `resource_open_mode_tag`: the caller falls back to the general path
+    // rather than acting on a decoded literal.
     let Lowered::Int {
         known: Some(head), ..
-    } = &args[0]
+    } = args[0].specialized_at("a char list head field").ok()?
     else {
         return None;
     };
     let head = u8::try_from(*head).ok()?;
-    let mut tail = lowered_char_list(&args[1])?;
+    let mut tail = lowered_char_list(args[1].specialized_at("a char list tail field").ok()?)?;
     tail.insert(0, head);
     Some(tail)
 }
@@ -16296,9 +16497,26 @@ impl<'a> Lowering<'a> {
                 Lowered::Constructor {
                     constructor,
                     mut args,
-                    ..
+                    synthesized_identity,
+                    occurrence,
                 } if constructor.ends_with("::ITree::Ret") && args.len() == 1 => {
-                    lowered = args.remove(0);
+                    match args.remove(0) {
+                        ConstructorField::Specialized(inner) => lowered = inner,
+                        // This function is infallible, so the conservative move
+                        // is to NOT see through the wrapper: hand the
+                        // constructor back intact and let the ordinary
+                        // value-producing consumers refuse it. Unwrapping to
+                        // the worker would hand a caller expecting a value
+                        // something with no value representation.
+                        field @ ConstructorField::StaticWorker(_) => {
+                            return Lowered::Constructor {
+                                constructor,
+                                synthesized_identity,
+                                occurrence,
+                                args: vec![field],
+                            };
+                        }
+                    }
                 }
                 lowered => return lowered,
             }
@@ -17542,7 +17760,10 @@ impl<'a> Lowering<'a> {
                 static_origin,
                 PlannedAggregateShape::Constructor,
             )?),
-            args: lowered_args,
+            args: lowered_args
+                .into_iter()
+                .map(ConstructorField::specialized)
+                .collect(),
         })
     }
 
@@ -18503,7 +18724,10 @@ impl<'a> Lowering<'a> {
                 occurrence: None,
                 args: args
                     .iter()
-                    .map(|arg| self.lower_value(builder, arg))
+                    .map(|arg| {
+                        self.lower_value(builder, arg)
+                            .map(ConstructorField::specialized)
+                    })
                     .collect::<Result<Vec<_>, _>>()?,
             }),
             // ⚠ A VALUE-domain record has no occurrence in the program, so it
@@ -18638,7 +18862,10 @@ impl<'a> Lowering<'a> {
                 occurrence: None,
                 args: args
                     .iter()
-                    .map(|arg| self.lower_ground_value(builder, arg))
+                    .map(|arg| {
+                        self.lower_ground_value(builder, arg)
+                            .map(ConstructorField::specialized)
+                    })
                     .collect::<Result<Vec<_>, _>>()?,
             }),
             // ⚠ Likewise a ground-value record: no occurrence, stated.
@@ -19152,10 +19379,10 @@ impl<'a> Lowering<'a> {
                 constructor: some.clone(),
                 synthesized_identity: None,
                 occurrence: None,
-                args: vec![Lowered::Int {
+                args: vec![ConstructorField::specialized(Lowered::Int {
                     value: builder.ins().iconst(types::I64, i64::from(byte)),
                     known: Some(i64::from(byte)),
-                }],
+                })],
             },
             None => Lowered::Constructor {
                 constructor: none.clone(),
@@ -19212,7 +19439,7 @@ impl<'a> Lowering<'a> {
                 constructor: some.clone(),
                 synthesized_identity: None,
                 occurrence: None,
-                args: vec![Lowered::Bytes(bytes)],
+                args: vec![ConstructorField::specialized(Lowered::Bytes(bytes))],
             },
             None => Lowered::Constructor {
                 constructor: none.clone(),
@@ -19279,18 +19506,18 @@ impl<'a> Lowering<'a> {
                 constructor: ok.clone(),
                 synthesized_identity: None,
                 occurrence: None,
-                args: vec![Lowered::String(value)],
+                args: vec![ConstructorField::specialized(Lowered::String(value))],
             },
             Err(_) => Lowered::Constructor {
                 constructor: err.clone(),
                 synthesized_identity: None,
                 occurrence: None,
-                args: vec![Lowered::Constructor {
+                args: vec![ConstructorField::specialized(Lowered::Constructor {
                     constructor: error.clone(),
                     synthesized_identity: None,
                     occurrence: None,
                     args: Vec::new(),
-                }],
+                })],
             },
         })
     }
@@ -19427,6 +19654,13 @@ impl<'a> Lowering<'a> {
         if constructor != self.process_symbols.exit_failure {
             return builder.ins().iconst(types::I64, -2);
         }
+        // A worker field joins the malformed-payload sentinel rather than
+        // getting its own: this decoder answers with a status word and has no
+        // way to refuse, so the conservative move is the value that already
+        // means "this is not a decodable exit status".
+        let Ok(args) = specialized_fields_at(&args, "an exit status payload field") else {
+            return builder.ins().iconst(types::I64, -3);
+        };
         let Ok([payload]) = <Vec<Lowered> as TryInto<[Lowered; 1]>>::try_into(args) else {
             return builder.ins().iconst(types::I64, -3);
         };
@@ -19541,7 +19775,13 @@ impl<'a> Lowering<'a> {
                 constructor,
                 args: args
                     .into_iter()
-                    .map(|arg| self.ground_value(arg))
+                    .map(|arg| {
+                        self.ground_value(
+                            arg.into_specialized_at(
+                                "a constructor field escaping to a ground value",
+                            )?,
+                        )
+                    })
                     .collect::<Result<Vec<_>, _>>()?,
             }),
             Lowered::Record { fields, .. } => Ok(RuntimeGroundValue::Record {
@@ -19576,6 +19816,36 @@ impl<'a> Lowering<'a> {
         token
     }
 }
+/// [`same_recursive_argument_shapes`] over a constructor template's fields.
+///
+/// **A static-worker field is conservatively NOT the same shape as anything,
+/// including another worker field.** This predicate gates recursive
+/// loop-parameter reuse, and answering `true` would let two templates share a
+/// parameter run that has no representation for the worker at all. What
+/// worker-to-worker equality should mean is `D2k-1b-ii`'s question, once a
+/// worker can actually appear here; `false` is the answer that cannot be wrong
+/// while nothing constructs one.
+///
+/// **Both arms name both kinds — there is no wildcard**, so a third field kind
+/// is a compile error here rather than silently falling into `false`.
+fn same_recursive_field_shapes(left: &[ConstructorField], right: &[ConstructorField]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| match (left, right) {
+                (ConstructorField::Specialized(left), ConstructorField::Specialized(right)) => {
+                    same_recursive_argument_shapes(
+                        std::slice::from_ref(left),
+                        std::slice::from_ref(right),
+                    )
+                }
+                (ConstructorField::StaticWorker(_), ConstructorField::Specialized(_))
+                | (ConstructorField::Specialized(_), ConstructorField::StaticWorker(_))
+                | (ConstructorField::StaticWorker(_), ConstructorField::StaticWorker(_)) => false,
+            })
+}
+
 fn same_recursive_argument_shapes(left: &[Lowered], right: &[Lowered]) -> bool {
     left.len() == right.len()
         && left
@@ -19608,7 +19878,7 @@ fn same_recursive_argument_shapes(left: &[Lowered], right: &[Lowered]) -> bool {
                     },
                 ) => {
                     left_constructor == right_constructor
-                        && same_recursive_argument_shapes(left_args, right_args)
+                        && same_recursive_field_shapes(left_args, right_args)
                 }
                 (
                     Lowered::Record { fields: left, .. },
@@ -19703,7 +19973,12 @@ fn append_recursive_argument_values(
             Lowered::BorrowedNativeValue { pointer } => output.push(*pointer),
             Lowered::Bytes(_) | Lowered::String(_) => {}
             Lowered::Constructor { args, .. } => {
-                append_recursive_argument_values(builder, args, output, native_int_tags)?;
+                append_recursive_argument_values(
+                    builder,
+                    &specialized_fields_at(args, "a recursive loop constructor field")?,
+                    output,
+                    native_int_tags,
+                )?;
             }
             Lowered::Record { fields, .. } => {
                 for field in fields {
@@ -19797,8 +20072,14 @@ fn rebuild_recursive_argument(
             occurrence: *occurrence,
             args: args
                 .iter()
-                .map(|arg| rebuild_recursive_argument(arg, values, native_int_tags))
-                .collect::<Result<Vec<_>, _>>()?,
+                .map(|arg| {
+                    Ok(ConstructorField::specialized(rebuild_recursive_argument(
+                        arg.specialized_at("a recursive loop constructor field")?,
+                        values,
+                        native_int_tags,
+                    )?))
+                })
+                .collect::<Result<Vec<_>, CraneliftBackendError>>()?,
         },
         Lowered::Record { occurrence, fields } => Lowered::Record {
             // ⭐ The producer travels with the rebuilt template. Dropping it

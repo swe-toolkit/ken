@@ -3799,7 +3799,10 @@ impl<'a> Lowering<'a> {
                             static_origin,
                             PlannedAggregateShape::Constructor,
                         )?),
-                        args: specialized_operands_at(&lowered_args, "a constructor argument")?,
+                        args: specialized_constructor_fields_at(
+                            &lowered_args,
+                            "a constructor argument",
+                        )?,
                     }));
                 }
                 // `D3` retains the selected computational case facts: the
@@ -4328,7 +4331,10 @@ impl<'a> Lowering<'a> {
                             static_origin,
                             PlannedAggregateShape::Constructor,
                         )?),
-                        args: specialized_operands_at(&lowered_args, "a constructor argument")?,
+                        args: specialized_constructor_fields_at(
+                            &lowered_args,
+                            "a constructor argument",
+                        )?,
                     })
                 };
                 // `D6a` upstream half -- ordinary evaluation STARTS direct and
@@ -4584,7 +4590,10 @@ impl<'a> Lowering<'a> {
                         "tree-producing match constructor arity changed",
                     ));
                 }
-                let case_env = env_with(args, producer_env);
+                let case_env = env_with(
+                    specialized_fields_at(&args, "a tree-producing match case binder")?,
+                    producer_env,
+                );
                 let body =
                     self.case_body_occurrence(static_origin, case_index, &producer_case.body)?;
                 self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
@@ -5357,7 +5366,13 @@ impl<'a> Lowering<'a> {
                         // ⭐ `AC-C4` clause 1 — the SPECIALIZED caller wraps
                         // explicitly, so the phase is stated at the call site
                         // rather than inferred by the callee.
-                        LoweringOperand::Specialized(args[position].clone()),
+                        LoweringOperand::Specialized(
+                            args[position]
+                                .specialized_at(
+                                    "a computational recursor's selected recursive argument",
+                                )?
+                                .clone(),
+                        ),
                         eliminator.cases.to_vec(),
                         eliminator.default.clone(),
                         eliminator.env.to_vec(),
@@ -5384,7 +5399,10 @@ impl<'a> Lowering<'a> {
                 #[cfg(test)]
                 d2e_record_binder_assembly(case, &induction_hypotheses);
                 let mut case_env = induction_hypotheses;
-                extend_specialized(&mut case_env, args);
+                extend_specialized(
+                    &mut case_env,
+                    specialized_fields_at(&args, "a computational match case binder")?,
+                );
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Computational(eliminator),
@@ -5435,7 +5453,10 @@ impl<'a> Lowering<'a> {
                         ),
                     ));
                 }
-                let mut case_env = env_with(args, &[]);
+                let mut case_env = env_with(
+                    specialized_fields_at(&args, "an ordinary match case binder")?,
+                    &[],
+                );
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Ordinary(eliminator),
@@ -5830,7 +5851,14 @@ impl<'a> Lowering<'a> {
                 deferred.construct_origin,
                 PlannedAggregateShape::Constructor,
             )?),
-            args: constructor_args.clone(),
+            // `constructor_args` stays `Vec<Lowered>` because it is also the
+            // case operand list below. Only the template it feeds carries the
+            // closed field kind, and every field it builds is ordinary.
+            args: constructor_args
+                .iter()
+                .cloned()
+                .map(ConstructorField::specialized)
+                .collect(),
         };
         let outer_tail = match self.materialize_eliminator_frame_env(
             builder,
@@ -7073,7 +7101,13 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 ),
                                         ));
                                     }
-                                    let mut case_env = env_with(args, &[]);
+                                    let mut case_env = env_with(
+                                        specialized_fields_at(
+                                            &args,
+                                            "a source-machine match case binder",
+                                        )?,
+                                        &[],
+                                    );
                                     case_env.extend(env);
                                     SourceMachineState::Eval {
                                         expr: self.owned_case_body_occurrence(
@@ -7541,7 +7575,12 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         .and_then(|index| ih_slots[index]);
                                     let induction_hypothesis = self.make_computational_recursor(
                                         LoweringOperand::Specialized(
-                                            args[position].clone(),
+                                            args[position]
+                                                .specialized_at(
+                                                    "a source-machine computational recursor's \
+                                                     selected recursive argument",
+                                                )?
+                                                .clone(),
                                         ),
                                         cases.clone(),
                                         default.clone(),
@@ -7581,7 +7620,13 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 Err(trap) => return Ok(LoweringOperand::Specialized(Lowered::Trap(trap))),
                             };
                             let mut case_env = induction_hypotheses;
-                            extend_specialized(&mut case_env, args);
+                            extend_specialized(
+                                &mut case_env,
+                                specialized_fields_at(
+                                    &args,
+                                    "a source-machine computational match case binder",
+                                )?,
+                            );
                             case_env.extend(frame_env);
                             let previous_selected = control.selected.clone();
                             let pending = std::mem::take(&mut control.selected.pending);
@@ -11532,8 +11577,13 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // position. The assembly is the shared seat's.
         let field_run = args
             .iter()
-            .map(|arg| LoweringOperand::Specialized(arg.clone()))
-            .collect::<Vec<_>>();
+            .map(|arg| {
+                Ok(LoweringOperand::Specialized(
+                    arg.specialized_at("a resolved continuation's field run")?
+                        .clone(),
+                ))
+            })
+            .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         Ok(self
             .claim_and_call_resolved_continuation(
                 builder, &identity, &field_run, position, unit_env,
@@ -14813,7 +14863,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         static_origin,
                         PlannedAggregateShape::Constructor,
                     )?),
-                    args: specialized_operands_at(&lowered_args, "a constructor argument")?,
+                    args: specialized_constructor_fields_at(
+                        &lowered_args,
+                        "a constructor argument",
+                    )?,
                 }))
             }
             RuntimeExpr::Match {
@@ -15067,7 +15120,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         ),
                     ));
                 }
-                let case_env = env_with(args, env);
+                let case_env = env_with(
+                    specialized_fields_at(&args, "a match case binder")?,
+                    env,
+                );
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 self.lower_expr(builder, body, &case_env)
             }

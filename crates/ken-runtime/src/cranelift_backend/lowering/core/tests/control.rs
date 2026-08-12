@@ -7668,13 +7668,13 @@ fn c1_d5_a_closure_is_inadmissible_at_the_root_and_at_every_depth() {
         constructor: "ctor:fixture::Box::MkBox".to_string(),
         synthesized_identity: None,
         occurrence: None,
-        args: vec![c1_closure(origin)],
+        args: vec![ConstructorField::specialized(c1_closure(origin))],
     };
     let depth_2 = Lowered::Constructor {
         constructor: "ctor:fixture::Box::MkBox".to_string(),
         synthesized_identity: None,
         occurrence: None,
-        args: vec![Lowered::Record {
+        args: vec![ConstructorField::specialized(Lowered::Record {
             occurrence: None,
             fields: vec![LoweredRecordField {
                 name: "field:held".to_string(),
@@ -7683,7 +7683,7 @@ fn c1_d5_a_closure_is_inadmissible_at_the_root_and_at_every_depth() {
                 identity: None,
                 value: c1_closure(origin),
             }],
-        }],
+        })],
     };
 
     for (label, value) in [
@@ -7738,15 +7738,15 @@ fn c1_d5_a_closure_free_constructor_is_admissible() {
         synthesized_identity: None,
         occurrence: None,
         args: vec![
-            Lowered::String("left".to_string()),
-            Lowered::Record {
+            ConstructorField::specialized(Lowered::String("left".to_string())),
+            ConstructorField::specialized(Lowered::Record {
                 occurrence: None,
                 fields: vec![LoweredRecordField {
                     name: "field:right".to_string(),
                     identity: None,
                     value: Lowered::Bytes(vec![7, 8]),
                 }],
-            },
+            }),
         ],
     };
     assert!(
@@ -7764,15 +7764,15 @@ fn c1_d5_a_closure_free_constructor_is_admissible() {
         synthesized_identity: None,
         occurrence: None,
         args: vec![
-            Lowered::String("left".to_string()),
-            Lowered::Record {
+            ConstructorField::specialized(Lowered::String("left".to_string())),
+            ConstructorField::specialized(Lowered::Record {
                 occurrence: None,
                 fields: vec![LoweredRecordField {
                     name: "field:right".to_string(),
                     identity: None,
                     value: c1_closure(origin),
                 }],
-            },
+            }),
         ],
     };
     assert!(

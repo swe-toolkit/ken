@@ -2063,11 +2063,11 @@ fn c1_d3_producer_screens_admissibility_before_it_touches_the_carrier() {
         constructor: "ctor:fixture::C1::Wrap".to_string(),
         synthesized_identity: None,
         occurrence: Some(wrap_occurrence),
-        args: vec![Lowered::Closure {
+        args: vec![ConstructorField::specialized(Lowered::Closure {
             captures: Vec::new(),
             params: Vec::new(),
             body: closure_body,
-        }],
+        })],
     };
     let refused = compiler
         .transfer_into_carrier(&mut builder, construct_origin, &inadmissible)
@@ -2089,10 +2089,10 @@ fn c1_d3_producer_screens_admissibility_before_it_touches_the_carrier() {
         constructor: "ctor:fixture::C1::Wrap".to_string(),
         synthesized_identity: None,
         occurrence: Some(wrap_occurrence),
-        args: vec![Lowered::Bool {
+        args: vec![ConstructorField::specialized(Lowered::Bool {
             value: builder.ins().iconst(types::I64, 1),
             known: Some(true),
-        }],
+        })],
     };
     let reached = compiler
         .transfer_into_carrier(&mut builder, construct_origin, &admissible)
@@ -2736,15 +2736,15 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
                 constructor: ordinary_symbols.result_ok.clone(),
                 synthesized_identity: None,
                 occurrence: None,
-                args: vec![Lowered::Constructor {
+                args: vec![ConstructorField::specialized(Lowered::Constructor {
                     constructor: ordinary_symbols.read_some.clone(),
                     synthesized_identity: None,
                     occurrence: None,
-                    args: vec![Lowered::Bool {
+                    args: vec![ConstructorField::specialized(Lowered::Bool {
                         value: true_word,
                         known: Some(true),
-                    }],
-                }],
+                    })],
+                })],
             };
             Ok(compiler
                 .transfer_into_carrier(
@@ -3219,7 +3219,11 @@ fn ac_c7_lowered_wrap(
             plan.source_aggregate_occurrence(origin, PlannedAggregateShape::Constructor)
                 .expect("the planned wrapper has an ownership record at its own origin"),
         ),
-        args: vec![ac_c7_lowered_ctor(plan, inner_origin, inner)],
+        args: vec![ConstructorField::specialized(ac_c7_lowered_ctor(
+            plan,
+            inner_origin,
+            inner,
+        ))],
     }
 }
 
@@ -3869,8 +3873,8 @@ fn ac_c4_lowered_wrap2(
                 .expect("the planned wrapper has an ownership record at its own origin"),
         ),
         args: vec![
-            ac_c7_lowered_ctor(plan, child_origin(0), first),
-            ac_c7_lowered_ctor(plan, child_origin(1), second),
+            ConstructorField::specialized(ac_c7_lowered_ctor(plan, child_origin(0), first)),
+            ConstructorField::specialized(ac_c7_lowered_ctor(plan, child_origin(1), second)),
         ],
     }
 }
@@ -4345,7 +4349,7 @@ fn c1_d3_ac_c4_the_recursor_capsule_is_refused_before_its_residual_is_read() {
             constructor: "ctor:fixture::C1::Wrap".to_string(),
             synthesized_identity: None,
             occurrence: Some(wrap_occurrence),
-            args: vec![ac_c4_recursor_capsule(residual)],
+            args: vec![ConstructorField::specialized(ac_c4_recursor_capsule(residual))],
         };
         let refused = compiler
             .transfer_into_carrier(&mut builder, construct_origin, &inadmissible)
@@ -4369,10 +4373,10 @@ fn c1_d3_ac_c4_the_recursor_capsule_is_refused_before_its_residual_is_read() {
         constructor: "ctor:fixture::C1::Wrap".to_string(),
         synthesized_identity: None,
         occurrence: Some(wrap_occurrence),
-        args: vec![Lowered::Bool {
+        args: vec![ConstructorField::specialized(Lowered::Bool {
             value: builder.ins().iconst(types::I64, 1),
             known: Some(true),
-        }],
+        })],
     };
     let reached = compiler
         .transfer_into_carrier(&mut builder, construct_origin, &admissible)
@@ -7657,10 +7661,10 @@ fn an_aggregate_with_no_producer_certificate_cannot_reach_the_carrier() {
         constructor: "ctor:fixture::C1::Wrap".to_string(),
         synthesized_identity: None,
         occurrence,
-        args: vec![Lowered::Bool {
+        args: vec![ConstructorField::specialized(Lowered::Bool {
             value: child,
             known: Some(true),
-        }],
+        })],
     };
 
     let refused = compiler
@@ -7970,7 +7974,7 @@ fn a_mismatch_below_every_recursive_container_is_refused_before_any_allocation()
         constructor: "ctor:fixture::C1::Wrap".to_string(),
         synthesized_identity: None,
         occurrence,
-        args: vec![leaf()],
+        args: vec![ConstructorField::specialized(leaf())],
     };
     let host_result = |error: Lowered, ok: Lowered| Lowered::HostResult {
         success: word,
@@ -8124,7 +8128,7 @@ fn a_child_owner_set_outside_the_planned_meet_is_refused_before_any_allocation()
         constructor: "ctor:fixture::C1::Wrap".to_string(),
         synthesized_identity: None,
         occurrence: Some(wrap_occurrence),
-        args: vec![child],
+        args: vec![ConstructorField::specialized(child)],
     };
 
     let guard = GovernedAllocationMutationGuard::install(GovernedAllocationMutation::None);
