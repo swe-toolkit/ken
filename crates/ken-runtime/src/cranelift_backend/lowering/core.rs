@@ -2477,6 +2477,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         // installed, and a ledger rebuilt at this point would validate every
         // region against the population its own install already narrowed.
         fusion_claims: Some(fusion_claims),
+        fused_consumer_authority: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -5503,18 +5504,64 @@ impl<'a> Lowering<'a> {
                 case_env.extend(frame_env);
                 let case_body =
                     self.case_body_occurrence(eliminator.static_origin, case_index, &case.body)?;
-                if !case.recursive_positions.is_empty() {
-                    return self.lower_source_machine(builder, case_body, &case_env, &active_state);
+                // ── `RT-LEXICAL-R3-FUSION-EMITTER` `D1` — THE PER-PHASE
+                //    AUTHORITY SWITCH, at the only point that can express it ──
+                //
+                // Authority runs producer -> consumer -> producer, and this is
+                // the consumer phase. The fused function is lowered under the
+                // producer's authority throughout; the one span that belongs to
+                // the consumer is **its own case body**, which is exactly what
+                // is lowered below.
+                //
+                // **Keyed on the frame, not on the fusion.** The switch fires
+                // when this eliminator's `static_origin` equals the region's
+                // `continuation_origin` -- the consumer continuation the claim
+                // names. Nothing here searches for a claim, and nothing asserts
+                // a `frame_origin` equality: the carrier gate covers one
+                // function and the two origins are not the same coordinate.
+                //
+                // **Why it has to be here rather than at the fused function's
+                // entry.** Collapsing producer and consumer lowering into one
+                // dispatcher call was forced -- lowering the producer to a value
+                // first relocates its own in-flight-activation refusal into the
+                // fused body -- and that collapse deleted the function-level
+                // boundary the switch used to sit at. This is the only place the
+                // consumer's case body is identifiable as such.
+                //
+                // The bound owner is the consumer's `Predeclared` identity.
+                // **Never `Fusion`**: that stays region and definition identity
+                // only. `release` restores the producer's facts, which is the
+                // third phase and is why the guard is scoped rather than set.
+                let switch = self
+                    .fused_consumer_authority
+                    .filter(|(origin, _)| *origin == eliminator.static_origin)
+                    .map(|(_, consumer_owner)| {
+                        AmbientBodyAuthority::bind(
+                            self,
+                            ContinuationEmissionOwner::Predeclared(consumer_owner),
+                            consumer_owner,
+                        )
+                    });
+                let lowered = if !case.recursive_positions.is_empty() {
+                    self.lower_source_machine(builder, case_body, &case_env, &active_state)
+                } else if remaining_eliminators.is_empty() {
+                    self.lower_expr(builder, case_body, &case_env)
+                } else {
+                    self.lower_computational_producer_expr(
+                        builder,
+                        case_body,
+                        &case_env,
+                        remaining_eliminators,
+                    )
+                };
+                // Restored on BOTH outcomes. An early `?` here would leave the
+                // consumer's authority installed for whatever the caller lowers
+                // next, which is the residue `AmbientBodyAuthority`'s release
+                // exists to prevent.
+                if let Some(switch) = switch {
+                    switch.release(self);
                 }
-                if remaining_eliminators.is_empty() {
-                    return self.lower_expr(builder, case_body, &case_env);
-                }
-                return self.lower_computational_producer_expr(
-                    builder,
-                    case_body,
-                    &case_env,
-                    remaining_eliminators,
-                );
+                return lowered;
             }
             EliminatorFrame::Ordinary(eliminator) => {
                 let (case_index, case) = match select_ordinary_case(eliminator, &constructor) {

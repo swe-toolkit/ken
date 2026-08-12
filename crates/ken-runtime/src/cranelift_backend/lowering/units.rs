@@ -3207,6 +3207,19 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             let lowered = {
                 let ambient =
                     AmbientBodyAuthority::bind(compiler, causal_owner, fusion.producer_owner);
+                // `RT-LEXICAL-R3-FUSION-EMITTER` `D1` — arm the interior switch
+                // for the extent of THIS region's body, and no longer.
+                //
+                // The key is the region's own `continuation_origin` and the fact
+                // is its own `consumer_owner`; both come from the claim, so
+                // nothing downstream infers either. Restored to whatever was
+                // held on the way out rather than cleared, for the same reason
+                // `AmbientBodyAuthority` restores: a nested definition pass must
+                // not be handed `None` when its caller held a key.
+                let enclosing_switch = compiler.fused_consumer_authority.replace((
+                    fusion.continuation_origin,
+                    fusion.consumer_owner,
+                ));
                 let lowered = fuse_producer_through_consumer_suffix(
                     compiler,
                     &mut builder,
@@ -3215,6 +3228,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     &parameters,
                     &captures,
                 );
+                compiler.fused_consumer_authority = enclosing_switch;
                 ambient.release(compiler);
                 lowered?
             };

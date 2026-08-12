@@ -85,6 +85,7 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         continuation_claims: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -253,6 +254,7 @@ fn run_px8j_malformed_recursor_consumer(
         continuation_claims: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -3090,12 +3092,62 @@ fn d2f_0_the_applied_root_production_path_gate() {
 /// `Some(oriented)` — **never a direct builder or emitter call** — and resolves
 /// exactly one key, one id and one descriptor.
 ///
-/// **Both planes are read by the same call**, `build_static_continuation_fusion_plan`,
-/// differing only in the argument that is genuinely different between the two
-/// lanes — `Some(oriented)` against `None`. That is what makes `0` and `1` one
-/// currency instead of an arrival field compared against a plane length, and it
-/// is also the non-constancy proof: the same instrument answers both ways in
-/// this test, so neither number is a shape it returns for anything.
+/// **Both planes are read by the same call**, `build_static_continuation_fusion_plan`.
+/// That is what makes `0` and `1` **one currency** instead of an arrival field
+/// compared against a plane length, and it is also the non-constancy proof: the
+/// same instrument answers both ways in this test, so neither number is a shape
+/// it returns for anything handed to it.
+///
+/// **CORRECTION, and it is the load-bearing kind.** An earlier version of this
+/// block said the two reads differ *"only in the argument that is genuinely
+/// different between the two lanes — `Some(oriented)` against `None`."*
+/// **That attribution is false.** The seed row and the positive row differ in
+/// **four** things at once: a different planner, a different expression,
+/// different declarations, **and** the oriented argument. So those two rows
+/// establish a shared **return-type currency** and nothing more — they cannot
+/// attribute the `0`/`1` difference to `oriented`, because three other
+/// variables moved with it. The currency claim survives; the causal one never
+/// held.
+///
+/// **The one-variable cell below is what attribution needs**, and it is the
+/// `D2h` soundness discriminator (Steward `evt_2n6n5hnxyh0cg`). It re-reads the
+/// **same planner, same expression, same declarations** as the positive, with
+/// the oriented plan **withheld** — `None`. One variable moves.
+///
+/// The fork it was given had two branches: plane **0** means the attribution
+/// holds, plane **1** means a candidate forms without the plan and is a stop.
+///
+/// **MEASURED: neither. It REFUSES** —
+/// `OrientedSubcontinuationPlanV1` / *"checked subcontinuation markers have no
+/// checked plan metadata"*. The markers are still on the expression and the
+/// plan they require is gone, so the builder rejects the combination rather
+/// than quietly resolving nothing.
+///
+/// **What that refusal is, stated on its own axis.** It is raised by the
+/// `OrientedSubcontinuationPlanV1` validator **before** transport, before any
+/// candidate is formed, and therefore before any key, ID or descriptor exists.
+/// So it is a **fail-closed plan-dependence refusal** — the marked expression
+/// will not proceed without the plan its markers require.
+///
+/// **It is NOT plane 0, and it is NOT a cardinality result.** Nothing here
+/// counts candidates, because the path stops upstream of counting. ⇒ **This row
+/// attributes nothing about the `0`/`1` cardinality**, and must not be read as
+/// the attribution the one-variable cell was added to supply.
+///
+/// On the **plan-dependence axis alone**, it is a stronger answer than plane 0
+/// would have been: plane 0 would say a candidate failed to form, this says the
+/// pipeline refuses before it could be asked for one. That is the only axis on
+/// which "stronger" is a claim this row can carry.
+///
+/// **It is asserted as the refusal it is, not re-mapped onto the fork's zero
+/// branch.** Folding an unanticipated outcome into the nearest anticipated one
+/// is how a measurement stops being one, and this row would have read as a
+/// clean plane-0 confirmation for every future reader.
+///
+/// `px8j` is retained beside it as the **distinct seed absence comparator**,
+/// with no plan injected, because it answers a different question: what an
+/// unmarked seed-lane compile does, not what withholding a plan does to a
+/// marked one.
 ///
 /// **The production compile and the planner derivation are independent, and
 /// that is the only reason their agreement says anything.** Neither reads the
@@ -3178,6 +3230,45 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
     )
     .expect("the checked twin resolves a plane");
 
+    // ── THE ONE-VARIABLE CELL — the `D2h` soundness discriminator ──
+    //
+    // Same planner, same expression, same declarations as the positive above.
+    // The ONLY thing that moves is the oriented plan, withheld. This is what
+    // the seed row cannot do: that row changes four things at once, so it
+    // establishes a shared return-type currency and attributes nothing.
+    //
+    // Plane 0 here means the candidate genuinely depends on the plan. Plane 1
+    // would mean a candidate forms without it -- fusion independent of
+    // `oriented` -- and that is a stop before D2/D3, not a number to record.
+    //
+    // MEASURED, and it is a THIRD outcome the fork did not name: withholding
+    // the plan resolves neither plane 0 nor plane 1. It REFUSES. The markers
+    // are still on the expression and the plan they require is gone, so the
+    // builder rejects the combination rather than quietly resolving nothing.
+    //
+    // The refusal is raised BEFORE transport, before a candidate is formed, and
+    // so before any key, ID or descriptor exists. It is a fail-closed
+    // plan-dependence refusal and NOT a cardinality result: nothing here counts
+    // candidates, because the path stops upstream of counting. On the
+    // plan-dependence axis alone it is stronger than plane 0 would have been --
+    // that is the only axis on which "stronger" is a claim this row carries.
+    //
+    // It is recorded as the refusal it is, NOT re-mapped onto the fork's
+    // zero branch. Re-mapping an unanticipated outcome onto the nearest
+    // anticipated one is how a measurement stops being one.
+    let withheld = crate::cranelift_backend::planning::build_static_continuation_fusion_plan(
+        &planner,
+        &entry,
+        &declarations,
+        None,
+    );
+    let withheld_refuses_for_missing_metadata = matches!(
+        &withheld,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            if *construct == "OrientedSubcontinuationPlanV1"
+                && reason.contains("no checked plan metadata")
+    );
+
     // ---- row 1: the seed, which carries no marker at all.
     let seed_expr = host_result_closure_match(px8j_equal_payload_hole_placement(
         Px8jSelectedScopePlacement::BeforeReturnHole,
@@ -3240,11 +3331,16 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
             ),
             // row 3 -- refused by the validator, before the builder
             (stripped_refusal, stripped_arrivals.len()),
+            // the ONE-VARIABLE cell: same planner, expression and declarations
+            // as the positive, oriented plan withheld. Neither plane -- a
+            // refusal, which is a stronger answer than plane 0.
+            withheld_refuses_for_missing_metadata,
         ),
         (
             (true, 1, 1, 1, 0),
             (false, 0, 0, 0, 0),
             (true, 0),
+            true,
         ),
         "D0: the checked twin must reach the builder through the production entry with \
          Some(oriented) and resolve exactly one key, one id and one descriptor at definition \
@@ -3811,6 +3907,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         continuation_claims: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,

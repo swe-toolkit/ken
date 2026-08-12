@@ -2793,6 +2793,26 @@ struct Lowering<'a> {
     /// than absent** on a compile that reached it with no fused region, which is
     /// what keeps the zero case on the same path as the non-zero one.
     fusion_claims: Option<FusionRegionClaimLedger>,
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D1` — the per-phase authority switch's
+    /// only state, and it is deliberately a KEY plus a FACT, not a mode.**
+    ///
+    /// Set for the extent of one fused region's body definition, to that
+    /// region's `(continuation_origin, consumer_owner)`. The interior point in
+    /// the composed eliminator reads it and switches authority for exactly the
+    /// case body whose frame's `static_origin` equals the key.
+    ///
+    /// **Why a field rather than a frame member.** The fact is needed at the
+    /// consumer's case-body lowering, which is reached through the shared
+    /// eliminator path; carrying it on `ComputationalEliminatorFrame` would
+    /// touch every construction site of that struct across the whole lowering,
+    /// for a fact only the fused definition pass can supply. One scoped field
+    /// keeps the ripple inside the fusion entry path.
+    ///
+    /// **Never `ContinuationEmissionOwner::Fusion`.** `Fusion` is region and
+    /// definition identity only (Architect `evt_4vqey13cxxjqs`); the authority
+    /// that runs here is the *consumer's* `Predeclared` owner, and it is
+    /// restored to the producer's on the way out.
+    fused_consumer_authority: Option<(StaticOriginId, PredeclaredFunctionId)>,
     /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`** — the binding-candidate
     /// ledger, a sibling of the claim ledger on the same artifact lifetime.
     continuation_candidates: Option<units::ContinuationCandidateLedger>,

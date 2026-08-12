@@ -80,6 +80,7 @@ fn run_checked_bounded_nat_fixture(
         continuation_claims: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
