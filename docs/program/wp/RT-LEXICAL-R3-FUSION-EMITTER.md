@@ -120,16 +120,62 @@ fusion candidate used a synthetic fixture and called the builder directly —
 against it on *both* sides of the gate.
 
 **`D1` — the interior authority switch**, at the seam located in section 4.
+**Implemented and committed, then HELD.** Not routed to QA, not merged alone.
 
 **`D2` — the fusion-specific checked-frame adoption**, at that same interior
-point.
+point. Built on top of the held `D1`, and **held with it.**
 
-**`D3` — arm the emitter.** Flip `D2F_EMITTER_ARMED` only after `D0`'s positive
-row is non-zero and `D1`/`D2` are landed with their controls. **Arming is
-authorized by this frame and by nothing you inherit from `#6d`.**
+**`D3` — arm the emitter.** Flip `D2F_EMITTER_ARMED`. **This is the final
+implementation step**, taken only after `D0`'s positive row is non-zero and
+`D1` and `D2` are implemented. **Arming is authorized by this frame and by
+nothing you inherit from `#6d`.**
 
 **`D4` — the before-hole expression is repaired and green** under `B`-only
-exclusion at the pre-retirement base.
+exclusion at the pre-retirement base. **If arming plus `D2` necessarily makes
+`D4` green, it belongs in the same candidate** — do not cut another inert
+increment to carry it.
+
+> ### `D1`+`D2`+`D3` MERGE AS ONE ATOMIC CANDIDATE — 2026-08-12
+>
+> **Architect ruling `evt_4m0q1m4zn4k79`, on exact `33a77bd4`. `D1` may not
+> merge unexercised, and a pre-arm decline is not its control.**
+>
+> The `D1` mechanism as built is structurally coherent — the claim supplies
+> `(continuation_origin, consumer_owner)`, the selected composed case-body seam
+> matches `eliminator.static_origin`, `AmbientBodyAuthority` installs the
+> consumer's `Predeclared` owner and unit, both `Ok` and `Err` restore the
+> producer facts, `Fusion` is never authority, and there is no signature,
+> planner or ABI expansion. **But with the installer unarmed the production
+> population is empty, the field stays `None`, and none of that behaviour
+> fires. Green compilation of that state proves only that inert scaffolding
+> compiles.**
+>
+> **Binding ordering.** Implement `D1`, hold it. Build `D2` on top, hold it.
+> Make `D3` arming the last implementation step. Then route **one** review
+> candidate spanning `D1`+`D2`+`D3` (plus `D4` if arming makes it green), whose
+> controls exercise the real checked `D0` positive through
+> `compile_expr_into_object_module`.
+>
+> **Forbidden:** routing `33a77bd4` alone to QA or merging it; any standalone
+> inert `D1` or `D2` merge; a direct-builder fixture; a test-only setter for
+> `fused_consumer_authority`. A pre-arm observation that the real seam is
+> reached and declines is lawful **as diagnostic evidence only** and earns no
+> `D1` or AC credit.
+>
+> **This changes merge granularity, not semantic order.** `D1` and `D2` are
+> still implemented before the arm, no `main` state ever carries the arm
+> without both, and the control becomes constructible only inside the armed
+> range.
+>
+> **What was superseded is this frame's own `D3` clause** — *"`D1`/`D2` are
+> landed with their controls"*. It was **infeasible as written**, because
+> `D1`'s real control needs `D3`'s non-empty population. Do not reconstruct it
+> from a memory of this frame.
+>
+> **Section 9's sizing target still applies per increment.** The atomic unit is
+> the **review candidate**, not the turn: `D1`, `D2` and `D3` remain separate
+> commits with separate handbacks to the leader. This adds no review hop and no
+> new party.
 
 ## 6. Acceptance criteria
 
@@ -166,6 +212,23 @@ candidate. *Control:* `git diff`.
 **AC-7 — CI green** on the merge. Not a local `--workspace` run
 (`COORDINATION §12`).
 
+**AC-8 — the live authority control, on the atomic candidate.** Architect
+`evt_4m0q1m4zn4k79`; this is the AC that the atomic ordering exists to make
+constructible, and **it must run from the actual armed production compile**,
+not from a fixture.
+
+- **One installed fusion definition and one region-keyed switch** are asserted
+  from that compile.
+- **The live authority fields are observed in three positions:** producer
+  `Predeclared` **before** the consumer phase, consumer `Predeclared` **during**
+  the exact selected case body, producer **restored after** it. **No `Fusion`
+  authority at any of the three.**
+- **The error control forces an error *after* the switch, through that same
+  production path**, and observes producer restoration **before the error
+  propagates.** An error injected anywhere else does not discharge this.
+- **`D0`'s plane and refusal rows are retained**, along with this frame's guard
+  controls. `AC-8` is added to them, not substituted for them.
+
 ## 7. Excluded scope
 
 - **Retirement of the residual class and any lane deletion.** That is
@@ -174,6 +237,14 @@ candidate. *Control:* `git diff`.
 - **`D2h`'s key re-derivation.** Soundness-bearing and not reopened.
 - **Unwinding any of the eleven landed `D2f` partials.** They are the
   substrate; they are inert and correctly labelled.
+- **A direct-builder fixture, and a test-only setter for
+  `fused_consumer_authority`** (Architect `evt_4m0q1m4zn4k79`). The first is
+  the exact defect `D0` exists to correct; the second manufactures the state
+  whose real arrival is the thing under test. **If `AC-8` seems to need
+  either, the candidate is not yet armed** — that is a sequencing answer, not a
+  fixture problem.
+- **A standalone inert `D1` or `D2` merge.** See the atomic-candidate ruling in
+  section 5.
 
 ## 8. Stop conditions — return to me, do not decide
 
