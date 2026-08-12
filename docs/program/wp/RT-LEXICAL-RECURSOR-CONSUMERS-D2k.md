@@ -173,9 +173,17 @@ candidate. *Control:* `git diff`.
 ## 9. Contention and sizing
 
 `crates/ken-runtime/src/cranelift_backend/lowering/mod.rs`, `.../core.rs`, and
-the lexical-recursion consumer paths. **This is the same file set as
-[[RT-LEXICAL-R3-FUSION-EMITTER]], which is in flight** — Runtime runs one node
-at a time; sequence after it and re-derive the intersection at candidate time.
+the lexical-recursion consumer paths. This is the same file set as
+[[RT-LEXICAL-R3-FUSION-EMITTER]].
+
+> **THE SEQUENCING BAR IS LIFTED — released 2026-08-12 at `evt_9tx4kt0k8epm`.**
+> This frame previously said to sequence **after** `RT-LEXICAL-R3-FUSION-EMITTER`
+> because that node was in flight. **It is stopped** (Architect
+> `evt_1q7v9fcw5hd87` fired its cumulative planner/ABI/representation stop) and
+> its held range is preserved as **evidence only** — not a merge candidate, not
+> competing for these files. **`D2k` is the in-flight node; you are not
+> sequenced behind anything.** Re-derive the intersection at candidate time as
+> always.
 
 `scripts/ken-cargo test -p ken-runtime --lib` plus your focused suite. **Never
 `--workspace`** — that is CI's gate, and `AC-7` means green in CI.
