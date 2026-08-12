@@ -2829,9 +2829,20 @@ fn d2f_0_the_applied_root_production_path_gate() {
         );
     };
 
-    // ---- the two positives, each on its own root.
+    // ---- the three positives, each on its own root.
+    //
+    // `D2k` `AC-1a` extends this gate to the THIRD positive. `ProducerArity` is
+    // a documented positive, not a refusal: `static_transition.rs`'s `D2jCause`
+    // doc says "Five are refusal causes ... and `ProducerArity` is a positive
+    // widening that makes the argument row's inventory non-degenerate", and its
+    // variant doc gives the reason -- the exact witness's producer construct has
+    // ONE child, so "the argument is the child at the recursive position" cannot
+    // discriminate position on a single-element inventory. A `ProducerArity`
+    // that refused would defeat its reason for existing.
     let (exact_arrivals, exact_error) = compile_cause(D2jCause::Exact, "ken_d2f_gate_exact");
     let (rehomed_arrivals, rehomed_error) = compile_cause(D2jCause::ReHomed, "ken_d2f_gate_rehomed");
+    let (arity_arrivals, arity_error) =
+        compile_cause(D2jCause::ProducerArity, "ken_d2f_gate_arity");
     let exact = match exact_arrivals.as_slice() {
         [only] => only.clone(),
         other => panic!("the applied exact root must reach the builder once: {}", other.len()),
@@ -2839,6 +2850,13 @@ fn d2f_0_the_applied_root_production_path_gate() {
     let rehomed = match rehomed_arrivals.as_slice() {
         [only] => only.clone(),
         other => panic!("the bare re-homed root must reach the builder once: {}", other.len()),
+    };
+    let arity = match arity_arrivals.as_slice() {
+        [only] => only.clone(),
+        other => panic!(
+            "the widened-arity root must reach the builder once: {}",
+            other.len()
+        ),
     };
 
     // ---- the old seed witness, which carries no marker at all.
@@ -2883,6 +2901,12 @@ fn d2f_0_the_applied_root_production_path_gate() {
             // the positives -- the denominator for everything below them
             (exact.oriented_present, exact.keys.len(), exact.descriptors.len(), exact.fusion_definitions),
             (rehomed.oriented_present, rehomed.keys.len(), rehomed.descriptors.len(), rehomed.fusion_definitions),
+            (
+                arity.oriented_present,
+                arity.keys.len(),
+                arity.descriptors.len(),
+                arity.fusion_definitions
+            ),
             // the unmarked seed
             (seed.oriented_present, seed.keys.len(), seed.descriptors.len(), seed.fusion_definitions),
             // AC-6a phase A: refused upstream, never arrived
@@ -2893,19 +2917,26 @@ fn d2f_0_the_applied_root_production_path_gate() {
         (
             (true, 1, 1, 0),
             (true, 1, 1, 0),
+            (true, 1, 1, 0),
             (false, 0, 0, 0),
             vec![0, 0, 0],
             vec![(1, 0, 0), (1, 0, 0)],
         ),
-        "both positives must resolve exactly one key and one descriptor at definition count \
-         zero, while the unmarked seed reaches the same builder and resolves nothing, three \
-         marker causes never reach it, and two source-shape causes reach it and resolve \
-         nothing -- rows {no_arrival:?} and {arrived_empty:?}"
+        "all THREE positives must resolve exactly one key and one descriptor at definition \
+         count zero, while the unmarked seed reaches the same builder and resolves nothing, \
+         three marker causes never reach it AT ALL, and two source-shape causes reach it and \
+         resolve nothing. The two refusal tiers are kept apart deliberately: an arrivals-zero \
+         row says the validator refused upstream and says NOTHING about the builder's \
+         discrimination, so it is asserted as non-arrival and never as a zero key. Only the \
+         arrived-and-empty pair is evidence about the builder, and both tiers are operands of \
+         the same assertion as the positives so that no zero stands alone -- rows \
+         {no_arrival:?} and {arrived_empty:?}"
     );
 
     // ---- the pre-emission seat, per positive, on its own root.
     ordinary_refusal(&exact_error, "exact");
     ordinary_refusal(&rehomed_error, "re-homed");
+    ordinary_refusal(&arity_error, "widened-arity");
 
     // ---- production must agree with the INDEPENDENT planner derivation, per cause.
     let exact_planner = planner_plane(D2jCause::Exact);
@@ -2922,12 +2953,48 @@ fn d2f_0_the_applied_root_production_path_gate() {
         "and the bare re-homed root likewise, against ITS own planner derivation"
     );
 
-    // ---- non-aliasing, by whole keys and never by id (AC-6c).
-    assert_ne!(
-        exact.keys, rehomed.keys,
-        "the two roots describe different programs, so their complete keys must differ -- \
-         established by the keys themselves, never by an id inequality, since the two planes \
-         are independent interners that both lawfully issue local id 0"
+    let arity_planner = planner_plane(D2jCause::ProducerArity);
+    assert_eq!(
+        (arity.keys.as_slice(), arity.descriptors.as_slice()),
+        (
+            arity_planner.observed_keys(),
+            arity_planner.observed_descriptors()
+        ),
+        "and the widened-arity root likewise, against ITS own planner derivation"
+    );
+
+    // ---- non-aliasing, by whole keys and never by id (AC-6c), now PAIRWISE
+    // over the three positives (`D2k` `AC-1a`).
+    //
+    // Stated over ALL PAIRS of the positive population rather than as a fixed
+    // list of `assert_ne!`s: individual inequalities are what let a later fourth
+    // positive be added while one pair silently coincides. Distinctness is a
+    // property of the population, so it is derived from the population -- add a
+    // positive to the array and it is covered with no second edit.
+    //
+    // Not a set, deliberately: `StaticContinuationFusionKey` is `Eq` and not
+    // `Ord`, and giving a planner identity a total order to let a test build a
+    // `BTreeSet` would widen a production type for a test's convenience.
+    let positives = [
+        ("exact", &exact.keys),
+        ("re-homed", &rehomed.keys),
+        ("widened-arity", &arity.keys),
+    ];
+    let coincident: Vec<(&str, &str)> = (0..positives.len())
+        .flat_map(|left| (left + 1..positives.len()).map(move |right| (left, right)))
+        .filter(|(left, right)| positives[*left].1 == positives[*right].1)
+        .map(|(left, right)| (positives[left].0, positives[right].0))
+        .collect();
+    assert_eq!(
+        coincident,
+        Vec::<(&str, &str)>::new(),
+        "the three positive roots describe three different programs, so their complete keys \
+         must be pairwise distinct -- established by the keys themselves, never by an id \
+         inequality, since the planes are independent interners that all lawfully issue local \
+         id 0. exact={:?} rehomed={:?} arity={:?}",
+        exact.keys,
+        rehomed.keys,
+        arity.keys
     );
 }
 
@@ -32321,5 +32388,130 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
          constructors (rows 4 and 5 take a Node then a Leaf at match origin 5). Do not infer \
          transport multiplicity from it. If this table moves, re-run the read before trusting any \
          pairing built on it."
+    );
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k` `AC-1b` — the unmarked seeds are
+/// ABSENCE COMPARATORS and earn no fusion credit.**
+///
+/// `AC-1` was rebound because its five witnesses cannot carry the selected
+/// repair's required input: they are seed-lane compiles with no checked package,
+/// so no oriented plan can be decoded for them, and the completed A/B measured
+/// that even a supplied empty plan is admitted and still resolves zero keys.
+/// This control keeps them in the suite as what they actually are.
+///
+/// **The two halves are asserted TOGETHER, on purpose.** Each row states
+///
+/// - **the refusal it OBSERVES**, and
+/// - **the fusion plane it LACKS** — no oriented plan present, no resolved key,
+///   an empty resolved plane.
+///
+/// Separating them is how a zero becomes evidence for something it does not
+/// support. A seed that resolves nothing is indistinguishable from a compile
+/// that never ran, so the plane is only meaningful **beside the refusal that
+/// proves the compile reached a wall**. That pairing is this control's whole
+/// content; neither half discharges any fusion property, and the assertion
+/// message says so rather than leaving a reader to infer it.
+///
+/// **The wall half is REUSED from [`d2k_wall_under_current_selector`], not
+/// re-derived**, so this row cannot drift from `D2k-0`'s. What is asserted is
+/// the refusal's **construct**, per row against its own literal — deliberately
+/// not its reason, which names constructor origins that renumber under
+/// unrelated planner changes, and not its edge, which `D2k-1b` retired by
+/// recognizing the binding ahead of the value read.
+///
+/// **Row 1 sits at a different wall and that is kept, not smoothed.** It reaches
+/// `NativeJoinPlanV1` before this increment's conservation close. A uniform
+/// expectation across the five would go green under a uniform move, which is
+/// exactly the case worth catching.
+///
+/// **This test claims NOTHING about fusion working.** The positive that gives
+/// a resolved plane its meaning is the checked twin, on a different fixture
+/// family, and it is deliberately not cited here as though it covered these
+/// rows — that citation is the defect `AC-1`'s rebind exists to prevent.
+///
+/// **Promise class: durable invariant.** It asserts a relation — refusal
+/// observed together with plane absent — over the whole seed population. It reds
+/// if a seed starts resolving a plane, which would mean a forbidden route made
+/// these fixtures green, and it reds if a seed stops refusing, which is
+/// `D2k-1b`'s repair and is the event that retires it.
+#[test]
+fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
+    use crate::cranelift_backend::lowering::core::{
+        d2f_gate_arrivals_take, d2f_production_fusion_planes_take, set_selector_variant_exclusion,
+    };
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// `(refusing construct, any oriented plan present, resolved keys, resolved
+    /// planes)` for one seed row, under the same wrong-consumer exclusion every
+    /// other `D2k` control runs.
+    fn seed_row(
+        expression: &RuntimeExpr,
+        symbol: &str,
+    ) -> (Option<String>, bool, usize, Vec<usize>) {
+        set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
+        let _restore = Restore;
+        let _ = d2f_gate_arrivals_take();
+        let _ = d2f_production_fusion_planes_take();
+        let refusal = d2k_wall_under_current_selector(expression, symbol);
+        let planes = d2f_production_fusion_planes_take();
+        // Drained ONCE. Taking this twice would leave the second read empty
+        // and make the key count zero for the wrong reason.
+        let arrivals = d2f_gate_arrivals_take();
+        (
+            refusal.map(|(construct, _edge)| construct),
+            arrivals.iter().any(|arrival| arrival.oriented_present),
+            arrivals.iter().map(|arrival| arrival.keys.len()).sum(),
+            planes,
+        )
+    }
+
+    let row1 = host_result_closure_match(px8j_layered_recursive_result(1, 1));
+    let row4_d1 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let row4_d2 = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let row4_d3 = host_result_closure_match(px8j_scope_chain_observation_result(3, 0));
+    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::AfterReturnHole,
+    ));
+    // The absence, written once: no oriented plan reached the builder, no key
+    // resolved, and the one plane the builder built was empty.
+    let absent = (false, 0usize, vec![0usize]);
+    let conservation = Some("StaticWorkerBinding".to_string());
+
+    assert_eq!(
+        [
+            ("row1-owned-scope", seed_row(&row1, "ken_d2k1b_row1")),
+            ("row4-depth-1", seed_row(&row4_d1, "ken_d2k1b_row4_d1")),
+            ("row4-depth-2", seed_row(&row4_d2, "ken_d2k1b_row4_d2")),
+            ("row4-depth-3", seed_row(&row4_d3, "ken_d2k1b_row4_d3")),
+            ("row5-after-hole", seed_row(&row5, "ken_d2k1b_row5")),
+        ]
+        .map(|(label, (construct, present, keys, planes))| {
+            (label, construct, (present, keys, planes))
+        }),
+        [
+            (
+                "row1-owned-scope",
+                Some("NativeJoinPlanV1".to_string()),
+                absent.clone(),
+            ),
+            ("row4-depth-1", conservation.clone(), absent.clone()),
+            ("row4-depth-2", conservation.clone(), absent.clone()),
+            ("row4-depth-3", conservation.clone(), absent.clone()),
+            ("row5-after-hole", conservation.clone(), absent.clone()),
+        ],
+        "AC-1b: each unmarked seed must REACH a refusal and, on that same compile, carry NO \
+         oriented plan, resolve NO fusion key, and leave the built plane empty. The absence is \
+         recorded BESIDE the refusal that proves the compile ran, because a zero plane on its \
+         own is indistinguishable from a compile that never happened. Nothing here discharges \
+         any fusion property: these rows are absence comparators and the checked twin on a \
+         different fixture family is the only positive. A row that starts resolving a plane \
+         means a forbidden route made a seed green by supplying a plan, adding markers or \
+         weakening the key; a row that stops refusing is D2k-1b's repair and retires this \
+         control."
     );
 }
