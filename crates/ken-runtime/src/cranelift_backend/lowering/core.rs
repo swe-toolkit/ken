@@ -4602,7 +4602,7 @@ impl<'a> Lowering<'a> {
                         "tree-producing match constructor arity changed",
                     ));
                 }
-                let case_env = self.bound_constructor_fields(&args, producer_env);
+                let case_env = self.bound_constructor_fields(&args, producer_env)?;
                 let body =
                     self.case_body_occurrence(static_origin, case_index, &producer_case.body)?;
                 self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
@@ -5408,7 +5408,7 @@ impl<'a> Lowering<'a> {
                 #[cfg(test)]
                 d2e_record_binder_assembly(case, &induction_hypotheses);
                 let mut case_env = induction_hypotheses;
-                self.extend_constructor_fields(&mut case_env, &args);
+                self.extend_constructor_fields(&mut case_env, &args)?;
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Computational(eliminator),
@@ -5459,7 +5459,7 @@ impl<'a> Lowering<'a> {
                         ),
                     ));
                 }
-                let mut case_env = self.bound_constructor_fields(&args, &[]);
+                let mut case_env = self.bound_constructor_fields(&args, &[])?;
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Ordinary(eliminator),
@@ -6354,7 +6354,8 @@ impl<'a> Lowering<'a> {
                             // `D2k-1b-i` — the source machine's terminal
                             // disposition, counted into the same conservation
                             // ledger as the direct descent's.
-                            self.static_worker_fields.note_consuming_call();
+                            self.static_worker_fields
+                            .note_consuming_call(worker.transported_field)?;
                             #[cfg(test)]
                             d8e_record_consumption();
                             // `D8l2` — which facet this consumption carried,
@@ -7108,7 +7109,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 ),
                                         ));
                                     }
-                                    let mut case_env = self.bound_constructor_fields(&args, &[]);
+                                    let mut case_env = self.bound_constructor_fields(&args, &[])?;
                                     case_env.extend(env);
                                     SourceMachineState::Eval {
                                         expr: self.owned_case_body_occurrence(
@@ -7621,7 +7622,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 Err(trap) => return Ok(LoweringOperand::Specialized(Lowered::Trap(trap))),
                             };
                             let mut case_env = induction_hypotheses;
-                            self.extend_constructor_fields(&mut case_env, &args);
+                            self.extend_constructor_fields(&mut case_env, &args)?;
                             case_env.extend(frame_env);
                             let previous_selected = control.selected.clone();
                             let pending = std::mem::take(&mut control.selected.pending);
@@ -12504,6 +12505,11 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             captures,
             route,
             discharge,
+            // Bound directly by the lexical binder, not rebound out of a
+            // constructor field. A consumption of this binding discharges no
+            // conservation obligation, which is exactly what stops an ordinary
+            // worker call from paying a transported field's debt.
+            transported_field: None,
         })
     }
 
@@ -15299,7 +15305,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         ),
                     ));
                 }
-                let case_env = self.bound_constructor_fields(&args, env);
+                let case_env = self.bound_constructor_fields(&args, env)?;
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 self.lower_expr(builder, body, &case_env)
             }
@@ -15531,7 +15537,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // reaches this arm is consumed; the conservation close
                         // counts it against the fields a static elimination
                         // rebound.
-                        self.static_worker_fields.note_consuming_call();
+                        self.static_worker_fields
+                            .note_consuming_call(worker.transported_field)?;
                         #[cfg(test)]
                         crate::cranelift_backend::lowering::record_d2k_owner_event(
                             crate::cranelift_backend::lowering::D2kOwnerEvent::StaticWorkerCallConsumed {

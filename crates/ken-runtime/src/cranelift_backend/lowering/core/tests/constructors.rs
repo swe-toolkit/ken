@@ -5453,6 +5453,7 @@ fn lower_against_static_worker(
         // constructible here even in a test: it needs a planner-issued
         // `ContinuationCallIdentity`, which has no constructor outside planning.
         discharge: ContinuationDischarge::DirectSpecializationCall,
+        transported_field: None,
     })];
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),

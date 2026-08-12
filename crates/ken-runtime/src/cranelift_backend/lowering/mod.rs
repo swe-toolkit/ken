@@ -3498,6 +3498,28 @@ struct StaticWorkerBinding {
     /// consumer, and it is the thing to check when asking whether `D8i` is
     /// still transport-only.
     discharge: ContinuationDischarge,
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i`** — the constructor field
+    /// this binding was rebound out of, or `None` if it was bound directly.
+    ///
+    /// **This is the OCCURRENCE key, and it is what makes conservation
+    /// one-to-one rather than a count.** A ledger that recorded recognized
+    /// fields but counted consuming calls in aggregate accepts a compile in
+    /// which one rebound field is dropped while another is called twice, or in
+    /// which an **unrelated pre-existing** static-worker call supplies the
+    /// tally. Architect `dec_2xxj1zrwmgjdb` rejected exactly that. Carrying the
+    /// planner's `child_static_origin(owner, position)` on the binding lets the
+    /// call arm name the entry it discharges, so a consumption can be matched
+    /// to a transport instead of merely counted against one.
+    ///
+    /// **`None` is a real state, not a missing value:** every pre-existing
+    /// construction site produces it, and a call consuming such a binding
+    /// touches no ledger entry at all. That is what keeps an ordinary worker
+    /// call from paying a constructor field's debt.
+    ///
+    /// ⇒ Compiler-side identity only. It is a planner-owned `StaticOriginId`,
+    /// not a runtime word, tag, descriptor or carrier, and recording it creates
+    /// no planner population.
+    transported_field: Option<StaticOriginId>,
 }
 
 impl StaticWorkerBinding {
@@ -3988,38 +4010,72 @@ fn specialized_field_refs_at<'a>(
 /// different *routes* — so no site local to either can see both. This is the
 /// same shape as the `D3` continuation claim ledger and the `D2f` fused-region
 /// ledger, and it closes beside them.
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i` — the CONSERVATION LEDGER for
+/// compiler-only static-worker constructor fields.**
+///
+/// **The invariant is conservation, and exact-`Var` consumption is a terminal
+/// disposition rather than the invariant itself** (Architect
+/// `evt_5etamwj8tp2fh`). Every recognized worker at constructor field
+/// `(owner, position)` receives **exactly one** disposition before any
+/// runtime-value boundary:
+///
+/// 1. **Consume** — a static elimination of that exact field rebinds the same
+///    `StaticWorkerBinding` through [`Lowering::bound_constructor_fields`], and
+///    the pre-existing exact-`Var` callee call consumes it exactly once.
+/// 2. **Erase as proven unobservable** — lawful only under a whole-graph,
+///    origin-keyed proof, **at or before construction**. ⇒ **No such authority
+///    exists in this increment, so this ledger never records one.** A field
+///    already built and then ignored is not erasure and earns no consumed
+///    credit; erasure would have to prevent the construction.
+/// 3. **Refuse** — neither holds, so compilation refuses before emission.
+///
+/// **The forbidden fourth state is constructed-then-forgotten**, which is what
+/// the producer-alone cut shipped: four rows compiled with the worker dropped,
+/// and an enumeration of forbidden *uses* was satisfied vacuously because a
+/// drop is not a use.
+///
+/// **Every relation here is per occurrence, keyed by the planner's
+/// `child_static_origin(owner, position)`, and never an aggregate.** The first
+/// attempt kept the recognized origins but tallied consuming calls in one
+/// compile-wide scalar, accepting whenever the tally reached the entry count.
+/// Architect `dec_2xxj1zrwmgjdb` rejected it: that accepts a compile in which
+/// one transported field is dropped while another is called twice, or in which
+/// an unrelated pre-existing worker call supplies the count, and it cannot see
+/// excess consumption at all. **A count over a population is not a pairing
+/// within it** — and a documented limit is not a discharged claim.
+///
+/// **Why a ledger and not a local check.** The recognition and the elimination
+/// are in different descents, and on the measured population they are in
+/// different *routes* — so no site local to either can see both. This is the
+/// same shape as the `D3` continuation claim ledger and the `D2f` fused-region
+/// ledger, and it closes beside them.
 #[derive(Default)]
 struct StaticWorkerFieldLedger {
-    entries: Vec<StaticWorkerFieldEntry>,
-    /// Exact-`Var` calls that consumed a static worker out of the binding
-    /// authority, across the whole unit-definition pass.
+    /// One entry per recognized constructor field, keyed by the planner's
+    /// `child_static_origin(owner, position)`.
     ///
-    /// **Counted globally rather than per entry, and that is a stated limit
-    /// rather than an oversight.** The call arm reads a
-    /// [`LoweringEnvironmentBinding::StaticWorker`], which carries the binding
-    /// and not the constructor field it came from — so the call site cannot
-    /// name the entry without threading the pairing key through the binding
-    /// authority, which would change [`LoweringEnvironmentBinding`] and with it
-    /// `value_at`'s exhaustive match. `AC-2` forbids that. ⇒ The ledger proves
-    /// *"every rebound field was matched by at least as many consuming calls"*,
-    /// not *"this field was consumed by that call"*. The stronger pairing is
-    /// owed, and it is owed at the binding authority, not here.
-    consuming_calls: usize,
+    /// **Keyed rather than listed, because the same static occurrence can be
+    /// lowered more than once** — a speculative descent and the descent that
+    /// keeps its result both recognize the same field. Those are two transports
+    /// of one occurrence, and each owes its own consumption; they are not two
+    /// occurrences and must not become two entries.
+    entries: BTreeMap<StaticOriginId, StaticWorkerFieldEntry>,
 }
 
-/// One recognized static-worker constructor field, and where it got to.
+/// One recognized static-worker constructor field, and its running balance.
 struct StaticWorkerFieldEntry {
     owner: StaticOriginId,
     position: usize,
-    /// `child_static_origin(owner, position)` — the planner's key, which is how
-    /// the elimination below names the same occurrence the producer recognized.
-    field_origin: StaticOriginId,
     constructor: String,
-    rebound: bool,
+    /// Installs of this field into the lexical binding authority by a static
+    /// elimination.
+    rebinds: usize,
+    /// Exact-`Var` calls that consumed a binding **naming this field**.
+    consumptions: usize,
 }
 
 impl StaticWorkerFieldLedger {
-    /// Disposition 0 — a producer recognized a worker and built the field.
+    /// A producer recognized a worker and built the field.
     fn recognize(
         &mut self,
         owner: StaticOriginId,
@@ -4027,28 +4083,81 @@ impl StaticWorkerFieldLedger {
         field_origin: StaticOriginId,
         constructor: &str,
     ) {
-        self.entries.push(StaticWorkerFieldEntry {
-            owner,
-            position,
-            field_origin,
-            constructor: constructor.to_string(),
-            rebound: false,
-        });
+        self.entries
+            .entry(field_origin)
+            .or_insert_with(|| StaticWorkerFieldEntry {
+                owner,
+                position,
+                constructor: constructor.to_string(),
+                rebinds: 0,
+                consumptions: 0,
+            });
     }
 
     /// Disposition 1, first half — a static elimination rebound this exact
     /// field into the binding authority, keyed by the planner's origin.
-    fn rebind(&mut self, field_origin: StaticOriginId) {
-        for entry in &mut self.entries {
-            if entry.field_origin == field_origin {
-                entry.rebound = true;
-            }
-        }
+    ///
+    /// **A rebind of a field no producer recognized fails closed.** It cannot
+    /// happen while the armed producer is the only builder of the worker arm,
+    /// which is precisely why it is worth refusing rather than ignoring: the
+    /// day a second builder appears, an unrecognized transport must not be able
+    /// to enter the binding authority unaccounted.
+    fn rebind(&mut self, field_origin: StaticOriginId) -> Result<(), CraneliftBackendError> {
+        let Some(entry) = self.entries.get_mut(&field_origin) else {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "a static elimination rebound a static worker field at origin \
+                     {field_origin:?} that no recognized constructor field owns"
+                ),
+            ));
+        };
+        entry.rebinds += 1;
+        Ok(())
     }
 
-    /// Disposition 1, second half — the exact-`Var` call arm consumed a worker.
-    fn note_consuming_call(&mut self) {
-        self.consuming_calls += 1;
+    /// Disposition 1, second half — an exact-`Var` call consumed a binding.
+    ///
+    /// **`transported_field` is what makes this one-to-one.** A binding that
+    /// never came out of a constructor field carries `None` and discharges
+    /// nothing, so an ordinary worker call cannot pay a transported field's
+    /// debt. A call naming a field with no outstanding transport is an **excess
+    /// consumption** and refuses, which is the other half the aggregate count
+    /// could not see: it accepted more consumptions than transports as readily
+    /// as fewer.
+    fn note_consuming_call(
+        &mut self,
+        transported_field: Option<StaticOriginId>,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(field_origin) = transported_field else {
+            return Ok(());
+        };
+        let Some(entry) = self.entries.get_mut(&field_origin) else {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "an exact-Var call consumed a static worker naming constructor field origin \
+                     {field_origin:?}, which no recognized field owns"
+                ),
+            ));
+        };
+        if entry.consumptions >= entry.rebinds {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "constructor {} at origin {:?} field {} was consumed {} time(s) against {} \
+                     transport(s): a consumption with no outstanding transport cannot discharge \
+                     another field's obligation",
+                    entry.constructor,
+                    entry.owner,
+                    entry.position,
+                    entry.consumptions + 1,
+                    entry.rebinds
+                ),
+            ));
+        }
+        entry.consumptions += 1;
+        Ok(())
     }
 
     /// **The total.** Every recognized worker is consumed exactly once, erased
@@ -4056,34 +4165,41 @@ impl StaticWorkerFieldLedger {
     /// before emission; none is dropped.
     ///
     /// Erasure is structurally absent here — an entry exists only because the
-    /// field was built — so the two reachable outcomes are consume and refuse,
-    /// and the refusal names the occurrence by the planner's key so the route
-    /// gap it reports is actionable rather than merely a red.
+    /// field was built — so the two reachable outcomes are consume and refuse.
+    /// **The check is per occurrence and it is an equality**, so neither a
+    /// dropped transport nor a doubled consumption can be offset by a sibling.
     fn close(&self) -> Result<(), CraneliftBackendError> {
-        if let Some(entry) = self.entries.iter().find(|entry| !entry.rebound) {
-            return Err(unsupported(
-                "StaticWorkerBinding",
-                format!(
-                    "constructor {} at origin {:?} transports a static worker in field {} \
-                     (field origin {:?}) that no static elimination rebinds, so the field is \
-                     neither consumed at an exact-Var call nor erased before construction; \
-                     a constructor carrying an unconsumed static worker denotes a value \
-                     containing the callable and has no runtime representation",
-                    entry.constructor, entry.owner, entry.position, entry.field_origin
-                ),
-            ));
-        }
-        let rebound = self.entries.len();
-        if self.consuming_calls < rebound {
-            return Err(unsupported(
-                "StaticWorkerBinding",
-                format!(
-                    "{rebound} static worker constructor fields were rebound by a static \
-                     elimination but only {} exact-Var calls consumed one, so at least one \
-                     rebound worker was dropped rather than called",
-                    self.consuming_calls
-                ),
-            ));
+        for (field_origin, entry) in &self.entries {
+            if entry.rebinds == 0 {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "constructor {} at origin {:?} transports a static worker in field {} \
+                         (field origin {field_origin:?}) that no static elimination rebinds, so \
+                         the field is neither consumed at an exact-Var call nor erased before \
+                         construction; a constructor carrying an unconsumed static worker \
+                         denotes a value containing the callable and has no runtime \
+                         representation",
+                        entry.constructor, entry.owner, entry.position
+                    ),
+                ));
+            }
+            if entry.consumptions != entry.rebinds {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "constructor {} at origin {:?} field {} (field origin {field_origin:?}) \
+                         was rebound into the binding authority {} time(s) and consumed at an \
+                         exact-Var call {} time(s); a transported static worker that is not \
+                         called is dropped",
+                        entry.constructor,
+                        entry.owner,
+                        entry.position,
+                        entry.rebinds,
+                        entry.consumptions
+                    ),
+                ));
+            }
         }
         Ok(())
     }
@@ -4113,10 +4229,10 @@ impl Lowering<'_> {
         &mut self,
         fields: &[ConstructorField],
         outer: &[LoweringEnvironmentBinding],
-    ) -> Vec<LoweringEnvironmentBinding> {
-        let mut bindings = self.constructor_field_bindings(fields);
+    ) -> Result<Vec<LoweringEnvironmentBinding>, CraneliftBackendError> {
+        let mut bindings = self.constructor_field_bindings(fields)?;
         bindings.extend(outer.iter().cloned());
-        bindings
+        Ok(bindings)
     }
 
     /// [`Self::bound_constructor_fields`] for the sites that append to an
@@ -4126,9 +4242,10 @@ impl Lowering<'_> {
         &mut self,
         env: &mut Vec<LoweringEnvironmentBinding>,
         fields: &[ConstructorField],
-    ) {
-        let bindings = self.constructor_field_bindings(fields);
+    ) -> Result<(), CraneliftBackendError> {
+        let bindings = self.constructor_field_bindings(fields)?;
         env.extend(bindings);
+        Ok(())
     }
 
     /// The one place a [`ConstructorField`] becomes a
@@ -4143,11 +4260,10 @@ impl Lowering<'_> {
     fn constructor_field_bindings(
         &mut self,
         fields: &[ConstructorField],
-    ) -> Vec<LoweringEnvironmentBinding> {
-        fields
-            .iter()
-            .enumerate()
-            .map(|(_position, field)| match field {
+    ) -> Result<Vec<LoweringEnvironmentBinding>, CraneliftBackendError> {
+        let mut bindings = Vec::with_capacity(fields.len());
+        for (position, field) in fields.iter().enumerate() {
+            bindings.push(match field {
                 ConstructorField::Specialized(value) => {
                     LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(value.clone()))
                 }
@@ -4155,16 +4271,25 @@ impl Lowering<'_> {
                     binding,
                     field_origin,
                 } => {
-                    self.static_worker_fields.rebind(*field_origin);
+                    self.static_worker_fields.rebind(*field_origin)?;
                     #[cfg(test)]
                     record_d2k_owner_event(D2kOwnerEvent::StaticWorkerBinderInstalled {
                         field_origin: *field_origin,
-                        position: _position,
+                        position,
                     });
-                    LoweringEnvironmentBinding::StaticWorker(binding.clone())
+                    // **The transport key travels WITH the binding**, so the
+                    // exact-`Var` call that consumes it can name the field it
+                    // discharges. Without this the call arm sees only a
+                    // `StaticWorkerBinding`, which is why the first attempt
+                    // could count consumptions but not pair them.
+                    LoweringEnvironmentBinding::StaticWorker(StaticWorkerBinding {
+                        transported_field: Some(*field_origin),
+                        ..binding.clone()
+                    })
                 }
-            })
-            .collect()
+            });
+        }
+        Ok(bindings)
     }
 
     /// **The conservation close** — run at the end of the unit-definition pass,

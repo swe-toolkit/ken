@@ -20645,6 +20645,7 @@ fn d8i_the_discharge_facet_is_transported_stated_and_refuses_both_ways() {
         captures: Vec::new(),
         route: StaticWorkerCallRoute::RawWorker,
         discharge: ContinuationDischarge::DirectSpecializationCall,
+        transported_field: None,
     };
     let refusal = format!(
         "{:?}",
@@ -31641,5 +31642,127 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
          recognizes -- so the lawful disposition available today is REFUSE, keyed by the \
          planner's (owner, position) origin. If a row here installs and consumes, the route gap \
          is closed and this table is rewritten to AC-1's green, never restored."
+    );
+}
+
+/// **`D2k-1b-i` — the conservation ledger's pairing is ONE-TO-ONE and keyed by
+/// occurrence, exercised directly.**
+///
+/// **This control exists because the five rows cannot reach it.** They all
+/// refuse at the ledger's first closeout branch — recognized, never rebound —
+/// so their sentinel witnesses the drop case and nothing else. Architect
+/// `dec_2xxj1zrwmgjdb` rejected an earlier ledger for precisely that reason:
+/// its consuming-call tally was one compile-wide scalar, and the population
+/// that could have exposed the difference never reached the branch where the
+/// scalar was read. **A witness that stops at the first refusal cannot prove
+/// the claim the later branches make**, so those branches get their own.
+///
+/// The origins come from the planner's own positional child table, so the key
+/// under test is the same `child_static_origin(owner, position)` the producer
+/// and the binder use — not a hand-rolled identity that would test a different
+/// relation than production runs.
+///
+/// **Promise class: durable invariant.** Every row is a property of
+/// conservation itself, not of the current route or the current five: a
+/// transport must be matched by a consumption naming the same field, and no
+/// aggregate may substitute for that pairing.
+#[test]
+fn d2k_1b_i_conservation_pairs_each_transport_to_a_consumption_of_the_same_field() {
+    use crate::cranelift_backend::lowering::StaticWorkerFieldLedger;
+
+    let owner_expr = RuntimeExpr::Construct {
+        constructor: "ctor:fixture::Pair::Mk".to_string(),
+        args: vec![RuntimeExpr::Var(0), RuntimeExpr::Var(0)],
+    };
+    let (plan, owner) = planned_root_occurrence(&owner_expr);
+    let field_a = plan
+        .child_static_origin(owner, 0)
+        .expect("the constructor plans its first argument as child 0");
+    let field_b = plan
+        .child_static_origin(owner, 1)
+        .expect("the constructor plans its second argument as child 1");
+    assert_ne!(
+        field_a, field_b,
+        "the two fields must be distinct occurrences or every row below is vacuous"
+    );
+
+    let recognized_only = || {
+        let mut ledger = StaticWorkerFieldLedger::default();
+        ledger.recognize(owner, 0, field_a, "ctor:fixture::Pair::Mk");
+        ledger
+    };
+
+    // 1. Recognized and never rebound is the DROP -- the state the
+    //    producer-alone cut shipped, and the one the five reach today.
+    assert!(
+        recognized_only().close().is_err(),
+        "a recognized field that no static elimination rebinds must refuse"
+    );
+
+    // 2. One transport, one consumption naming that field: the lawful ending.
+    let mut lawful = recognized_only();
+    lawful.rebind(field_a).expect("the field is recognized");
+    lawful
+        .note_consuming_call(Some(field_a))
+        .expect("a consumption naming an outstanding transport is lawful");
+    assert!(
+        lawful.close().is_ok(),
+        "a transported field consumed once at the exact-Var call is conserved"
+    );
+
+    // 3. Two transports of one occurrence, one consumption: a DROP that an
+    //    entry-count comparison cannot see, because the entry was rebound.
+    let mut short = recognized_only();
+    short.rebind(field_a).expect("recognized");
+    short.rebind(field_a).expect("recognized");
+    short
+        .note_consuming_call(Some(field_a))
+        .expect("the first consumption has an outstanding transport");
+    assert!(
+        short.close().is_err(),
+        "two transports discharged by one consumption leaves one worker dropped"
+    );
+
+    // 4. THE REJECTED SHAPE, stated as a row: one field dropped while another
+    //    is called twice. Under an aggregate tally the totals balance and the
+    //    compile is accepted; under occurrence keying the second consumption of
+    //    `field_a` has no outstanding transport and refuses on the spot.
+    let mut offset = StaticWorkerFieldLedger::default();
+    offset.recognize(owner, 0, field_a, "ctor:fixture::Pair::Mk");
+    offset.recognize(owner, 1, field_b, "ctor:fixture::Pair::Mk");
+    offset.rebind(field_a).expect("recognized");
+    offset.rebind(field_b).expect("recognized");
+    offset
+        .note_consuming_call(Some(field_a))
+        .expect("the first consumption of field_a is matched");
+    assert!(
+        offset.note_consuming_call(Some(field_a)).is_err(),
+        "a second consumption of field_a cannot discharge field_b's transport, however the \
+         compile-wide totals happen to balance"
+    );
+
+    // 5. An ordinary worker call -- one never rebound out of a constructor
+    //    field -- carries no key and discharges nothing. This is the other way
+    //    an aggregate tally could be satisfied by something unrelated.
+    let mut unrelated = recognized_only();
+    unrelated.rebind(field_a).expect("recognized");
+    unrelated
+        .note_consuming_call(None)
+        .expect("a direct binding's consumption is lawful and pays no debt");
+    assert!(
+        unrelated.close().is_err(),
+        "a pre-existing static worker call must not discharge a transported field's obligation"
+    );
+
+    // 6. Both directions of the unknown-origin case fail closed, so a second
+    //    builder of the worker arm cannot enter or leave the ledger unaccounted.
+    let mut stranger = StaticWorkerFieldLedger::default();
+    assert!(
+        stranger.rebind(field_a).is_err(),
+        "rebinding a field no producer recognized must refuse"
+    );
+    assert!(
+        stranger.note_consuming_call(Some(field_b)).is_err(),
+        "consuming a field no producer recognized must refuse"
     );
 }
