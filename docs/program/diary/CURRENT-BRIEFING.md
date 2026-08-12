@@ -38,7 +38,48 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~22:0xZ. `main` = `d5912acd`.
+> ### RESUME HERE — state at 2026-08-12 ~23:2xZ. **`main` = `689dabd7`.**
+>
+> > **PUBLISHED. `main` MOVED `d5912acd` → `689dabd7` (doc-only PR #2041) — the
+> > first merge in three hours.** It carried 14 commits of rulings,
+> > refutations and corrections that existed only on `steward/work` while the
+> > frame on `main` fell **four rulings** behind. `steward/work` is **reset to
+> > `origin/main`** after verifying all four files byte-identical — a
+> > squash-merged branch reads 14-ahead forever otherwise.
+> >
+> > **I HAD THE HOLD WRONG, and the correction is the lesson.** Holding was
+> > right while the ring was mid-build against a hand-named base; it was wrong
+> > once they were tracing and the branch was freed. **The path intersection was
+> > empty the whole time** — no `crates/` paths — so the rebase was always
+> > clean, and the only thing the hold bought was a `main` whose frame described
+> > none of what had been ruled. **Re-derive a hold at each tick; it does not
+> > stay true because it was true.** Ring told at `evt_2v4sdvr74yme2`; they must
+> > not name `d5912acd` again.
+> >
+> > **RE-PRICING THE ATOMIC BOUNDARY IS WITH THE ARCHITECT
+> > (`evt_2v4sdvr74yme2`), and it is a real question, not schedule pressure.**
+> > `evt_4m0q1m4zn4k79` forbade merging **unexercised** mechanism. Measured on
+> > `766cbdf0`, **four controls now run UNARMED in the tree** — control 1,
+> > `dp_composition_time_membership_is_validated_and_changes_the_binding_fingerprint`
+> > (**`DP` is exercised**), `d3_the_splice_capability_is_spendable_exactly_once...`
+> > (net 3), and `ac_d3_self_the_recursive_edges_call_site_is_separated_from_its_callee_body`.
+> > ⇒ **The ruling's own precondition is no longer uniformly true**; `D1`/`D2`
+> > appear to be the only unexercised parts. **I proposed NO cut** — amending an
+> > atomicity ruling is soundness and is the Architect's. **"Still one object"
+> > is a legitimate answer I will record as settled and stop asking.** It must
+> > not delay the route-C ruling.
+> >
+> > **RESEARCH ENGAGED (`evt_5h8qz9efzz1ky`), advisory and non-blocking,
+> > bounded to one turn.** Question: in fusion/deforestation, **what makes the
+> > fused-away producer DEAD and WHERE is that established** — asserted by the
+> > transform, discovered by a later DCE/reachability pass, or a property of
+> > ownership so the occurrence is never lowered again — plus the standard
+> > failure mode when a fusion leaves its producer reachable. **Approach and
+> > behavior only; no `crates/` read; no repair proposed.** *"No transferable
+> > prior art, here is why"* is an accepted answer. **Two Enters were needed
+> > (1192-char paste).**
+>
+> ### RESUME HERE — earlier state at 2026-08-12 ~22:0xZ. `main` was `d5912acd`.
 >
 > > **~23:0xZ — THE TRACE LANDED AND FOUND A THIRD CONSTRUCTOR ROUTE NOBODY
 > > WAS RULING ABOUT. The sequencing ruling paid for itself in one turn.**
