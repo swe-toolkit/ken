@@ -31898,6 +31898,14 @@ fn d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport() {
 /// `evt_55rzfnc1gkekq` confirmed the reading and Architect `evt_6c9f1csfvrey7`
 /// made the repair conditional on this measurement.
 ///
+/// **The population is TWO rebind callers and SIX descent sites** — four
+/// through `bound_constructor_fields`, two through `extend_constructor_fields`,
+/// all reaching `rebind` by way of the single `constructor_field_bindings`. The
+/// deciding read was posed over the four `bound_constructor_fields` sites, and
+/// **the witness landed on an `extend_constructor_fields` one**, so a four-site
+/// reading is short by exactly the sites that mattered. Sites are named by
+/// stable function route, never `file:line` (`1c-0c`).
+///
 /// **Why this could not be measured on the worker-keyed REBIND event.** `rebind`
 /// runs only for a `ConstructorField::StaticWorker`, and every one of the five
 /// rows sits at `installs == 0` behind the route gap. So the population that
@@ -32085,7 +32093,11 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
     // three depths are its scale check: one repeated eliminating occurrence per
     // level, so the repetition tracks the source graph rather than being an
     // artifact of the harness. The SECOND column is the deciding read.
-    let composed = "core.rs:5411";
+    // ⛔ A STABLE ROUTE NAME, never a line number. The label was
+    // `core.rs:5411`, which re-aims itself at an unrelated site on any edit
+    // above it and is then green for the wrong reason -- the same defect this
+    // node already found in `AC-2`'s own control. `1c-0c`.
+    let composed = "extend_constructor_fields@composed";
     assert_eq!(
         rows,
         [

@@ -4604,7 +4604,7 @@ impl<'a> Lowering<'a> {
                 }
                 #[cfg(test)]
                 record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "core.rs:4605",
+                    site: "bound_constructor_fields@producer-env",
                     eliminated_origin: static_origin,
                 });
                 let case_env = self.bound_constructor_fields(&args, producer_env)?;
@@ -5415,7 +5415,7 @@ impl<'a> Lowering<'a> {
                 let mut case_env = induction_hypotheses;
                 #[cfg(test)]
                 record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "core.rs:5411",
+                    site: "extend_constructor_fields@composed",
                     eliminated_origin: eliminator.static_origin,
                 });
                 self.extend_constructor_fields(&mut case_env, &args)?;
@@ -5471,7 +5471,7 @@ impl<'a> Lowering<'a> {
                 }
                 #[cfg(test)]
                 record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "core.rs:5462",
+                    site: "bound_constructor_fields@ordinary-eliminator",
                     eliminated_origin: eliminator.static_origin,
                 });
                 let mut case_env = self.bound_constructor_fields(&args, &[])?;
@@ -7126,7 +7126,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     }
                                     #[cfg(test)]
                                     record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "core.rs:7112",
+                    site: "bound_constructor_fields@source-machine",
                     eliminated_origin: static_origin,
                 });
                                     let mut case_env = self.bound_constructor_fields(&args, &[])?;
@@ -7644,7 +7644,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             let mut case_env = induction_hypotheses;
                             #[cfg(test)]
                             record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "core.rs:7625",
+                    site: "extend_constructor_fields@source-machine-composed",
                     eliminated_origin: frame.static_origin,
                 });
                             self.extend_constructor_fields(&mut case_env, &args)?;
@@ -15338,7 +15338,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 }
                 #[cfg(test)]
                 record_d2k_owner_event(D2kOwnerEvent::StaticMatchBinderDescent {
-                    site: "core.rs:15308",
+                    site: "bound_constructor_fields@direct-descent",
                     eliminated_origin: static_origin,
                 });
                 let case_env = self.bound_constructor_fields(&args, env)?;

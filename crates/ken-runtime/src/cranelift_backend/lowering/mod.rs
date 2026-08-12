@@ -2525,20 +2525,35 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
     /// elimination.
     StaticWorkerCallConsumed { origin: StaticOriginId },
     /// `D2k-1c-0` — a static `Match` elimination descended over a constructor's
-    /// fields at one of the six binder sites, tagged with **which** site and
-    /// with the planner origin of the eliminating match occurrence.
+    /// fields, tagged with **which** site and with the planner origin of the
+    /// eliminating match occurrence.
     ///
-    /// **This is the deciding-read instrument, and its subject is the ROUTE,
-    /// not the static worker.** [`StaticWorkerBinderInstalled`] fires only for
-    /// a worker field, and on today's population that is never — every row
-    /// sits at zero installs behind the route gap, so no worker-keyed event can
-    /// see whether one occurrence is descended twice. This one fires for every
-    /// constructor field of every kind, so the multiplicity question is
-    /// measurable on the rows as they stand rather than only after the repair
-    /// that would make it matter.
+    /// **THE DURABLE POPULATION IS TWO REBIND CALLERS AND SIX DESCENT SITES**:
+    /// four reach [`Lowering::rebind`] through
+    /// [`Lowering::bound_constructor_fields`] and two through
+    /// [`Lowering::extend_constructor_fields`], both by way of the single
+    /// [`Lowering::constructor_field_bindings`]. The deciding read was posed
+    /// over the four `bound_constructor_fields` sites; the two
+    /// `extend_constructor_fields` sites reach the same chokepoint and the
+    /// witness landed on one of them, so a four-site reading of this instrument
+    /// is short by exactly the sites that mattered.
+    ///
+    /// **This is a ROUTE instrument, not a worker one.**
+    /// [`StaticWorkerBinderInstalled`] fires only for a worker field, and on
+    /// today's population that is never — every row sits at zero installs
+    /// behind the route gap. This one fires for every constructor field of
+    /// every kind, so descent multiplicity is measurable on the rows as they
+    /// stand. ⛔ **Descent multiplicity is not field multiplicity**: repeated
+    /// descents of one eliminating match occurrence may traverse different
+    /// constructors, and rows 4 and 5 do.
     ///
     /// [`StaticWorkerBinderInstalled`]: D2kOwnerEvent::StaticWorkerBinderInstalled
     StaticMatchBinderDescent {
+        /// **A stable function-route name**, e.g.
+        /// `extend_constructor_fields@composed` — never a `file:line`. A line
+        /// label re-aims itself at an unrelated site on any edit above it and is
+        /// then green for the wrong reason, which is the defect this node
+        /// already found in `AC-2`'s own control. `1c-0c`.
         site: &'static str,
         eliminated_origin: StaticOriginId,
     },
