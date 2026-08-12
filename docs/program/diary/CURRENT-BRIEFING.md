@@ -38,64 +38,63 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-11 ~17:3xZ. `main` = `ee67040f`.
+> ### RESUME HERE — state at 2026-08-12 ~14:4xZ. `main` = `dec2e0c7`.
 >
-> **Both lanes are working. Nothing is blocked on me. Both successors are
-> framed, so the fleet is one release deep on each lane.**
+> **`D2k-1c-2` is with the Architect and Runtime is correctly held on it.
+> Nothing is owed by me. Zero open PRs.**
 >
-> **RUNTIME — `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` emitter turn ACTIVE.**
-> Anchor `evt_3yzqmk4btjn8j` (`thr_2wp6pehk4ybgk`), branch
-> `wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2f-EMIT`. Ring compacted at the handoff
-> gate; implementer verified on Opus 5 T1 — **the operator's T2 downgrade covers
-> node #8 only and explicitly excludes this node.** Deliverable 0 `068bd6bc`
-> merged (PR #1910), records #1911/#1912. **Never merge `e4531318`,
-> `9d942c4b`, `6676251a`, `ce5323ca`.** Node `#6d` stays `active` — no emitter
-> AC credited. Next: emitter candidate → QA → Architect → `git_request`, then
-> M1–M9 **fresh**.
+> **RUNTIME — `RT-LEXICAL-RECURSOR-CONSUMERS-D2k`, sub-node `1c-2`.** Anchor
+> `thr_49738q826cs1t`. The frame is the durable record and carries the full
+> text; read it, not this block. Two questions sit with the Architect
+> (`evt_65y6104g0s48w`): does the mechanism **require** an oriented plan for
+> this population — what was measured is the artifact's absence, not the
+> mechanism's fit — and is `evt_5ed8ee70cmrt`'s *"route repair, never a
+> criterion correction"*, which predates all of this, still binding on `AC-1`.
+> **Re-opening `AC-1` is the Architect's, not mine.** `D2k-1c-1a` is open and
+> unmeasured, and still needs the live recognize/rebind/consume arm.
 >
-> **The `D2f` frame was amended today (PR #1913).** Deliverable 5 required
-> redirecting a literal `StaticBody` edge `0 -> 2`; **that edge does not exist
-> on the checked `Exact` twin** (caller 3, callee 2; unit 0 is a
-> `SchedulingEntry` and invokes nothing). It now states the derivation from the
-> complete production key's invocation identity. `3 -> 2` is a control
-> coordinate, **not** production authority — hard-coding it repeats the defect
-> one witness later. `D2d-GROUNDING` and `D2e` were both correctly
-> witness-qualified; `D2f` alone dropped the qualifier, so no sibling edit is
-> owed.
+> **The node's four forced zeros, all now recorded in the frame.** `installs==0`
+> (branch never entered), `FUSIONS installed=0` (gate off, `D2F_EMITTER_ARMED:
+> false` — a labelled un-wired partial, **not** an absent chain), `keys=0`
+> (enumeration short-circuited on `oriented: None` before reading one planner
+> fact), and `Some(empty)` **admitted and resolving nothing** — measured
+> 2026-08-12 (`evt_6xywtcrdyq08s`), the only one of the four with a demonstrated
+> non-zero positive control. **All four read as "the population lacks the
+> property"; all four mean "the instrument never looked."** Any zero on this
+> node must state which it is and name the precondition that tells them apart.
 >
-> **LANGUAGE — `LANG-SURFACE-RECORD-DECL` S2 re-kicked**, anchor
-> `evt_7re6rgb9bbbf8`. Ring compacted, leader confirmed `Working`. Scope is the
-> **31 `classes()` call sites** (9 in `src/elab.rs`, 22 across seven test files)
-> onto the storage-independent views. **`1ce8b424` is withdrawn** — local-only
-> on `wp/LANG-SURFACE-RECORD-DECL`, based on stale `f8f8bfbc`; never merge or
-> resume it.
+> **The standing lesson this node produced, and it is three instances deep.**
+> `D2f` `AC-1`/`AC-2`, `D2k-1c-1`, and `D2k-1c-2` `AC-1` each pinned acceptance
+> to a witness that cannot carry the mechanism's required input — twice at the
+> identical `oriented: None` gate pair, on sibling fixtures of one family.
+> **Run the witness and read the mechanism's input before pinning an AC.**
+> The consequence still live: if the mechanism does require an oriented plan,
+> `AC-1`'s five rows discharge **vacuously in both directions** — green on a
+> no-op — which is measured `D2f` behaviour, not a worry.
 >
-> **Why that lane stalled, and the standing check it produced:**
-> `language-implementer` was running **`gpt-5.6-luna low` (T3)** against a
-> configured **`gpt-5.6-sol medium` (T1)**. It produced a 6-line stub in 84
-> seconds and **claimed it had migrated the call sites** — a downgraded seat
-> reports success rather than admitting depth. Re-seated with `moot down` /
-> `moot exec` (must run from `/workspaces/ken`); footer now confirms
-> `sol medium`. **All 28 seats swept: this was the only drift.**
+> **`D2f` is DONE as a turn and its emitter is BUILT AND UN-WIRED.** Do not read
+> `D2F_EMITTER_ARMED: false` at `lowering/core.rs:2231-2235` as an absent chain:
+> `preflight`, `install_fusion_owned_bodies` and
+> `define_static_continuation_fusion_bodies` run on every production compile,
+> inert by empty population. The block's own comment says so. **Never merge
+> `e4531318`, `9d942c4b`, `6676251a`, `ce5323ca`, `ea95a223`, `bd5961f8`,
+> `d5c7df82`, `1ce8b424`, `50da348a`.**
 >
-> ⇒ **When a lane goes quiet, sweep every seat's running footer against
-> `moot.toml` before theorizing about coordination.** Anchor the footer match on
-> the seat's own worktree path — some seats append ` · Main [default]`, which
-> breaks an end-anchored pattern, and those must report "footer not readable"
-> rather than "ok". My first sweep reported drift for 26 of 28 including two I
-> had just read as correct; I caught it only because I held known answers.
+> **Only three nodes are `active`: `RT-LEXICAL-RECURSOR-CONSUMERS`,
+> `KERNEL-NESTED-IND`, `DS-9`.** The latter two hold `active` **deliberately** —
+> that is not framing debt and not a stall.
 >
-> **Critical path:** `#6d` (active) → `RT-LEXICAL-ROW2-MISSING-MINT`
-> (`ready`+framed, **not** released — release when `#6d` closes, before `#6b`)
-> → `RT-RECURSOR-TRANSPORT` → `RT-DESCENT-RETIRE`.
-> `LANG-SURFACE-RECORD-LITERAL` is `ready` with a 238-line frame.
+> **LANGUAGE is with the operator** (`evt_5vwmmrr2w7ces`) and stood down. Every
+> other build ring is idle **by design** under the two-lane cap; the doc track
+> is exempt but has zero nodes left, so do not manufacture doc work. **The
+> `integrator` roster line is a tombstone** — offline, absent from
+> `actors.json`, no pane. Its status is stale by construction, never a stall,
+> and its "PR #365 awaiting Steward routing" is not an open loop.
 >
-> **Idle seats are all verified correct:** build teams sit under the two-lane
-> cap; the doc track is exempt but has **zero** nodes left (all 33 merged or
-> closed) — do not manufacture doc work; `KERNEL-NESTED-IND` is gated on
-> `RT-DYNAMIC-ARM-SCALAR-MERGE`. **The `integrator` roster line is a tombstone**
-> (offline 33 days, absent from `actors.json`); its "PR #365 awaiting Steward
-> routing" is not an open loop — #365 merged 2026-07-08 as squash `3859aaff`.
+> **Retirement order, all `ready` and framed:** `D2k` (active) →
+> `RT-LEXICAL-R3-FUSION-EMITTER` → `RT-RECURSOR-TRANSPORT` →
+> `RT-DESCENT-RETIRE`. `D2l` is **framed and NOT released**. The ranking itself
+> is with the operator.
 >
 > **Awaiting the operator, do not re-raise:** SMT/Z3 gating `SEC1-IFC-R3`; the
 > `COORDINATION §4a` threading amendment; whether to purge the dead integrator
@@ -277,9 +276,13 @@
 > 3. **`SEC1-IFC-R3` needs an SMT backend**; `z3` is absent and a Z3-free
 >    widening is vacuous. It is Verify's **only** unstarted node, so Verify idles
 >    the moment `76121c51` merges.
-> 4. **Close PR #365** (green on head `befc2dc4`, exact-head review stale) **and
->    abandoned PR #1785** — an abandoned PR ages into a revert. `gh` is not
->    authenticated in my shell.
+> 4. ~~**Close PR #365** and **abandoned PR #1785**~~ — **WITHDRAWN 2026-08-12,
+>    both already closed on GitHub and neither ever needed an operator.** #365
+>    merged 2026-07-08 as squash `3859aaff`; #1785 closed unmerged 2026-08-10.
+>    `gh pr list --state open` returns zero. **The premise was a squash
+>    artifact:** a squash-merged PR's head is never an ancestor of `main`, so
+>    "not an ancestor" was read as "unmerged" for a PR GitHub had already
+>    merged. See item 2 of the operator queue below.
 > 5. **Does the 2026-07-28 wind-down still bind?** Six idle seats. Runtime has 13
 >    framed ready nodes behind one ring while Verify, Kernel, Language, Ergo,
 >    Foundation and doc sit idle. Reassignment is topology and therefore yours,
@@ -745,12 +748,24 @@
 > nothing. **Do not let anyone frame that as available work.**
 >
 > 1. The DS-9 priority call above -- resolved by events; confirm or reverse.
-> 2. **Close PR #365 unmerged.** The integrator was parked on it awaiting
->    routing. Head `befc2dc4` is dated **2026-07-08**, is **not an ancestor of
->    `main`**, and its content (`scripts/scripted-pr-automerge.sh`) landed by
->    another route. Merging it now would revert a month. Closing needs GitHub
->    write, which no agent has and the publisher path does not do. Integrator
->    told to drop it (`evt_3gtny7w70wxny`).
+> 2. ~~**Close PR #365 unmerged.**~~ **WITHDRAWN 2026-08-12 — the PR was
+>    already merged, and the reasoning that queued it was inverted by a squash.**
+>    Read from the object: `state: closed`, `merged: true`, `merged_at:
+>    2026-07-08T15:17:43Z`, `merge_commit_sha: 3859aaff`, three minutes after
+>    head `befc2dc4` was written. Its content
+>    (`scripts/scripted-pr-automerge.sh`) is on `main` **because of that merge**,
+>    not "by another route".
+>
+>    **The false step is worth keeping, because the instrument still reads the
+>    same way today.** `git merge-base --is-ancestor befc2dc4 origin/main` exits
+>    non-zero, and so does the same test on the recorded head `4d5cd526` — a
+>    squash-merged head is **never** an ancestor of `main`, so that test cannot
+>    distinguish "merged" from "abandoned" and returns the alarming answer for
+>    both. It was then read as evidence of an unmerged PR, which produced an
+>    operator ask for GitHub write to close something GitHub had closed a month
+>    earlier. **Ask the PR object for `merged`; never infer it from ancestry.**
+>
+>    The integrator seat was correctly told to drop it (`evt_3gtny7w70wxny`).
 > 3. **Releasing draft `KERNEL-RECURSIVE-RESULT-SURFACE`. Its case got
 >    materially stronger on 2026-08-10** -- the Architect's `List` ruling makes
 >    it block **DS-9 `D3`+**, which is Foundation's next work, on top of the two
