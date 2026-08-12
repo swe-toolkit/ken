@@ -86,8 +86,22 @@ a merge-base goes stale without your branch moving.
 > ⇒ **An elimination that sees origin 31 cannot discharge the worker in origin
 > 26.** In both fixtures the source graph places the worker-bearing occurrence
 > immediately under a later computational eliminator whose selected case calls
-> the field. **The excluded route is losing or misattaching that pending outer
-> continuation when the producer's recursive/direct descent returns.**
+> the field.
+>
+> > **THE TRAILING SENTENCE HERE IS REFUTED. IT SAID: *"the excluded route is
+> > losing or misattaching that pending outer continuation when the producer's
+> > recursive/direct descent returns."*** The bounded trace
+> > (`evt_72hmebjj5c9rt`) settled it: **there is no misattachment and no loss.
+> > It is ONE occurrence lowered TWICE, in two traversals with two different
+> > environments.** `CASE-BODY-SELECT` is keyed on planner coordinates and picks
+> > the **same** child in both — row 4 child `26`, row 5 child `22`.
+> > **`define_unit_bodies` eliminates it; `define_continuation_bodies`
+> > recognizes it.** The eliminating traversal has no worker in the environment,
+> > so there is nothing to rebind; the recognizing traversal has no eliminator
+> > in scope, so there is nothing to rebind it with. **Neither traversal is
+> > wrong on its own**, which is why every repair aimed at one of them missed.
+> > The separating edge is a traversal boundary, not a continuation defect.
+> > **The `31`-vs-`26` claim above is untouched by this and still holds.**
 >
 > **Refusing is safe while that route is absent, and is not the permanent
 > semantics.** Declaring the refusal permanent would reject a source program
@@ -1105,7 +1119,43 @@ surface.
 not this question. Build to `evt_3manpp82emcq6`, not to the superseded
 transport-only shape.
 
-> ### `1c-2` IS A BOUNDED READ RIGHT NOW, NOT THE REPAIR. DO NOT WRITE ROUTE CODE.
+> ### THE BOUNDED READ IS COMPLETE. `evt_72hmebjj5c9rt` AT `199fbbb0`.
+>
+> **The answer: ONE occurrence, lowered TWICE, in two traversals.**
+> `define_unit_bodies` eliminates it and has no worker in the environment;
+> `define_continuation_bodies` recognizes it and has no eliminator in scope. The
+> armed backtrace is four frames deep with **no eliminator machinery at all**.
+> The frame's long-standing "different occurrence" premise is refuted above.
+>
+> **Counts, identical on rows 4 and 5:** `UNARMED-A` (`:3802`) **0**;
+> `UNARMED-B` (`:4329`) 2; armed `lower_expr` entries 6; armed recognitions 1;
+> outer selections 2; **rebind/install 0; consume 0**; `RecursiveDescent` sites
+> **0**; `FunctionizedUnits` sites 8.
+>
+> **THE CENSUS IS INCOMPLETE, AND THIS IS THE NEXT QUESTION.** Row 4's
+> worker-bearing outer selection (`aggr 5`) **matches no instrumented producer
+> event** — neither unarmed site nor the armed site produced it. ⇒ **A fourth
+> production path inside the `define_unit_bodies` traversal supplies it**, and
+> it was not located within the authorized bound. The three-site census I
+> published is therefore a floor, not the population.
+>
+> **`UNARMED-A` stays in census.** Zero entries on rows 4 and 5 is evidence
+> about **this population only** and does not prove the site cannot receive the
+> governed case-body population. The ring said so itself rather than banking
+> the exclusion.
+>
+> **Bearing on `1c-1a`, and it does NOT discharge it:** every site on both rows
+> is `FunctionizedUnits` and `RecursiveDescent` was never exercised. That
+> constrains which arm the read will be taken on; it says nothing yet about
+> `defining_function_id`, which still needs a live rebound field.
+>
+> **The read was run twice and the ring disclosed it.** The first run's
+> collection filter discarded the backtrace bodies — item 4 — so it re-ran
+> unfiltered. Given the read exists to settle a conclusion refused *because* it
+> rested on a filtered backtrace, keeping that filter silently would have been
+> the wrong economy.
+>
+> ### THE AUTHORIZATION THAT PRODUCED IT. DO NOT WRITE ROUTE CODE.
 >
 > Architect reconciliation, released as `evt_48cyxhcc76ftq`, **supersedes the
 > earlier site-specific direction `evt_3yw1vw4rsv8rn`.** Runtime is authorized
@@ -1209,12 +1259,31 @@ obligations, verbatim in substance from the ruling:
    drop.
 
 - **Obligation 4 is the one a passing suite will not catch.** A repair that
-  "works" by feeding origin 31 to the consumer goes **green and is wrong** — 31
-  is causally downstream of the required consumer, so consuming it proves
-  nothing about origin 26. **Commit a named negative control that fails if 31
-  is ever substituted**, and a positive control proving that control's path is
-  reached. A negative that passes because nothing arrived is the defect this
-  campaign keeps re-finding.
+  "works" by feeding origin 31 to the consumer goes **green and is wrong**, so
+  consuming it proves nothing about origin 26. **Commit a named negative control
+  that fails if 31 is ever substituted**, and a positive control proving that
+  control's path is reached. A negative that passes because nothing arrived is
+  the defect this campaign keeps re-finding.
+
+  > **THE REASON GIVEN FOR OBLIGATION 4 IS MEASURED WRONG. THE OBLIGATION
+  > STANDS; RE-DERIVE `31` BEFORE WRITING ITS CONTROL.**
+  >
+  > This bullet said *"31 is causally downstream of the required consumer"*, and
+  > obligation 4 itself calls it *"row 4's origin-31 **post-consumption**
+  > result"*. The bounded trace (`evt_72hmebjj5c9rt`) measured `31` as a
+  > `PX8JScopeTree::Node` whose **sole argument is a literal `LexicalClosure`**,
+  > lowered with **both matches still pending** (`[Comp(21) | Comp(5)]`) — the
+  > shape of the **input** tree — and row 5's positional counterpart is named
+  > `PX8JHoleInput::Node`. **That reads as upstream, not downstream.**
+  >
+  > **Why this is flagged rather than silently rewritten:** a negative control is
+  > keyed to *what the substituted value is*, so a control written against
+  > "downstream result" and a control written against "input tree" refuse
+  > different things. **Establish what `31` is from the fixture before the
+  > control is authored**, and correct obligation 4's wording in the same cut.
+  > The obligation — that `31` must never be substituted as the consumer's input
+  > — is unaffected either way, and the ring is not asserting the frame is
+  > wrong.
 - **Obligation 5 is an A/B, and the INFORMATIVE side is the one that GREENS.**
   Detaching the continuation restoring the refusal shows the mechanism is load
   bearing; it does **not** show the repair is correct. The green arm — rows 4
