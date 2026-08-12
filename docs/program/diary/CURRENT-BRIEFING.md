@@ -38,7 +38,26 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~17:4xZ. `main` = `8b142d01`.
+> ### RESUME HERE — state at 2026-08-12 ~18:0xZ. `main` = `5d8f563b`.
+>
+> **RELEASED AND WITH THE RING: `DP-0`** (`evt_6dhg3f216pyf0`, base `5d8f563b`,
+> frame blob `5b900ed2`, the `DP-0` block above section 6 of the R3 frame).
+> Comment-only, one file, `lowering/core.rs`. It closes the Adversary's
+> `evt_h0mzz2y4666b`, whose three findings I verified at the landed source
+> before framing.
+>
+> **Finding 1 is my own defect and is the reason it jumped the queue.** I
+> required a retirement clause on the previous partial — correctly: a
+> tree-state claim must name its falsifier and owner, because nothing reddens
+> when it expires. **The scoping words were wrong.** *"Every sentence above"*
+> and *"deleting this block"* sweep in `core.rs:2234` (the Architect ruling
+> citation) and `:2238` (*"ruled unlawful rather than merely out of scope"*),
+> **neither of which `D1`/`D2` falsify**, and a grep over `crates/` at
+> `8b142d01` returns exactly one hit for each — that block is the only in-tree
+> record of both. So the prohibition is deleted **at the exact moment it
+> becomes relevant**, since `D1`/`D2` landing is what makes the guard
+> reachable. Fail-open. The cut: **a measurement of a tree state expires; a
+> ruling about what is lawful does not.**
 >
 > **WIP AUDIT CLOCK: NOT ARMED AGAINST ANY SEAT.** No implementation seat is
 > working. `DP` is a genuine hard stop (resets the clock) and the last candidate
