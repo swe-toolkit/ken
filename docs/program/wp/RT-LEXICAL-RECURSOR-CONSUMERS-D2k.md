@@ -309,7 +309,7 @@ their arms. **No consumer becomes green here** — the five still refuse.
   wildcard/default arm or a `LoweringEnvironmentBinding`-as-payload arm.
   Section 3 forbids both — stop, do not widen.
 
-> #### THREE of `1b-i0`'s discharges are INDUCTIVE on the premise `1b-i` deletes
+> #### `1b-i0`'s discharges are INDUCTIVE on the premise `1b-i` deletes
 >
 > `1b-i0` is accepted as *behaviour is unchanged*, and it earns that honestly —
 > **because nothing constructs the worker variant.** Three of its decisions were
@@ -340,6 +340,49 @@ their arms. **No consumer becomes green here** — the five still refuse.
 > `same_recursive_field_shapes` returning `false` licenses when a worker really
 > can be present; and whether handing back an intact constructor is still right
 > when the thing inside it has no value representation.
+>
+> #### ONE premise statement self-retires. The other four go false SILENTLY.
+>
+> Adversary `evt_6g3z0xm53cfaz` established the **asymmetry** and the count of
+> **five** premise statements in `1b-i0`'s added lines. **The coordinates below
+> are not its** — they were derived by grep at `8ab2813d`, and all five sit in
+> `crates/ken-runtime/src/cranelift_backend/lowering/mod.rs`. The report's own
+> `:136 / :275 / :323 / :377` are **offsets into a diff stream, not file
+> lines** (`evt_5191zntrffvv3`), and its *"the premises live in `core.rs` and
+> `mod.rs`"* was inherited from the merge's declared path list rather than
+> measured. **Open the anchors below; do not chase the report's.**
+>
+> | line | what it asserts |
+> |---|---|
+> | `2872` | *"NOTHING CONSTRUCTS THIS ARM AT `D2k-1b-i0`, and the resulting `never constructed` warning is the open checkpoint staying visible"* |
+> | `4551` | `d9_collect` — *"This walk is an infallible observation"* |
+> | `16505` | `unwrap_terminal_ret` — *"This function is infallible, so the conservative move is to NOT see through the wrapper"* |
+> | `19826` | `same_recursive_field_shapes` — *"`false` is the answer that cannot be wrong"* |
+>
+> plus `emit_carrier_transfer`'s ordering note.
+>
+> **The asymmetry is the finding.** When `1b-i` constructs the variant, the
+> `never constructed` warning **disappears** — a real compiler-generated event.
+> **The other four go false in place, with no warning, no red, and nothing
+> naming them.** Three are one-line justifications inside otherwise unrelated
+> functions, which is exactly where a behaviour-focused pass does not look.
+>
+> ⇒ **AC for `1b-i`, and it is greppable rather than a reminder: after `1b-i`,
+> no comment in the changed files may still assert that nothing constructs the
+> worker variant.** Each of the four is corrected or removed, and the handback
+> states what each now says. A reviewer can check that by reading the four
+> anchors above; *"we re-verified"* is not checkable and this is.
+>
+> **If the ring wants a cross-reference, `mod.rs:2872` is the place** — it is
+> the one artifact whose obsolescence the compiler announces, so whoever closes
+> the checkpoint is already reading it. **Put the obligation where the trigger
+> fires, not only where the work is scheduled.** That is the Adversary's point
+> and it is right; the AC above is the part that fails loudly if it is missed.
+>
+> **Do not re-derive whether anything constructs the variant by grep.** The
+> `never constructed` warning is the compiler's total enumeration of exactly
+> that question; a grep answers *who names the type*. That distinction is what
+> turned this increment's `9` into `22`.
 
 > ### The owner relation has a PLANNER-OWNED KEY. Use it; `D2k-1a` did not.
 >
