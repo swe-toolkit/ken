@@ -6370,7 +6370,7 @@ impl<'a> Lowering<'a> {
                             // disposition, counted into the same conservation
                             // ledger as the direct descent's.
                             self.static_worker_fields
-                            .note_consuming_call(worker.transported_field)?;
+                            .note_consuming_call(worker.transport, static_origin, self.defining_function_id)?;
                             #[cfg(test)]
                             d8e_record_consumption();
                             // `D8l2` — which facet this consumption carried,
@@ -12534,7 +12534,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             // constructor field. A consumption of this binding discharges no
             // conservation obligation, which is exactly what stops an ordinary
             // worker call from paying a transported field's debt.
-            transported_field: None,
+            transport: None,
         })
     }
 
@@ -15568,7 +15568,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // counts it against the fields a static elimination
                         // rebound.
                         self.static_worker_fields
-                            .note_consuming_call(worker.transported_field)?;
+                            .note_consuming_call(worker.transport, static_origin, self.defining_function_id)?;
                         #[cfg(test)]
                         crate::cranelift_backend::lowering::record_d2k_owner_event(
                             crate::cranelift_backend::lowering::D2kOwnerEvent::StaticWorkerCallConsumed {

@@ -20645,7 +20645,7 @@ fn d8i_the_discharge_facet_is_transported_stated_and_refuses_both_ways() {
         captures: Vec::new(),
         route: StaticWorkerCallRoute::RawWorker,
         discharge: ContinuationDischarge::DirectSpecializationCall,
-        transported_field: None,
+        transport: None,
     };
     let refusal = format!(
         "{:?}",
@@ -31645,30 +31645,41 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
     );
 }
 
-/// **`D2k-1b-i` — the conservation ledger's pairing is ONE-TO-ONE and keyed by
-/// occurrence, exercised directly.**
+/// **`D2k-1c-0` — the conservation ledger pairs each consumption to ONE MINTED
+/// TRANSPORT, exercised directly.**
+///
+/// **RE-DERIVED from `D2k-1b-i`'s pairing control, and it went red because the
+/// RULED SEMANTICS CHANGED — not because the repair is incomplete.** That
+/// control asserted a pairing keyed by `field_origin`, and every row of it was
+/// true of what it measured. `D2k-1c-0` then measured that **one static
+/// occurrence is descended more than once in a single compile**, which makes an
+/// origin key one transport too coarse: at `rebinds = 2`, consuming transport
+/// #1 twice while transport #2 was dropped balanced the per-origin counters at
+/// `2 == 2` and closed green. Architect `evt_2npnrzesz3t65` replaced the
+/// counters with `minted`/`consumed` relations over an opaque transport
+/// identity. The rows below are the same *questions* asked of the new
+/// representation, plus the two the old one could not express at all.
 ///
 /// **This control exists because the five rows cannot reach it.** They all
 /// refuse at the ledger's first closeout branch — recognized, never rebound —
-/// so their sentinel witnesses the drop case and nothing else. Architect
-/// `dec_2xxj1zrwmgjdb` rejected an earlier ledger for precisely that reason:
-/// its consuming-call tally was one compile-wide scalar, and the population
-/// that could have exposed the difference never reached the branch where the
-/// scalar was read. **A witness that stops at the first refusal cannot prove
-/// the claim the later branches make**, so those branches get their own.
+/// so their sentinel witnesses the drop case and nothing else. **A witness that
+/// stops at the first refusal cannot prove the claim the later branches make**,
+/// so those branches get their own.
 ///
-/// The origins come from the planner's own positional child table, so the key
-/// under test is the same `child_static_origin(owner, position)` the producer
-/// and the binder use — not a hand-rolled identity that would test a different
-/// relation than production runs.
+/// The field origins come from the planner's own positional child table, so the
+/// provenance under test is the same `child_static_origin(owner, position)` the
+/// producer and the binder use. The transport identities come from the ledger's
+/// own issuer, because they cannot come from anywhere else — the type's field is
+/// private to its module, so a test cannot forge one, which is the property
+/// being relied on rather than described.
 ///
 /// **Promise class: durable invariant.** Every row is a property of
-/// conservation itself, not of the current route or the current five: a
-/// transport must be matched by a consumption naming the same field, and no
-/// aggregate may substitute for that pairing.
+/// conservation itself, not of the current route or the current five: each
+/// transport is discharged by exactly one consumption of that same transport,
+/// and no aggregate, count or sibling may substitute for it.
 #[test]
-fn d2k_1b_i_conservation_pairs_each_transport_to_a_consumption_of_the_same_field() {
-    use crate::cranelift_backend::lowering::StaticWorkerFieldLedger;
+fn d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport() {
+    use crate::cranelift_backend::lowering::{FuncId, StaticWorkerFieldLedger};
 
     let owner_expr = RuntimeExpr::Construct {
         constructor: "ctor:fixture::Pair::Mk".to_string(),
@@ -31685,6 +31696,15 @@ fn d2k_1b_i_conservation_pairs_each_transport_to_a_consumption_of_the_same_field
         field_a, field_b,
         "the two fields must be distinct occurrences or every row below is vacuous"
     );
+    // The consumer occurrence recorded against a discharge. Any planned origin
+    // serves; what matters is that the relation stores WHICH call paid, so a
+    // refusal can name both consumers rather than reporting a total.
+    let consumer = owner;
+    // ⚠ `from_u32` is a TEST-only way to name a body identity, exactly as the
+    // existing constructor controls use it. Production always passes
+    // `defining_function_id`, which is `None` outside the emission pass.
+    let body_one = Some(FuncId::from_u32(0));
+    let body_two = Some(FuncId::from_u32(1));
 
     let recognized_only = || {
         let mut ledger = StaticWorkerFieldLedger::default();
@@ -31699,71 +31719,121 @@ fn d2k_1b_i_conservation_pairs_each_transport_to_a_consumption_of_the_same_field
         "a recognized field that no static elimination rebinds must refuse"
     );
 
-    // 2. One transport, one consumption naming that field: the lawful ending.
-    let mut lawful = recognized_only();
-    lawful.rebind(field_a).expect("the field is recognized");
-    lawful
-        .note_consuming_call(Some(field_a))
-        .expect("a consumption naming an outstanding transport is lawful");
-    assert!(
-        lawful.close().is_ok(),
-        "a transported field consumed once at the exact-Var call is conserved"
+    // 2. TWO REBINDS OF ONE FIELD ORIGIN MINT DISTINCT IDENTITIES. This is the
+    //    row the previous representation could not state: both rebinds were the
+    //    same key, so nothing downstream could tell the transports apart.
+    let mut minted_twice = recognized_only();
+    let first = minted_twice
+        .rebind(field_a, body_one)
+        .expect("the field is recognized");
+    let second = minted_twice
+        .rebind(field_a, body_one)
+        .expect("the field is recognized");
+    assert_ne!(
+        first, second,
+        "two transports of one occurrence must have distinct identities, or every row below \
+         collapses back into a count"
     );
 
-    // 3. Two transports of one occurrence, one consumption: a DROP that an
-    //    entry-count comparison cannot see, because the entry was rebound.
+    // 3. Consuming A twice REFUSES, and cannot cover outstanding B. Under the
+    //    per-origin balance this compile closed green at 2 == 2 with one worker
+    //    dropped; it is the exact shape the adversary found.
+    let mut doubled = minted_twice;
+    doubled
+        .note_consuming_call(Some(first), consumer, body_one)
+        .expect("the first consumption of a minted transport is lawful");
+    assert!(
+        doubled
+            .note_consuming_call(Some(first), consumer, body_one)
+            .is_err(),
+        "a second consumption of one transport must refuse AT THE CALL; it cannot be absorbed \
+         into a total and it cannot discharge the sibling transport"
+    );
+    assert!(
+        doubled.close().is_err(),
+        "the sibling transport is still outstanding, so the close must refuse even though two \
+         consuming calls were attempted against two transports"
+    );
+
+    // 4. Consuming A and B once each CLOSES GREEN. The positive control: the
+    //    refusals above are not a ledger that refuses everything.
+    let mut lawful = recognized_only();
+    let a = lawful.rebind(field_a, body_one).expect("recognized");
+    let b = lawful.rebind(field_a, body_one).expect("recognized");
+    lawful
+        .note_consuming_call(Some(a), consumer, body_one)
+        .expect("a consumption of an outstanding transport is lawful");
+    lawful
+        .note_consuming_call(Some(b), consumer, body_one)
+        .expect("a consumption of the sibling transport is lawful");
+    assert!(
+        lawful.close().is_ok(),
+        "two transports of one occurrence, each consumed once, is conserved"
+    );
+
+    // 5. A short count is still a drop. Two transports, one consumption: the
+    //    close refuses naming the outstanding transport rather than a balance.
     let mut short = recognized_only();
-    short.rebind(field_a).expect("recognized");
-    short.rebind(field_a).expect("recognized");
+    let a = short.rebind(field_a, body_one).expect("recognized");
+    let _b = short.rebind(field_a, body_one).expect("recognized");
     short
-        .note_consuming_call(Some(field_a))
-        .expect("the first consumption has an outstanding transport");
+        .note_consuming_call(Some(a), consumer, body_one)
+        .expect("the first consumption is matched");
     assert!(
         short.close().is_err(),
         "two transports discharged by one consumption leaves one worker dropped"
     );
 
-    // 4. THE REJECTED SHAPE, stated as a row: one field dropped while another
-    //    is called twice. Under an aggregate tally the totals balance and the
-    //    compile is accepted; under occurrence keying the second consumption of
-    //    `field_a` has no outstanding transport and refuses on the spot.
-    let mut offset = StaticWorkerFieldLedger::default();
-    offset.recognize(owner, 0, field_a, "ctor:fixture::Pair::Mk");
-    offset.recognize(owner, 1, field_b, "ctor:fixture::Pair::Mk");
-    offset.rebind(field_a).expect("recognized");
-    offset.rebind(field_b).expect("recognized");
-    offset
-        .note_consuming_call(Some(field_a))
-        .expect("the first consumption of field_a is matched");
-    assert!(
-        offset.note_consuming_call(Some(field_a)).is_err(),
-        "a second consumption of field_a cannot discharge field_b's transport, however the \
-         compile-wide totals happen to balance"
-    );
-
-    // 5. An ordinary worker call -- one never rebound out of a constructor
-    //    field -- carries no key and discharges nothing. This is the other way
-    //    an aggregate tally could be satisfied by something unrelated.
+    // 6. A DIRECT binding carries no transport and discharges nothing. This is
+    //    how an unrelated pre-existing worker call could have satisfied a tally.
     let mut unrelated = recognized_only();
-    unrelated.rebind(field_a).expect("recognized");
+    let _a = unrelated.rebind(field_a, body_one).expect("recognized");
     unrelated
-        .note_consuming_call(None)
+        .note_consuming_call(None, consumer, body_one)
         .expect("a direct binding's consumption is lawful and pays no debt");
     assert!(
         unrelated.close().is_err(),
         "a pre-existing static worker call must not discharge a transported field's obligation"
     );
 
-    // 6. Both directions of the unknown-origin case fail closed, so a second
-    //    builder of the worker arm cannot enter or leave the ledger unaccounted.
-    let mut stranger = StaticWorkerFieldLedger::default();
+    // 7. CROSS-SCOPE. Minted while defining one generated function body and
+    //    consumed while defining another is a provenance failure, not a
+    //    discharge -- repeated lowering in different bodies mints distinct
+    //    identities, and carrying one across that boundary is not a licence to
+    //    consume it there.
+    let mut crossed = recognized_only();
+    let a = crossed.rebind(field_a, body_one).expect("recognized");
     assert!(
-        stranger.rebind(field_a).is_err(),
-        "rebinding a field no producer recognized must refuse"
+        crossed
+            .note_consuming_call(Some(a), consumer, body_two)
+            .is_err(),
+        "a transport minted in one generated body must not be dischargeable from another"
     );
     assert!(
-        stranger.note_consuming_call(Some(field_b)).is_err(),
-        "consuming a field no producer recognized must refuse"
+        crossed.close().is_err(),
+        "and the refused cross-scope consumption leaves the transport outstanding"
+    );
+
+    // 8. Both directions of the unrecognized case fail closed, so a second
+    //    builder of the worker arm cannot enter or leave the ledger unaccounted.
+    //    The unknown-transport direction needs an identity this ledger never
+    //    minted, and the only way to hold one is to mint it in another ledger --
+    //    which is exactly the compile-to-compile confusion being refused.
+    let mut stranger = StaticWorkerFieldLedger::default();
+    assert!(
+        stranger.rebind(field_a, body_one).is_err(),
+        "rebinding a field no producer recognized must refuse"
+    );
+    let foreign = {
+        let mut other = StaticWorkerFieldLedger::default();
+        other.recognize(owner, 1, field_b, "ctor:fixture::Pair::Mk");
+        other.rebind(field_b, body_one).expect("recognized there")
+    };
+    assert!(
+        stranger
+            .note_consuming_call(Some(foreign), consumer, body_one)
+            .is_err(),
+        "consuming a transport this compilation never minted must refuse"
     );
 }
 
