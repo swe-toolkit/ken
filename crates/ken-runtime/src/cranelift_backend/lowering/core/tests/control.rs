@@ -31766,3 +31766,236 @@ fn d2k_1b_i_conservation_pairs_each_transport_to_a_consumption_of_the_same_field
         "consuming a field no producer recognized must refuse"
     );
 }
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1c-0` — THE DECIDING READ: one static
+/// occurrence IS descended more than once in a single compile, so a per-origin
+/// count cannot be the conservation proof.**
+///
+/// `StaticWorkerFieldLedger` closes on `consumptions != rebinds` **per
+/// `field_origin`** while its entry documentation states a *pairing*: two
+/// transports of one occurrence, each owing its own consumption. Those two
+/// differ exactly when one origin is rebound twice — transport #1 consumed
+/// twice and transport #2 dropped balances at `2 == 2` and closes green, which
+/// is the forbidden fourth state with the count made to agree. Steward triage
+/// `evt_55rzfnc1gkekq` confirmed the reading and Architect `evt_6c9f1csfvrey7`
+/// made the repair conditional on this measurement.
+///
+/// **Why this could not be measured on the worker-keyed events.** `rebind` runs
+/// only for a `ConstructorField::StaticWorker`, and every one of the five rows
+/// sits at `installs == 0` behind the route gap. So the population that would
+/// exhibit a double rebind cannot reach the branch at all — the same shape as
+/// the rejection this campaign already produced once. The measurement is
+/// therefore taken on the **route** rather than on the worker: every binder
+/// descent of every field kind is recorded with the planner origin of the
+/// eliminating match, and the multiplicity question is asked of that.
+///
+/// ## MEASURED / CLAIMED / THE GAP
+///
+/// - **MEASURED.** On all five rows one binder site descends **twice over one
+///   and the same eliminating match occurrence** in a single compile; on
+///   `row1` the `Construct` occurrence is additionally *entered* twice, so its
+///   `child(owner, 0)` field origin is **recognized twice**.
+/// - **CLAIMED.** A single `field_origin` can therefore reach `rebind` more
+///   than once once the route repair puts a worker field on one of these
+///   constructors, so origin-level cardinality cannot pair a consumption to a
+///   particular transport.
+/// - **THE GAP.** This measures multiplicity, **not its cause**, and not
+///   whether both descents are retained. The entry doc attributes it to *"a
+///   speculative descent and the descent that keeps its result"*; nothing here
+///   establishes that, and it is not the only shape that fits — `row1` repeats
+///   its `Construct` while the other four repeat only the elimination. If one
+///   descent is speculative and discarded, a transport instance minted for it
+///   would still be outstanding at closeout and would refuse a **correct**
+///   compile, which is a constraint on the instance design rather than on this
+///   reading.
+///
+/// **Promise class: MIXED, and the split is stated because it matters.**
+/// - **Durable invariant**, asserted first and relationally: some binder
+///   descent repeats over one occurrence. That is the whole content of the
+///   deciding read, and it reds only if the route stops repeating descents —
+///   which would itself re-open the representation question rather than being
+///   maintenance noise.
+/// - **Transition sentinel** on the per-row literals: the exact sites, origins
+///   and repeat counts are facts about today's excluded lane. **Retiring
+///   event:** the `D2k-1c` route repair, which changes which occurrences are
+///   descended. Rewrite the table to what it then measures; do not restore it.
+#[test]
+fn d2k_1c_0_one_static_occurrence_is_descended_more_than_once_in_one_compile() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+    use std::collections::BTreeMap;
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    /// `(repeated binder descents, repeated field recognitions)`, each as
+    /// `(key, count)` pairs and each keyed by a **planner** origin.
+    fn multiplicity(
+        expression: &RuntimeExpr,
+        symbol: &str,
+    ) -> (Vec<(String, usize)>, Vec<(String, usize)>) {
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
+        let _restore = Restore;
+        let _ = d2k_owner_trace_take();
+        let (_result, _trace) = px8j_capture_source_trace(expression, false, symbol);
+        let events = d2k_owner_trace_take();
+        let mut descents: BTreeMap<String, usize> = BTreeMap::new();
+        let mut recognitions: BTreeMap<String, usize> = BTreeMap::new();
+        for event in &events {
+            match event {
+                D2kOwnerEvent::StaticMatchBinderDescent {
+                    site,
+                    eliminated_origin,
+                } => {
+                    *descents
+                        .entry(format!("{site} eliminating {eliminated_origin:?}"))
+                        .or_default() += 1;
+                }
+                D2kOwnerEvent::StaticWorkerField {
+                    owner,
+                    position,
+                    field_origin,
+                    ..
+                } => {
+                    *recognitions
+                        .entry(format!("{field_origin:?}=child({owner:?},{position})"))
+                        .or_default() += 1;
+                }
+                _ => {}
+            }
+        }
+        let repeated = |table: BTreeMap<String, usize>| {
+            table
+                .into_iter()
+                .filter(|(_, count)| *count > 1)
+                .collect::<Vec<_>>()
+        };
+        (repeated(descents), repeated(recognitions))
+    }
+
+    let rows = [
+        (
+            "row1-owned-scope",
+            multiplicity(
+                &host_result_closure_match(px8j_layered_recursive_result(1, 1)),
+                "ken_d2k1c0_row1",
+            ),
+        ),
+        (
+            "row4-depth-1",
+            multiplicity(
+                &host_result_closure_match(px8j_scope_chain_observation_result(1, 0)),
+                "ken_d2k1c0_row4_d1",
+            ),
+        ),
+        (
+            "row4-depth-2",
+            multiplicity(
+                &host_result_closure_match(px8j_scope_chain_observation_result(2, 0)),
+                "ken_d2k1c0_row4_d2",
+            ),
+        ),
+        (
+            "row4-depth-3",
+            multiplicity(
+                &host_result_closure_match(px8j_scope_chain_observation_result(3, 0)),
+                "ken_d2k1c0_row4_d3",
+            ),
+        ),
+        (
+            "row5-after-hole",
+            multiplicity(
+                &host_result_closure_match(px8j_equal_payload_hole_placement(
+                    Px8jSelectedScopePlacement::AfterReturnHole,
+                )),
+                "ken_d2k1c0_row5",
+            ),
+        ),
+    ];
+
+    // THE DURABLE HALF, asserted over the population and as a relation. This is
+    // the deciding read itself: if ANY row descends one eliminating occurrence
+    // more than once, a per-origin counter cannot distinguish "this transport
+    // was paid" from "some transport was paid", and origin-level cardinality is
+    // structurally insufficient as the conservation proof.
+    for (label, (descents, _)) in &rows {
+        assert!(
+            descents.iter().any(|(_, count)| *count > 1),
+            "{label} descended no eliminating occurrence more than once. If that becomes true of \
+             every row, one field origin can be rebound at most once per compile, the ledger's \
+             per-origin equality IS a pairing, and the multi-transport premise in the entry \
+             documentation is the thing that needs correcting instead."
+        );
+    }
+
+    // THE MEASURED HALF, each row against its own literals. `row4`'s three
+    // depths are the scale check: one repeated eliminating occurrence per
+    // level, each descended exactly twice, so the repetition tracks the source
+    // graph rather than being a fixed artifact of the harness.
+    let composed = "core.rs:5411";
+    assert_eq!(
+        rows,
+        [
+            (
+                "row1-owned-scope",
+                (
+                    vec![(format!("{composed} eliminating StaticOriginId(5)"), 2)],
+                    // The one row whose `Construct` is entered twice, so the
+                    // SAME planner field origin is recognized twice from a
+                    // single source occurrence. This is the direct witness that
+                    // two transports of one occurrence are reachable.
+                    vec![(
+                        "StaticOriginId(21)=child(StaticOriginId(22),0)".to_string(),
+                        2
+                    )],
+                )
+            ),
+            (
+                "row4-depth-1",
+                (
+                    vec![(format!("{composed} eliminating StaticOriginId(5)"), 2)],
+                    vec![],
+                )
+            ),
+            (
+                "row4-depth-2",
+                (
+                    vec![
+                        (format!("{composed} eliminating StaticOriginId(21)"), 2),
+                        (format!("{composed} eliminating StaticOriginId(5)"), 2),
+                    ],
+                    vec![],
+                )
+            ),
+            (
+                "row4-depth-3",
+                (
+                    vec![
+                        (format!("{composed} eliminating StaticOriginId(21)"), 2),
+                        (format!("{composed} eliminating StaticOriginId(31)"), 2),
+                        (format!("{composed} eliminating StaticOriginId(5)"), 2),
+                    ],
+                    vec![],
+                )
+            ),
+            (
+                "row5-after-hole",
+                (
+                    vec![(format!("{composed} eliminating StaticOriginId(5)"), 2)],
+                    vec![],
+                )
+            ),
+        ],
+        "D2k-1c-0 deciding read: one static match occurrence is descended twice by the composed \
+         recursor binder in a single compile, on every row, and row1 additionally recognizes one \
+         planner field origin twice. A field carried by such a constructor is therefore rebound \
+         more than once as soon as the route repair delivers it, so `consumptions == rebinds` per \
+         origin cannot be the conservation proof: transport #1 consumed twice and transport #2 \
+         dropped balances at 2 == 2. If this table moves, re-run the read before trusting any \
+         pairing built on it."
+    );
+}

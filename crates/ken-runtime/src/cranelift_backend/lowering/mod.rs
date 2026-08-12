@@ -2524,6 +2524,24 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
     /// reached it through a constructor field installed by a static `Match`
     /// elimination.
     StaticWorkerCallConsumed { origin: StaticOriginId },
+    /// `D2k-1c-0` — a static `Match` elimination descended over a constructor's
+    /// fields at one of the six binder sites, tagged with **which** site and
+    /// with the planner origin of the eliminating match occurrence.
+    ///
+    /// **This is the deciding-read instrument, and its subject is the ROUTE,
+    /// not the static worker.** [`StaticWorkerBinderInstalled`] fires only for
+    /// a worker field, and on today's population that is never — every row
+    /// sits at zero installs behind the route gap, so no worker-keyed event can
+    /// see whether one occurrence is descended twice. This one fires for every
+    /// constructor field of every kind, so the multiplicity question is
+    /// measurable on the rows as they stand rather than only after the repair
+    /// that would make it matter.
+    ///
+    /// [`StaticWorkerBinderInstalled`]: D2kOwnerEvent::StaticWorkerBinderInstalled
+    StaticMatchBinderDescent {
+        site: &'static str,
+        eliminated_origin: StaticOriginId,
+    },
 }
 
 #[cfg(test)]
@@ -4055,10 +4073,19 @@ struct StaticWorkerFieldLedger {
     /// `child_static_origin(owner, position)`.
     ///
     /// **Keyed rather than listed, because the same static occurrence can be
-    /// lowered more than once** — a speculative descent and the descent that
-    /// keeps its result both recognize the same field. Those are two transports
-    /// of one occurrence, and each owes its own consumption; they are not two
-    /// occurrences and must not become two entries.
+    /// lowered more than once.** Those are two transports of one occurrence,
+    /// and each owes its own consumption; they are not two occurrences and must
+    /// not become two entries.
+    ///
+    /// **`D2k-1c-0` MEASURED that premise rather than inheriting it, and it
+    /// holds** — see
+    /// `d2k_1c_0_one_static_occurrence_is_descended_more_than_once_in_one_compile`.
+    /// **The cause stated here previously was NOT measured** and is removed: it
+    /// read *"a speculative descent and the descent that keeps its result"*,
+    /// which is one shape that fits and not the one the trace shows. What the
+    /// trace shows is a binder descending twice over one eliminating match
+    /// occurrence on every row, and on `row1` a `Construct` occurrence entered
+    /// twice as well. Multiplicity is established; its cause is not.
     entries: BTreeMap<StaticOriginId, StaticWorkerFieldEntry>,
 }
 
@@ -4297,13 +4324,25 @@ impl Lowering<'_> {
     /// reason: the disposition of a field recognized in one descent can only be
     /// known once every descent is done.
     ///
-    /// **It runs before emission of the root answer, which is what makes the
-    /// refusal lawful rather than late.** A dropped field allocates nothing by
-    /// definition, and a field that would have escaped into a runtime aggregate
-    /// has already been refused ahead of the first allocation by
-    /// `source_aggregate_preflight` and
+    /// **On `RecursiveDescent` it runs before emission of the root answer**
+    /// (`core.rs:2730`, ahead of every arm that emits `lowered`). **On
+    /// `FunctionizedUnits` it does not, and that is deliberate:**
+    /// `define_root_adapter` is called above it (`core.rs:2581` versus
+    /// `:2614`), because the adapter is itself a generated `Function` and
+    /// closing the causal ledgers before it would make a ref declared there
+    /// invisible to the laws rather than caught by them. **The ordering there
+    /// belongs to the causal ledger and is not this close's to move.**
+    ///
+    /// **The refusal's lawfulness does not rest on that ordering — the sentence
+    /// below carries it, and it holds on both authorities.** A dropped field
+    /// allocates nothing by definition, and a field that would have escaped into
+    /// a runtime aggregate has already been refused ahead of the first
+    /// allocation by `source_aggregate_preflight` and
     /// [`Lowered::boundary_transfer_admissibility`]. This close covers the
     /// remaining state those two cannot see — built, never used, never refused.
+    /// The unqualified claim was a **wrong reason standing beside a right one**,
+    /// which is the shape the next auditor inherits (adversary sweep, Steward
+    /// `evt_55rzfnc1gkekq`).
     fn require_complete_static_worker_disposition(&self) -> Result<(), CraneliftBackendError> {
         self.static_worker_fields.close()
     }
