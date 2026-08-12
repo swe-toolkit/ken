@@ -2213,21 +2213,51 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     //      `Predeclared(producer_owner)` across the WHOLE combined lowering; the
     //      ruled per-body switch is excluded and is named at the bind site.
     //   5. `OrientedSubcontinuationPlanV1: computational IH slot marker is
-    //      detached from its checked frame` — **where it stops.** The fused
-    //      `Function` opens its own `CheckedFrameFunctionScope`, and the IH slot
-    //      marker the producer's body carries belongs to the consumer's checked
-    //      frame, which now spans two `Function`s.
+    //      detached from its checked frame` — the fused `Function` opens its own
+    //      `CheckedFrameFunctionScope`, and the IH slot marker the producer's
+    //      body carries belongs to the consumer's checked frame, which now spans
+    //      two `Function`s. **This step is ANSWERED, not open.** The fused body
+    //      re-enters the consumer frame identity locally, immediately before the
+    //      suffix's ordinary checked consumer runs; nothing is re-homed and no
+    //      new frame is minted. That is the node's `D2`, and its A/B is causal:
+    //      with the adoption off the suffix lowers outside its checked frame and
+    //      the marker refuses as detached, with it on the existing consumer
+    //      consumes the transported identity and lowering advances.
+    //   6. `OrientedSubcontinuationPlanV1: oriented segment mixes checked and
+    //      inferred computational frames` — **where it stops now**, in
+    //      `compose_oriented_subcontinuation`. Once ANY pending semantic layer
+    //      is checked, EVERY pending semantic layer must carry both an exact
+    //      checked frame and an invocation identity. The producer eliminator is
+    //      still `semantic_pending` — it is a genuine semantic participant, not
+    //      a control-only wrapper that may be omitted — so this refusal is
+    //      correct for the current representation rather than a gap in the
+    //      guard. Architect `evt_1q7v9fcw5hd87`; the answer is the node's `DP`,
+    //      which gives the producer occurrence its own transported checked
+    //      identity. A fusion-only admission of the guard, and copying or
+    //      inferring the consumer's identity onto the producer, are both ruled
+    //      **unlawful** rather than merely out of scope.
     //
-    // ⇒ **Step 5 is the open question and it is not an implementation detail:**
-    // a checked frame is currently a per-`Function` transaction, and a fused
-    // region is the first construct whose frame spans the producer's body and
-    // the consumer's suffix across one. Whether the fused body adopts the
-    // consumer's frame, or the marker is re-homed, is a design question for the
-    // Architect rather than a refusal to code around.
+    // **Steps 5 and 6 have no committed witness in this tree, and step 6
+    // cannot be reproduced by running anything here.** The `D1`/`D2` mechanism
+    // is held as evidence off `main`, and this file is still at the pre-`D1`
+    // state — so the guard above is not merely inert, it is **unreached**.
+    // MEASURED on the `D0` gate's own compiles at `21307d7f`:
+    // `compose_oriented_subcontinuation` is entered twice, both times with
+    // `plan = None` and every layer `(checked_frame_id, checked_invocation_id)
+    // = (None, None)`, so `has_planned` is false and the mixed-frame guard is
+    // never entered. The checked twin's compile does not reach composition at
+    // all. ⇒ Do not read a green suite as evidence about step 6 either way.
     //
-    // Do NOT arm this to "see how far it gets" without that answer. Arming it
-    // makes the `Exact` and `ReHomed` roots refuse at step 5, which reds
-    // `d2f_0` — whose baseline assertion pins refusal 1 above.
+    // **What falsifies this block, and who retires it.** Its precondition is a
+    // tree state, not an invariant: `D1`/`D2` landing makes the guard reachable
+    // and every sentence above false, **and nothing will go red when it does**
+    // — a claim in a comment is not executed. `RT-LEXICAL-R3-FUSION-EMITTER`
+    // owns deleting this block at that point, as part of the same candidate
+    // that lands them.
+    //
+    // Do NOT arm this to "see how far it gets". Arming it makes the `Exact` and
+    // `ReHomed` roots refuse at step 5, which reds `d2f_0` — whose baseline
+    // assertion pins refusal 1 above.
     const D2F_EMITTER_ARMED: bool = false;
     if D2F_EMITTER_ARMED {
         static_transition_plan
