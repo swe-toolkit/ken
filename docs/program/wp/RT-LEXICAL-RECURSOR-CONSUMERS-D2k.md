@@ -2013,8 +2013,19 @@ the existing guard controls:
 > ### `D2k-1e` — `D2k-1d` REPAIRED THE REASON AND LEFT THE CLAIM IT SUPPORTED
 >
 > **Added 2026-08-12 from Adversary `evt_4n9x6a46whzqp`, verified at
-> `control.rs:2710`, `:2713-2714`, `:2717` before framing.** This is the cut
-> after `DP`. Small. Do not fold it into `DP`.
+> `control.rs:2710`, `:2713-2714`, `:2717` before framing.** Small. Do not fold
+> it into `DP`.
+>
+> **SEQUENCING CORRECTED 2026-08-12 ~17:5xZ: this is NOT gated on `DP`.** The
+> block first read *"this is the cut after `DP`"*, written while `DP` was being
+> worked. **`DP` is now stopped on an open Architect ruling with no ETA**, so
+> "after `DP`" would park a ready deliverable behind an unbounded wait. It is
+> **ready, and released when the ring's turn frees** — the Steward sequences it
+> per tick, not against `DP`.
+>
+> What has not changed: this stays a **separate cut on the `D2k` node and its
+> own thread**, folding it into `DP` remains forbidden, and contention with
+> `DP` is empty (different file, and `DP` is not being worked).
 >
 > **The defect.** `D2k-1d` was right that arrivals length does not carry the
 > phase, and replaced it with `(0, true)` — arrivals `0` plus the construct and
