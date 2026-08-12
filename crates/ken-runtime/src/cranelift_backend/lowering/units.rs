@@ -2923,6 +2923,26 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
 /// **The claim is READ, not consumed.** The takeover at the consumer's seat is
 /// the one consumption, and consuming here would make a definition spend the
 /// affine right the redirect's seat still needs.
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — which origin keys the recursive self
+/// edge and which origin records its call site.**
+///
+/// A two-line function because the choice is the whole content: the map key and
+/// `origin` are the **callee body**, and `call_site_origin` is the **consuming
+/// call**. They are different occurrences and this is the only place that says
+/// so, so a control can assert the production decision instead of a copy of it.
+///
+/// **Why it is worth naming at all.** On the `R3` witness the claim's `seat`,
+/// its `producer_body` and its redirect's callee entry ALL print `37` while the
+/// consuming call is `17`. A fold of call site into body type-checks, and a
+/// control whose expected values are every `37` still passes under the fold —
+/// separating `17` from `37` is the only thing that catches it.
+pub(super) fn fusion_self_edge_identities(
+    producer_body: StaticOriginId,
+    consuming_call: StaticOriginId,
+) -> (StaticOriginId, StaticOriginId) {
+    (producer_body, consuming_call)
+}
+
 pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
     module: &mut M,
     compiler: &mut Lowering<'_>,
@@ -3127,10 +3147,15 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     .to_string(),
             ));
         }
+        // The two identities, chosen by one shared function so the control that
+        // separates them exercises the production decision rather than a copy of
+        // it.
+        let (self_edge_body, self_edge_call_site) =
+            fusion_self_edge_identities(fusion.producer_body, fusion.consuming_call);
         let self_edge = DeclaredUnitCall {
             function: module.declare_func_in_func(id, &mut func),
-            origin: fusion.producer_body,
-            call_site_origin: fusion.consuming_call,
+            origin: self_edge_body,
+            call_site_origin: self_edge_call_site,
             header: fusion.header,
             slots: slots.to_vec(),
             offsets: offsets.to_vec(),
@@ -3141,7 +3166,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         // producer would stay reachable beside its fused definition.
         if function_local
             .unit_calls
-            .insert(fusion.producer_body, self_edge)
+            .insert(self_edge_body, self_edge)
             .is_some()
         {
             return Err(backend_module(

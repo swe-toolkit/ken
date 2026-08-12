@@ -33036,3 +33036,205 @@ fn dp_composition_time_membership_is_validated_and_changes_the_binding_fingerpri
          identity that is supposed to bind it."
     );
 }
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — affine selector net 3: the splice
+/// capability is spendable exactly once, and every other way of presenting one
+/// refuses.**
+///
+/// Architect `evt_4g2hmsr8tb3bm` requires that *"missing, escaped, replayed, or
+/// doubly consumed capability must refuse."* Three of those four are properties
+/// of the ledger itself and are pinned here, unarmed.
+///
+/// | row | presented | verdict |
+/// |---|---|---|
+/// | ordinary edge | no capability at all | `Ordinary`, and NOT an error |
+/// | the splice's edge | an outstanding capability | `Composed`, ledger emptied |
+/// | replay / double consume | the same id a second time | refused |
+/// | escaped / forged | an id this ledger never issued | refused |
+///
+/// **Why "no capability" must be a non-error and is asserted as one.** Every
+/// edge in the compile that is not a splice's carries `None`, so a refusal there
+/// would reject every ordinary segment. It is the row most likely to be dropped
+/// as uninteresting and the one whose loss would be loudest.
+///
+/// **Why the replay row cannot be inferred from the escape row.** They differ in
+/// the state that makes them wrong: a replayed id WAS outstanding and was spent,
+/// a forged id never existed. A single `contains` check answers both, which is
+/// exactly why both are asserted — a future issuer that recycled ids would keep
+/// the escape row green and break the replay row.
+///
+/// **The issuer is asserted monotone in the same breath.** Reuse would let a
+/// later issue answer for a spent id, turning a replay into a silent acceptance;
+/// the two fresh ids being distinct is what forecloses that.
+///
+/// **What this does NOT cover, stated rather than implied.** The *unconsumed*
+/// row's refusal lives in the splice's closeout, which needs a function builder
+/// and an armed region. What is pinned here is the state that closeout fires on:
+/// after an issue with no consume the capability is **still spendable**, which
+/// is precisely the leak the closeout refuses. The refusal itself is owed with
+/// the armed nets.
+///
+/// **Promise class: durable invariant.** Affine consumption of a capability:
+/// one spend succeeds, every other presentation refuses. It carries no fixture
+/// literals — the ids come from the issuer under test.
+#[test]
+fn d3_the_splice_capability_is_spendable_exactly_once_and_every_other_presentation_refuses() {
+    let seed_env = NativeSeedEnvironment::empty();
+    let mut lowering = root_authority_test_lowering(&seed_env);
+
+    // An edge with no capability: the common case, and it must be ordinary
+    // rather than an error.
+    let ordinary = lowering.consume_splice_capability(None);
+
+    let first = lowering.issue_splice_capability();
+    let second = lowering.issue_splice_capability();
+    let issuer_is_monotone = first != second;
+
+    // The splice's own edge spends its capability once.
+    let spent = lowering.consume_splice_capability(Some(first));
+    let outstanding_after_spend = lowering.outstanding_splice_capabilities.contains(&first);
+
+    // The same id again: a replay, from a `Copy` of the edge that already spent.
+    let replayed = lowering.consume_splice_capability(Some(first));
+
+    // The state the closeout fires on: `second` was issued and never consumed,
+    // so it is still spendable. That is the leak, observed where it starts.
+    let unconsumed_is_still_spendable = lowering
+        .outstanding_splice_capabilities
+        .contains(&second);
+
+    // An id this ledger never issued. Taken past the issuer's high-water mark so
+    // it cannot collide with anything outstanding.
+    let forged = lowering.consume_splice_capability(Some(
+        crate::cranelift_backend::lowering::SpliceCompositionCapabilityId(u64::MAX),
+    ));
+
+    fn refusal(result: &Result<SegmentComposition, CraneliftBackendError>) -> bool {
+        matches!(
+            result,
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("consumed twice, or consumed after its splice closed")
+        )
+    }
+
+    assert_eq!(
+        (
+            ordinary.as_ref().ok().copied(),
+            spent.as_ref().ok().copied(),
+            outstanding_after_spend,
+            refusal(&replayed),
+            refusal(&forged),
+            issuer_is_monotone,
+            unconsumed_is_still_spendable,
+        ),
+        (
+            Some(SegmentComposition::Ordinary),
+            Some(SegmentComposition::Composed),
+            false,
+            true,
+            true,
+            true,
+            true,
+        ),
+        "D3 net 3: an edge with no capability is Ordinary and not an error; the splice's edge \
+         spends its capability once, selects Composed, and leaves nothing outstanding; a replay \
+         of that same id and an id this ledger never issued each refuse with the splice's own \
+         sentence; the issuer never repeats an id, so no later issue can answer for a spent one; \
+         and an issued-but-unconsumed capability remains spendable, which is the leak the \
+         splice's closeout refuses. ordinary={ordinary:?} spent={spent:?} replayed={replayed:?} \
+         forged={forged:?}"
+    );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `AC-D3-SELF` — the recursive self edge's
+/// call site is not its callee body, and on this witness that is the ONLY way
+/// to see it.**
+///
+/// The Steward measured the inputs and wrote them into the frame: on the `R3`
+/// twin the claim's **`seat`, its `producer_body`, and its redirect's callee
+/// entry all print `37`**, while the consuming call is **`17`**. The coincidence
+/// is three-way.
+///
+/// ⇒ **A control whose expected values are every `37` passes under the fold it
+/// is supposed to catch.** Folding call site into body type-checks — the two are
+/// the same type — and three of the four identities agree, so any assertion
+/// drawn from those three is satisfied by the wrong code. Separating `17` from
+/// `37` is the whole content of this control.
+///
+/// **It exercises the production decision, not a copy.** The emission seam and
+/// this test both call `fusion_self_edge_identities`, which exists for exactly
+/// that reason: an assertion that re-spelled the choice locally would agree with
+/// itself no matter what the seam did.
+///
+/// **The three-way coincidence is asserted too**, not as a property worth
+/// preserving but as the *precondition of this test's own value*. If a future
+/// fixture separates those three, the fold stops being invisible and a reader
+/// should know this control was built for a harder case than the one they have.
+///
+/// **Promise class: durable invariant.** The self edge keys on the callee body
+/// and records the consuming call as its call site, and those are different
+/// occurrences. The literals are the claim's own measured origins, read from the
+/// claim rather than written in.
+#[test]
+fn ac_d3_self_the_recursive_edges_call_site_is_separated_from_its_callee_body() {
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause, D2J_DECLARATION};
+
+    let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+    let mut declarations = std::collections::BTreeMap::new();
+    declarations.insert(D2J_DECLARATION, &declaration);
+    let mut planner =
+        crate::cranelift_backend::planning::plan_static_transition_graph(&entry, &declarations)
+            .expect("the checked twin plans");
+    let plane = crate::cranelift_backend::planning::build_static_continuation_fusion_plan(
+        &planner,
+        &entry,
+        &declarations,
+        Some(&oriented),
+    )
+    .expect("the checked twin resolves a plane");
+    planner
+        .install_static_continuation_fusions(plane)
+        .expect("the resolved plane installs");
+    let ledger =
+        crate::cranelift_backend::planning::FusionRegionClaimLedger::preflight(&planner)
+            .expect("the installed region preflights a claim");
+    let fusion = *ledger
+        .planned()
+        .iter()
+        .next()
+        .expect("the twin installs exactly one region");
+    let claim = ledger.claim(fusion).expect("the region's claim is outstanding");
+
+    // The production decision, called rather than restated.
+    let (edge_body, edge_call_site) =
+        crate::cranelift_backend::lowering::units::fusion_self_edge_identities(
+            claim.producer_body(),
+            claim.consuming_call(),
+        );
+
+    assert_eq!(
+        (
+            // The edge keys on the CALLEE BODY and records the CONSUMING CALL.
+            edge_body == claim.producer_body(),
+            edge_call_site == claim.consuming_call(),
+            // ...and those are different occurrences. This is the row the fold
+            // fails.
+            edge_body != edge_call_site,
+            // The precondition that makes the row above the only witness: three
+            // of the four identities agree, so nothing drawn from them can see
+            // the fold.
+            claim.seat() == claim.producer_body(),
+            claim.redirect().callee_origin() == claim.producer_body(),
+        ),
+        (true, true, true, true, true),
+        "AC-D3-SELF: the definition-local recursive edge must key on the claim's callee body and \
+         record the claim's consuming call as its call site, and those must be different \
+         occurrences. On this witness the seat, the producer body and the redirect's callee entry \
+         all agree, so an assertion drawn from any of them is satisfied by a build that folded \
+         call site into body; the body-versus-call-site inequality is the only row that is not. \
+         body={edge_body:?} call_site={edge_call_site:?} seat={:?} redirect_callee={:?}",
+        claim.seat(),
+        claim.redirect().callee_origin()
+    );
+}
