@@ -951,8 +951,12 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     // continuation specialization, before any body is defined. The symbol
     // carries a dense ordinal only so the linker sees distinct names; the map
     // is keyed by the planner's typed identity, never by that string.
+    // `D3` — the EXECUTABLE subset, not the complete template population. A
+    // specialization an installed fusion has subsumed gets no symbol here, and
+    // therefore no body below and no resolvable target in `resolve_continuation_
+    // targets`; preflight has already refused if any caller still needed one.
     let mut continuations = BTreeMap::new();
-    for (ordinal, unit) in plan.continuation_units()?.into_iter().enumerate() {
+    for (ordinal, unit) in plan.executable_continuation_units()?.into_iter().enumerate() {
         let name = format!("ken_continuation_{ordinal}");
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
@@ -1028,6 +1032,16 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
 ) -> Result<BTreeMap<ContinuationCallIdentity, FuncId>, CraneliftBackendError> {
     let mut resolved = BTreeMap::new();
     for call in plan.continuation_calls()? {
+        // `D3` — the callable-edge half of the same disposition the declaration
+        // and definition passes read. The one call reaching a subsumed
+        // specialization is the region's own, and the consumer's takeover
+        // answers it with the fused result instead of emitting it; preflight has
+        // already refused if any OTHER caller survived. Resolving it here would
+        // demand a `FuncId` for a specialization that was deliberately never
+        // declared, which is the `None` this function's own doc calls a reject.
+        if plan.continuation_specialization_is_fusion_owned(call.target()) {
+            continue;
+        }
         let identity = plan
             .continuation_call_binding_for(
                 call.producer_construct_origin(),
@@ -1579,9 +1593,12 @@ pub(super) fn define_continuation_bodies<M: Module>(
     // separately emitted caller; a continuation function is exactly that, so
     // it declares its own worker refs rather than borrowing another's.
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
+    // `D3` — the same executable subset the declaration pass read. Reading the
+    // complete population here would define a body for a specialization that
+    // was never declared.
     let emissions = compiler
         .static_transition_plan
-        .continuation_units()?
+        .executable_continuation_units()?
         .into_iter()
         .map(|unit| {
             let (offsets, _frame_bytes) = unit.slot_offsets()?;
@@ -4439,7 +4456,14 @@ impl ContinuationClaimLedger {
         // and the projected header/slots/offsets, which is exactly what
         // `call_declared_unit_target` consumes. Reusing it is what keeps this
         // on the existing unit-call ABI instead of inventing a second one.
-        let units = plan.continuation_units()?;
+        //
+        // `D3` — the executable subset, so a subsumed specialization that
+        // somehow reached `resolved` fails HERE rather than being handed a
+        // contract for a `Function` nobody defined. `resolved` is already
+        // filtered, which is exactly why this reads the narrower population:
+        // agreeing with the filter costs nothing and disagreeing with it is the
+        // defect worth surfacing.
+        let units = plan.executable_continuation_units()?;
         self.resolved
             .iter()
             .filter(|(identity, _)| identity.emission_owner() == defining)

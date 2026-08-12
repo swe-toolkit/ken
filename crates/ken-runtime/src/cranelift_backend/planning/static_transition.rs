@@ -2678,6 +2678,21 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// a standalone unit. Empty until `install_fusion_owned_bodies` moves a
     /// fully validated scratch map in; there is deliberately no other writer.
     fusion_owned_bodies: BTreeMap<StaticOriginId, FusionOwnedBody>,
+    /// **`D3` — the generated continuation specializations an installed fusion
+    /// has SUBSUMED, keyed by specialization identity.**
+    ///
+    /// Ruled at `evt_5jqvmnzf9dhf0`. The producer-side map above is keyed by
+    /// **body origin**, and this one deliberately is not: two specializations
+    /// can share a worker body while remaining distinct units, and a body-keyed
+    /// filter would take the unclaimed sibling out of the executable population
+    /// along with the claimed one. **A same-body different specialization stays
+    /// executable unless independently claimed**, which only an identity key can
+    /// express.
+    ///
+    /// Written by the same install as `fusion_owned_bodies`, in the same
+    /// transaction, so a compile can never hold one disposition without the
+    /// other.
+    fusion_owned_continuation_specializations: BTreeSet<ContinuationSpecializationId>,
     /// Whether body ownership has been installed. **Not derivable from the map's
     /// emptiness:** a plan with no fused regions installs an empty map, and a
     /// second install against it must still refuse.
@@ -11018,6 +11033,7 @@ impl<'src> Planner<'src> {
                 // Empty by construction: body ownership is installed only from
                 // validated claims, which cannot exist before the plan does.
                 fusion_owned_bodies: BTreeMap::new(),
+                fusion_owned_continuation_specializations: BTreeSet::new(),
                 fusion_bodies_installed: false,
             },
             store_interner: BTreeMap::new(),
@@ -13891,7 +13907,10 @@ impl<'src> StaticTransitionPlan<'src> {
         let units = self.executable_units()?;
         let template_only = self.template_only_worker_bodies()?;
         let edges = self.emittable_call_edges()?;
+        let specializations = self.continuation_units()?;
+        let specialization_calls = self.continuation_calls()?;
         let mut scratch: BTreeMap<StaticOriginId, FusionOwnedBody> = BTreeMap::new();
+        let mut subsumed: BTreeSet<ContinuationSpecializationId> = BTreeSet::new();
         let mut owned = BTreeSet::new();
 
         for fusion in ledger.planned().iter().copied() {
@@ -13983,6 +14002,84 @@ impl<'src> StaticTransitionPlan<'src> {
                      would leave that route unresolvable",
                 ));
             }
+
+            // ---- `D3` — THE SUBSUMED CONTINUATION SPECIALIZATION.
+            //
+            // Ruled at `evt_5jqvmnzf9dhf0`. The producer-side rows above take
+            // the producer's own body out of the executable population. They do
+            // NOT touch the generated continuation specialization for the same
+            // region, and `define_continuation_bodies` goes on defining it —
+            // re-deriving the producer construct from the unit's own
+            // `continuation_origin` and `producer_alternative`. That definition
+            // is lawful in the complete template population and unlawful in the
+            // executable one once this fusion has subsumed it.
+            //
+            // **The match deliberately does NOT include the producer construct
+            // origin, and that is the whole reason this is a separate relation.**
+            // MEASURED on both witnesses: the claim names the FUSION's producer
+            // construct (`Exact` 30, `ReHomed` 26) while the specialization
+            // names the generic continuation producer (`39`, `35`). They are two
+            // relations over one region, each authoritative for its own side, so
+            // keying this on the construct would match nothing and silently
+            // subsume no specialization at all.
+            //
+            // What DOES join them is the worker/body relation: the
+            // specialization's worker body is the claim's producer body, under
+            // the same continuation origin, alternative, position and consumer.
+            let mut matching = specializations.iter().filter(|unit| {
+                unit.continuation_origin() == claim.continuation_origin()
+                    && unit.consumer_owner() == claim.consumer_owner()
+                    && unit.producer_alternative() == claim.producer_alternative()
+                    && unit.recursive_position() == claim.recursive_position()
+                    && unit.worker_body_origin() == body
+            });
+            let Some(specialization) = matching.next() else {
+                return Err(planner_error(
+                    "a static continuation fusion subsumes no generated continuation \
+                     specialization, so the standalone definition its fused body replaces cannot \
+                     be named and would still be emitted",
+                ));
+            };
+            if matching.next().is_some() {
+                return Err(planner_error(
+                    "two generated continuation specializations answer one static continuation \
+                     fusion's continuation origin, alternative, position, consumer and producer \
+                     body, so which standalone definition the fused body replaces is ambiguous",
+                ));
+            }
+            let specialization = specialization.id();
+
+            // No surviving executable route may still require its standalone
+            // `Function`. The ONE call this fusion supersedes is the one at the
+            // claim's own continuation origin under its own consumer, which the
+            // consumer's takeover intercepts and answers with the fused result.
+            // Any OTHER call reaching this specialization is a caller the fused
+            // definition does not serve, and omitting the standalone definition
+            // would leave it unresolvable at declaration time.
+            //
+            // ⇒ Refused here rather than dropped: the ruling requires a
+            // surviving caller to REFUSE, never to be silently removed.
+            let surviving_call = specialization_calls.iter().any(|call| {
+                call.target() == specialization
+                    && !(call.continuation_origin() == claim.continuation_origin()
+                        && call.emission_owner()
+                            == ContinuationEmissionOwner::Predeclared(claim.consumer_owner()))
+            });
+            if surviving_call {
+                return Err(planner_error(
+                    "a generated continuation specialization subsumed by a static continuation \
+                     fusion keeps another caller, so removing its standalone definition would \
+                     leave that caller unresolvable",
+                ));
+            }
+
+            // Exactly one claim subsumes this specialization.
+            if !subsumed.insert(specialization) {
+                return Err(planner_error(
+                    "two static continuation fusion claims subsume one generated continuation \
+                     specialization, so which fused definition replaces it is undetermined",
+                ));
+            }
         }
 
         // **The transaction. Every fallible refusal is above this line.**
@@ -14000,6 +14097,11 @@ impl<'src> StaticTransitionPlan<'src> {
         // commits after it are infallible.
         ledger.check_body_owned(&owned)?;
         self.fusion_owned_bodies = scratch;
+        // Same transaction as the producer-side map above, deliberately: a
+        // compile holding one disposition without the other would either define
+        // a standalone body the fused definition replaces, or omit a
+        // specialization whose producer body is still standalone.
+        self.fusion_owned_continuation_specializations = subsumed;
         self.fusion_bodies_installed = true;
         ledger.commit_body_owned(owned);
         Ok(())
@@ -14029,6 +14131,48 @@ impl<'src> StaticTransitionPlan<'src> {
             // axis, exactly as `unit.body_occurrence()` does.
             .filter(|unit| !dispositions.contains_key(&unit.body_occurrence()))
             .collect())
+    }
+
+    /// **`D3` — the continuation specializations that receive a declared and
+    /// defined `Function`.**
+    ///
+    /// [`Self::continuation_units`] stays the **complete template population**
+    /// and is unchanged, exactly as `emittable_units` does on the producer side:
+    /// a subsumed specialization remains the descriptor, ABI and slot authority
+    /// for the region its fused definition lowers. This is the **executable**
+    /// subset.
+    ///
+    /// **Declaration, definition and callable-edge resolution must all read
+    /// THIS method.** Declaring from one population and defining from the other
+    /// is the undefined-phantom the producer-side sibling already forbids, and
+    /// it is worse here: the declaration pass mints the symbol a later call
+    /// resolves against, so a split would surface as an unresolvable target
+    /// rather than as a missing body.
+    ///
+    /// **Keyed by specialization identity, never by worker body.** Two
+    /// specializations may share a body; only the claimed one is subsumed.
+    pub(in crate::cranelift_backend) fn executable_continuation_units(
+        &self,
+    ) -> Result<Vec<ContinuationUnitView<'_>>, CraneliftBackendError> {
+        Ok(self
+            .continuation_units()?
+            .into_iter()
+            .filter(|unit| {
+                !self
+                    .fusion_owned_continuation_specializations
+                    .contains(&unit.id())
+            })
+            .collect())
+    }
+
+    /// Whether one generated continuation specialization has been subsumed by an
+    /// installed fusion, so its standalone definition is not emitted.
+    pub(in crate::cranelift_backend) fn continuation_specialization_is_fusion_owned(
+        &self,
+        specialization: ContinuationSpecializationId,
+    ) -> bool {
+        self.fusion_owned_continuation_specializations
+            .contains(&specialization)
     }
 
     /// **`D5a` checkpoint 1 — the call edges that survive the retarget.**
@@ -18631,6 +18775,128 @@ mod tests {
             "each perturbation refuses AT the binder-to-body relation, and the same key issues \
              once that one rule is suppressed -- so the four marginal checks stayed green and \
              the refusal is not an earlier proxy answering for them"
+        );
+    }
+
+    /// **`D3` — the fusion subsumes exactly ONE generated continuation
+    /// specialization, by IDENTITY, and its sibling stays executable.**
+    ///
+    /// Ruled at `evt_5jqvmnzf9dhf0`: route C is `define_continuation_bodies`
+    /// defining the specialization the installed fusion has superseded, and the
+    /// repair is an exact fusion-owned specialization disposition established
+    /// before declaration or definition.
+    ///
+    /// **MEASURED, and the resolution's shape is the finding.** On `Exact` the
+    /// claim names producer construct `30` while the specialization it subsumes
+    /// names `39`; on `ReHomed`, `26` against `35`. They are two relations over
+    /// one region, so **matching on the producer construct would resolve
+    /// nothing** and the disposition would silently subsume no specialization at
+    /// all. What joins them is the worker/body relation -- the specialization's
+    /// worker body IS the claim's producer body -- under the same continuation
+    /// origin, alternative, position and consumer owner. That is the match this
+    /// pins.
+    /// **CLAIMED:** an installed fusion removes exactly the one specialization
+    /// whose standalone definition its fused body replaces, and removes it from
+    /// the executable population only -- the complete template population, which
+    /// remains the descriptor and slot authority, is untouched.
+    /// **THE GAP, and it has two halves.** First, this pins the PLANNER
+    /// disposition and no emission: the armed rows the ruling requires -- that
+    /// route C is never reached and the fused `Carried` store survives -- are
+    /// not discharged here, and the armed compile does not currently complete
+    /// (see the node's handback).
+    ///
+    /// Second, and stated because the assertion above would read as covering it:
+    /// **this witness cannot discriminate identity keying from body keying.**
+    /// Its two specializations have DIFFERENT worker bodies (measured 34 and
+    /// 37), so a body-keyed filter would subsume the same one and this control
+    /// would stay green under it. The ruling's same-body/different-specialization
+    /// row needs a fixture with two specializations over one body, which the
+    /// `D2j` family does not contain. The disposition is keyed by identity
+    /// because the ruling requires it, **not because anything here proves the
+    /// difference.**
+    #[test]
+    fn d3_the_fusion_subsumes_exactly_one_continuation_specialization_by_identity() {
+        let ledger = d2f_preflight_exact_owned(|_| (), true).expect("ownership installs");
+        let _ = &ledger;
+
+        // Rebuild the same plan so the populations can be read after the
+        // install. `d2f_preflight_exact_owned` consumes its plan, so this walks
+        // the identical fixture rather than reaching into it.
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+        let resolved =
+            build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                .expect("the witness resolves a plane");
+        let mut plane = StaticContinuationFusionPlan::default();
+        for key in resolved.installed_keys().to_vec() {
+            plane.intern(key).expect("interns");
+        }
+        plan.install_static_continuation_fusions(plane)
+            .expect("installs");
+
+        let complete_before = plan
+            .continuation_units()
+            .expect("units")
+            .iter()
+            .map(|unit| unit.id())
+            .collect::<Vec<_>>();
+
+        let mut claims = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+        // The claim's own coordinates, read BEFORE ownership consumes them, so
+        // the two-relation finding is asserted rather than described.
+        let id = *claims.planned().iter().next().expect("one region");
+        let claim = claims.claim(id).expect("outstanding");
+        let claim_construct = claim.producer_construct_origin();
+        let claim_body = claim.producer_body();
+        plan.install_fusion_owned_bodies(&mut claims)
+            .expect("ownership installs");
+
+        let executable = plan
+            .executable_continuation_units()
+            .expect("executable units")
+            .iter()
+            .map(|unit| unit.id())
+            .collect::<Vec<_>>();
+        let complete_after = plan
+            .continuation_units()
+            .expect("units")
+            .iter()
+            .map(|unit| unit.id())
+            .collect::<Vec<_>>();
+        let subsumed = complete_after
+            .iter()
+            .copied()
+            .filter(|id| plan.continuation_specialization_is_fusion_owned(*id))
+            .collect::<Vec<_>>();
+        // The subsumed one's own coordinates, to pin that it is the region's
+        // specialization and that it was NOT found by the producer construct.
+        let subsumed_view = plan
+            .continuation_units()
+            .expect("units")
+            .into_iter()
+            .find(|unit| plan.continuation_specialization_is_fusion_owned(unit.id()))
+            .expect("one subsumed specialization");
+
+        assert_eq!(
+            (
+                complete_before.len(),
+                complete_after.len(),
+                executable.len(),
+                subsumed.len(),
+                subsumed_view.worker_body_origin() == claim_body,
+                subsumed_view.producer_construct_origin() == claim_construct,
+                executable
+                    .iter()
+                    .all(|id| !plan.continuation_specialization_is_fusion_owned(*id)),
+            ),
+            (2, 2, 1, 1, true, false, true),
+            "the fusion subsumes exactly one specialization; the COMPLETE population is unchanged \
+             at two because it stays the descriptor and slot authority; the executable population \
+             drops to one; the subsumed one is joined to the claim by WORKER BODY and NOT by \
+             producer construct, which is the relation that makes this a separate disposition \
+             rather than a re-spelling of the producer-side one"
         );
     }
 
