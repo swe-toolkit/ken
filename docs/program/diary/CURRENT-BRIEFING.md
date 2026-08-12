@@ -40,6 +40,44 @@
 
 > ### RESUME HERE — state at 2026-08-12 ~22:0xZ. `main` = `d5912acd`.
 >
+> > **~23:0xZ — THE TRACE LANDED AND FOUND A THIRD CONSTRUCTOR ROUTE NOBODY
+> > WAS RULING ABOUT. The sequencing ruling paid for itself in one turn.**
+> >
+> > **ANSWERED AND RETIRED:** producer and suffix are **ONE machine, joined,
+> > and CORRECT.** `next=["Terminal"]` at construct 30 **is** the `ResumeOuter`
+> > the machine was started with — that is how the suffix is reached, so
+> > `Terminal` is **the join's spelling**, not a missing continuation. ⇒ **There
+> > is NO answer selection to repair at any fused seat**, which is precisely why
+> > the funnel and the receipt each had **nowhere to attach.** Three mechanisms
+> > failed for one shared reason.
+> >
+> > **THE ESCAPE IS ROUTE C**, a third production of the same source occurrence:
+> > `lower_expr`'s `RuntimeExpr::Construct` arm, **the sole builder of the
+> > `StaticWorker` arm**, emitting at `machine_depth=0`, `fused_auth=None`, in
+> > **root-projection `block3`** under
+> > `compile_expr_into_module_with_root_projection` — **not the fused definition
+> > and not a unit body.** It fires **after** the fused body exits `Carried`,
+> > **after** takeover, **with the affine claim already SPENT.** Route A and
+> > route B are where every prior ruling aimed. **Route B's template is consumed
+> > inside the machine and never reaches a sink at all.**
+> >
+> > **TRAP, flagged before anyone fell in:** at that seat `defining=2` is
+> > **ambient carrier state, not the enclosing emission** — backtrace is
+> > authority, and they **disagree.** **Do not key anything there on
+> > `defining_unit`.**
+> >
+> > **STILL OPEN, and much narrower:** why does the root projection lower the
+> > claimed producer **at all** after body ownership and fused consumption — and
+> > is the defect that **route C runs**, that **its result is selected**, or that
+> > **ownership left the occurrence reachable from the root**? Different
+> > repairs; nobody has picked. Architect grounding at `evt_7z2jq0k1g42np`.
+> >
+> > **REUSE THE SEQUENCING MOVE.** The Architect accepted evidence-first without
+> > argument, **tightened the trace bounds instead of ruling**, and one trace in
+> > two cuts retired what three full ruling cycles could not — for **one
+> > implementer turn.** When a mechanism is refuted twice, **buy the measurement
+> > before buying another ruling.**
+> >
 > > **~22:5xZ — THIRD MECHANISM, THIRD REFUTATION. I RULED THE SEQUENCING:
 > > the causal trace runs BEFORE the next mechanism (`evt_41remx6xn6pda`).**
 > >

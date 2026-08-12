@@ -576,6 +576,80 @@ nothing you inherit from `#6d`.**
 > **Different repairs, different discriminators, both consistent with every
 > measurement above.**
 >
+> ### THE TRACE LANDED, AND IT FOUND A THIRD CONSTRUCTOR ROUTE NOBODY HAD
+> ### BEEN RULING ABOUT. Steward, 2026-08-12, from `evt_1a9t81p0j7h77` +
+> ### `evt_338x5qd0hf6fx`, under bounds `evt_41remx6xn6pda` + `evt_7qkp9qd7a2381`.
+>
+> **Read this box before any of the stop-4 boxes below it. It retires the
+> question they were all built on.**
+>
+> **THE ONE-MACHINE-OR-TWO QUESTION IS ANSWERED AND RETIRED: one machine,
+> joined, and CORRECT.** The fused body starts one machine for the producer's
+> selected case body; construct **30** completes inside it with
+> `next=["Terminal"]` — **and that `Terminal` IS the `ResumeOuter` the machine
+> was started with**, so it resumes the pending outer eliminator, which runs the
+> suffix as nested machines under the **consumer's** defining unit. The
+> producer's machine then exits carrying the suffix's result and the fused body
+> exits `Carried`. ⇒ **The join exists, it is the `Terminal`/`ResumeOuter`, and
+> nothing about it is broken.**
+>
+> ⇒ **AND IT RETIRES THE SHARED PREMISE OF EVERY REPAIR SO FAR:** there is **no
+> point in that nesting at which two candidate answers coexist and one is
+> selected.** **There is no answer selection to repair at any fused seat** —
+> which is exactly why a funnel and a receipt each **had nowhere to attach.**
+> Three mechanisms failed for one reason.
+>
+> **THE ESCAPE IS A THIRD PRODUCTION OF THE SAME SOURCE OCCURRENCE, BY A ROUTE
+> NOBODY HAS RULED ON.** The three constructor-completion routes:
+>
+> | route | what it is | verdict |
+> |---|---|---|
+> | **A** | `lower_computational_producer_expr`'s `Construct` arm — the generic funnel with `claim_and_call_continuation` | every ruling so far aimed here |
+> | **B** | the owned source-machine `ConstructArgument` completion | ...or here |
+> | **C** | **`lower_expr`'s `RuntimeExpr::Construct` arm** — documented in place as *"the ONE armed producer"*, **the sole builder of the `StaticWorker` arm** via `static_worker_constructor_template` | **this is the one that escapes** |
+>
+> **Route C is the only one of the three that can produce a `StaticWorker` field
+> at all** — its own comment records that route A's two `Construct` producers
+> stay fail-closed at `value_at`.
+>
+> **WHERE AND WHEN IT FIRES, which is what makes it a separate object.** Route C
+> emits at `machine_depth=0`, `fused_auth=None`, in **root-projection entry
+> `block3`**, with the enclosing emission identified by backtrace as
+> **`compile_expr_into_module_with_root_projection`** — **not a unit body and
+> not the fused definition.** It runs **after** the fused body exited `Carried`
+> and **after** the takeover forwarded `Carried`. **At that point the affine
+> claim is already SPENT and the fused definition is already complete**, so
+> route C is **downstream of the entire affine lifecycle rather than racing
+> it.**
+>
+> **Answer sinks, both traced:** the fused definition's result-store input is
+> `Carried` on **both** witnesses; **route B's direct template is consumed
+> inside the machine and never reaches a sink at all**; route C's template goes
+> straight to `emit_result`/`ground_value` with **no other consumer**, never
+> entering the fused definition. ⇒ **Independent emissions in DIFFERENT
+> FUNCTIONS — not alternative CFG arms, not sequential values on one lineage.**
+>
+> **A TRAP THE IMPLEMENTER FLAGGED BEFORE ANYONE COULD FALL INTO IT:** at the
+> route-C emission `defining=2` is **ambient carrier state, NOT the enclosing
+> emission** — **the backtrace is the authority and the two disagree.** ⇒ **Do
+> not key anything at that seat on `defining_unit`.**
+>
+> **WHAT IS STILL OPEN, and it is narrower than anything before it:** why does
+> the root projection lower the claimed producer occurrence **at all** after
+> body ownership and fused consumption — and is the defect that **route C
+> runs**, that **its result is selected as the program answer**, or that
+> **ownership left the occurrence reachable from the root**? **Different
+> repairs. Nobody has probed or picked between them.** The Architect is
+> grounding the root projection's ownership/selection contract
+> (`evt_7z2jq0k1g42np`).
+>
+> **THE SEQUENCING RULING IS VINDICATED AND SHOULD BE REUSED.** The Architect
+> accepted evidence-first without argument (`evt_5mj370jt0ax14`: *"no fourth
+> repair ruling will issue before the causal trace"*), **tightened the trace's
+> bounds instead of ruling** (`evt_7qkp9qd7a2381`), and **one trace in two cuts
+> retired a question three full ruling cycles could not settle** — and surfaced
+> a route that was never in anyone's field of view. **Cost: one implementer turn.**
+>
 > ### THIRD MECHANISM, THIRD REFUTATION — and my sequencing ruling
 > ### `evt_41remx6xn6pda`: THE CAUSAL TRACE RUNS BEFORE THE NEXT MECHANISM
 >
