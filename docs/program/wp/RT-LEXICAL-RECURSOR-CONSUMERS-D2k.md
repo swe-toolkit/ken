@@ -2010,6 +2010,83 @@ the existing guard controls:
 > before, no thread spawned); and the three tier-3 causes do **not** in fact
 > reach the builder.
 
+> ### `D2k-1e` — `D2k-1d` REPAIRED THE REASON AND LEFT THE CLAIM IT SUPPORTED
+>
+> **Added 2026-08-12 from Adversary `evt_4n9x6a46whzqp`, verified at
+> `control.rs:2710`, `:2713-2714`, `:2717` before framing.** This is the cut
+> after `DP`. Small. Do not fold it into `DP`.
+>
+> **The defect.** `D2k-1d` was right that arrivals length does not carry the
+> phase, and replaced it with `(0, true)` — arrivals `0` plus the construct and
+> the cause's own reason substring. The doc explains that the sentence *"is
+> emitted by the refusing authority itself and is identical under either
+> copy."*
+>
+> **That sentence is true, and it is the admission.** Identical under either
+> copy means the assertion cannot tell the copies apart:
+>
+> | world | arrivals | construct | reason | verdict |
+> |---|---|---|---|---|
+> | outer copy refuses (today) | `0` | `OrientedSubcontinuationPlanV1` | X | passes |
+> | outer call gone, builder's own first statement refuses | `0`, the `?` kills both pushes | same | same | **passes identically** |
+>
+> So the row is ordering-independent in the sense that it **passes either way**.
+> It is no longer evidence about the phase at all — and three sentences still
+> say it is:
+>
+> - **`control.rs:2710`**, in a column literally headed `phase reached`:
+>   *"transport validation, refusing at its own named authority — no arrival"*.
+>   `D2k-1d` edited this line, strengthened the authority half, and kept
+>   `no arrival`.
+> - **`control.rs:2713-2714`**, untouched: *"Three refuse **upstream of the
+>   builder** and never arrive."*
+> - **`control.rs:2717`**, untouched: *"The phase is asserted per row."*
+>
+> ⇒ **That last one was weakly true before `D2k-1d` and is false after it.**
+> The increment refutes that arrivals carries the phase, substitutes a
+> discriminator that does not carry it either, and leaves standing the sentence
+> asserting that it is carried. **Nothing in the control now asserts the
+> two-tier split's whole point.**
+>
+> **Direction: fail-green** — and it is the same shape as the finding
+> `D2k-1d` repaired, one layer up: precision in the prose while the operative
+> row holds regardless. Remove or reorder the outer validator and every tier-3
+> row still passes on both halves while all three phase claims silently invert.
+>
+> **TWO LAWFUL CLOSURES. Measure first; the measurement selects.** The defect is
+> the gap between what the control asserts and what the prose claims — not which
+> side you close it on. **Do not take the fork from this frame or from the
+> finding; take it from the measurement.**
+>
+> 1. **Assert the phase for real.** `with_match_recursor_census` is `pub`
+>    (`core.rs:633`) and returns rows carrying `validator_admitted`, fed at
+>    `core.rs:2039` from **the outer call's** `is_ok()`. It is `false` exactly
+>    when the outer copy refused and `true` if the outer admitted and the
+>    builder's own copy refused — the discriminator already exists, is
+>    production-recorded, and `control.rs` reads neither it nor
+>    `reached_selector` anywhere.
+> 2. **Delete the three phase claims** and let the doc say what the control
+>    actually says: each tier-3 cause refuses at its own named authority,
+>    position not asserted. Three sentences, no new instrument.
+>
+> **The measurement that decides it:** does `with_match_recursor_census` compose
+> cleanly with `compile_cause` — nesting, and the thread-local interaction with
+> the arrival drains? The Adversary explicitly did not check this and named it
+> as the one read between naming the repair and it being writable. **If it
+> composes, take closure 1; if it does not, take closure 2 and say so.** Either
+> is acceptable; leaving the gap is not.
+>
+> **Out of scope, again:** whether the duplicated validator should exist.
+> Untouched by `D2k-1d` and untouched here.
+>
+> **Refuted by the same pass, do not re-raise:** the reason substrings **are**
+> discriminating — each is raised at exactly one production site, the two
+> occurrence-mismatch reasons differ at `slot` versus `call` and one error
+> carries one message, and `construct` is compared by equality rather than
+> `contains`. And the `1c-1` disclosure is **complete**, not partial: it says
+> rows 1-3, and rows 1-3 are the whole directly-built impossible-ledger set,
+> row 0 being a real state.
+
 ## 6. Acceptance criteria
 
 > ### `AC-1` IS REBOUND. Architect ruling `evt_290zp8kxn9jbs`, checkpoint `16532068`.
