@@ -1970,11 +1970,68 @@ checked fixture whose **unchanged** Runtime IR and **independently authored,
 non-empty** oriented plan validate together through the production entry, a
 non-empty exact fusion key/claim is resolved for the governed relation.
 
-*Control:* the `D2j` refusal causes as discriminating comparators on a shared
-input — `Frame`, `SelectedSlot`, `Invocation`, `ExactSuffix`, `CallIdentity`,
-`ProducerArity` each perturb one coordinate and must fail to resolve, while
-`Exact` resolves. A lone positive is green-vs-green under the swap it should
-catch (`COORDINATION §7b`).
+> ##### THE CONTROL WAS WRONG WHEN FIRST WRITTEN, AND CORRECTED 2026-08-12
+>
+> It read: *"`Frame`, `SelectedSlot`, `Invocation`, `ExactSuffix`,
+> `CallIdentity`, `ProducerArity` each perturb one coordinate and must fail to
+> resolve, while `Exact` resolves."* **Two things are wrong with that, and the
+> second is the one this node keeps re-finding.**
+>
+> **`ProducerArity` is a documented POSITIVE, not a refusal.** The type's own
+> doc at `static_transition.rs:16863-16868` says so in as many words — *"Five
+> are refusal causes. `ReHomed` is the segment-owner category … rather than a
+> sixth refusal, and **`ProducerArity` is a positive widening that makes the
+> argument row's inventory non-degenerate**."* Its variant doc gives the reason:
+> the exact witness's producer construct has **one** child, so *"the argument is
+> the child at the recursive position"* cannot discriminate position on a
+> single-element inventory, and `ProducerArity` widens it to two. **A
+> `ProducerArity` that refused would defeat its reason for existing.** The
+> refusal set is **five**, not six. Measured, ring-confirmed: `Exact`, `ReHomed`
+> and `ProducerArity` all resolve, each with a **distinct** key.
+>
+> **The mechanism of the error, because it will recur:** the classification
+> lives in the enum's **doc comment**, which sits *above* the declaration. A
+> `grep -A` anchored on `enum D2jCause` starts at the declaration and cuts it
+> off, leaving only the per-variant docs — from which the Steward classified
+> `ProducerArity` by inference. **In Rust the doc comment always precedes the
+> item, so `-A` alone systematically hides the summary that governs it. Use
+> `-B` too, or read the span.**
+>
+> **The deeper defect: the six-cause list would have CREDITED THREE FORCED
+> ZEROS.** Measured through the production entry, the five refusals are not one
+> class — `Frame`, `SelectedSlot` and `Invocation` are refused by the validator
+> and **never reach the builder** (arrivals `0`), while `ExactSuffix` and
+> `CallIdentity` **arrive once and resolve nothing** (arrivals `1`, keys `0`).
+> Only the second pair says anything about the builder's discrimination. A
+> control that accepted "must fail to resolve" uniformly would have read three
+> never-ran zeros as evidence the mechanism discriminates — **forced zero number
+> five, written into an acceptance criterion by the very frame that spent four
+> blocks warning about them.**
+
+*Control:* **close the `D2j` family to all eight causes, in three tiers, on a
+shared input** (`COORDINATION §7b` — a lone positive is green-vs-green under the
+swap it should catch):
+
+| tier | causes | what each row asserts |
+|---|---|---|
+| resolves, **distinct** key | `Exact`, `ReHomed`, `ProducerArity` | a non-empty key/claim, and the three keys differ from one another |
+| **arrives**, resolves nothing | `ExactSuffix`, `CallIdentity` | arrivals `1` **and** keys `0` — the arrival is the content |
+| refused upstream, **never arrives** | `Frame`, `SelectedSlot`, `Invocation` | arrivals `0`, asserted **as** non-arrival, never as a zero key |
+
+**A zero in tier three is not evidence about the builder and must not be
+written as though it were.** Each tier's rows are operands of the same
+assertion as the tier-one positives, so no zero stands alone.
+
+> **Scope note: most of this is ALREADY LANDED, so build the gap, not the
+> whole.** `d2f_0_the_applied_root_production_path_gate` covers seven of the
+> eight causes through this same production entry and **already encodes the
+> two-tier refusal split** (`no_arrival` vs `arrived_empty`,
+> `control.rs:2856-2894`). **`ProducerArity` is the one cause absent at the
+> lowering level** — and the one the old text misclassified. `AC-1a` is
+> therefore an extension of that landed gate to the eighth variant plus the
+> distinct-key assertion across the three positives, **not** a new parallel
+> control. Re-authoring what is landed would duplicate it and risk the two
+> drifting.
 
 **`AC-1b` — the seeds are absence comparators and earn NO credit.** The current
 unmarked seed fixtures are preserved **unchanged** and their ordinary refusal is
