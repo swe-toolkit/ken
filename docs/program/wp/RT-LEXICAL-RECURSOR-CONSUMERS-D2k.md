@@ -242,13 +242,51 @@ to fall anywhere.
 >
 > ⇒ **Neither ordering is available. `1b-i` carries both.**
 
-**`D2k-1b-i` — the closed field and its fail-closed boundary, together.**
-Introduce the compiler-only constructor-field distinction — an ordinary
-specialized field versus a static-worker field — have `Construct` recognize a
-`StaticWorker` binding **before** `value_at` and retain it as that field kind,
-and land the whole-graph preflight refusal for any path that would carry,
+> ### SIZED AGAIN on measured blast radius — 2026-08-12. `1b-i` is now TWO.
+>
+> `1b-i` was handed back **unstarted on capacity**, with grounding
+> (`evt_12smbvsmxxk9d`): `Lowered::Constructor` is mentioned at **87 sites**,
+> **9 of which read `args`**. Changing that element type touches the nine plus
+> every construction site, and section 3 forbids a wildcard or default arm —
+> so **each of the nine is an explicit decision, not a mechanical edit.**
+>
+> **The atomicity ruling is untouched. What moves is the type migration.** The
+> bulk of the work is introducing the two-variant field type; the part that
+> must be atomic is *arming* it. Those are separable, and separating them does
+> not put the forbidden shape on `main` — because in `1b-i0` **no site
+> constructs the worker variant at all**, so no constructor can carry one.
+>
+> **`1b-i0` claims nothing about worker fields and carries no control asserting
+> one.** Its acceptance is *behaviour is unchanged*. That is what keeps it from
+> being the inert-preflight half the note above rejects: it is not a boundary
+> landed early, it is a type landed early.
+
+**`D2k-1b-i0` — the two-variant field type, with the worker variant
+UNCONSTRUCTIBLE.** Change `Lowered::Constructor`'s `args` element type from
+`Lowered` to the closed compiler-only field kind — an ordinary specialized
+field versus a static-worker field. **Every construction site produces the
+ordinary variant; nothing produces the worker variant.** Each of the nine
+`args` readers gets an explicit worker arm, because section 3 forbids a
+wildcard or default.
+
+- *Acceptance:* behaviour is unchanged and the targeted suite is green. **No
+  new claim about static workers, and no control asserting one** — there is
+  nothing yet to assert it against.
+- **The nine arms are a type-completeness obligation, NOT the boundary.** They
+  are local, per-reader refusals; the ruling requires a **whole-graph** refusal
+  *before the first allocation or emitted transfer*. **Do not let their
+  existence read as the preflight being done** — a per-reader refusal reached
+  during descent is precisely *"descends partway and then refuses"*. `1b-i`
+  still owes the boundary, ahead of them.
+- *Hard stop:* the split forces some construction site to produce the worker
+  variant. Then the two are not separable after all — say so and hand back.
+
+**`D2k-1b-i` — arm it, atomically.** Have `Construct` recognize a
+`StaticWorker` binding **before** `value_at` and produce the worker variant,
+**and** land the whole-graph preflight refusal for any path that would carry,
 allocate, store, join, project, return or publish a constructor containing one.
-**No consumer becomes green here** — the five still refuse.
+With `1b-i0` landed this is small: the type exists and the readers already have
+their arms. **No consumer becomes green here** — the five still refuse.
 
 - **State the property, not the site.** The requirement is *each of the five
   still refuses, and nothing allocates, stores, emits or publishes a
