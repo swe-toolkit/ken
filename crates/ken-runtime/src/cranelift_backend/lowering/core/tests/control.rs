@@ -31885,6 +31885,163 @@ fn d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport() {
     );
 }
 
+/// **`D2k-1c-1` — THE JOIN OF THE THREE-LINK CHAIN IS A LAW, and each half of
+/// it has a row that fails without it.**
+///
+/// `close()` asserted `dom(transitioned) = dom(recognized)` and
+/// `dom(consumed) = dom(minted)`, **each keyed on its own map's keys**, and
+/// supplied the link between them as prose: *"`minted` in bijection with
+/// `transitioned` because one transition mints exactly one transport."* That is
+/// a claim about `rebind`'s body, not something the close could fail on.
+/// Adversary `evt_733esjz2t4bn8`, confirmed.
+///
+/// **Why these rows cannot be reached through the ordinary methods, and why
+/// that is the point rather than a weakness of the control.** `rebind` inserts
+/// into `minted` and `transitioned` back to back with no branch between, so
+/// today its adjacency is what makes the join hold — and the finding is exactly
+/// that the close cannot fail when the adjacency does not hold. A row built by
+/// calling `rebind` would therefore prove the adjacency, not the law. **These
+/// rows build the admitted states directly**, which the test module can do
+/// because the ledger's fields are private to `lowering` and this module
+/// descends from it, while **the identities still cannot be forged** — every
+/// recognition and transport below comes from the ledger's own issuer, whose
+/// field is private to a module this one does not descend from.
+///
+/// **Row 2 is why the finding's own one-line repair is not the fix.**
+/// `range(transitioned) ⊆ dom(minted)` is satisfied by two recognitions naming
+/// ONE minted transport, whose single consumption then discharges both — the
+/// constructed-then-forgotten state with the containment green. The law is the
+/// agreeing bijection, and injectivity is a consequence of it.
+///
+/// **Promise class: durable invariant.** Every row is a property of the chain
+/// itself — a transition and a transport must name each other — and none of them
+/// mentions the current route, the current five rows, or any count.
+#[test]
+fn d2k_1c_1_a_transition_and_its_transport_must_name_each_other() {
+    use crate::cranelift_backend::lowering::{
+        FuncId, MintedStaticWorkerTransport, StaticWorkerFieldLedger,
+    };
+
+    let owner_expr = RuntimeExpr::Construct {
+        constructor: "ctor:fixture::Pair::Mk".to_string(),
+        args: vec![RuntimeExpr::Var(0), RuntimeExpr::Var(0)],
+    };
+    let (plan, owner) = planned_root_occurrence(&owner_expr);
+    let field_a = plan
+        .child_static_origin(owner, 0)
+        .expect("the constructor plans its first argument as child 0");
+    let consumer = owner;
+    let body = Some(FuncId::from_u32(0));
+    let ctor = "ctor:fixture::Pair::Mk";
+
+    // 0. THE POSITIVE CONTROL, first, so no row below can pass for a ledger
+    //    that refuses everything. One construction, one transition, one
+    //    consumption -- built through the ordinary methods -- closes green, and
+    //    the two new laws are silent on it.
+    let mut lawful = StaticWorkerFieldLedger::default();
+    let recognition = lawful
+        .recognize(owner, 0, field_a, ctor, body)
+        .expect("the issuer mints");
+    let transport = lawful.rebind(recognition, body).expect("recognized");
+    lawful
+        .note_consuming_call(Some(transport), consumer, body)
+        .expect("the transported worker is consumed");
+    assert!(
+        lawful.close().is_ok(),
+        "the ordinary chain must still close, or every refusal below is vacuous"
+    );
+
+    // 1. THE ADMITTED STATE THE FINDING NAMES: `transitioned[r] = T` with
+    //    `T` absent from `minted`. Before the join law this closed GREEN --
+    //    loop one saw `r` transitioned, loop two saw `r` recognized, and the
+    //    loops over `minted` and `consumed` never quantified over `T` at all.
+    //    The transport is minted by the issuer and deliberately never recorded,
+    //    which is the one way to hold a real identity that `minted` does not
+    //    know.
+    let mut stranded = StaticWorkerFieldLedger::default();
+    let recognition = stranded
+        .recognize(owner, 0, field_a, ctor, body)
+        .expect("the issuer mints");
+    let unrecorded = stranded
+        .issuer
+        .mint()
+        .expect("a fresh issuer is not exhausted");
+    stranded.transitioned.insert(recognition, unrecorded);
+    assert!(
+        stranded.close().is_err(),
+        "a transition naming a transport that was never minted is a constructed field whose \
+         obligation no other law quantifies over; the close must fail on it rather than describe \
+         it in prose"
+    );
+
+    // 2. THE CONTAINMENT IS NOT ENOUGH. Two constructions transitioning to ONE
+    //    minted transport satisfies `range(transitioned) subset dom(minted)`,
+    //    and that transport's single lawful consumption then discharges both.
+    //    This row is green under the one-line repair the finding proposed and
+    //    red under the agreeing bijection, so it is what distinguishes them.
+    let mut shared = StaticWorkerFieldLedger::default();
+    let built_once = shared
+        .recognize(owner, 0, field_a, ctor, body)
+        .expect("mints");
+    let built_again = shared
+        .recognize(owner, 0, field_a, ctor, body)
+        .expect("mints");
+    assert_ne!(
+        built_once, built_again,
+        "two constructions of one planner origin must be two recognitions, or this row cannot \
+         express the state it is about"
+    );
+    let shared_transport = shared.rebind(built_once, body).expect("recognized");
+    shared.transitioned.insert(built_again, shared_transport);
+    shared
+        .note_consuming_call(Some(shared_transport), consumer, body)
+        .expect("one lawful consumption of the one minted transport");
+    assert!(
+        shared.close().is_err(),
+        "one transport cannot be the transition of two constructed fields; its single consumption \
+         would discharge both, which is the forbidden state with every containment satisfied"
+    );
+
+    // 3. THE JOIN, BACK. A transport standing behind a recognition that
+    //    transitions elsewhere is a construction that entered binding authority
+    //    twice. `rebind` refuses the second one at the call; this asserts the
+    //    close can fail on the state, which is what the call-side refusal being
+    //    the ONLY guard is the objection to.
+    let mut doubled = StaticWorkerFieldLedger::default();
+    let recognition = doubled
+        .recognize(owner, 0, field_a, ctor, body)
+        .expect("mints");
+    let kept = doubled.rebind(recognition, body).expect("recognized");
+    let extra = {
+        // Minted for the same recognition, recorded in `minted` alone -- the
+        // state `rebind`'s second-transition refusal exists to prevent.
+        let spare = doubled.issuer.mint().expect("the issuer is not exhausted");
+        doubled.minted.insert(
+            spare,
+            MintedStaticWorkerTransport {
+                recognition,
+                field_origin: field_a,
+                owner,
+                position: 0,
+                constructor: ctor.to_string(),
+                scope: body,
+            },
+        );
+        spare
+    };
+    doubled
+        .note_consuming_call(Some(kept), consumer, body)
+        .expect("lawful");
+    doubled
+        .note_consuming_call(Some(extra), consumer, body)
+        .expect("lawful in isolation, which is why the close must be the one to refuse");
+    assert!(
+        doubled.close().is_err(),
+        "a second transport behind one recognition is an obligation with no construction behind \
+         it, and consuming both does not make it one"
+    );
+}
+
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1c-0` — THE DECIDING READ: one planner
 /// field origin IS recognized more than once in a single compile, so a
 /// per-origin count cannot be the conservation proof.**
