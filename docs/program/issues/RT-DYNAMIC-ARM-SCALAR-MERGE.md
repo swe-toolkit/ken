@@ -1,7 +1,7 @@
 ---
 id: RT-DYNAMIC-ARM-SCALAR-MERGE
 title: "A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair"
-status: active
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,30 @@ blocks: [KERNEL-NESTED-IND, RT-NESTED-IH-NATIVE-REALIZATION]
 github: null
 origin: Measured by KERNEL-NESTED-IND D5 at WIP 51c482a5 (evt_3evnpax25tckf, 2026-08-09). Kernel reached the native boundary after interpreter Nat-3 and provenance-gated erasure both passed, and stopped without Runtime edits exactly as the durable D5 ruling at main 46c12adb requires. Steward-filed (agents cannot create tracked work per COORDINATION §2). Steward owns the frame and AC/control placement.
 ---
+
+> # STATUS `active` -> `ready`, 2026-08-12. NOTHING WAS UN-LANDED.
+>
+> **`c1` merged at `7bfc8ae5` and stays merged.** This is a tracker correction,
+> not a rollback. The node carried `active` while **no seat held it** — the
+> Runtime ring moved to `RT-LEXICAL-RECURSOR-CONSUMERS` (`D2k`) at
+> `evt_9tx4kt0k8epm` and has been there since. `depends_on` is empty, the frame
+> below is shovel-ready, and the remaining slices (`c2-pre`, `c2`) are
+> unassigned. Per the tracker legend that is **`ready`**: deps met, unassigned.
+>
+> **The lie was in the direction that hides an idle ring.** `KERNEL-NESTED-IND`
+> is blocked on this node and reads *"blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE`
+> (status: active)"*, which tells a tracker reader — including the operator —
+> that Kernel's unblock is in progress. It is not; it is on the shelf. Kernel's
+> three seats and, behind them, `DS-9` are waiting on a node nobody is building.
+> This is the same failure direction [[RT-NESTED-IH-NATIVE-REALIZATION]] records
+> for the undeclared edge, one node over and reached by a different route: there
+> the edge was missing, here the edge is declared and its endpoint's status is
+> wrong.
+>
+> **Not a lane request and not a re-ranking.** Runtime's ordering behind the
+> `RecursiveDescent` retirement chain is the operator's standing priority and is
+> unchanged. Making the shelf visible is what lets that priority be re-examined
+> on real state; it does not pre-empt it.
 
 > # `c1` SCOPE AMENDED IN PLACE 2026-08-10 ~08:3xZ — Steward `evt_28pvpc4rpyvyx`
 >
