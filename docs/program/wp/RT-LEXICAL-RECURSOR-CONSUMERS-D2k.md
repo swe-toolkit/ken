@@ -1132,12 +1132,27 @@ transport-only shape.
 > outer selections 2; **rebind/install 0; consume 0**; `RecursiveDescent` sites
 > **0**; `FunctionizedUnits` sites 8.
 >
-> **THE CENSUS IS INCOMPLETE, AND THIS IS THE NEXT QUESTION.** Row 4's
-> worker-bearing outer selection (`aggr 5`) **matches no instrumented producer
-> event** — neither unarmed site nor the armed site produced it. ⇒ **A fourth
-> production path inside the `define_unit_bodies` traversal supplies it**, and
-> it was not located within the authorized bound. The three-site census I
-> published is therefore a floor, not the population.
+> **THE CENSUS IS INCOMPLETE, AND THIS IS THE NEXT QUESTION. The measured half
+> and the inferred half are separated here on purpose — do not merge them.**
+>
+> **MEASURED:** row 4's worker-bearing outer selection (`aggr 5`) **matches no
+> instrumented producer event.** Neither unarmed site nor the armed site
+> produced it. ⇒ The three-site census is a **floor, not the population**, and
+> that consequence follows from the measurement alone.
+>
+> **INFERRED, NOT MEASURED:** that the producing path lies **inside the
+> `define_unit_bodies` traversal.** That reading came from surrounding
+> backtraces; the trace neither located a fourth site nor established which
+> traversal contains it. **An earlier version of this block stated it as a
+> consequence of the measurement. It is not one** — flagged by the ring at
+> `evt_7drjcf65d758a` before it could become a repair input, which is the
+> correct time to catch it.
+>
+> ⇒ **The open question is "where is the unlocated producer", NOT "where in
+> `define_unit_bodies` is it".** The second phrasing narrows the search to a
+> region nothing has established, which is precisely how this node's earlier
+> enumerations sent instruments at populations that could not exhibit the
+> property.
 >
 > **`UNARMED-A` stays in census.** Zero entries on rows 4 and 5 is evidence
 > about **this population only** and does not prove the site cannot receive the
