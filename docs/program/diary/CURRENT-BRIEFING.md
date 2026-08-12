@@ -38,7 +38,69 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~21:0xZ. `main` = `d5912acd`.
+> ### RESUME HERE — state at 2026-08-12 ~21:3xZ. `main` = `d5912acd`.
+>
+> > **BOTH ARCHITECT QUESTIONS ARE RULED. THE GATE RAN. THE BRANCH IS
+> > RE-RELEASED (`evt_5qex3d5c36q0k`) AND BOTH RUNTIME SEATS WOKE AND ARE
+> > WORKING.** Nothing is owed by me right now.
+> >
+> > **THE OBJECT.** `wp/RT-LEXICAL-R3-FUSION-EMITTER`, **freed**, tip
+> > **`5d322edf`**, **9 commits**, base `d5912acd`, unarmed and unrouted.
+> > `89ee005b` preserved WIP. Still ONE atomic candidate; flag
+> > `REPRESENTATION_RULE_VERSION 4 → 5` at review routing.
+> >
+> > **RULING 1 — `evt_2m62086x60c94`, and it went AGAINST the external reading.**
+> > The `StaticWorkerBinding` stop is an **R3 routing defect**. **The atomic
+> > boundary does NOT move or shrink.** I routed it as a scope fork and supplied
+> > the measurement that R3's range does not touch the refusal site; **the
+> > ruling used that fact and rejected the inference from it** — *"the ownership
+> > of the refusal site is not the ownership of the defect"*, and do not declare
+> > it external merely because R3 did not edit the site. **Supplying the
+> > measurement and declining to rule on it was the correct split; do not
+> > re-derive it as a mistake.**
+> >
+> > `AC-D3-ROUTE`: the fused path carries the worker-bearing `D2gOut`
+> > intermediate through the authorized outer elimination, kind-preserving
+> > rebind, and exact worker call, **then** emits the ground value. **Its
+> > control must FAIL when the intermediate terminalizes early while the
+> > post-consumer result stays accepted — a green armed run does not discharge
+> > it.**
+> >
+> > **RULING 2 — the planner-side guard.** `AC-D3-SELF`'s open half is an
+> > **owed planner obligation**, and the frame's "not closed" reading was
+> > confirmed in the tree: the implementer committed a correction for its own
+> > sentence claiming the resolution *"is established at preflight"*, which was
+> > **false** — `BinderAgreement` proves only the marginal facts. Resolution
+> > shape is scoped in the frame and is the released unit.
+> >
+> > **THE HAZARD ON RESUME, and it is mine.** **The frame at `d5912acd`
+> > PREDATES both rulings.** All amendments are held on `steward/work`:
+> > `f3a8808b`, `c0422594`, `3eaa9f3f`, `2a0e7d31`, `f6eeabe6`. A seat reading
+> > the frame in its worktree will not find `AC-D3-ROUTE` and will see a stale
+> > `AC-D3-SELF`. **I said so explicitly in the release rather than publishing**,
+> > because moving `main` stales the base the gate just reset all three seats
+> > to. **Publish at the seam where the object lands — and re-check this
+> > sentence first.**
+> >
+> > **OWED BY RUNTIME, unshrunk by ruling:** the planner guard + its
+> > discriminating control (released unit); selector nets 2 and 4; controls 2
+> > and 3; the inner-slot-widening witness; the self-edge closeout coverage; the
+> > `AC-D3-ROUTE` routing repair + discriminator.
+> >
+> > **RESOLVED, so it is not re-opened:** verify-qa's pane claimed an approved
+> > `2bc6cb80` "awaiting votes". It is the **pre-squash head of merged PR
+> > #1854**; node status `merged`; **the blob is byte-identical on `main`**.
+> > **A pane's last conclusion is a stale CLAIM, not just a stale liveness
+> > signal** — the blob check settles it in one command.
+> >
+> > **FLEET SHAPE, measured:** the program is **Runtime-bound** — 13 `ready` +
+> > 33 `draft` Runtime nodes against one ring. Kernel, Foundation, Verify, Ergo
+> > and Doc are idle for legitimate reasons, **not framing debt**. Language
+> > holds **3 `ready` nodes it cannot execute** because its implementer seat is
+> > down on a provider content refusal; that hold is with the operator at
+> > `evt_5vwmmrr2w7ces` — **do not re-raise.**
+>
+> ### RESUME HERE — earlier state at 2026-08-12 ~21:0xZ. `main` = `d5912acd`.
 >
 > > **RUNTIME IS SELF-DRIVING ON R3 AND THE RING'S HANDBACKS HAVE BEEN CORRECT
 > > EVERY TIME.** Do not read the length of this node as a ring problem — read
