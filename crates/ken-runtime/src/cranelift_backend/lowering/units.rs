@@ -2935,12 +2935,27 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         producer_owner: PredeclaredFunctionId,
         consumer_owner: PredeclaredFunctionId,
         producer_body: StaticOriginId,
+        /// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the CALL SITE the moved
+        /// suffix's claimed IH invocation is authorized at. Deliberately kept
+        /// beside `producer_body` rather than folded into it: this is the
+        /// occurrence that calls, that is the body called, and in this fixture
+        /// they are different origins that a numeric coincidence elsewhere
+        /// could hide.
+        consuming_call: StaticOriginId,
+        consuming_callee: StaticOriginId,
+        redirect_callee: StaticOriginId,
         continuation_origin: StaticOriginId,
         /// `RT-LEXICAL-R3-FUSION-EMITTER` `D2` — the claim's consumer frame
         /// identity, re-entered locally inside the fused function.
         checked_frame_id: u64,
         slots: Vec<AbiSlot>,
         offsets: Vec<u32>,
+        /// The INSTALLED fusion frame's whole header, carried rather than
+        /// rebuilt from its parts. `D3`'s recursive self edge targets this
+        /// definition, so it must present the frame contract the region was
+        /// installed with; reassembling a header here is how it would come to
+        /// differ in a field nobody thought to copy.
+        header: AbiFrameHeader,
         header_parameters: u32,
         header_captures: u32,
     }
@@ -2974,6 +2989,9 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     producer_owner: claim.producer_owner(),
                     consumer_owner: claim.consumer_owner(),
                     producer_body: claim.producer_body(),
+                    consuming_call: claim.consuming_call(),
+                    consuming_callee: claim.consuming_callee(),
+                    redirect_callee: claim.redirect().callee_origin(),
                     continuation_origin: claim.continuation_origin(),
                     // `D2` -- the consumer frame identity the claim was
                     // preflighted against, carried so the fused body re-enters
@@ -2981,6 +2999,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     checked_frame_id: claim.checked_transport().frame_id(),
                     slots: fusion.slots().to_vec(),
                     offsets,
+                    header: fusion.header(),
                     header_parameters: fusion.header().parameters,
                     header_captures: fusion.header().captures,
                 })
@@ -3048,6 +3067,88 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         // invocation is the edge that reaches this function, not one inside it.
         let declared_calls = call_edges.declare_in_func(fusion.producer_owner, module, &mut func)?;
         function_local.unit_calls = declared_calls.static_bodies;
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE DEFINITION-LOCAL
+        // ---- FUSION-RECURSIVE SELF EDGE (Architect, via `evt_6fzg11hpvfp4w`).
+        //
+        // The suffix moved into this function, and its claimed IH invocation is
+        // a **recursive call to this same `Fusion(id)`** — not a no-op forward
+        // of a current result, and not a call to the standalone producer, whose
+        // body this definition now owns.
+        //
+        // Without this the fused body reaches
+        // `call_declared_unit(producer_body)` against a table holding only the
+        // producer's inherited edges and refuses with *"retained body ... has no
+        // graph-derived call target in this unit"*. That refusal is correct and
+        // stays: this supplies the edge the body genuinely contains rather than
+        // relaxing the check.
+        //
+        // **Authorized from the preflighted claim, never from the failure.** The
+        // ruling forbids inferring this edge from a lookup miss, from numeric
+        // coincidence between origins, from body shape, or from ambient
+        // "inside a fusion" state — so each fact below is read off `claim`.
+        //
+        // **Call-site identity is kept distinct from body identity.** The key
+        // and `origin` are the callee body; `call_site_origin` is
+        // `claim.consuming_call()`. In this fixture the body and the claim's
+        // seat both print `37` while the consuming call is `17`; folding them
+        // would compile and would make a wrong-call-site edge indistinguishable
+        // from a right one.
+        //
+        // **The header and slots are the installed FUSION frame's**, never the
+        // producer's — the callee is this fused definition, so the frame
+        // contract is the one it was installed with.
+        //
+        // This is a **separate, definition-local obligation** from the external
+        // consumer-to-fusion redirect, which remains the sole affine external
+        // redirect. It consumes no region claim and records no redirect.
+        // The half of the ruled verification that is genuinely derivable HERE:
+        // the redirect's producer entry and the claim's producer body must be
+        // the same occurrence. They reach the claim by different routes --
+        // `producer_body` from `invocation_callee_entry` via the unique static
+        // body triple, `redirect` from `fusion_redirect_target` -- so their
+        // agreement is a real cross-check rather than a field compared with
+        // itself.
+        //
+        // MEASURED, and stated rather than implied: `consuming_callee` does NOT
+        // equal `producer_body` and must not be compared to it. On this witness
+        // the consuming call is `17`, its callee occurrence `16`, and the
+        // producer body `37`. The callee reaches the body through an IH
+        // BINDING, and `CheckedIhBinding` names a `frame_origin` and a recursive
+        // position -- not a body -- so that resolution is established at
+        // preflight and is not re-derivable at this seam: it needs
+        // `ih_bindings` and `SemanticIr::child_origin`, which is `pub(super)` to
+        // the planner. An earlier draft of this guard compared the two ids
+        // directly and refused every lawful region.
+        if fusion.redirect_callee != fusion.producer_body {
+            return Err(backend_module(
+                "a fused region's redirect names a producer entry other than the claim's producer \
+                 body, so the definition-local recursive edge would target a body this claim \
+                 never admitted"
+                    .to_string(),
+            ));
+        }
+        let self_edge = DeclaredUnitCall {
+            function: module.declare_func_in_func(id, &mut func),
+            origin: fusion.producer_body,
+            call_site_origin: fusion.consuming_call,
+            header: fusion.header,
+            slots: slots.to_vec(),
+            offsets: offsets.to_vec(),
+        };
+        // INSERTED, and its absence beforehand is required rather than assumed —
+        // the producer's inherited edges must not already answer for this body,
+        // or the suffix would have two answers to one lookup and the standalone
+        // producer would stay reachable beside its fused definition.
+        if function_local
+            .unit_calls
+            .insert(fusion.producer_body, self_edge)
+            .is_some()
+        {
+            return Err(backend_module(
+                "a fused definition already holds a call target for the body it owns, so its                  recursive suffix edge would be one of two answers to the same lookup"
+                    .to_string(),
+            ));
+        }
         function_local.declaration_calls = declared_calls.declarations;
         function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
         // No retarget happens in a fused body, so the two tables agree. Populated
@@ -3175,6 +3276,28 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 let binding = LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
                     CarriedBoundaryWord { word },
                 ));
+                // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the CURRENT FUSED
+                // FRAME's ordered operand run, recorded in this same single
+                // walk and in descriptor order.
+                //
+                // `fused_redirect_inputs` resolves `claim.inputs()` by indexing
+                // `defining_abi_operands` of the function making the call. Until
+                // the suffix moved in, that function was always the consumer's
+                // predeclared unit, which populates the run in its own slot
+                // walk. The fused definition never did, so the recursive self
+                // edge above refused with *"names entry ABI position 0 outside
+                // the calling function's 0 operands"* — an empty run, not a
+                // wrong one.
+                //
+                // Written HERE rather than reassembled afterwards for the reason
+                // the ordinary unit body states: one walk loads each slot once,
+                // and a second pass that rebuilds the order is how the operand
+                // run comes to disagree with the descriptor it was declared
+                // from.
+                compiler
+                    .function_local
+                    .defining_abi_operands
+                    .push(LoweringOperand::Carried(CarriedBoundaryWord { word }));
                 match slot.kind {
                     AbiSlotKind::Parameter => parameters.push(binding),
                     _ => captures.push(binding),
