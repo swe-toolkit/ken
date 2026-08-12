@@ -27,15 +27,50 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > **route a subsumption proposal before coding** — it may not be inferred from
 > shared retirement timing or shared syntax.
 
-> # FILED `draft` ON PURPOSE — RELEASED WHEN THE A NODE MERGES
+> # THE RESIDUAL IS SIX EXPRESSIONS AT TWO WALLS — updated 2026-08-12
 >
-> The frame is written and shovel-ready; the node is held at `draft` only to
-> enforce the ruled release order. **The A node goes first** because it closes
-> the Position-A claim that the `D2` record correction is narrowing, and the
-> fleet runs one Runtime ring at a time.
+> The `draft`-until-the-A-node-merges hold is **spent**:
+> [[RT-MATCH-RECURSOR-CONSUMERS]] merged, this node released and is `active`,
+> and eleven `D2f` partials have landed.
 >
-> ⇒ **Nothing here is owed further analysis.** The moment
-> [[RT-MATCH-RECURSOR-CONSUMERS]] merges, this flips `ready` and releases.
+> **Two of the original eight expressions have left this node.** Row 2 went to
+> [[RT-LEXICAL-ROW2-MISSING-MINT]] (**merged** 2026-08-12, no production repair
+> — the row was not a regression, its assertion was over-specified). Row 5's
+> **before**-hole went to [[RT-LEXICAL-R3-FUSION-EMITTER]] together with the
+> `D2f` emitter machinery, **released to Runtime 2026-08-12**.
+>
+> | cell | expressions | where it stopped |
+> |---|---|---|
+> | rows 1 and 4 | 4 | `StaticWorkerBinding` wall |
+> | row 5 **after**-hole | 1 | `StaticWorkerBinding` wall |
+> | row 3 | 1 | retained singular-specialization wall |
+>
+> ⇒ **Five of the six remaining expressions are stopped at one wall**, and
+> `#6d` closure gates [[RT-RECURSOR-TRANSPORT]] `D3`, which gates
+> [[RT-DESCENT-RETIRE]]. The measured remainder for closure is **closer to a
+> week** (runtime-leader `evt_645tm43wf1cne`).
+>
+> > ### THE `StaticWorkerBinding` WALL HAS NO OWNER — question routed 2026-08-12
+> >
+> > `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2a.md` files it as
+> > *"successor, **unfiled here**"*, and **no successor was ever filed.** `D2a`
+> > was explicit that *"`R1` is repaired"* must never be read as *"rows 1 and 4
+> > pass"* — the advance is evidence the repair was reached, not a pass.
+> >
+> > **Steward question `evt_27chdjk4xh200` to the Architect:** does this repair
+> > belong to `#6d` as its next increment, or does it require
+> > [[RT-CONTSRC-CALLABLE-CONTRACT]] first? Both quote the same production
+> > fact — *a static worker binding has no value representation* — in two
+> > different components, and that node is `ready` and unblocked with
+> > `blocks: []`.
+> >
+> > **If it is a prerequisite, the graph is currently lying**: a `blocks: []`
+> > node would sit on the retirement critical path while rendering as *nothing
+> > depends on this*. **Declare the edge in BOTH directions if so** —
+> > `gen-progress.sh` reads `depends_on`, not `blocks`.
+> >
+> > **Do not start the wall repair on the strength of this note.** It records
+> > an open ownership question, not a released deliverable.
 
 ## What it is
 
