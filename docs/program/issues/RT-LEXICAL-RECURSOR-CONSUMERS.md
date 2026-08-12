@@ -78,6 +78,106 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > > sentence, but it is emitted by **one chokepoint every value read funnels
 > > through**, so a shared string is equally what five unrelated wrong-consumer
 > > routes would produce. **Prove the roots before sizing the repair.**
+> >
+> > #### `D2k-0` MERGED 2026-08-12 — THE ROOT COUNT IS ONE
+> >
+> > Exact `67b6b99e`, PR #1969, **CI green**, `origin/main` `d9e717fe`.
+> > Declared base `b6c8655c`, one non-merge commit, one test-only path
+> > `core/tests/control.rs`, `+128/-0`. Decision `dec_6x992cvp2v0ds`; QA
+> > `evt_3ssgrrmvr3kfe`, Architect `evt_2s93e1qy2nxet`. M6 verified by blob
+> > identity from the declared merge-base. **Evidence only — no repair.**
+> >
+> > **What is asserted, exactly:** all five refuse with construct
+> > `StaticWorkerBinding` and the **same `edge`**, `a Var in value position`.
+> > The committed table also gives a refusing caller and a route per
+> > expression. **The frame's scope signal did not fire: no fifth `value_at`
+> > caller at that base.**
+> >
+> > ⇒ **`D2k-1` is provisionally sized as a SINGLE repair.** That sizing is this
+> > measurement's only load, and it is the reason the measurement came first.
+> >
+> > **The bound travels with the number.** The route is **not executable and the
+> > candidate says so** — observing which caller fired needs instrumenting
+> > `value_at`, which `AC-2` requires byte-unchanged — so the route column is a
+> > **measured-and-reverted probe**, and the conclusion stands as *"one root, on
+> > this evidence."* **A different `edge` met during `D2k-1` is a SECOND ROOT
+> > and re-opens the sizing.** Stop and hand back; do not widen the repair.
+> >
+> > #### THE SIZING IS PROVISIONAL — the discriminator is ONE-SIDED
+> >
+> > **Adversary `evt_1mpre0qmhx6s5`, confirmed against `67b6b99e`. Rider on
+> > `D2k-1` at `evt_hkhfctkb888h`, and it lands BEFORE the repair.**
+> >
+> > The frame's discriminator is *"the `edge` argument and the causal consumer
+> > owner, **never the message**."* **`wall()` returns `(construct, edge)` with
+> > `edge` parsed out of the refusal message via
+> > `reason.split(" is a value-producing position")`, and no consumer owner
+> > appears in the tuple or in any assertion.** So *"never the message"* is
+> > false as written, and the message-independent half is absent.
+> >
+> > **The direction is what matters: the claim being asserted is SAMENESS**, and
+> > a discriminator establishing identity must be able to distinguish. **The
+> > candidate's own doc discloses how it might not — `mod.rs:3661` forwards its
+> > caller's edge**, so a forwarded route presents `a Var in value position`
+> > indistinguishably from a direct `core.rs:14593` route. **Five same edges is
+> > consistent with one root and with distinct routes converging through a
+> > forward.**
+> >
+> > **An earlier version of this record said "the same call site." That was my
+> > overstatement, corrected here before it landed** — the candidate never
+> > claimed the route was executable.
+> >
+> > **The rider's three outcomes are all good:** the owner is obtainable without
+> > touching `value_at` and all five share it (one root established on a
+> > discriminator that can distinguish); it resolves to more than one root (the
+> > sizing stop fires, late but correctly); or **no message-independent
+> > discriminator is constructible under `AC-2`** — a return-to-the-Steward
+> > finding meaning *"one root"* can never be established on the evidence this
+> > frame permits. **`AC-2` is not to be weakened to resolve the third.**
+> >
+> > #### RIDER ANSWERED — outcome 1, and the SAME measurement stopped the repair
+> >
+> > Runtime implementer `evt_6z8xjk3gkh821`; stop report `evt_134atze90gs1m`.
+> >
+> > **"One root" survives on a discriminator that can actually distinguish.**
+> > The causal consumer owner for all five is **`RuntimeExpr::Construct`** —
+> > `PX8JTree1::Node`, `PX8JScopeTree::Node` at three depths, and
+> > `PX8JHoleOutput::Node`. It is the enclosing `lower_expr` arm, so nothing is
+> > parsed out of `reason`. **The forwarding ambiguity is measured absent, not
+> > argued away:** all four `value_at` callers were tagged, `mod.rs:3661`
+> > **never fired**, and the last tag before every refusal was `core.rs:14593`.
+> > **`value_at` was never touched** — the instrumentation sat on its callers
+> > and on the `Construct` arm — so `AC-2` is intact and outcome 3 does not
+> > arise. **The stronger measurement agrees with the weaker one rather than
+> > overturning it.**
+> >
+> > **It is PROBE-MEASURED AND REVERTED.** The committed `D2k-0` test still
+> > asserts only construct and edge, so the **durable** evidence remains the
+> > narrower thing. The leader has ordered the owner assertion committed as its
+> > own pre-repair checkpoint (`evt_4ggrxzk22e46m`).
+> >
+> > **The `D2k-0` redness claim is still unverified by anyone. Still owed.**
+> >
+> > > ##### SECTION 3'S FRONT-LOADED PREMISE IS MEASURED FALSE FOR THESE FIVE
+> > >
+> > > **The same measurement that saved "one root" is why `D2k-1` stopped.**
+> > > The frame's section 3 says the lawful consumer — *a `Call` whose callee is
+> > > an exact `Var` bound to `StaticWorker`* — is **already installed**, so the
+> > > wall means the binding reached the wrong consumer *shape*.
+> > >
+> > > **For these five there is no call.** The static worker is a **constructor
+> > > argument**, which is a value-producing position **by construction**, so
+> > > the exact-`Var` callee path has nothing to key on. **The root "one root"
+> > > names is not the root section 3 assumes.**
+> > >
+> > > ⇒ **Section 3 is marked *"do not re-derive it"*. Do not act on it for
+> > > these five until the Architect's disposition lands** (`evt_78agvsvb0z450`,
+> > > grounding static workers as constructor arguments). **The repair scope is
+> > > open and must not be broadened by the ring.**
+> >
+> > **The committed test asserts the edge and refusal per expression and reds if
+> > a repair moves any of them.** That is what makes this durable rather than a
+> > one-time reading — **a red there is information, not a test to update.**
 
 ## What it is
 
