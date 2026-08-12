@@ -57,6 +57,28 @@ LoweringEnvironmentBinding::StaticWorker(_) => Err(unsupported(
 
 ## 3. The design judgment, front-loaded — do not re-derive it
 
+> ### MEASURED FALSE FOR THESE FIVE — 2026-08-12. Do not act on this section.
+>
+> **The premise below is that the lawful consumer is already installed and the
+> binding merely reached the wrong consumer *shape*. For these five there is no
+> call at all.** The causal consumer owner is `RuntimeExpr::Construct` —
+> `PX8JTree1::Node`, `PX8JScopeTree::Node` at three depths, `PX8JHoleOutput::Node`
+> — so **the static worker is a constructor argument**, a value-producing
+> position **by construction**, and the exact-`Var` callee path has nothing to
+> key on. Measured by the Runtime implementer at `evt_6z8xjk3gkh821`; stop
+> report `evt_134atze90gs1m`.
+>
+> **This is why "do not re-derive it" is dangerous here rather than merely
+> stale.** That instruction exists to stop a ring re-litigating a settled call,
+> and it works by discouraging exactly the check that would have caught this.
+> **A front-loaded judgment carried into a frame is only as good as the
+> population it was measured on.**
+>
+> **`D2k-1`'s repair scope is OPEN and stopped.** The Architect is grounding the
+> disposition of static workers as constructor arguments (`evt_78agvsvb0z450`).
+> **The ring must not broaden the repair to cover it**, and the section below
+> stands only as the record of what was believed, not as an instruction.
+
 **Architect `evt_5wvk3e8k1bjqn`, and this is the whole reason the increment is
 small.** At this wall the callable fact is **already expressible and already
 installed**. Both the direct lowerer and the source machine already have the
