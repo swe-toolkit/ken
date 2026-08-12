@@ -212,6 +212,7 @@ fn run_dynamic_constructor_dispatch_fixture(
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        static_worker_fields: Default::default(),
         fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
@@ -1925,6 +1926,7 @@ fn bare_carrier_test_lowering<'src>(
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        static_worker_fields: Default::default(),
         fusion_claims: None,
         continuation_candidates: None,
         checked_call_ledger: None,
@@ -5451,6 +5453,7 @@ fn lower_against_static_worker(
         // constructible here even in a test: it needs a planner-issued
         // `ContinuationCallIdentity`, which has no constructor outside planning.
         discharge: ContinuationDischarge::DirectSpecializationCall,
+        transported_field: None,
     })];
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
@@ -5494,18 +5497,52 @@ fn static_worker_fails_closed_in_value_position() {
     );
 }
 
-/// The same binding used as an aggregate field fails closed before any
-/// carrier transfer, rather than entering the constructor's argument list.
+/// The same binding used as an aggregate field is **recognized and
+/// transported**, and the template it produces is non-materializable.
+///
+/// **RE-DERIVED at `D2k-1b-i`, and the red that preceded this rewrite was the
+/// RULED SEMANTICS CHANGING — not the repair being incomplete.** This control
+/// previously asserted the opposite outcome: that a worker in a constructor
+/// argument refuses at `value_at` for the *"value-producing position"* reason,
+/// exactly as the bare-`Var` control above still does. Architect
+/// `evt_4krvq67427n5z` reversed that for this one position — a specialized
+/// constructor is a compiler template, not necessarily a materialized runtime
+/// aggregate, so the field is recognized **ahead of** the value read and
+/// retained as [`ConstructorField::StaticWorker`]. The old assertion could not
+/// survive its own ruling.
+///
+/// **What replaces it is the part of the old property that IS durable:** the
+/// worker still never becomes a value. It is transported in a template that
+/// **refuses at the boundary**, so nothing about the reversal opened a route
+/// into a runtime aggregate. The sibling scrutinee, call-argument and
+/// value-position controls are untouched, which is what keeps this narrow.
+///
+/// **This harness calls `lower_expr` directly**, so the conservation close in
+/// `compile_expr_into_module` does not run here and the drop is not what this
+/// control measures. `d2k_1b_i_every_recognized_static_worker_reaches_a_disposition`
+/// is the whole-compile measurement of the disposition.
 #[test]
-fn static_worker_fails_closed_as_aggregate_field() {
+fn static_worker_as_aggregate_field_is_transported_and_non_materializable() {
     let subject = RuntimeExpr::Construct {
         constructor: "ctor:fixture::Box::Wrap".to_string(),
         args: vec![RuntimeExpr::Var(0)],
     };
-    let error = expect_lowering_rejection(lower_against_static_worker(&subject, 1, true));
+    let lowered = match lower_against_static_worker(&subject, 1, true) {
+        Ok(LoweringOperand::Specialized(lowered)) => lowered,
+        Ok(LoweringOperand::Carried(_)) => {
+            panic!("a template transporting a static worker must not reach the carrier")
+        }
+        Err(error) => panic!("the worker is transported rather than refused here: {error:?}"),
+    };
+    let error = match lowered.boundary_transfer_admissibility() {
+        Ok(()) => panic!(
+            "a constructor transporting a static worker field must refuse at the boundary,              before any allocation or emitted transfer"
+        ),
+        Err(error) => error,
+    };
     assert!(
-        format!("{error:?}").contains("value-producing position"),
-        "fails closed for the value-position reason: {error:?}"
+        format!("{error:?}").contains("no value representation"),
+        "the boundary refusal names the missing value representation: {error:?}"
     );
 }
 

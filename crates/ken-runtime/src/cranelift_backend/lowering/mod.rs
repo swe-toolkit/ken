@@ -2490,6 +2490,40 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
         origin: StaticOriginId,
         site: &'static str,
     },
+    /// `D2k-1b-i` — a `Construct` argument was **recognized** as a static
+    /// worker and retained as a compiler-only field, instead of being read as
+    /// a value.
+    ///
+    /// **The owner/argument relation this carries is the PLANNER's, not
+    /// emission order.** `field_origin` is
+    /// `child_static_origin(owner, position)`, so a consumer of this trace
+    /// learns which constructor owns the field from the planner's own
+    /// positional child-origin range rather than from which `ConstructEntered`
+    /// happened to be emitted nearest. That distinction is not cosmetic: a
+    /// constructor argument may itself be a `Construct`, and a
+    /// nearest-preceding rule names the **inner** one while agreeing with the
+    /// planner on every non-nested fixture.
+    StaticWorkerField {
+        owner: StaticOriginId,
+        position: usize,
+        field_origin: StaticOriginId,
+        constructor: String,
+    },
+    /// `D2k-1b-i` — a static `Match` elimination installed a constructor's
+    /// static-worker field into the lexical binding authority **without
+    /// erasing its kind**, so the existing exact-`Var` call arm can consume it.
+    ///
+    /// This is the consumption half of the total: every recorded
+    /// [`D2kOwnerEvent::StaticWorkerField`] must be answered by one of these
+    /// or by a refusal, and a row that compiles with none is a failure.
+    StaticWorkerBinderInstalled {
+        field_origin: StaticOriginId,
+        position: usize,
+    },
+    /// `D2k-1b-i` — the exact-`Var` call arm consumed a static worker that
+    /// reached it through a constructor field installed by a static `Match`
+    /// elimination.
+    StaticWorkerCallConsumed { origin: StaticOriginId },
 }
 
 #[cfg(test)]
@@ -2698,6 +2732,19 @@ struct Lowering<'a> {
     /// the whole unit-definition pass so a token claimed at one producer
     /// occurrence cannot be claimed again at another.
     continuation_claims: Option<units::ContinuationClaimLedger>,
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i`** — the conservation ledger
+    /// for compiler-only static-worker constructor fields. See
+    /// [`StaticWorkerFieldLedger`]; closed by
+    /// [`Lowering::require_complete_static_worker_disposition`].
+    ///
+    /// **Always present, never `Option`**, unlike the two ledgers above. Those
+    /// are opened by an authority that may not run, and their absence is a real
+    /// state meaning *"no claim regime here"*. This one has no such state: a
+    /// recognized worker field must reach a disposition on **every** route,
+    /// including a direct lowering harness that opens no unit-definition pass.
+    /// An `Option` would give the drop a way back in — an unopened ledger that
+    /// closes vacuously.
+    static_worker_fields: StaticWorkerFieldLedger,
     /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`** — the fused-region claim
     /// ledger, held across the whole unit-definition pass for the same reason
     /// the continuation ledger above is: the redirect happens while defining the
@@ -2869,24 +2916,60 @@ enum ConstructorField {
     /// A statically-bound worker transported through the constructor template
     /// without becoming a value.
     ///
-    /// **NOTHING CONSTRUCTS THIS ARM AT `D2k-1b-i0`, and the resulting
-    /// `never constructed` warning is the open checkpoint staying visible** —
-    /// the same convention [`StaticWorkerBinding::route`] states for itself.
-    /// Silencing it with an `#[allow(dead_code)]` would hide the one fact that
-    /// distinguishes this increment from the armed one: `D2k-1b-i` supplies the
-    /// producer, and until it does, this arm is unreachable by construction.
+    /// **THIS ARM IS NOW CONSTRUCTED**, at the one armed producer:
+    /// `Lowering::static_worker_constructor_template`, reached from the
+    /// direct-descent `RuntimeExpr::Construct` arm after
+    /// `recognized_constructor_worker_fields` answers ahead of any
+    /// value-producing read. The `never constructed` warning that stood here as
+    /// `D2k-1b-i0`'s open checkpoint is gone, and its disappearance is the
+    /// compiler's own announcement that the checkpoint closed.
+    ///
+    /// **It is also READ**, by the kind-preserving static `Match` binder
+    /// [`bound_constructor_fields`], which installs it into the one lexical
+    /// binding authority as [`LoweringEnvironmentBinding::StaticWorker`] rather
+    /// than converting it to a value — so the pre-existing exact-`Var` call arm
+    /// is the thing that consumes it. Both `1b-i0` warnings (`never
+    /// constructed`, then `field 0 is never read`) are therefore gone, and
+    /// neither was silenced with an `#[allow(dead_code)]`.
+    ///
+    /// > **MEASURED, and it is why arming the producer ALONE does not land:**
+    /// > with this arm constructed and nothing consuming it, four of `D2k`'s
+    /// > five expressions stop refusing and **compile with the worker silently
+    /// > dropped** (`739cfde3`, preserved as evidence). That is the forbidden
+    /// > fourth state — constructed, neither consumed nor authoritatively
+    /// > erased, then forgotten — and it is what
+    /// > [`StaticWorkerFieldLedger`] exists to make impossible.
     ///
     /// **The field readers' arms below are TYPE COMPLETENESS, NOT the
     /// boundary.** They are local refusals reached *during* descent, and the
     /// ruling requires a **whole-graph** refusal *before the first allocation
-    /// or emitted transfer*. `D2k-1b-i` owes that boundary and it is not
-    /// present here; nine green arms are not a preflight.
-    StaticWorker(StaticWorkerBinding),
+    /// or emitted transfer*. That boundary is
+    /// `Lowering::source_aggregate_preflight` together with
+    /// [`Lowered::boundary_transfer_admissibility`], both of which run ahead of
+    /// every emission; a count of green reader arms is never evidence about it,
+    /// because the two differ in **when**, not in **how many**.
+    StaticWorker {
+        binding: StaticWorkerBinding,
+        /// **The planner-owned pairing key**, `child_static_origin(owner,
+        /// position)` at the producing `Construct`.
+        ///
+        /// Architect `evt_5etamwj8tp2fh` requires the recognized field to be
+        /// paired to its later static elimination **by planner origin/position
+        /// — never by constructor spelling and never by trace proximity.** A
+        /// constructor argument may itself be a `Construct`, so a
+        /// nearest-preceding rule names the inner constructor and agrees with
+        /// the planner on every non-nested fixture. Carrying the key on the
+        /// field is what lets the elimination and the conservation ledger name
+        /// the same occurrence without either of them inferring the relation.
+        field_origin: StaticOriginId,
+    },
 }
 
 impl ConstructorField {
     /// The ordinary field a producer builds. Every construction site in the
-    /// tree goes through this arm at `D2k-1b-i0`.
+    /// tree goes through this arm **except** the one armed producer,
+    /// `Lowering::static_worker_constructor_template`, which is the sole
+    /// builder of the worker arm.
     fn specialized(value: Lowered) -> Self {
         ConstructorField::Specialized(value)
     }
@@ -2922,7 +3005,7 @@ impl ConstructorField {
     fn specialized_at(&self, edge: &str) -> Result<&Lowered, CraneliftBackendError> {
         match self {
             ConstructorField::Specialized(value) => Ok(value),
-            ConstructorField::StaticWorker(_) => Err(Self::static_worker_refusal(edge)),
+            ConstructorField::StaticWorker { .. } => Err(Self::static_worker_refusal(edge)),
         }
     }
 
@@ -2932,7 +3015,7 @@ impl ConstructorField {
     fn into_specialized_at(self, edge: &str) -> Result<Lowered, CraneliftBackendError> {
         match self {
             ConstructorField::Specialized(value) => Ok(value),
-            ConstructorField::StaticWorker(_) => Err(Self::static_worker_refusal(edge)),
+            ConstructorField::StaticWorker { .. } => Err(Self::static_worker_refusal(edge)),
         }
     }
 }
@@ -3415,6 +3498,28 @@ struct StaticWorkerBinding {
     /// consumer, and it is the thing to check when asking whether `D8i` is
     /// still transport-only.
     discharge: ContinuationDischarge,
+    /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i`** — the constructor field
+    /// this binding was rebound out of, or `None` if it was bound directly.
+    ///
+    /// **This is the OCCURRENCE key, and it is what makes conservation
+    /// one-to-one rather than a count.** A ledger that recorded recognized
+    /// fields but counted consuming calls in aggregate accepts a compile in
+    /// which one rebound field is dropped while another is called twice, or in
+    /// which an **unrelated pre-existing** static-worker call supplies the
+    /// tally. Architect `dec_2xxj1zrwmgjdb` rejected exactly that. Carrying the
+    /// planner's `child_static_origin(owner, position)` on the binding lets the
+    /// call arm name the entry it discharges, so a consumption can be matched
+    /// to a transport instead of merely counted against one.
+    ///
+    /// **`None` is a real state, not a missing value:** every pre-existing
+    /// construction site produces it, and a call consuming such a binding
+    /// touches no ledger entry at all. That is what keeps an ordinary worker
+    /// call from paying a constructor field's debt.
+    ///
+    /// ⇒ Compiler-side identity only. It is a planner-owned `StaticOriginId`,
+    /// not a runtime word, tag, descriptor or carrier, and recording it creates
+    /// no planner population.
+    transported_field: Option<StaticOriginId>,
 }
 
 impl StaticWorkerBinding {
@@ -3807,17 +3912,20 @@ fn specialized_operands_at(
 /// [`specialized_operands_at`] for the arguments of a **constructor template**,
 /// producing that template's closed [`ConstructorField`] kinds.
 ///
-/// **`D2k-1b-i0`: every operand becomes [`ConstructorField::Specialized`], with
-/// no exception.** This is the whole of the behaviour-preserving claim on the
-/// producer side — a static worker reaching a constructor argument has already
-/// refused upstream at [`LoweringEnvironmentBinding::value_at`], so no operand
-/// arriving here can be one.
+/// **Every operand becomes [`ConstructorField::Specialized`], with no
+/// exception, and that stays true with the producer armed.** A
+/// [`LoweringOperand`] is a lowered value, and recognition happens *before* an
+/// argument is lowered — so a static worker never becomes an operand and can
+/// never arrive here. An operand reaching this function that names a worker has
+/// already refused upstream at [`LoweringEnvironmentBinding::value_at`].
 ///
-/// **This is the seam `D2k-1b-i` arms, and it is deliberately one function.**
-/// That increment makes `Construct` recognize a static-worker binding *before*
-/// `value_at` and produce [`ConstructorField::StaticWorker`] here. Until then
-/// the uniform mapping is the honest statement of what the compiler does, not a
-/// placeholder: nothing upstream can hand this function a worker.
+/// **The armed seam is NOT this function**, which is the correction worth
+/// leaving: `D2k-1b-i0` predicted that `D2k-1b-i` would arm it, and arming it
+/// would have been arming the wrong end. Recognition has to happen where the
+/// *source argument* is still in hand, not where its lowered operand is — by
+/// then the value-producing read has already been taken. The armed producer is
+/// `Lowering::static_worker_constructor_template`, which builds the mixed
+/// template itself and never routes through here.
 fn specialized_constructor_fields_at(
     operands: &[LoweringOperand],
     edge: &'static str,
@@ -3831,20 +3939,23 @@ fn specialized_constructor_fields_at(
 /// The ordinary values behind a constructor template's fields, or a refusal
 /// naming the reader.
 ///
-/// **The read direction of [`specialized_constructor_fields_at`]**, for the
-/// static `Match` elimination sites that install a constructor's fields into
-/// the one lexical binding authority.
+/// **The read direction of [`specialized_constructor_fields_at`]**, for readers
+/// that genuinely need a value out of every field.
+///
+/// **The static `Match` elimination sites are NO LONGER among them.** They took
+/// this function until `D2k-1b-i`, and converting was exactly what a worker
+/// field could not survive: it has no value representation, so conversion could
+/// only refuse. They call [`Lowering::bound_constructor_fields`] instead, which
+/// installs each field into the one lexical binding authority *without erasing
+/// its kind* — a site that must preserve the worker stops converting rather
+/// than converting more cleverly.
 ///
 /// **This is a per-reader refusal, and it is NOT the boundary.** It is reached
 /// *during* descent, which is exactly the *"descends partway and then refuses"*
-/// shape the ruling forbids as a substitute for whole-graph preflight.
-/// `D2k-1b-i` owes that preflight ahead of every site that calls this.
-///
-/// **`D2k-1b-ii` replaces callers of this, it does not extend it.** That
-/// increment installs each field into the binding authority *without erasing
-/// its kind* — ordinary becomes `Value(Specialized(..))` and worker becomes the
-/// same `StaticWorker` — so a site that must preserve the worker stops
-/// converting to [`Lowered`] at all rather than converting it more cleverly.
+/// shape the ruling forbids as a substitute for whole-graph preflight. The
+/// boundary is `Lowering::source_aggregate_preflight` with
+/// [`Lowered::boundary_transfer_admissibility`] ahead of every allocation, and
+/// [`Lowering::require_complete_static_worker_disposition`] ahead of emission.
 fn specialized_fields_at(
     fields: &[ConstructorField],
     edge: &'static str,
@@ -3854,6 +3965,7 @@ fn specialized_fields_at(
         .map(|field| field.specialized_at(edge).cloned())
         .collect()
 }
+
 
 /// [`specialized_fields_at`] without the clone, for readers that only borrow
 /// the fields — a preflight walk, a shape comparison, a tag read.
@@ -3865,6 +3977,336 @@ fn specialized_field_refs_at<'a>(
         .iter()
         .map(|field| field.specialized_at(edge))
         .collect()
+}
+
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i` — the CONSERVATION LEDGER for
+/// compiler-only static-worker constructor fields.**
+///
+/// **The invariant is conservation, and exact-`Var` consumption is a terminal
+/// disposition rather than the invariant itself** (Architect
+/// `evt_5etamwj8tp2fh`). Every recognized worker at constructor field
+/// `(owner, position)` receives **exactly one** disposition before any
+/// runtime-value boundary:
+///
+/// 1. **Consume** — a static elimination of that exact field rebinds the same
+///    `StaticWorkerBinding` through [`bound_constructor_fields`], and the
+///    pre-existing exact-`Var` callee call consumes it exactly once.
+/// 2. **Erase as proven unobservable** — lawful only under a whole-graph,
+///    origin-keyed proof, **at or before construction**. ⇒ **No such authority
+///    exists in this increment, so this ledger never records one.** A field
+///    already built and then ignored is not erasure and earns no consumed
+///    credit; erasure would have to prevent the construction.
+/// 3. **Refuse** — neither holds, so compilation refuses before emission.
+///
+/// **The forbidden fourth state is constructed-then-forgotten**, which is what
+/// the producer-alone cut shipped: four rows compiled with the worker dropped,
+/// and an enumeration of forbidden *uses* was satisfied vacuously because a
+/// drop is not a use. [`Self::close`] is the total that closes it — it does not
+/// ask what happened to the field, it asks whether **every** recognized field
+/// reached a disposition, and refuses on the complement.
+///
+/// **Why a ledger and not a local check.** The recognition and the elimination
+/// are in different descents, and on the measured population they are in
+/// different *routes* — so no site local to either can see both. This is the
+/// same shape as the `D3` continuation claim ledger and the `D2f` fused-region
+/// ledger, and it closes beside them.
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i` — the CONSERVATION LEDGER for
+/// compiler-only static-worker constructor fields.**
+///
+/// **The invariant is conservation, and exact-`Var` consumption is a terminal
+/// disposition rather than the invariant itself** (Architect
+/// `evt_5etamwj8tp2fh`). Every recognized worker at constructor field
+/// `(owner, position)` receives **exactly one** disposition before any
+/// runtime-value boundary:
+///
+/// 1. **Consume** — a static elimination of that exact field rebinds the same
+///    `StaticWorkerBinding` through [`Lowering::bound_constructor_fields`], and
+///    the pre-existing exact-`Var` callee call consumes it exactly once.
+/// 2. **Erase as proven unobservable** — lawful only under a whole-graph,
+///    origin-keyed proof, **at or before construction**. ⇒ **No such authority
+///    exists in this increment, so this ledger never records one.** A field
+///    already built and then ignored is not erasure and earns no consumed
+///    credit; erasure would have to prevent the construction.
+/// 3. **Refuse** — neither holds, so compilation refuses before emission.
+///
+/// **The forbidden fourth state is constructed-then-forgotten**, which is what
+/// the producer-alone cut shipped: four rows compiled with the worker dropped,
+/// and an enumeration of forbidden *uses* was satisfied vacuously because a
+/// drop is not a use.
+///
+/// **Every relation here is per occurrence, keyed by the planner's
+/// `child_static_origin(owner, position)`, and never an aggregate.** The first
+/// attempt kept the recognized origins but tallied consuming calls in one
+/// compile-wide scalar, accepting whenever the tally reached the entry count.
+/// Architect `dec_2xxj1zrwmgjdb` rejected it: that accepts a compile in which
+/// one transported field is dropped while another is called twice, or in which
+/// an unrelated pre-existing worker call supplies the count, and it cannot see
+/// excess consumption at all. **A count over a population is not a pairing
+/// within it** — and a documented limit is not a discharged claim.
+///
+/// **Why a ledger and not a local check.** The recognition and the elimination
+/// are in different descents, and on the measured population they are in
+/// different *routes* — so no site local to either can see both. This is the
+/// same shape as the `D3` continuation claim ledger and the `D2f` fused-region
+/// ledger, and it closes beside them.
+#[derive(Default)]
+struct StaticWorkerFieldLedger {
+    /// One entry per recognized constructor field, keyed by the planner's
+    /// `child_static_origin(owner, position)`.
+    ///
+    /// **Keyed rather than listed, because the same static occurrence can be
+    /// lowered more than once** — a speculative descent and the descent that
+    /// keeps its result both recognize the same field. Those are two transports
+    /// of one occurrence, and each owes its own consumption; they are not two
+    /// occurrences and must not become two entries.
+    entries: BTreeMap<StaticOriginId, StaticWorkerFieldEntry>,
+}
+
+/// One recognized static-worker constructor field, and its running balance.
+struct StaticWorkerFieldEntry {
+    owner: StaticOriginId,
+    position: usize,
+    constructor: String,
+    /// Installs of this field into the lexical binding authority by a static
+    /// elimination.
+    rebinds: usize,
+    /// Exact-`Var` calls that consumed a binding **naming this field**.
+    consumptions: usize,
+}
+
+impl StaticWorkerFieldLedger {
+    /// A producer recognized a worker and built the field.
+    fn recognize(
+        &mut self,
+        owner: StaticOriginId,
+        position: usize,
+        field_origin: StaticOriginId,
+        constructor: &str,
+    ) {
+        self.entries
+            .entry(field_origin)
+            .or_insert_with(|| StaticWorkerFieldEntry {
+                owner,
+                position,
+                constructor: constructor.to_string(),
+                rebinds: 0,
+                consumptions: 0,
+            });
+    }
+
+    /// Disposition 1, first half — a static elimination rebound this exact
+    /// field into the binding authority, keyed by the planner's origin.
+    ///
+    /// **A rebind of a field no producer recognized fails closed.** It cannot
+    /// happen while the armed producer is the only builder of the worker arm,
+    /// which is precisely why it is worth refusing rather than ignoring: the
+    /// day a second builder appears, an unrecognized transport must not be able
+    /// to enter the binding authority unaccounted.
+    fn rebind(&mut self, field_origin: StaticOriginId) -> Result<(), CraneliftBackendError> {
+        let Some(entry) = self.entries.get_mut(&field_origin) else {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "a static elimination rebound a static worker field at origin \
+                     {field_origin:?} that no recognized constructor field owns"
+                ),
+            ));
+        };
+        entry.rebinds += 1;
+        Ok(())
+    }
+
+    /// Disposition 1, second half — an exact-`Var` call consumed a binding.
+    ///
+    /// **`transported_field` is what makes this one-to-one.** A binding that
+    /// never came out of a constructor field carries `None` and discharges
+    /// nothing, so an ordinary worker call cannot pay a transported field's
+    /// debt. A call naming a field with no outstanding transport is an **excess
+    /// consumption** and refuses, which is the other half the aggregate count
+    /// could not see: it accepted more consumptions than transports as readily
+    /// as fewer.
+    fn note_consuming_call(
+        &mut self,
+        transported_field: Option<StaticOriginId>,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(field_origin) = transported_field else {
+            return Ok(());
+        };
+        let Some(entry) = self.entries.get_mut(&field_origin) else {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "an exact-Var call consumed a static worker naming constructor field origin \
+                     {field_origin:?}, which no recognized field owns"
+                ),
+            ));
+        };
+        if entry.consumptions >= entry.rebinds {
+            return Err(unsupported(
+                "StaticWorkerBinding",
+                format!(
+                    "constructor {} at origin {:?} field {} was consumed {} time(s) against {} \
+                     transport(s): a consumption with no outstanding transport cannot discharge \
+                     another field's obligation",
+                    entry.constructor,
+                    entry.owner,
+                    entry.position,
+                    entry.consumptions + 1,
+                    entry.rebinds
+                ),
+            ));
+        }
+        entry.consumptions += 1;
+        Ok(())
+    }
+
+    /// **The total.** Every recognized worker is consumed exactly once, erased
+    /// before construction under positive unobservability authority, or refused
+    /// before emission; none is dropped.
+    ///
+    /// Erasure is structurally absent here — an entry exists only because the
+    /// field was built — so the two reachable outcomes are consume and refuse.
+    /// **The check is per occurrence and it is an equality**, so neither a
+    /// dropped transport nor a doubled consumption can be offset by a sibling.
+    fn close(&self) -> Result<(), CraneliftBackendError> {
+        for (field_origin, entry) in &self.entries {
+            if entry.rebinds == 0 {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "constructor {} at origin {:?} transports a static worker in field {} \
+                         (field origin {field_origin:?}) that no static elimination rebinds, so \
+                         the field is neither consumed at an exact-Var call nor erased before \
+                         construction; a constructor carrying an unconsumed static worker \
+                         denotes a value containing the callable and has no runtime \
+                         representation",
+                        entry.constructor, entry.owner, entry.position
+                    ),
+                ));
+            }
+            if entry.consumptions != entry.rebinds {
+                return Err(unsupported(
+                    "StaticWorkerBinding",
+                    format!(
+                        "constructor {} at origin {:?} field {} (field origin {field_origin:?}) \
+                         was rebound into the binding authority {} time(s) and consumed at an \
+                         exact-Var call {} time(s); a transported static worker that is not \
+                         called is dropped",
+                        entry.constructor,
+                        entry.owner,
+                        entry.position,
+                        entry.rebinds,
+                        entry.consumptions
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// **The KIND-PRESERVING static `Match` binder** — a constructor template's
+/// fields entering the one lexical binding authority without losing the
+/// distinction the template drew.
+///
+/// **This is the consumer half of `D2k-1b-i`, and it is deliberately not a
+/// cleverer [`specialized_fields_at`].** That function converts every field to
+/// a [`Lowered`], which is precisely what a static-worker field cannot survive:
+/// it has no value representation, so conversion can only refuse. The repair is
+/// to stop converting — an ordinary field becomes
+/// `Value(Specialized(..))` exactly as it always did, and a worker field
+/// becomes the **same** [`LoweringEnvironmentBinding::StaticWorker`] it was
+/// bound as before it entered the constructor.
+///
+/// ⇒ **The consumer is not new.** Once the worker is back in the binding
+/// authority, the pre-existing exact-`Var` call arm is the only thing that can
+/// read it, and every other use still fails closed at
+/// [`LoweringEnvironmentBinding::value_at`] — which this function does not
+/// touch. The repair installs the binding; it does not widen what may consume
+/// one.
+impl Lowering<'_> {
+    fn bound_constructor_fields(
+        &mut self,
+        fields: &[ConstructorField],
+        outer: &[LoweringEnvironmentBinding],
+    ) -> Result<Vec<LoweringEnvironmentBinding>, CraneliftBackendError> {
+        let mut bindings = self.constructor_field_bindings(fields)?;
+        bindings.extend(outer.iter().cloned());
+        Ok(bindings)
+    }
+
+    /// [`Self::bound_constructor_fields`] for the sites that append to an
+    /// environment they are already building, rather than building one in front
+    /// of a spine.
+    fn extend_constructor_fields(
+        &mut self,
+        env: &mut Vec<LoweringEnvironmentBinding>,
+        fields: &[ConstructorField],
+    ) -> Result<(), CraneliftBackendError> {
+        let bindings = self.constructor_field_bindings(fields)?;
+        env.extend(bindings);
+        Ok(())
+    }
+
+    /// The one place a [`ConstructorField`] becomes a
+    /// [`LoweringEnvironmentBinding`], so both binder shapes above spell the
+    /// kind-preservation identically rather than each re-deriving it, and so
+    /// **the conservation ledger is marked exactly where the rebinding happens**
+    /// rather than at each caller.
+    ///
+    /// **The match is exhaustive with no wildcard**, for the same reason every
+    /// other field reader's is: a future third field kind must be a compile
+    /// error at this binder rather than silently taking the ordinary arm.
+    fn constructor_field_bindings(
+        &mut self,
+        fields: &[ConstructorField],
+    ) -> Result<Vec<LoweringEnvironmentBinding>, CraneliftBackendError> {
+        let mut bindings = Vec::with_capacity(fields.len());
+        for (position, field) in fields.iter().enumerate() {
+            bindings.push(match field {
+                ConstructorField::Specialized(value) => {
+                    LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(value.clone()))
+                }
+                ConstructorField::StaticWorker {
+                    binding,
+                    field_origin,
+                } => {
+                    self.static_worker_fields.rebind(*field_origin)?;
+                    #[cfg(test)]
+                    record_d2k_owner_event(D2kOwnerEvent::StaticWorkerBinderInstalled {
+                        field_origin: *field_origin,
+                        position,
+                    });
+                    // **The transport key travels WITH the binding**, so the
+                    // exact-`Var` call that consumes it can name the field it
+                    // discharges. Without this the call arm sees only a
+                    // `StaticWorkerBinding`, which is why the first attempt
+                    // could count consumptions but not pair them.
+                    LoweringEnvironmentBinding::StaticWorker(StaticWorkerBinding {
+                        transported_field: Some(*field_origin),
+                        ..binding.clone()
+                    })
+                }
+            });
+        }
+        Ok(bindings)
+    }
+
+    /// **The conservation close** — run at the end of the unit-definition pass,
+    /// beside the `D3` causal and `D2f` fused-region ledgers and for the same
+    /// reason: the disposition of a field recognized in one descent can only be
+    /// known once every descent is done.
+    ///
+    /// **It runs before emission of the root answer, which is what makes the
+    /// refusal lawful rather than late.** A dropped field allocates nothing by
+    /// definition, and a field that would have escaped into a runtime aggregate
+    /// has already been refused ahead of the first allocation by
+    /// `source_aggregate_preflight` and
+    /// [`Lowered::boundary_transfer_admissibility`]. This close covers the
+    /// remaining state those two cannot see — built, never used, never refused.
+    fn require_complete_static_worker_disposition(&self) -> Result<(), CraneliftBackendError> {
+        self.static_worker_fields.close()
+    }
 }
 
 /// [`specialized_operands_at`] for a **lexical environment** rather than a bare
@@ -4546,12 +4988,25 @@ fn d9_collect(
             for arg in args {
                 match arg {
                     ConstructorField::Specialized(value) => d9_collect(value, words, origins),
-                    // A worker field contributes no runtime word and no
-                    // aggregate origin — that is precisely what "no value
-                    // representation" means. This walk is an infallible
-                    // observation, so it records the absence by contributing
-                    // nothing rather than by refusing.
-                    ConstructorField::StaticWorker(_) => {}
+                    // A worker field contributes **no runtime word** — that is
+                    // what "no value representation" means, and it is why this
+                    // arm cannot push onto `words`.
+                    //
+                    // **It does contribute an ORIGIN, and that is a
+                    // re-derivation rather than the original decision.** This
+                    // arm previously contributed nothing at all, justified by
+                    // *"this walk is an infallible observation"* — sound only
+                    // while nothing constructed a worker. Now that the producer
+                    // is armed, contributing nothing would make a template
+                    // carrying a worker observationally **identical** to one
+                    // missing that field entirely, and distinguishing operands
+                    // is this walk's whole purpose. The binding's `body_origin`
+                    // is the same fact the `Closure` arm below records, so the
+                    // observation stays faithful without inventing a word the
+                    // field does not have.
+                    ConstructorField::StaticWorker { binding, .. } => {
+                        origins.push(binding.body_origin)
+                    }
                 }
             }
         }
@@ -7573,9 +8028,27 @@ impl<'a> Lowering<'a> {
                 // inside the store loop below would refuse only after
                 // `emit_checked_aggregate_alloc` had already run — the
                 // *"descends partway and then refuses"* shape the ruling
-                // forbids. This is local ordering, not the whole-graph
-                // boundary: `source_aggregate_preflight` already walks the
-                // spine ahead of this, and `D2k-1b-i` owes the refusal there.
+                // forbids.
+                //
+                // **Emitted instruction order is still unchanged now that
+                // this read CAN fail, and that is measured rather than assumed
+                // from unconstructibility.** The premise used to be that
+                // nothing constructed a worker; with the producer armed, the
+                // claim rests instead on reachability: every route into this
+                // function is screened whole-graph first.
+                // `transfer_into_carrier` runs `boundary_transfer_admissibility`
+                // and `source_aggregate_preflight` before calling it,
+                // `transfer_constructor_operands` runs the same pair ahead of
+                // its own allocation, this function's recursion only descends
+                // into a subgraph its parent already screened, and
+                // `emit_carrier_dynamic_constructor` is reached only from here.
+                // ⇒ A worker-bearing template cannot arrive, so this read
+                // cannot fail in production and no instruction is emitted
+                // before it either way.
+                //
+                // This is local ordering, not the whole-graph boundary — the
+                // boundary is the screening pair named above, and no count of
+                // arms like this one is ever evidence about it.
                 let arguments =
                     specialized_field_refs_at(args, "a constructor field being materialized")?;
                 let word = self.emit_checked_aggregate_alloc(
@@ -16502,13 +16975,35 @@ impl<'a> Lowering<'a> {
                 } if constructor.ends_with("::ITree::Ret") && args.len() == 1 => {
                     match args.remove(0) {
                         ConstructorField::Specialized(inner) => lowered = inner,
-                        // This function is infallible, so the conservative move
-                        // is to NOT see through the wrapper: hand the
-                        // constructor back intact and let the ordinary
-                        // value-producing consumers refuse it. Unwrapping to
-                        // the worker would hand a caller expecting a value
+                        // This function is infallible, so it cannot refuse; the
+                        // decision it CAN take is to leave the wrapper on and
+                        // keep the refusal with a consumer that is able to make
+                        // one. Unwrapping would hand a caller expecting a value
                         // something with no value representation.
-                        field @ ConstructorField::StaticWorker(_) => {
+                        //
+                        // **Re-derived now that a worker really can arrive
+                        // here.** The original justification was that the read
+                        // was infallible because nothing constructed a worker;
+                        // that premise is gone, so the claim has to rest on
+                        // where the intact constructor actually lands. Both
+                        // reachable consumers fail closed on it:
+                        // `emit_process_exit_status` answers its `-3`
+                        // malformed-payload sentinel, and the scalar-pair join
+                        // either routes into that same decoder or refuses with
+                        // *"dynamic native arms must produce scalar Int
+                        // values"*. Neither can mistake the wrapper for a
+                        // value, which is what makes handing it back the
+                        // conservative move rather than merely the unchanged
+                        // one.
+                        //
+                        // **And the conservation close is behind both of
+                        // them.** A worker field that nothing rebinds refuses
+                        // before the root answer is emitted, so an intact
+                        // wrapper carrying an unconsumed worker cannot appear
+                        // in a shipped object at all — the two decoder
+                        // refusals above are what happens on the way there,
+                        // not the last line of defence.
+                        field @ ConstructorField::StaticWorker { .. } => {
                             return Lowered::Constructor {
                                 constructor,
                                 synthesized_identity,
@@ -19822,9 +20317,20 @@ impl<'a> Lowering<'a> {
 /// including another worker field.** This predicate gates recursive
 /// loop-parameter reuse, and answering `true` would let two templates share a
 /// parameter run that has no representation for the worker at all. What
-/// worker-to-worker equality should mean is `D2k-1b-ii`'s question, once a
-/// worker can actually appear here; `false` is the answer that cannot be wrong
-/// while nothing constructs one.
+/// worker-to-worker equality should mean is still unruled, and `D2k-1b-ii` --
+/// which used to own that question -- was folded into `D2k-1b-i`, so it is
+/// owed by whichever increment first needs two worker fields compared.
+///
+/// **Re-derived now that a worker really can appear here.** `false` was
+/// previously justified as *"the answer that cannot be wrong while nothing
+/// constructs one"* — a premise the armed producer deletes. What `false`
+/// **licenses** is the question, and the answer is measured rather than
+/// argued: it licenses nothing, because the loop path it gates refuses a
+/// worker-bearing template outright one step later, at
+/// [`append_recursive_argument_values`]'s `"a recursive loop constructor
+/// field"` read. So the two possible answers differ only in *which* refusal a
+/// worker-bearing loop parameter receives, never in whether it receives one —
+/// and `false` is the one that cannot admit a shared parameter run.
 ///
 /// **Both arms name both kinds — there is no wildcard**, so a third field kind
 /// is a compile error here rather than silently falling into `false`.
@@ -19840,9 +20346,9 @@ fn same_recursive_field_shapes(left: &[ConstructorField], right: &[ConstructorFi
                         std::slice::from_ref(right),
                     )
                 }
-                (ConstructorField::StaticWorker(_), ConstructorField::Specialized(_))
-                | (ConstructorField::Specialized(_), ConstructorField::StaticWorker(_))
-                | (ConstructorField::StaticWorker(_), ConstructorField::StaticWorker(_)) => false,
+                (ConstructorField::StaticWorker { .. }, ConstructorField::Specialized(_))
+                | (ConstructorField::Specialized(_), ConstructorField::StaticWorker { .. })
+                | (ConstructorField::StaticWorker { .. }, ConstructorField::StaticWorker { .. }) => false,
             })
 }
 
