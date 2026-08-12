@@ -2449,6 +2449,66 @@ pub(in crate::cranelift_backend) fn d6a_route_applications() -> usize {
     D6A_ROUTE_APPLICATIONS.with(std::cell::Cell::get)
 }
 
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1a` — the owner discriminator, and it
+/// is deliberately independent of the refusal message.**
+///
+/// `D2k-0` established that the five walls share one edge, but the edge is
+/// parsed out of the refusal text and `mod.rs`'s environment-value read
+/// **forwards its caller's edge** — so five distinct routes converging through
+/// that forward would present identically. Sameness is the claim, and a
+/// discriminator used to establish identity has to be able to distinguish.
+///
+/// These events are what distinguishes: the **enclosing `lower_expr` arm**, and
+/// **which `value_at` caller** actually ran. Neither reads the refusal string.
+///
+/// **`value_at` itself is not instrumented and must stay byte-identical**
+/// (`AC-2`). Every tag sits on a *caller* or on an enclosing arm, which is why
+/// this discriminator is constructible at all.
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(in crate::cranelift_backend) enum D2kOwnerEvent {
+    /// A `Construct` arm was entered, with the constructor it is building.
+    ConstructEntered {
+        origin: StaticOriginId,
+        constructor: String,
+    },
+    /// A `value_at` call was reached, tagged by which caller it was.
+    ValueAtCaller { site: &'static str },
+    /// A `Var` in value position resolved to a static worker binding -- the
+    /// read that is about to refuse -- **paired with the caller that is about
+    /// to take it**.
+    ///
+    /// **The two facts are ONE event on purpose.** They were briefly two, and
+    /// the caller was then recovered by scanning backwards from the read. That
+    /// scan could only ever find an EARLIER caller event, because this path
+    /// records the read first and the caller second -- so the caller it
+    /// reported was a stale predecessor from an unrelated successful read, and
+    /// the assertion was green without ever establishing adjacency. Pairing
+    /// removes the question rather than answering it: there is no ordering to
+    /// get wrong when one event carries both halves.
+    StaticWorkerRead {
+        origin: StaticOriginId,
+        site: &'static str,
+    },
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2K_OWNER_TRACE: std::cell::RefCell<Vec<D2kOwnerEvent>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn record_d2k_owner_event(event: D2kOwnerEvent) {
+    D2K_OWNER_TRACE.with(|trace| trace.borrow_mut().push(event));
+}
+
+/// Take and clear the trace, so one compile's events are never read as another's.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn d2k_owner_trace_take() -> Vec<D2kOwnerEvent> {
+    D2K_OWNER_TRACE.with(|trace| std::mem::take(&mut *trace.borrow_mut()))
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn record_d6a_route_event(event: D6aRouteEvent) {
     D6A_ROUTE_TRACE.with(|trace| trace.borrow_mut().push(event));
@@ -3658,7 +3718,13 @@ fn specialized_bindings_at(
     edge: &'static str,
 ) -> Result<Vec<Lowered>, CraneliftBackendError> {
     env.iter()
-        .map(|binding| binding.value_at(edge)?.specialized_ref_at(edge).cloned())
+        .map(|binding| {
+            #[cfg(test)]
+            record_d2k_owner_event(D2kOwnerEvent::ValueAtCaller {
+                site: "mod.rs environment values (forwards its caller's edge)",
+            });
+            binding.value_at(edge)?.specialized_ref_at(edge).cloned()
+        })
         .collect()
 }
 
