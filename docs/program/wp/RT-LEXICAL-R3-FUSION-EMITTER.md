@@ -465,17 +465,116 @@ nothing you inherit from `#6d`.**
 > > ruled and been wrong.** The implementer stopped rather than build it; that
 > > is the correct handback and I am recording it as such.
 > >
-> > **THE OPEN QUESTION, back with the Architect at `evt_2fanpwder54a0`, and
+> > ~~**THE OPEN QUESTION, back with the Architect at `evt_2fanpwder54a0`, and
 > > deliberately not answered here:** is the second root occurrence **wrongly
-> > produced**, or **wrongly selected as the answer**? Both readings fit every
-> > measurement above **and they have opposite repairs.** The implementer did
-> > not guess and neither will I.
+> > produced**, or **wrongly selected as the answer**?~~ **ANSWERED — it is
+> > WRONGLY SELECTED. `AC-D3-ANSWER` below.** The implementer did not guess and
+> > neither did I; the fork was real and the Architect resolved it.
+> >
+> > **CORRECT MY "DIFFERENT OCCURRENCE" ABOVE BEFORE YOU ACT ON IT — the
+> > Architect called this precision load-bearing** (`evt_5rze80e6w9qz8`).
+> > **`29`/`25` is NOT a second same-spelling source constructor.** It is **the
+> > claimed producer source occurrence ITSELF, entered again by a distinct
+> > lowering traversal / dynamic construction.** ⇒ *"different occurrence"* is
+> > true **only at the dynamic construction / route-instance axis**, and **false
+> > at the planner source-origin axis.** The planner coordinates on `766cbdf0`:
+> >
+> > | case | claimed producer | the OTHER same-spelling construct |
+> > |---|---|---|
+> > | `Exact` | construct **30** / field **29** | construct 39 / field 38 |
+> > | `ReHomed` | construct **26** / field **25** | construct 35 / field 34 |
+> >
+> > **Constructor spelling and origin equality remain non-selectors**, and
+> > **repeated entry of one static field origin stays legal and
+> > instance-scoped.** Anyone reading my earlier sentence as "hunt for a second
+> > source constructor" is hunting the wrong thing.
 > >
 > > **UNAFFECTED EITHER WAY, so do not re-open them:** the classification (an R3
 > > routing defect, not a representation gap), the closed `RuntimeGroundValue`
 > > domain, the conservation guard itself, and **the atomic boundary** — nets
 > > 2/4, controls 2/3, the inner-slot witness, the routing discriminator and the
 > > self-edge closeout all remain owed **unshrunk**.
+>
+> ### `AC-D3-ANSWER` — STOP 4 RE-RULED. Steward, 2026-08-12, recording
+> ### Architect `evt_5rze80e6w9qz8`, durable at `9fd0731e`.
+>
+> **Leader's dispatch is `evt_5s5hkcjr0e2c`. This SUPERSEDES the struck
+> `AC-D3-ROUTE` repair; the classification and the atomic boundary are
+> unchanged.**
+>
+> **The defect is ANSWER ROUTING at owned source-machine constructor
+> completion** — not unlawful source production, and **not a fault in the fused
+> takeover.** The Architect withdrew its own causal sentence: the fused call
+> returning `Carried`, the takeover forwarding it, suffix consumption and the
+> worker-disposition close are **all correct and must remain unchanged.**
+>
+> **The two construction routes, which is the whole mechanism:**
+>
+> 1. **Generic `lower_expr`** lowers the constructor fields, attempts the exact
+>    continuation claim/call, constructs the ordinary fallback, then selects
+>    `continuation_result.unwrap_or_else(|| RoutedAnswer::direct(produced))`.
+>    ⇒ **a successful claimed call OWNS the answer.**
+> 2. **The owned source machine** lowers the same `Construct` through
+>    `SourceContinuation::ConstructArgument` and then **unconditionally** returns
+>    `RoutedAnswer::direct(finish_source_constructor(...))`. ⇒ **it has no
+>    equivalent exact-call answer choice at all.**
+>
+> Under `FunctionizedUnits`, **route 2 is the direct specialized value the root
+> projection sees.** Entering the producer occurrence, lowering its fields, and
+> having an ordinary fallback are all lawful. **What is wrong is that fallback
+> remaining the SELECTED answer when the exact plan-authored claim resolves and
+> its call result exists.**
+>
+> **`AC-D3-ANSWER` — the lawful repair boundary.** Close the owned
+> source-machine constructor-completion seam with **the same authoritative
+> claim/call decision generic `lower_expr` already uses**: after all fields are
+> lowered, resolve the exact continuation identity **from the planner relation**
+> and pass through the **existing** claim/call/settlement funnel. If the exact
+> call succeeds, its returned `RoutedAnswer` — **including the `Carried` result
+> and its checked route** — replaces the direct constructor fallback. If no
+> exact binding exists, ordinary source-machine construction stays
+> **byte-for-byte** the direct fallback. **Prefer one shared constructor-answer
+> funnel over two independently maintained spellings, if that can be done
+> without widening the surface.**
+>
+> **This is selection AFTER lawful evaluation, not "do not produce origin
+> 29/25."** Keep source-occurrence entry, field lowering, recognition, rebind,
+> exact consumption, and the ordinary fallback.
+>
+> **Forbidden, and the first five are the tempting ones:** suppressing the
+> constructor by source origin, constructor name, root status, or fusion-body
+> context; stopping or delaying consumer takeover; replaying the suffix;
+> changing `FunctionizedUnits` root pairing; turning `StaticWorker` into a value
+> or carrier; weakening `ground_value`.
+>
+> **WHY THE LEDGER PASSING IS NOT A CONTRADICTION, and why it must not be made
+> to carry this.** `require_complete_static_worker_disposition()` succeeding
+> before the escape is **consistent** with the diagnosis: that ledger proves
+> **recognition → transition → consumption**. It does **not** prove that a
+> compiler template containing the now-consumed field was not **selected later
+> as an answer**. ⇒ **R3 adds the answer-exclusivity control; it does not
+> burden the conservation ledger with a routing fact.**
+>
+> **THE SIX REQUIRED DISCRIMINATORS, in this same held atomic object:**
+>
+> 1. On armed `Exact` **and** `ReHomed`, the owned source-machine completion for
+>    the claimed producer **reaches the exact claim/call funnel and selects its
+>    returned `Carried` answer**; the direct producer template **does not reach
+>    root emission**.
+> 2. **Mutating only the final choice** to prefer the direct constructed
+>    template despite a successful call **must red**, while the existing
+>    worker-disposition close **stays green**. This is what separates answer
+>    routing from conservation.
+> 3. A row with **no exact continuation binding** still returns the ordinary
+>    direct constructor — proving this is **not global suppression**.
+> 4. The control **pins the planner claim coordinates** above and keeps the
+>    other same-spelling construct (**39/38** or **35/34**) **non-authoritative**.
+> 5. **Repeated entry of one static field origin stays permitted and
+>    instance-scoped** — **no origin-level "already handled" bit** may discharge
+>    a later construction.
+> 6. The final post-consumer ground result **remains accepted**, and a
+>    worker-bearing producer fallback at root **remains refused by the unchanged
+>    terminal guard**.
 >
 > **Its control is a discriminator, not a green run:** it must **fail** if the
 > producer intermediate reaches terminal emission before its claimed outer
