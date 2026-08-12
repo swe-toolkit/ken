@@ -4910,12 +4910,39 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         producer: SourceOccurrence<'a>,
         continuation_origin: StaticOriginId,
+        checked_frame_id: u64,
         cases: &[crate::RuntimeComputationalMatchCase],
         default: &RuntimeTrap,
         parameters: &[LoweringEnvironmentBinding],
         captures: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let provenance = self.mint_recursor_frame_provenance();
+        // ── `RT-LEXICAL-R3-FUSION-EMITTER` `D2` — THE FUSION-SPECIFIC
+        //    CHECKED-FRAME ADOPTION, at the same interior seam as `D1` ──
+        //
+        // The fused function already opens its own fresh
+        // `CheckedFrameFunctionScope`, so `active_subcontinuation_frame` is
+        // `None` here and the suffix would otherwise lower **unchecked** — the
+        // consumer's marker was crossed in the consumer's own body, which this
+        // function is not.
+        //
+        // ⇒ Re-enter the frame identity **the claim was preflighted against**,
+        // locally, so the ordinary checked consumer below consumes it here.
+        // Nothing is re-homed: the marker is not moved out of the consumer's
+        // source, and no new frame is minted. This is a local re-entry of an
+        // identity that already exists on the claim's checked transport, which
+        // is itself a member of the complete key the claim's identity came from.
+        //
+        // **The consumer is the EXISTING one.** `checked_computational_frame`
+        // below is the same call every checked computational match makes, and
+        // it validates the frame against the transported plan's fingerprint. A
+        // fused body that entered a frame the plan does not agree with is
+        // refused there, by machinery this deliberately does not duplicate.
+        //
+        // The scope's `close` still requires the frame to have been consumed:
+        // if the suffix somehow did not consume it, the fused body ends with a
+        // marker active and is refused rather than silently emitting.
+        self.enter_checked_subcontinuation_frame(checked_frame_id)?;
         let checked = self.checked_computational_frame(cases, default)?;
         let frame = ComputationalEliminatorFrame {
             cases,

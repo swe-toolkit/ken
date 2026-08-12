@@ -8404,6 +8404,20 @@ pub(in crate::cranelift_backend) struct CheckedTransportCoordinate {
     call_occurrence_path: Vec<u64>,
 }
 
+impl CheckedTransportCoordinate {
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D2`** — the consumer frame identity
+    /// this coordinate already carries, exposed read-only.
+    ///
+    /// Read, never re-derived. The fused body re-enters **this** frame rather
+    /// than looking one up, so the identity the claim was preflighted against
+    /// is the identity the checked consumer then validates. Nothing new is
+    /// planned for it and no second authority is introduced: the coordinate is
+    /// already a member of the complete key the claim's identity came from.
+    pub(in crate::cranelift_backend) fn frame_id(&self) -> u64 {
+        self.frame_id
+    }
+}
+
 /// What is in scope while descending; a member stays `None` until its marker is
 /// crossed, and a coordinate is recorded only when all three are present.
 #[derive(Clone, Debug, Default)]

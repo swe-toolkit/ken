@@ -2936,6 +2936,9 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         consumer_owner: PredeclaredFunctionId,
         producer_body: StaticOriginId,
         continuation_origin: StaticOriginId,
+        /// `RT-LEXICAL-R3-FUSION-EMITTER` `D2` — the claim's consumer frame
+        /// identity, re-entered locally inside the fused function.
+        checked_frame_id: u64,
         slots: Vec<AbiSlot>,
         offsets: Vec<u32>,
         header_parameters: u32,
@@ -2972,6 +2975,10 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     consumer_owner: claim.consumer_owner(),
                     producer_body: claim.producer_body(),
                     continuation_origin: claim.continuation_origin(),
+                    // `D2` -- the consumer frame identity the claim was
+                    // preflighted against, carried so the fused body re-enters
+                    // THAT frame rather than resolving one of its own.
+                    checked_frame_id: claim.checked_transport().frame_id(),
                     slots: fusion.slots().to_vec(),
                     offsets,
                     header_parameters: fusion.header().parameters,
@@ -3225,6 +3232,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     &mut builder,
                     fusion.producer_body,
                     fusion.continuation_origin,
+                    fusion.checked_frame_id,
                     &parameters,
                     &captures,
                 );
@@ -3319,6 +3327,7 @@ fn fuse_producer_through_consumer_suffix(
     builder: &mut FunctionBuilder<'_>,
     producer_body: StaticOriginId,
     continuation_origin: StaticOriginId,
+    checked_frame_id: u64,
     parameters: &[LoweringEnvironmentBinding],
     captures: &[LoweringEnvironmentBinding],
 ) -> Result<LoweringOperand, CraneliftBackendError> {
@@ -3335,6 +3344,7 @@ fn fuse_producer_through_consumer_suffix(
         builder,
         body,
         continuation_origin,
+        checked_frame_id,
         cases,
         default,
         parameters,
