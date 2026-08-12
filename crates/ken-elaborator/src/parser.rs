@@ -2334,7 +2334,15 @@ impl Parser {
     /// consume there — it only fires for atoms that didn't already eat
     /// their own dots (`d.leq`, `(sort xs).leq`, etc).
     fn parse_atom_expr(&mut self) -> Result<Expr, ElabError> {
-        let mut e = self.parse_atom_expr_base()?;
+        // Keep record parsing out of the large ordinary-atom dispatch frame.
+        // Nested `match` bodies recursively retain that frame; adding the
+        // record parser as one of its arms exhausted an ordinary test thread's
+        // stack on the generated decimal-power cascade.
+        let mut e = if matches!(self.peek(), Token::LBrace) {
+            self.parse_record_expr()?
+        } else {
+            self.parse_atom_expr_base()?
+        };
         while matches!(self.peek(), Token::Dot)
             && matches!(self.lookahead(1), Token::Ident(_) | Token::Nat(1 | 2))
         {
@@ -2366,7 +2374,6 @@ impl Parser {
         use crate::ast::NumLit;
         let start = self.peek_span().start;
         match self.peek().clone() {
-            Token::LBrace => self.parse_record_expr(),
             Token::KwIf => self.parse_if_expr(),
             Token::Nat(n) => {
                 let span = self.peek_span().clone();
@@ -2526,71 +2533,7 @@ impl Parser {
                 self.expect(&Token::RParen)?;
                 let end = self.tokens[self.pos - 1].1.end;
                 let span = Span::new(start, end);
-                Ok(match inner {
-                    Expr::EAsc(e, t, _) => Expr::EAsc(e, t, span),
-                    e => match e {
-                        Expr::EVar(s, _) => Expr::EVar(s, span),
-                        Expr::ECon(s, _) => Expr::ECon(s, span),
-                        Expr::EUniv(l, _) => Expr::EUniv(l, span),
-                        Expr::EApp(f, a, _) => Expr::EApp(f, a, span),
-                        Expr::ELam(ns, b, _) => Expr::ELam(ns, b, span),
-                        Expr::ELet(bindings, body, _) => Expr::ELet(bindings, body, span),
-                        Expr::EAsc(e, t, _) => Expr::EAsc(e, t, span),
-                        Expr::EOld(e, _) => Expr::EOld(e, span),
-                        Expr::EBecomes(cell, value, _) => Expr::EBecomes(cell, value, span),
-                        Expr::ENumLit(lit, _) => Expr::ENumLit(lit, span),
-                        Expr::EStr(s, _) => Expr::EStr(s, span),
-                        Expr::EBinOp(op, l, r, _) => Expr::EBinOp(op, l, r, span),
-                        Expr::EMatch {
-                            scrut,
-                            equation,
-                            arms,
-                            span: _,
-                        } => Expr::EMatch {
-                            scrut,
-                            equation,
-                            arms,
-                            span,
-                        },
-                        Expr::EIf {
-                            condition,
-                            then_branch,
-                            else_branch,
-                            ..
-                        } => Expr::EIf {
-                            condition,
-                            then_branch,
-                            else_branch,
-                            span,
-                        },
-                        Expr::EPair(components, _) => Expr::EPair(components, span),
-                        Expr::ERecord { base, fields, .. } => Expr::ERecord { base, fields, span },
-                        Expr::EProj(e, field, _) => Expr::EProj(e, field, span),
-                        Expr::EPosProj(e, index, _) => Expr::EPosProj(e, index, span),
-                        Expr::EPi(x, a, b, _) => Expr::EPi(x, a, b, span),
-                        Expr::EArrow(a, b, _) => Expr::EArrow(a, b, span),
-                        Expr::EAttachedProofRef {
-                            subject,
-                            proof_name,
-                            ..
-                        } => Expr::EAttachedProofRef {
-                            subject,
-                            proof_name,
-                            span,
-                        },
-                        Expr::ERecursiveResult {
-                            selector,
-                            operand,
-                            operand_span,
-                            ..
-                        } => Expr::ERecursiveResult {
-                            selector,
-                            operand,
-                            operand_span,
-                            span,
-                        },
-                    },
-                })
+                Ok(respan_expr(inner, span))
             }
             other => Err(ElabError::ParseError {
                 msg: format!("expected an expression, found {:?}", other),
@@ -2608,6 +2551,72 @@ impl Parser {
             });
         }
         Ok(e)
+    }
+}
+
+#[inline(never)]
+fn respan_expr(expr: Expr, span: Span) -> Expr {
+    match expr {
+        Expr::EVar(s, _) => Expr::EVar(s, span),
+        Expr::ECon(s, _) => Expr::ECon(s, span),
+        Expr::EUniv(l, _) => Expr::EUniv(l, span),
+        Expr::EApp(f, a, _) => Expr::EApp(f, a, span),
+        Expr::ELam(ns, b, _) => Expr::ELam(ns, b, span),
+        Expr::ELet(bindings, body, _) => Expr::ELet(bindings, body, span),
+        Expr::EAsc(e, t, _) => Expr::EAsc(e, t, span),
+        Expr::EOld(e, _) => Expr::EOld(e, span),
+        Expr::EBecomes(cell, value, _) => Expr::EBecomes(cell, value, span),
+        Expr::ENumLit(lit, _) => Expr::ENumLit(lit, span),
+        Expr::EStr(s, _) => Expr::EStr(s, span),
+        Expr::EBinOp(op, l, r, _) => Expr::EBinOp(op, l, r, span),
+        Expr::EMatch {
+            scrut,
+            equation,
+            arms,
+            ..
+        } => Expr::EMatch {
+            scrut,
+            equation,
+            arms,
+            span,
+        },
+        Expr::EIf {
+            condition,
+            then_branch,
+            else_branch,
+            ..
+        } => Expr::EIf {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        },
+        Expr::EPair(components, _) => Expr::EPair(components, span),
+        Expr::ERecord { base, fields, .. } => Expr::ERecord { base, fields, span },
+        Expr::EProj(e, field, _) => Expr::EProj(e, field, span),
+        Expr::EPosProj(e, index, _) => Expr::EPosProj(e, index, span),
+        Expr::EPi(x, a, b, _) => Expr::EPi(x, a, b, span),
+        Expr::EArrow(a, b, _) => Expr::EArrow(a, b, span),
+        Expr::EAttachedProofRef {
+            subject,
+            proof_name,
+            ..
+        } => Expr::EAttachedProofRef {
+            subject,
+            proof_name,
+            span,
+        },
+        Expr::ERecursiveResult {
+            selector,
+            operand,
+            operand_span,
+            ..
+        } => Expr::ERecursiveResult {
+            selector,
+            operand,
+            operand_span,
+            span,
+        },
     }
 }
 
