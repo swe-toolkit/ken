@@ -93,6 +93,11 @@ a merge-base goes stale without your branch moving.
 > > (`[Comp(21) | Comp(5)]`), and row 5's positional counterpart is named
 > > `PX8JHoleInput::Node`.
 > >
+> > **ANSWERED — `child(21, 0) = 31`, so `31` is the transform match's
+> > SCRUTINEE**, measured by coordinates at `b8164398` (`evt_1zfnezm35h4x3`).
+> > It matched **neither** candidate reading below, and the actual post-call
+> > result origin lies under `16`. Obligation 4's control is now authorable.
+> >
 > > **`31`'s true position is UNKNOWN, not "upstream".** "Upstream" was the
 > > ring's reading of the same trace and the ruling does not adopt it either.
 > > The bounded feasibility read below re-derives `31` **by planner parent/child
@@ -1227,6 +1232,84 @@ transport-only shape.
 > still be reported **with** the live recognize/rebind/consume arm it was taken
 > on.
 >
+> ### THE FEASIBILITY READ IS COMPLETE. `evt_1zfnezm35h4x3` AT `b8164398`.
+>
+> **Four of five items answered. The single open value is the section 8
+> discriminator, and it is one targeted read away.**
+>
+> **Item 1 — CONFIRMED, and the falsifier did NOT fire.** Two adjacent events
+> per row: `FINISH-SOURCE-CTOR origin=26 ctor=PX8JScopeTree::Node aggr=5`, then
+> `OUTER-SELECT match_origin=5 eliminated_aggr=5 case_index=0
+> FIELD_KINDS=[Specialized]`. The first worker-bearing outer selection binds
+> **directly** to `finish_source_constructor`'s completion at the same origin,
+> and the selected value carries **no worker field** — exactly what the
+> unconditional `map(ConstructorField::specialized)` predicts.
+> ⇒ **`finish_source_constructor` is the unlocated producer, MEASURED, not
+> derived.** The binding **stands** rather than merely being unrefuted, because
+> the observation that would have refuted it was taken and came back negative.
+>
+> **Item 2 — the relation chain ALREADY EXISTS, entirely in planner
+> coordinates.** `child(5,0)=21`, `child(21,0)=31`, `child(5,1)=16`,
+> `child(21,1)=26`, `child(5,2)=7`, `child(21,2)=23`; and
+> `case_body_occurrence(parent, i) = child_occurrence(parent, 1+i)`, so position
+> 0 is the scrutinee and 1+ are case bodies. ⇒ **`26` --case-0 body of--> `21`
+> --scrutinee of--> `5` --case-0 body--> `16`**, where `16` owns the
+> exact-`Var` consumer. Row 5 is the same shape at `22 → 17 → 5 → 12`.
+> **No new planner population is needed — the path is four existing edges.**
+>
+> **Item 3 — the OPERAND half is YES; the CONSUMER-RELATION half is OPEN, and
+> that is the hard-stop discriminator.** `CONT-UNIT frame_origin=21
+> alternative=0 body_origin=26 recursive_position=0`, with `binder_run`
+> carrying `InductionHypothesis -> STATIC_WORKER` and
+> `SelectedRecursiveArgument(0) -> STATIC_WORKER`, `carried_inputs=2`,
+> `ordinary=0`. The selected outer case needs **exactly one** operand — the
+> worker at recursive position 0 — and the continuation `Function` that lowers
+> the worker-bearing occurrence **already holds it, by two independent routes.**
+>
+> > **THE ONE OPEN MEASUREMENT.** `ContinuationInputProjection` already carries
+> > `producer_owner`, `consumer_owner`, `coordinate`, `ordinal`, `ownership`,
+> > `storage_owner` with existing accessors — **so the surface exists and that is
+> > not the question.** What is unmeasured is **`consumer_owner`'s VALUE for
+> > this edge**: does it name the function owning outer-match case body `16`
+> > (row 4) / `12` (row 5)?
+> >
+> > **Operand present, relation unmeasured** is the exact state section 8 turns
+> > on. **Do not infer the relation from the surface existing.** If the value is
+> > absent or mismatched, the hard stop fires and the dependency is reported,
+> > not added.
+>
+> **Item 4 — origin `31` re-derived by COORDINATES, and it matches NEITHER
+> prior reading.** `child(21, 0) = 31` ⇒ **`31` is the SCRUTINEE of the
+> transform match.** Not the frame's "post-consumption result", and not the
+> "upstream input tree" offered after the first trace. The actual post-call
+> result origin lies under `16`, whose children this traversal never reached.
+> ⇒ **Obligation 4's control is now authorable against a measured coordinate
+> rather than a spelling.**
+>
+> **Item 5 — NOT PROVEN, and deliberately not banked.** `TERMINAL-EXIT-GUARD`
+> fired twice per row — origins `31`/`23` on row 4, `27`/`19` on row 5 — every
+> time with **both** `terminal_exit=false` and `itree_frame=false`, so neither
+> conjunct is carrying the result, and **the governed occurrence never reached
+> the guard at all.** That is reachability evidence about this population only.
+> A general proof needs the argument that `terminal_exit` requires an
+> `ExitCode` constructor while a governed occurrence requires a recognized
+> worker argument, and that no `ExitCode` declaration can carry an argument —
+> not established. **`UNARMED-A` stays in census.**
+>
+> > **THE BASE MOVED UNDER THIS READ, AND THE CAUSE WAS THE STEWARD.**
+> > `handoff-gate-compact.sh` resets each named worktree to `origin/main` before
+> > compacting. It was run on the seat while
+> > `wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k` was checked out with **uncommitted**
+> > instrumentation, destroying three instrumented files; the script's
+> > `preserved/` ref covers commits only, so it had nothing to save. The read
+> > was re-instrumented and completed, and **`b8164398` is the base every result
+> > above was measured on.**
+> >
+> > **The gate pre-check was taken on a different branch two minutes earlier**,
+> > after a Steward mention had already woken the seat into work. Recorded here
+> > because the frame's reported base is the thing it corrupts: a result whose
+> > base moved mid-measurement is only interpretable if the move is disclosed.
+>
 > ### THE BOUNDED READ IS COMPLETE. `evt_72hmebjj5c9rt` AT `199fbbb0`.
 >
 > **The answer: ONE occurrence, lowered TWICE, in two traversals.**
@@ -1263,6 +1346,14 @@ transport-only shape.
 > property.
 >
 > > ### THE ARCHITECT HAS NAMED A CANDIDATE PRODUCER. IT IS DERIVED, NOT MEASURED.
+> >
+> > **SUPERSEDED — IT IS NOW MEASURED. `evt_1zfnezm35h4x3` AT `b8164398`.** The
+> > feasibility read bound the first worker-bearing outer selection directly to
+> > `finish_source_constructor`'s completion at the same origin, with
+> > `FIELD_KINDS=[Specialized]` at the selected seat. **The falsifier below was
+> > taken and did not fire**, so the binding stands rather than being merely
+> > unrefuted. The block is kept because the derived/measured distinction it
+> > drew is what made the read cheap to specify. Read the rest as history.
 > >
 > > `evt_4y754p2s8aksk` names the missing template producer as the source
 > > machine's **`finish_source_constructor`** completion — calls at
@@ -1451,6 +1542,11 @@ obligations, verbatim in substance from the ruling:
   > distinctness claim and it was measured directly. **A negative control is
   > keyed to what the substituted value IS**, so the control is not authorable
   > until the read lands — but the obligation it discharges is not in doubt.
+  >
+  > **THE READ HAS LANDED AND THE CONTROL IS NOW AUTHORABLE.** `child(21,0) =
+  > 31` ⇒ `31` is the transform match's **scrutinee**, measured at `b8164398`.
+  > **Key the control on that coordinate, not on a constructor spelling** —
+  > spelling is what produced both discarded classifications.
   >
   > **Fix this bullet's wording and obligation 4's in the same cut as the
   > control**, from the read's result rather than from either discarded
