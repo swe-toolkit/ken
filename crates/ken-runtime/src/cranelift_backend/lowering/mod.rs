@@ -82,7 +82,8 @@ pub(in crate::cranelift_backend) use super::planning::{
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
     build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
-    BodyEmissionDisposition, FusionOwnedBody, FusionRegionClaim, FusionRegionClaimLedger,
+    BodyEmissionDisposition, FusionCompositionLayer, FusionOwnedBody, FusionRegionClaim,
+    FusionRegionClaimLedger,
     StaticContinuationFusionId, StaticContinuationFusionView,
     validate_oriented_subcontinuation_transport,
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
@@ -6033,6 +6034,40 @@ pub(in crate::cranelift_backend) enum D8oBodyKey {
     OrdinaryUnit(PredeclaredFunctionId),
     ContinuationSpecialization(ContinuationSpecializationId),
     GeneratedContext(ContinuationContextId),
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local compositions this
+/// compile actually REALIZED, in order.**
+///
+/// ⛔ Recorded at the composition seat AFTER the affine consumption succeeded,
+/// so a refused composition contributes nothing. The ledger already knows what
+/// was planned; what no ledger can report — because the compile refuses before
+/// its closeout — is which planned members a given artifact managed to reach.
+/// That is what this observes and it is the only thing it observes.
+#[cfg(test)]
+thread_local! {
+    static R3_LOCAL_COMPOSITIONS: std::cell::RefCell<
+        Vec<(ContinuationSpecializationId, FusionCompositionLayer)>,
+    > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn record_r3_local_composition(
+    target: ContinuationSpecializationId,
+    layer: FusionCompositionLayer,
+) {
+    R3_LOCAL_COMPOSITIONS.with(|cell| cell.borrow_mut().push((target, layer)));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn r3_local_compositions()
+-> Vec<(ContinuationSpecializationId, FusionCompositionLayer)> {
+    R3_LOCAL_COMPOSITIONS.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_r3_local_compositions() {
+    R3_LOCAL_COMPOSITIONS.with(|cell| cell.borrow_mut().clear());
 }
 
 #[cfg(test)]
@@ -15230,6 +15265,30 @@ enum SourceComputationalAnswerRoute {
 /// ⛔ Compiler-path metadata only. It is **not** a field in the runtime word,
 /// not a carrier lane, and not a runtime discriminator — nothing here reaches
 /// the emitted CFG.
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — one continuation target's operands,
+/// assembled at its exact call edge.**
+///
+/// The two runs are the target specialization's own `Parameter` and `Capture`
+/// runs, in the planner's order. ⛔ Separate fields rather than one operand
+/// vector: a direct call concatenates them, a local composition consumes them
+/// at two different seats, and a pre-concatenated run would force the second
+/// caller to split on a length that neither seat owns.
+struct ContinuationCallOperands {
+    /// The facts the target's selected case body is lowered from, projected
+    /// once here so the composition seat never re-derives them.
+    body: units::ContinuationSelectedCaseBody,
+    /// The owner of the source body this specialization lowers — the
+    /// continuation's own consumer. Carried because the local composition binds
+    /// it as the ambient defining unit, exactly as the definition pass does.
+    consumer_owner: PredeclaredFunctionId,
+    /// The planner's ordinary envelope, as the assembly consumed it. ⛔ Carried
+    /// so the body lowering reads the SAME sequence the operands were assembled
+    /// from, including any test perturbation, rather than re-projecting it.
+    envelope: Vec<ContinuationOrdinaryEnvelopeRole>,
+    ordinary: Vec<LoweringOperand>,
+    continuation_inputs: Vec<LoweringOperand>,
+}
+
 #[derive(Clone)]
 struct RoutedAnswer {
     value: LoweringOperand,

@@ -2264,25 +2264,50 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // asserted here:
     //
     // ```text
-    // Unsupported(ContinuationSpecialization,
-    //   "the claimed continuation target was not declared into this function")
+    // Unsupported(StaticContinuationFusion,
+    //   "a fusion-composition splice issued a capability that no dynamic
+    //    invocation segment consumed, ...")
     // ```
     //
-    // **This is the FAIL-CLOSED INTERMEDIATE of a half-landed replacement, and
-    // it moved BACKWARDS on purpose.** `evt_6kn9ckdnbf0ph` §3 replaces *only the
-    // direct-call realization* of a fusion-local identity, in two halves. The
-    // first has landed: `O = P \ F` feeds resolution, declaration and both
-    // ledger opens, so an identity in `F` has no declared target and **the
-    // direct path is closed for it**. The second — local selected-body lowering
-    // — is not built, so nothing opens the local path and the identity meets
-    // this refusal. A refusal, never a silent wrong answer, which is the only
-    // reason the halves may land separately.
+    // **The local selected-body composition has LANDED and the stop moved
+    // forward past every refusal above.** MEASURED on both roots: the inner
+    // composed identity reaches the composition seat, its target's exact
+    // selected case body is lowered locally, and its phase-bearing operand
+    // answers the producer's own constructor —
+    // `producer-construct origin=36 answered_by_continuation=true` on `Exact`
+    // (32 on `ReHomed`). The fused body then lowers to completion, `Ok`, and
+    // the refusal above is its EXIT closeout rather than a lowering failure.
+    //
+    // **⚠ THE STOP IS NOT A REGRESSION AND THE DISTINCTION IS LOAD-BEARING.**
+    // `lower_fused_producer_through_suffix` issues the splice capability, and
+    // its closeout has THREE arms: spent, outstanding, and *descent failed*, in
+    // which the capability is **withdrawn and the original error propagates**.
+    // Every previous armed compile on this witness took that third arm, so the
+    // outstanding arm has **never been evaluated here before**. What changed is
+    // that the descent now succeeds; whether the capability would have been
+    // consumed under a successful direct-call descent is **not observable**,
+    // because the direct path never produced one.
+    //
+    // **MEASURED, and it is the open question:** the capability is issued on the
+    // FUSED body's own frame (continuation origin 10 on `Exact`, 6 on
+    // `ReHomed`), while the only composition realized is at continuation origin
+    // 25 / 21 — a different frame. And of the TWO planned composed edges, only
+    // the `Inner` reaches a claim seat at all: the `Outer`'s producer construct
+    // (39 on `Exact`, 35 on `ReHomed`) reaches **no claim seat anywhere in the
+    // armed compile**. ⛔ Do not read either fact as settling which repair is
+    // owed — three readings survive and none has been probed.
     //
     // **THE PREVIOUS MEASURED STOP**, superseded and recorded so the movement is
-    // auditable: the root-result escape in `emit_result` -> `ground_value` ->
-    // `into_specialized_at`, on the fusion key's OWN producer — construct 30,
-    // field 29 on `Exact` (26 / 25 on `ReHomed`), the only worker field in the
-    // compile, built after every call and never rebound.
+    // auditable: `ContinuationSpecialization: "the claimed continuation target
+    // was not declared into this function"` — the fail-closed intermediate of the
+    // half-landed replacement, when `O = P \ F` had closed the direct path for
+    // `F` and nothing yet opened the local one.
+    //
+    // **AND THE ONE BEFORE THAT**, kept because its withdrawal is what the
+    // ruling turned on: the root-result escape in `emit_result` ->
+    // `ground_value` -> `into_specialized_at`, on the fusion key's OWN producer
+    // — construct 30, field 29 on `Exact` (26 / 25 on `ReHomed`), the only
+    // worker field in the compile, built after every call and never rebound.
     //
     // **That order was the pre-mechanism one and was NOT a refutation.**
     // Architect `evt_6kn9ckdnbf0ph`: the worker is a compiler-local intermediate
@@ -2292,10 +2317,12 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // appear there is **withdrawn**; it tested the very ABI crossing local
     // composition removes.
     //
-    // ⇒ **What retires this paragraph is the local lowering**, at which point
-    // the stop moves again and the control reds again. That is the whole
-    // difference from the prose this replaces, which claimed a step-5 / step-6
-    // stop that had silently stopped being true with nothing to catch it.
+    // ⇒ **The local lowering retired the two paragraphs above, exactly as this
+    // block said it would**, and the control reddened on the commit that did it.
+    // That is the whole difference from the prose this replaces, which claimed a
+    // step-5 / step-6 stop that had silently stopped being true with nothing to
+    // catch it. What retires the CURRENT stop is a ruling on the splice
+    // capability's seat, and the control will red again when it lands.
     //
     // ---- DURABLE. A RULING, NOT A MEASUREMENT. `D1`/`D2` DO NOT TOUCH IT, AND
     // ---- THE RETIREMENT INSTRUCTION BELOW EXCLUDES IT BY NAME.
@@ -10606,6 +10633,40 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         recursive_position: usize,
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
+        // ⭐⭐ **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local fork, and
+        // it is HERE, at the funnel every direct consumption seat passes
+        // through.**
+        //
+        // ⛔ Not at either caller. This node has now paid three times for an
+        // instrument or a settlement placed at one consumer while another
+        // reached the same machinery by a different route -- the paragraph
+        // below this one records the last time. A fork at the retained-frame
+        // seat alone would leave the detached-result seat emitting a direct
+        // call for an identity the planner composed.
+        //
+        // ⛔ **Probed by WHOLE identity, and the probe is total.** An identity
+        // with no composed edge takes the byte-identical direct path below;
+        // nothing about its target, body, owner or origin is consulted, and
+        // there is no domain scan. `F` is empty unless a fusion was installed,
+        // so this is inert on every artifact that has none.
+        if self
+            .static_transition_plan
+            .fusion_composed_edge(identity)
+            .is_some()
+        {
+            // ⛔ Returns BEFORE the `DirectCall` settlement below. A fusion-local
+            // identity is not a `DirectCall`, is not a `ComposedCall`, and is
+            // not in the candidate ledger's domain at all -- `O` is what that
+            // ledger opens over. Settling one here would put an `F` member into
+            // a population the closeout requires to equal `O`.
+            return self.compose_continuation_locally(
+                builder,
+                identity,
+                fields,
+                recursive_position,
+                producer_env,
+            );
+        }
         let answer = self.claim_and_call_resolved_continuation_inner(
             builder,
             identity,
@@ -10662,208 +10723,39 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         Ok(answer)
     }
 
-    fn claim_and_call_resolved_continuation_inner(
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the target specialization's own
+    /// operands, assembled at the call edge, for BOTH realizations.**
+    ///
+    /// Architect `evt_6kn9ckdnbf0ph` step 1: *"assemble that target
+    /// specialization's ordinary envelope and ordered continuation inputs
+    /// through its existing planner projections."* ⭐ **That is not a step the
+    /// local composition adds — it is the step the direct call already
+    /// performed**, and this factoring is what makes "the same operands" a fact
+    /// rather than a claim. The two realizations differ in what they DO with
+    /// these runs, and in nothing about how the runs are built.
+    ///
+    /// ⛔ **The two runs are returned separately and are not concatenated
+    /// here.** A direct call wants them end to end as one operand run; a local
+    /// composition consumes them at different seats, because they are the
+    /// target body's `Parameter` and `Capture` runs and the body reads each from
+    /// its own place. Concatenating here would force the composition to split on
+    /// a length, which is a boundary neither seat owns.
+    ///
+    /// ⛔ Every guard below is the direct path's own, moved unchanged: the
+    /// selected closure's identity/arity/capture agreement, the envelope's
+    /// order and provenance, the assembled cardinality against the DECLARED
+    /// parameter count, the injectivity of resolved immediate slots, and both
+    /// observatories. A fusion-local identity is therefore held to the exact
+    /// same operand contract as an ordinary one; nothing is skipped for it.
+    fn assemble_continuation_call_operands(
         &mut self,
-        builder: &mut FunctionBuilder<'_>,
         identity: &ContinuationCallIdentity,
-        // `D9` — the producer constructor's WHOLE lowered field run and the
-        // ruled recursive position, not a pre-assembled ordinary run. ⛔ The
-        // assembly moved here because `unit` is resolved here: both callers
-        // previously built their own run from the nonrecursive fields alone,
-        // and each carried a comment claiming the captures were appended by the
-        // other side. One authority, one assembly, both callers.
         fields: &[LoweringOperand],
         recursive_position: usize,
         producer_env: &[LoweringEnvironmentBinding],
-    ) -> Result<RoutedAnswer, CraneliftBackendError> {
-        let identity = identity.clone();
-        let defining = self.defining_unit.ok_or_else(|| {
-            unsupported(
-                "ContinuationSpecialization",
-                "a continuation claim was reached with no unit currently being defined",
-            )
-        })?;
-        // `D5a` — the EMISSION owner of the context currently executing, which
-        // is a different question from which predeclared unit's body this is.
-        // ⛔ Not derived from `defining`: a generated specialization context
-        // lowers a raw body and would otherwise be mistaken for that raw body's
-        // predeclared owner, which is the whole conflation being removed.
-        let defining_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
-                "ContinuationSpecialization",
-                "a continuation claim was reached with no emission owner bound for the context \
-                 currently being defined",
-            )
-        })?;
-        // The EXACT target, resolved first.
-        let exact_target = self
-            .function_local
-            .continuation_calls
-            .get(&identity)
-            .cloned()
-            .ok_or_else(|| {
-                unsupported(
-                    "ContinuationSpecialization",
-                    "the claimed continuation target was not declared into this function",
-                )
-            })?;
-        // `D4` control, on the real causal call seam: substitute ONLY the
-        // emitted `FuncRef` with another callable already declared into this
-        // same function, on the same unit-call ABI.
-        //
-        // ⭐ Header, slots, offsets, inputs, identity and owner are all
-        // retained, so the call is still emitted and the ONLY thing that moves
-        // is the callee identity -- which is what makes the finished-CLIF
-        // oracle's rejection attributable to one cause.
-        //
-        // ⛔ No fall back to exact, and no widening: if this function declares
-        // no other unit-call target the control rejects loudly rather than
-        // silently becoming the identity.
-        #[cfg(test)]
-        let target = match CONTINUATION_EMISSION_MUTATION.with(std::cell::Cell::get) {
-            ContinuationEmissionMutation::SubstituteEmittedFuncRef => {
-                let substitute = self
-                    .function_local
-                    .worker_calls
-                    .values()
-                    .chain(self.function_local.unit_calls.values())
-                    .chain(self.function_local.declaration_calls.values())
-                    .map(|call| call.function)
-                    .find(|function| *function != exact_target.function)
-                    .ok_or_else(|| {
-                        unsupported(
-                            "ContinuationSpecialization",
-                            "the D4 emitted-ref substitution found no other unit-call target \
-                             declared into this function; that is a fact about this function's \
-                             declarations, not a licence to import a FuncRef from another \
-                             function",
-                        )
-                    })?;
-                units::DeclaredUnitCall {
-                    function: substitute,
-                    ..exact_target
-                }
-            }
-            // `RT-CONTSPEC-WITNESS` `D7` reachability sentinel: redirect to a
-            // DISTINCT SAME-SHAPED target to show this seam is REACHED.
-            //
-            // ⛔ Not a behavioural oracle. The mutated arm is rejected by the
-            // finished-CLIF equality gate and never executes; `AC-9`'s executed
-            // witness is `SubstituteContinuationBodyDefinition`, at the
-            // definition-binding seat this gate cannot see.
-            //
-            // ⛔ The predicate is `RT-WORKER-BIND`'s: equal declared arity and
-            // equal capture count, read as the counts of this unit's own
-            // declared `Parameter` and `Capture` slots. It is deliberately NOT
-            // a comparison of ABI layout -- no width, alignment, offset,
-            // carrier, ownership or header is consulted -- and NOT origin
-            // inequality, which would make any other target qualify.
-            ContinuationEmissionMutation::RedirectToDistinctSameShapedTarget => {
-                // ⛔ Both sides are read from the SAME source -- each call's own
-                // declared record -- so the comparison cannot be an artefact of
-                // two different derivations disagreeing. The exact target is a
-                // continuation specialization and is not an `emittable_units`
-                // member, so a plan-side lookup answers `None` for it and the
-                // control would refuse for its own reason rather than measure
-                // anything. Measured, not reasoned: it did exactly that.
-                let declared_shape = |call: &units::DeclaredUnitCall| {
-                    (
-                        call.slots
-                            .iter()
-                            .filter(|slot| slot.kind == AbiSlotKind::Parameter)
-                            .count(),
-                        call.slots
-                            .iter()
-                            .filter(|slot| slot.kind == AbiSlotKind::Capture)
-                            .count(),
-                    )
-                };
-                let exact_shape = declared_shape(&exact_target);
-                let substitute = self
-                    .function_local
-                    .worker_calls
-                    .values()
-                    .chain(self.function_local.unit_calls.values())
-                    .chain(self.function_local.declaration_calls.values())
-                    .find(|call| {
-                        call.function != exact_target.function
-                            && declared_shape(call) == exact_shape
-                    })
-                    .map(|call| call.function)
-                    .ok_or_else(|| {
-                        unsupported(
-                            "ContinuationSpecialization",
-                            "the D7 same-shaped redirect found no DISTINCT target with the same \
-                             declared arity and capture count declared into this function; per \
-                             the frame that is a missing fixture precondition, not a discharge",
-                        )
-                    })?;
-                units::DeclaredUnitCall {
-                    function: substitute,
-                    ..exact_target
-                }
-            }
-            _ => exact_target,
-        };
-        #[cfg(not(test))]
-        let target = exact_target;
-        // Claim exactly once, with the defining unit supplied independently of
-        // the token so the owner check is a real comparison.
-        // `D4` controls, on the real claim: present the same exact token a
-        // second time, or present an owner that is not the unit actually being
-        // defined. Both perturb this call seam, not a pre-body ledger.
-        #[cfg(test)]
-        let mutation = CONTINUATION_EMISSION_MUTATION.with(std::cell::Cell::get);
-        #[cfg(test)]
-        let claimed_owner = if mutation == ContinuationEmissionMutation::ClaimUnderWrongOwner {
-            // An actually wrong current owner: any planned owner that is not
-            // the unit being defined.
-            // ⛔ Drawn from the PLANNED UNIT population, not from the causal
-            // calls' own owners, and with NO fall back to `defining`.
-            //
-            // ⭐ It used to read `continuation_calls().find(owner != defining)
-            // .unwrap_or(defining)`. In this seam's real population there is
-            // exactly one causal token and its owner IS the unit being defined,
-            // so `find` returned `None` and the mutation silently became the
-            // IDENTITY -- a committed control that could not fire, green since
-            // `457b9fc6` for the same structural reason the same-shaped redirect
-            // could not reach the call seam. Measured, not reasoned: the control
-            // passed until this fallback was removed.
-            self.static_transition_plan
-                .emittable_units()?
-                .iter()
-                .map(|unit| ContinuationEmissionOwner::Predeclared(unit.function()))
-                .find(|owner| *owner != defining_owner)
-                .ok_or_else(|| {
-                    unsupported(
-                        "ContinuationSpecialization",
-                        "the D4 wrong-owner control found no planned unit other than the one being \
-                         defined; a control with no wrong owner to present must fail loudly rather \
-                         than quietly claim under the right one",
-                    )
-                })?
-        } else {
-            defining_owner
-        };
-        #[cfg(not(test))]
-        let claimed_owner = defining_owner;
-        let ledger = self.continuation_claims.as_mut().ok_or_else(|| {
-            unsupported(
-                "ContinuationSpecialization",
-                "a continuation claim was reached with no open claim ledger",
-            )
-        })?;
-        ledger.claim_exact(&identity, claimed_owner)?;
-        #[cfg(test)]
-        d5a_trace(format!(
-            "  CLAIM outcome=Claimed target={:?} owner={claimed_owner:?}",
-            identity.target()
-        ));
-        #[cfg(test)]
-        if mutation == ContinuationEmissionMutation::ClaimTokenTwice {
-            ledger.claim_exact(&identity, claimed_owner)?;
-        }
-
+        defining: PredeclaredFunctionId,
+        defining_owner: ContinuationEmissionOwner,
+    ) -> Result<ContinuationCallOperands, CraneliftBackendError> {
         // Capture slots come from the EXACT producer environment, addressed by
         // the projected `source_owner` + `source_abi_position`. ⛔
         // `ordinary_abi_position` is not a source position and is never used
@@ -11146,7 +11038,17 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     .collect(),
             },
         );
-        let mut inputs = ordinary;
+        // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the two runs stay SEPARATE.
+        //
+        // ⛔ They used to be one vector, because the one consumer that existed
+        // concatenated them into a call's operand run. The local composition
+        // consumes them at different seats -- the ordinary envelope is the
+        // target body's `Parameter` run and the continuation inputs are its
+        // `Capture` run -- so a concatenation here would have to be undone by
+        // splitting on a length, which is a boundary neither seat owns. The
+        // direct path concatenates at its own call site instead, in the same
+        // order, and that order is asserted there.
+        let mut continuation_inputs = Vec::new();
         #[cfg(test)]
         d5a_trace(format!(
             "  CAPTURES defining={defining:?} consumer={:?} producer={:?} env_len={} inputs={:?}",
@@ -11489,7 +11391,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     ),
                 )
             })?;
-            inputs.push(binding.value_at({
+            continuation_inputs.push(binding.value_at({
                 #[cfg(test)]
                 crate::cranelift_backend::lowering::record_d2k_owner_event(
                     crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller { site: "core.rs continuation capture" },
@@ -11497,6 +11399,394 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 "a continuation capture input"
             })?.clone());
         }
+        Ok(ContinuationCallOperands {
+            body: super::units::ContinuationSelectedCaseBody {
+                id: unit.id(),
+                continuation_origin: unit.continuation_origin(),
+                producer_alternative: unit.producer_alternative(),
+                recursive_position: unit.recursive_position(),
+                worker_closure_origin: unit.worker_closure_origin(),
+                worker_body_origin: unit.worker_body_origin(),
+                worker_declared_arity: unit.worker_declared_arity(),
+                worker_capture_count: unit.worker_capture_count(),
+            },
+            consumer_owner: unit.consumer_owner(),
+            envelope,
+            ordinary,
+            continuation_inputs,
+        })
+    }
+
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local realization:
+    /// lower the target's exact selected case body HERE, at its call edge.**
+    ///
+    /// Architect `evt_6kn9ckdnbf0ph`, the four ruled steps, in order:
+    ///
+    /// 1. assemble the target specialization's ordinary envelope and ordered
+    ///    continuation inputs through its existing planner projections;
+    /// 2. lower that target's exact selected case body **locally**, under the
+    ///    target's own checked authority;
+    /// 3. return its phase-bearing [`LoweringOperand`] directly into the
+    ///    caller's existing exact eliminator;
+    /// 4. emit **no** target call, result slot, `emit_result`, `ground_value`
+    ///    or ABI conversion for that identity.
+    ///
+    /// ⭐⭐ **What is replaced is the REALIZATION, not the source.** The
+    /// producer's construct origin, its ownership and its body are all
+    /// unchanged; what moves is where the exact continuation specialization is
+    /// lowered — from a standalone `Function` reached across a result ABI, to
+    /// its own call edge. Steps 1 and 2 are literally the direct path's own
+    /// machinery, shared rather than reimplemented, which is why a fusion-local
+    /// identity is held to exactly the same operand and body contract as an
+    /// ordinary one.
+    ///
+    /// ⛔ **No result slot and no `emit_result`.** The definition pass wrote the
+    /// body's answer to its frame's `Result` offset because a callee has to;
+    /// there is no frame and no callee here, and the operand is handed straight
+    /// to the caller's eliminator. The inner local result may be the specialized
+    /// constructor template containing the compiler-only worker — the outer
+    /// eliminator destructures it, which is where `constructor_field_bindings`
+    /// mints the exact transport instance. **The worker is an intermediate
+    /// between two compiler-local steps and crosses no ABI**, which is the whole
+    /// property the composition exists to obtain.
+    ///
+    /// ⛔ **This does not touch the `FusionRegionClaimLedger`.** Consuming a
+    /// composition does not spend the region claim; redirect and takeover remain
+    /// the sole redirect and claim-consumption seats.
+    fn compose_continuation_locally(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        identity: &ContinuationCallIdentity,
+        fields: &[LoweringOperand],
+        recursive_position: usize,
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<RoutedAnswer, CraneliftBackendError> {
+        let identity = identity.clone();
+        let defining = self.defining_unit.ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fusion-local composition was reached with no unit currently being defined",
+            )
+        })?;
+        let defining_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fusion-local composition was reached with no emission owner bound for the \
+                 context currently being defined",
+            )
+        })?;
+        // The affine consumption, BEFORE any operand is assembled and before a
+        // single instruction is emitted.
+        //
+        // ⛔ The order is the mechanism. A composition that is going to be
+        // refused -- unknown identity, foreign owner, disagreeing target, or a
+        // replay -- must be refused with nothing emitted for it, exactly as the
+        // direct path claims before it calls. Consuming afterwards would leave a
+        // locally lowered body in the caller's block that the refusal cannot
+        // retract.
+        //
+        // ⛔ The target handed in is the CALL IDENTITY's own, not the edge's, so
+        // the ledger's comparison is between two separate planner facts about
+        // one call rather than a record against itself.
+        let target = identity.target();
+        let (_fusion, _layer) = self
+            .fusion_compositions
+            .as_mut()
+            .ok_or_else(|| {
+                unsupported(
+                    "StaticContinuationFusion",
+                    "a fusion-local composition was reached with no composition ledger open; the \
+                     realization would then be affine-unaccounted, and an unconsumed plan member \
+                     is the case that reads as success because nothing was emitted",
+                )
+            })?
+            .consume(&identity, defining_owner, target)?;
+        // The realized population, recorded AFTER the consumption succeeded.
+        #[cfg(test)]
+        crate::cranelift_backend::lowering::record_r3_local_composition(target, _layer);
+        // Step 1 — the SAME assembly the direct call performs.
+        let operands = self.assemble_continuation_call_operands(
+            &identity,
+            fields,
+            recursive_position,
+            producer_env,
+            defining,
+            defining_owner,
+        )?;
+        // `D5a` — whether THIS function retargeted the target's worker body to a
+        // generated execution context, read from this function's own two tables.
+        //
+        // ⛔ Not re-asked of the planner. An issued context this function did
+        // not resolve is not a context the induction hypothesis may name, and
+        // the definition pass reads its own retarget outcome for exactly that
+        // reason. The two tables are what the retarget itself writes: it
+        // overwrites `worker_calls` and leaves `raw_worker_calls` at the raw
+        // target, so a difference between them IS the retarget having happened
+        // in this function.
+        let worker_body = operands.body.worker_body_origin;
+        let retargeted_worker_body = match (
+            self.function_local.worker_calls.get(&worker_body),
+            self.function_local.raw_worker_calls.get(&worker_body),
+        ) {
+            (Some(current), Some(raw)) if current.function != raw.function => Some(worker_body),
+            _ => None,
+        };
+        // Step 2 — the target's OWN checked authority, for the body's extent.
+        //
+        // ⛔ Bound and released around the lowering rather than for this whole
+        // function: the caller's body resumes under its own authority the moment
+        // the composed operand is in hand. The release runs on the error path
+        // too, which is why the result is held rather than `?`-ed -- an early
+        // exit here would leave the target's authority installed over the rest
+        // of the caller's body, and the next reader in it would see facts
+        // belonging to a specialization it is not lowering.
+        let ambient = AmbientBodyAuthority::bind(
+            self,
+            ContinuationEmissionOwner::Specialization(target),
+            operands.consumer_owner,
+        );
+        let lowered = super::units::lower_continuation_selected_case_body(
+            self,
+            builder,
+            &operands.body,
+            &operands.envelope,
+            &operands.ordinary,
+            &operands.continuation_inputs,
+            retargeted_worker_body,
+        );
+        ambient.release(self);
+        let lowered = lowered?;
+        // Step 3 — the phase-bearing operand, straight back to the caller's
+        // existing exact eliminator.
+        //
+        // ⛔ `checked`, and this is the ruled third caller of it. The doc on
+        // `RoutedAnswer::checked` names two and forbids a third without a
+        // ruling; `evt_6kn9ckdnbf0ph` is that ruling. The value returned IS the
+        // result of the exact continuation specialization the identity names --
+        // its own selected case body, lowered under its own authority, with the
+        // affine consumption already recorded above. What changed is that the
+        // result arrives without a call, not that a weaker producer now raises
+        // the route.
+        Ok(RoutedAnswer::checked(lowered))
+    }
+
+    fn claim_and_call_resolved_continuation_inner(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        identity: &ContinuationCallIdentity,
+        // `D9` — the producer constructor's WHOLE lowered field run and the
+        // ruled recursive position, not a pre-assembled ordinary run. ⛔ The
+        // assembly moved here because `unit` is resolved here: both callers
+        // previously built their own run from the nonrecursive fields alone,
+        // and each carried a comment claiming the captures were appended by the
+        // other side. One authority, one assembly, both callers.
+        fields: &[LoweringOperand],
+        recursive_position: usize,
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<RoutedAnswer, CraneliftBackendError> {
+        let identity = identity.clone();
+        let defining = self.defining_unit.ok_or_else(|| {
+            unsupported(
+                "ContinuationSpecialization",
+                "a continuation claim was reached with no unit currently being defined",
+            )
+        })?;
+        // `D5a` — the EMISSION owner of the context currently executing, which
+        // is a different question from which predeclared unit's body this is.
+        // ⛔ Not derived from `defining`: a generated specialization context
+        // lowers a raw body and would otherwise be mistaken for that raw body's
+        // predeclared owner, which is the whole conflation being removed.
+        let defining_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "ContinuationSpecialization",
+                "a continuation claim was reached with no emission owner bound for the context \
+                 currently being defined",
+            )
+        })?;
+        // The EXACT target, resolved first.
+        let exact_target = self
+            .function_local
+            .continuation_calls
+            .get(&identity)
+            .cloned()
+            .ok_or_else(|| {
+                unsupported(
+                    "ContinuationSpecialization",
+                    "the claimed continuation target was not declared into this function",
+                )
+            })?;
+        // `D4` control, on the real causal call seam: substitute ONLY the
+        // emitted `FuncRef` with another callable already declared into this
+        // same function, on the same unit-call ABI.
+        //
+        // ⭐ Header, slots, offsets, inputs, identity and owner are all
+        // retained, so the call is still emitted and the ONLY thing that moves
+        // is the callee identity -- which is what makes the finished-CLIF
+        // oracle's rejection attributable to one cause.
+        //
+        // ⛔ No fall back to exact, and no widening: if this function declares
+        // no other unit-call target the control rejects loudly rather than
+        // silently becoming the identity.
+        #[cfg(test)]
+        let target = match CONTINUATION_EMISSION_MUTATION.with(std::cell::Cell::get) {
+            ContinuationEmissionMutation::SubstituteEmittedFuncRef => {
+                let substitute = self
+                    .function_local
+                    .worker_calls
+                    .values()
+                    .chain(self.function_local.unit_calls.values())
+                    .chain(self.function_local.declaration_calls.values())
+                    .map(|call| call.function)
+                    .find(|function| *function != exact_target.function)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "ContinuationSpecialization",
+                            "the D4 emitted-ref substitution found no other unit-call target \
+                             declared into this function; that is a fact about this function's \
+                             declarations, not a licence to import a FuncRef from another \
+                             function",
+                        )
+                    })?;
+                units::DeclaredUnitCall {
+                    function: substitute,
+                    ..exact_target
+                }
+            }
+            // `RT-CONTSPEC-WITNESS` `D7` reachability sentinel: redirect to a
+            // DISTINCT SAME-SHAPED target to show this seam is REACHED.
+            //
+            // ⛔ Not a behavioural oracle. The mutated arm is rejected by the
+            // finished-CLIF equality gate and never executes; `AC-9`'s executed
+            // witness is `SubstituteContinuationBodyDefinition`, at the
+            // definition-binding seat this gate cannot see.
+            //
+            // ⛔ The predicate is `RT-WORKER-BIND`'s: equal declared arity and
+            // equal capture count, read as the counts of this unit's own
+            // declared `Parameter` and `Capture` slots. It is deliberately NOT
+            // a comparison of ABI layout -- no width, alignment, offset,
+            // carrier, ownership or header is consulted -- and NOT origin
+            // inequality, which would make any other target qualify.
+            ContinuationEmissionMutation::RedirectToDistinctSameShapedTarget => {
+                // ⛔ Both sides are read from the SAME source -- each call's own
+                // declared record -- so the comparison cannot be an artefact of
+                // two different derivations disagreeing. The exact target is a
+                // continuation specialization and is not an `emittable_units`
+                // member, so a plan-side lookup answers `None` for it and the
+                // control would refuse for its own reason rather than measure
+                // anything. Measured, not reasoned: it did exactly that.
+                let declared_shape = |call: &units::DeclaredUnitCall| {
+                    (
+                        call.slots
+                            .iter()
+                            .filter(|slot| slot.kind == AbiSlotKind::Parameter)
+                            .count(),
+                        call.slots
+                            .iter()
+                            .filter(|slot| slot.kind == AbiSlotKind::Capture)
+                            .count(),
+                    )
+                };
+                let exact_shape = declared_shape(&exact_target);
+                let substitute = self
+                    .function_local
+                    .worker_calls
+                    .values()
+                    .chain(self.function_local.unit_calls.values())
+                    .chain(self.function_local.declaration_calls.values())
+                    .find(|call| {
+                        call.function != exact_target.function
+                            && declared_shape(call) == exact_shape
+                    })
+                    .map(|call| call.function)
+                    .ok_or_else(|| {
+                        unsupported(
+                            "ContinuationSpecialization",
+                            "the D7 same-shaped redirect found no DISTINCT target with the same \
+                             declared arity and capture count declared into this function; per \
+                             the frame that is a missing fixture precondition, not a discharge",
+                        )
+                    })?;
+                units::DeclaredUnitCall {
+                    function: substitute,
+                    ..exact_target
+                }
+            }
+            _ => exact_target,
+        };
+        #[cfg(not(test))]
+        let target = exact_target;
+        // Claim exactly once, with the defining unit supplied independently of
+        // the token so the owner check is a real comparison.
+        // `D4` controls, on the real claim: present the same exact token a
+        // second time, or present an owner that is not the unit actually being
+        // defined. Both perturb this call seam, not a pre-body ledger.
+        #[cfg(test)]
+        let mutation = CONTINUATION_EMISSION_MUTATION.with(std::cell::Cell::get);
+        #[cfg(test)]
+        let claimed_owner = if mutation == ContinuationEmissionMutation::ClaimUnderWrongOwner {
+            // An actually wrong current owner: any planned owner that is not
+            // the unit being defined.
+            // ⛔ Drawn from the PLANNED UNIT population, not from the causal
+            // calls' own owners, and with NO fall back to `defining`.
+            //
+            // ⭐ It used to read `continuation_calls().find(owner != defining)
+            // .unwrap_or(defining)`. In this seam's real population there is
+            // exactly one causal token and its owner IS the unit being defined,
+            // so `find` returned `None` and the mutation silently became the
+            // IDENTITY -- a committed control that could not fire, green since
+            // `457b9fc6` for the same structural reason the same-shaped redirect
+            // could not reach the call seam. Measured, not reasoned: the control
+            // passed until this fallback was removed.
+            self.static_transition_plan
+                .emittable_units()?
+                .iter()
+                .map(|unit| ContinuationEmissionOwner::Predeclared(unit.function()))
+                .find(|owner| *owner != defining_owner)
+                .ok_or_else(|| {
+                    unsupported(
+                        "ContinuationSpecialization",
+                        "the D4 wrong-owner control found no planned unit other than the one being \
+                         defined; a control with no wrong owner to present must fail loudly rather \
+                         than quietly claim under the right one",
+                    )
+                })?
+        } else {
+            defining_owner
+        };
+        #[cfg(not(test))]
+        let claimed_owner = defining_owner;
+        let ledger = self.continuation_claims.as_mut().ok_or_else(|| {
+            unsupported(
+                "ContinuationSpecialization",
+                "a continuation claim was reached with no open claim ledger",
+            )
+        })?;
+        ledger.claim_exact(&identity, claimed_owner)?;
+        #[cfg(test)]
+        d5a_trace(format!(
+            "  CLAIM outcome=Claimed target={:?} owner={claimed_owner:?}",
+            identity.target()
+        ));
+        #[cfg(test)]
+        if mutation == ContinuationEmissionMutation::ClaimTokenTwice {
+            ledger.claim_exact(&identity, claimed_owner)?;
+        }
+
+        // `D3` — the operands, through the ONE assembly both realizations share.
+        let operands = self.assemble_continuation_call_operands(
+            &identity,
+            fields,
+            recursive_position,
+            producer_env,
+            defining,
+            defining_owner,
+        )?;
+        // The direct call's operand run: the ordinary envelope followed by the
+        // continuation inputs in ordinal order. ⛔ The order is asserted by the
+        // callee's own declared slot walk, which is what the assembly above
+        // validated each half against separately.
+        let mut inputs = operands.ordinary;
+        inputs.extend(operands.continuation_inputs);
 
         let (returned, call) = self.call_declared_unit_target(
             builder,

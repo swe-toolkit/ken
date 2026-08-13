@@ -2799,41 +2799,59 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// be true"*, because the prose it replaces claimed a step-5/step-6 stop that
 /// had already been overtaken with nothing going red.
 ///
-/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile, at the
-/// residual-narrowing increment: the compile stops at
-/// `ContinuationSpecialization: the claimed continuation target was not
-/// declared into this function`.
-/// **CLAIMED:** that is where the armed compile currently stops, and it is the
-/// **fail-closed intermediate** the half-landed replacement is expected to sit
-/// at.
+/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile, with the
+/// local selected-body composition landed: the compile stops at
+/// `StaticContinuationFusion: a fusion-composition splice issued a capability
+/// that no dynamic invocation segment consumed`. Measured beside it, and
+/// asserted below so the stop is not the only thing pinned: **exactly one**
+/// fusion-local composition is realized per compile, at the **`Inner`** layer,
+/// on both roots.
 ///
-/// **WHY IT MOVED, and it moved BACKWARDS on purpose.** `evt_6kn9ckdnbf0ph` §3
-/// replaces *only the direct-call realization* of a fusion-local identity, and
-/// that replacement has two halves. The first half has landed: `O = P \ F` now
-/// feeds resolution, declaration and both ledger opens, so a fusion-local
-/// identity no longer has a declared target — **the direct path is closed for
-/// `F`.** The second half, local selected-body lowering, is not built yet, so
-/// nothing opens the local path and the identity meets this refusal instead.
+/// **CLAIMED:** that is where the armed compile currently stops, and the
+/// composition population is the reason — one of the two planned composed
+/// edges is realized and the other is never reached.
 ///
-/// ⇒ **The intermediate is a refusal, never a silent wrong answer**, which is
-/// the only reason it is acceptable to land the halves separately. Production
-/// is unarmed, so no production compile reaches it at all.
+/// **THE GAP:** this says nothing about whether the unrealized `Outer` edge and
+/// the outstanding capability have one cause or two. They are recorded as two
+/// measurements precisely so a later reading cannot quietly assume they are one.
 ///
-/// **THE PREVIOUS MEASURED STOP**, superseded by this one and recorded so the
-/// movement is auditable rather than rewritten: the root-result escape in
-/// `emit_result` -> `ground_value` -> `into_specialized_at`, on the fusion
-/// key's own producer construct. Per `evt_6kn9ckdnbf0ph` that order was the
-/// *pre-mechanism* one and never a refutation — the worker is a compiler-local
-/// intermediate between two lowering steps, so its absence from any ABI operand
-/// run is the design, not a defect.
+/// **THE STOP MOVED FORWARD, past every refusal the previous two increments sat
+/// at.** The composition reaches its seat, the target's exact selected case
+/// body is lowered locally, its phase-bearing operand answers the producer's own
+/// constructor, and the fused body lowers to completion — the refusal is that
+/// body's EXIT closeout, not a lowering failure.
+///
+/// ⚠ **It is not a regression, and the distinction is load-bearing.** The
+/// capability's closeout has three arms — spent, outstanding, and *descent
+/// failed*, which **withdraws** the capability and propagates the original
+/// error. Every previous armed compile on this witness took the third arm, so
+/// the outstanding arm has never been evaluated here before. Whether the
+/// capability would have been consumed under a successful DIRECT-call descent is
+/// **not observable**: the direct path never produced one.
+///
+/// **THE TWO PREVIOUS MEASURED STOPS**, superseded and recorded so the movement
+/// is auditable rather than rewritten:
+///
+/// 1. `ContinuationSpecialization: the claimed continuation target was not
+///    declared into this function` — the fail-closed intermediate of the
+///    half-landed replacement, when `O = P \ F` had closed the direct path for
+///    `F` and the local path was not yet open.
+/// 2. the root-result escape in `emit_result` -> `ground_value` ->
+///    `into_specialized_at`, on the fusion key's own producer construct. Per
+///    `evt_6kn9ckdnbf0ph` that order was the *pre-mechanism* one and never a
+///    refutation — the worker is a compiler-local intermediate between two
+///    lowering steps, so its absence from any ABI operand run is the design.
 ///
 /// **Promise class: transition sentinel.** It is named for the boundary rather
-/// than for a count, and the event that retires it is the local selected-body
-/// composition landing for `dom(FusionComposedEdge)` — at which point the stop
-/// moves again, this row reds again, and the comment beside the installer is
-/// restated again. **Each red is the mechanism reporting progress**, and the
-/// instruction is always to restate the measured stop, never to relax the
-/// assertion.
+/// than for a count, and the event that retires it is a ruling on the splice
+/// capability's consumption seat — at which point the stop moves again, this row
+/// reds again, and the comment beside the installer is restated again. **Each
+/// red is the mechanism reporting progress**, and the instruction is always to
+/// restate the measured stop, never to relax the assertion.
+///
+/// ⛔ **The composition-population assertion is a sentinel too, and is the one
+/// that must NOT be relaxed into an inequality.** `>= 1 realized` would stay
+/// green through both the repair and its absence.
 ///
 /// Production stays unarmed. `D2F_EMITTER_ARMED` is `false`; the arm here is
 /// the `cfg(test)` RAII `D2fEmitterTestArm`, which disarms on drop so a
@@ -2873,28 +2891,52 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     }
 
     let mut rows = Vec::new();
+    let mut realized = Vec::new();
     for (cause, symbol) in [
         (D2jCause::Exact, "ken_d2f_armed_stop_exact"),
         (D2jCause::ReHomed, "ken_d2f_armed_stop_rehomed"),
     ] {
+        crate::cranelift_backend::lowering::reset_r3_local_compositions();
         let error = compile_armed(cause, symbol);
         let reached = matches!(
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
-                if *construct == "ContinuationSpecialization"
-                    && reason.contains("was not declared into this function")
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("no dynamic invocation segment consumed")
         );
         rows.push((cause, reached));
+        // ⛔ The LAYERS, not a count. A count of one is satisfied by the wrong
+        // one of the two planned edges, and which layer is realized is exactly
+        // the fact the open question turns on.
+        realized.push((
+            cause,
+            crate::cranelift_backend::lowering::r3_local_compositions()
+                .into_iter()
+                .map(|(_, layer)| layer)
+                .collect::<Vec<_>>(),
+        ));
     }
 
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must stop at the fail-closed intermediate: a fusion-local identity \
-         whose direct path is closed by the residual narrowing and whose local path is not open \
-         yet. If this row is red because the stop MOVED, the comment beside the D2f installer in \
-         core.rs is now stale and must be restated to the new measured stop rather than this \
-         assertion being relaxed"
+        "the armed compile must stop at the fused body's splice-capability closeout: the local \
+         composition lands, the fused body lowers to completion, and no dynamic invocation \
+         segment consumed the capability the splice issued. If this row is red because the stop \
+         MOVED, the comment beside the D2f installer in core.rs is now stale and must be restated \
+         to the new measured stop rather than this assertion being relaxed"
+    );
+    assert_eq!(
+        realized,
+        vec![
+            (D2jCause::Exact, vec![FusionCompositionLayer::Inner]),
+            (D2jCause::ReHomed, vec![FusionCompositionLayer::Inner]),
+        ],
+        "exactly one of the two planned composed edges is realized per compile, and it is the \
+         Inner one. The Outer edge's producer construct reaches no claim seat anywhere in the \
+         armed compile, so its composition is not merely refused -- it is never attempted. If \
+         this row is red because the Outer edge became reachable, that is the mechanism \
+         advancing and the measurement must be restated, not widened to an inequality"
     );
 
     // The arm is scoped, so an unarmed compile must still reach the ordinary

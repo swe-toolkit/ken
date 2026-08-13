@@ -4824,9 +4824,15 @@ impl ContinuationClaimLedger {
 ///   reached for something the planner never composed;
 /// - a **second** consumption of one identity is refused, whether in the same
 ///   function or another one, which is the replay case;
-/// - a consumption whose **owner, layer or target** disagrees with the planned
-///   edge is refused, each named separately so the refusal says which fact
-///   moved;
+/// - a consumption whose **owner or target** disagrees with the planned edge is
+///   refused, each named separately so the refusal says which fact moved;
+/// - at close, each fusion's CONSUMED layers must be exactly one `Outer` and one
+///   `Inner`. ⛔ The layer is deliberately **not** checked at consumption: the
+///   seat has no authority over it independent of the edge itself, so a
+///   per-consumption comparison would read the edge's layer and compare it with
+///   itself. What is real is the whole-artifact statement that both ruled layers
+///   of each fusion were actually realized rather than merely planned, and that
+///   is asserted where that population exists;
 /// - a planned member **never consumed** is refused at close -- the case that
 ///   reads as success because nothing happened;
 /// - a consumed identity that **also reached the ordinary ledger** in any role
@@ -4898,16 +4904,20 @@ impl FusionCompositionLedger {
 
     /// Consume ONE fusion-local composition, at its exact call edge.
     ///
-    /// The four facts are checked against the planned edge's own record, each
-    /// with its own refusal, so a red names the fact that moved rather than
-    /// reporting a generic mismatch.
+    /// Each fact is checked against the planned edge's own record with its own
+    /// refusal, so a red names the fact that moved rather than reporting a
+    /// generic mismatch.
+    ///
+    /// ⛔ `target` is the CALL IDENTITY's own recorded target, supplied by the
+    /// seat, not the edge's. The two are separate planner facts about one call,
+    /// so this is a real comparison; passing the edge's own target back in would
+    /// be an identity.
     pub(super) fn consume(
         &mut self,
         identity: &ContinuationCallIdentity,
         defining: ContinuationEmissionOwner,
-        layer: FusionCompositionLayer,
         target: ContinuationSpecializationId,
-    ) -> Result<StaticContinuationFusionId, CraneliftBackendError> {
+    ) -> Result<(StaticContinuationFusionId, FusionCompositionLayer), CraneliftBackendError> {
         let edge = self.planned.get(identity).ok_or_else(|| {
             backend_module(
                 "a fusion-local composition was consumed for an identity the planner never \
@@ -4925,14 +4935,6 @@ impl FusionCompositionLedger {
                 edge.emission_owner()
             )));
         }
-        if edge.layer() != layer {
-            return Err(backend_module(format!(
-                "a fusion-local composition planned at layer {:?} was consumed as {layer:?}; the \
-                 two ruled layers are selected by different checked bindings of the fusion key \
-                 and are not substitutable",
-                edge.layer()
-            )));
-        }
         if edge.target() != target {
             return Err(backend_module(format!(
                 "a fusion-local composition planned for target {:?} was consumed against {target:?}; \
@@ -4942,6 +4944,7 @@ impl FusionCompositionLedger {
             )));
         }
         let fusion = edge.fusion();
+        let layer = edge.layer();
         let consumed = self.consumed.get_mut(identity).ok_or_else(|| {
             backend_module(
                 "a fusion-local composition has a planned edge but no consumption slot; the two \
@@ -4957,7 +4960,7 @@ impl FusionCompositionLedger {
             )));
         }
         *consumed = Some(defining);
-        Ok(fusion)
+        Ok((fusion, layer))
     }
 
     /// The closeout, over three populations.
@@ -5004,6 +5007,46 @@ impl FusionCompositionLedger {
                      fusion-local range F_t: {missing} fusion-local targets were still {pass}ed, \
                      and {extra} ordinary targets were omitted. A fusion-local target that keeps \
                      its standalone Function is a second realization of one edge"
+                )));
+            }
+        }
+        // BOTH RULED LAYERS OF EACH FUSION WERE ACTUALLY REALIZED.
+        //
+        // ⭐ The planner's preflight already requires each body-owning fusion to
+        // CARRY exactly one `Outer` and one `Inner` composed edge. This is the
+        // consumption-side dual and is a different statement: it says both of
+        // them were lowered locally. ⛔ Over `consumed`, never over `planned` --
+        // over `planned` it would re-assert the preflight law against the same
+        // records and would pass for an artifact that realized neither.
+        let mut consumed_layers: BTreeMap<
+            StaticContinuationFusionId,
+            BTreeSet<FusionCompositionLayer>,
+        > = BTreeMap::new();
+        for identity in &consumed {
+            let edge = self.planned.get(identity).ok_or_else(|| {
+                backend_module(
+                    "a consumed fusion-local composition has no planned edge at close; \
+                     consumption cannot record an identity the planned map does not hold"
+                        .to_string(),
+                )
+            })?;
+            if !consumed_layers.entry(edge.fusion()).or_default().insert(edge.layer()) {
+                return Err(backend_module(format!(
+                    "static continuation fusion {:?} realized its {:?} composition layer twice; \
+                     one fusion has one composed edge per layer",
+                    edge.fusion(),
+                    edge.layer()
+                )));
+            }
+        }
+        for (fusion, layers) in &consumed_layers {
+            if *layers
+                != BTreeSet::from([FusionCompositionLayer::Outer, FusionCompositionLayer::Inner])
+            {
+                return Err(backend_module(format!(
+                    "static continuation fusion {fusion:?} did not realize both ruled composition \
+                     layers locally; it consumed {layers:?}, and a composition missing one layer \
+                     is half a fusion with the other half still expecting a call that was omitted"
                 )));
             }
         }
