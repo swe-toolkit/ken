@@ -2279,10 +2279,27 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // invocation with no descent is a call assembled from operands nobody
     // lowered.
     //
-    // **What remains is the next link: the rebind / transport mint.** The
-    // producer construct still carries its worker field with no static
-    // elimination rebinding it, so the transport ledger refuses. That refusal is
-    // the chain reporting where it got to, not a defect in what landed.
+    // **What remains is the next link: the rebind / transport mint — and it is
+    // LOCATED.** MEASURED on both armed roots, probes reverted:
+    //
+    // ```text
+    // recognize   construct=30 defining=unit 2      (Exact)
+    // recognize   construct=26 defining=unit 3      (ReHomed)
+    // constructor_field_bindings   ENTERED ZERO TIMES in either compile
+    // ```
+    //
+    // The worker field IS recognized at construction, so the producer half of
+    // the transport chain runs. What never happens is the destructuring half:
+    // `constructor_field_bindings` is the sole minting seat — *"the field enters
+    // lexical binding authority here"* — and no eliminator reaches it. So the
+    // ledger's refusal is accurate rather than premature: nothing rebound the
+    // field because nothing destructured the constructor.
+    //
+    // ⇒ Per `evt_5edhqyyhw4585`'s chain the missing step is the **immediate
+    // existing outer eliminator** consuming the `I` composition's local result.
+    // The result is produced and answers construct 36/32's producer dispatch;
+    // what is unmeasured is why the eliminator over it does not reach the
+    // constructor-field seat. **Not repaired here** — see the handback.
     //
     // **That guard is the mechanism working, and the residual is exactly one
     // unnarrowed projection.** Under `P = O ⊎ I ⊎ R` (Architect
