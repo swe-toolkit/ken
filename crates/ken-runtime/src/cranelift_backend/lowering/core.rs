@@ -2259,16 +2259,31 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // compile:** every one of the six unit calls is emitted, both composed edges
     // among them, and the compile then stops at the ROOT RESULT.
     //
-    // **THE CURRENT MEASURED TERMINAL STOP**, pinned by
-    // `d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves` rather than
-    // asserted here:
+    // **THERE IS NO LONGER A TERMINAL STOP. The armed compile COMPLETES on both
+    // roots**, pinned by `d2f_armed_compile_completes_and_its_populations_are_
+    // pinned` rather than asserted here. That row was a transition sentinel for
+    // five successive stops and has now retired itself by reaching its own
+    // boundary; the five are listed on its doc comment so the movement stays
+    // auditable.
+    //
+    // **SUPERSEDED, recorded rather than deleted.** The last two stops this block
+    // named were:
     //
     // ```text
     // Unsupported(StaticWorkerBinding,
     //   "a computational recursor's selected recursive argument requires an
     //    ordinary specialized constructor field, and this field transports a
-    //    static worker ...")
+    //    static worker ...")          <- cleared by the two-member binder wiring
+    //
+    // Unsupported(StaticWorkerBinding,
+    //   "... was rebound into the binding authority as transport ... and never
+    //    consumed at an exact-Var call")
+    //                                 <- cleared by the SHARED-transport ruling
     // ```
+    //
+    // ⛔ **Completion is not execution.** Nothing measured here runs the emitted
+    // code or checks that it computes the right answer, and the gate below stays
+    // `false`. What is established is that the chain lowers end to end.
     //
     // **The eliminator-role axis landed and the datatype trap is gone.**
     // `evt_43ng4f578mdvv`: the Inner composition issues
@@ -2300,17 +2315,23 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // ```
     //
     // The worker field IS recognized at construction, so the producer half of
-    // the transport chain runs. What never happens is the destructuring half:
-    // `constructor_field_bindings` is the sole minting seat — *"the field enters
-    // lexical binding authority here"* — and no eliminator reaches it. So the
-    // ledger's refusal is accurate rather than premature: nothing rebound the
-    // field because nothing destructured the constructor.
+    // the transport chain runs. What never happened *then* was the destructuring
+    // half: `constructor_field_bindings` is the sole minting seat — *"the field
+    // enters lexical binding authority here"* — and no eliminator reached it.
     //
-    // ⇒ Per `evt_5edhqyyhw4585`'s chain the missing step is the **immediate
-    // existing outer eliminator** consuming the `I` composition's local result.
-    // The result is produced and answers construct 36/32's producer dispatch;
-    // what is unmeasured is why the eliminator over it does not reach the
-    // constructor-field seat. **Not repaired here** — see the handback.
+    // ⛔ **THAT THIRD ROW IS NOW FALSE, and it is kept because the census is what
+    // made the gap findable.** `constructor_field_bindings` is entered on both
+    // roots: the composed eliminator calls it once per selected case and derives
+    // the induction-hypothesis prefix from its output. The field is rebound, the
+    // transport is minted, and it is consumed at the body's exact-`Var` call.
+    // A reader who greps this block for the destructuring seat must not conclude
+    // from the row above that it is still unreached.
+    //
+    // ⇒ Per `evt_5edhqyyhw4585`'s chain the missing step was the **immediate
+    // existing outer eliminator** consuming the `I` composition's local result,
+    // and that is the step the two-member binder wiring supplied. The composed
+    // eliminator now reaches the constructor-field seat, which is what turned the
+    // census's open question into a closed one.
     //
     // **That guard is the mechanism working, and the residual is exactly one
     // unnarrowed projection.** Under `P = O ⊎ I ⊎ R` (Architect
@@ -5756,10 +5777,66 @@ impl<'a> Lowering<'a> {
                 // `role_at` answers `FrameEnvironment` for any index and so states
                 // nothing to disagree with.
                 let binder_layout = CheckedCaseBinderLayout::for_case(case)?;
-                for position in case.recursive_positions.iter().rev().copied() {
-                    // The slot this iteration is about to fill, read before the
-                    // push so the check names the position it actually occupies.
-                    let slot = induction_hypotheses.len();
+                // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ONE REBIND,
+                // ---- AHEAD OF THE PREFIX, because the IH is DERIVED FROM IT.
+                // ---- Architect `evt_37715knv356yp`.
+                //
+                // **The transport names the recognized source FIELD's single entry
+                // into lexical binding authority. It does not name one binder
+                // member.** The two members are distinct callable *views* of one
+                // joined worker -- not two recognized fields and not two
+                // obligations -- so the obligation is:
+                //
+                // ```text
+                // recognized source worker field
+                //   -> one rebind transport
+                //   -> two authorized binder projections { IH, selected argument }
+                //   -> one exact-Var consumption through EITHER projection
+                // ```
+                //
+                // ⛔ This SUPERSEDES the earlier `transport: None` sub-rule for the
+                // IH in `evt_5yhm9c78dm27s`. That sub-rule made a source-field
+                // obligation member-specific, and the ledger red it produced is
+                // exactly what falsified it: the body reached its producer through
+                // the hypothesis, so the only consumption available could not pay
+                // segment 2's debt. The two-member law, the bind-all law, the
+                // one-mint law and the exact-once close all stand unchanged; only
+                // the lawful *carrier population* of that one transport changes.
+                //
+                // ⛔ `constructor_field_bindings` stays the SOLE rebind/mint
+                // authority, and this is why the call is hoisted here rather than
+                // left at `extend_constructor_fields` below: the prefix must be
+                // able to read the already-rebound binding. Minting from IH
+                // construction, or rebinding a second time for the prefix, would
+                // be a second obligation behind one recognition -- which the close
+                // refuses by design.
+                //
+                // ⭐ **The authorization for sharing is NOT "same worker body".**
+                // It is the exact tuple -- same `ConstructorField::StaticWorker`
+                // recognition, same defining scope, same `CheckedCaseBinderLayout`
+                // recursive position, and the paired `InductionHypothesis` /
+                // `ConstructorChild` roles. Deriving the prefix member *from* the
+                // field binding at the layout-checked recursive position is what
+                // makes that tuple structural here: there is no lookup by body, no
+                // search, and no way to reach a same-bodied worker from another
+                // recognition or another scope.
+                // ---- EVERY LAYOUT REFUSAL RUNS BEFORE THE FIRST MUTATION.
+                //
+                // `constructor_field_bindings` below **mints**: it moves each
+                // recognized field into binding authority and issues its transport,
+                // and the ledger has no un-rebind. So the whole plan is checked
+                // against the layout FIRST, on the case's own declaration, and only
+                // then is anything rebound. A refusal after the mint would leave a
+                // recognition transitioned to a transport this compile then
+                // abandons, which the close would report as an outstanding
+                // obligation -- a second, misleading refusal standing in front of
+                // the real one.
+                //
+                // This is also the ordering control 6 of `evt_37715knv356yp` asks
+                // for: a layout / recursive-position disagreement refuses *before*
+                // the shared projection is installed, and now before it even
+                // exists.
+                for (slot, position) in case.recursive_positions.iter().rev().copied().enumerate() {
                     match binder_layout.role_at(slot) {
                         CheckedCaseBinderRole::InductionHypothesis { recursive_position }
                             if recursive_position as usize == position => {}
@@ -5767,7 +5844,7 @@ impl<'a> Lowering<'a> {
                             return Err(unsupported(
                                 "ComputationalMatch",
                                 format!(
-                                    "this case's induction-hypothesis prefix is assembling \
+                                    "this case's induction-hypothesis prefix would assemble \
                                      recursive source position {position} at binder slot {slot}, \
                                      where the checked case binder layout says {other:?} belongs; \
                                      the prefix order and its single authority disagree, and a \
@@ -5776,6 +5853,27 @@ impl<'a> Lowering<'a> {
                             ));
                         }
                     }
+                }
+                for field_position in 0..case.argument_binders {
+                    let slot = case.recursive_positions.len() + field_position;
+                    match binder_layout.role_at(slot) {
+                        CheckedCaseBinderRole::ConstructorChild {
+                            field_position: named,
+                        } if named as usize == field_position => {}
+                        other => {
+                            return Err(unsupported(
+                                "ComputationalMatch",
+                                format!(
+                                    "this case would bind constructor source position \
+                                     {field_position} at binder slot {slot}, where the checked \
+                                     case binder layout says {other:?} belongs"
+                                ),
+                            ));
+                        }
+                    }
+                }
+                let field_bindings = self.constructor_field_bindings(&args)?;
+                for position in case.recursive_positions.iter().rev().copied() {
                     // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE
                     // IS HERE, and the claim cannot be made yet.
                     //
@@ -5873,61 +5971,59 @@ impl<'a> Lowering<'a> {
                     // *selected recursive argument*; the hypothesis answers for no
                     // composed causal obligation.
                     //
-                    // **Transport `None`, by construction.** The member is built
-                    // through `construct_static_worker_binding`, which is the sole
-                    // binding constructor and issues no transport. The single
-                    // transport for this field is minted once, in segment 2's
-                    // rebind. Two members over one worker with **one** transport
-                    // between them is what keeps the conservation ledger balanced:
-                    // a consumption of the hypothesis discharges nothing.
-                    //
-                    // ---- WHAT THIS WIRING MEASURED, and where the armed compile
-                    // ---- stops next.
-                    //
-                    // The run assembled below is the ruled one, verified on both
-                    // armed roots by instrumenting it and every exact-`Var` call:
-                    //
-                    // ```text
-                    // env[0] = Worker(body=34, transport=None)      <- this member
-                    // env[1] = Worker(body=34, transport=Some(0))   <- segment 2
-                    // the ONLY exact-Var call in the case body: Var(0)
-                    // ```
-                    //
-                    // ⇒ The armed compile clears this stop and now ends at the
-                    // static-worker field ledger's close, because the body reaches
-                    // its producer through the hypothesis and segment 2's transport
-                    // is never consumed. **That collision between `D6a`'s bind-all
-                    // law and the conservation ledger is stated in full beside the
-                    // close itself**, in `mod.rs`, which is where the next reader
-                    // meets the refusal. It is a mechanism question and is routed,
-                    // not taken here.
-                    let binder = match &args[position] {
-                        // ⛔ EXHAUSTIVE with no wildcard: a future third field kind
+                    // **The transport is the SHARED one, carried across from the
+                    // already-rebound selected-argument binding.** This is the half
+                    // `evt_37715knv356yp` corrected: the hypothesis is not a fresh
+                    // construction that happens to name the same body, it is the
+                    // *same obligation viewed as a callee*, so it must carry the
+                    // same opaque transport, the same recognition/scope provenance,
+                    // and the same closure occurrence, body, arity and ordered
+                    // captures. The first exact-`Var` call through EITHER member
+                    // consumes it; a call through the sibling afterwards is a
+                    // duplicate consumption and refuses at that call; if neither is
+                    // called the close still refuses. `note_consuming_call` remains
+                    // the terminal writer for both.
+                    let binder = match &field_bindings[position] {
+                        // ⛔ EXHAUSTIVE with no wildcard: a future third binding kind
                         // must be a compile error at this binder, forcing a
                         // decision about what it means at a recursive position,
                         // rather than silently taking the ordinary arm.
-                        ConstructorField::StaticWorker { binding, .. } => {
-                            // The SAME joined worker segment 2 will bind: its
-                            // closure occurrence, body, declared arity and ordered
-                            // captures, taken from the field's own binding and not
-                            // re-derived from anything this frame lowered.
-                            let hypothesis = self.construct_static_worker_binding(
-                                binding.closure_origin,
-                                binding.body_origin,
-                                binding.declared_arity,
-                                binding.captures.len(),
-                                binding.captures.clone(),
-                                StaticWorkerCallRoute::RawWorker,
-                                ContinuationDischarge::DirectSpecializationCall,
-                            )?;
-                            LoweringEnvironmentBinding::StaticWorker(hypothesis)
+                        LoweringEnvironmentBinding::StaticWorker(rebound) => {
+                            // ⭐ **Struct update, deliberately, and it is the
+                            // mechanism rather than brevity.** Everything that must
+                            // be preserved is preserved *because it is not
+                            // mentioned* -- transport, closure occurrence, worker
+                            // body, declared arity and ordered captures all come
+                            // across untouched, and a future field added to
+                            // `StaticWorkerBinding` is shared by default rather than
+                            // silently dropped from the hypothesis. Only the two
+                            // facets ruled for the IH are named.
+                            //
+                            // ⛔ Not rebuilt through `construct_static_worker_
+                            // binding`: that constructor issues `transport: None`,
+                            // which is precisely the superseded sub-rule, and
+                            // overwriting its answer afterwards would put a second
+                            // authority on the field the ledger keys.
+                            LoweringEnvironmentBinding::StaticWorker(StaticWorkerBinding {
+                                route: StaticWorkerCallRoute::RawWorker,
+                                discharge: ContinuationDischarge::DirectSpecializationCall,
+                                ..rebound.clone()
+                            })
                         }
-                        ConstructorField::Specialized(value) => {
+                        LoweringEnvironmentBinding::Value(operand) => {
+                            // The ordinary pre-worker population, unchanged. It
+                            // reads the field through the same one binder authority
+                            // the run is assembled from, so there is no second
+                            // reading of `args` here to drift from it.
                             let induction_hypothesis = self.make_computational_recursor(
                                 // ⭐ `AC-C4` clause 1 — the SPECIALIZED caller
                                 // wraps explicitly, so the phase is stated at the
                                 // call site rather than inferred by the callee.
-                                LoweringOperand::Specialized(value.clone()),
+                                LoweringOperand::Specialized(
+                                    operand.clone().specialized_at(
+                                        "a computational recursor's selected recursive argument",
+                                    )?,
+                                ),
                                 eliminator.cases.to_vec(),
                                 eliminator.default.clone(),
                                 eliminator.env.to_vec(),
@@ -5964,19 +6060,25 @@ impl<'a> Lowering<'a> {
                     site: "extend_constructor_fields@composed",
                     eliminated_origin: eliminator.static_origin,
                 });
-                self.extend_constructor_fields(&mut case_env, &args)?;
-                // ---- `D2e` — SEGMENT 2 CHECKED AGAINST THE SAME AUTHORITY.
+                // ⛔ The bindings assembled ABOVE, extended -- not a second call to
+                // `constructor_field_bindings`. A second call would `rebind` every
+                // worker field again, and the close refuses a second transport
+                // standing behind one recognition. `D6a`'s "ALL constructor
+                // arguments in source order" is unchanged: this is the same
+                // source-order vector, and the recursive one is included.
+                case_env.extend(field_bindings);
+                // ---- `D2e` — THE ASSEMBLY CHECKED, not just the plan.
                 //
-                // The prefix check above is per-slot and covers segment 1 only.
-                // This closes the run: every constructor argument must sit at the
-                // slot the layout gives it, and the run must be exactly as long as
-                // the layout says before the frame environment is appended.
-                //
-                // ⛔ **The length check is not redundant with the walk.** The walk
-                // ranges over `argument_binders`; a run that is too LONG passes it
-                // slot by slot and still displaces the frame environment, which is
-                // the `D6a` symptom -- an out-of-range `Var` at the tail, nowhere
-                // near the surplus. Both directions are refused.
+                // ⛔ **Not redundant with the pre-pass above, and the difference is
+                // which object each one is about.** The pre-pass checks the PLAN --
+                // the layout against the case's declared positions, before anything
+                // is minted. This checks what was actually ASSEMBLED. They come
+                // apart if the construction drops or duplicates a member while the
+                // plan was lawful, which is a builder defect rather than a layout
+                // one and is exactly the class `D6a` measured: a run of the wrong
+                // length displaces the frame environment, and the symptom surfaces
+                // as an out-of-range `Var` at the tail rather than at the member
+                // that moved. Both directions -- short and long -- are refused.
                 if case_env.len() != binder_layout.binder_count() {
                     return Err(unsupported(
                         "ComputationalMatch",
@@ -5990,24 +6092,20 @@ impl<'a> Lowering<'a> {
                         ),
                     ));
                 }
-                for field_position in 0..case.argument_binders {
-                    let slot = case.recursive_positions.len() + field_position;
-                    match binder_layout.role_at(slot) {
-                        CheckedCaseBinderRole::ConstructorChild {
-                            field_position: named,
-                        } if named as usize == field_position => {}
-                        other => {
-                            return Err(unsupported(
-                                "ComputationalMatch",
-                                format!(
-                                    "this case bound constructor source position \
-                                     {field_position} at binder slot {slot}, where the checked \
-                                     case binder layout says {other:?} belongs"
-                                ),
-                            ));
-                        }
-                    }
-                }
+                // The assembled run's static-worker members, recorded as the
+                // sharing relation's only observable -- see
+                // `record_r3_run_worker_members`. Taken here, after the whole run
+                // exists and before the frame environment is appended, so a row is
+                // exactly one case's binder run.
+                #[cfg(test)]
+                crate::cranelift_backend::lowering::record_r3_run_worker_members(&case_env);
+                // ⛔ The per-slot constructor-argument walk that used to sit here
+                // moved into the pre-pass above, where it runs before the mint. It
+                // is NOT duplicated down here: the same comparison on the same two
+                // inputs in two places is one check with two chances to drift, and
+                // the earlier position is strictly better because it precedes the
+                // mutation. Only the length check above belongs after assembly,
+                // because only it is about what was built.
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Computational(eliminator),

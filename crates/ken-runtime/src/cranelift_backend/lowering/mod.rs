@@ -6137,6 +6137,52 @@ pub(in crate::cranelift_backend) fn r3_outer_dispatches()
     R3_OUTER_DISPATCHES.with(|cell| cell.borrow().clone())
 }
 
+/// **`D3` — THE SHARING RELATION, one row per assembled composed-eliminator
+/// case run.**
+///
+/// Each row holds that run's static-worker members as
+/// `(binder slot, transport)`. This is the only observable that can state
+/// `evt_37715knv356yp`'s coordinate — *one recognized source field, one
+/// transport, two authorized binder projections* — because the transport
+/// identity is opaque and privately-fielded, so a control cannot forge one and
+/// cannot recover it from anywhere else.
+///
+/// ⛔ Rows, not a flat list. Whether TWO members of ONE run share a transport is
+/// a different question from whether two transports exist in a compile, and a
+/// flattened recording answers only the second.
+#[cfg(test)]
+thread_local! {
+    static R3_RUN_WORKER_MEMBERS: std::cell::RefCell<
+        Vec<Vec<(usize, Option<StaticWorkerTransportId>)>>,
+    > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn record_r3_run_worker_members(
+    run: &[LoweringEnvironmentBinding],
+) {
+    let row: Vec<_> = run
+        .iter()
+        .enumerate()
+        .filter_map(|(slot, binding)| match binding {
+            LoweringEnvironmentBinding::StaticWorker(worker) => Some((slot, worker.transport)),
+            LoweringEnvironmentBinding::Value(_) => None,
+        })
+        .collect();
+    R3_RUN_WORKER_MEMBERS.with(|cell| cell.borrow_mut().push(row));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn r3_run_worker_members()
+-> Vec<Vec<(usize, Option<StaticWorkerTransportId>)>> {
+    R3_RUN_WORKER_MEMBERS.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_r3_run_worker_members() {
+    R3_RUN_WORKER_MEMBERS.with(|cell| cell.borrow_mut().clear());
+}
+
 /// **`D3` — the fused invocations emitted at claims' exact consuming calls.**
 #[cfg(test)]
 thread_local! {
