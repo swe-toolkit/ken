@@ -122,6 +122,47 @@ comment-only entry point to spare it the discriminant.
   if the code moved. A diff that deletes it is a stop.
 - **AC-6 — no new red in CI.** Targeted locally: `-p ken-elaborator`. Never
   `--workspace` on the box.
+- **AC-8 — the overlapping-delimiter rows, with witnesses I measured rather
+  than reported.** Added mid-flight 2026-08-13 from an Adversary pass on
+  `7baa5eb2` (`evt_1tgxxw760tswq`). **Put these in a NEW test function, not
+  into `ac5_prefix_relations_enumerated`** — that keeps `AC-2` clean, since
+  adding rows to an existing control reads too much like amending one.
+
+  **These are run results at `7baa5eb2`, not derivations.** I built a throwaway
+  probe against `Lexer::lex`, captured the token streams, and deleted it.
+
+  | input | measured |
+  |---|---|
+  | `{--}` | REJECT, "unterminated doc block comment", span 0..4 |
+  | `{---}` | REJECT, "unterminated doc block comment", span 0..5 |
+  | `{----}` | ACCEPT, `[Eof]` |
+  | `{----} 1` | ACCEPT, `[Nat(1), Eof]` |
+  | `{-} 1 -}` | **ACCEPT, `[Eof]` — the `1` is silently consumed** |
+
+  ⇒ **`{--}` and `{---}` are openers, and the shortest empty doc block is
+  `{----}`.** A Haskell-literate author writes `{--}` for an empty comment;
+  Ken's `{--`-before-`{-` ordering makes it a doc-block opener instead, and
+  nothing in the code or the tests says so.
+
+  **The existing enumeration runs every collision at EOF only**, which is the
+  one configuration where "where does this comment end" is not being measured —
+  at EOF the answer is always "it doesn't." `{-} 1 -}` is the fail-open twin,
+  and it asserts on the **token stream**, so a silently-consumed span shows up
+  as a missing token rather than as a passing error check.
+
+  > **Do NOT use `{-}` followed by a later `--}` as the fail-open witness.** It
+  > is the obvious fixture and **it errors.** A `{--` partially matches the
+  > `{-` check and increments depth — documented at `lexer.rs:193-201` and
+  > correct — so the later `--}` returns depth to 1 rather than 0 and the file
+  > is rejected as unterminated. **The closer must be a plain `-}`.** Measured:
+  > `"{-}\n1\n{-- d --}\n2\n"` REJECTs with span 0..18.
+
+- **AC-9 — say it where the author will see it.** One clause in
+  `skip_ws_comments`' doc comment recording that `{--}` is an opener and that
+  the shortest empty doc block is `{----}`. **This is worth more than the test
+  rows**, because the surprise lands at authoring time and nobody reads the
+  test file first.
+
 - **AC-7 — an unrelated one-line rider, carried because it is in your crate's
   test surface and does not deserve a node.**
   `tests/lang_foreign_name_control_chars.rs:62-63` is the positive control for
