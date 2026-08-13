@@ -237,8 +237,13 @@ pub enum RExpr {
     RBecomes(usize, String, Box<RExpr>, Span),
     /// Numeric literal (`35 §4.1`).
     RNumLit(NumLit, Span),
-    /// String literal (`37 §2.1`, VAL1-surface).
+    /// String literal (`37 §2.1`, VAL1-surface). Also the raw triple-quoted
+    /// form (`31 §3`).
     RStr(String, Span),
+    /// Character literal (`31 §3`) -- one decoded Unicode scalar.
+    RCharLit(char, Span),
+    /// Byte-string literal (`31 §3`) -- decoded bytes.
+    RByteStr(Vec<u8>, Span),
     /// Infix binary op (`35 §3`); names resolved, operands still unelab'd.
     RBinOp(BinOp, Box<RExpr>, Box<RExpr>, Span),
     /// `match scrut { P₁ => body₁ ; … }` — pattern match (`34 §3`).
@@ -303,6 +308,8 @@ impl RExpr {
             | RExpr::RBecomes(_, _, _, s)
             | RExpr::RNumLit(_, s)
             | RExpr::RStr(_, s)
+            | RExpr::RCharLit(_, s)
+            | RExpr::RByteStr(_, s)
             | RExpr::RPair(_, s)
             | RExpr::RRecord { span: s, .. }
             | RExpr::RProj(_, _, s)
@@ -594,6 +601,8 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EBecomes(..)
         | Expr::ENumLit(..)
         | Expr::EStr(..)
+        | Expr::ECharLit(..)
+        | Expr::EByteStr(..)
         | Expr::EBinOp(..)
         | Expr::EMatch { .. }
         | Expr::EIf { .. }
@@ -1726,6 +1735,8 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
 
         Expr::ENumLit(lit, span) => Ok(RExpr::RNumLit(lit.clone(), span.clone())),
         Expr::EStr(s, span) => Ok(RExpr::RStr(s.clone(), span.clone())),
+        Expr::ECharLit(c, span) => Ok(RExpr::RCharLit(*c, span.clone())),
+        Expr::EByteStr(b, span) => Ok(RExpr::RByteStr(b.clone(), span.clone())),
 
         Expr::EBinOp(op, l, r, span) => {
             let rl = resolve_expr_ctx(scope, l, ctx)?;

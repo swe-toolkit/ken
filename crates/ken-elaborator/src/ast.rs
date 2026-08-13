@@ -610,8 +610,13 @@ pub enum Expr {
     EBecomes(Box<Expr>, Box<Expr>, Span),
     /// Numeric literal (`35 §4.1`).
     ENumLit(NumLit, Span),
-    /// String literal (`37 §2.1`, VAL1-surface).
+    /// String literal (`37 §2.1`, VAL1-surface). Also the raw triple-quoted
+    /// form (`31 §3`) -- both decode to the same `String` value.
     EStr(String, Span),
+    /// Character literal `'…'` (`31 §3`) -- one decoded Unicode scalar.
+    ECharLit(char, Span),
+    /// Byte-string literal `b"…"` (`31 §3`) -- decoded bytes.
+    EByteStr(Vec<u8>, Span),
     /// Infix binary operation (`35 §3`).
     EBinOp(BinOp, Box<Expr>, Box<Expr>, Span),
     /// `match scrut { P₁ => body₁ ; … }` — pattern matching (`34 §3`).
@@ -686,6 +691,8 @@ impl Expr {
             | Expr::EBecomes(_, _, s)
             | Expr::ENumLit(_, s)
             | Expr::EStr(_, s)
+            | Expr::ECharLit(_, s)
+            | Expr::EByteStr(_, s)
             | Expr::EPi(_, _, _, s)
             | Expr::EArrow(_, _, s)
             | Expr::EAttachedProofRef { span: s, .. }

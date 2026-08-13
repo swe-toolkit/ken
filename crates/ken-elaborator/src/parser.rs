@@ -2078,6 +2078,8 @@ impl Parser {
                 | Token::DecimalLit(_, _)
                 | Token::Float32Lit(_)
                 | Token::Str(_)
+                | Token::CharLit(_)
+                | Token::ByteStr(_)
         )
     }
 
@@ -2369,6 +2371,16 @@ impl Parser {
                 self.advance();
                 Ok(Expr::EStr(s, span))
             }
+            Token::CharLit(c) => {
+                let span = self.peek_span().clone();
+                self.advance();
+                Ok(Expr::ECharLit(c, span))
+            }
+            Token::ByteStr(bytes) => {
+                let span = self.peek_span().clone();
+                self.advance();
+                Ok(Expr::EByteStr(bytes, span))
+            }
             Token::DecimalLit(c, e) => {
                 let span = self.peek_span().clone();
                 self.advance();
@@ -2521,6 +2533,8 @@ impl Parser {
                         Expr::EBecomes(cell, value, _) => Expr::EBecomes(cell, value, span),
                         Expr::ENumLit(lit, _) => Expr::ENumLit(lit, span),
                         Expr::EStr(s, _) => Expr::EStr(s, span),
+                        Expr::ECharLit(c, _) => Expr::ECharLit(c, span),
+                        Expr::EByteStr(b, _) => Expr::EByteStr(b, span),
                         Expr::EBinOp(op, l, r, _) => Expr::EBinOp(op, l, r, span),
                         Expr::EMatch {
                             scrut,

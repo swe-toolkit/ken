@@ -84,7 +84,11 @@ pub enum Token {
     LBracket,    // `[`
     RBracket,    // `]`
     Comma,       // `,`
-    Str(String), // `"…"` — symbol name / library name in `foreign` decls
+    Str(String), // `"…"` (escape-decoded) or `"""…"""` (raw) — also carries
+                 // `foreign` decl symbol/library names; one escape repertoire
+                 // for every `Token::Str` consumer (D0, `31 §3`)
+    CharLit(char), // `'…'` — escape-decoded, exactly one Unicode scalar
+    ByteStr(Vec<u8>), // `b"…"` — escape-decoded ASCII body + `\xHH` bytes
     // L1 arithmetic operators
     Plus,        // `+`  — type-directed infix addition
     PlusPercent, // `+%` — explicit wrapping add
@@ -114,6 +118,20 @@ pub enum Token {
     ConId(String), // uppercase-initial base type / constructor
     Nat(u32),      // small non-negative integer (≤ u32::MAX); also a level digit
     Eof,
+}
+
+/// One fully-parsed escape production (`31 §3`), before literal-kind
+/// gating. Shape and value parsing is identical regardless of which literal
+/// kind is scanning; each kind's body-scan function decides which variants
+/// its own repertoire accepts.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum EscapeShape {
+    /// `\\ \" \' \0 \n \r \t` — accepted by every literal kind.
+    Common(char),
+    /// `\u{H…H}` — well-shaped, in-range, non-surrogate scalar.
+    Unicode(char),
+    /// `\xHH` — well-shaped byte.
+    Byte(u8),
 }
 
 pub struct Lexer<'s> {
@@ -158,6 +176,336 @@ impl<'s> Lexer<'s> {
 
     fn is_ascii_ident_continue(c: char) -> bool {
         c.is_ascii_alphanumeric() || c == '_' || c == '\''
+    }
+
+    // ── Literal-escape scanning (`31 §3`, LANG-SURFACE-LITERAL-ESCAPES) ────
+    //
+    // One scanner, one error (`ElabError::InvalidEscape`), one span rule,
+    // shared by every non-raw literal kind (String, Char, byte-string).
+    // `scan_escape` parses a production's SHAPE and VALUE uniformly,
+    // independent of which kind is asking; each kind's body-scan function
+    // gates the returned `EscapeShape` against its own repertoire (the
+    // "wrong-kind, well-shaped escape" case in the seed) and is the only
+    // place that knows what its decoded content means.
+
+    /// Consume one character if it is not the enclosing literal's own
+    /// closing delimiter or a line boundary, returning it so the caller can
+    /// fold it into an escape's error span. Returns `None` at a boundary
+    /// (closing delimiter, `\n`, or EOF) WITHOUT consuming it -- error spans
+    /// exclude the interrupting boundary (`31 §3`).
+    fn consume_escape_offender(&mut self, closing: char) -> Option<char> {
+        match self.cur() {
+            Some(c) if c != closing && c != '\n' => {
+                self.advance();
+                Some(c)
+            }
+            _ => None,
+        }
+    }
+
+    /// Scan one escape production immediately after a consumed backslash.
+    /// `backslash_start` anchors the error span; `closing` is the enclosing
+    /// literal's own delimiter (`"` for String/byte-string, `'` for Char),
+    /// needed only to tell a boundary apart from an ordinary-but-wrong body
+    /// character while scanning `\u{...}`/`\x..`'s interior.
+    fn scan_escape(
+        &mut self,
+        backslash_start: usize,
+        closing: char,
+    ) -> Result<EscapeShape, ElabError> {
+        match self.cur() {
+            Some('\\') => {
+                self.advance();
+                Ok(EscapeShape::Common('\\'))
+            }
+            Some('"') => {
+                self.advance();
+                Ok(EscapeShape::Common('"'))
+            }
+            Some('\'') => {
+                self.advance();
+                Ok(EscapeShape::Common('\''))
+            }
+            Some('0') => {
+                self.advance();
+                Ok(EscapeShape::Common('\0'))
+            }
+            Some('n') => {
+                self.advance();
+                Ok(EscapeShape::Common('\n'))
+            }
+            Some('r') => {
+                self.advance();
+                Ok(EscapeShape::Common('\r'))
+            }
+            Some('t') => {
+                self.advance();
+                Ok(EscapeShape::Common('\t'))
+            }
+            Some('u') => {
+                self.advance(); // consume 'u'
+                if self.cur() != Some('{') {
+                    self.consume_escape_offender(closing);
+                    return Err(
+                        self.invalid_escape(backslash_start, "malformed \\u escape: expected '{'")
+                    );
+                }
+                self.advance(); // consume '{'
+                let mut digits = String::new();
+                loop {
+                    match self.cur() {
+                        Some(c) if c.is_ascii_hexdigit() && digits.len() < 6 => {
+                            self.advance();
+                            digits.push(c);
+                        }
+                        Some(c) if c.is_ascii_hexdigit() => {
+                            self.advance(); // the 7th digit is unambiguously ordinary content
+                            return Err(self.invalid_escape(
+                                backslash_start,
+                                "unicode escape has more than six hex digits",
+                            ));
+                        }
+                        Some('}') if digits.is_empty() => {
+                            self.advance(); // '}' is what reveals the empty escape; include it
+                            return Err(
+                                self.invalid_escape(backslash_start, "empty unicode escape")
+                            );
+                        }
+                        Some('}') => {
+                            self.advance();
+                            let value = u32::from_str_radix(&digits, 16)
+                                .expect("digits is 1-6 ASCII hex chars");
+                            if value > 0x10FFFF || (0xD800..=0xDFFF).contains(&value) {
+                                return Err(self.invalid_escape(
+                                    backslash_start,
+                                    "unicode escape is not a valid scalar value",
+                                ));
+                            }
+                            let ch = char::from_u32(value).expect("range checked above");
+                            return Ok(EscapeShape::Unicode(ch));
+                        }
+                        _ => {
+                            self.consume_escape_offender(closing);
+                            return Err(
+                                self.invalid_escape(backslash_start, "malformed unicode escape")
+                            );
+                        }
+                    }
+                }
+            }
+            Some('x') => {
+                self.advance(); // consume 'x'
+                let Some(d1) = (match self.cur() {
+                    Some(c) if c.is_ascii_hexdigit() => {
+                        self.advance();
+                        Some(c)
+                    }
+                    _ => None,
+                }) else {
+                    self.consume_escape_offender(closing);
+                    return Err(self.invalid_escape(
+                        backslash_start,
+                        "malformed byte escape: expected two hex digits",
+                    ));
+                };
+                let Some(d2) = (match self.cur() {
+                    Some(c) if c.is_ascii_hexdigit() => {
+                        self.advance();
+                        Some(c)
+                    }
+                    _ => None,
+                }) else {
+                    self.consume_escape_offender(closing);
+                    return Err(self.invalid_escape(
+                        backslash_start,
+                        "malformed byte escape: expected two hex digits",
+                    ));
+                };
+                let value = u8::from_str_radix(&format!("{d1}{d2}"), 16)
+                    .expect("d1/d2 are ASCII hex digits");
+                Ok(EscapeShape::Byte(value))
+            }
+            // A line boundary right after the backslash is a BOUNDARY, not a
+            // discriminator to consume -- the enclosing literal's own
+            // closing delimiter is handled above (`\"`/`\'` are valid common
+            // escapes in every kind, so `"`/`'` never reach this arm).
+            Some('\n') => Err(
+                self.invalid_escape(backslash_start, "incomplete escape before line boundary"),
+            ),
+            Some(other) => {
+                self.advance();
+                Err(self.invalid_escape(backslash_start, &format!("unrecognized escape '\\{other}'")))
+            }
+            None => Err(self.invalid_escape(backslash_start, "incomplete escape at end of input")),
+        }
+    }
+
+    fn invalid_escape(&self, backslash_start: usize, reason: &str) -> ElabError {
+        ElabError::InvalidEscape {
+            span: Span::new(backslash_start, self.pos),
+            reason: reason.to_string(),
+        }
+    }
+
+    /// Scan an ordinary escaped string body up to its closing `"`. `start`
+    /// is the position of the OPENING quote (used only for the unterminated-
+    /// literal error's span).
+    fn scan_string_body(&mut self, start: usize) -> Result<String, ElabError> {
+        let mut s = String::new();
+        loop {
+            match self.cur() {
+                None | Some('\n') => {
+                    return Err(ElabError::ParseError {
+                        msg: "unterminated string literal".to_string(),
+                        span: Span::new(start, self.pos),
+                    });
+                }
+                Some('"') => {
+                    self.advance();
+                    return Ok(s);
+                }
+                Some('\\') => {
+                    let backslash_start = self.pos;
+                    self.advance();
+                    match self.scan_escape(backslash_start, '"')? {
+                        EscapeShape::Common(c) | EscapeShape::Unicode(c) => s.push(c),
+                        EscapeShape::Byte(_) => {
+                            return Err(ElabError::InvalidEscape {
+                                span: Span::new(backslash_start, self.pos),
+                                reason: "\\xHH is only valid in a byte string".to_string(),
+                            });
+                        }
+                    }
+                }
+                Some(c) => {
+                    self.advance();
+                    s.push(c);
+                }
+            }
+        }
+    }
+
+    /// Scan a character literal body up to its closing `'`, then enforce the
+    /// exactly-one-scalar cardinality rule (`31 §3`) -- a validity check
+    /// applied AFTER decoding, distinct from `InvalidEscape` and not pinned
+    /// to a specific name/span by the seed.
+    fn scan_char_body(&mut self, start: usize) -> Result<char, ElabError> {
+        let mut s = String::new();
+        loop {
+            match self.cur() {
+                None | Some('\n') => {
+                    return Err(ElabError::ParseError {
+                        msg: "unterminated character literal".to_string(),
+                        span: Span::new(start, self.pos),
+                    });
+                }
+                Some('\'') => {
+                    self.advance();
+                    break;
+                }
+                Some('\\') => {
+                    let backslash_start = self.pos;
+                    self.advance();
+                    match self.scan_escape(backslash_start, '\'')? {
+                        EscapeShape::Common(c) | EscapeShape::Unicode(c) => s.push(c),
+                        EscapeShape::Byte(_) => {
+                            return Err(ElabError::InvalidEscape {
+                                span: Span::new(backslash_start, self.pos),
+                                reason: "\\xHH is only valid in a byte string".to_string(),
+                            });
+                        }
+                    }
+                }
+                Some(c) => {
+                    self.advance();
+                    s.push(c);
+                }
+            }
+        }
+        let mut chars = s.chars();
+        match (chars.next(), chars.next()) {
+            (Some(c), None) => Ok(c),
+            _ => Err(ElabError::ParseError {
+                msg: format!(
+                    "character literal must contain exactly one scalar, found {}",
+                    s.chars().count()
+                ),
+                span: Span::new(start, self.pos),
+            }),
+        }
+    }
+
+    /// Scan a byte-string body up to its closing `"`. Unescaped body
+    /// characters must be ASCII (`31 §3`); a non-ASCII unescaped scalar is a
+    /// distinct, unpinned diagnostic, never implicit UTF-8 encoding.
+    fn scan_byte_string_body(&mut self, start: usize) -> Result<Vec<u8>, ElabError> {
+        let mut bytes = Vec::new();
+        loop {
+            match self.cur() {
+                None | Some('\n') => {
+                    return Err(ElabError::ParseError {
+                        msg: "unterminated byte string literal".to_string(),
+                        span: Span::new(start, self.pos),
+                    });
+                }
+                Some('"') => {
+                    self.advance();
+                    return Ok(bytes);
+                }
+                Some('\\') => {
+                    let backslash_start = self.pos;
+                    self.advance();
+                    match self.scan_escape(backslash_start, '"')? {
+                        EscapeShape::Common(c) => bytes.push(c as u8),
+                        EscapeShape::Byte(b) => bytes.push(b),
+                        EscapeShape::Unicode(_) => {
+                            return Err(ElabError::InvalidEscape {
+                                span: Span::new(backslash_start, self.pos),
+                                reason: "\\u{...} is not valid in a byte string".to_string(),
+                            });
+                        }
+                    }
+                }
+                Some(c) if c.is_ascii() => {
+                    self.advance();
+                    bytes.push(c as u8);
+                }
+                Some(c) => {
+                    let char_start = self.pos;
+                    self.advance();
+                    return Err(ElabError::ParseError {
+                        msg: format!("non-ASCII character '{c}' in byte string literal"),
+                        span: Span::new(char_start, self.pos),
+                    });
+                }
+            }
+        }
+    }
+
+    /// Scan a raw triple-quoted string body up to its closing `"""`. No
+    /// escape processing: a backslash is ordinary content (`31 §3`, D4).
+    fn scan_raw_triple_string_body(&mut self, start: usize) -> Result<String, ElabError> {
+        let mut s = String::new();
+        loop {
+            if self.src[self.pos..].starts_with("\"\"\"") {
+                self.advance();
+                self.advance();
+                self.advance();
+                return Ok(s);
+            }
+            match self.cur() {
+                None => {
+                    return Err(ElabError::ParseError {
+                        msg: "unterminated raw string literal".to_string(),
+                        span: Span::new(start, self.pos),
+                    });
+                }
+                Some(c) => {
+                    self.advance();
+                    s.push(c);
+                }
+            }
+        }
     }
 
     pub fn next_token(&mut self) -> Result<(Token, Span), ElabError> {
@@ -205,28 +553,22 @@ impl<'s> Lexer<'s> {
                 self.advance();
                 return Ok((Token::Comma, Span::new(start, self.pos)));
             }
+            '"' if self.src[self.pos..].starts_with("\"\"\"") => {
+                self.advance();
+                self.advance();
+                self.advance(); // consume opening '"""'
+                let s = self.scan_raw_triple_string_body(start)?;
+                return Ok((Token::Str(s), Span::new(start, self.pos)));
+            }
             '"' => {
                 self.advance(); // consume opening '"'
-                let mut s = String::new();
-                loop {
-                    match self.cur() {
-                        None | Some('\n') => {
-                            return Err(ElabError::ParseError {
-                                msg: "unterminated string literal".to_string(),
-                                span: Span::new(start, self.pos),
-                            });
-                        }
-                        Some('"') => {
-                            self.advance(); // consume closing '"'
-                            break;
-                        }
-                        Some(c) => {
-                            self.advance();
-                            s.push(c);
-                        }
-                    }
-                }
+                let s = self.scan_string_body(start)?;
                 return Ok((Token::Str(s), Span::new(start, self.pos)));
+            }
+            '\'' => {
+                self.advance(); // consume opening '\''
+                let c = self.scan_char_body(start)?;
+                return Ok((Token::CharLit(c), Span::new(start, self.pos)));
             }
             '|' => {
                 self.advance();
@@ -451,6 +793,15 @@ impl<'s> Lexer<'s> {
             }
             if self.src[self.pos..].starts_with("0b") || self.src[self.pos..].starts_with("0B") || self.src[self.pos..].starts_with("0o") || self.src[self.pos..].starts_with("0O") { return self.lex_radix_integer(start); }
             return self.lex_numeric(start);
+        }
+
+        // Byte string `b"…"` (`31 §3`) -- must precede identifier scanning,
+        // since 'b' is otherwise an ordinary lowercase identifier start.
+        if c == 'b' && self.src[self.pos..].starts_with("b\"") {
+            self.advance(); // consume 'b'
+            self.advance(); // consume opening '"'
+            let bytes = self.scan_byte_string_body(start)?;
+            return Ok((Token::ByteStr(bytes), Span::new(start, self.pos)));
         }
 
         // Identifiers and keywords

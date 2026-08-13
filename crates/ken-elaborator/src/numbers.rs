@@ -44,6 +44,12 @@ pub enum NumericLitVal {
     Decimal { coeff: BigInt, exp: i32 },
     /// NFC-normalized UTF-8 string literal (`37 §2.1`, VAL1-surface).
     Str(NfcString),
+    /// Byte-string literal (`31 §3`, LANG-SURFACE-LITERAL-ESCAPES). `Char`
+    /// literals do NOT get their own variant here -- `Char` is `{c : Int |
+    /// isScalar c}` (`decimal_char.rs`), so a Char literal's value is its
+    /// codepoint stored as an ordinary `Int`, reusing every existing
+    /// Int-consuming bridge unchanged.
+    Bytes(Vec<u8>),
 }
 
 // ── dispatch entries ────────────────────────────────────────────────────────

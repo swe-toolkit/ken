@@ -916,6 +916,8 @@ fn rewrite_rexpr(
         ),
         RExpr::RNumLit(l, s) => RExpr::RNumLit(l, s),
         RExpr::RStr(v, s) => RExpr::RStr(v, s),
+        RExpr::RCharLit(c, s) => RExpr::RCharLit(c, s),
+        RExpr::RByteStr(v, s) => RExpr::RByteStr(v, s),
         RExpr::RBinOp(op, l, r, s) => RExpr::RBinOp(
             op,
             Box::new(rewrite_rexpr(scope, exports, *l)?),

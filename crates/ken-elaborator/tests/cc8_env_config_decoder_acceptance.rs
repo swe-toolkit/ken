@@ -91,6 +91,7 @@ fn lit_to_eval(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
             ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
         }
         NumericLitVal::Str(s) => EvalVal::Str(s.clone()),
+        NumericLitVal::Bytes(b) => EvalVal::Bytes(b.clone()),
     }
 }
 

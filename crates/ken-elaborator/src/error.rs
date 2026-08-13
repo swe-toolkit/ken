@@ -41,6 +41,13 @@ pub enum ElabError {
     ParseError { msg: String, span: Span },
     /// A non-ASCII letter appeared where an identifier could begin or continue.
     NonAsciiIdentifierCharacter { character: char, span: Span },
+    /// A backslash committed the lexer to an escape production that is
+    /// unrecognized for its literal kind, malformed in shape, or well-shaped
+    /// with an invalid value (`31 §3`). Takes precedence over the ordinary
+    /// unterminated-literal error once the backslash is consumed. Emits no
+    /// literal token; span starts at the backslash and excludes any
+    /// interrupting delimiter, line boundary, or end of input.
+    InvalidEscape { span: Span, reason: String },
     /// A forbidden documentary name in an anonymous boundary header.
     NamedBoundaryHeader { name: String, span: Span },
     /// A `capabilities` item named no supported effect family.
@@ -240,6 +247,9 @@ impl fmt::Display for ElabError {
                 "non-ASCII identifier character '{}' at {}-{}: identifiers are ASCII-only",
                 character, span.start, span.end,
             ),
+            ElabError::InvalidEscape { span, reason } => {
+                write!(f, "invalid escape at {}-{}: {}", span.start, span.end, reason)
+            }
             ElabError::NamedBoundaryHeader { name, span } => write!(
                 f,
                 "named boundary header at {}-{}: '{}' is forbidden; \
