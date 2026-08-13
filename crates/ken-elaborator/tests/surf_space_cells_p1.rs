@@ -43,6 +43,7 @@ fn literal_value(value: &NumericLitVal, decimal_pair: GlobalId) -> EvalVal {
             ken_interp::decimal_value(decimal_pair, coeff.clone(), *exp)
         }
         NumericLitVal::Str(value) => EvalVal::Str(value.clone()),
+        NumericLitVal::Bytes(value) => EvalVal::Bytes(value.clone()),
     }
 }
 

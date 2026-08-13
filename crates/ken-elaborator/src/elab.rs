@@ -3367,6 +3367,10 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RStr(s, span) => elab_str_lit(cx, s, None, span),
 
+        RExpr::RCharLit(c, span) => elab_char_lit(cx, *c, span),
+
+        RExpr::RByteStr(bytes, span) => elab_bytes_lit(cx, bytes, span),
+
         RExpr::RBinOp(op, lhs, rhs, span) => elab_binop(cx, op, lhs, rhs, span),
 
         RExpr::RMatch {
@@ -3903,6 +3907,56 @@ fn elab_str_lit(
     cx.num_values
         .insert(lit_id, NumericLitVal::Str(crate::NfcString::new(s)));
     Ok((Term::const_(lit_id, vec![]), str_ty))
+}
+
+/// Elaborate a character literal (`31 §3`) -- one decoded Unicode scalar,
+/// already validated by the lexer's cardinality check. `Char` is `{c : Int |
+/// isScalar c}` (`decimal_char.rs`), so the literal's value is its codepoint
+/// stored as an ordinary `NumericLitVal::Int` -- every existing Int-consuming
+/// bridge (evaluation, native codegen) sees it unchanged; only the surface
+/// type is `Char`.
+fn elab_char_lit(cx: &mut ElabCtx, c: char, span: &Span) -> Result<(Term, Term), ElabError> {
+    let char_id = cx
+        .globals
+        .get("Char")
+        .copied()
+        .ok_or_else(|| ElabError::UnresolvedCon {
+            name: "Char".to_owned(),
+            span: span.clone(),
+        })?;
+    let char_ty = Term::const_(char_id, vec![]);
+    let lit_id = declare_primitive(cx.env, vec![], char_ty.clone(), PrimReduction::Literal)
+        .map_err(|e| ElabError::KernelRejected {
+            error: e,
+            span: span.clone(),
+        })?;
+    cx.num_values
+        .insert(lit_id, NumericLitVal::Int(num_bigint::BigInt::from(c as u32)));
+    Ok((Term::const_(lit_id, vec![]), char_ty))
+}
+
+/// Elaborate a byte-string literal (`31 §3`), mirroring `elab_str_lit`
+/// exactly -- `Bytes` is `declare_primitive(OpaqueType)`, same family as
+/// `String`, so an opaque literal typed directly at `Bytes` is the same
+/// mechanism, carrying the decoded byte vector instead of an `NfcString`.
+fn elab_bytes_lit(cx: &mut ElabCtx, bytes: &[u8], span: &Span) -> Result<(Term, Term), ElabError> {
+    let bytes_id = cx
+        .globals
+        .get("Bytes")
+        .copied()
+        .ok_or_else(|| ElabError::UnresolvedCon {
+            name: "Bytes".to_owned(),
+            span: span.clone(),
+        })?;
+    let bytes_ty = Term::const_(bytes_id, vec![]);
+    let lit_id = declare_primitive(cx.env, vec![], bytes_ty.clone(), PrimReduction::Literal)
+        .map_err(|e| ElabError::KernelRejected {
+            error: e,
+            span: span.clone(),
+        })?;
+    cx.num_values
+        .insert(lit_id, NumericLitVal::Bytes(bytes.to_vec()));
+    Ok((Term::const_(lit_id, vec![]), bytes_ty))
 }
 
 /// Returns the default (Val, TypeId) for a literal without an expected type.
@@ -4774,7 +4828,9 @@ fn infer_expr_row_type(
         | RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
-        | RExpr::RStr(_, _) => crate::effects::RowType::empty(),
+        | RExpr::RStr(_, _)
+        | RExpr::RCharLit(_, _)
+        | RExpr::RByteStr(_, _) => crate::effects::RowType::empty(),
         RExpr::RApp(f, a, _) => infer_expr_row_type(f, effect_rows, projection_ctx)
             .join(infer_expr_row_type(a, effect_rows, projection_ctx)),
         RExpr::RLam(_, _, _) | RExpr::RPi(_, _, _, _) | RExpr::RArrow(_, _, _) => {
@@ -6942,7 +6998,9 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         | RExpr::RRecursiveResult { .. }
         | RExpr::RUniv(_, _)
         | RExpr::RNumLit(_, _)
-        | RExpr::RStr(_, _) => false,
+        | RExpr::RStr(_, _)
+        | RExpr::RCharLit(_, _)
+        | RExpr::RByteStr(_, _) => false,
         RExpr::RApp(f, a, _) => rexpr_mentions_name(f, name) || rexpr_mentions_name(a, name),
         RExpr::RLam(_, b, _) => rexpr_mentions_name(b, name),
         RExpr::RLet(_, _, rhs, body, _) => {

@@ -40,6 +40,7 @@ fn eval_view(src: &str) -> EvalVal {
             ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
             }
             NumericLitVal::Str(s) => EvalVal::Str(s.clone()),
+            NumericLitVal::Bytes(b) => EvalVal::Bytes(b.clone()),
         };
         store.num_values.insert(*id, val);
     }

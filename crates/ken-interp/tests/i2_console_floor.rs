@@ -58,6 +58,7 @@ fn eval_store(env: &ConsoleEnv) -> EvalStore {
                 ken_interp::decimal_value(env.elab.prelude_env.mkdecimalpair_id, coeff.clone(), *exp)
             }
             NumericLitVal::Str(value) => EvalVal::Str(value.clone()),
+            NumericLitVal::Bytes(value) => EvalVal::Bytes(value.clone()),
         };
         store.num_values.insert(*id, value);
     }

@@ -40,6 +40,7 @@ fn eval_const(env: &ElabEnv, id: ken_kernel::GlobalId) -> EvalVal {
             ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
             }
             NumericLitVal::Str(value) => EvalVal::Str(value.clone()),
+            NumericLitVal::Bytes(value) => EvalVal::Bytes(value.clone()),
         };
         store.num_values.insert(*literal_id, value);
     }

@@ -447,6 +447,7 @@ fn lit_to_eval(
             ken_interp::decimal_value(mkdecimalpair_id, coeff.clone(), *exp)
         }
         NumericLitVal::Str(s) => ken_interp::EvalVal::Str(s.clone()),
+        NumericLitVal::Bytes(b) => ken_interp::EvalVal::Bytes(b.clone()),
     }
 }
 
