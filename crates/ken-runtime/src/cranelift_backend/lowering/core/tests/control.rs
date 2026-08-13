@@ -4065,6 +4065,202 @@ fn r3_fused_outer_selector_refuses_an_escaped_selected_claim() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the fused capture suffix must be the
+/// claim's exact ordered projection through the real entry ABI.
+///
+/// **MEASURED:** Exact reaches one two-member `claim.inputs()` projection and
+/// one two-member entry-ABI result. Dropping its last projected member,
+/// duplicating its first, swapping its two, or replacing its first with the
+/// second real entry-ABI source reaches the production integrity detector once
+/// and refuses with zero claim consumption and zero fused invocation. ReHomed
+/// reaches the same seam with a measured `(0, 0)` projection and completes
+/// with one consumption and one invocation.
+///
+/// **CLAIMED:** after opaque selection and identity closure, the call's capture
+/// suffix is exactly `claim.inputs()` in source order -- no missing, repeated,
+/// transposed or differently sourced member may reach call emission.
+///
+/// **THE GAP:** the source-derived row reuses another member of Exact's real
+/// entry-ABI projection; it creates no capture authority, claim, ABI operand or
+/// source relation. No governed claim contains a `ProducerLocal` coordinate, so
+/// this control does not manufacture one to widen the population. ReHomed is a
+/// zero-capture comparator and therefore cannot itself discriminate a suffix
+/// mutation; its measured empty projection plus successful affine pair is the
+/// control that keeps that limitation visible.
+///
+/// **Promise class: durable invariant.** The assertion relates the claim's
+/// ordered source authorities to the suffix actually presented at the fused
+/// call, without freezing owner ids, ABI positions, carriers or operand values.
+#[test]
+fn r3_fused_capture_projection_refuses_before_emission() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_capture_projection_mutation, D2fCaptureProjectionMutation,
+        D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fCaptureProjectionMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, Vec<(usize, usize)>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications, populations) =
+            with_d2f_capture_projection_mutation(mutation, || {
+                let _arm = D2fEmitterTestArm::arm();
+                crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                    crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                        "ken-r3-capture-projection",
+                    )
+                    .expect("object module"),
+                    symbol,
+                    cranelift_module::Linkage::Export,
+                    &entry,
+                    &crate::NativeSeedEnvironment::empty(),
+                    declarations,
+                    None,
+                    false,
+                    None,
+                    None,
+                    Some(oriented),
+                )
+                .err()
+            });
+        (
+            error,
+            applications,
+            populations,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("capture suffix")
+                && reason.contains("exact ordered input projection") =>
+            {
+                "capture-integrity refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (mutation, suffix) in [
+        (D2fCaptureProjectionMutation::Exact, "exact"),
+        (D2fCaptureProjectionMutation::DropLast, "dropped"),
+        (D2fCaptureProjectionMutation::DuplicateFirst, "duplicated"),
+        (D2fCaptureProjectionMutation::SwapFirstTwo, "swapped"),
+        (
+            D2fCaptureProjectionMutation::UseSecondSourceForFirst,
+            "source-derived",
+        ),
+    ] {
+        let symbol = format!("ken_r3_capture_projection_exact_{suffix}");
+        let (error, applications, populations, consumptions, invocations) =
+            compile(D2jCause::Exact, mutation, &symbol);
+        rows.push((
+            D2jCause::Exact,
+            mutation,
+            classify(&error),
+            applications,
+            populations,
+            consumptions,
+            invocations,
+        ));
+    }
+    let (error, applications, populations, consumptions, invocations) = compile(
+        D2jCause::ReHomed,
+        D2fCaptureProjectionMutation::Exact,
+        "ken_r3_capture_projection_rehomed_exact",
+    );
+    rows.push((
+        D2jCause::ReHomed,
+        D2fCaptureProjectionMutation::Exact,
+        classify(&error),
+        applications,
+        populations,
+        consumptions,
+        invocations,
+    ));
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::Exact,
+                "completed",
+                0,
+                vec![(2, 2)],
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::DropLast,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::DuplicateFirst,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::SwapFirstTwo,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::UseSecondSourceForFirst,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fCaptureProjectionMutation::Exact,
+                "completed",
+                0,
+                vec![(0, 0)],
+                1,
+                1,
+            ),
+        ],
+        "Exact's real two-capture suffix is accepted only in claim order; every alteration \
+         reaches the independent integrity detector before either affine event, while ReHomed \
+         proves the same seam is a real zero-capture comparator"
+    );
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.

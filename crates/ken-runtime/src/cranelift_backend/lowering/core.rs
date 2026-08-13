@@ -409,6 +409,73 @@ fn fusion_outer_claim_is_outstanding(
     ledger.claim(fusion).is_some()
 }
 
+/// Test-only corruption of the already-projected fused capture suffix.
+///
+/// Every altered member is a real projection through the selected claim and
+/// the current function's entry ABI. No arm constructs an authority or an ABI
+/// operand; the arms only remove, repeat, reorder, or reselect values already
+/// present in that exact projection.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D2fCaptureProjectionMutation {
+    Exact,
+    DropLast,
+    DuplicateFirst,
+    SwapFirstTwo,
+    UseSecondSourceForFirst,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2F_CAPTURE_PROJECTION_MUTATION: std::cell::Cell<D2fCaptureProjectionMutation> =
+        const { std::cell::Cell::new(D2fCaptureProjectionMutation::Exact) };
+    static D2F_CAPTURE_PROJECTION_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+    static D2F_CAPTURE_PROJECTION_POPULATIONS: std::cell::RefCell<Vec<(usize, usize)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Run one compile with a post-projection capture defect. The observed pair is
+/// `(claim inputs, real entry-ABI projections)` before the mutation, so the
+/// control distinguishes Exact's two-member population from ReHomed's empty
+/// comparator independently of whether an alteration can apply.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_d2f_capture_projection_mutation<R>(
+    mutation: D2fCaptureProjectionMutation,
+    run: impl FnOnce() -> R,
+) -> (R, usize, Vec<(usize, usize)>) {
+    struct Restore(D2fCaptureProjectionMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D2F_CAPTURE_PROJECTION_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = D2F_CAPTURE_PROJECTION_MUTATION.with(|cell| cell.replace(mutation));
+    D2F_CAPTURE_PROJECTION_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    D2F_CAPTURE_PROJECTION_POPULATIONS.with(|cell| cell.borrow_mut().clear());
+    let _restore = Restore(previous);
+    let result = run();
+    let applications =
+        D2F_CAPTURE_PROJECTION_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    let populations =
+        D2F_CAPTURE_PROJECTION_POPULATIONS.with(|cell| cell.borrow().clone());
+    (result, applications, populations)
+}
+
+/// The production capture-integrity detector, separate from the test-only
+/// suffix corruption so mutation proof can retain the altered population while
+/// relaxing only this relation.
+fn fusion_capture_projection_is_exact(
+    expected: &[ContinuationSourceSlotAuthority],
+    projected: &[(ContinuationSourceSlotAuthority, LoweringOperand)],
+) -> bool {
+    expected
+        .iter()
+        .eq(projected.iter().map(|(authority, _)| authority))
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -13726,7 +13793,61 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         ),
                     )
                 })?;
-            captures.push(operand);
+            captures.push((input.clone(), operand));
+        }
+        #[cfg(test)]
+        D2F_CAPTURE_PROJECTION_POPULATIONS.with(|cell| {
+            cell.borrow_mut()
+                .push((claim.inputs().len(), captures.len()));
+        });
+        // The population-side control acts only after the exact claim, owner,
+        // consuming Call, worker body, parameter run, target and entry-ABI
+        // sources have all closed. Every arm changes the already-real suffix;
+        // none changes the claim or obtains another source relation.
+        #[cfg(test)]
+        {
+            let mutation = D2F_CAPTURE_PROJECTION_MUTATION.with(std::cell::Cell::get);
+            let applied = match mutation {
+                D2fCaptureProjectionMutation::Exact => false,
+                D2fCaptureProjectionMutation::DropLast => captures.pop().is_some(),
+                D2fCaptureProjectionMutation::DuplicateFirst => {
+                    if let Some(first) = captures.first().cloned() {
+                        captures.insert(0, first);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                D2fCaptureProjectionMutation::SwapFirstTwo => {
+                    if captures.len() >= 2 {
+                        captures.swap(0, 1);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                D2fCaptureProjectionMutation::UseSecondSourceForFirst => {
+                    if captures.len() >= 2 {
+                        captures[0] = captures[1].clone();
+                        true
+                    } else {
+                        false
+                    }
+                }
+            };
+            if applied {
+                D2F_CAPTURE_PROJECTION_MUTATION_APPLICATIONS.with(|cell| {
+                    cell.set(cell.get().saturating_add(1));
+                });
+            }
+        }
+        if !fusion_capture_projection_is_exact(claim.inputs(), &captures) {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "the fused call's capture suffix does not preserve the claim's exact ordered \
+                 input projection; a capture was dropped, duplicated, reordered or read from \
+                 another entry-ABI source",
+            ));
         }
         if captures.len() != target.header.captures as usize {
             return Err(unsupported(
@@ -13754,7 +13875,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // settlement the affine ledger cannot describe — so its position is a
         // requirement, not an oversight, and it must not be "fixed" by moving.
         let mut operands = inputs.to_vec();
-        operands.extend(captures);
+        operands.extend(captures.into_iter().map(|(_, operand)| operand));
         // The post-field control defers THIS exact call after every closure
         // check above, preserving the selected claim, worker binding, ordered
         // ordinary run, capture suffix and declared target. No source walk or
