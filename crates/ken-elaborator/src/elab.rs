@@ -989,6 +989,15 @@ fn check_pair_or_record(
 }
 
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
+    // FRAME BUDGET: this match is reached by every checked expression in
+    // every compile, and in an unoptimized build a new arm's locals are paid
+    // by every call regardless of which arm runs (LANG-RECORD-STACK-OVERFLOW,
+    // b4d38b8a). A wide, fixed-depth recursion elsewhere (register_decimal_char's
+    // 31-level match cascade, unrelated to any arm here) sits close to the
+    // guard page as a result: ~115 KiB of headroom out of a 2 MiB thread
+    // stack remained at the deepest call after that node's repair -- cleared
+    // by inches, not a mile. Keep new arm bodies as a call to a separate
+    // (ideally #[inline(never)]) function; don't build locals inline here.
     match expr {
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
