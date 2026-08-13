@@ -3050,6 +3050,55 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// alternative program. ⇒ Control 2 needs a genuinely different checked body,
 /// authored rather than selected.
 ///
+/// **AUTHORING IT WAS ATTEMPTED, AND IT IS A DEEPER CHANGE THAN IT LOOKS.** A
+/// `SelectedArgumentCall` cause was built as `CallIdentity`'s positive twin —
+/// the identical source rewrite (callee `Var(1)`), but with its oriented plan
+/// derived from its OWN body, which is exactly the treatment that makes
+/// `ProducerArity` a witness rather than a refusal. It compiled, and it still
+/// refuses at the same `"names an in-flight activation"` guard with **no**
+/// binder run recorded — declined upstream just as `CallIdentity` is. The
+/// attempt was reverted rather than left in the tree as a variant that reads
+/// like a working witness.
+///
+/// ⇒ **Plan derivation was not the obstacle, so the remaining one is the CHECKED
+/// STRUCTURE** — and reading the real checker settles what that structure is.
+///
+/// **THE ANSWER, from `ken_elaborator::erasure`, and it makes control 2
+/// EXPRESSIBLE rather than blocked.** `computational_ih_application_spine`
+/// returns `Some` **only when the application head's de Bruijn index maps to a
+/// computational IH slot** (`branch_remap.computational_ih_slot(index)`). A head
+/// naming the *constructor-field* binder has no slot, so the recognizer answers
+/// `None`, no `consume_computational_ih_call` is recorded, and **no
+/// `CheckedComputationalIHInvocation` marker is emitted around that call at
+/// all**.
+///
+/// ⇒ **A lawful selected-argument-consuming body simply HAS NO IH-invocation
+/// marker there**, and both attempts above were self-contradictory by
+/// construction: each kept the marker — which asserts an IH invocation — while
+/// pointing the callee at a binder that is not the hypothesis. That is exactly
+/// the disagreement `CallIdentity` exists to be, which is why deriving the plan
+/// from its own body changed nothing. The *source* still carried a marker the
+/// checker would never have put there.
+///
+/// **This is also precisely why the fixture must come from the real checker**
+/// (Steward scope ruling): hand-building it would have let the marker simply be
+/// deleted here, which **asserts** that the checker omits it instead of
+/// **testing** that it does. The route is the `ken-cli` integration harness that
+/// `px7l_checked_host_recursive_bind` and `px8l_recursive_decl_native` already
+/// establish — real Ken source through the ordinary front end — not another
+/// `D2jCause`. Its entry point is
+/// `ken_cli::build_native_program(source, SourceFormat::Ken, name, &dir)` on an
+/// inline source string, so the witness is authored as Ken and the checked form
+/// is whatever the front end makes of it.
+///
+/// **The shape that source has to reach** is a computational match over a
+/// datatype whose recursive field transports a static worker, with the case body
+/// APPLYING that field rather than the hypothesis. Whether Ken's surface admits
+/// such a program at all is the open question, and if it does not, that is the
+/// result to report — the fixture must not be weakened to make this control
+/// runnable, because a control armed against a shape the checker never emits is
+/// worth less than an honest gap.
+///
 /// **What the same probe DID establish**, on both roots, read directly out of
 /// the recorded run: `[(0, Some(TransportId(0))), (1, Some(TransportId(0)))]` —
 /// the two members carry one transport, which is the ruled coordinate observed
