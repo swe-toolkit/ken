@@ -256,6 +256,106 @@ pub(in crate::cranelift_backend) fn with_d2f_call_build_mutation<R>(
     (result, applications)
 }
 
+/// Test-only reintroduction of the forbidden direct fused call at the outer
+/// realization's post-field seam.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D2fPostFieldDirectCallMutation {
+    Exact,
+    ReintroduceDirectFusionCall,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2F_POST_FIELD_DIRECT_CALL_MUTATION:
+        std::cell::Cell<D2fPostFieldDirectCallMutation> =
+        const { std::cell::Cell::new(D2fPostFieldDirectCallMutation::Exact) };
+    static D2F_POST_FIELD_DIRECT_CALL_SCOPE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static D2F_DEFERRED_POST_FIELD_DIRECT_CALL:
+        std::cell::RefCell<Option<D2fDeferredPostFieldDirectCall>> =
+        const { std::cell::RefCell::new(None) };
+    static D2F_POST_FIELD_DIRECT_CALL_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Run one compile with the post-field route mutation installed. The
+/// application count is recorded only after the real consuming call has been
+/// selected and all of its closure checks have succeeded.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_d2f_post_field_direct_call_mutation<R>(
+    mutation: D2fPostFieldDirectCallMutation,
+    run: impl FnOnce() -> R,
+) -> (R, usize) {
+    struct Restore(D2fPostFieldDirectCallMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D2F_POST_FIELD_DIRECT_CALL_MUTATION.with(|cell| cell.set(self.0));
+            D2F_POST_FIELD_DIRECT_CALL_SCOPE.with(|cell| cell.set(false));
+            D2F_DEFERRED_POST_FIELD_DIRECT_CALL.with(|cell| {
+                cell.borrow_mut().take();
+            });
+        }
+    }
+
+    let previous = D2F_POST_FIELD_DIRECT_CALL_MUTATION.with(|cell| cell.replace(mutation));
+    D2F_POST_FIELD_DIRECT_CALL_SCOPE.with(|cell| cell.set(false));
+    D2F_DEFERRED_POST_FIELD_DIRECT_CALL.with(|cell| {
+        assert!(
+            cell.borrow_mut().take().is_none(),
+            "a prior post-field direct-call mutation left a deferred call behind"
+        );
+    });
+    D2F_POST_FIELD_DIRECT_CALL_APPLICATIONS.with(|cell| cell.set(0));
+    let _restore = Restore(previous);
+    let result = run();
+    let applications = D2F_POST_FIELD_DIRECT_CALL_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+#[cfg(test)]
+struct D2fPostFieldDirectCallScope(bool);
+
+#[cfg(test)]
+impl D2fPostFieldDirectCallScope {
+    fn enter() -> Self {
+        let active = D2F_POST_FIELD_DIRECT_CALL_MUTATION.with(std::cell::Cell::get)
+            == D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall;
+        if active {
+            D2F_POST_FIELD_DIRECT_CALL_SCOPE.with(|cell| {
+                assert!(
+                    !cell.replace(true),
+                    "the post-field direct-call mutation scope cannot nest"
+                );
+            });
+        }
+        Self(active)
+    }
+}
+
+#[cfg(test)]
+impl Drop for D2fPostFieldDirectCallScope {
+    fn drop(&mut self) {
+        if self.0 {
+            D2F_POST_FIELD_DIRECT_CALL_SCOPE.with(|cell| cell.set(false));
+        }
+    }
+}
+
+#[cfg(test)]
+fn d2f_post_field_direct_call_scope_is_active() -> bool {
+    D2F_POST_FIELD_DIRECT_CALL_SCOPE.with(std::cell::Cell::get)
+}
+
+/// The production exclusion. Mutation proof temporarily relaxes only this
+/// predicate while leaving the deferred real call and its population intact.
+#[cfg(test)]
+fn d2f_post_field_direct_call_is_excluded() -> bool {
+    D2F_POST_FIELD_DIRECT_CALL_MUTATION.with(std::cell::Cell::get)
+        == D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -7393,7 +7493,8 @@ impl<'a> Lowering<'a> {
                                     Vec::new(),
                                     static_origin,
                                     None,
-                                )?;
+                                )?
+                                .into_emitted()?;
                                 // `D8p` — the TARGET side, under the same key,
                                 // written only now that the call instruction
                                 // exists and carrying the run it actually took.
@@ -8775,7 +8876,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                                 lowered,
                                                 static_origin,
                                                 None,
-                                            )?;
+                                            )?
+                                            .into_emitted()?;
                                         // `D8p` — the target side, post-instruction.
                                         #[cfg(test)]
                                         if disposition
@@ -10957,6 +11059,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             ContinuationEmissionOwner::Specialization(realization.target()),
             operands.consumer_owner,
         );
+        #[cfg(test)]
+        let post_field_direct_call_scope = D2fPostFieldDirectCallScope::enter();
         let lowered = super::units::lower_continuation_selected_case_body(
             self,
             builder,
@@ -10966,8 +11070,44 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             &operands.continuation_inputs,
             retargeted_worker_body,
         );
+        #[cfg(test)]
+        drop(post_field_direct_call_scope);
         ambient.release(self);
         let lowered = lowered?;
+        // The mutation has walked the exact selected body to its exact
+        // consuming call and brought that call's already-validated target and
+        // operand run back to this post-field seam. Production excludes the
+        // direct call here before either affine event. The code after the guard
+        // is test-only mutation-proof machinery: relaxing only the exclusion
+        // must make the same real call complete without changing its inputs.
+        #[cfg(test)]
+        if let Some(deferred) =
+            D2F_DEFERRED_POST_FIELD_DIRECT_CALL.with(|cell| cell.borrow_mut().take())
+        {
+            if d2f_post_field_direct_call_is_excluded() {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    "a fused invocation was reintroduced directly at the outer realization's \
+                     post-field seam; this seam may lower the selected body locally but may not \
+                     call the fused target or an R specialization",
+                ));
+            }
+            let (returned, _call) = self.call_declared_unit_target(
+                builder,
+                deferred.target,
+                &deferred.operands,
+                None,
+            )?;
+            self.fusion_claims
+                .as_mut()
+                .expect("the deferred call retained its outstanding claim")
+                .consume(deferred.fusion, deferred.seat)?;
+            crate::cranelift_backend::lowering::record_r3_fused_invocation(
+                deferred.fusion,
+                deferred.consuming_call,
+            );
+            return Ok(Some(returned));
+        }
         #[cfg(test)]
         crate::cranelift_backend::lowering::record_r3_outer_dispatch(
             realization.fusion(),
@@ -13196,7 +13336,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         inputs: &[LoweringOperand],
         static_origin: StaticOriginId,
         visited_arguments: Option<&[StaticOriginId]>,
-    ) -> Result<Option<(LoweringOperand, StaticWorkerEmission)>, CraneliftBackendError> {
+    ) -> Result<Option<StaticWorkerCallOutcome>, CraneliftBackendError> {
         let Some(ledger) = self.fusion_claims.as_ref() else {
             return Ok(None);
         };
@@ -13527,6 +13667,36 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // requirement, not an oversight, and it must not be "fixed" by moving.
         let mut operands = inputs.to_vec();
         operands.extend(captures);
+        // The post-field control defers THIS exact call after every closure
+        // check above, preserving the selected claim, worker binding, ordered
+        // ordinary run, capture suffix and declared target. No source walk or
+        // second relation reconstructs it at the outer seam.
+        #[cfg(test)]
+        if d2f_post_field_direct_call_scope_is_active() {
+            let placeholder = inputs
+                .first()
+                .cloned()
+                .expect("the governed fused call has a non-empty ordinary run");
+            D2F_DEFERRED_POST_FIELD_DIRECT_CALL.with(|cell| {
+                let replaced = cell.borrow_mut().replace(D2fDeferredPostFieldDirectCall {
+                    fusion,
+                    seat,
+                    consuming_call: static_origin,
+                    target,
+                    operands,
+                });
+                assert!(
+                    replaced.is_none(),
+                    "one outer selected-body descent may defer only one fused call"
+                );
+            });
+            D2F_POST_FIELD_DIRECT_CALL_APPLICATIONS.with(|cell| {
+                cell.set(cell.get().saturating_add(1));
+            });
+            return Ok(Some(StaticWorkerCallOutcome::DeferredPostField(
+                placeholder,
+            )));
+        }
         // The late-failure control withholds one input only after the exact
         // claim, target, parameter run and capture suffix have all been checked.
         // `call_declared_unit_target` then applies its real descriptor-driven
@@ -13574,7 +13744,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             .consume(fusion, seat)?;
         #[cfg(test)]
         crate::cranelift_backend::lowering::record_r3_fused_invocation(fusion, static_origin);
-        Ok(Some((
+        Ok(Some(StaticWorkerCallOutcome::Emitted(
             returned,
             StaticWorkerEmission {
                 inst: call,
@@ -13624,7 +13794,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             // composed consumption and has no causal obligation to answer for;
             // dropping the handle here is that statement, made where the
             // decision belongs.
-            .map(|(operand, _)| operand)
+            .map(StaticWorkerCallOutcome::into_operand)
     }
 
     /// **The route-selected static-worker emitter, from evaluated arguments
@@ -13641,7 +13811,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // control and cannot report them; the fusion seam then refuses rather
         // than skipping its equality.
         visited_arguments: Option<&[StaticOriginId]>,
-    ) -> Result<(LoweringOperand, StaticWorkerEmission), CraneliftBackendError> {
+    ) -> Result<StaticWorkerCallOutcome, CraneliftBackendError> {
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE FUSED INVOCATION, at
         // ---- the exact checked consuming call. Architect `evt_5edhqyyhw4585`.
         //
@@ -13956,7 +14126,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         } else {
             emission
         };
-        Ok((emitted.0, emission))
+        Ok(StaticWorkerCallOutcome::Emitted(emitted.0, emission))
     }
 
     /// **`D2` -- the binder-lowering helper.** Lowers a `Let`'s bound value

@@ -3759,6 +3759,160 @@ fn r3_fused_late_call_build_refusal_keeps_claim_outstanding() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the fusion-owned outer realization
+/// lowers its selected body locally and never reintroduces a direct fused or R
+/// specialization call at the post-field seam.
+///
+/// **MEASURED:** on both governed roots, the real local selected-body descent
+/// reaches the claim's exact consuming call with its checked worker and ordered
+/// operand run. Deferring only that already-validated call back to the outer
+/// post-field seam reaches the named direct-call exclusion exactly once and
+/// refuses with zero claim consumptions and zero fused invocations. The exact
+/// route completes at one and one.
+///
+/// **CLAIMED:** the R post-field fork is non-calling. It may lower the selected
+/// body locally, but only the exact consuming call reached inside that body may
+/// emit and consume the fused invocation.
+///
+/// **THE GAP:** the mutation preserves the real claim, worker binding, visited
+/// argument run, capture suffix and declared target by moving the completed
+/// call preparation rather than rebuilding it. It does not prove the ordinary
+/// O direct path, which never enters the outer-realization dispatcher and is
+/// intentionally byte-identical.
+///
+/// **Promise class: durable invariant.** The assertion relates the named route
+/// exclusion to the mutation's post-closure application count and both affine
+/// events, without freezing an origin, target, arity or operand value.
+#[test]
+fn r3_fused_post_field_direct_call_reintroduction_refuses_before_emission() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_post_field_direct_call_mutation, D2fEmitterTestArm,
+        D2fPostFieldDirectCallMutation,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fPostFieldDirectCallMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications) = with_d2f_post_field_direct_call_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-post-field-direct-call",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            applications,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("reintroduced directly")
+                && reason.contains("post-field seam") =>
+            {
+                "post-field direct-call refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fPostFieldDirectCallMutation::Exact, "exact"),
+            (
+                D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall,
+                "direct-call",
+            ),
+        ] {
+            let symbol = format!("ken_r3_post_field_direct_call_{prefix}_{suffix}");
+            let (error, applications, consumptions, invocations) =
+                compile(cause, mutation, &symbol);
+            rows.push((
+                cause,
+                mutation,
+                classify(&error),
+                applications,
+                consumptions,
+                invocations,
+            ));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fPostFieldDirectCallMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall,
+                "post-field direct-call refusal",
+                1,
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fPostFieldDirectCallMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall,
+                "post-field direct-call refusal",
+                1,
+                0,
+                0,
+            ),
+        ],
+        "both exact roots consume and invoke once through the consuming Call inside the selected \
+         body; deferring that same prepared call to the forbidden post-field seam reaches the \
+         exclusion once and refuses before either affine event"
+    );
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.
