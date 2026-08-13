@@ -32,6 +32,20 @@ Measured at `origin/main`: **42 `std::env::temp_dir()` call sites** across
 `crates/ken-runtime/src/` and `crates/ken-cli/tests/`, and **`tempfile` is not
 a dependency** of either crate.
 
+> ### THAT COUNT IS ONE AXIS OF TWO. Corrected 2026-08-13, eighth recurrence.
+>
+> `r3_4b_observation_feature_is_native_artifact_identical` keys its scratch on
+> `std::process::id()` under **`CARGO_TARGET_TMPDIR`**, not `temp_dir()`, and
+> removes nothing. It is an artifact-level A/B, so it must not share a Cargo
+> target directory — **each run leaves two full target trees.** Ten accumulated
+> runs were **11G**, taking `/workspaces/ken` to 97% used.
+>
+> ⇒ **A grep for `temp_dir` returns zero hits on the largest leaker in the
+> tree.** Enumerate both axes; the frame's `AC-3` now requires both populations
+> reported separately. `RT-4B-UNIQUENESS-GATE-REACH`'s `AC-9` is a point fix on
+> that one fixture, because its own `AC-6` re-arms the leak by construction —
+> **this node owns the class.**
+
 **Not every site leaks, and the distinction is the scope.** Sites that join a
 **fixed** name — `ken-fs-flip-e2e`, `ken-cli-i1-entrypoint-abi`,
 `ken-rosetta-runner` — reuse one directory across runs and contribute nothing
