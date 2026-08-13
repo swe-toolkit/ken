@@ -11,7 +11,9 @@ use crate::ast::{
     Binder, ConstructorSignatureArg, Decl, ExplicitDataCtor, Expr, MatchArm, PatKind, Pattern, Type,
 };
 use crate::error::{ElabError, Span};
-use crate::lexer::{Lexer, Token};
+use crate::lexer::{
+    classify_comment, BlockCommentForm, CommentKind, Lexer, Token, UnterminatedComment,
+};
 use crate::parser::Parser;
 
 /// A source token together with its original byte span.
@@ -35,6 +37,20 @@ pub enum TriviaKind {
     /// `{-- … --}` (`31 §5`, D2) -- attaches like `DocLineComment`; does not
     /// nest (only the plain block form does).
     DocBlockComment,
+}
+
+/// Widen the shared classifier's comment-only kind to this module's trivia
+/// kind, which also has a non-comment `Whitespace` case the classifier does
+/// not produce.
+impl From<CommentKind> for TriviaKind {
+    fn from(kind: CommentKind) -> Self {
+        match kind {
+            CommentKind::Line => TriviaKind::LineComment,
+            CommentKind::DocLine => TriviaKind::DocLineComment,
+            CommentKind::Block => TriviaKind::BlockComment,
+            CommentKind::DocBlock => TriviaKind::DocBlockComment,
+        }
+    }
 }
 
 impl TriviaKind {
@@ -277,49 +293,54 @@ fn append_trivia(
 ) -> Result<(), ElabError> {
     let mut cursor = start;
     while cursor < end {
-        // Specific before general, exactly matching
-        // `Lexer::skip_ws_comments`'s dispatch order (`31 §5`,
-        // LANG-SURFACE-BLOCK-COMMENTS AC-1): `{--` before `{-`; `---`
-        // (folded into the same `--` scan, since a doc line comment is a
-        // line comment whose text starts with a dash) before `--`.
-        let (kind, next) = if src[cursor..end].starts_with("{--") {
-            (
-                TriviaKind::DocBlockComment,
-                scan_doc_block_comment_end(src, cursor, end)?,
-            )
-        } else if src[cursor..end].starts_with("{-") {
-            (
-                TriviaKind::BlockComment,
-                scan_nested_block_comment_end(src, cursor, end)?,
-            )
-        } else if src[cursor..end].starts_with("---") {
-            let next = src[cursor..end]
-                .find('\n')
-                .map_or(end, |offset| cursor + offset);
-            (TriviaKind::DocLineComment, next)
-        } else if src[cursor..end].starts_with("--") {
-            let next = src[cursor..end]
-                .find('\n')
-                .map_or(end, |offset| cursor + offset);
-            (TriviaKind::LineComment, next)
-        } else {
-            let mut next = cursor;
-            while next < end
-                && !src[next..end].starts_with("--")
-                && !src[next..end].starts_with("{-")
-            {
-                let ch = src[next..end].chars().next().ok_or_else(|| {
-                    ElabError::Internal("trivia cursor was not on a UTF-8 boundary".into())
-                })?;
-                if !ch.is_whitespace() {
-                    return Err(ElabError::Internal(format!(
-                        "non-trivia bytes between lexer tokens at {}",
-                        next
-                    )));
+        // Comment classification and both end-scanners are the shared
+        // `classify_comment` (LANG-COMMENT-CLASSIFIER-SHARED D1/D3), the
+        // same function `Lexer::skip_ws_comments` calls -- the two scanners
+        // cannot disagree about a comment's kind or end by construction.
+        // Whitespace is not a comment arm there, so it stays this caller's
+        // own concern below, along with the totality error it carries.
+        let (kind, next) = match classify_comment(src, cursor, end) {
+            Ok(Some((comment_kind, next))) => (TriviaKind::from(comment_kind), next),
+            Ok(None) => {
+                let mut next = cursor;
+                while next < end
+                    && !src[next..end].starts_with("--")
+                    && !src[next..end].starts_with("{-")
+                {
+                    let ch = src[next..end].chars().next().ok_or_else(|| {
+                        ElabError::Internal("trivia cursor was not on a UTF-8 boundary".into())
+                    })?;
+                    if !ch.is_whitespace() {
+                        return Err(ElabError::Internal(format!(
+                            "non-trivia bytes between lexer tokens at {}",
+                            next
+                        )));
+                    }
+                    next += ch.len_utf8();
                 }
-                next += ch.len_utf8();
+                (TriviaKind::Whitespace, next)
             }
-            (TriviaKind::Whitespace, next)
+            // The classifier's `end` is the boundary `Lexer::skip_ws_comments`
+            // already established as this gap's far edge, so a close that is
+            // not found by `end` is not a normal unterminated-comment case
+            // (the semantic lexer would already have raised that and this
+            // code would never run) but the two scanners disagreeing,
+            // reported as an internal error rather than misattributed to the
+            // user's source.
+            Err(UnterminatedComment {
+                form,
+                start: comment_start,
+            }) => {
+                let form_text = match form {
+                    BlockCommentForm::Block => "block comment",
+                    BlockCommentForm::DocBlock => "doc block comment",
+                };
+                return Err(ElabError::Internal(format!(
+                    "lossless rescan disagrees with the lexer: {} opened at {} is not \
+                     closed by {} (the lexer already accepted this range as trivia)",
+                    form_text, comment_start, end
+                )));
+            }
         };
         if next == cursor {
             return Err(ElabError::Internal(format!(
@@ -340,66 +361,6 @@ fn append_trivia(
         cursor = next;
     }
     Ok(())
-}
-
-/// Rescan `{- … -}` starting at `src[start..]` (already confirmed to begin
-/// with `{-`) and return the byte offset immediately after its matching
-/// close, mirroring `Lexer::skip_nested_block_comment` exactly. Bounded to
-/// `end` -- the position `Lexer::skip_ws_comments` already established as
-/// this gap's far boundary -- so a close that is not found by `end` is not a
-/// normal unterminated-comment case (the semantic lexer would already have
-/// raised that and this code would never run) but the two scanners
-/// disagreeing, reported as an internal error rather than misattributed to
-/// the user's source.
-fn scan_nested_block_comment_end(src: &str, start: usize, end: usize) -> Result<usize, ElabError> {
-    let mut pos = start + 2; // consumed opening '{-'
-    let mut depth: usize = 1;
-    while pos < end {
-        if src[pos..end].starts_with("{-") {
-            pos += 2;
-            depth += 1;
-            continue;
-        }
-        if src[pos..end].starts_with("-}") {
-            pos += 2;
-            depth -= 1;
-            if depth == 0 {
-                return Ok(pos);
-            }
-            continue;
-        }
-        let ch = src[pos..end].chars().next().ok_or_else(|| {
-            ElabError::Internal("trivia cursor was not on a UTF-8 boundary".into())
-        })?;
-        pos += ch.len_utf8();
-    }
-    Err(ElabError::Internal(format!(
-        "lossless rescan disagrees with the lexer: block comment opened at {} is not \
-         closed by {} (the lexer already accepted this range as trivia)",
-        start, end
-    )))
-}
-
-/// Rescan `{-- … --}` starting at `src[start..]` (already confirmed to begin
-/// with `{--`), mirroring `Lexer::skip_doc_block_comment` exactly --
-/// non-nesting, scans for the first literal `--}`. Same `end`-boundary
-/// reasoning as `scan_nested_block_comment_end`.
-fn scan_doc_block_comment_end(src: &str, start: usize, end: usize) -> Result<usize, ElabError> {
-    let mut pos = start + 3; // consumed opening '{--'
-    while pos < end {
-        if src[pos..end].starts_with("--}") {
-            return Ok(pos + 3);
-        }
-        let ch = src[pos..end].chars().next().ok_or_else(|| {
-            ElabError::Internal("trivia cursor was not on a UTF-8 boundary".into())
-        })?;
-        pos += ch.len_utf8();
-    }
-    Err(ElabError::Internal(format!(
-        "lossless rescan disagrees with the lexer: doc block comment opened at {} is not \
-         closed by {} (the lexer already accepted this range as trivia)",
-        start, end
-    )))
 }
 
 fn attach_comments(

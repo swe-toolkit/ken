@@ -279,3 +279,91 @@ fn acd0_bool_literals_and_trueish_preserved() {
         other => panic!("expected UnresolvedCon(\"trueish\"), got {other:?}"),
     }
 }
+
+/// AC-8 (frame amendment, `origin/main=1b2b4326` / PR #2134) -- the
+/// doc-block opener/closer boundary, pinned in a new function; no
+/// predecessor assertion above this one is edited. These characterize
+/// existing semantics only; nothing here changes comment behaviour.
+///
+/// The rows are also LANG-COMMENT-CLASSIFIER-SHARED's AC-4 discriminator:
+/// swapping `{-` ahead of `{--` in the shared classifier makes `{--}` and
+/// `{---}` stop erroring (a bare `{-`-opened block would close on the
+/// trailing `-}` each already contains), which is a stronger, more legible
+/// red than a kind-only divergence -- proven by temporary mutation and
+/// reverted before landing, recorded in the handback rather than kept as a
+/// permanent test.
+#[test]
+fn ac8_doc_block_opener_closer_edge_cases() {
+    // `{--}` -- the doc-block OPENER `{--` plus a bare `}`; `}` alone is
+    // not the doc-block closer `--}`, so this never closes and is
+    // unterminated through EOF.
+    let src = "{--}";
+    match Lexer::lex(src).unwrap_err() {
+        ElabError::ParseError { msg, span } => {
+            assert!(msg.contains("unterminated doc block comment"), "{msg}");
+            assert_eq!((span.start, span.end), (0, src.len()));
+        }
+        other => panic!("{other:?}"),
+    }
+    match parse_lossless(src) {
+        Err(_) => {}
+        Ok(_) => panic!("lossless layer must also reject `{{--}}` as unterminated"),
+    }
+
+    // `{---}` -- opener `{--` plus `-}`, still short of the three-character
+    // closer `--}`; also unterminated through EOF.
+    let src = "{---}";
+    match Lexer::lex(src).unwrap_err() {
+        ElabError::ParseError { msg, span } => {
+            assert!(msg.contains("unterminated doc block comment"), "{msg}");
+            assert_eq!((span.start, span.end), (0, src.len()));
+        }
+        other => panic!("{other:?}"),
+    }
+    match parse_lossless(src) {
+        Err(_) => {}
+        Ok(_) => panic!("lossless layer must also reject `{{---}}` as unterminated"),
+    }
+
+    // `{----}` -- opener `{--` immediately followed by its own closer
+    // `--}`: the shortest possible empty doc block comment.
+    assert_eq!(
+        Lexer::lex("{----}")
+            .unwrap()
+            .into_iter()
+            .map(|(t, _)| t)
+            .collect::<Vec<_>>(),
+        vec![Token::Eof],
+        "{{----}} must be one complete, empty doc block comment"
+    );
+    roundtrip("{----}const t : Int = 1");
+
+    // `{----} 1` -- same empty doc block, followed by ordinary content; the
+    // `1` survives as an ordinary token, unaffected by the (empty)
+    // preceding comment.
+    assert_eq!(
+        Lexer::lex("{----} 1")
+            .unwrap()
+            .into_iter()
+            .map(|(t, _)| t)
+            .collect::<Vec<_>>(),
+        vec![Token::Nat(1), Token::Eof],
+        "{{----}} 1 must leave 1 as an ordinary token"
+    );
+
+    // `{-} 1 -}` -- the fail-open witness. `{-` opens an ORDINARY nested
+    // block comment (not `{--`, since the third character is `}` not `-`);
+    // the bare `}` right after does not close it -- only `-}` does -- so
+    // the comment stays open, silently consuming ` 1 ` as ordinary body
+    // content until the first `-}` at the end. The `1` is therefore absent
+    // from the token stream entirely, not merely "commented around".
+    assert_eq!(
+        Lexer::lex("{-} 1 -}")
+            .unwrap()
+            .into_iter()
+            .map(|(t, _)| t)
+            .collect::<Vec<_>>(),
+        vec![Token::Eof],
+        "{{-}} 1 -}} must consume the 1 as comment body, not leave it as a token"
+    );
+}
