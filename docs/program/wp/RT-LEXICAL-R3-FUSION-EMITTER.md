@@ -391,6 +391,68 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE FORK IS ANSWERED BY REFUSING BOTH OF ITS OPTIONS — the guard moves
+> ### from the EMITTER to the PLANNER as a bijection law. Steward, 2026-08-13,
+> ### recording Architect `evt_7akh94dvqeqap` (durable `cc37116f`).
+>
+> **Branch (b), but explicitly NOT another heuristic** — and (a) was rejected in
+> the terms this frame already anticipated: *"documenting it as unreachable
+> would leave the load-bearing claim in prose. Neither is acceptable."*
+>
+> **THE ACTUAL FINDING, and it is a real hole rather than a re-siting.**
+> `validate_continuation_specialization_closure` today proves key↔unit
+> bijection, unique call tokens, token/target agreement, and surjective
+> reachability of units. **It does NOT prove injectivity of call target: two
+> distinct call tokens may name one unit.** ⇒ the emitter's incoming-domain scan
+> was defending an **invalid planner state, late, with a guard no lawful source
+> can make fail.** The fixtures-first result did not merely show the guard was
+> vacuous — it showed the guard was **at the wrong layer**.
+>
+> **THE REPLACEMENT CONTRACT.** (1) Planner closure makes calls and
+> specialization units **bijective**: no two exact planned calls share a
+> `ContinuationSpecializationId`, and a repeated target **refuses in planner
+> validation** — before generated-context interning, fusion preflight,
+> disposition, declaration, or any lowering mutation. (2) **Target liveness is
+> the outcome of its unique call identity**, settling exactly one of
+> `ComposedCall` or `DirectCall`; **there is no complete-incoming-domain scan in
+> the emitter and no partial-coverage state there.** (3) **Body equality is
+> never liveness authority** — distinct full keys give distinct IDs and distinct
+> call identities even with equal worker body/provenance, so composing one
+> identity cannot suppress a sibling. Do not query body, origin, owner, target
+> coincidence, constructor spelling, or arity. (4) The two ruled composition
+> layers are unchanged.
+>
+> **THE SAME-BODY SIBLING FIXTURE PROBLEM IS DISSOLVED RATHER THAN WAIVED.** It
+> becomes a **planner-level** discriminator: two exact, closure-valid full keys
+> sharing worker body/provenance but differing on one legitimate identity
+> coordinate must intern to distinct units with distinct call identities; mark
+> one composed and one direct, and only the composed unit may leave the
+> executable population. **It need not be a `D2j` source program** — it tests
+> the planner relation directly — **but it must use the exact path, never a
+> coarsening mutation, and must not be described as source reachability.**
+>
+> **THE OWED RESIDUAL-DIRECT-CALLER SOURCE FIXTURE IS REMOVED**, because that
+> state is now **rejected as a planner alias** rather than preserved as lawful
+> execution. **It is explicitly NOT replaced by a comment-only
+> "structurally unreachable" claim.**
+>
+> **THE FIRST BOUNDED UNIT, before any lowering or body change:** strengthen the
+> closure validator with the unique-target law; show Exact and ReHomed stay
+> green at two units / two unique call identities / two unique targets; add a
+> **mutation-backed negative that reaches the new check** — an `OmitProjection`
+> row **whose omitted projection is not present in the call token** is the
+> preferred discriminator, because a mutation that already fails token/target
+> agreement **does not discharge this row**; and keep the duplicate-token
+> refusal separate, since duplicate identity and distinct-identities/same-target
+> are **different defects**.
+>
+> **THE FALSIFIER IS NAMED, which is what makes this rulable without a further
+> round:** if the new bijection check **rejects any current exact lawful
+> fixture**, stop and report that population — **that refutes the ruling's own
+> premise.** If exact planning stays green and the projection-coarsening
+> mutation reds at the new check, the ring **continues to the already-ruled
+> composition relation with no further Architect round.**
+
 > ### THE FIXTURES CANNOT BE BUILT, AND THAT IS THE RESULT — the partition
 > ### guard may be defending a state the planner already makes unreachable.
 > ### Steward, 2026-08-13, recording `evt_1j3h4asztzp7n`. **THE FORK IS THE
