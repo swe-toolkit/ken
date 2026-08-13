@@ -1,15 +1,47 @@
 ---
 id: RT-CONTSRC-FRAME-FINALIZE
 title: "The continuation availability lifecycle stops one stage short -- Stage 1 interns a `ContinuationFrameRequirement` before the context ids that would resolve it are minted, so Stage 2's `ContinuationFrameIdentity` never runs for the five governed rows and the publication gate correctly refuses to publish an unfinalized claim; the storage-independent view both consumers read is designed, typed and landed, it is simply never finalized"
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: none
 depends_on: []
-blocks: [RT-LEXICAL-RECURSOR-CONSUMERS]
+blocks: []
 github: null
 origin: Architect evt_713gsajzg3hmf, ruling on the RT-LEXICAL-RECURSOR-CONSUMERS D2k-1b hard stop routed by the Steward at evt_3547g5q20t0bc. Named by the Architect as the lawful successor and deliberately NOT authorized in passing; scope, ownership and sequencing taken by the Steward 2026-08-13.
 ---
+
+> **CLOSED 2026-08-13 — RESOLVED WITHOUT LANDING. THE PREMISE IS REFUTED BY
+> MEASUREMENT, AND NOTHING IN THIS FILE BELOW THIS BANNER SHOULD BE ACTED ON.**
+>
+> Runtime's D1 probe at base `89050686` measured the opposite of what this node
+> assumes. **Stage 2 already runs and is already correctly sequenced:**
+> Stage-1 requirements are interned in specialization keys, generated context
+> ids are minted after fixed-point closure, and `Planner::finish` calls
+> `finalize_continuation_availability_plan`
+> (`planning/static_transition.rs:1292`, called at `:12174`) **after minting and
+> before either published consumer view.** The exact/drop/duplicate/
+> publication-gate control passes.
+>
+> **And the five governed rows have ZERO `ContinuationInputProjection`s and ZERO
+> `ContinuationFrameRequirement`s.** Row 1: two units, one generated context,
+> unit-input counts `[0, 0]`, context capture `[0]`. Rows 4 at all three depths
+> and row 5: one unit, zero contexts, unit-input count `[0]`. **Stage 2 runs;
+> nothing in these rows is eligible to finalize.**
+>
+> ⇒ **The lifecycle gap is real as a general fact about the type and was never
+> what blocks these five rows.** Their live refusals are the independently named
+> `NativeJoinPlanV1` / `StaticWorkerBinding` walls, exactly as originally
+> reported. `D2k-1b` is not blocked on this node and never was.
+>
+> **How the whole chain went wrong, because it is worth more than the node was:**
+> the picture was assembled from three code sites and their doc comments —
+> including the projection's own comment that *"the context ids that would
+> resolve it are minted after this record is interned"*. That comment is TRUE.
+> It simply never applied to these rows, because they have no such records.
+> **A mechanism picture built from prose needs a probe, not more reading** — and
+> a measured property can be perfectly true without entailing what the mechanism
+> needs. One probe refuted what four agreeing documents supported.
 
 ## What this is
 

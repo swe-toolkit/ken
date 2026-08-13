@@ -1,7 +1,7 @@
 ---
 id: LANG-VIEW-RETIRE
 title: "Operator ruling SURF-1 retired the single definition keyword `view` and split it into `const`/`fn`/`proc`, but the landed elaborator still accepts it -- and `view` is not an alias: it takes an EARLY RETURN out of the bidirectional purity check that `33 §1` calls a hard error, so every definition still spelled `view` has never been checked for the effect discipline the spec requires"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none

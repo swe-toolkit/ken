@@ -1,12 +1,12 @@
 ---
 id: LANG-RECORD-STACK-OVERFLOW
 title: "The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: []
-blocks: [LANG-VIEW-RETIRE]
+blocks: []
 github: null
 origin: Steward measurement 2026-08-13 after publishing 50da348a as PR #2092 and having CI reject it. Refutes the structural argument in Architect evt_1f9z6akt6vrj5 that the change adds "time, not stack". Supersedes the never-released frame LANG-PARSER-DEPTH-HONEST, whose premise (that no stack problem was measured) measurement has overtaken.
 ---
