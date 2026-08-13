@@ -391,10 +391,114 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE FORK IS CLOSED — READING TWO. RUNTIME IS RELEASED. Steward,
+> ### 2026-08-13, recording Architect `evt_6kn9ckdnbf0ph` (durable
+> ### `39ff9d8f`). **THE BOX BELOW IS RESOLVED; READ IT AS HISTORY.**
+>
+> **The falsifier was a false alarm against the mechanism, and the Architect
+> corrected it at the falsifier rather than discounting the measurement.**
+> Runtime executed it exactly as written and proved the test sat on the wrong
+> temporal and semantic axis: it asserted a worker must already appear in a
+> composed call's **declared operand run**, which would require the
+> compiler-only worker to cross the very ABI boundary the mechanism removes.
+> **That falsifier is WITHDRAWN.** The held object contains the planner half
+> only, so the six observed direct calls are the expected pre-emitter order.
+>
+> **Construct 30 is produced by local lowering of the inner composed target's
+> selected body and consumed, with NO ABI crossing, by the outer composed
+> target's existing eliminator.** The worker is an intermediate result
+> *between* two compiler-local steps — it is not an incoming operand of either
+> ordinary call ABI.
+>
+> **CALL 17/37 DOES NOT ENTER `dom(FusionComposedEdge)`.** It has no
+> `ContinuationCallIdentity`, is not a continuation-specialization target, and
+> already carries its authority on `FusionRegionClaim`
+> (`producer_construct_origin`, `producer_argument_origin`,
+> `selected_case_body`, `consuming_call`, `consuming_callee`, `producer_body`,
+> and the exact redirect). The join is
+> `FusionComposedEdge.fusion = FusionRegionClaim.fusion`, validated by preflight
+> as **one fusion-scoped structure, never by origin coincidence.** No new
+> planner relation is authorized. A union edge would erase the distinction
+> between *which call edge is locally composed* and *which checked call consumes
+> the worker produced inside that composition.*
+>
+> **The implementer's discriminator is what closed the fork**, and it was
+> offered as a coordinate with the conclusion withheld — the second time in the
+> same node. Construct 30/26 appears **nowhere** in the unit population; the
+> composed edges are specializations of entirely different producers (36/39,
+> 32/35). Comparing 30 against 36/39 would collapse a call's **input**
+> provenance into its selected body's **output** provenance.
+>
+> #### The local lowering shape — at an exact composed identity, replace ONLY
+> #### the direct-call realization
+>
+> 1. assemble that target specialization's ordinary envelope and ordered
+>    continuation inputs through its existing planner projections;
+> 2. lower that target's exact selected case body **locally**, under the
+>    target's own checked authority;
+> 3. return its phase-bearing `LoweringOperand` directly into the caller's
+>    existing exact eliminator;
+> 4. emit **no** target call, result slot, `emit_result`, `ground_value`, or ABI
+>    conversion for that identity.
+>
+> The inner local result may be the specialized constructor template containing
+> the worker; the outer eliminator destructures it, which is where
+> `constructor_field_bindings` mints the exact transport instance. **This is not
+> source-origin surgery** — construct 30's source body and ownership are
+> unchanged. What relocates is the exact continuation specialization's
+> *lowering*, from a standalone function/result ABI to its exact call edge,
+> which is the mechanism already ruled.
+>
+> #### THE REPLACEMENT FALSIFIER IS POST-IMPLEMENTATION, NOT PRE
+>
+> ```text
+> inner exact composed selected-body completion
+>   -> claim producer construct 30/26 and field 29/25
+>   -> immediate existing outer eliminator
+>   -> exactly one rebind / transport mint
+>   -> exactly one consuming call 17/13
+>   -> checked producer body 37/33
+>   -> closure-free answer
+> ```
+>
+> **If either witness lacks that exact ordered chain — or the specialized
+> template reaches a result slot or `ground_value`, or any worker appears in an
+> ABI operand run, or the consumer is selected by anything other than the claim
+> — STOP AND REVERT before widening the mechanism.** That one would be a real
+> refutation, and it is handed back as a stop, exactly as the last one was.
+>
+> The transport ledger and the fusion-region claim ledger **stay separate**:
+> consuming the worker transport at call 17/13 does not spend the region claim.
+> Redirect and takeover remain the sole redirect and claim-consumption seats.
+>
+> #### THE HOMELESS DELIVERABLE IS HOMED, AND THE RULING MADE IT STRICTER
+>
+> The stale step-5/step-6 stop-comment correction attaches to **this**
+> implementation turn as an independent correction. Its replacement must state
+> the current measured stop **and carry a control or assertion that goes red
+> when that statement ceases to be true.** Narrative-only planning authority is
+> explicitly not acceptable. **That is the point of the item** — a comment
+> nothing can falsify is exactly how this one went stale.
+>
+> #### UNCHANGED, AND UNSHRUNK
+>
+> `P = O ⊎ F`, `F = dom(FusionComposedEdge)`. Ordinary identities `O` keep the
+> byte-identical direct path and every existing ordinary ledger law; fusion-local
+> identities `F` omit only their direct call/target realization and close in the
+> sibling affine composition ledger. Still required: the two layers per fusion,
+> the same-body composed/ordinary discriminator, and the missing, duplicate,
+> replay, cross-fusion, wrong-owner/target, direct-plus-composed and unconsumed
+> negatives. All previously owed selector nets, corrected-seam controls, the
+> inner-slot witness, the self-edge discriminator, route exclusions, ACs and the
+> atomic boundary remain **unshrunk**.
+>
+> **Released to Runtime at `evt_40xt053gtt9md`**, rebasing the held range from
+> `e25ba27d` onto `origin/main` `6d5a2d84`. Unarmed, unrouted, arm last, no
+> partial to QA.
+
 > ### THE RULING'S OWN NAMED FALSIFIER FIRED, BEFORE ANY MUTATION. Steward,
 > ### 2026-08-13, recording Architect `evt_48rwarx25pj2p` and the measurement
-> ### `evt_7a2mymej6y3s6`. **THE MECHANISM QUESTION IS OPEN AND IS THE
-> ### ARCHITECT'S.**
+> ### `evt_7a2mymej6y3s6`. **RESOLVED by the box above — reading two. History.**
 >
 > **SCOPE IS SETTLED: construct 30 STAYS in the R3 atomic object.** The
 > measurements were accepted and the inference drawn from them was not — again.
