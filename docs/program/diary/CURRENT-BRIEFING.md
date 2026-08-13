@@ -38,7 +38,22 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~04:1xZ. R3 partial LANDING as PR #2053.
+> ### RESUME HERE — state at 2026-08-13 ~04:3xZ. **`main` = `f8f853b8`.**
+>
+> **R3 PARTIAL `11177a3c` IS LANDED** — PR #2053, 25 commits, 11 `crates/`
+> files, CI green, blob identity verified on all 11, Adversary notified at
+> `evt_6pyebj76ebv4d`. **The corrected unit is released at `evt_745ke8cg0sxn7`
+> and the implementer is working from `main`.** The WP branch is merged and
+> deleted on origin — a resumed seat must start from `main`, not from a branch.
+>
+> **STILL OFF `main`, and the rule below says land them at a green seam:**
+> `wp/LANG-SURFACE-RECORD-LITERAL` at `8e9baa18` (3 commits, 10 `crates/` files,
+> QA-approved, Language stood down with the operator); `wp/CAT-CAPEX`
+> `31d1efcb` (2 commits, 1 `crates/` file); `wp/LIB-LINEAR-CAUSAL-OBLIGATION-
+> CALCULUS` and `wp/catalog-style-guide` (doc-only).
+> **`50da348a` on the never-merge list is a SUPERSEDED SHA, not a verdict on
+> Language's work — and that list carries NO recorded rationale**, which is
+> itself worth fixing before it is trusted again.
 >
 > > ## STANDING OPERATOR RULE, 2026-08-13 — MERGE TIMING IS MINE
 > >
