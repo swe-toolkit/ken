@@ -54,6 +54,23 @@ seventh is drawn from it.
 out blocked on cross-crate gate expressibility, `REACH` never runs and the
 understated paragraph would sit there permanently.
 
+## Amended 2026-08-13 — a third comment site
+
+A second Adversary finding (`evt_6vk68fj3e90ps`), same root cause and same
+repair shape, folded in before any source read rather than made a node.
+
+`StaticContinuationFusionPlan` derives `PartialEq`/`Eq` and `walked` is
+`#[cfg(test)]`, so **the type's value identity differs between test and non-test
+builds** — "zero production footprint" is true of behaviour and false of
+equality. The A/B at `planning/static_transition.rs:18998-19010` compares a
+plane carrying the enumerator-set `walked` against a synthetic `::default()`
+with `walked == 0`, and its comment says the operand moved "and nothing else"
+and that a refusal is attributable to the carrier.
+
+**No witness today** — the test compares views, headers and slots, not planes.
+It becomes one the moment anyone adds `walked` to what the A/B observes. One
+clause closes it; nothing about the field, the derive or the gating changes.
+
 ## Not this node
 
 - **Changing the instrument.** Recording the input population is a reasonable
