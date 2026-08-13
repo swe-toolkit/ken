@@ -43,6 +43,78 @@ emission region**. Suppressing that fusion must restore the measured refusal —
 that is `AC-3` below, and it is the control that distinguishes a fusion that
 does work from one that is merely present.
 
+> ### GATE 4b IS AUTHORIZED, AND THE OBSERVER ALREADY EXISTS — Steward,
+> ### 2026-08-13, folding Architect `evt_4hpn5331ye325` into operative scope
+>
+> **4b is authorized as its own increment, sequenced AFTER `D2k-1b`.** 4a is
+> positive, repaired and landed; nothing about 4b blocks that slice.
+>
+> **DO NOT BUILD AN OBSERVER. ONE ALREADY SITS AT THE EXACT SITE.** Measured at
+> `origin/main`, `crates/ken-runtime/src/cranelift_backend/lowering/core.rs:2182-2194`
+> — three lines below the seam Runtime proposed — `d2f_gate_note_arrival` already
+> records the 4b population: the fusion plan's `keys` and `descriptors` plus the
+> transition plan's fusion-definition count, at the exact point production
+> computes them. It landed under `D2f`.
+>
+> ⇒ **The Steward's handback premise — "observing 4b is a new seam rather than a
+> wider read of an existing one" — was WRONG, and the Architect measured it
+> rather than accepting it.** 4b does not need a read built. It needs the
+> existing read to be **reachable**.
+>
+> **THE REAL OBSTACLE IS GATE EXPRESSIBILITY ACROSS A CRATE BOUNDARY.**
+> `#[cfg(test)]` is active only when compiling **that crate's own** tests. A
+> control in `ken-elaborator` links `ken-runtime` built **without** `cfg(test)`,
+> so those calls do not exist in its build. And the dependency runs one way:
+> `ken-elaborator/Cargo.toml:13` depends on `ken-runtime`; `ken-runtime` does
+> **not** depend on `ken-elaborator`. **The real-source witness lives above the
+> boundary and the population lives below it, and today nothing holds both.**
+>
+> **AUTHORIZED ENVELOPE — make the EXISTING observation reachable.**
+>
+> - Re-gate the existing `D2f` observation so it can be enabled from outside
+>   `ken-runtime` — off-by-default feature, installable read-only sink, **the
+>   mechanism is yours**; more than one is defensible and you are closer to the
+>   cost.
+> - Drive the existing `D2fGateArrival` census from the **real C2 source**
+>   through the elaborator — the same witness 4a used. **Not a synthetic
+>   fixture.**
+> - **No new production API returning the fusion population**, and **no second
+>   observer** beside the one already there.
+>
+> **HARD CONSTRAINTS.**
+>
+> 1. The gate may control **only the recording** — never plan construction,
+>    never its inputs, never any branch that can change what the plan contains.
+>    **An instrument that alters the thing measures nothing.**
+> 2. **Prove that, do not assert it.** Enabled and disabled, the produced
+>    artifact must be **identical** — the same non-forking discipline ruled for
+>    the 4a equality control, by identity wherever identity is available rather
+>    than by a recomputed comparison.
+> 3. Read the population by **exact identity and path**, never by non-empty
+>    counts — `keys` and `descriptors` matched exactly, as 4a's census does with
+>    `[(0,0,2,0), (1,0,3,1), (2,0,1,0)]`.
+> 4. Still unauthorized: classifier, checker, marker, enumeration,
+>    fusion-candidate, representation, ledger, closure-boundary repair.
+>    Production stays unarmed; gates 5 and 6 stay held.
+>
+> **STOP CONDITIONS — return to the Architect.**
+>
+> - Enabled and disabled compilations produce **different** artifacts. That is a
+>   finding, not something to tune around.
+> - Reaching real source would require `ken-runtime` to depend on
+>   `ken-elaborator`. That is a dependency cycle; stop. **Do not vendor a
+>   checked-package fixture to get around it** — a hand-carried artifact carries
+>   markers the producer would never write, and the control would then be
+>   reading its own authorship.
+>
+> **R3 DOES NOT CLOSE WITHOUT 4b.** State 4a at exactly its own strength: *the
+> compiler produces the checked IH slot/call population and the validated
+> oriented plan, and they arrive at the preparation boundary.* It does **not**
+> establish that the Runtime fusion planner forms the expected population from
+> them — which is what 4b is for and what gates 5-6 lean on. Closing on 4a alone
+> would leave that gap under a "gate 4 complete" heading, and **this arc has
+> already paid twice for a claim written wider than its measurement.**
+
 ## 3. THE TRAP — read this before you plan, it has already cost this work once
 
 > ### `px8j`'s before-hole compile CANNOT carry an oriented plan
