@@ -1,4 +1,4 @@
-# ken federation — moot launch profile. TWO HARNESSES, split 25 / 3.
+# ken federation — moot launch profile. TWO HARNESSES, split 24 / 4.
 #
 # ⚠ THIS HEADER WAS REWRITTEN 2026-07-25 BECAUSE IT DESCRIBED A FLEET THAT NO
 # LONGER EXISTS. The previous version claimed "EVERY role runs DIRECT on the
@@ -9,7 +9,7 @@
 # or `env` block anywhere in this file. Derive wiring from the `[agents.*]`
 # blocks below, never from prose — including this prose.
 #
-# **25 seats — native Codex harness** (`harness = "codex"`, the operator's
+# **24 seats — native Codex harness** (`harness = "codex"`, the operator's
 # ChatGPT/Codex subscription). Two tiers, by role shape rather than by team:
 #   - `gpt-5.6-sol`   — implementers, and the seats that author or audit deeply
 #                       (spec-author, conformance-validator, librarian,
@@ -17,13 +17,24 @@
 #   - `gpt-5.6-terra` — leaders and QA (coordination + verification).
 # Effort is `model_reasoning_effort` on these seats, NOT `effort`.
 #
-# **3 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
+# **4 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
 # steward's cold-start `/login`; these use `effort`, not
-# `model_reasoning_effort`), all on `claude-opus-5[1m]`:
-#   - `steward`             — operator proxy / workflow authority.
-#   - `adversary`           — standing red team.
-#   - `architect`           — reseated from `gpt-5.6-sol` on 2026-08-13 per the
-#                             operator, swapping with `runtime-implementer`.
+# `model_reasoning_effort`). Three on `claude-opus-5[1m]`, one on
+# `claude-sonnet-5` — so this group is NO LONGER uniformly Opus, and you cannot
+# infer a seat's model from its harness:
+#   - `steward`             — operator proxy / workflow authority. Opus.
+#   - `adversary`           — standing red team. Opus.
+#   - `architect`           — Opus; reseated from `gpt-5.6-sol` on 2026-08-13
+#                             per the operator, swapping with
+#                             `runtime-implementer`.
+#   - `language-implementer` — **Sonnet 5**, reseated from `gpt-5.6-sol` on
+#                             2026-08-13. This one is NOT a tier change:
+#                             Sonnet-class is the role's documented T2 tier.
+#                             The reason is a PROVIDER CAPABILITY GAP — the
+#                             OpenAI policy layer refuses stack-depth subjects,
+#                             the refusal fires on the SUBJECT so it re-trips
+#                             rather than clearing, and the node in front of the
+#                             seat is entirely that subject.
 #
 # ⚠ THE 2026-08-13 SWAP. `runtime-implementer` had been on Opus 5 since
 # 2026-07-25 (operator: early results showed it the stronger coding model) and
@@ -192,9 +203,17 @@ startup_prompt = "You lead Ken's Language team. Read agent/COORDINATION.md (fede
 
 [agents.language-implementer]
 display_name = "Language implementer"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "medium"
+# Reseated from `gpt-5.6-sol` to Sonnet 5 on 2026-08-13 per the operator.
+# NOT a tier change — Sonnet-class is this role's documented T2 tier in
+# MODELS.md. The reason is a PROVIDER CAPABILITY GAP, not difficulty: the
+# OpenAI policy layer refuses stack-depth subjects outright ("we take extra
+# caution with cybersecurity requests"), the refusal fires on the SUBJECT so it
+# re-trips rather than clearing on retry, and `LANG-RECORD-STACK-OVERFLOW` is
+# entirely that subject. There is no way to route around it.
+# Claude Code harness, so `effort` — NOT `model_reasoning_effort`, and no
+# `harness` key. Escalate to Opus only on observed misses, never up front.
+model = "claude-sonnet-5"
+effort = "high"
 startup_prompt = "You are the Language team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/language/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.language-qa]
