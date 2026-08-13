@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPT = Path(__file__).with_name("ci-ignored-sweep.py")
@@ -77,7 +78,10 @@ def registry_identities(rows: list[dict[str, str]]) -> set[tuple[str, str, str]]
     identities: set[tuple[str, str, str]] = set()
     for row in rows:
         package, remainder = row["test_path"].split("::", 1)
-        if package == "ken-interp":
+        if package == "ken-interp" or (
+            package == "ken-elaborator"
+            and remainder.startswith("r3_c2_source_mixed_branch::")
+        ):
             binary, test = remainder.split("::", 1)
         else:
             binary, test = "ken_runtime_lib", remainder
@@ -245,15 +249,126 @@ class IgnoredSweepTests(unittest.TestCase):
             with self.assertRaisesRegex(SWEEP.SweepError, "citation roots: spec"):
                 SWEEP.conformance_namespaces(conformance_root)
 
-    def test_checked_in_registry_has_one_cost_and_three_placeholders(self) -> None:
+    def test_workspace_population_comes_from_every_metadata_member(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "crates" / "first"
+            second = root / "tools" / "second"
+            first.mkdir(parents=True)
+            second.mkdir(parents=True)
+            document = {
+                "workspace_members": ["first-id", "second-id"],
+                "packages": [
+                    {
+                        "id": "first-id",
+                        "name": "first",
+                        "manifest_path": str(first / "Cargo.toml"),
+                    },
+                    {
+                        "id": "second-id",
+                        "name": "second",
+                        "manifest_path": str(second / "Cargo.toml"),
+                    },
+                ],
+            }
+
+            self.assertEqual(
+                SWEEP.workspace_packages_from_metadata(document, root),
+                {"first": Path("crates/first"), "second": Path("tools/second")},
+            )
+            document["workspace_members"].append("missing-id")
+            with self.assertRaisesRegex(
+                SWEEP.SweepError, "omitted workspace member packages"
+            ):
+                SWEEP.workspace_packages_from_metadata(document, root)
+
+    def test_source_census_receives_every_workspace_package_path(self) -> None:
+        packages = {
+            "first": Path("crates/first"),
+            "second": Path("tools/second"),
+        }
+        completed = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="", stderr=""
+        )
+        with mock.patch.object(SWEEP.subprocess, "run", return_value=completed) as run:
+            self.assertEqual(SWEEP.ignored_attribute_count(packages), 0)
+
+        command = run.call_args.args[0]
+        self.assertEqual(command[-2:], ["crates/first", "tools/second"])
+        self.assertNotIn("crates/ken-runtime", command)
+
+    def test_blocked_relation_requires_exact_source_reason_agreement(self) -> None:
+        with tempfile.TemporaryDirectory(dir=SWEEP.ROOT) as directory:
+            package_root = Path(directory)
+            source = package_root / "src" / "lib.rs"
+            source.parent.mkdir()
+            source.write_text(
+                "#[test]\n"
+                '#[ignore = "blocked at exact_relation before completion"]\n'
+                "fn blocked_control() {}\n",
+                encoding="utf-8",
+            )
+            rows = [
+                {
+                    "test_path": "fixture::tests::blocked_control",
+                    "class": "blocked-upstream-relation",
+                    "readmission": "exact_relation",
+                }
+            ]
+            relative_root = package_root.relative_to(SWEEP.ROOT)
+
+            self.assertEqual(
+                SWEEP.verify_blocked_upstream_relations(
+                    rows, {"fixture": relative_root}
+                ),
+                1,
+            )
+            rows[0]["readmission"] = "different_relation"
+            with self.assertRaisesRegex(
+                SWEEP.SweepError, "does not name readmission relation"
+            ):
+                SWEEP.verify_blocked_upstream_relations(
+                    rows, {"fixture": relative_root}
+                )
+
+            rows[0]["readmission"] = "exact"
+            with self.assertRaisesRegex(
+                SWEEP.SweepError, "does not name readmission relation"
+            ):
+                SWEEP.verify_blocked_upstream_relations(
+                    rows, {"fixture": relative_root}
+                )
+
+    def test_checked_in_registry_has_all_declared_classes(self) -> None:
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
         classes = [row["class"] for row in rows]
         self.assertEqual(classes.count("policy-cost"), 1)
         self.assertEqual(classes.count("placeholder-no-assertions"), 3)
-        self.assertEqual(len({row["test_path"] for row in rows}), 4)
+        self.assertEqual(classes.count("blocked-upstream-relation"), 2)
+        self.assertEqual(len({row["test_path"] for row in rows}), 6)
         for row in rows:
             if row["class"] == "placeholder-no-assertions":
                 self.assertIn("assert", row["readmission"])
+            if row["class"] == "blocked-upstream-relation":
+                self.assertRegex(
+                    row["readmission"], r"^[A-Za-z][A-Za-z0-9_-]*$"
+                )
+
+    def test_blocked_relation_registry_rejects_non_symbol_readmission(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            registry = Path(directory) / "registry.toml"
+            registry.write_text(
+                "version = 1\n\n"
+                "[[exemption]]\n"
+                'test_path = "fixture::tests::blocked_control"\n'
+                'class = "blocked-upstream-relation"\n'
+                'readmission = "wait for the relation"\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                SWEEP.SweepError, "must be one exact relation symbol"
+            ):
+                SWEEP.load_registry(registry)
 
     def test_filter_is_sweep_local_and_contains_every_registry_identity(self) -> None:
         rows = SWEEP.load_registry(SWEEP.DEFAULT_REGISTRY)
@@ -272,7 +387,10 @@ class IgnoredSweepTests(unittest.TestCase):
         renamed_identities = identities - {cost_identity} | {renamed_identity}
         renamed_expression = SWEEP.filter_expression(rows, renamed_identities)
         self.assertIn("binary(=renamed_lib_target)", renamed_expression)
-        self.assertNotIn(f"binary(={cost_identity[1]})", renamed_expression)
+        self.assertNotIn(
+            f"package(={cost_identity[0]}) & binary(={cost_identity[1]})",
+            renamed_expression,
+        )
 
     def test_registry_resolution_rejects_missing_and_ambiguous_paths(self) -> None:
         row = {
@@ -318,9 +436,9 @@ class IgnoredSweepTests(unittest.TestCase):
             with self.assertRaises(SWEEP.SweepError) as mismatch:
                 SWEEP.verify_lists(all_listing, selected_listing, 46, rows)
             diagnostic = str(mismatch.exception)
-            self.assertIn("source attribute census reports 50 ignored rows", diagnostic)
+            self.assertIn("source attribute census reports 52 ignored rows", diagnostic)
             self.assertIn("2646 total discovered tests", diagnostic)
-            self.assertIn("51 rows matching the ignored-only filter", diagnostic)
+            self.assertIn("53 rows matching the ignored-only filter", diagnostic)
             self.assertIn("ken-runtime::ken-runtime::base_debt_0", diagnostic)
 
             selected_document = json.loads(selected_listing.read_text())
