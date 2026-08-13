@@ -87,8 +87,6 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        outstanding_splice_capabilities: BTreeSet::new(),
-        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -259,8 +257,6 @@ fn run_px8j_malformed_recursor_consumer(
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        outstanding_splice_capabilities: BTreeSet::new(),
-        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -391,7 +387,6 @@ fn run_px8j_malformed_recursor_consumer(
             cursor,
             None,
             None,
-            SegmentComposition::Ordinary,
         ),
     };
     let active = ActiveContinuationFrame {
@@ -463,7 +458,6 @@ fn oriented_dynamic_sibling_fixture() -> (
         ContinuationCursorId(13),
         None,
         None,
-        SegmentComposition::Ordinary,
     );
     segment.dynamic_splice_edges = vec![DynamicSpliceEdgeId(71), DynamicSpliceEdgeId(72)];
     let edges = vec![
@@ -1131,7 +1125,6 @@ fn run_px8j_source_machine_install(
         ContinuationCursorId(20),
         None,
         None,
-        SegmentComposition::Ordinary,
     );
     assert!(!recursor_invocation_is_checked(&invocation));
 
@@ -1339,7 +1332,6 @@ fn oriented_five_control_invocation() -> RecursorInvocationSegment {
         ContinuationCursorId(7),
         None,
         None,
-        SegmentComposition::Ordinary,
     );
     for layer in &mut invocation.unwind.later_wrappers_in_construction_order[..2] {
         layer.checked_invocation_source = Some(InvocationTemplateRef::SameSccCall(999));
@@ -2277,7 +2269,6 @@ fn nested_computational_inner_missing_selects_exact_inner_default() {
     };
     let frames = [
         ComputationalEliminatorFrame {
-            splice_capability: None,
             cases: &inner_cases,
             default: &inner_default,
             env: &[],
@@ -2292,7 +2283,6 @@ fn nested_computational_inner_missing_selects_exact_inner_default() {
             answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
         },
         ComputationalEliminatorFrame {
-            splice_capability: None,
             cases: &outer_cases,
             default: &outer_default,
             env: &[],
@@ -2569,7 +2559,6 @@ fn oriented_test_invocation() -> RecursorInvocationSegment {
         ContinuationCursorId(7),
         None,
         None,
-        SegmentComposition::Ordinary,
     )
 }
 #[test]
@@ -2901,8 +2890,8 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
         let reached = matches!(
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
-                if *construct == "StaticContinuationFusion"
-                    && reason.contains("no dynamic invocation segment consumed")
+                if *construct == "ContinuationSpecialization"
+                    && reason.contains("reached the detached-result seat")
         );
         rows.push((cause, reached));
         // The LAYERS, not a count. A count of one is satisfied by the wrong
@@ -2920,11 +2909,11 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must stop at the fused body's splice-capability closeout: the local \
-         composition lands, the fused body lowers to completion, and no dynamic invocation \
-         segment consumed the capability the splice issued. If this row is red because the stop \
-         MOVED, the comment beside the D2f installer in core.rs is now stale and must be restated \
-         to the new measured stop rather than this assertion being relaxed"
+        "the armed compile must stop at the detached-result seat, on the R (Outer) identity: it \
+         is still projected as a causal call there, and under the ternary partition it must be \
+         realized by the fusion-owned body instead of reaching any call seat. If this row is red \
+         because the stop MOVED, the comment beside the D2f installer in core.rs is now stale and \
+         must be restated to the new measured stop rather than this assertion being relaxed"
     );
     assert_eq!(
         realized,
@@ -4021,7 +4010,6 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
     };
     let frames = [
         ComputationalEliminatorFrame {
-            splice_capability: None,
             cases: &inner_cases,
             default: &inner_default,
             env: &[],
@@ -4036,7 +4024,6 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
             answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
         },
         ComputationalEliminatorFrame {
-            splice_capability: None,
             cases: &outer_cases,
             default: &outer_default,
             env: &[],
@@ -4110,8 +4097,6 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         static_worker_fields: Default::default(),
         fusion_claims: None,
         fused_consumer_authority: None,
-        outstanding_splice_capabilities: BTreeSet::new(),
-        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -9558,7 +9543,6 @@ fn rtfp_segment(
         ContinuationCursorId(7),
         None,
         None,
-        SegmentComposition::Ordinary,
     )
 }
 
@@ -33226,115 +33210,6 @@ fn dp_composition_time_membership_is_validated_and_changes_the_binding_fingerpri
     );
 }
 
-/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — affine selector net 3: the splice
-/// capability is spendable exactly once, and every other way of presenting one
-/// refuses.**
-///
-/// Architect `evt_4g2hmsr8tb3bm` requires that *"missing, escaped, replayed, or
-/// doubly consumed capability must refuse."* Three of those four are properties
-/// of the ledger itself and are pinned here, unarmed.
-///
-/// | row | presented | verdict |
-/// |---|---|---|
-/// | ordinary edge | no capability at all | `Ordinary`, and NOT an error |
-/// | the splice's edge | an outstanding capability | `Composed`, ledger emptied |
-/// | replay / double consume | the same id a second time | refused |
-/// | escaped / forged | an id this ledger never issued | refused |
-///
-/// **Why "no capability" must be a non-error and is asserted as one.** Every
-/// edge in the compile that is not a splice's carries `None`, so a refusal there
-/// would reject every ordinary segment. It is the row most likely to be dropped
-/// as uninteresting and the one whose loss would be loudest.
-///
-/// **Why the replay row cannot be inferred from the escape row.** They differ in
-/// the state that makes them wrong: a replayed id WAS outstanding and was spent,
-/// a forged id never existed. A single `contains` check answers both, which is
-/// exactly why both are asserted — a future issuer that recycled ids would keep
-/// the escape row green and break the replay row.
-///
-/// **The issuer is asserted monotone in the same breath.** Reuse would let a
-/// later issue answer for a spent id, turning a replay into a silent acceptance;
-/// the two fresh ids being distinct is what forecloses that.
-///
-/// **What this does NOT cover, stated rather than implied.** The *unconsumed*
-/// row's refusal lives in the splice's closeout, which needs a function builder
-/// and an armed region. What is pinned here is the state that closeout fires on:
-/// after an issue with no consume the capability is **still spendable**, which
-/// is precisely the leak the closeout refuses. The refusal itself is owed with
-/// the armed nets.
-///
-/// **Promise class: durable invariant.** Affine consumption of a capability:
-/// one spend succeeds, every other presentation refuses. It carries no fixture
-/// literals — the ids come from the issuer under test.
-#[test]
-fn d3_the_splice_capability_is_spendable_exactly_once_and_every_other_presentation_refuses() {
-    let seed_env = NativeSeedEnvironment::empty();
-    let mut lowering = root_authority_test_lowering(&seed_env);
-
-    // An edge with no capability: the common case, and it must be ordinary
-    // rather than an error.
-    let ordinary = lowering.consume_splice_capability(None);
-
-    let first = lowering.issue_splice_capability();
-    let second = lowering.issue_splice_capability();
-    let issuer_is_monotone = first != second;
-
-    // The splice's own edge spends its capability once.
-    let spent = lowering.consume_splice_capability(Some(first));
-    let outstanding_after_spend = lowering.outstanding_splice_capabilities.contains(&first);
-
-    // The same id again: a replay, from a `Copy` of the edge that already spent.
-    let replayed = lowering.consume_splice_capability(Some(first));
-
-    // The state the closeout fires on: `second` was issued and never consumed,
-    // so it is still spendable. That is the leak, observed where it starts.
-    let unconsumed_is_still_spendable = lowering
-        .outstanding_splice_capabilities
-        .contains(&second);
-
-    // An id this ledger never issued. Taken past the issuer's high-water mark so
-    // it cannot collide with anything outstanding.
-    let forged = lowering.consume_splice_capability(Some(
-        crate::cranelift_backend::lowering::SpliceCompositionCapabilityId(u64::MAX),
-    ));
-
-    fn refusal(result: &Result<SegmentComposition, CraneliftBackendError>) -> bool {
-        matches!(
-            result,
-            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
-                if *construct == "StaticContinuationFusion"
-                    && reason.contains("consumed twice, or consumed after its splice closed")
-        )
-    }
-
-    assert_eq!(
-        (
-            ordinary.as_ref().ok().copied(),
-            spent.as_ref().ok().copied(),
-            outstanding_after_spend,
-            refusal(&replayed),
-            refusal(&forged),
-            issuer_is_monotone,
-            unconsumed_is_still_spendable,
-        ),
-        (
-            Some(SegmentComposition::Ordinary),
-            Some(SegmentComposition::Composed),
-            false,
-            true,
-            true,
-            true,
-            true,
-        ),
-        "D3 net 3: an edge with no capability is Ordinary and not an error; the splice's edge \
-         spends its capability once, selects Composed, and leaves nothing outstanding; a replay \
-         of that same id and an id this ledger never issued each refuse with the splice's own \
-         sentence; the issuer never repeats an id, so no later issue can answer for a spent one; \
-         and an issued-but-unconsumed capability remains spendable, which is the leak the \
-         splice's closeout refuses. ordinary={ordinary:?} spent={spent:?} replayed={replayed:?} \
-         forged={forged:?}"
-    );
-}
 
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `AC-D3-SELF` — the recursive self edge's
 /// call site is not its callee body, and on this witness that is the ONLY way

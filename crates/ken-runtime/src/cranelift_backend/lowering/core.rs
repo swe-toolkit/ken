@@ -2264,10 +2264,23 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // asserted here:
     //
     // ```text
-    // Unsupported(StaticContinuationFusion,
-    //   "a fusion-composition splice issued a capability that no dynamic
-    //    invocation segment consumed, ...")
+    // Unsupported(ContinuationSpecialization,
+    //   "a projected causal call reached the detached-result seat with a unit
+    //    result that is not a specialized constructor, ...")
     // ```
+    //
+    // **That is the `R` identity, and it is the next piece rather than a
+    // defect.** Under the ternary partition `P = O ⊎ I ⊎ R` (Architect
+    // `evt_6bm54j10w1n88`) the Outer consumer-binding identity is realized once
+    // by the existing fusion-owned body and region claim and must never reach a
+    // call seat at all. It still reaches this one because the residual-edge
+    // projection has not yet been narrowed to `O`.
+    //
+    // **THE SPLICE-CAPABILITY STOP IS RETIRED WITH ITS MECHANISM**, not moved:
+    // `StaticContinuationFusion: "a fusion-composition splice issued a
+    // capability that no dynamic invocation segment consumed"`. The capability
+    // was minted for a dynamic invocation segment this mechanism does not build,
+    // and its issuance, its closeout and its whole representation are gone.
     //
     // **The local selected-body composition has LANDED and the stop moved
     // forward past every refusal above.** MEASURED on both roots: the inner
@@ -2547,8 +2560,6 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         // region against the population its own install already narrowed.
         fusion_claims: Some(fusion_claims),
         fused_consumer_authority: None,
-        outstanding_splice_capabilities: BTreeSet::new(),
-        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -3300,7 +3311,6 @@ impl<'a> Lowering<'a> {
             producer_env,
             &[EliminatorFrame::Computational(
                 ComputationalEliminatorFrame {
-                    splice_capability: None,
                     cases,
                     default,
                     env: eliminator_env,
@@ -4155,7 +4165,6 @@ impl<'a> Lowering<'a> {
                                 crate::cranelift_backend::lowering::D8mBridgeArm::Computational,
                             );
                             EliminatorFrame::Computational(ComputationalEliminatorFrame {
-                                splice_capability: None,
                                 cases,
                                 default,
                                 env: &[],
@@ -4236,7 +4245,6 @@ impl<'a> Lowering<'a> {
                                 checked
                             };
                             EliminatorFrame::Computational(ComputationalEliminatorFrame {
-                                splice_capability: None,
                                 cases,
                                 default,
                                 env: &[],
@@ -4773,7 +4781,6 @@ impl<'a> Lowering<'a> {
                 let checked = self.checked_computational_frame(inner_cases, inner_default)?;
                 composed.push(EliminatorFrame::Computational(
                     ComputationalEliminatorFrame {
-                        splice_capability: None,
                         cases: inner_cases,
                         default: inner_default,
                         env: producer_env,
@@ -5056,23 +5063,21 @@ impl<'a> Lowering<'a> {
         // marker active and is refused rather than silently emitting.
         self.enter_checked_subcontinuation_frame(checked_frame_id)?;
         let checked = self.checked_computational_frame(cases, default)?;
-        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ISSUE THE AFFINE SPLICE
-        // ---- CAPABILITY, here and nowhere else.
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE SPLICE CAPABILITY IS
+        // ---- RETIRED HERE, NOT RE-SEATED. Architect `evt_6bm54j10w1n88`.
         //
-        // This is the checked fusion-composition splice: the claim's own frame
-        // identity has just been re-entered above, and the edge built below is
-        // the pending semantic edge that identity travels on. The capability is
-        // bound to THAT edge, so the segment which consumes the edge is the
-        // segment the checked plan's composed sequence applies to.
+        // It was minted for a dynamic invocation segment this mechanism does not
+        // build. MEASURED on both armed roots before the ruling: issued on the
+        // Outer/fused frame (continuation origin 10 / 6) with
+        // `checked_invocation_source = None` and depth zero; the only local
+        // composition is the Inner one, under frame 25 / 21; and no
+        // `make_computational_recursor` occurs after the Inner result. No
+        // dynamic segment exists that could lawfully present or consume it.
         //
-        // **It is not an ambient flag and not a counter.** Every other edge in
-        // this same fused body carries `None`, gets `Ordinary`, and is measured
-        // against the ordinary sequence — including the second `[outer]` segment
-        // this body builds, which is the case the previous body-scoped selector
-        // got wrong (Architect `evt_4g2hmsr8tb3bm`).
-        let splice_capability = self.issue_splice_capability();
+        // Consuming it at fusion close to green the assertion, or moving it to
+        // the Inner call seat, each manufactures a receipt for an event that did
+        // not occur. Neither was done.
         let frame = ComputationalEliminatorFrame {
-            splice_capability: Some(splice_capability),
             cases,
             default,
             env: captures,
@@ -5092,33 +5097,11 @@ impl<'a> Lowering<'a> {
             parameters,
             &[EliminatorFrame::Computational(frame)],
         );
-        // ---- `D3` — CLOSE THE CAPABILITY'S SCOPE, on success AND on error.
-        //
-        // Three outcomes, and only one of them is the splice doing its job:
-        //
-        //   - spent, and the descent succeeded: the edge joined a segment and
-        //     that segment holds the receipt. Nothing to do.
-        //   - still outstanding: the splice issued a capability no segment
-        //     consumed, so the composed sequence the plan authored describes a
-        //     construction that never happened. Refused, not swept up — an
-        //     ESCAPED capability is exactly the state that would let a later,
-        //     unrelated edge be measured as composed if the id ever leaked.
-        //   - the descent failed: the capability is withdrawn so it cannot
-        //     outlive its splice, and the original error is what propagates.
-        //     Withdrawal is not consumption and mints no receipt.
-        let outstanding = self
-            .outstanding_splice_capabilities
-            .remove(&splice_capability);
-        match (lowered, outstanding) {
-            (Ok(lowered), false) => Ok(lowered),
-            (Ok(_), true) => Err(unsupported(
-                "StaticContinuationFusion",
-                "a fusion-composition splice issued a capability that no dynamic invocation \
-                 segment consumed, so the checked composed sequence describes a construction this \
-                 body never built",
-            )),
-            (Err(error), _) => Err(error),
-        }
+        // The descent's own result IS the fused body's result. There is no
+        // capability scope to close: the outstanding-capability closeout was
+        // retired with the capability itself, and reinstating either half would
+        // reinstate an obligation nothing in this mechanism can discharge.
+        lowered
     }
 
     fn lower_computational_match_value_composed(
@@ -5660,7 +5643,6 @@ impl<'a> Lowering<'a> {
                         splice_caller,
                         None,
                         None,
-                        eliminator.splice_capability,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
@@ -6263,7 +6245,6 @@ impl<'a> Lowering<'a> {
                         deferred.splice_caller,
                         None,
                         None,
-                        frame.splice_capability,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(
@@ -7634,7 +7615,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             if let LoweringOperand::Carried(word) = &value {
                                 let word = *word;
                                 let frame = ComputationalEliminatorFrame {
-                                    splice_capability: None,
                                     cases: &cases,
                                     default: &default,
                                     env: &env,
@@ -7843,7 +7823,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 }
                             }
                             let frame = ComputationalEliminatorFrame {
-                                splice_capability: None,
                                 cases: &cases,
                                 default: &default,
                                 env: &env,
@@ -7930,7 +7909,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             control.selected_lineage.as_slice(),
                                         )),
                                         None,
-                                        frame.splice_capability,
                                     )?;
                                     #[cfg(test)]
                                     px8j_record_recursor_carrier(
@@ -15032,7 +15010,6 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         splice_caller,
                         None,
                         self.recursive_position_unit_body(eliminator.static_origin, position)?,
-                        eliminator.splice_capability,
                     )?;
                     #[cfg(test)]
                     px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
