@@ -1,7 +1,7 @@
 ---
 id: LANG-FOREIGN-NAME-CONTROL-CHARS
 title: "Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet"
-status: ready
+status: active
 owner: language
 size: XS
 gate: none
