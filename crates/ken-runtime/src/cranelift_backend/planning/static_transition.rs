@@ -16643,7 +16643,9 @@ pub(in crate::cranelift_backend) use tests::contspec_nested_fixture;
 /// `D2f` Deliverable 0 — the shared checked-witness fixture, re-exported so the
 /// full-compile gate consumes the very constructor the planner controls do.
 #[cfg(test)]
-pub(in crate::cranelift_backend) use tests::{D2J_DECLARATION, D2jCause, d2j_checked_fixture_under};
+pub(in crate::cranelift_backend) use tests::{
+    d2j_checked_fixture_under, d2j_installed_plan_under, D2jCause, D2J_DECLARATION,
+};
 
 #[cfg(test)]
 mod tests {
@@ -18512,6 +18514,38 @@ mod tests {
             d2j_declaration_under(cause),
             d2j_oriented_plan_under(cause),
         )
+    }
+
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fully installed planner
+    /// witness for one cause: fusions interned, region claims preflighted,
+    /// fusion-owned bodies installed.**
+    ///
+    /// ⛔ One constructor, so a control outside this module measures the SAME
+    /// installed plan the partition control inside it does. The interning and
+    /// installation steps are module-private, which is what previously forced
+    /// any consumer to be written in here beside them; the alternative was a
+    /// second inline copy of the sequence, and two copies of an installation
+    /// order is exactly how two controls come to disagree about the witness
+    /// they share.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn d2j_installed_plan_under<'src>(
+        cause: D2jCause,
+        entry: &'src RuntimeExpr,
+        declarations: &BTreeMap<&'static str, &'src crate::RuntimeDeclaration>,
+        oriented: &crate::OrientedSubcontinuationPlanV1,
+    ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
+        let _ = cause;
+        let mut plan = plan_static_transition_graph(entry, declarations)?;
+        let resolved =
+            build_static_continuation_fusion_plan(&plan, entry, declarations, Some(oriented))?;
+        let mut plane = StaticContinuationFusionPlan::default();
+        for key in resolved.installed_keys().to_vec() {
+            plane.intern(key)?;
+        }
+        plan.install_static_continuation_fusions(plane)?;
+        let mut claims = FusionRegionClaimLedger::preflight(&plan)?;
+        plan.install_fusion_owned_bodies(&mut claims)?;
+        Ok(plan)
     }
 
     /// Build the plane for one cause: mutated source, correct plan.

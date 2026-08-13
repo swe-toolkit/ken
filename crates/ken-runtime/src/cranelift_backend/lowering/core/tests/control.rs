@@ -33427,3 +33427,190 @@ fn ac_d3_self_the_recursive_edges_call_site_is_separated_from_its_callee_body() 
         claim.redirect().callee_origin()
     );
 }
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local composition
+/// ledger's affine refusals, each reached by its own perturbation.**
+///
+/// **MEASURED:** on the `Exact` and `ReHomed` planner witnesses, with the
+/// fusion plane installed, the ledger plans exactly the two composed edges;
+/// consuming an identity it never planned, one under an owner that is not the
+/// edge's, one against a target the identity does not name, and one twice, are
+/// each refused with that fact's own message; a closeout with a planned member
+/// unconsumed is refused; and the whole-population closeout succeeds only when
+/// every planned member has been consumed and both omission sets equal `F_t`.
+///
+/// **CLAIMED:** `dom(planned) = dom(consumed)` is affine and total, and no half
+/// of it passes for the other.
+///
+/// **THE GAP, and it is two named clauses rather than a hedge.** Two of the
+/// closeout's clauses are **not reachable by any perturbation of this ledger**,
+/// and neither is claimed as measured:
+///
+/// - the per-fusion `{Outer, Inner}` layer law is IMPLIED by the population
+///   equality above it plus the planner's own preflight, which already refuses
+///   a body-owning fusion that does not carry exactly one of each. It is kept
+///   because that implication routes through a law this ledger does not own,
+///   and a redundant refusal naming a silent-wrong-answer path earns its line.
+/// - the cross-ledger disjointness is implied by `claim_exact` refusing an
+///   identity outside `O` — an `F` member cannot enter the ordinary ledger to
+///   be found in both.
+///
+/// **Promise class: durable invariant.** Every assertion is over sets and over
+/// refusal identity, never over a count of edges: this witness plans two, and a
+/// row that said "two" would red the moment a second fusion was installed
+/// without saying anything about affinity.
+#[test]
+fn d3_the_fusion_local_composition_ledger_is_affine_and_total() {
+    use crate::cranelift_backend::lowering::units::{declare_unit_bundle, FusionCompositionLedger};
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, d2j_installed_plan_under, D2jCause, D2J_DECLARATION,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
+
+    for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        // The SAME installed witness the planner-side partition control uses.
+        let plan = d2j_installed_plan_under(cause, &entry, &declarations, &oriented)
+            .expect("the witness installs");
+
+        let mut module = crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+            "ken-d3-composition-ledger",
+        )
+        .expect("object module");
+        let bundle = declare_unit_bundle(&mut module, &plan).expect("bundle declares");
+
+        // The planned population and the fusion-local targets, read from the
+        // planner rather than from the ledger the assertions are about.
+        let planned = plan.fusion_composed_edges().clone();
+        let fused_targets = planned
+            .values()
+            .map(|edge| edge.target())
+            .collect::<BTreeSet<_>>();
+        assert!(
+            !planned.is_empty(),
+            "{cause:?}: the witness must plan at least one composed edge, or every row below \
+             passes vacuously over an empty population"
+        );
+
+        let open = || FusionCompositionLedger::open(&plan, &bundle).expect("ledger opens");
+
+        // ---- The declaration pass actually omitted `F_t`, read from the
+        // bundle it produced rather than from the plan.
+        for target in &fused_targets {
+            assert!(
+                bundle.continuation(*target).is_none(),
+                "{cause:?}: a fusion-local target keeps a declared Function, so its selected body \
+                 would be realized twice"
+            );
+        }
+
+        // ---- Refusal 1: an identity this ledger never planned.
+        //
+        // ⛔ The unplanned identity is a REAL planner-issued ordinary identity,
+        // not a fabricated one. A fabricated key could be refused merely for
+        // being unrecognizable; an ordinary identity is the case the guard
+        // actually has to catch, because it is exactly what a fork that
+        // misrouted `O` into this ledger would present.
+        let ordinary = plan
+            .ordinary_continuation_call_identities()
+            .expect("ordinary identities");
+        if let Some(stranger) = ordinary.iter().next() {
+            let mut ledger = open();
+            let error = ledger
+                .consume(stranger, stranger.emission_owner(), stranger.target())
+                .expect_err("an unplanned identity must be refused");
+            assert!(
+                format!("{error:?}").contains("the planner never composed"),
+                "{cause:?}: {error:?}"
+            );
+        }
+
+        // ---- Refusals 2 and 3: a wrong owner and a wrong target, each named.
+        for (identity, edge) in &planned {
+            let wrong_owner = planned
+                .values()
+                .map(|other| other.emission_owner())
+                .find(|owner| *owner != edge.emission_owner());
+            if let Some(wrong_owner) = wrong_owner {
+                let mut ledger = open();
+                let error = ledger
+                    .consume(identity, wrong_owner, identity.target())
+                    .expect_err("a foreign emission owner must be refused");
+                assert!(
+                    format!("{error:?}").contains("was consumed while defining"),
+                    "{cause:?}: {error:?}"
+                );
+            }
+            let wrong_target = fused_targets.iter().find(|target| **target != edge.target());
+            if let Some(wrong_target) = wrong_target {
+                let mut ledger = open();
+                let error = ledger
+                    .consume(identity, edge.emission_owner(), *wrong_target)
+                    .expect_err("a disagreeing target must be refused");
+                assert!(
+                    format!("{error:?}").contains("was consumed against"),
+                    "{cause:?}: {error:?}"
+                );
+            }
+
+            // ---- Refusal 4: the replay.
+            let mut ledger = open();
+            ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect("the exact consumption is accepted");
+            let error = ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect_err("a second consumption of one identity must be refused");
+            assert!(
+                format!("{error:?}").contains("consumed twice"),
+                "{cause:?}: {error:?}"
+            );
+        }
+
+        // ---- Refusal 5: a planned member left unconsumed. THE case that reads
+        // as success because nothing was emitted for it.
+        let mut ledger = open();
+        for target in &fused_targets {
+            ledger.record_definition_omitted(*target);
+        }
+        let error = ledger
+            .close(&BTreeSet::new())
+            .expect_err("an unrealized composition must be refused at close");
+        assert!(
+            format!("{error:?}").contains("never realized"),
+            "{cause:?}: {error:?}"
+        );
+
+        // ---- Refusal 6: the definition pass did not omit `F_t`.
+        let mut ledger = open();
+        for (identity, edge) in &planned {
+            ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect("consumes");
+        }
+        let error = ledger
+            .close(&BTreeSet::new())
+            .expect_err("a definition pass that omitted nothing must be refused");
+        assert!(
+            format!("{error:?}").contains("definition pass's omitted"),
+            "{cause:?}: {error:?}"
+        );
+
+        // ---- The positive: every planned member consumed, both omission sets
+        // equal to `F_t`, and nothing shared with the ordinary ledger.
+        let mut ledger = open();
+        for (identity, edge) in &planned {
+            ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect("consumes");
+        }
+        for target in &fused_targets {
+            ledger.record_definition_omitted(*target);
+        }
+        ledger
+            .close(&ordinary)
+            .expect("the total, affine, disjoint closeout succeeds");
+    }
+}

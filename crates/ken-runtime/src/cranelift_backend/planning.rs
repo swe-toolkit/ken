@@ -39,7 +39,7 @@ pub(in crate::cranelift_backend) use static_transition::{
 /// `D2f` Deliverable 0 — THE shared checked-witness fixture constructor.
 #[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::{
-    d2j_checked_fixture_under, D2jCause, D2J_DECLARATION,
+    d2j_checked_fixture_under, d2j_installed_plan_under, D2jCause, D2J_DECLARATION,
 };
 pub(super) use static_transition::plan_static_transition_graph_with_symbols;
 #[cfg(test)]
