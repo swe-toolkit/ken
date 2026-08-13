@@ -391,6 +391,69 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE RULING'S OWN NAMED FALSIFIER FIRED, BEFORE ANY MUTATION. Steward,
+> ### 2026-08-13, recording Architect `evt_48rwarx25pj2p` and the measurement
+> ### `evt_7a2mymej6y3s6`. **THE MECHANISM QUESTION IS OPEN AND IS THE
+> ### ARCHITECT'S.**
+>
+> **SCOPE IS SETTLED: construct 30 STAYS in the R3 atomic object.** The
+> measurements were accepted and the inference drawn from them was not — again.
+> Construct 30 and calls 36/39 **name opposite ends of the transport**:
+> construct 30 is the worker-bearing producer value, the opaque
+> `ContinuationCallIdentity` names the exact consumer edge. **Requiring them to
+> coincide would alias producer identity to consumer identity, which this node
+> and `DP` have repeatedly forbidden.** `emit_result` → `ground_value` stays a
+> closed conservation boundary and keeps refusing `StaticWorkerBinding`.
+>
+> **THE COLLISION IS SOLVED WITHOUT TOUCHING THE ENUM.** Do not reuse
+> `ComposedCall`, do not reuse `InlineNoCall`, **do not add a fourth variant** —
+> *"giving it a spelling inside that enum would weaken a proof by
+> classification."* The already-minted `FusionComposedEdge` **is** the
+> disposition authority, and the ordinary ledgers are preserved by **narrowing
+> their input once**: `P = O ⊎ F` by exact set equality and disjointness (never
+> counts), with one plan-authoritative residual accessor feeding candidate/claim
+> opens, declaration, definition, resolution, and the `D8` machinery. **Every
+> landed ordinary law then stays literally true over its own complete domain** —
+> nothing is widened to accept an unevidenced absence. Fusion-local composition
+> gets its own sibling affine ledger.
+>
+> **THE RULING NAMED ITS OWN FALSIFIER, AND IT FIRED ON THE FIRST
+> MEASUREMENT.** *"If neither composed edge receives the exact construct-30
+> transport instance through the direct call's declared operand position/run,
+> stop before mutation and report."* Measured: **no `WORKER(...)` field appears
+> in any operand run anywhere** — and it is stronger than absence. **`rebind`
+> never fires on this compile**, so no `StaticWorkerTransportId` is ever minted;
+> a field enters binding authority only when its constructor is **destructured**,
+> and nothing destructures construct 30. **The ordering forecloses it
+> independently: all six unit calls are emitted before construct 30 is built.**
+>
+> **THE ACTIONABLE HALF: the fusion's own consuming call is NOT in the composed
+> population.** The key names `consuming_call=17`, `consuming_callee=16`,
+> `invocation_callee_entry=37` — and **none of 17/16/37 is a continuation
+> specialization unit.** The call at `callee_origin=37 call_site=17` is an
+> **ordinary unit call**, so it is outside `dom(FusionComposedEdge)` by
+> construction. The transport the chain needs runs **construct 30 → the
+> consuming call at 17/37**, and that consumer is not a composed edge.
+>
+> **THE OPEN QUESTION, and why it could not be answered by measuring harder:**
+> either the composed-edge population should be keyed to **include** the
+> fusion's own consuming call, or **construct 30 is meant to be lowered INSIDE
+> the composed consumer's selected body**, in which case the measured order is
+> the **pre-mechanism state and the falsifier is a false alarm.** **The
+> falsifier measures the CURRENT emission order, and a mechanism that relocates
+> where construct 30 is lowered would change it.** Reading one and reading two
+> cannot be distinguished without building one of them.
+>
+> ### ⚠ THE STALE STOP-COMMENT CORRECTION IS NOW HOMELESS — Steward
+>
+> Clause 6 placed it *"in this implementation turn"*, and **the falsifier fired
+> before any implementation turn existed.** It is therefore pinned to an event
+> that did not happen, which is how a deliverable evaporates. **It remains OWED
+> and UNHOMED: land it with whatever ruling follows.** The defect is real
+> regardless of the mechanism outcome — `core.rs` still names a step-5/step-6
+> stop that the armed compile no longer reaches, and nothing goes red when that
+> becomes false.
+
 > ### THE EMITTER HALF STOPPED AT A GENUINE BOUNDARY — three premises under it
 > ### are refuted, and one of them is a NAME COLLISION WITH LANDED PRODUCTION
 > ### CODE. Steward, 2026-08-13, recording `evt_46ka0eqw5rmrb`. **BOTH
