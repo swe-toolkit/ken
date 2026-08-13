@@ -5746,6 +5746,33 @@ impl<'a> Lowering<'a> {
                         .iter()
                         .position(|candidate| *candidate == position)
                         .and_then(|index| ih_slots[index]);
+                    // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ARMED
+                    // ---- COMPILE STOPS HERE, and it is a MECHANISM BOUNDARY.
+                    //
+                    // MEASURED on both armed roots once the eliminator-role axis
+                    // landed: `args[position]` at the ruled recursive position is
+                    // the producer's compiler-only STATIC WORKER field (origin 29
+                    // on `Exact`, 25 on `ReHomed`), so `specialized_at` below
+                    // refuses -- a worker binding has no value representation.
+                    //
+                    // ⇒ **This seat has no ruled disposition for a recursive
+                    // position whose field transports a worker, and its sibling
+                    // does.** `continuation_case_binder_run` in `units.rs` gives
+                    // that position the compiler-only
+                    // `SelectedRecursiveArgument` member -- a SECOND
+                    // `StaticWorkerBinding` beside the IH, needing no envelope
+                    // operand and no ABI slot. The composed eliminator here
+                    // instead demands an ordinary specialized value.
+                    //
+                    // ⛔ **Do not "fix" this by skipping the position.** `D6a`
+                    // records that this loop once did exactly that: the IH then
+                    // stood in for the argument as well as the hypothesis and
+                    // every later binder shifted down one slot. The cheap-looking
+                    // option is the one already measured as a defect.
+                    //
+                    // The choice between mirroring the specialization path's
+                    // two-member treatment and something else is a mechanism
+                    // decision, and it is routed rather than taken here.
                     let induction_hypothesis = self.make_computational_recursor(
                         // ⭐ `AC-C4` clause 1 — the SPECIALIZED caller wraps
                         // explicitly, so the phase is stated at the call site
