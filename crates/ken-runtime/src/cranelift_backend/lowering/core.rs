@@ -12764,7 +12764,19 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             ));
         }
 
-        // ---- THE ACTION. All fallible validation is above.
+        // ---- THE ACTION.
+        //
+        // ⚠ **This comment previously read "all fallible validation is above",
+        // and that was FALSE** — `consume` below is fallible, and no reading of
+        // the code makes it otherwise. Adversary finding on `555642ba`.
+        //
+        // The true statement is narrower and is the one that matters:
+        // **everything HOISTABLE is above the action, and the one check whose
+        // answer can only change AS A RESULT of the action is below, where it
+        // must be.** Consumption is that check. Hoisting it would settle the
+        // claim for a call that had not been built, which is exactly the partial
+        // settlement the affine ledger cannot describe — so its position is a
+        // requirement, not an oversight, and it must not be "fixed" by moving.
         let mut operands = inputs.to_vec();
         operands.extend(captures);
         let (returned, call) = self.call_declared_unit_target(
@@ -12776,6 +12788,23 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         )?;
         // The claim is consumed ONLY after the call was accepted. A failed build
         // above leaves it outstanding with no partial settlement.
+        //
+        // ⚠ **`seat` here is `claim.seat()`, so the ledger's own seat guard is
+        // VACUOUS on this caller** — a second adversary finding, and the
+        // coordinate read it turns on is now settled rather than assumed:
+        // `FusionRegionClaim::seat()` is `redirect.call_site_origin()`, which is
+        // **not** `consuming_call`. Measured on both roots: seat 37 / 33 against
+        // consuming call 17 / 13.
+        //
+        // ⇒ **The parameter is therefore NOT collapsed**, because the two
+        // coordinates being distinct is exactly what leaves room for the guard
+        // to become a real cross-check. But it cannot become one *here*: the
+        // only origin this seat holds independently of the claim is
+        // `static_origin`, which by the selector above IS the consuming call, so
+        // passing it would refuse every lawful consumption. Every other source —
+        // `unit_calls`, `target.call_site_origin` — is keyed by the seat and is
+        // circular. **Reported rather than papered over; the derivation that
+        // would make this a live check does not exist at either caller today.**
         self.fusion_claims
             .as_mut()
             .expect("the ledger was present at the borrow above")
