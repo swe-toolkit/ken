@@ -7,6 +7,18 @@
 (feature), `766c9f07` (attempted repair), `8e9baa18` (inert control). Fixed
 inputs below were measured at `main` = `cbe58725`.
 
+> **DELIVERED — merged as PR #2098 at `b4d38b8a`, together with the record
+> literal surface itself.** This frame is historical. The dispatch-frame repair
+> landed in `elab.rs`, and the depth fixture at
+> `crates/ken-cli/tests/record_literal_parser_depth.rs` was rebuilt to use Ken's
+> real `|->` token rather than the `=>` that made the original fixture die in
+> the lexer before it reached depth one.
+>
+> **The node's `status:` sat at `ready` for hours after it merged**, and on
+> 2026-08-13 the Steward read that stale status and kicked Language onto
+> already-finished work. The language leader caught it. **A node status is not
+> evidence about the tree — check whether the work landed.**
+
 ## The witness, and it already exists
 
 ```
@@ -103,22 +115,30 @@ coverage. If you fix it, report the depth actually reached; **do not tune
   trampolining). Stop and report the finding with its size — that is a Steward
   cut, not something to absorb.
 
-## Seating — READ BEFORE ASSIGNING
+## Seating — RESOLVED 2026-08-13, the blocker is gone
 
-**The current `language-implementer` seat (`gpt-5.6-sol`, OpenAI-backed) cannot
-work this node.** Its provider's policy layer refuses stack-depth subjects
-outright — *"we take extra caution with cybersecurity requests"* — and the
-refusal fires on the **subject**, so it re-trips rather than clearing on retry.
-Retrying is prohibited.
+**This section previously said the seat could not work this node. That is no
+longer true, and the reseat happened FOR this node.**
 
-**The whole node is that subject**, so unlike the earlier framing there is no
-way to route around it. The seating disposition is an operator call because it
-moves a seat between credit pools; the language leader escalated it rather than
-burning turns, which is correct.
+The former `language-implementer` seat (`gpt-5.6-sol`, OpenAI-backed) could not
+work it: the provider's policy layer refused stack-depth subjects outright
+(*"we take extra caution with cybersecurity requests"*), the refusal fired on
+the **subject** rather than the phrasing, and the whole node is that subject —
+so it re-tripped rather than clearing on retry, and there was no way to route
+around it.
+
+**The operator reseated `language-implementer` to Sonnet 5 on 2026-08-13
+(PR #2094).** That is **not** a tier change — Sonnet-class is this role's
+documented T2 tier in `agent/MODELS.md`. The reason was a provider capability
+gap, not task difficulty. **The seat can work this node; proceed normally.**
 
 ## Contention
 
-`crates/ken-elaborator/src/parser.rs`. **`LANG-VIEW-RETIRE` touches the same
-file and is sequenced after this**, on one implementer lane. No Runtime
-contention on the source, but the *witness* is Runtime's test — do not modify
-it.
+`crates/ken-elaborator/src/parser.rs`. **`LANG-VIEW-RETIRE` merged first**
+(PR #2103) and touched the same file, so **re-derive your base from current
+`origin/main` rather than from this frame's measured SHAs** — `DefKeyword::View`,
+`Token::KwView`, `expect_legacy_view_name` and the `check_surface_purity` early
+return no longer exist, and `view` now lexes as an ordinary identifier.
+
+One implementer lane. No Runtime contention on the source, but the *witness* is
+Runtime's test — do not modify it.

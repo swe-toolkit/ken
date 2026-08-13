@@ -1,7 +1,7 @@
 ---
 id: LANG-SURFACE-RECORD-LITERAL
 title: "`33 §2` names record literals `{ x = 1, y = 2 }`, punning `{ x, y }` and functional update `{ p | y = 3 }` as having their expected definitional behaviour, and none of the three parses -- expression-position `{` has no arm in `parse_atom_expr_base` at all, so the brace fork the sibling frame warned about does not exist here: refinement braces live in `parse_type`, which is a separate parser"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none

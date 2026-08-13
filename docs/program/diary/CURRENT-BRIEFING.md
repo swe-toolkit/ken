@@ -62,92 +62,85 @@
 >
 > Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~16:1xZ. **`main` = `d1fb2763`.**
-> **I hold nothing. No publisher. BOTH RINGS ARE WORKING — do not kick either.**
+> ### RESUME HERE — state at 2026-08-13 ~17:0xZ. **`main` = `89050686`.**
+> **I hold nothing except a publisher on the spec erratum. BOTH RINGS ARE WORKING — do not kick either.**
 >
-> **Runtime — GATE 4b**, started 2026-08-13 ~16:1xZ.
+> **Runtime — `RT-CONTSRC-FRAME-FINALIZE`**, kicked at anchor `evt_5mazfrtngffvg`.
+> Finish the two-stage continuation availability lifecycle so Stage 2 runs for
+> the five governed rows. **`D2k-1b` stays parked until it lands.**
 >
-> **`D2k-1b` IS PARKED AT A HARD STOP, PENDING AN ARCHITECT RULING**
-> (`evt_3547g5q20t0bc`). No candidate, no source change. Runtime measured that
-> all five governed rows **split the required operands across two Cranelift
-> `Function`s** — `define_unit_bodies` has `finish_source_constructor` and the
-> pending outer static-Match eliminator but no `StaticWorker` binding;
-> `define_continuation_bodies` has the recognized worker environment but no
-> pending outer Match suffix; `ContinuationInputProjection` supplies provenance
-> and owners, not a value or pending-consumer expression. Every join they can
-> see needs something a frame forbids.
+> **Language — `LANG-SURFACE-LITERAL-ESCAPES`**, kicked at anchor
+> `evt_1geg939by8h4r`. The lexer does no escape processing at all; I verified
+> that against `origin/main` before sending it.
 >
-> ⚠ **That boundary is asserted from the frame's PROHIBITIONS, not from a
-> measurement that no join exists.** I asked the Architect to separate two
-> questions the ring cannot: are the five rows genuinely unjoinable at this
-> layer, or is one of the named prohibitions the wrong constraint for *this*
-> slice rather than a standing one. **If the answer is a new relation or a
-> carrier, that is a scope call I take and frame — it is not authorized in
-> passing.**
+> ### THE ERROR I MADE TODAY, AND IT IS THE ONE THIS FILE EXISTS TO PREVENT
 >
-> **I routed Runtime's measurement ATTRIBUTED TO RUNTIME and characterized no
-> mechanism myself** — see the gate-4b error below for why.
+> **I kicked Language onto `LANG-RECORD-STACK-OVERFLOW`, which had already
+> merged as PR #2098 at `b4d38b8a`.** The node still said `status: ready`
+> because nobody flipped it when the PR landed. I read the status as the state
+> of the tree.
 >
-> **Language — `LANG-VIEW-RETIRE`.** D1 census and D2 purity-failure measurement
-> done; D3 (remove `KwView`, decide the post-removal spelling) in progress.
-> **If it asks what `view` becomes after removal and the spec does not settle
-> it, that is the ENCLAVE's call** — not mine, not theirs.
+> ⇒ **A node's `status:` is a claim ABOUT a node. Only the tree is evidence
+> about the code.** Before any kick: check that the work has not landed —
+> `gh pr list --search "<NODE-ID>" --state merged`, or grep the mechanism on
+> `origin/main`. The language leader caught this and blocked on a node-identity
+> question rather than assigning it, which cost one round trip instead of an
+> implementer turn.
 >
-> ### GATE 4b — THE OBSERVER ALREADY EXISTS. DO NOT BUILD ONE.
+> **It compounded:** my kick also warned about a `=>`-vs-`|->` fixture trap that
+> the same PR had already repaired. **A stale node status makes every derived
+> claim in the kick stale too.**
 >
-> `d2f_gate_note_arrival` at
-> `crates/ken-runtime/src/cranelift_backend/lowering/core.rs:2182-2194` already
-> records the 4b population — fusion-plan `keys` and `descriptors` plus the
-> transition plan's fusion-definition count — at the exact point production
-> computes them. It landed under `D2f`. **4b does not need a read built; it
-> needs the existing one REACHABLE.**
+> I flipped `LANG-RECORD-STACK-OVERFLOW`, `LANG-SURFACE-RECORD-LITERAL` and
+> `LANG-VIEW-RETIRE` to `merged`, and reverted a `depends_on` edge I had added
+> from the same wrong premise.
 >
-> **My premise that this was a new seam was WRONG**, and the Architect measured
-> it rather than accepting it (`evt_4hpn5331ye325`, folded into the frame's
-> newest box at #2099 — **read the frame, not this block**). The obstacle is
-> **cross-crate gate expressibility**: `#[cfg(test)]` fires only for that
-> crate's own tests, and `ken-elaborator` depends on `ken-runtime`, not the
-> reverse. The real-source witness is above the boundary and the population
-> below it.
+> ### GATE 4b IS ANSWERED AS FAR AS OBSERVATION CAN ANSWER IT
 >
-> **The error shape, because it recurs:** I characterized a mechanism from a
-> handback describing *where a seam would go*, and never checked whether one was
-> already there. **A description of where to add something is not evidence that
-> nothing exists.**
+> Runtime handed 4b back with a named stop, no candidate. **Three of its four
+> measured values did not mean what the handback read them as:**
+> `fusion_definitions = 0` is the **pinned expected value** ("zero until the
+> emitter exists"); `oriented_present` is a **boolean over an `Option`**, so it
+> says a plan arrived, not that a population did; and `keys = []` is exactly
+> `candidates.len() == 0` because the interning loop **has no decline path**
+> (Architect, `static_transition.rs:10030-10053`).
 >
-> **R3 DOES NOT CLOSE WITHOUT 4b.** State 4a at exactly its own strength — the
-> compiler produces the checked IH slot/call population and the validated
-> oriented plan, and they **arrive at the preparation boundary**. That is *not*
-> the claim that the Runtime fusion planner forms the expected population from
-> them. This arc has paid three times for a claim written wider than its
-> measurement.
+> **I measured all thirteen elimination exits in
+> `enumerate_live_fusion_candidates` (`:10242-10365`): NONE is distinguished** —
+> every one is a bare `continue` or bare early return. By the Architect's own
+> criterion that puts the per-gate census **out** of the observation gate.
 >
-> ### THE PUBLISHER RULE I GOT WRONG TODAY — ASK THE PR, NOT THE PROCESS
+> **`RT-4B-ENUMERATION-INPUT-SIZE` is framed and `ready`** behind
+> `RT-CONTSRC-FRAME-FINALIZE`. It records the **admitted-discovery ledger's**
+> length — not the oriented plan's, because the ledger is what enumeration
+> actually iterates — and its frame **pre-states what each outcome licenses**,
+> so no one needs a round trip to find out. Non-empty licenses **nothing about
+> the planner**.
+>
+> ### THE PUBLISHER RULE — ASK THE PR, NOT THE PROCESS
 >
 > ```
 > gh pr view N --json state,mergeCommit,statusCheckRollup
 > ```
 >
-> **MERGED ⇒ never restart**, whatever `pgrep` says; kill any live publisher.
-> **OPEN + checks running ⇒ wait.** **OPEN + checks done + `pgrep` empty ⇒
-> restart.**
+> **MERGED ⇒ never restart**, whatever `pgrep` says. **OPEN + checks running ⇒
+> wait.** **OPEN + checks done + `pgrep` empty ⇒ restart.**
 >
-> **`pgrep` is necessary and NOT sufficient, and it errs in BOTH directions.**
-> On #2098 it reported "not running" while the publisher sat in its opening
-> wait, and I started a second one against one PR. It also matches **my own
-> shell wrapper**, so the naive form reports "running" when nothing is.
-> ⇒ **Print the matched lines, discount your own wrapper, and never collapse it
-> to a boolean you cannot audit** — when the instrument is wrong, the boolean
-> has destroyed the evidence that would have shown you.
+> **`pgrep` errs in BOTH directions** — it reported "not running" while a
+> publisher sat in its opening wait, and it also matches my own shell wrapper.
+> Print the matched lines; never collapse it to a boolean.
 >
-> Also before any publish: `gh api repos/swe-toolkit/ken/commits/<sha>/check-runs`.
-> **422 = never pushed = clean.** A candidate that was already red does not
-> become green by being reviewed.
+> Before any publish: `gh api repos/swe-toolkit/ken/commits/<sha>/check-runs`.
+> **422 = never pushed = clean.** `gh` is not authenticated in a plain shell —
+> mint a token with `.devcontainer/mint-gh-token.sh` (needs
+> `dangerouslyDisableSandbox`).
 >
 > ### LANDED 2026-08-13
 >
 > #2091 gate 4a + the one-cut sweep repair · #2093 two language frames · #2094
 > the `language-implementer` reseat to Sonnet 5 · #2095 checkpoint · #2096 the
-> C2 slot-consumption repair · #2097 the briefing flush (4648 → 356) · #2098
-> record literals + the dispatch-frame repair · #2099 the gate-4b ruling fold.
-> **#2088 and #2092 closed**, each with its reason in the PR.
+> C2 slot-consumption repair · #2097 the briefing flush (4648 to 356) · #2098
+> record literals + the dispatch-frame repair · #2099 the gate-4b ruling fold ·
+> **#2103 `LANG-VIEW-RETIRE`** (landed tree `5f5469c8`). Spec erratum
+> `93e92812` publishing. **#2088 and #2092 closed**, each with its reason in
+> the PR.
