@@ -2881,19 +2881,27 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
 
     let mut rows = Vec::new();
     let mut realized = Vec::new();
+    let mut realized_outer = Vec::new();
     for (cause, symbol) in [
         (D2jCause::Exact, "ken_d2f_armed_stop_exact"),
         (D2jCause::ReHomed, "ken_d2f_armed_stop_rehomed"),
     ] {
         crate::cranelift_backend::lowering::reset_r3_local_compositions();
+        crate::cranelift_backend::lowering::reset_r3_outer_dispatches();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
         let error = compile_armed(cause, symbol);
         let reached = matches!(
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
-                if *construct == "StaticContinuationFusion"
-                    && reason.contains("reached the shared continuation call funnel")
+                if *construct == "StaticWorkerBinding"
+                    && reason.contains("that no static elimination rebinds")
         );
         rows.push((cause, reached));
+        realized_outer.push((
+            cause,
+            crate::cranelift_backend::lowering::r3_outer_dispatches().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        ));
         // The LAYERS, not a count. A count of one is satisfied by the wrong
         // one of the two planned edges, and which layer is realized is exactly
         // the fact the open question turns on.
@@ -2909,11 +2917,24 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must stop at the shared call funnel's R guard: three projections have \
-         been narrowed to O and one still routes the fusion-owned outer identity to a call seat \
-         it has no call edge for. The guard is fail-closed and names the residual. If this row is \
-         red because the stop MOVED, the comment beside the D2f installer in core.rs is now stale \
-         and must be restated to the new measured stop rather than this assertion being relaxed"
+        "the armed compile must stop at the static-worker TRANSPORT ledger: the R descent \
+         completed, the fused invocation was emitted at the claim's exact consuming call and the \
+         claim was consumed, and the producer construct's worker field is not yet rebound by any \
+         static elimination. That rebind is the next link of the ordered chain. If this row is \
+         red because the stop MOVED, the comment beside the D2f installer in core.rs is now \
+         stale and must be restated to the new measured stop rather than this assertion being \
+         relaxed"
+    );
+    assert_eq!(
+        realized_outer,
+        vec![
+            (D2jCause::Exact, 1usize, 1usize),
+            (D2jCause::ReHomed, 1usize, 1usize),
+        ],
+        "each armed root must realize exactly ONE R local descent and emit exactly ONE fused \
+         invocation at the claim's consuming call. Counted per compile and as a pair, because a \
+         descent with no invocation is the region left unrealized and an invocation with no \
+         descent is a call assembled from operands nobody lowered"
     );
     assert_eq!(
         realized,

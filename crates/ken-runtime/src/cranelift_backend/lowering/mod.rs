@@ -6043,6 +6043,60 @@ pub(in crate::cranelift_backend) fn r3_local_compositions()
     R3_LOCAL_COMPOSITIONS.with(|cell| cell.borrow().clone())
 }
 
+/// **`D3` — the fusion-owned outer realizations this compile dispatched.**
+#[cfg(test)]
+thread_local! {
+    static R3_OUTER_DISPATCHES: std::cell::RefCell<
+        Vec<(StaticContinuationFusionId, ContinuationSpecializationId)>,
+    > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn record_r3_outer_dispatch(
+    fusion: StaticContinuationFusionId,
+    target: ContinuationSpecializationId,
+) {
+    R3_OUTER_DISPATCHES.with(|cell| cell.borrow_mut().push((fusion, target)));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn r3_outer_dispatches()
+-> Vec<(StaticContinuationFusionId, ContinuationSpecializationId)> {
+    R3_OUTER_DISPATCHES.with(|cell| cell.borrow().clone())
+}
+
+/// **`D3` — the fused invocations emitted at claims' exact consuming calls.**
+#[cfg(test)]
+thread_local! {
+    static R3_FUSED_INVOCATIONS: std::cell::RefCell<
+        Vec<(StaticContinuationFusionId, StaticOriginId)>,
+    > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn record_r3_fused_invocation(
+    fusion: StaticContinuationFusionId,
+    consuming_call: StaticOriginId,
+) {
+    R3_FUSED_INVOCATIONS.with(|cell| cell.borrow_mut().push((fusion, consuming_call)));
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn r3_fused_invocations()
+-> Vec<(StaticContinuationFusionId, StaticOriginId)> {
+    R3_FUSED_INVOCATIONS.with(|cell| cell.borrow().clone())
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_r3_fused_invocations() {
+    R3_FUSED_INVOCATIONS.with(|cell| cell.borrow_mut().clear());
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_r3_outer_dispatches() {
+    R3_OUTER_DISPATCHES.with(|cell| cell.borrow_mut().clear());
+}
+
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn reset_r3_local_compositions() {
     R3_LOCAL_COMPOSITIONS.with(|cell| cell.borrow_mut().clear());
