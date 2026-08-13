@@ -675,6 +675,35 @@ nothing you inherit from `#6d`.**
 > **everything hoistable is above the action; the one check whose answer can
 > only change AS A RESULT of the action is below, where it must be.**
 
+> ### CORRECTION TO MY OWN PUBLISHED CLAIM — THE ZERO-CENSUS RESULT IS
+> ### SAMPLED, NOT UNIVERSAL. Steward, 2026-08-13, correcting the release
+> ### notes of `f708fd2c` (#2076) and `37b270bf` (#2077).
+>
+> **Those two releases said, or let a reader conclude, that "the ordinary front
+> end emits no `ComputationalMatch`." That is REFUTED and it was never what was
+> measured.** The bounded producer probe at `d30e20ee` shows
+> `NESTED_LIFT_NAT_THREE_SOURCE` produces a **retained generated lifted-family
+> `ComputationalMatch` in erased Runtime IR**, through the ordinary front end.
+>
+> **The valid measured statement, and the only one to quote from here on:**
+> **the eight programs sampled were zero, and all then-current positive seat
+> controls were synthetic.** Both halves are still true. Neither licenses a
+> claim about the front end's whole output.
+>
+> ⇒ **Read every "self-defeating at the classifier" phrase below as scoped to
+> the sampled shape**, not to surface Ken. The Architect's nested-result
+> selector call was right, and the witness source question is open in the
+> other direction: surface Ken **does** have an erased-IR producer.
+>
+> **How this happened, since it is the reusable part.** Eight witnesses came
+> back zero, three authoring attempts failed in a row, and I wrote the release
+> notes in the voice of the pattern rather than the voice of the sample. The
+> implementer had stated the gap explicitly — *"eight witnesses plus one
+> predicate read is not an enumeration of the surface"* — and I published over
+> it anyway. **A stated gap in a handback is not discharged by the handback
+> being convincing.** Carry the qualifier into every derived artifact, or the
+> qualifier dies at the first retelling.
+
 > ### RESTATE THE CONTROLS. DO NOT CHANGE THE CLASSIFIER. Steward, 2026-08-13,
 > ### folding Architect `evt_7mg1x1vqe7qph`. **This amends the control list;
 > ### read it before authoring any further control at this seat.**
