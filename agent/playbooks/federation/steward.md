@@ -210,41 +210,15 @@ Commit it to `steward/work` on every state change. It reaches `main` through
 the tracker-sync commit in the merge procedure — see
 `steward/merge-procedure.md`.
 
-## 4g. The briefing is a POINTER. Flush it daily, on a T2 subagent.
+## 4g. The briefing is a POINTER, and it is flushed daily
 
-`docs/program/diary/CURRENT-BRIEFING.md` holds **the last 24 hours and nothing
-else.** Everything older belongs in the dated diary,
-`docs/program/diary/YYYY/Mon/DD.md` (`diary/INDEX.md` describes the store).
+`docs/program/diary/CURRENT-BRIEFING.md` holds **the last 24 hours, under 250
+lines.** Older blocks go to the dated diary. **Flush it once a day, delegated
+to a `model: sonnet` subagent** — procedure in `steward/briefing-flush.md`.
 
-**Budget: under 250 lines.** Over that, flush before you write anything new.
-
-**Run the flush once a day, and delegate it** (operator, 2026-08-13):
-
-> Agent tool, `model: sonnet`. Tell it to move every block older than 24 hours
-> out of `CURRENT-BRIEFING.md` into the dated file for the day the block
-> describes, creating `YYYY/Mon/DD.md` as needed. **Move, never summarize and
-> never drop** — the diary is the archive and content must survive the edit.
-> **Standing content is not dated and does not move:** operator rulings,
-> preserved refs, standing traps, and the where-durable-law-lives pointers.
-
-**Verify it moved rather than deleted, before committing.** Line counts are the
-cheap check: old total should equal new briefing plus everything added to dated
-files. A flush that loses content is worse than a long file.
-
-**Why this is delegated rather than done:** the judgement is "which day does
-this block belong to", which is mechanical and deterministically checkable —
-exactly the delegation criterion in `MODELS.md`. Doing it yourself spends T1
-tokens on filing.
-
-**The failure mode, because it is silent.** Nothing reds when the briefing
-grows; it just costs every future resume more context, and the operator reads
-it. It reached **4648 lines / 273 KB across 19 unflushed days** before anyone
-noticed, having been "rewritten to be small" once already. **A file whose only
-enforcement is your own restraint gets flushed on a schedule or not at all.**
-
-⚠ **Do not hold uncommitted edits in the worktree while the subagent runs.** A
-subagent can revert them, and your verification then passes vacuously against
-the reverted file. Commit first, dispatch second.
+Nothing reds when it grows, so it is enforced by schedule or not at all: it
+reached 4648 lines across 19 unflushed days, having already been rewritten to
+be small once.
 
 ## 4e. Stay one release ahead of the frontier
 
@@ -291,6 +265,7 @@ need at the point of use; do not work from memory of it.
 | What lands on `main` and when: the accepted-base and partial-WP policies | `steward/merge-policy.md` |
 | Merging: the nine-step procedure and corpus git routing | `steward/merge-procedure.md` |
 | Compaction: your own and the teams' | `steward/compaction.md` |
+| The daily briefing flush, delegated to a T2 subagent | `steward/briefing-flush.md` |
 | The watchdog and the comms-drop backstop | `steward/watchdog.md` |
 | Hard-stop escalation, symptom inventory, the 60-minute WIP audit | `steward/escalation.md` |
 
