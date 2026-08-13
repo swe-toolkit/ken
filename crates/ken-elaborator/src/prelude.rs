@@ -436,6 +436,40 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.elaborate_decl("data Prod a b = MkProd a b")
         .map_err(|e| ElabError::Internal(format!("prelude Prod failed: {}", e)))?;
 
+    // `List` combinators (`37 §9`, WS-L). Declaration text for `map`/`fold`/
+    // `zip` is lifted byte-for-byte from `tests/l3a_acceptance.rs`'s former
+    // `setup_combinators` (LANG-PRELUDE-COLLECTIONS D1) -- unchanged, since
+    // the L3a suite already proved these strings elaborate against a real
+    // `ElabEnv` on every run; moving them is a placement change, not a
+    // re-derivation. `filter` (D2) is newly written in the same recursive
+    // shape as `map`, matching on the predicate's `Bool` result -- `Bool` is
+    // ordinary matchable data (`data Bool = True | False`), so this needs no
+    // `if` primitive and has no double-evaluation question. `sort` and
+    // `unfoldUpTo` are deliberately not here: `sort`'s `is_sorted ∧ Perm`
+    // obligation would enter the prelude as an undischarged postulate (a
+    // trusted-base change), and `unfoldUpTo` is the no-coinduction
+    // infinitude idiom rather than a combinator -- both stay test-local.
+    elab.elaborate_decl(
+        "fn map (a b : Type) (f : a → b) (xs : List a) : List b = \
+         match xs { Nil |-> Nil b ; Cons h t |-> Cons b (f h) (map a b f t) }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude map failed: {}", e)))?;
+    elab.elaborate_decl(
+        "fn fold (a b : Type) (f : a → b → b) (z : b) (xs : List a) : b = \
+         match xs { Nil |-> z ; Cons h t |-> f h (fold a b f z t) }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude fold failed: {}", e)))?;
+    elab.elaborate_decl(
+        "fn zip (a b : Type) (xs : List a) (ys : List b) : List (Prod a b) = \
+         match xs { Nil |-> Nil (Prod a b) ; Cons h t |-> match ys { Nil |-> Nil (Prod a b) ; Cons k u |-> Cons (Prod a b) (MkProd a b h k) (zip a b t u) } }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude zip failed: {}", e)))?;
+    elab.elaborate_decl(
+        "fn filter (a : Type) (p : a → Bool) (xs : List a) : List a = \
+         match xs { Nil |-> Nil a ; Cons h t |-> match p h { True |-> Cons a h (filter a p t) ; False |-> filter a p t } }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude filter failed: {}", e)))?;
+
     // VAL1-surface inductives — declared before `lookup` closure to avoid
     // conflicting borrows (elaborate_decl needs &mut elab).
     elab.elaborate_decl("data Unit = MkUnit")
