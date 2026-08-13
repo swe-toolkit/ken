@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: S
 gate: none
-depends_on: [RT-4B-ENUMERATION-INPUT-SIZE]
+depends_on: [RT-4B-C2-REACHABILITY]
 blocks: [RT-4B-UNIQUENESS-GATE-ATTRIBUTION]
 github: null
 origin: Architect evt_5gck3qg72xe37 ruling the Steward's single attribution node be SPLIT, on the Steward's own sizing caveat (evt_24j7cjr1bhvzr) that exit 12 may never be reached. Reach is pure recording inside the already-authorized 4b observation gate and needs no exception; attribution is a builder change and stays conditional. Split taken by the Steward 2026-08-13.
