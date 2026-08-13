@@ -3506,7 +3506,7 @@ fn d2f_0_the_applied_root_production_path_gate() {
         (cause, arrivals.len(), named_its_own_authority, error)
     })
     .collect();
-    let arrived_empty: Vec<(D2jCause, usize, usize, usize)> =
+    let arrived_empty: Vec<_> =
         [D2jCause::ExactSuffix, D2jCause::CallIdentity]
             .into_iter()
             .map(|cause| {
@@ -3515,7 +3515,17 @@ fn d2f_0_the_applied_root_production_path_gate() {
                     [only] => only.clone(),
                     other => panic!("{cause:?} must reach the builder once: {}", other.len()),
                 };
-                (cause, arrivals.len(), one.keys.len(), one.descriptors.len())
+                (
+                    cause,
+                    arrivals.len(),
+                    one.keys.len(),
+                    one.descriptors.len(),
+                    one.walked_admitted_continuation_discoveries,
+                    one.oriented_frames,
+                    one.oriented_recursive_calls,
+                    one.oriented_computational_ih_slots,
+                    one.oriented_computational_ih_calls,
+                )
             })
             .collect();
 
@@ -3538,7 +3548,12 @@ fn d2f_0_the_applied_root_production_path_gate() {
                 .map(|(_, arrivals, named, _)| (*arrivals, *named))
                 .collect::<Vec<_>>(),
             // AC-6a phase B: arrived once, resolved nothing
-            arrived_empty.iter().map(|(_, a, k, d)| (*a, *k, *d)).collect::<Vec<_>>(),
+            arrived_empty
+                .iter()
+                .map(|(_, a, k, d, walked, frames, recursive, slots, calls)| {
+                    (*a, *k, *d, *walked, *frames, *recursive, *slots, *calls)
+                })
+                .collect::<Vec<_>>(),
         ),
         (
             (true, 1, 1, 0),
@@ -3546,7 +3561,10 @@ fn d2f_0_the_applied_root_production_path_gate() {
             (true, 1, 1, 0),
             (false, 0, 0, 0),
             vec![(0, true), (0, true), (0, true)],
-            vec![(1, 0, 0), (1, 0, 0)],
+            vec![
+                (1, 0, 0, 4, 2, 0, 2, 1),
+                (1, 0, 0, 4, 2, 0, 2, 1),
+            ],
         ),
         "all THREE positives must resolve exactly one key and one descriptor at definition \
          count zero, while the unmarked seed reaches the same builder and resolves nothing, \
@@ -3623,6 +3641,110 @@ fn d2f_0_the_applied_root_production_path_gate() {
         exact.keys,
         rehomed.keys,
         arity.keys
+    );
+}
+
+/// Gate 4b's observer is a pure read of the production planner inputs.
+///
+/// MEASURED: the same checked fixture, entry symbol, object-module name and
+/// test-only emitter arm produce byte-identical object artifacts with arrival
+/// recording enabled and disabled. The enabled leg records exactly one arrival
+/// and its five input populations; the disabled leg records none.
+///
+/// CLAIMED: recording the input populations does not alter compilation output.
+///
+/// THE GAP: this does not attribute any enumerator exit. A non-empty walked
+/// population beside empty keys exhausts this observation route and licenses no
+/// conclusion about which planner relation declined the candidates.
+///
+/// Promise class: durable invariant.
+#[test]
+fn r3_4b_input_observation_is_artifact_identical_when_disabled() {
+    use crate::cranelift_backend::lowering::core::{
+        d2f_gate_arrivals_take, set_d2f_gate_observation_enabled, D2fEmitterTestArm,
+        D2fGateArrival,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, D2jCause, D2J_DECLARATION,
+    };
+
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_d2f_gate_observation_enabled(true);
+            let _ = d2f_gate_arrivals_take();
+        }
+    }
+
+    fn emit(record_arrival: bool) -> (Vec<u8>, Vec<D2fGateArrival>) {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let _ = d2f_gate_arrivals_take();
+        set_d2f_gate_observation_enabled(record_arrival);
+        let compiled = {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-4b-input-identity",
+                )
+                .expect("object module"),
+                "ken_r3_4b_input_identity",
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .expect("the test-only armed checked fixture compiles")
+        };
+        let arrivals = d2f_gate_arrivals_take();
+        let bytes = compiled
+            .module
+            .finish()
+            .emit()
+            .expect("the checked fixture emits an object artifact");
+        (bytes, arrivals)
+    }
+
+    let _restore = Restore;
+    let (enabled_bytes, enabled_arrivals) = emit(true);
+    let (disabled_bytes, disabled_arrivals) = emit(false);
+    let enabled = match enabled_arrivals.as_slice() {
+        [only] => only,
+        other => panic!(
+            "the enabled observation must record exactly one builder arrival: {}",
+            other.len()
+        ),
+    };
+
+    assert_eq!(
+        (
+            enabled.walked_admitted_continuation_discoveries,
+            enabled.oriented_frames,
+            enabled.oriented_recursive_calls,
+            enabled.oriented_computational_ih_slots,
+            enabled.oriented_computational_ih_calls,
+        ),
+        (4, 2, 0, 2, 1),
+        "the enabled route must reach the observer and report the walked ledger plus each named \
+         oriented-plan vector separately"
+    );
+    assert!(
+        disabled_arrivals.is_empty(),
+        "the disabled control must suppress the observation rather than reproducing the enabled leg"
+    );
+    assert!(
+        !enabled_bytes.is_empty(),
+        "the artifact-identity relation must compare an emitted object, not two empty buffers"
+    );
+    assert_eq!(
+        enabled_bytes, disabled_bytes,
+        "enabling the gate-4b input observation must leave the emitted object artifact byte-identical"
     );
 }
 
