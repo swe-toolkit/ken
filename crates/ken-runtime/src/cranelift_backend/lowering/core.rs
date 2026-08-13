@@ -84,6 +84,67 @@ pub(in crate::cranelift_backend) fn seed_callee_unit_ports() -> usize {
     SEED_CALLEE_UNIT_PORTS.with(std::cell::Cell::get)
 }
 
+/// **`R3` — a TEST-ONLY arm for the `D2f` emitter installer.**
+///
+/// ⛔ **This does not arm anything in production.** `D2F_EMITTER_ARMED` stays
+/// `false` and is the only authority a production compile consults; this switch
+/// is `#[cfg(test)]`, defaults to off, and is reset by the guard below.
+///
+/// **It exists because the ruling forbids a narrative-only stop claim.**
+/// Architect `evt_6kn9ckdnbf0ph` §5 requires the corrected comment on that
+/// installer to *"have a control or assertion that becomes red when the
+/// statement ceases to be true"*. The statement is about what the **armed**
+/// compile does, so pinning it needs a seat that can arm — and a `const` in a
+/// function body has none. Without this switch the corrected comment would be
+/// exactly the unfalsifiable planning authority the ruling is retiring.
+#[cfg(test)]
+thread_local! {
+    static D2F_EMITTER_TEST_ARM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Arm the `D2f` installer for the current test thread. **Always pair with
+/// [`D2fEmitterTestArm`]** so an early return or a panicking assertion cannot
+/// leave the thread armed for the next test that runs on it.
+#[cfg(test)]
+fn set_d2f_emitter_test_arm(armed: bool) {
+    D2F_EMITTER_TEST_ARM.with(|cell| cell.set(armed));
+}
+
+/// RAII arm, so "armed" can never outlive the block that wanted it.
+///
+/// The thread-local switches in this file are reset by explicit calls, and that
+/// is safe for counters — a stale count is read, not acted on. **An armed gate
+/// is different in kind**: leaking it changes what a *later, unrelated* compile
+/// does, and the ruling's "never permanently" is a property of the whole suite
+/// rather than of one test.
+#[cfg(test)]
+pub(in crate::cranelift_backend) struct D2fEmitterTestArm;
+
+#[cfg(test)]
+impl D2fEmitterTestArm {
+    pub(in crate::cranelift_backend) fn arm() -> Self {
+        set_d2f_emitter_test_arm(true);
+        Self
+    }
+}
+
+#[cfg(test)]
+impl Drop for D2fEmitterTestArm {
+    fn drop(&mut self) {
+        set_d2f_emitter_test_arm(false);
+    }
+}
+
+#[cfg(test)]
+fn d2f_emitter_test_armed() -> bool {
+    D2F_EMITTER_TEST_ARM.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+fn d2f_emitter_test_armed() -> bool {
+    false
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -2193,54 +2254,52 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // compile, so this pass only changes which caller would raise it first.
     //
     // **This is a labelled un-wired partial, and the label is not a
-    // formality.** The wired form was built and measured on the `Exact` witness;
-    // it advances the compile through four successive distinct refusals and
-    // stops at a fifth. The measured sequence, each step a real one:
+    // formality.** The wired form runs through the WHOLE of lowering. **MEASURED
+    // at `83546180`, armed via `D2fEmitterTestArm` on an isolated `Exact`
+    // compile:** every one of the six unit calls is emitted, both composed edges
+    // among them, and the compile then stops at the ROOT RESULT.
     //
-    //   1. `ComputationalMatch: a computational recursor closure names an
-    //      in-flight activation` — the BASELINE, in the producer's standalone
-    //      unit. Body ownership removes that unit, so this refusal is gone.
-    //   2. `callee frame is missing a declared input` — the redirect is live and
-    //      the fused frame's continuation inputs are unsupplied. Closed by
-    //      `Lowering::fused_redirect_inputs`.
-    //   3. `the claimed continuation target was not declared into this function`
-    //      — the fused body lowers, and the producer's causal refs need
-    //      declaring in it. Closed by declaring under `causal_owner`.
-    //   4. `a continuation call token was claimed by a context that is not its
-    //      emission owner` — the ambient authority must be a `Predeclared`
-    //      owner, never `Fusion(id)`, because the planner issues no
-    //      `Fusion`-owned causal tokens. What this cut binds is
-    //      `Predeclared(producer_owner)` across the WHOLE combined lowering; the
-    //      ruled per-body switch is excluded and is named at the bind site.
-    //   5. `OrientedSubcontinuationPlanV1: computational IH slot marker is
-    //      detached from its checked frame` — the fused `Function` opens its own
-    //      `CheckedFrameFunctionScope`, and the IH slot marker the producer's
-    //      body carries belongs to the consumer's checked frame, which now spans
-    //      two `Function`s. **This step is ANSWERED, not open.** The fused body
-    //      re-enters the consumer frame identity locally, immediately before the
-    //      suffix's ordinary checked consumer runs; nothing is re-homed and no
-    //      new frame is minted. That is the node's `D2`, and its A/B is causal:
-    //      with the adoption off the suffix lowers outside its checked frame and
-    //      the marker refuses as detached, with it on the existing consumer
-    //      consumes the transported identity and lowering advances. **That A/B
-    //      is HELD OFF `main` and was NOT re-derived here** — this sentence is
-    //      read off the held `D1`/`D2` range and the node, never off a compile
-    //      run for this comment. Nothing in this tree exercises it.
-    //   6. `OrientedSubcontinuationPlanV1: oriented segment mixes checked and
-    //      inferred computational frames` — **where it stops now**, in
-    //      `compose_oriented_subcontinuation`. Once ANY pending semantic layer
-    //      is checked, EVERY pending semantic layer must carry both an exact
-    //      checked frame and an invocation identity. The producer eliminator is
-    //      still `semantic_pending` — it is a genuine semantic participant, not
-    //      a control-only wrapper that may be omitted — so this refusal is
-    //      correct for the current representation rather than a gap in the
-    //      guard.
+    // **THE CURRENT MEASURED TERMINAL STOP**, and it is pinned by
+    // `d2f_armed_terminal_stop_is_the_root_result_worker_escape` rather than
+    // asserted here:
+    //
+    // ```text
+    // compile_expr_into_object_module
+    //   -> compile_expr_into_module_with_root_projection
+    //   -> emit_result -> ground_value -> into_specialized_at
+    //   => Unsupported(StaticWorkerBinding,
+    //      "a constructor field escaping to a ground value ...")
+    // ```
+    //
+    // The escaping value is the fusion key's OWN producer: construct 30, field
+    // 29 on `Exact` (26 / 25 on `ReHomed`), the only worker field built in the
+    // compile, built AFTER every call and never rebound or consumed.
+    //
+    // ⛔ **That is the pre-mechanism order and it is NOT a refutation.**
+    // Architect `evt_6kn9ckdnbf0ph`: the held object carries the planner half
+    // only, so the direct calls and the later route-C build are exactly the
+    // expected sequence. The worker is a compiler-local intermediate BETWEEN two
+    // lowering steps of the composition, never an operand of either ordinary
+    // call ABI — so it not appearing in a declared operand run says nothing
+    // about the mechanism. An earlier falsifier that required it to appear there
+    // is **withdrawn**; it tested the very ABI crossing local composition
+    // removes.
+    //
+    // ⇒ **What retires this paragraph is the local lowering**, at which point
+    // the stop moves and the control above goes red on its own. That is the
+    // whole difference from the prose this replaces, which claimed a step-5 /
+    // step-6 stop that had silently stopped being true.
     //
     // ---- DURABLE. A RULING, NOT A MEASUREMENT. `D1`/`D2` DO NOT TOUCH IT, AND
     // ---- THE RETIREMENT INSTRUCTION BELOW EXCLUDES IT BY NAME.
     //
-    // Architect `evt_1q7v9fcw5hd87`. The answer to step 6 is the node's `DP`,
-    // which gives the producer occurrence its own transported checked identity.
+    // Architect `evt_1q7v9fcw5hd87`. The answer to the mixed-frame refusal
+    // (`OrientedSubcontinuationPlanV1: oriented segment mixes checked and
+    // inferred computational frames`, in `compose_oriented_subcontinuation`) is
+    // the node's `DP`, which gives the producer occurrence its own transported
+    // checked identity. **That refusal is no longer the terminal stop** — the
+    // measured stop is the root-result escape recorded above — but the ruling
+    // about how it may be answered is unaffected by where the compile stops.
     // **A fusion-only admission of the guard, and copying or inferring the
     // consumer's identity onto the producer, are both ruled `unlawful` rather
     // than merely out of scope.**
@@ -2254,55 +2313,30 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // **proximity, not authority**: someone editing this block is in the
     // compiler, not necessarily in the node.
     //
-    // Note WHEN it matters: `D1`/`D2` landing is exactly what makes the guard
-    // reachable, so it is the moment a successor first meets the mixed-frame
-    // refusal and reaches for one of those two shortcuts. **It becomes relevant
-    // then, not obsolete** — which is why it is fenced off from the expiring
-    // paragraph rather than sharing its fate.
+    // Note WHEN it matters: a successor meets the mixed-frame refusal and
+    // reaches for one of those two shortcuts. **It becomes relevant as the
+    // compile advances, not obsolete** — which is why it survived the retirement
+    // of the stale stop prose around it rather than sharing its fate.
     //
-    // ---- EXPIRING. THE PARAGRAPH BELOW, UP TO THE NEXT `----` FENCE, IS THE
-    // ---- WHOLE OF WHAT `D1`/`D2` RETIRE. NOTHING ABOVE THIS FENCE.
+    // **Arm through `D2fEmitterTestArm` and nothing else.** Arming moves all
+    // three of `d2f_0`'s positive roots off the baseline refusal that gate pins,
+    // so `d2f_0` reds under a leaked arm — which is why the arm is RAII and
+    // scoped to one block rather than a set/reset pair. The three roots do not
+    // agree on where they land, and a panic surfaces only the first.
     //
-    // **Steps 5 and 6 have no committed witness in this tree, and step 6
-    // cannot be reproduced by running anything here.** The `D1`/`D2` mechanism
-    // is held as evidence off `main`, and this file is still at the pre-`D1`
-    // state — so the guard above is not merely inert, it is **unreached**.
-    // MEASURED on the `D0` gate's own compiles at `21307d7f`:
-    // `compose_oriented_subcontinuation` is entered twice, both times with
-    // `plan = None` and every layer `(checked_frame_id, checked_invocation_id)
-    // = (None, None)`, so `has_planned` is false and the mixed-frame guard is
-    // never entered. The checked twin's compile does not reach composition at
-    // all. ⇒ Do not read a green suite as evidence about step 6 either way.
-    //
-    // **What falsifies the paragraph above, and who retires it.** Its
-    // precondition is a tree state, not an invariant: `D1`/`D2` landing makes
-    // the guard reachable and every sentence between the two `----` fences
-    // false, **and nothing will go red when it does** — a claim in a comment is
-    // not executed. `RT-LEXICAL-R3-FUSION-EMITTER` owns deleting exactly that
-    // fenced paragraph, in the same candidate that lands them.
-    //
-    // ---- END EXPIRING.
-    //
-    // Do NOT arm this to "see how far it gets". **MEASURED at `5d8f563b`, with
-    // the unarmed control run in the same pass:** arming moves all three of
-    // `d2f_0`'s positive roots off the baseline refusal the gate pins, so the
-    // gate reds — but the three do **not** agree on where they land, and the
-    // panic surfaces only the first.
-    //
-    //   - `Exact` and `ReHomed` refuse at step 5.
-    //   - `ProducerArity` **never reaches step 5.** It refuses earlier, at
+    //   - `Exact` and `ReHomed` reach the root-result stop recorded above.
+    //   - `ProducerArity` **never reaches it.** It refuses earlier, at
     //     `ComputationalMatch: case ctor:fixture::D2gOut::Node expects 1
     //     constructor arguments but value has 2` — that cause's own widened
     //     producer construct meeting the one-argument case, which is the whole
     //     reason the cause exists.
-    //   - Unarmed, all three give refusal 1 above. That is the control, and it
-    //     is what makes the split attributable to arming.
+    //   - Unarmed, all three give the `in-flight activation` baseline. That is
+    //     the control, and it is what makes the split attributable to arming.
     //
-    // ⇒ **The step-5 population is two roots, not three.** `ProducerArity` is a
-    // positive of `d2f_0` and is **not** a step-5 witness; do not cite it as one
-    // when this warning is next revised.
+    // ⇒ **The terminal-stop population is two roots, not three.**
+    // `ProducerArity` is a positive of `d2f_0` and is **not** a witness for it.
     const D2F_EMITTER_ARMED: bool = false;
-    if D2F_EMITTER_ARMED {
+    if D2F_EMITTER_ARMED || d2f_emitter_test_armed() {
         static_transition_plan
             .install_static_continuation_fusions(static_continuation_fusion_plan)?;
     }

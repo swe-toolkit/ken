@@ -2789,6 +2789,132 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// the positives: each names **which gate refused**, so it moves only when that
 /// gate's authority moves, and a cause that broke something upstream instead
 /// would fail here rather than pass as coverage.
+/// **`R3` — the ARMED `D2f` compile's current terminal stop, pinned so the
+/// source comment beside the installer cannot silently stop being true.**
+///
+/// Architect `evt_6kn9ckdnbf0ph` §5 requires the corrected stop comment to
+/// carry *"a control or assertion that becomes red when the statement ceases to
+/// be true"*, because the prose it replaces claimed a step-5/step-6 stop that
+/// had already been overtaken with nothing going red.
+///
+/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile: lowering
+/// runs to completion — every unit call is emitted, both composed edges among
+/// them — and the compile stops at the ROOT RESULT, in `emit_result` ->
+/// `ground_value` -> `into_specialized_at`, on the fusion key's own producer
+/// construct whose worker field has no value representation.
+/// **CLAIMED:** that, and not the mixed-frame or IH-marker refusal, is where the
+/// armed compile currently stops.
+/// **THE GAP, and it is the whole point of the row:** this pins the
+/// **pre-mechanism** order. It is *expected* to go red when local composition
+/// lands, and going red is the signal to restate the comment — not a
+/// regression. It says nothing about whether the mechanism is right; per
+/// `evt_6kn9ckdnbf0ph` the worker is a compiler-local intermediate between two
+/// lowering steps, so its absence from any ABI operand run is the design, not a
+/// defect.
+///
+/// **Promise class: transition sentinel.** It is named for the boundary rather
+/// than for a count, and the event that retires it is the local selected-body
+/// composition landing for `dom(FusionComposedEdge)`.
+///
+/// ⛔ Production stays unarmed. `D2F_EMITTER_ARMED` is `false`; the arm here is
+/// the `cfg(test)` RAII `D2fEmitterTestArm`, which disarms on drop so a
+/// panicking assertion cannot leak an armed gate into the next test on this
+/// thread.
+#[test]
+fn d2f_armed_terminal_stop_is_the_root_result_worker_escape() {
+    use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause};
+
+    fn compile_armed(cause: D2jCause, symbol: &str) -> Option<CraneliftBackendError> {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(
+            crate::cranelift_backend::planning::D2J_DECLARATION,
+            &declaration,
+        );
+        // Armed for exactly this compile and disarmed on drop.
+        let _arm = D2fEmitterTestArm::arm();
+        crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+            crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                "ken-d2f-armed-stop",
+            )
+            .expect("object module"),
+            symbol,
+            cranelift_module::Linkage::Export,
+            &entry,
+            &crate::NativeSeedEnvironment::empty(),
+            declarations,
+            None,
+            false,
+            None,
+            None,
+            Some(oriented),
+        )
+        .err()
+    }
+
+    let mut rows = Vec::new();
+    for (cause, symbol) in [
+        (D2jCause::Exact, "ken_d2f_armed_stop_exact"),
+        (D2jCause::ReHomed, "ken_d2f_armed_stop_rehomed"),
+    ] {
+        let error = compile_armed(cause, symbol);
+        let reached = matches!(
+            &error,
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticWorkerBinding"
+                    && reason.contains("escaping to a ground value")
+        );
+        rows.push((cause, reached));
+    }
+
+    assert_eq!(
+        rows,
+        vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
+        "the armed compile must run through lowering and stop at the ROOT RESULT worker escape; \
+         if this row is red because the stop MOVED, the comment beside the D2f installer in \
+         core.rs is now stale and must be restated to the new measured stop rather than this \
+         assertion being relaxed"
+    );
+
+    // The arm is scoped, so an unarmed compile must still reach the ordinary
+    // baseline. Without this the row above would pass just as well if arming
+    // had silently stopped working.
+    let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+    let mut declarations = std::collections::BTreeMap::new();
+    declarations.insert(
+        crate::cranelift_backend::planning::D2J_DECLARATION,
+        &declaration,
+    );
+    let unarmed = crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+        crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+            "ken-d2f-unarmed-stop",
+        )
+        .expect("object module"),
+        "ken_d2f_unarmed_stop",
+        cranelift_module::Linkage::Export,
+        &entry,
+        &crate::NativeSeedEnvironment::empty(),
+        declarations,
+        None,
+        false,
+        None,
+        None,
+        Some(oriented),
+    )
+    .err();
+    assert!(
+        matches!(
+            &unarmed,
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "ComputationalMatch" && reason.contains("in-flight activation")
+        ),
+        "the POSITIVE control for the arm: unarmed, the same root must still reach the ordinary \
+         in-flight-activation baseline, so the armed row above is attributable to arming and not \
+         to a compile that refuses everywhere: {unarmed:?}"
+    );
+}
+
 #[test]
 fn d2f_0_the_applied_root_production_path_gate() {
     use crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take;
