@@ -2264,11 +2264,25 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // asserted here:
     //
     // ```text
-    // Unsupported(StaticContinuationFusion,
-    //   "a fusion-owned outer identity reached the shared continuation call
-    //    funnel; ... whichever projection routed it here is naming a call that
-    //    does not exist")
+    // Unsupported(StaticWorkerBinding,
+    //   "constructor ... at origin 30/26 transports a static worker in field 0
+    //    (field origin 29/25 ...) that no static elimination rebinds")
     // ```
+    //
+    // **Four links of the ordered chain now hold on both roots.** The `R` local
+    // selected-body descent completes; inside it the claim's exact checked
+    // consuming call (17 / 13) is reached; the fused invocation is emitted there
+    // through the normal descriptor-driven ABI; and the region claim is consumed
+    // exactly once, after the call was accepted. `r3_outer_dispatches()` and
+    // `r3_fused_invocations()` are each length one per compile, pinned as a pair
+    // — a descent with no invocation is the region left unrealized, and an
+    // invocation with no descent is a call assembled from operands nobody
+    // lowered.
+    //
+    // **What remains is the next link: the rebind / transport mint.** The
+    // producer construct still carries its worker field with no static
+    // elimination rebinding it, so the transport ledger refuses. That refusal is
+    // the chain reporting where it got to, not a defect in what landed.
     //
     // **That guard is the mechanism working, and the residual is exactly one
     // unnarrowed projection.** Under `P = O ⊎ I ⊎ R` (Architect
@@ -4444,6 +4458,31 @@ impl<'a> Lowering<'a> {
                 if let Some((frame_origin, case_index, recursive_positions)) =
                     selected_computational.as_ref()
                 {
+                    // ---- `D3` — THE OUTER-REALIZATION DISPATCH, before any
+                    // ---- ordinary continuation-call resolution or emission.
+                    //
+                    // `evt_2564nv6yqqs2q`. The field run above is complete and
+                    // nothing has been emitted for this seat yet, which is the
+                    // measured precondition the ruling turns on. An `R` identity
+                    // is realized here, once, by calling the already-declared
+                    // fused target; the fused function computes the whole
+                    // composed region, so its result IS this seat's result and
+                    // the eliminator below must not run over it a second time.
+                    for position in recursive_positions.iter().copied() {
+                        if let Some(realized) = self
+                            .dispatch_fusion_owned_outer_realization(
+                                builder,
+                                static_origin,
+                                *frame_origin,
+                                *case_index,
+                                position,
+                                &lowered_args,
+                                producer_env,
+                            )?
+                        {
+                            return Ok(realized);
+                        }
+                    }
                     for position in recursive_positions.iter().copied() {
                         // `D9` — the WHOLE lowered field run is handed down; the
                         // ordinary run is assembled from the planner's envelope
@@ -6709,6 +6748,7 @@ impl<'a> Lowering<'a> {
                                     &worker,
                                     Vec::new(),
                                     static_origin,
+                                    None,
                                 )?;
                                 // `D8p` — the TARGET side, under the same key,
                                 // written only now that the call instruction
@@ -8086,6 +8126,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                                 &worker,
                                                 lowered,
                                                 static_origin,
+                                                None,
                                             )?;
                                         // `D8p` — the target side, post-instruction.
                                         #[cfg(test)]
@@ -10091,6 +10132,200 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             .pending_composed_discharges
             .iter()
             .any(|pending| &pending.identity == identity)
+    }
+
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE OUTER-REALIZATION DISPATCH,
+    /// at the producer-dispatcher's post-field / pre-call seam.**
+    ///
+    /// Architect `evt_2564nv6yqqs2q`, ruled against a reverted chronology trace
+    /// rather than ahead of one. At this seam, on both armed roots and before
+    /// any consumer-body fusion call has emitted, the lowering already holds
+    /// every piece of planner-issued authority the dispatch needs: the exact
+    /// resolved identity, its `FusionOwnedOuterRealization`, the same fusion's
+    /// outstanding `FusionRegionClaim`, the declared fusion target in this
+    /// `Function`'s `unit_calls`, and the complete checked operand run.
+    ///
+    /// **The selector is the opaque identity relation and nothing else.** Every
+    /// coordinate equality below is a CLOSURE CHECK APPLIED AFTER SELECTION --
+    /// never a search key, never a fallback, never a source-tree inference.
+    /// Selecting on origin or body coincidence is the aliasing this node has
+    /// refused throughout.
+    ///
+    /// **This is the single authority point, and there is deliberately no
+    /// second copy.** The source-machine `ComputationalMatchScrutinee` hook is
+    /// downstream residue on an execution shape these roots never take -- it is
+    /// attempted zero times in either armed compile -- and the shared call
+    /// funnel is too late, because an `R` identity reaching it already means
+    /// this dispatch was missed. That funnel's refusal stays as a backstop and
+    /// correct execution makes it unreachable.
+    ///
+    /// `Ok(None)` is the ordinary answer: no realization for this identity, and
+    /// the caller takes the byte-identical ordinary path.
+    #[allow(clippy::too_many_arguments)]
+    fn dispatch_fusion_owned_outer_realization(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        producer_construct_origin: StaticOriginId,
+        continuation_origin: StaticOriginId,
+        producer_alternative: usize,
+        recursive_position: usize,
+        fields: &[LoweringOperand],
+        producer_env: &[LoweringEnvironmentBinding],
+    ) -> Result<Option<LoweringOperand>, CraneliftBackendError> {
+        let alternative = u32::try_from(producer_alternative).map_err(|_| {
+            unsupported("StaticContinuationFusion", "case index exceeds addressable range")
+        })?;
+        let position = u32::try_from(recursive_position).map_err(|_| {
+            unsupported(
+                "StaticContinuationFusion",
+                "recursive position exceeds addressable range",
+            )
+        })?;
+        let Some(identity) = self.static_transition_plan.continuation_call_binding_for(
+            producer_construct_origin,
+            continuation_origin,
+            alternative,
+            position,
+        )?
+        else {
+            return Ok(None);
+        };
+        let Some(realization) = self
+            .static_transition_plan
+            .fusion_outer_realizations()
+            .get(&identity)
+            .cloned()
+        else {
+            return Ok(None);
+        };
+
+        // ---- CLOSURE, COMPLETE, BEFORE ANY MUTATION.
+        //
+        // Every fallible fact is established here. Nothing below this block may
+        // fail after the call is emitted or the claim is settled, because a
+        // partial settlement is exactly the state an affine ledger cannot
+        // describe.
+        let defining = self.defining_unit.ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization was dispatched with no unit being defined",
+            )
+        })?;
+        let defining_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization was dispatched with no emission owner bound",
+            )
+        })?;
+        if realization.emission_owner() != defining_owner {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "a fusion-owned outer realization names emission owner {:?} while {defining_owner:?} \
+                     is being defined; the realization is dispatched from the consumer's own \
+                     function and a foreign one holds none of its operands",
+                    realization.emission_owner()
+                ),
+            ));
+        }
+        let ledger = self.fusion_claims.as_ref().ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization was dispatched with no region claim ledger open",
+            )
+        })?;
+        let claim = ledger.claim(realization.fusion()).ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization has no outstanding region claim; the claim is \
+                 spent, replayed or escaped, and dispatching against a consumed claim would \
+                 realize one region twice",
+            )
+        })?;
+        if claim.consumer_owner() != defining {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization's region claim names a different consumer than \
+                 the unit being defined",
+            ));
+        }
+        if realization.consumer_continuation_origin() != claim.continuation_origin()
+            || realization.selected_case_body() != claim.selected_case_body()
+            || realization.producer_body() != claim.producer_body()
+            || realization.producer_body() != claim.redirect().callee_origin()
+        {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization does not close against its region claim on \
+                 continuation origin, selected case body, or producer/redirect body",
+            ));
+        }
+        // ---- THE ACTION IS NON-CALLING. Architect `evt_5edhqyyhw4585`.
+        //
+        // ⚠ **The direct call this seat used to attempt is WITHDRAWN, and the
+        // reason is a measurement rather than a preference.** The earlier ruling
+        // assembled the fused invocation here from *"the already-lowered
+        // recursive producer field parameter run"*. Measured on both armed
+        // roots, that run is `[Spec(Closure)]` -- the producer's compiler-only
+        // worker -- which has no durable lane and cannot cross an ABI. The
+        // constructor has exactly one field and it is the recursive one, so
+        // there was no other operand here to supply.
+        //
+        // ⇒ **The two runs are different axes.** The field run supplies the
+        // local WORKER BINDING; the fused invocation's ordinary parameters come
+        // from the claim's exact checked consuming `Call`, which is reached
+        // INSIDE the body lowered below. That is why this seat descends rather
+        // than calls.
+        //
+        // ⛔ **The claim is NOT consumed here.** Only the external call emitted
+        // in the claim's consumer owner consumes it, and only after that call is
+        // accepted. Consuming it at this seat would settle an obligation whose
+        // call has not been built, which is precisely the partial settlement the
+        // affine ledger cannot describe.
+        //
+        // ⛔ **No `R` specialization call, and no boundary conversion.** The
+        // worker stays in the local environment; the target's omitted standalone
+        // `Function` is not defined and not called.
+        let operands = self.assemble_continuation_call_operands(
+            &identity,
+            fields,
+            recursive_position,
+            producer_env,
+            defining,
+            defining_owner,
+        )?;
+        let worker_body = operands.body.worker_body_origin;
+        let retargeted_worker_body = match (
+            self.function_local.worker_calls.get(&worker_body),
+            self.function_local.raw_worker_calls.get(&worker_body),
+        ) {
+            (Some(current), Some(raw)) if current.function != raw.function => Some(worker_body),
+            _ => None,
+        };
+        // Under the R target's OWN checked authority, released on the error path
+        // too so an early exit cannot leave it installed over the caller's body.
+        let ambient = AmbientBodyAuthority::bind(
+            self,
+            ContinuationEmissionOwner::Specialization(realization.target()),
+            operands.consumer_owner,
+        );
+        let lowered = super::units::lower_continuation_selected_case_body(
+            self,
+            builder,
+            &operands.body,
+            &operands.envelope,
+            &operands.ordinary,
+            &operands.continuation_inputs,
+            retargeted_worker_body,
+        );
+        ambient.release(self);
+        let lowered = lowered?;
+        #[cfg(test)]
+        crate::cranelift_backend::lowering::record_r3_outer_dispatch(
+            realization.fusion(),
+            realization.target(),
+        );
+        Ok(Some(lowered))
     }
 
     fn claim_and_call_continuation(
@@ -12237,6 +12472,308 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     /// The target comes from `worker_calls`, which was minted **into this
     /// function** (`D4`). Reading it here rather than from the binding is what
     /// keeps a `FuncRef` from ever crossing a function boundary.
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fused invocation, emitted at
+    /// the claim's EXACT checked consuming call.** Architect `evt_5edhqyyhw4585`.
+    ///
+    /// The producer constructor's recursive field is the callee/worker binding
+    /// and never crosses the ABI; this call's own ordered explicit arguments are
+    /// the fused target's ordinary parameter run. Two axes, and confusing them
+    /// is the assembly the earlier post-field direct call was withdrawn for.
+    ///
+    /// `Ok(None)` is the ordinary answer: no claim names this occurrence, and
+    /// the caller emits its ordinary static-worker call unchanged.
+    fn dispatch_fused_consuming_call(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        worker: &StaticWorkerBinding,
+        inputs: &[LoweringOperand],
+        static_origin: StaticOriginId,
+        visited_arguments: Option<&[StaticOriginId]>,
+    ) -> Result<Option<(LoweringOperand, StaticWorkerEmission)>, CraneliftBackendError> {
+        let Some(ledger) = self.fusion_claims.as_ref() else {
+            return Ok(None);
+        };
+        // ⛔ THE SELECTOR, and it is the only one: this occurrence IS the claim's
+        // exact checked consuming call. Nothing about the worker, the owner or
+        // any origin participates in choosing; they are all closure below.
+        let mut matched = ledger
+            .planned()
+            .iter()
+            .copied()
+            .filter(|fusion| {
+                ledger
+                    .claim(*fusion)
+                    .is_some_and(|claim| claim.consuming_call() == static_origin)
+            });
+        let Some(fusion) = matched.next() else {
+            return Ok(None);
+        };
+        if matched.next().is_some() {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "two outstanding fused regions claim one consuming call occurrence, so which \
+                 region this invocation belongs to is undetermined",
+            ));
+        }
+        let claim = ledger
+            .claim(fusion)
+            .expect("the claim was present at the filter above")
+            .clone();
+
+        // ---- CLOSURE, COMPLETE, BEFORE ANY MUTATION.
+        let defining = self.defining_unit.ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fused consuming call was reached with no unit currently being defined",
+            )
+        })?;
+        let defining_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fused consuming call was reached with no emission owner bound",
+            )
+        })?;
+        // ---- THE DEFINITION-LOCAL SELF EDGE DECLINES; IT DOES NOT REFUSE.
+        //
+        // ⚠ **Measured correction.** This began as a refusal and reddened on
+        // both armed roots: the fused body contains the claim's consuming call
+        // too, and reaches this seam FIRST. `evt_5edhqyyhw4585` is explicit that
+        // the definition-local self edge remains non-consuming — non-consuming
+        // is lawful, so the seam must hand it back to the ordinary
+        // static-worker path rather than reject the compile.
+        //
+        // ⛔ The two cases are told apart by the authority the fused body
+        // already binds, not by guessing from the owner: inside the fused
+        // definition `fused_consumer_authority` names this region's own
+        // continuation origin. A mismatch that is NOT that case is a real
+        // wrong-owner arrival and still refuses.
+        if self
+            .fused_consumer_authority
+            .is_some_and(|(origin, _)| origin == claim.continuation_origin())
+        {
+            return Ok(None);
+        }
+        // The EMISSION owner closes against the two lawful shapes, named rather
+        // than loosened.
+        //
+        // ⚠ **Measured correction, and it is the second one at this seam.** I
+        // first required `Predeclared(defining)`, which reddened on both roots:
+        // the call is reached during the `R` LOCAL DESCENT, which is deliberately
+        // bound under the `R` target's own checked authority, so the ambient
+        // emission owner is `Specialization(R target)` and that is correct. The
+        // consumer-owner requirement is about the defining UNIT, which was right
+        // all along; the emission owner is a second axis and needed its own
+        // statement.
+        //
+        // ⛔ Not widened to "any specialization": it must be the `R` target of
+        // THIS fusion, read from the realization relation rather than accepted
+        // because it is a specialization.
+        let r_target = self
+            .static_transition_plan
+            .fusion_outer_realizations()
+            .values()
+            .find(|realization| realization.fusion() == fusion)
+            .map(|realization| realization.target());
+        let owner_is_lawful = defining_owner == ContinuationEmissionOwner::Predeclared(defining)
+            || r_target
+                .is_some_and(|target| defining_owner == ContinuationEmissionOwner::Specialization(target));
+        if claim.consumer_owner() != defining || !owner_is_lawful {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "a fused consuming call was reached outside both the claim's consumer owner and \
+                 the region's own fused definition; only the external call emitted in the \
+                 consumer owner realizes the region",
+            ));
+        }
+        if worker.body_origin != claim.producer_body()
+            || claim.producer_body() != claim.redirect().callee_origin()
+        {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "a fused consuming call's checked worker body {:?} is not the claim's producer \
+                     body {:?} or its redirect callee {:?}; the invocation would enter a body the \
+                     region never claimed",
+                    worker.body_origin,
+                    claim.producer_body(),
+                    claim.redirect().callee_origin(),
+                ),
+            ));
+        }
+        // ⛔ THE ORDERED PARAMETER PROJECTION, compared against what this
+        // descent ACTUALLY VISITED. A consumer that cannot report its visited
+        // origins is refused rather than exempted: the equality is the whole
+        // content of the parameter half, and skipping it for one route is how a
+        // second route comes to assemble a different run.
+        let visited = visited_arguments.ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fused consuming call was reached by a consumer that does not report the \
+                 argument origins it visited, so the claim's ordered parameter projection cannot \
+                 be checked against what was lowered",
+            )
+        })?;
+        if visited != claim.invocation_parameters() {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "a fused consuming call visited argument origins {visited:?} where the \
+                     claim's ordered parameter projection is {:?}; a moved, reordered, short or \
+                     long run fills the fused frame's declared parameters with other values",
+                    claim.invocation_parameters()
+                ),
+            ));
+        }
+        if inputs.len() != visited.len() {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "a fused consuming call lowered a different number of operands than argument \
+                 origins it visited",
+            ));
+        }
+        // The declared fusion target, at the claim-issued seat. Not searched for.
+        let seat = claim.seat();
+        let target = self.function_local.unit_calls.get(&seat).cloned().ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "this function declares no fused-region target at the claim-issued seat \
+                     {seat:?}; the redirect that installs it has not run here"
+                ),
+            )
+        })?;
+        if target.origin != claim.redirect().callee_origin() || target.call_site_origin != seat {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "the target declared at the claim-issued seat does not carry the claim's own \
+                 lookup and call-site authority",
+            ));
+        }
+        if inputs.len() != target.header.parameters as usize {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "a fused consuming call supplies {} ordinary operands but the declared fused \
+                     target declares {} parameter slots",
+                    inputs.len(),
+                    target.header.parameters
+                ),
+            ));
+        }
+        // ⛔ **The COMPILER-ONLY class is refused here, before mutation; the rest
+        // of the ABI check belongs to the descriptor-driven emitter and is not
+        // duplicated.**
+        //
+        // ⚠ **Measured correction, the third at this seam.** I first required
+        // every ordinary operand to be `Carried`. That reddened on both roots at
+        // position 0: the consuming call's sole argument is the source `Unit`
+        // value, which lowers to a lawful SPECIALIZED operand and has a perfectly
+        // good boundary representation. "Specialized" is not the defect.
+        //
+        // What has no durable lane is a CLOSURE — that is exactly what the
+        // withdrawn post-field assembly tried to pass, and it is the one class
+        // worth catching before the call begins to build rather than mid-build.
+        // Everything else is validated against the real slot contract by
+        // `call_declared_unit_target`, which owns that check; restating it here
+        // would be a second ABI authority.
+        for (position, operand) in inputs.iter().enumerate() {
+            if matches!(operand, LoweringOperand::Specialized(Lowered::Closure { .. })) {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    format!(
+                        "a fused consuming call's ordinary operand at position {position} is a \
+                         closure, which is runtime-local with no durable lane, so it cannot fill \
+                         the fused frame's declared parameter slot"
+                    ),
+                ));
+            }
+        }
+        // The CAPTURE SUFFIX, distinct from the parameters, projected from
+        // `claim.inputs()` through this function's entry ABI in its recorded
+        // order.
+        let mut captures = Vec::new();
+        for (ordinal, input) in claim.inputs().iter().enumerate() {
+            let ContinuationSourceCoordinate::EntryAbi {
+                source_owner,
+                source_abi_position,
+                ..
+            } = input.coordinate
+            else {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    format!(
+                        "the fused region's checked input at ordinal {ordinal} is not an \
+                         entry-ABI coordinate; this seam reads the consumer's own entry frame and \
+                         has nowhere to locate another domain"
+                    ),
+                ));
+            };
+            if source_owner != defining {
+                return Err(unsupported(
+                    "StaticContinuationFusion",
+                    format!(
+                        "the fused region's checked input at ordinal {ordinal} is owned by \
+                         {source_owner:?}, not the {defining:?} being defined"
+                    ),
+                ));
+            }
+            let operand = self
+                .function_local
+                .defining_abi_operands
+                .get(source_abi_position as usize)
+                .cloned()
+                .ok_or_else(|| {
+                    unsupported(
+                        "StaticContinuationFusion",
+                        format!(
+                            "the fused region's checked input at ordinal {ordinal} names entry ABI \
+                             position {source_abi_position}, outside this function's {}-operand \
+                             entry run",
+                            self.function_local.defining_abi_operands.len()
+                        ),
+                    )
+                })?;
+            captures.push(operand);
+        }
+        if captures.len() != target.header.captures as usize {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "the checked input run projects {} captures but the declared fused target \
+                     declares {}",
+                    captures.len(),
+                    target.header.captures
+                ),
+            ));
+        }
+
+        // ---- THE ACTION. All fallible validation is above.
+        let mut operands = inputs.to_vec();
+        operands.extend(captures);
+        let (returned, call) = self.call_declared_unit_target(
+            builder,
+            target,
+            &operands,
+            #[cfg(test)]
+            None,
+        )?;
+        // The claim is consumed ONLY after the call was accepted. A failed build
+        // above leaves it outstanding with no partial settlement.
+        self.fusion_claims
+            .as_mut()
+            .expect("the ledger was present at the borrow above")
+            .consume(fusion, seat)?;
+        #[cfg(test)]
+        crate::cranelift_backend::lowering::record_r3_fused_invocation(fusion, static_origin);
+        Ok(Some((
+            returned,
+            StaticWorkerEmission {
+                inst: call,
+                supplied_operands: operands.len(),
+            },
+        )))
+    }
+
     fn call_static_worker(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -12255,15 +12792,25 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // line after this point, which is the whole reason the split is here and
         // not lower: captures, the route's suffix, the route's table and the
         // emitted call are one assembly with one owner.
+        // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the VISITED argument origins,
+        // recorded as this descent walks them rather than re-derived later.
+        //
+        // The fusion seam below compares them against the claim's ordered
+        // parameter projection. Recomputing the children there would be a source
+        // walk in lowering, which `evt_5edhqyyhw4585` forbids; recording what
+        // was actually visited is a different fact and is the one the equality
+        // is about.
+        let mut visited = Vec::with_capacity(args.len());
         let inputs = args
             .iter()
             .enumerate()
             .map(|(position, argument)| {
                 let argument = self.child_occurrence(static_origin, 1 + position, argument)?;
+                visited.push(argument.static_origin);
                 self.lower_expr(builder, argument, env)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        self.call_static_worker_with_inputs(builder, worker, inputs, static_origin)
+        self.call_static_worker_with_inputs(builder, worker, inputs, static_origin, Some(&visited))
             // `D8j` — direct descent DISCARDS the emission handle. It is not a
             // composed consumption and has no causal obligation to answer for;
             // dropping the handle here is that statement, made where the
@@ -12280,7 +12827,31 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         worker: &StaticWorkerBinding,
         mut inputs: Vec<LoweringOperand>,
         static_origin: StaticOriginId,
+        // `D3` — the argument origins this call's own descent VISITED, in source
+        // order. `None` from a consumer that evaluates arguments under another
+        // control and cannot report them; the fusion seam then refuses rather
+        // than skipping its equality.
+        visited_arguments: Option<&[StaticOriginId]>,
     ) -> Result<(LoweringOperand, StaticWorkerEmission), CraneliftBackendError> {
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE FUSED INVOCATION, at
+        // ---- the exact checked consuming call. Architect `evt_5edhqyyhw4585`.
+        //
+        // Seated at the shared seam both static-worker consumers pass through,
+        // not at the direct descent above. This node has paid four times for an
+        // instrument placed at one consumer while another reached the same
+        // machinery by a different route.
+        //
+        // ⛔ Selected ONLY by `claim.consuming_call == static_origin`. Every
+        // other equality below is a closure check after selection.
+        if let Some(realized) = self.dispatch_fused_consuming_call(
+            builder,
+            worker,
+            &inputs,
+            static_origin,
+            visited_arguments,
+        )? {
+            return Ok(realized);
+        }
         // `D2b` OBSERVATION ONLY, at the seam BOTH consumers share -- the direct
         // descent and the source-machine consumer. Recording at one caller
         // would miss whichever path a fixture happens to take, which is exactly

@@ -9304,6 +9304,21 @@ pub(in crate::cranelift_backend) struct FusionRegionClaim {
     selected_case_body: StaticOriginId,
     consuming_call: StaticOriginId,
     consuming_callee: StaticOriginId,
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the ordered invocation-parameter
+    /// projection.** Architect `evt_5edhqyyhw4585`.
+    ///
+    /// One entry per fused `Parameter` ABI slot, in source order: the positional
+    /// argument child of this claim's exact checked consuming `Call`. It is the
+    /// ORDINARY parameter run of the fused invocation, and it is a DIFFERENT
+    /// AXIS from the producer constructor's recursive field run -- that field is
+    /// the callee/worker binding, is compiler-only, and must never cross the
+    /// ABI. Confusing the two is the false assembly this projection replaces,
+    /// which was measured to refuse at the boundary before it could be emitted.
+    ///
+    /// Closure carried by the claim: not a fusion identity member, not a second
+    /// candidate relation. Lowering receives it read-only and does not call
+    /// `child_origin`, scan the source, or rebuild the list.
+    invocation_parameters: Vec<StaticOriginId>,
     /// The claimed continuation prefix's own origin — the
     /// `ComputationalMatchScrutinee` seat whose stored `next` replaces it when
     /// this claim is consumed.
@@ -9368,6 +9383,11 @@ impl FusionRegionClaim {
 
     pub(in crate::cranelift_backend) fn consuming_callee(&self) -> StaticOriginId {
         self.consuming_callee
+    }
+
+    /// **`D3` — the ordered invocation-parameter projection**, read-only.
+    pub(in crate::cranelift_backend) fn invocation_parameters(&self) -> &[StaticOriginId] {
+        &self.invocation_parameters
     }
 
     pub(in crate::cranelift_backend) fn continuation_origin(&self) -> StaticOriginId {
@@ -9682,6 +9702,51 @@ impl FusionRegionClaimLedger {
             // exercise them.** They are kept as defence in depth against a
             // future caller that preflights against an arena some other writer
             // filled, which is the only way they could ever fire.
+            // ---- `D3` — THE ORDERED INVOCATION-PARAMETER PROJECTION.
+            // ---- Architect `evt_5edhqyyhw4585`, derived here and nowhere else.
+            //
+            // Derived only AFTER the fusion key has selected its exact consuming
+            // `Call` and its checked callee binding, so this is closure over an
+            // already-selected edge rather than a search. Lowering gets it
+            // read-only: it never walks the source for these operands.
+            let call_children = plan.semantic.child_origins(key.consuming_call)?;
+            // 1. Child 0 is the claim's own consuming callee, and its checked
+            //    binding resolves to the claim's producer body. Both halves,
+            //    because the first alone would admit a call whose callee merely
+            //    shares an origin with a binding that resolves elsewhere.
+            // ⛔ **Validation 1 is NOT re-run here, and that is measured rather
+            // than assumed.** Both halves -- child 0 being the claim's consuming
+            // callee, and its checked binding resolving to the producer body --
+            // belong to the `resolution_armed` block above, which is ONE rule
+            // that `d3_the_consuming_binder_must_resolve_to_the_redirected_producer_body`
+            // suppresses to prove its refusals are not an earlier proxy. Adding
+            // an unconditional copy here refused under suppression too, reddening
+            // exactly that control: the copy WAS the earlier proxy the control
+            // exists to exclude. So validation 1 is discharged there, once.
+            // 3. Every recorded argument origin is an actual positional child of
+            //    THAT SAME call. Taken by construction from `call_children`, so
+            //    there is no origin here the call does not own.
+            let invocation_parameters =
+                call_children.iter().skip(1).copied().collect::<Vec<_>>();
+            // 2. The ordered argument count equals the fused header's ordinary
+            //    parameter count. ⛔ Against the DESCRIPTOR's own slot walk, not
+            //    against the vector's length, which would compare the projection
+            //    with itself.
+            let parameter_slots = view
+                .slots()
+                .iter()
+                .filter(|slot| slot.kind == AbiSlotKind::Parameter)
+                .count();
+            if invocation_parameters.len() != parameter_slots {
+                return Err(fusion_claim_error(FusionClaimRefusal::InputAvailability));
+            }
+            // 4. The producer-capture run is EMPTY on this admitted population.
+            //    A future non-empty one is a new ABI disposition and refuses
+            //    here rather than being folded into the parameters or into
+            //    `inputs`.
+            if view.header().captures as usize != key.continuation_inputs.len() {
+                return Err(fusion_claim_error(FusionClaimRefusal::InputAvailability));
+            }
             let captures = view
                 .slots()
                 .iter()
@@ -9744,6 +9809,7 @@ impl FusionRegionClaimLedger {
                     selected_case_body: key.selected_case_body,
                     consuming_call: key.consuming_call,
                     consuming_callee: key.consuming_callee,
+                    invocation_parameters,
                     continuation_origin: key.admitted.continuation_origin,
                     result_root: key.admitted.result_root,
                     enclosing_specialization: key.admitted.enclosing_specialization,
