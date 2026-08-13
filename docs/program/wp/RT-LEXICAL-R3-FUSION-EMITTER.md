@@ -391,6 +391,66 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE EMITTER HALF STOPPED AT A GENUINE BOUNDARY — three premises under it
+> ### are refuted, and one of them is a NAME COLLISION WITH LANDED PRODUCTION
+> ### CODE. Steward, 2026-08-13, recording `evt_46ka0eqw5rmrb`. **BOTH
+> ### QUESTIONS ARE THE ARCHITECT'S AND ARE OPEN.**
+>
+> **This stop is not the previous turn's reason.** That one was context depth,
+> named honestly. This one is a mechanism boundary reached on a **fresh
+> context**, found by arming the emitter in a **local reverted probe** rather
+> than building the picture from a comment. No emitter code written.
+>
+> **(1) THE IN-TREE STEP LIST IS OBSOLETE, IN THE GOOD DIRECTION — AND NOTHING
+> GOES RED WHEN IT LIES.** `core.rs` says the wired form advances through four
+> refusals and stops at step 5 or step 6. **It does neither:** armed, `Exact`
+> now runs through **all of lowering** and dies at the very end in `emit_result`
+> → `ground_value` → `into_specialized_at`, at the root projection. Steps 1-6
+> are all behind it. **That is an advancing refusal and it is the held `D1`/`D2`
+> range working** — but **the comment describing it is now false, and its own
+> text admits no detector fires when it becomes false.** A reader planning
+> against that block would plan against a stop that no longer exists.
+>
+> **(2) THE FUNNEL CANNOT REACH THE VALUE THAT BLOCKS THE ARMED PATH.** The
+> escaping value is a `StaticWorker` constructor field at **owner construct 30,
+> position 0, `field_origin` 29, `ctor:fixture::D2gOut::Node`, `funcid43`** —
+> the **only** worker field in the entire armed compile. But `Exact`'s **whole
+> continuation-call population is two edges**, at construct origins **36** and
+> **39**, and **both are composed**. **Construct 30 mints no call identity, so
+> no funnel lookup — composed or direct — reaches it.** Building the funnel
+> would not move this refusal. ⇒ It also makes this family **wholly composed**:
+> there is **no residual direct edge** to be the `DirectCall` half of the
+> same-body row.
+>
+> **(3) `CandidateDisposition::ComposedCall` ALREADY EXISTS IN PRODUCTION WITH
+> THE OPPOSITE MEANING.** It is settled at `mod.rs:8381` and documented as *"a
+> raw-worker call was emitted AND passed finished-CLIF verification"* — the
+> `D8` composed-recursive-argument mechanism, in which **a call IS emitted**.
+> The ruled fusion composition **emits no call**. The collision is load-bearing
+> because it feeds landed closeouts: `call_obligations = DirectCall ∪
+> ComposedCall`, then `emitted ⊎ composed == call_obligations` **and**
+> `claimed == call_obligations`. A fusion-composed edge is in **none** of those
+> sets, so settling it `ComposedCall` reds immediately. A fourth face is
+> structural: `close` also asserts `resolved == planned` and `declared ==
+> planned`, yet a target with no emitted `Function` has no `FuncId` to resolve
+> and no `FuncRef` to declare while its identity is still `planned`.
+>
+> **WHAT WOULD HAVE HIDDEN ALL OF IT, and this is the reason it was reported
+> from the code rather than from a red:** the claim/candidate closeout **is
+> never reached on the `d2j` witnesses, armed or unarmed.** The collision
+> **cannot be measured on the witness this unit is built around** — it would
+> have landed green here and red somewhere else.
+>
+> **THE FORK, and the implementer explicitly declined to choose:** (a) is the
+> construct-30 worker field in **this node's scope at all**, or does it belong
+> to the `DP` transported-identity work — the funnel was ruled expecting to
+> consume it and that expectation is **measurably false**; and (b) how does a
+> fusion-composed edge satisfy the two closeout laws while preserving `D8`'s
+> landed meaning of `ComposedCall`? **`InlineNoCall` is the available spelling
+> and is the silent-wrong-answer option** — it would make a fusion-composed edge
+> indistinguishable from an inlined non-call, and the enum's own doc says
+> `InlineNoCall` is *"deliberately not a third arm."*
+
 > ### THE FORK IS ANSWERED BY REFUSING BOTH OF ITS OPTIONS — the guard moves
 > ### from the EMITTER to the PLANNER as a bijection law. Steward, 2026-08-13,
 > ### recording Architect `evt_7akh94dvqeqap` (durable `cc37116f`).
