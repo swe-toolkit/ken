@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 17:22:03Z — from 235 issue file(s) in `docs/program/issues/`.
+2026-08-13 17:38:34Z — from 236 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -159,9 +159,10 @@ the committed file matches the generator's output.
 | `Q-CLAIM-CLOSURE` | Q-RESIDUE adversary findings — claim-loss in multi-claim test blocks, plus R1/R2/R3 | merged | runtime | S | none | — |
 | `Q-CLAIM-COMPARE-ORD` | claim-loss in list_instance_routes... (compare_ord) — both routing claims dropped, replacement only instantiates Bool | merged | runtime | XS | none | — |
 | `Q-RESIDUE` | the Track Q rework residue — 10 tests, folded from Q3-Q7 | closed | runtime | S | none | 818 |
+| `RT-4B-C2-REACHABILITY` | Establish whether a witness driving through `ken-elaborator` can reach the `D2f` observation at all, and at what cost -- the question 4b opened with, never answered, and the reason every 4b measurement so far has been taken on in-crate D2j fixtures instead of the real C2 source; the answer decides whether the reach node re-points or 4b's honest status becomes blocked-on-cross-crate-expressibility rather than awaiting-a-count | ready | runtime | S | none | — |
 | `RT-4B-ENUMERATION-INPUT-SIZE` | Gate 4b's observer records whether an oriented plan ARRIVED but not how large the population it walks is, so `keys = []` cannot be read as either lawful absence or a missing producer relation -- and the scalar that would settle it is the admitted-discovery ledger's length, not the oriented plan's, because that ledger is what candidate enumeration actually iterates | ready | runtime | S | none | — |
 | `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` | Gate 4b's observation route is exhausted -- four admitted discoveries enter enumeration and zero candidates leave, and none of the fourteen elimination routes is attributed; the Architect named `fusion_unique_static_body_triple` as the cheapest and most informative place to recover attribution, but instrumenting one gate is only decisive if the eliminations actually happen there, and nothing measured says they do | draft | runtime | S | none | — |
-| `RT-4B-UNIQUENESS-GATE-REACH` | Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all | ready | runtime | S | none | — |
+| `RT-4B-UNIQUENESS-GATE-REACH` | Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all | draft | runtime | S | none | — |
 | `RT-AGG-COMPOSE` | escaping two Resources into one aggregate (Prod (Resource _) (Resource _)) fails at erasure — checked endpoints do not compose | draft | runtime | TBD | none | — |
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
 | `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` | Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER | draft | runtime | M | none | — |
@@ -281,6 +282,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `LANG-SURFACE-BLOCK-COMMENTS` — `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate
 - `LANG-SURFACE-LITERAL-ESCAPES` — The lexer performs NO escape processing -- its single string form pushes every character verbatim, so the escape repertoire that SPEC-LITERAL-ESCAPE-PIN just closed is entirely unimplemented, and Char literals, byte literals, byte strings and raw triple strings do not exist at all despite String, Char and Bytes all being built prelude targets
+- `RT-4B-C2-REACHABILITY` — Establish whether a witness driving through `ken-elaborator` can reach the `D2f` observation at all, and at what cost -- the question 4b opened with, never answered, and the reason every 4b measurement so far has been taken on in-crate D2j fixtures instead of the real C2 source; the answer decides whether the reach node re-points or 4b's honest status becomes blocked-on-cross-crate-expressibility rather than awaiting-a-count
 - `RT-4B-ENUMERATION-INPUT-SIZE` — Gate 4b's observer records whether an oriented plan ARRIVED but not how large the population it walks is, so `keys = []` cannot be read as either lawful absence or a missing producer relation -- and the scalar that would settle it is the admitted-discovery ledger's length, not the oriented plan's, because that ledger is what candidate enumeration actually iterates
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
@@ -327,8 +329,8 @@ is itself not yet `merged`/`closed`:
 - `PX8` blocked by `PX8-F-CAP-41` (status: draft)
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
-- `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-4B-UNIQUENESS-GATE-REACH` blocked by `RT-4B-ENUMERATION-INPUT-SIZE` (status: ready)
+- `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: draft)
+- `RT-4B-UNIQUENESS-GATE-REACH` blocked by `RT-4B-C2-REACHABILITY` (status: ready)
 - `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: ready)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: ready)

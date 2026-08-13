@@ -1,15 +1,55 @@
 ---
 id: RT-4B-UNIQUENESS-GATE-REACH
 title: "Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all"
-status: ready
+status: draft
 owner: runtime
 size: S
 gate: none
-depends_on: [RT-4B-ENUMERATION-INPUT-SIZE]
+depends_on: [RT-4B-C2-REACHABILITY]
 blocks: [RT-4B-UNIQUENESS-GATE-ATTRIBUTION]
 github: null
 origin: Architect evt_5gck3qg72xe37 ruling the Steward's single attribution node be SPLIT, on the Steward's own sizing caveat (evt_24j7cjr1bhvzr) that exit 12 may never be reached. Reach is pure recording inside the already-authorized 4b observation gate and needs no exception; attribution is a builder change and stays conditional. Split taken by the Steward 2026-08-13.
 ---
+
+> **PULLED BACK TO `draft` 2026-08-13, SAME DAY, BEFORE ANY WORK STARTED.
+> DO NOT CUT THIS NODE. Architect `evt_6hfw027f43cgg`, verified by the Steward.**
+>
+> **The measurement this node was built on is about the wrong population.**
+> `(4, 2, 0, 2, 1)` is asserted on `arrived_empty` in
+> `d2f_0_the_applied_root_production_path_gate`, which iterates exactly
+> `[D2jCause::ExactSuffix, D2jCause::CallIdentity]` under the test's own comment
+> **`// AC-6a phase B: arrived once, resolved nothing`.**
+>
+> Those are **deliberate perturbations, authored so fusion does NOT form** —
+> `ExactSuffix` = *"the selected case body is no longer the IH-consuming
+> `Call`"*; `CallIdentity` = *"the consuming `Call` calls the ordinary child
+> instead of the hypothesis."* Four candidates walk in and nothing survives
+> **because the fixture was perturbed to make nothing survive.**
+>
+> **The same assertion shows the three unperturbed rows resolve exactly one key
+> and one descriptor each. This planner FUSES.** And the artifact-identity
+> control drives `d2j_checked_fixture_under(D2jCause::Exact)` — a D2j fixture,
+> **not `C2_MIXED_SOURCE`.**
+>
+> ⇒ **`C2`'s walked count remains UNMEASURED**, exactly where 4b stood before.
+> Pointed as written, this node would faithfully count the same comparators and
+> the successor would be spent on a fixture built to fail.
+>
+> **THE FRAME DEFECT, because it is the reusable part:** the C2 requirement was
+> written as **prose in D2 and never carried into an AC**. AC-1 to AC-5
+> constrained where the count came from, what stayed identical, which channel
+> carried it, that a mutation redded it, and that the artifact stated its limit
+> — **not one said which witness.** An in-crate D2j implementation satisfies
+> every acceptance criterion while answering a different question. **A
+> deliverable stated in prose and not carried into an AC is one the frame cannot
+> check.**
+>
+> **AND THE DRIFT WAS NOT CARELESSNESS.** The observation is `#[cfg(test)]`
+> inside `ken-runtime`; C2 drives through `ken-elaborator`, which links a build
+> where those calls do not exist. **The cross-crate gate expressibility problem
+> that 4b opened with is still unsolved and is the actual blocker** — this frame
+> asked for something its own fixed inputs made impossible. Re-pointing at C2 is
+> a scope question, not an edit.
 
 ## What this is, and why it is its own node
 

@@ -285,6 +285,56 @@ finalized contract — so it routes to the cross-repo owner, never asserted
 settled. The principle underneath: **Ken classifies epistemic status, never the
 counterparty's mechanism.**
 
+## THE LAST SWEEP BEFORE YOU RELEASE: every prose requirement must be an AC
+
+**Measured 2026-08-13, on both sides of one handoff in one afternoon.**
+
+> **A deliverable stated in prose and never carried into an AC is a deliverable
+> the frame cannot check. A ruling's constraint that never becomes an AC is a
+> constraint the build cannot fail.**
+
+`RT-4B-ENUMERATION-INPUT-SIZE` said in its D2, in plain words, *"drive the same
+real `C2_MIXED_SOURCE` through `compile_native_program_sources`."* Its five ACs
+then constrained where the count came from, what stayed identical, which channel
+carried it, that a mutation redded it, and that the artifact stated its
+ambiguity limit. **Not one said which witness.**
+
+⇒ An in-crate implementation on D2j fixtures satisfied **every** acceptance
+criterion while answering a different question — and two of those fixtures were
+**perturbed so the mechanism could not fire**, so the increment reported a
+negative control's designed outcome as a discovery. Nothing in the frame could
+have caught it, and the Steward published the reading.
+
+The Architect's half was identical from the reviewer's side: of four constraints
+in his 4b envelope, the two that became ACs were honoured exactly and the two
+that stayed prose were silently not met.
+
+### The detector, which is the part worth more than the rule
+
+**The constraints that resist becoming ACs resist because they are HARD — and
+hard is exactly where a frame asks for something its own fixed inputs forbid.**
+
+So their absence is not an oversight to tidy up; it is a **signal to re-check
+the frame against its own fixed inputs.** In this case the unenforced
+requirement was unenforceable: the observation is `#[cfg(test)]` inside
+`ken-runtime`, and the named witness drives through `ken-elaborator`, which
+links a build where those calls do not exist. **The frame asked for something
+impossible, and the missing AC was the tell.**
+
+### Do this, mechanically, before you flip a node `ready`
+
+1. **Read your own deliverables and hard stops for any requirement stated as
+   prose.** Especially *which witness*, *which population*, *which build*.
+2. **For each: is it in an AC?** If not, either write the AC or delete the
+   prose. **Never leave it as prose you are hoping someone honours.**
+3. **If it resists becoming an AC, stop and ask why** — that is the detector
+   firing, and the answer is usually that a fixed input forbids it.
+4. **Sweep the whole frame when you add a constraint late.** A frame that
+   contradicts itself gets read at whichever half is convenient. Adding the
+   four-row answer table to `RT-4B-C2-REACHABILITY` left a `D1` two paragraphs
+   above still saying *"report yes or no"*; the convenient half was the one that
+   loses the distinction.
+
 ## Authoring acceptance criteria
 
 Load `pin-a-property` (`agent/playbooks/tools/pin-a-property.md`) before

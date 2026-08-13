@@ -74,28 +74,45 @@
 > Decision, do not publish before it lands**; (3) doc commits `d7d008a3` +
 > `d1cf32f2`.
 >
-> ### R3 GATE 4b — THE OBSERVATION ROUTE IS EXHAUSTED
+> ### R3 GATE 4b — C2 HAS STILL NEVER BEEN MEASURED. READ THIS BEFORE ANY 4b WORK.
 >
-> Measured `(4, 2, 0, 2, 1)`: **four admitted discoveries enter
-> `enumerate_live_fusion_candidates` and `keys = []` comes out.** The interning
-> loop has no decline path, so `keys.len() == candidates.len()` identically —
-> all four were eliminated inside enumeration.
+> **A previous version of this block said the observation route was exhausted
+> and that "there was nothing to fuse" was dead. BOTH WERE WRONG and are
+> withdrawn** (Architect `evt_6hfw027f43cgg`, verified by the Steward against
+> the diff).
 >
-> **That kills exactly one explanation — "there was nothing to fuse" — and
-> licenses NOTHING about the planner.** Fourteen elimination routes, none
-> attributed, at least one documented lawful. **The full fourteen-exit census is
-> OUT** (Architect): all thirteen exits are bare `continue`s, so attributing
-> them means teaching enumeration to distinguish them — a builder change.
+> `(4, 2, 0, 2, 1)` is asserted on `arrived_empty` in
+> `d2f_0_the_applied_root_production_path_gate`, which iterates exactly
+> `[D2jCause::ExactSuffix, D2jCause::CallIdentity]` — **deliberate perturbations
+> authored so fusion does NOT form**, under the test's own comment
+> `// AC-6a phase B: arrived once, resolved nothing`.
 >
-> **`RT-4B-UNIQUENESS-GATE-REACH` counts arrivals at exit 12 of 13** — a
-> call-site counter, no signature or control-flow change, inside the already
-> authorized observation gate.
-> - **reach = 0 ⇒ CLOSE `RT-4B-UNIQUENESS-GATE-ATTRIBUTION`, do not kick it.**
->   That is a GOOD outcome: it narrows fourteen routes to eleven.
-> - **reach > 0 ⇒ attribution becomes lawful** against its five ACs.
+> ⇒ **Four candidates entered and nothing survived BECAUSE THE FIXTURE WAS
+> PERTURBED TO MAKE NOTHING SURVIVE.** It is a negative control reporting its
+> designed outcome.
 >
-> **Nobody may write "the uniqueness gate ate our candidates."** No node
-> licenses it, and the frames quarantine that exact sentence.
+> **The same assertion shows the three unperturbed rows each resolve exactly one
+> key and one descriptor. THIS PLANNER FUSES.** The artifact-identity control
+> drives `d2j_checked_fixture_under(D2jCause::Exact)` — **not `C2_MIXED_SOURCE`.**
+>
+> **`C2`'s walked count is UNMEASURED, exactly where 4b stood before the
+> increment.** `RT-4B-UNIQUENESS-GATE-REACH` and `RT-4B-UNIQUENESS-GATE-ATTRIBUTION`
+> are **both `draft`; do not cut either.** Pointed as written, reach would count
+> the same comparators.
+>
+> **THE ACTUAL BLOCKER, unchanged since 4b opened: cross-crate gate
+> expressibility.** The observation is `#[cfg(test)]` inside `ken-runtime`; C2
+> drives through `ken-elaborator`, which links a build where those calls do not
+> exist. **The reach frame asked for a C2 run its own fixed inputs made
+> impossible.** Re-pointing at C2 is a scope question, not an edit.
+>
+> **THE FRAME DEFECT WORTH CARRYING:** the C2 requirement lived in D2 prose and
+> **was never carried into an AC**. Five ACs constrained everything except
+> *which witness*, so an in-crate implementation satisfied all of them while
+> answering a different question. **A deliverable stated in prose and not in an
+> AC is one the frame cannot check.** QA hedged correctly — *"on these rows"* —
+> and the Steward dropped the qualifier when restating it. **The hedge was the
+> finding.**
 >
 > ### TWO ERRORS TODAY, BOTH THE SAME SHAPE: A CLAIM WIDER THAN ITS INSTRUMENT
 >
