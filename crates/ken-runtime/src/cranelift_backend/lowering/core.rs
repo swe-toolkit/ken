@@ -10641,9 +10641,44 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // composing it here would duplicate a realization that already
         // happened, and calling it would emit the call the mechanism removes.
         //
-        // ⛔ Fail-closed by design. If a projection still routes an `R`
-        // identity here, that projection is the defect and this names it at the
-        // seat rather than letting the identity take whichever path it lands in.
+        // Fail-closed by design. Whatever still routes an `R` identity here is
+        // the defect, and this names it at the seat rather than letting the
+        // identity take whichever path it lands in.
+        //
+        // ---- **THE ROUTE THAT STILL REACHES IT IS LOCATED. It is NOT a
+        // ---- projection, and that is the finding.**
+        //
+        // MEASURED on both armed roots, probes reverted:
+        //
+        // ```text
+        // retained-frame seat  construct=39 cont=10 alt=0 pos=0 defining=unit 3   (Exact)
+        // retained-frame seat  construct=35 cont=6  alt=0 pos=0 defining=unit 1   (ReHomed)
+        // take_fused_region_at   ENTERED ZERO TIMES in either compile
+        // ```
+        //
+        // The consumer's OWN standalone unit body lowers its producer occurrence
+        // through the **producer-dispatcher** route, and
+        // `take_fused_region_at` — the seat that would hand that region to the
+        // fused function instead — is offered **only on the source-machine
+        // `ComputationalMatchScrutinee` continuation.** The consumer never
+        // takes that route here, so the takeover is never offered at all.
+        //
+        // ⇒ Meanwhile `redirect_fused_producer_invocations` DID install the
+        // consumer's call to the fused function at the claim's seat. So without
+        // a takeover the consumer's body would both call the fused function and
+        // lower the same producer inline — the second selected-body lowering
+        // `evt_6bm54j10w1n88` forbids. **This guard is what stops that**, which
+        // is why the stop is a refusal and never a duplicated realization.
+        //
+        // ⚠ **This is a missing SEAT, not a population to narrow, so it is not
+        // repaired here.** It is the fourth time on this node that an
+        // instrument or settlement placed at one consumer was blind to another
+        // reaching the same machinery by a different route — the same shape as
+        // the `D1`/`D2` correction that moved `DirectCall` settlement to the
+        // shared funnel. The precedent says the answer is a seat every route
+        // passes through rather than a second copy on this one; **which point
+        // that is, is a mechanism decision and is routed rather than chosen
+        // here.**
         if self
             .static_transition_plan
             .fusion_outer_realizations()
