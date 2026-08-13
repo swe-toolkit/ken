@@ -3099,6 +3099,56 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// runnable, because a control armed against a shape the checker never emits is
 /// worth less than an honest gap.
 ///
+/// **THAT QUESTION IS NOW ANSWERED, AND THE ANSWER IS THE HONEST GAP: the
+/// ordinary front end does not emit a `ComputationalMatch` at all.** Measured
+/// through `ken_cli::build_native_program` on real Ken source, censusing the
+/// checker's own erased output (`runtime_program.declarations`, whose only
+/// body-bearing kind is `Transparent`, so the census is not partial):
+///
+/// | real-source program | `ComputationalMatch` | outcome |
+/// |---|---|---|
+/// | `data Branch = Tip \| Fork (Bool -> Branch)`, `Fork k` case applies `k` | 0 | BUILT |
+/// | first-order `Link rest` case, `Suc (depth rest)` | 0 | BUILT |
+/// | effectful `Link rest \|-> walk rest` (self-call present) | 0 | BUILT |
+/// | effectful `Link rest` case, field only, no self-call | 0 | BUILT |
+/// | `px7p`'s own PROGRAM (a GREEN integration test today) | 0 | BUILT |
+/// | `px8l`/`px7m`/`px7l` PROGRAMs | — | refuse at object emission on the
+/// |   |   | pre-existing `RT-CLOSURE-BOUNDARY-LANE` / `RT-CARRIER-BYTESPAN-OBSERVE`
+/// |   |   | debt, which is why those rows are `#[ignore]`d |
+///
+/// **The mechanism reading agrees with the measurement, and it is one
+/// predicate.** `checked_match_uses_computational_recursive_hypothesis`
+/// (`ken_elaborator::checked_core`) answers `true` only when a branch body
+/// **references the IH binder range** — `runtime_body_references_outer_binder_
+/// range(body, 0, recursive_count, 0)`. A surface self-call erases to a
+/// `RecursiveDeclarationCall`, **not** to a reference to that range, which is
+/// why even the self-calling positive above censused 0. So:
+///
+/// ⇒ **The property that DEFINES control 2 — a body that uses the selected
+/// recursive argument and never the hypothesis — is the very property that makes
+/// this predicate answer `false`.** A selected-argument-only body is classified
+/// as an ordinary `Match` and never reaches the composed eliminator seat at all.
+/// Control 2 is not merely hard to author from source; **as stated it is
+/// self-defeating at the classifier**, one gate above anything this file tests.
+///
+/// **THE GAP, stated as its own sentence.** MEASURED: eight real-source programs,
+/// including two of this repo's own integration programs, produce zero
+/// `ComputationalMatch` nodes. CLAIMED, and NOT proven: that *no* Ken program
+/// can. The first gate above the predicate —
+/// `validate_supported_match_motive`, which sets
+/// `computational_recursive_hypotheses` — **can** be satisfied from surface
+/// source, so the closure argument is about the second gate only, and it rests
+/// on eight witnesses plus one predicate read, not on an enumeration of the
+/// surface.
+///
+/// **What this says about the node, and it is larger than control 2.** Every
+/// control that reaches this seat — control 1 included, green above — does so
+/// through a `D2jCause` synthetic fixture, and the reason is now measured rather
+/// than suspected: **the front end does not produce the shape.** That is exactly
+/// the `D0` history the scope ruling cited, observed directly instead of
+/// inherited. It is reported, deliberately not repaired: making the classifier
+/// admit this shape is a checker change and is not this seat's to make.
+///
 /// **What the same probe DID establish**, on both roots, read directly out of
 /// the recorded run: `[(0, Some(TransportId(0))), (1, Some(TransportId(0)))]` —
 /// the two members carry one transport, which is the ruled coordinate observed
