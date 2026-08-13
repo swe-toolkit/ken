@@ -704,11 +704,101 @@ nothing you inherit from `#6d`.**
 > being convincing.** Carry the qualifier into every derived artifact, or the
 > qualifier dies at the first retelling.
 
+> ### GATE 4 SPLITS INTO 4a/4b. DO NOT WAIT ON `RT-CLOSURE-BOUNDARY-LANE` —
+> ### EXTRACT ONE PRODUCTION PRE-OBJECT PREPARATION SEAM. Steward, 2026-08-13,
+> ### folding Architect `evt_5r8ka125spqm9` into operative scope. **THIS IS THE
+> ### NEWEST BOX. It answers the gate-4 stop in the box below and does not
+> ### disturb anything else in it.**
+>
+> **The stop was an instrument gap, not a negative result, and the ruling keeps
+> both observations exactly as reported.**
+> `erase_checked_core_package_for_target` passes `native_plans=None`, so **its
+> zero cannot be quoted as a source zero or a planner zero**; and the
+> input-dependent full build reaches unrelated object-emission debt, while the
+> closed-literal green **folds the witness away and is not evidence**.
+>
+> **WHY WAITING WOULD BE WRONG — the authority already exists BEFORE the blocking
+> lane.** Inside `compile_native_program_sources`, production already:
+> normalizes the exact selected executable closure; derives
+> `checked_computational_ih_templates`; calls
+> `erase_checked_host_package_for_target_with_join_plan`; validates total
+> computational-IH seed consumption; finishes the join/oriented plans and binds
+> their exact Runtime marker locations; canonicalizes and embeds those plans in
+> the checked package and constructs the planned `RuntimeProgram` — **and only
+> then** calls `build_bound_process_starter_executable_artifact`, where the
+> closure-boundary debt is hit. ⇒ **Planner evidence is not semantically
+> downstream of `RT-CLOSURE-BOUNDARY-LANE`.** Making R3 wait would couple a
+> checked-plan acceptance fact to an unrelated backend representation debt.
+>
+> **THE AUTHORIZED SEAM.** Refactor that existing production prefix into **one
+> compiler-owned preparation operation**. The name is not normative; the contract
+> is:
+>
+> ```text
+> package name + real source set
+>   -> exact checked-main admission and selection
+>   -> normalized executable closure
+>   -> compiler-derived IH seeds
+>   -> plan-bearing erasure
+>   -> total-seed validation + exact marker binding
+>   -> immutable native-program preparation
+> ```
+>
+> It may expose the planned `RuntimeProgram`, exact selected closure/entrypoint
+> facts, and the canonical or decoded join and `OrientedSubcontinuationPlanV1`
+> needed for read-only inspection. **It stops before object emission.**
+> `compile_native_program_sources` **MUST consume that same preparation** and
+> then continue to artifact construction. **One producer transaction — not a test
+> path beside production.** The full-build path and the read path share the same
+> function body.
+>
+> **TWO LOAD-BEARING PROHIBITIONS.** Do **not** make
+> `erase_checked_host_package_for_target_with_join_plan` a caller-driven public
+> builder — it accepts compiler-private seeds, and exposing that surface would
+> **let the control author the fact it is meant to test**. Do **not** add a
+> second test-only seed collector, plan builder, marker injector, or an error
+> payload carrying a lucky partial result. If cross-crate integration needs a
+> public type, expose an **immutable** preparation/report type, never mutable
+> collectors or caller-supplied templates.
+>
+> **REQUIRED CONTROLS ON THE SEAM.**
+>
+> 1. **The non-forking control is equality.** On an already-green native source,
+>    compare the preparation's canonical Runtime program and embedded plan bytes
+>    with the same fields returned by the full native build.
+> 2. **Keep the C2 scrutinee input-dependent.** A folded `[main]` program is
+>    **red for this control even if preparation succeeds**.
+> 3. **Read the C2 relation by exact identity/path, never by non-empty counts.**
+>    Preserve the erased `[[2,3],[1]]` mixed match, then census the oriented
+>    computational-IH slots, complete IH-call templates, and their bound Runtime
+>    marker locations for that same checked match and branches.
+> 4. **Absence of a Fork IH CALL may be lawful** — that branch deliberately does
+>    not invoke its hidden recursive result. **It must not be conflated with
+>    absence of the Fork recursive-position SLOT. Report each class separately.**
+>    Neither measured population is pre-judged.
+>
+> **Named falsifiers:** caller-authored plans, marker injection, a folded
+> witness, a path/count-only match, an unbound marker location, or divergence
+> between the preparation and the prefix the full build consumes.
+>
+> **GATE 4 IS NOW ORDERED.** **4a** — compiler-derived IH slots/calls and the
+> validated oriented plan, taken through the new preparation seam. **4b** — the
+> existing Runtime static-fusion planner's population. If **4a** is absent or
+> refuses, **stop at that exact relation**. If 4a is positive but **4b** remains
+> unobservable without entering object compilation, **stop and hand back that
+> narrower planner-observer boundary — do not speculatively expose a second
+> Runtime seam in the same turn**. Gates 5 and 6 remain held.
+>
+> **What is NOT authorized:** classifier, checker, marker, enumeration,
+> fusion-candidate, representation, ledger, or closure-boundary repair.
+> **Production remains unarmed.** The published gates 1-3 increment retains its
+> stated strength and is unaffected.
+
 > ### SURFACE KEN IS THE WITNESS SOURCE. C1-SOURCE IS RELEASED; ONE BOUNDED
 > ### C2-SOURCE ATTEMPT IS AUTHORIZED. Steward, 2026-08-13, folding Architect
-> ### `evt_10ayk8fbjsz74` into operative scope. **THIS IS THE NEWEST CONTROL
-> ### RULING. It SUPERSEDES the "C1-source remains open" half of the box below
-> ### (`evt_7mg1x1vqe7qph`); that box's classifier prohibition STANDS.**
+> ### `evt_10ayk8fbjsz74` into operative scope. **This SUPERSEDES the "C1-source
+> ### remains open" half of `evt_7mg1x1vqe7qph`; that box's classifier
+> ### prohibition STANDS. Its gate-4 stop is ANSWERED by the box above.**
 >
 > **The premise "surface Ken has no erased-IR producer" is refuted, and the
 > lawful production source is named.** The nested-result association is:
