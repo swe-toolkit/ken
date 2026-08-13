@@ -16,13 +16,11 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REGISTRY = ROOT / ".github" / "ignored-test-exemptions.toml"
 DEFAULT_RUST_ROOT = ROOT / "crates"
 DEFAULT_CONFORMANCE_ROOT = ROOT / "conformance"
-POPULATION_PATHS = (
-    "crates/ken-cli",
-    "crates/ken-verify",
-    "crates/ken-runtime",
-    "crates/ken-interp",
-)
-ALLOWED_CLASSES = {"policy-cost", "placeholder-no-assertions"}
+ALLOWED_CLASSES = {
+    "blocked-upstream-relation",
+    "policy-cost",
+    "placeholder-no-assertions",
+}
 FILE_PATH_ROOTS = {"conformance", "spec"}
 SUMMARY_RE = re.compile(
     r"\b(?P<total>\d+) tests? run:\s+(?P<passed>\d+) passed\b"
@@ -38,10 +36,92 @@ LEVEL_THREE_HEADING_RE = re.compile(r"^###\s+(?P<token>\S+)(?:\s.*)?$")
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*#\[test\]\s*$")
 ATTRIBUTE_OR_COMMENT_RE = re.compile(r"^\s*(?:#\[|//)")
 TEST_FN_RE = re.compile(r"^\s*fn\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(")
+IGNORE_REASON_RE = re.compile(
+    r'^\s*#\[ignore\s*=\s*"(?P<reason>[^"]+)"\]\s*$'
+)
+RELATION_SYMBOL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 
 
 class SweepError(RuntimeError):
     """The sweep instrument could not establish its claimed measurement."""
+
+
+def workspace_packages_from_metadata(
+    document: object, root: Path
+) -> dict[str, Path]:
+    if not isinstance(document, dict):
+        raise SweepError("cargo metadata output is not an object")
+    members = document.get("workspace_members")
+    packages = document.get("packages")
+    if not isinstance(members, list) or not all(
+        isinstance(member, str) and member for member in members
+    ):
+        raise SweepError("cargo metadata has no valid workspace_members list")
+    if not isinstance(packages, list):
+        raise SweepError("cargo metadata has no packages list")
+    member_ids = set(members)
+    resolved: dict[str, Path] = {}
+    resolved_ids: set[str] = set()
+    for package in packages:
+        if not isinstance(package, dict) or package.get("id") not in member_ids:
+            continue
+        package_id = package["id"]
+        name = package.get("name")
+        manifest_path = package.get("manifest_path")
+        if (
+            not isinstance(package_id, str)
+            or not isinstance(name, str)
+            or not name
+            or not isinstance(manifest_path, str)
+            or not manifest_path
+        ):
+            raise SweepError("cargo metadata contains a malformed workspace package")
+        try:
+            package_root = Path(manifest_path).resolve().parent.relative_to(
+                root.resolve()
+            )
+        except ValueError as error:
+            raise SweepError(
+                f"workspace package {name!r} is outside the repository root"
+            ) from error
+        if name in resolved:
+            raise SweepError(f"duplicate workspace package name: {name}")
+        resolved[name] = package_root
+        resolved_ids.add(package_id)
+    missing = sorted(member_ids - resolved_ids)
+    if missing:
+        raise SweepError(
+            "cargo metadata omitted workspace member packages: "
+            + ", ".join(missing)
+        )
+    if not resolved:
+        raise SweepError("cargo metadata resolved zero workspace packages")
+    return resolved
+
+
+def cargo_workspace_packages() -> dict[str, Path]:
+    result = subprocess.run(
+        [
+            "cargo",
+            "metadata",
+            "--locked",
+            "--no-deps",
+            "--format-version",
+            "1",
+        ],
+        cwd=ROOT,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SweepError(result.stderr.strip() or "cargo metadata failed")
+    try:
+        document = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise SweepError("cargo metadata returned malformed JSON") from error
+    return workspace_packages_from_metadata(document, ROOT)
 
 
 def conformance_namespaces(root: Path) -> tuple[str, ...]:
@@ -198,12 +278,91 @@ def load_registry(path: Path) -> list[dict[str, str]]:
             raise SweepError("registry fields must be non-empty strings")
         if row["class"] not in ALLOWED_CLASSES:
             raise SweepError(f"unknown exemption class: {row['class']}")
+        if (
+            row["class"] == "blocked-upstream-relation"
+            and RELATION_SYMBOL_RE.fullmatch(row["readmission"]) is None
+        ):
+            raise SweepError(
+                "blocked-upstream-relation readmission must be one exact "
+                f"relation symbol: {row['readmission']!r}"
+            )
         if row["test_path"] in seen:
             raise SweepError(f"duplicate test_path: {row['test_path']}")
         if "::" not in row["test_path"]:
             raise SweepError(f"test_path is not keyed by package: {row['test_path']}")
         seen.add(row["test_path"])
     return rows
+
+
+def ignored_test_reasons(package_root: Path) -> dict[str, list[tuple[str, int, str]]]:
+    reasons: dict[str, list[tuple[str, int, str]]] = {}
+    for path in sorted(package_root.rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            function = TEST_FN_RE.match(line)
+            if function is None:
+                continue
+            cursor = index - 1
+            while cursor >= 0 and ATTRIBUTE_OR_COMMENT_RE.match(lines[cursor]):
+                ignored = IGNORE_REASON_RE.match(lines[cursor])
+                if ignored is not None:
+                    reasons.setdefault(function.group("name"), []).append(
+                        (
+                            str(path.relative_to(ROOT)),
+                            cursor + 1,
+                            ignored.group("reason"),
+                        )
+                    )
+                cursor -= 1
+    return reasons
+
+
+def verify_blocked_upstream_relations(
+    rows: list[dict[str, str]], workspace_packages: dict[str, Path]
+) -> int:
+    blocked = [
+        row for row in rows if row["class"] == "blocked-upstream-relation"
+    ]
+    package_reasons: dict[str, dict[str, list[tuple[str, int, str]]]] = {}
+    errors: list[str] = []
+    for row in blocked:
+        package, _, test = row["test_path"].partition("::")
+        function = test.rpartition("::")[2]
+        package_root = workspace_packages.get(package)
+        if package_root is None:
+            errors.append(
+                f"registry test_path {row['test_path']!r} names no workspace package"
+            )
+            continue
+        if package not in package_reasons:
+            package_reasons[package] = ignored_test_reasons(ROOT / package_root)
+        reasons = package_reasons[package]
+        matches = reasons.get(function, [])
+        if len(matches) != 1:
+            errors.append(
+                f"registry test_path {row['test_path']!r} resolves to "
+                f"{len(matches)} source #[ignore = \"...\"] reasons; expected exactly one"
+            )
+            continue
+        path, line, reason = matches[0]
+        relation = re.compile(
+            rf"(?<![A-Za-z0-9_-]){re.escape(row['readmission'])}"
+            r"(?![A-Za-z0-9_-])"
+        )
+        if relation.search(reason) is None:
+            errors.append(
+                f"{path}:{line} ignore reason for {row['test_path']!r} does not "
+                f"name readmission relation {row['readmission']!r}"
+            )
+    if errors:
+        raise SweepError(
+            "blocked-upstream-relation verification failed:\n" + "\n".join(errors)
+        )
+    print(
+        f"blocked upstream relations: {len(blocked)} registry readmissions "
+        "agree with their source ignore reasons"
+    )
+    return len(blocked)
 
 
 def possible_test_paths(identity: tuple[str, str, str]) -> set[str]:
@@ -245,14 +404,17 @@ def filter_expression(
     return f"not ({' + '.join(members)})"
 
 
-def ignored_attribute_count() -> int:
+def ignored_attribute_count(
+    workspace_packages: dict[str, Path] | None = None,
+) -> int:
+    packages = workspace_packages or cargo_workspace_packages()
     command = [
         "git",
         "grep",
         "-nE",
         r"^[[:space:]]*#\[ignore",
         "--",
-        *POPULATION_PATHS,
+        *(str(path) for path in sorted(set(packages.values()))),
     ]
     result = subprocess.run(
         command,
@@ -500,6 +662,9 @@ def main() -> int:
     try:
         if args.command == "verify-row-claims":
             verify_row_claims(DEFAULT_RUST_ROOT, DEFAULT_CONFORMANCE_ROOT)
+            verify_blocked_upstream_relations(
+                load_registry(args.registry), cargo_workspace_packages()
+            )
             return 0
         rows = load_registry(args.registry)
         if args.command == "filter":

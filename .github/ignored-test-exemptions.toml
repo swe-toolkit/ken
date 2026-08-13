@@ -1,5 +1,18 @@
 version = 1
 
+# `blocked-upstream-relation` is temporary: `readmission` is the exact absent
+# relation symbol and must occur in the row's own #[ignore = "..."] reason.
+
+[[exemption]]
+test_path = "ken-elaborator::compiler_driver::tests::gate_4a_preparation_and_full_build_are_one_transaction"
+class = "blocked-upstream-relation"
+readmission = "RT-CLOSURE-BOUNDARY-LANE"
+
+[[exemption]]
+test_path = "ken-elaborator::r3_c2_source_mixed_branch::c2_gate_4a_preparation_consumes_every_compiler_derived_slot"
+class = "blocked-upstream-relation"
+readmission = "checked_computational_ih_slot_unconsumed"
+
 [[exemption]]
 test_path = "ken-runtime::boundary_value_clif::tests::b2v_ac10_a_deep_acyclic_chain_adopts_at_thirty_thousand"
 class = "policy-cost"

@@ -273,7 +273,7 @@ pub struct NativeProgramBuildOutput {
     pub plan_transport_hash: u64,
     pub closure: TargetClosure,
     pub executable_closure: BTreeSet<StableSymbol>,
-    pub runtime_program: ken_runtime::RuntimeProgram,
+    pub runtime_program: Box<ken_runtime::RuntimeProgram>,
     pub executable_entrypoint: ExecutableEntrypointPackage,
     pub artifact: ken_runtime::BoundProcessExecutableArtifact,
     pub report: TargetSelectionReport,
@@ -2051,11 +2051,29 @@ fn checked_computational_ih_templates(
 
 /// Compile one exact checked Program I `main` through lowering and linked
 /// process-artifact production as a single identity-consistent transaction.
-pub fn compile_native_program_sources(
+/// `RT-LEXICAL-R3` gate 4a — **the production pre-object PREPARATION
+/// transaction**, and the one producer of everything the native build knows
+/// before object emission.
+///
+/// This is an EXTRACTION, not a new surface. It is the exact former prefix of
+/// [`compile_native_program_sources`] — selected-main admission, closure
+/// normalization, compiler-derived IH seeds, plan-bearing erasure, total-seed
+/// validation, exact marker binding, and the planned Runtime program — stopping
+/// immediately before `build_bound_process_starter_executable_artifact`.
+/// `compile_native_program_sources` now **consumes this same transaction**, so
+/// there is one producer rather than a test path running beside production.
+///
+/// **The caller cannot author any of it.** The returned
+/// [`NativeProgramPreparationV1`] is immutable and has no public constructor, no
+/// compiler-private seed enters through this signature, and no plan, marker or
+/// seed collector becomes reachable from outside. A control built on it reads
+/// what production produced and nothing else — which is the whole point, since a
+/// control able to author the fact it tests measures nothing.
+#[inline(always)]
+pub fn prepare_native_program_sources(
     package_name: &str,
     sources: Vec<CompilerSource>,
-    output_dir: impl AsRef<Path>,
-) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
     let manifest = CompilerManifest::new(package_name, Vec::new());
     if package_name.is_empty() {
         return Err(NativeProgramBuildError::Driver(
@@ -2090,6 +2108,9 @@ pub fn compile_native_program_sources(
     let plan =
         native_entrypoint_plan(&checked, &symbols).map_err(NativeProgramBuildError::Driver)?;
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
+    // Gate 4a: retained on the preparation so a control can compare the EMBEDDED
+    // plan bytes against a full native build's, rather than recomputing them.
+    let plan_bytes_retained = plan_bytes.clone();
     let plan_transport_hash = fingerprint(&plan_bytes);
     let host_spine =
         checked_host_spine_v1(&env.prelude_env, &symbols).map_err(NativeProgramBuildError::Driver)?;
@@ -2428,8 +2449,102 @@ pub fn compile_native_program_sources(
         .metadata
         .trusted_base_delta
         .retain(|symbol, _| runtime_targets.contains(symbol));
+    Ok(NativeProgramPreparationV1 {
+        package: Box::new(package),
+        plan: Box::new(plan),
+        plan_bytes: plan_bytes_retained,
+        plan_transport_hash,
+        host_spine: Box::new(host_spine),
+        closure: Box::new(closure),
+        executable_closure,
+        executable_entrypoint: Box::new(executable_entrypoint),
+        runtime_program: Box::new(runtime_program),
+        selected,
+    })
+}
+
+/// The immutable result of [`prepare_native_program_sources`].
+///
+/// Fields are private with read-only accessors: nothing here can be constructed,
+/// mutated, or partially supplied by a caller. Cross-crate integration needs the
+/// type to be public; it does not need it to be a builder, and it is not one.
+///
+/// The large members are boxed so the preparation stays pointer-sized while it
+/// crosses the extracted seam. The producer is always inlined because the
+/// pre-object transaction already approaches the debug-build stack limit; a
+/// second live call frame over that transaction overflows a native-executor
+/// control. Production borrows the boxed members in place and moves them into
+/// the final output only after emission succeeds.
+#[derive(Clone, Debug)]
+pub struct NativeProgramPreparationV1 {
+    package: Box<CheckedCorePackage>,
+    plan: Box<NativeEntrypointPlanV1>,
+    plan_bytes: Vec<u8>,
+    plan_transport_hash: u64,
+    host_spine: Box<crate::erasure::CheckedHostSpineV1>,
+    closure: Box<TargetClosure>,
+    executable_closure: BTreeSet<StableSymbol>,
+    executable_entrypoint: Box<ExecutableEntrypointPackage>,
+    runtime_program: Box<ken_runtime::RuntimeProgram>,
+    selected: Vec<SelectedTargetReport>,
+}
+
+impl NativeProgramPreparationV1 {
+    /// The planned Runtime program exactly as production carries it into object
+    /// emission.
+    pub fn runtime_program(&self) -> &ken_runtime::RuntimeProgram {
+        &self.runtime_program
+    }
+
+    /// The canonical entrypoint plan bytes embedded by this transaction.
+    pub fn plan_bytes(&self) -> &[u8] {
+        &self.plan_bytes
+    }
+
+    pub fn plan_transport_hash(&self) -> u64 {
+        self.plan_transport_hash
+    }
+
+    pub fn plan(&self) -> &NativeEntrypointPlanV1 {
+        &self.plan
+    }
+
+    /// The declarations this transaction owns, which are exactly the ones erased
+    /// into the runtime program.
+    pub fn executable_closure(&self) -> &BTreeSet<StableSymbol> {
+        &self.executable_closure
+    }
+}
+
+/// Elaborate, plan, and lower one Ken program to a linked native artifact.
+///
+/// Gate 4a: this now **consumes** [`prepare_native_program_sources`] rather than
+/// re-deriving its prefix, so the preparation a control observes and the
+/// preparation production emits from are the same object.
+pub fn compile_native_program_sources(
+    package_name: &str,
+    sources: Vec<CompilerSource>,
+    output_dir: impl AsRef<Path>,
+) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
+    let preparation = prepare_native_program_sources(package_name, sources)?;
+    complete_native_program_preparation(preparation, output_dir)
+}
+
+/// Consume the compiler-owned preparation by value and finish object emission.
+/// Keeping this operation private prevents callers from supplying a plan while
+/// preserving object identity for the closure-bearing Runtime program.
+#[inline(always)]
+fn complete_native_program_preparation(
+    preparation: NativeProgramPreparationV1,
+    output_dir: impl AsRef<Path>,
+) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
+    let plan = preparation.plan.as_ref();
+    let host_spine = preparation.host_spine.as_ref();
+    let NativeProgramPreparationV1 {
+        plan_transport_hash, ..
+    } = &preparation;
     let artifact = ken_runtime::build_bound_process_starter_executable_artifact(
-        &runtime_program,
+        &preparation.runtime_program,
         &ken_runtime::BoundProcessEntrypoint {
             target_symbol: plan.main.to_string(),
             program_caps_constructor: plan.program_caps_constructor.to_string(),
@@ -2441,13 +2556,13 @@ pub fn compile_native_program_sources(
             },
             fs_root_spec: plan.fs_root_spec.clone(),
             fs_root_binding: ken_runtime::fs_root_plan_binding_v1(
-                plan_transport_hash,
+                *plan_transport_hash,
                 &plan.fs_root_spec,
             ),
-            plan_hash: plan_transport_hash,
+            plan_hash: *plan_transport_hash,
             allow_root_execution: plan.allow_root_execution,
             root_execution_binding: ken_runtime::root_execution_plan_binding_v1(
-                plan_transport_hash,
+                *plan_transport_hash,
                 plan.allow_root_execution,
             ),
             ret_constructor: plan.ret_constructor.to_string(),
@@ -2504,6 +2619,22 @@ pub fn compile_native_program_sources(
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
     .map_err(NativeProgramBuildError::Packaging)?;
+    let NativeProgramPreparationV1 {
+        package,
+        plan,
+        plan_bytes: _,
+        plan_transport_hash,
+        host_spine: _,
+        closure,
+        executable_closure,
+        executable_entrypoint,
+        runtime_program,
+        selected,
+    } = preparation;
+    let package = *package;
+    let plan = *plan;
+    let closure = *closure;
+    let executable_entrypoint = *executable_entrypoint;
     let mut report = build_target_selection_report(&package, selected);
     report.runtime_lowering = ReportFact::Emitted;
     report.native_artifact = ReportFact::Emitted;
@@ -4925,6 +5056,150 @@ mod tests {
         ClassInstanceMetadata, ObligationMetadata, ObligationStatus,
     };
     use crate::erasure::erase_checked_core_package_for_target;
+
+    const GATE_4A_EQUALITY_SOURCE: &str = r#"program capabilities FS APartial
+fn walk (fuel : Nat) (state : Bool) : HostIO APartial ExitCode =
+  match fuel {
+    Zero |-> match state {
+      False |-> host_exit APartial (Failure 7);
+      True |-> host_exit APartial Success
+    };
+    Suc smaller |-> walk smaller (match state {
+      False |-> True;
+      True |-> False
+    })
+  }
+
+fn seed (input : ProcessInput) : Nat =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> Zero;
+      Cons _argv0 rest |-> match rest {
+        Nil |-> Zero;
+        Cons _argument _tail |-> Suc (Suc (Suc Zero))
+      }
+    }
+  }
+
+fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode =
+  walk (seed input) True
+"#;
+
+    fn exact_metadata_bytes(
+        package: &CheckedCorePackage,
+        package_name: &str,
+        metadata_name: &str,
+    ) -> Vec<u8> {
+        let symbol = StableSymbol::new(
+            SymbolNamespace::Metadata,
+            vec![package_name.to_string(), metadata_name.to_string()],
+        );
+        package
+            .artifact
+            .semantic
+            .metadata
+            .get(&symbol)
+            .unwrap_or_else(|| panic!("missing exact metadata symbol {symbol}"))
+            .clone()
+    }
+
+    /// Transition sentinel for the ruled non-forking equality control.
+    ///
+    /// MEASURED: this is the only landed native source found to retain more than
+    /// `[main]`; preparation succeeds with two declarations, but full completion
+    /// refuses at `RT-CLOSURE-BOUNDARY-LANE` before equality can be observed.
+    ///
+    /// CLAIMED: once an already-green source retains more than `[main]`, the
+    /// gate-4a read and full native build must observe one producer transaction.
+    ///
+    /// THE GAP: no already-green source currently reaches the assertions below.
+    /// Allocation identity, closure-free equality, and exact plan bytes are all
+    /// present, but a blocked control is not evidence for any of them.
+    #[test]
+    #[ignore = "no green >[main] fixture: recursive source stops at RT-CLOSURE-BOUNDARY-LANE"]
+    fn gate_4a_preparation_and_full_build_are_one_transaction() {
+        let package_name = "r3_gate_4a_equality";
+        let preparation = prepare_native_program_sources(
+            package_name,
+            vec![CompilerSource::new(
+                "src/main.ken",
+                GATE_4A_EQUALITY_SOURCE,
+            )],
+        )
+        .expect("the already-green recursive native source reaches preparation");
+
+        assert!(
+            preparation.runtime_program().declarations.len() > 1,
+            "the equality control must retain more than the folded [main] husk"
+        );
+        assert!(
+            std::ptr::eq(
+                preparation.runtime_program(),
+                preparation.runtime_program.as_ref(),
+            ),
+            "the public read accessor must borrow the consumed boxed program"
+        );
+
+        let program_identity = preparation.runtime_program() as *const ken_runtime::RuntimeProgram;
+        let declarations_identity = &preparation.runtime_program().declarations
+            as *const Vec<ken_runtime::RuntimeDeclaration>;
+        let examples_identity =
+            &preparation.runtime_program().examples as *const Vec<ken_runtime::RuntimeExample>;
+        let package_identity = preparation.runtime_program().package_identity.clone();
+        let erased_core = preparation.runtime_program().erased_core.clone();
+        let join_plan_bytes =
+            exact_metadata_bytes(&preparation.package, package_name, "NativeJoinPlanV1");
+        let oriented_plan_bytes = exact_metadata_bytes(
+            &preparation.package,
+            package_name,
+            "OrientedSubcontinuationPlanV1",
+        );
+
+        let output_dir = std::env::temp_dir().join(format!(
+            "ken-r3-gate-4a-equality-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system time after epoch")
+                .as_nanos()
+        ));
+        let output = complete_native_program_preparation(preparation, &output_dir)
+            .expect("the already-green source completes native object emission");
+        let _ = std::fs::remove_dir_all(&output_dir);
+
+        assert_eq!(
+            program_identity,
+            output.runtime_program.as_ref() as *const ken_runtime::RuntimeProgram,
+            "completion must return the exact prepared RuntimeProgram allocation"
+        );
+        assert_eq!(
+            declarations_identity,
+            &output.runtime_program.declarations as *const Vec<ken_runtime::RuntimeDeclaration>,
+            "declarations cross the closure wall by object identity"
+        );
+        assert_eq!(
+            examples_identity,
+            &output.runtime_program.examples as *const Vec<ken_runtime::RuntimeExample>,
+            "examples cross the closure wall by object identity"
+        );
+        assert_eq!(output.runtime_program.package_identity, package_identity);
+        assert_eq!(output.runtime_program.erased_core, erased_core);
+        assert_eq!(
+            exact_metadata_bytes(&output.package, package_name, "NativeJoinPlanV1"),
+            join_plan_bytes,
+            "the exact embedded NativeJoinPlanV1 bytes must not fork"
+        );
+        assert_eq!(
+            exact_metadata_bytes(
+                &output.package,
+                package_name,
+                "OrientedSubcontinuationPlanV1",
+            ),
+            oriented_plan_bytes,
+            "the exact embedded OrientedSubcontinuationPlanV1 bytes must not fork"
+        );
+    }
 
     fn px8ta_match_fixture(body: CheckedCoreBodyTerm) -> crate::checked_core::CheckedCoreMatchView {
         use crate::checked_core::{
