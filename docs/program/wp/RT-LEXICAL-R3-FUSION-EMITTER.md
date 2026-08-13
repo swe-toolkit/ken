@@ -391,6 +391,55 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE RECUT IS ACCEPTED AS EXACT NEGATIVE EVIDENCE, AND THE NEXT ROUTE-C
+> ### MECHANISM IS HELD FOR ONE MORE BOUNDED TRACE. Steward, 2026-08-13,
+> ### recording Architect `evt_mt5zxq1qd6bt` on tip `e30d33b9`.
+>
+> **The recut landed exactly** (`evt_6qgv6q1sbq88m`): both withdrawn mechanisms
+> removed, `continuation_units()` restored across all four projections, the
+> specialization declared/defined/target-resolved/called once and settled
+> `DirectCall`. **`git diff <rebased-pre-withdrawal> -- crates/` is EMPTY** —
+> the implementer proved the revert byte-exact rather than asserting it, and
+> that check caught two stray blank lines. Suite 909, down from 911 by exactly
+> the two controls that pinned withdrawn machinery. **The control that pinned
+> the subsumption was DELETED, not retargeted** — it asserted the thing the
+> ruling reverses, and a retargeted version would have been a test written to
+> survive its own refutation.
+>
+> **THE CLASSIFICATION IS RE-AFFIRMED AND IS STILL R3-OWNED.** A
+> `StaticWorkerBinding` is **compiler-only transport** from an exact constructor
+> template to its exact static eliminator and call. **It may not acquire a
+> runtime representation, carrier, slot, descriptor, token, or ABI member, and
+> `ground_value` must continue to refuse it.**
+>
+> **WHY NO SIXTH MECHANISM YET, and this is the sharpest finding of the arc.**
+> The prior one-counter trace labelled its seats with **ambient
+> `defining_unit` / fused authority** — but `define_continuation_bodies`
+> deliberately binds the semantic consumer owner into that ambient state **while
+> emitting a distinct generated Cranelift `Function`.** ⇒ **Those labels do not
+> prove which emitted function owns the continuation call, the refusal, or the
+> redirected call.** Nor does the trace prove what the direct call's returned
+> SSA value does next. Four outcomes are open — exact operand of the redirected
+> call; only the carried scrutinee/control predecessor; consumed wholly inside
+> the specialization; or absent from the redirected operand run — **and they
+> require different lawful joins.**
+>
+> **AUTHORIZED: exactly one measure-only armed trace** over both witnesses,
+> recording the **actual emitted Cranelift function/emission owner** rather than
+> ambient `defining_unit`; minting an opaque probe identity for the direct
+> call's returned SSA value; tracing every use of it; classifying into exactly
+> one of the four cases; and reporting whether the specialization frame already
+> holds every planner-authorized continuation input the redirect needs. **No
+> repair, no retarget, no new relation or representation, no ABI change, no
+> substitute operand, no grounding the worker, no control changes.**
+>
+> **THE MEASURE-FIRST DISCIPLINE IS NOW THE ARCHITECT'S OWN PRACTICE, not a
+> Steward intervention.** It ruled this hold unprompted. ⇒ **A future Steward
+> does not need to re-rule sequencing on this seam each cycle** — raise it only
+> if a mechanism is prescribed with an unmeasured premise. The reason it stuck
+> is in the implementer's own words: the single-run trace *"did not merely
+> choose between my two branches, it eliminated the whole class."*
+
 > ### `FusionForward` IS WITHDRAWN, AND SO IS CONTINUATION-SPECIALIZATION
 > ### SUBSUMPTION. Steward, 2026-08-13, recording Architect
 > ### `evt_27qhdnnmv4h4z` (durable state `fd62eb5d`).
