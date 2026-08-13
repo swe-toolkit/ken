@@ -7,7 +7,7 @@ source: 2026-08-13 — kicked Language onto `LANG-RECORD-STACK-OVERFLOW`, which
   rather than assigning it.
 ---
 
-# A node's `status:` is a claim ABOUT a node — only the tree is evidence about the code
+# A node's `status:` is a claim about the node, not evidence about the tree
 
 Nothing flips a node to `merged` when its PR lands. **A human or an agent has to
 do it, and on a busy day nobody does.** So `status: ready` means "nobody has
