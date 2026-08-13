@@ -3612,6 +3612,153 @@ fn r3_fused_nonempty_producer_captures_refuse_before_emission() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- a selected affine fusion claim is
+/// settled only after its declared fused call has been accepted.
+///
+/// **MEASURED:** on both governed roots, withholding the last input only after
+/// the real claim, target, ordinary parameter run and capture suffix have been
+/// checked reaches the descriptor-driven call builder exactly once. That
+/// builder refuses the real target's missing declared input with zero claim
+/// consumptions and zero fused invocations. The unchanged operand runs are
+/// accepted and then consume and invoke exactly once.
+///
+/// **CLAIMED:** a claim that is live at the fallible call-build boundary stays
+/// outstanding when that build refuses; the affine settlement occurs only
+/// after successful call emission.
+///
+/// **THE GAP:** the application counter proves this is a post-selection
+/// call-build refusal, not an earlier selector or preflight failure. The
+/// mutation changes only the real operand run handed to the real target; it
+/// creates no source relation, claim, target, settlement or call instruction.
+/// It does not prove the later post-field route remains absent.
+///
+/// **Promise class: durable invariant.** The exact error category, mutation
+/// reach count and both affine events jointly pin the ordering without freezing
+/// an origin literal or hand-building a ledger entry.
+#[test]
+fn r3_fused_late_call_build_refusal_keeps_claim_outstanding() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_call_build_mutation, D2fCallBuildMutation, D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fCallBuildMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications) = with_d2f_call_build_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-late-call-build",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            applications,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
+                if reason == "callee frame is missing a declared input" =>
+            {
+                "late call-build refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fCallBuildMutation::Exact, "exact"),
+            (
+                D2fCallBuildMutation::WithholdLastDeclaredInput,
+                "missing-last-input",
+            ),
+        ] {
+            let symbol = format!("ken_r3_late_call_build_{prefix}_{suffix}");
+            let (error, applications, consumptions, invocations) =
+                compile(cause, mutation, &symbol);
+            rows.push((
+                cause,
+                mutation,
+                classify(&error),
+                applications,
+                consumptions,
+                invocations,
+            ));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fCallBuildMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCallBuildMutation::WithholdLastDeclaredInput,
+                "late call-build refusal",
+                1,
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fCallBuildMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fCallBuildMutation::WithholdLastDeclaredInput,
+                "late call-build refusal",
+                1,
+                0,
+                0,
+            ),
+        ],
+        "both exact claims consume once only after accepted emission; both altered compiles reach \
+         the real call builder exactly once and its late refusal leaves each claim outstanding"
+    );
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.

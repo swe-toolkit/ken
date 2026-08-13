@@ -215,6 +215,47 @@ pub(in crate::cranelift_backend) fn with_d2f_consuming_call_mutation<R>(
     run()
 }
 
+/// Test-only corruption of the real declared-call operand run after the exact
+/// fusion claim and all hoistable closure checks have succeeded.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D2fCallBuildMutation {
+    Exact,
+    WithholdLastDeclaredInput,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2F_CALL_BUILD_MUTATION: std::cell::Cell<D2fCallBuildMutation> =
+        const { std::cell::Cell::new(D2fCallBuildMutation::Exact) };
+    static D2F_CALL_BUILD_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Run one compile with a post-selection declared-call defect. The application
+/// count proves the compile reached the real call-build boundary rather than an
+/// earlier selector or preflight refusal.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_d2f_call_build_mutation<R>(
+    mutation: D2fCallBuildMutation,
+    run: impl FnOnce() -> R,
+) -> (R, usize) {
+    struct Restore(D2fCallBuildMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D2F_CALL_BUILD_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = D2F_CALL_BUILD_MUTATION.with(|cell| cell.replace(mutation));
+    D2F_CALL_BUILD_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    let _restore = Restore(previous);
+    let result = run();
+    let applications = D2F_CALL_BUILD_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -13486,6 +13527,21 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // requirement, not an oversight, and it must not be "fixed" by moving.
         let mut operands = inputs.to_vec();
         operands.extend(captures);
+        // The late-failure control withholds one input only after the exact
+        // claim, target, parameter run and capture suffix have all been checked.
+        // `call_declared_unit_target` then applies its real descriptor-driven
+        // frame validation and refuses before it emits a call instruction.
+        #[cfg(test)]
+        if D2F_CALL_BUILD_MUTATION.with(std::cell::Cell::get)
+            == D2fCallBuildMutation::WithholdLastDeclaredInput
+        {
+            operands
+                .pop()
+                .expect("the governed fused call has a non-empty declared input run");
+            D2F_CALL_BUILD_MUTATION_APPLICATIONS.with(|cell| {
+                cell.set(cell.get().saturating_add(1));
+            });
+        }
         let (returned, call) = self.call_declared_unit_target(
             builder,
             target,
