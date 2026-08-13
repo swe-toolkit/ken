@@ -2788,38 +2788,24 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// be true"*, because the prose it replaces claimed a step-5/step-6 stop that
 /// had already been overtaken with nothing going red.
 ///
-/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile, with the
-/// local selected-body composition landed: the compile stops at
-/// `StaticContinuationFusion: a fusion-composition splice issued a capability
-/// that no dynamic invocation segment consumed`. Measured beside it, and
-/// asserted below so the stop is not the only thing pinned: **exactly one**
-/// fusion-local composition is realized per compile, at the **`Inner`** layer,
-/// on both roots.
+/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile: **the
+/// compile COMPLETES. There is no terminal stop left to pin.** Measured beside
+/// it and asserted below, so completion is not the only thing this row states:
+/// exactly one fusion-local composition is realized per compile, at the
+/// **`Inner`** layer, and the outer dispatch / fused invocation pair is `(1, 1)`.
 ///
-/// **CLAIMED:** that is where the armed compile currently stops, and the
-/// composition population is the reason — one of the two planned composed
-/// edges is realized and the other is never reached.
+/// **CLAIMED:** the armed `D2f` emitter chain lowers both roots end to end into
+/// an object module, with those populations.
 ///
-/// **THE GAP:** this says nothing about whether the unrealized `Outer` edge and
-/// the outstanding capability have one cause or two. They are recorded as two
-/// measurements precisely so a later reading cannot quietly assume they are one.
+/// **THE GAP:** completion is not execution. Nothing here runs the emitted code
+/// or checks that it computes the right answer — this row says the compile
+/// produces an artifact, not that the artifact is correct. It also says nothing
+/// about roots other than these two.
 ///
-/// **THE STOP MOVED FORWARD, past every refusal the previous two increments sat
-/// at.** The composition reaches its seat, the target's exact selected case
-/// body is lowered locally, its phase-bearing operand answers the producer's own
-/// constructor, and the fused body lowers to completion — the refusal is that
-/// body's EXIT closeout, not a lowering failure.
-///
-/// **It is not a regression, and the distinction is load-bearing.** The
-/// capability's closeout has three arms — spent, outstanding, and *descent
-/// failed*, which **withdraws** the capability and propagates the original
-/// error. Every previous armed compile on this witness took the third arm, so
-/// the outstanding arm has never been evaluated here before. Whether the
-/// capability would have been consumed under a successful DIRECT-call descent is
-/// **not observable**: the direct path never produced one.
-///
-/// **THE TWO PREVIOUS MEASURED STOPS**, superseded and recorded so the movement
-/// is auditable rather than rewritten:
+/// **THIS ROW WAS A TRANSITION SENTINEL FOR FIVE INCREMENTS, AND IT HAS NOW
+/// RETIRED ITSELF BY REACHING ITS OWN BOUNDARY.** Each red was the stop moving
+/// forward and each restatement is recorded rather than rewritten, so the
+/// movement is auditable:
 ///
 /// 1. `ContinuationSpecialization: the claimed continuation target was not
 ///    declared into this function` — the fail-closed intermediate of the
@@ -2830,24 +2816,39 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 ///    `evt_6kn9ckdnbf0ph` that order was the *pre-mechanism* one and never a
 ///    refutation — the worker is a compiler-local intermediate between two
 ///    lowering steps, so its absence from any ABI operand run is the design.
+/// 3. `StaticContinuationFusion: a fusion-composition splice issued a capability
+///    that no dynamic invocation segment consumed` — the splice closeout's
+///    *outstanding* arm, which had never been evaluated on this witness because
+///    every prior armed compile took its **descent-failed** arm instead. The
+///    splice capability was later retired outright.
+/// 4. `StaticWorkerBinding: ... requires an ordinary specialized constructor
+///    field` — the composed eliminator had no disposition for a recursive
+///    position whose field transports a worker. Cleared by the two-member
+///    binder wiring (`evt_5yhm9c78dm27s`).
+/// 5. `StaticWorkerBinding: ... was rebound into the binding authority as
+///    transport ... and never consumed at an exact-Var call` — the ledger close,
+///    likewise never evaluated before, because stop 4 refused ahead of the
+///    rebind. Cleared by `evt_37715knv356yp`: one source-field transport,
+///    projected to both authorized binder members, consumed through either.
 ///
-/// **Promise class: transition sentinel.** It is named for the boundary rather
-/// than for a count, and the event that retires it is a ruling on the splice
-/// capability's consumption seat — at which point the stop moves again, this row
-/// reds again, and the comment beside the installer is restated again. **Each
-/// red is the mechanism reporting progress**, and the instruction is always to
-/// restate the measured stop, never to relax the assertion.
+/// **Promise class: durable invariant**, changed from *transition sentinel* now
+/// that the boundary it was named for has been reached. Completing an armed
+/// compile is a property the mechanism must keep, not a waypoint — an intended
+/// extension that preserves the contract keeps this green, and a regression in
+/// the emitter chain reds it. ⛔ Do not re-weaken it to "stops at X" if a future
+/// change reintroduces a stop: that would pin the regression as the expectation.
 ///
-/// **The composition-population assertion is a sentinel too, and is the one
-/// that must NOT be relaxed into an inequality.** `>= 1 realized` would stay
-/// green through both the repair and its absence.
+/// **The population assertions must NOT be relaxed into inequalities.**
+/// `>= 1 realized` stays green through both the repair and its absence, and
+/// `>= 1` on the outer pair stays green through a compile that reaches the
+/// descent and drops the invocation.
 ///
 /// Production stays unarmed. `D2F_EMITTER_ARMED` is `false`; the arm here is
 /// the `cfg(test)` RAII `D2fEmitterTestArm`, which disarms on drop so a
 /// panicking assertion cannot leak an armed gate into the next test on this
 /// thread.
 #[test]
-fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
+fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
     use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
     use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause};
 
@@ -2890,12 +2891,9 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
         crate::cranelift_backend::lowering::reset_r3_outer_dispatches();
         crate::cranelift_backend::lowering::reset_r3_fused_invocations();
         let error = compile_armed(cause, symbol);
-        let reached = matches!(
-            &error,
-            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
-                if *construct == "StaticWorkerBinding"
-                    && reason.contains("never consumed at an exact-Var call")
-        );
+        // THE STOP IS GONE. This is no longer "which refusal did we reach" --
+        // it is whether the armed compile completes at all.
+        let reached = error.is_none();
         rows.push((cause, reached));
         realized_outer.push((
             cause,
@@ -2917,19 +2915,14 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must stop at the STATIC-WORKER FIELD LEDGER's close: the composed \
-         eliminator now builds the ruled two-member binder run, so the selected recursive \
-         field is rebound into binding authority as a transport, the case body's own recursive \
-         call names the transport-free induction hypothesis beside it, and the close finds the \
-         transport minted and never consumed. \
-         SUPERSEDED STOP, recorded rather than deleted: through `91e06d51` this row matched \
-         `requires an ordinary specialized constructor field` -- the seat had no disposition for \
-         a recursive position whose field transports a worker, and refused before it ever \
-         assembled the run. That stop is CLEARED by the two-member wiring; the ledger close is a \
-         link BEYOND it, not the same one renamed. \
-         If this row is red because the stop MOVED again, the comment beside the D2f installer \
-         in core.rs is now stale and must be restated to the new measured stop rather than this \
-         assertion being relaxed"
+        "THE ARMED COMPILE MUST COMPLETE on both roots. There is no terminal stop left to \
+         pin: the shared-transport ruling cleared the last one, and this row is now a DURABLE \
+         INVARIANT rather than the transition sentinel it was for five increments. \
+         ⛔ If this is red, the armed emitter chain has REGRESSED. Do not restate it to \
+         whatever refusal now fires -- that would pin the regression as the expectation, which \
+         is the opposite of what every earlier restatement of this row did. The five superseded \
+         stops are listed on this function's doc comment; a sixth belongs there only if a \
+         RULING deliberately reintroduces one"
     );
     assert_eq!(
         realized_outer,
@@ -2999,6 +2992,165 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
          in-flight-activation baseline, so the armed row above is attributable to arming and not \
          to a compile that refuses everywhere: {unarmed:?}"
     );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
+/// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
+/// `evt_37715knv356yp`, control 1.
+///
+/// The ledger's own laws — a second consumption of one transport refuses at the
+/// call, an unconsumed transport refuses at close, a direct binding pays no
+/// debt, and neither link crosses a scope — are all pinned by
+/// `d2k_1c_0_conservation_pairs_each_consumption_to_one_minted_transport`, which
+/// exercises `StaticWorkerFieldLedger` directly. **This control does not restate
+/// them.** It pins the one thing that ledger control cannot see: that the two
+/// members the composed eliminator assembles are projections of the **same**
+/// obligation rather than two obligations that happen to name one worker body.
+///
+/// **Why it has to be measured here and cannot be inferred from the green
+/// compile.** A compile that completes proves *some* consumption discharged the
+/// transport. It does not distinguish the ruled shape from two others that also
+/// complete: one member carrying no transport while the other is consumed, or
+/// two transports minted with both consumed. Only reading the members' transport
+/// identities out of one assembled run separates them.
+///
+/// **The identity cannot be forged and cannot be recovered any other way.**
+/// `StaticWorkerTransportId` has a private field in a module exposing only its
+/// issuers, so the equality asserted below is between two values the ledger
+/// minted, not between two values this test built.
+///
+/// **MEASURED, by restoring the superseded sub-rule in production:** setting the
+/// hypothesis back to `transport: None` reds this control and
+/// `d2f_armed_compile_completes_and_its_populations_are_pinned` together, with
+/// the ledger's own *"rebound ... and never consumed"* refusal as the evidence.
+/// Reverted; both green.
+///
+/// **THE GAP, and it is about this control's own rows.** That mutation reds at
+/// the **completion guard**, not at the two transport assertions — the compile
+/// stops before they are reached. So on this witness the rows that actually
+/// discriminate are completion, the run's length, and the slot order; the
+/// `is_some` and the equality are **stated but not independently falsifiable**:
+///
+/// - a differing pair would need a second `rebind` behind one recognition, which
+///   the ledger refuses outright — the shape is unrepresentable rather than
+///   merely untested;
+/// - a `None` hypothesis that still completes needs a case body reaching its
+///   producer through the *selected argument* instead of the hypothesis, which
+///   is control 2 of the ruling and needs a checked fixture this witness does
+///   not provide.
+///
+/// **The obvious candidate for control 2 was tried and does NOT serve, and this
+/// is a measurement rather than a guess.** `D2jCause::CallIdentity` is described
+/// as *"the consuming `Call` calls the ordinary child instead of the
+/// hypothesis"*, which is control 2's shape exactly. Compiled armed, it refuses
+/// at `ComputationalMatch: "a computational recursor closure names an in-flight
+/// activation, not a transferable value"` and records **no** binder run at all —
+/// so it is declined by a predecessor guard and never reaches this seat, rather
+/// than reaching it and disagreeing. It is a planner-defect cause, not a lawful
+/// alternative program. ⇒ Control 2 needs a genuinely different checked body,
+/// authored rather than selected.
+///
+/// **What the same probe DID establish**, on both roots, read directly out of
+/// the recorded run: `[(0, Some(TransportId(0))), (1, Some(TransportId(0)))]` —
+/// the two members carry one transport, which is the ruled coordinate observed
+/// rather than inferred from the compile completing.
+///
+/// They are written anyway, because an invariant that holds by construction
+/// today is exactly the one a later change silently breaks — but nobody should
+/// read them as exercised.
+///
+/// **Promise class: durable invariant.** It is the sharing relation itself, not
+/// a count and not the current stop: any extension that keeps one source-field
+/// obligation behind the paired projections keeps this green, and collapsing to
+/// a per-member transport — the sub-rule `evt_37715knv356yp` superseded — reds
+/// it immediately.
+///
+/// Production stays unarmed; the arm is the `cfg(test)` RAII `D2fEmitterTestArm`.
+#[test]
+fn d2f_the_two_binder_projections_share_one_source_field_transport() {
+    use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause};
+
+    for (cause, symbol) in [
+        (D2jCause::Exact, "ken_d2f_shared_transport_exact"),
+        (D2jCause::ReHomed, "ken_d2f_shared_transport_rehomed"),
+    ] {
+        crate::cranelift_backend::lowering::reset_r3_run_worker_members();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(
+            crate::cranelift_backend::planning::D2J_DECLARATION,
+            &declaration,
+        );
+        let error = {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-d2f-shared-transport",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        };
+        assert!(
+            error.is_none(),
+            "{cause:?}: the armed compile must complete, or the run recorded below is the run of \
+             a compile that stopped somewhere and the sharing claim is about nothing: {error:?}"
+        );
+
+        // The runs that actually carry a worker member. A composed eliminator
+        // over an ordinary case assembles none, and those rows are silent here
+        // rather than being asserted about.
+        let carrying: Vec<_> = crate::cranelift_backend::lowering::r3_run_worker_members()
+            .into_iter()
+            .filter(|run| !run.is_empty())
+            .collect();
+        assert_eq!(
+            carrying.len(),
+            1,
+            "{cause:?}: exactly one assembled case run carries static-worker members on this \
+             witness. More than one and the equality below would be averaging over runs; none \
+             and it would be vacuous: {carrying:?}"
+        );
+        let run = &carrying[0];
+        assert_eq!(
+            run.len(),
+            2,
+            "{cause:?}: the ruled run holds exactly TWO worker members -- the induction \
+             hypothesis and the selected recursive argument. One member is the `D6a` skip shape, \
+             which shifts every later binder; three is a second projection nobody authorized: \
+             {run:?}"
+        );
+        assert_eq!(
+            (run[0].0, run[1].0),
+            (0, 1),
+            "{cause:?}: the hypothesis leads the run and the constructor argument follows it, \
+             per CheckedCaseBinderLayout: {run:?}"
+        );
+        assert!(
+            run[0].1.is_some(),
+            "{cause:?}: the HYPOTHESIS must carry a transport. `None` here is exactly the \
+             superseded sub-rule of evt_5yhm9c78dm27s, under which the body's own recursive call \
+             discharged nothing and the close refused: {run:?}"
+        );
+        assert_eq!(
+            run[0].1, run[1].1,
+            "{cause:?}: BOTH projections must carry the SAME transport. One recognized source \
+             field is one obligation; two distinct transports would be two obligations behind one \
+             recognition, which the close refuses, and a consumption through either member must \
+             discharge the one debt: {run:?}"
+        );
+    }
 }
 
 #[test]
