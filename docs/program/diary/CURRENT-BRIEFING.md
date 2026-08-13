@@ -38,9 +38,51 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~03:5xZ. **`main` = `6d5a2d84`.**
+> ### RESUME HERE — state at 2026-08-13 ~04:2xZ. **`main` = `18403ead`.**
 >
-> **THE R3 FORK IS CLOSED AND RUNTIME IS IMPLEMENTING.** Architect
+> **R3 IS ON ITS FINAL MECHANISM UNIT. Gate run (exit 0, all three Runtime
+> seats compact-verified at `18403ead`), fresh unit released at
+> `evt_10fensp5rpey7`.** Held tip
+> `59b3c10fdd68c9885fe4af8ec6098dde3ea5d65f`, branch
+> `wp/RT-LEXICAL-R3-FUSION-EMITTER`, **20 commits** from `6d5a2d84`, verified
+> intact after the gate. Suite baseline **915** (913 + 2 new controls).
+>
+> **The unit is ONE inseparable mechanism** — local selected-body lowering,
+> sibling fusion-local affine closeout, same-body composed/ordinary
+> discriminator, plus the post-implementation ordered-chain falsifier. **Do not
+> let it be cut smaller**; the ledger has no consumer until the lowering exists.
+>
+> **Accepted last turn and NOT reopened:** exact `P = O ⊎ F` and
+> `T = O_t ⊎ F_t` validated as disjointness plus coverage (never counts); the
+> fusion-scoped join `edge.fusion == claim.fusion` checked from both sides; `O`
+> threaded through resolution, declaration and both ledger opens by **narrowing
+> the input, not weakening a law**; and the stop-comment correction with a
+> `cfg(test)`-only **RAII** arm (a set/reset pair would leak an armed gate on a
+> panicking assertion). **The sentinel reddening on the implementer's own next
+> commit was the control working** — the armed stop moved backwards to a
+> fail-closed refusal, legitimate only because the intermediate refuses rather
+> than half-applying.
+>
+> **DISK: RECLAIMED 2026-08-13 ~04:3xZ — 96% / 11G free → 81% / 42G free.**
+> The scratch reaper fired **three times in one hour**, recovering only ~1G
+> each, which is the tell that scratch was not the consumer. Measured: the two
+> **Language** worktree `target/` dirs held **33G** (`language-implementer` 19G,
+> `language-qa` 14G) while Language is stood down with the operator
+> (`evt_5vwmmrr2w7ces`). Deleted both.
+>
+> **What it cost and who pays:** Language pays one cold rebuild whenever the
+> operator returns it to work. Nothing else — branches, candidates and sources
+> are git objects and were untouched; `wp/LANG-SURFACE-RECORD-LITERAL` still
+> holds `50da348a`. Verified zero build processes fleet-wide and both worktrees
+> clean before deleting.
+>
+> **Why it was worth doing rather than waiting for the operator:** a full disk
+> **presents as a test regression** and `df /` cannot see it, so the cost of
+> inaction lands as a false red on the critical-path Runtime turn plus a turn
+> spent diagnosing it. **`runtime-qa/target` (13G) is the next lever and I did
+> NOT pull it** — QA rebuilds on the critical path at review time.
+>
+> **The prior fork, for history:** Architect
 > `evt_6kn9ckdnbf0ph` (durable `39ff9d8f`) took **reading two**: the falsifier
 > was a false alarm against the mechanism — it tested the pre-mechanism ABI
 > input run — and is **withdrawn**, replaced by a post-implementation chain
