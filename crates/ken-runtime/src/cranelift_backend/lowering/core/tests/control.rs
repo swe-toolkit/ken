@@ -83,8 +83,12 @@ fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowe
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_compositions: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -251,8 +255,12 @@ fn run_px8j_malformed_recursor_consumer(
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_compositions: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -383,6 +391,7 @@ fn run_px8j_malformed_recursor_consumer(
             cursor,
             None,
             None,
+            SegmentComposition::Ordinary,
         ),
     };
     let active = ActiveContinuationFrame {
@@ -454,6 +463,7 @@ fn oriented_dynamic_sibling_fixture() -> (
         ContinuationCursorId(13),
         None,
         None,
+        SegmentComposition::Ordinary,
     );
     segment.dynamic_splice_edges = vec![DynamicSpliceEdgeId(71), DynamicSpliceEdgeId(72)];
     let edges = vec![
@@ -1121,6 +1131,7 @@ fn run_px8j_source_machine_install(
         ContinuationCursorId(20),
         None,
         None,
+        SegmentComposition::Ordinary,
     );
     assert!(!recursor_invocation_is_checked(&invocation));
 
@@ -1328,6 +1339,7 @@ fn oriented_five_control_invocation() -> RecursorInvocationSegment {
         ContinuationCursorId(7),
         None,
         None,
+        SegmentComposition::Ordinary,
     );
     for layer in &mut invocation.unwind.later_wrappers_in_construction_order[..2] {
         layer.checked_invocation_source = Some(InvocationTemplateRef::SameSccCall(999));
@@ -2265,6 +2277,7 @@ fn nested_computational_inner_missing_selects_exact_inner_default() {
     };
     let frames = [
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &inner_cases,
             default: &inner_default,
             env: &[],
@@ -2279,6 +2292,7 @@ fn nested_computational_inner_missing_selects_exact_inner_default() {
             answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
         },
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &outer_cases,
             default: &outer_default,
             env: &[],
@@ -2555,6 +2569,7 @@ fn oriented_test_invocation() -> RecursorInvocationSegment {
         ContinuationCursorId(7),
         None,
         None,
+        SegmentComposition::Ordinary,
     )
 }
 #[test]
@@ -2776,6 +2791,192 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// the positives: each names **which gate refused**, so it moves only when that
 /// gate's authority moves, and a cause that broke something upstream instead
 /// would fail here rather than pass as coverage.
+/// **`R3` — the ARMED `D2f` compile's current terminal stop, pinned so the
+/// source comment beside the installer cannot silently stop being true.**
+///
+/// Architect `evt_6kn9ckdnbf0ph` §5 requires the corrected stop comment to
+/// carry *"a control or assertion that becomes red when the statement ceases to
+/// be true"*, because the prose it replaces claimed a step-5/step-6 stop that
+/// had already been overtaken with nothing going red.
+///
+/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile, with the
+/// local selected-body composition landed: the compile stops at
+/// `StaticContinuationFusion: a fusion-composition splice issued a capability
+/// that no dynamic invocation segment consumed`. Measured beside it, and
+/// asserted below so the stop is not the only thing pinned: **exactly one**
+/// fusion-local composition is realized per compile, at the **`Inner`** layer,
+/// on both roots.
+///
+/// **CLAIMED:** that is where the armed compile currently stops, and the
+/// composition population is the reason — one of the two planned composed
+/// edges is realized and the other is never reached.
+///
+/// **THE GAP:** this says nothing about whether the unrealized `Outer` edge and
+/// the outstanding capability have one cause or two. They are recorded as two
+/// measurements precisely so a later reading cannot quietly assume they are one.
+///
+/// **THE STOP MOVED FORWARD, past every refusal the previous two increments sat
+/// at.** The composition reaches its seat, the target's exact selected case
+/// body is lowered locally, its phase-bearing operand answers the producer's own
+/// constructor, and the fused body lowers to completion — the refusal is that
+/// body's EXIT closeout, not a lowering failure.
+///
+/// **It is not a regression, and the distinction is load-bearing.** The
+/// capability's closeout has three arms — spent, outstanding, and *descent
+/// failed*, which **withdraws** the capability and propagates the original
+/// error. Every previous armed compile on this witness took the third arm, so
+/// the outstanding arm has never been evaluated here before. Whether the
+/// capability would have been consumed under a successful DIRECT-call descent is
+/// **not observable**: the direct path never produced one.
+///
+/// **THE TWO PREVIOUS MEASURED STOPS**, superseded and recorded so the movement
+/// is auditable rather than rewritten:
+///
+/// 1. `ContinuationSpecialization: the claimed continuation target was not
+///    declared into this function` — the fail-closed intermediate of the
+///    half-landed replacement, when `O = P \ F` had closed the direct path for
+///    `F` and the local path was not yet open.
+/// 2. the root-result escape in `emit_result` -> `ground_value` ->
+///    `into_specialized_at`, on the fusion key's own producer construct. Per
+///    `evt_6kn9ckdnbf0ph` that order was the *pre-mechanism* one and never a
+///    refutation — the worker is a compiler-local intermediate between two
+///    lowering steps, so its absence from any ABI operand run is the design.
+///
+/// **Promise class: transition sentinel.** It is named for the boundary rather
+/// than for a count, and the event that retires it is a ruling on the splice
+/// capability's consumption seat — at which point the stop moves again, this row
+/// reds again, and the comment beside the installer is restated again. **Each
+/// red is the mechanism reporting progress**, and the instruction is always to
+/// restate the measured stop, never to relax the assertion.
+///
+/// **The composition-population assertion is a sentinel too, and is the one
+/// that must NOT be relaxed into an inequality.** `>= 1 realized` would stay
+/// green through both the repair and its absence.
+///
+/// Production stays unarmed. `D2F_EMITTER_ARMED` is `false`; the arm here is
+/// the `cfg(test)` RAII `D2fEmitterTestArm`, which disarms on drop so a
+/// panicking assertion cannot leak an armed gate into the next test on this
+/// thread.
+#[test]
+fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
+    use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause};
+
+    fn compile_armed(cause: D2jCause, symbol: &str) -> Option<CraneliftBackendError> {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(
+            crate::cranelift_backend::planning::D2J_DECLARATION,
+            &declaration,
+        );
+        // Armed for exactly this compile and disarmed on drop.
+        let _arm = D2fEmitterTestArm::arm();
+        crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+            crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                "ken-d2f-armed-stop",
+            )
+            .expect("object module"),
+            symbol,
+            cranelift_module::Linkage::Export,
+            &entry,
+            &crate::NativeSeedEnvironment::empty(),
+            declarations,
+            None,
+            false,
+            None,
+            None,
+            Some(oriented),
+        )
+        .err()
+    }
+
+    let mut rows = Vec::new();
+    let mut realized = Vec::new();
+    for (cause, symbol) in [
+        (D2jCause::Exact, "ken_d2f_armed_stop_exact"),
+        (D2jCause::ReHomed, "ken_d2f_armed_stop_rehomed"),
+    ] {
+        crate::cranelift_backend::lowering::reset_r3_local_compositions();
+        let error = compile_armed(cause, symbol);
+        let reached = matches!(
+            &error,
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("no dynamic invocation segment consumed")
+        );
+        rows.push((cause, reached));
+        // The LAYERS, not a count. A count of one is satisfied by the wrong
+        // one of the two planned edges, and which layer is realized is exactly
+        // the fact the open question turns on.
+        realized.push((
+            cause,
+            crate::cranelift_backend::lowering::r3_local_compositions()
+                .into_iter()
+                .map(|(_, layer)| layer)
+                .collect::<Vec<_>>(),
+        ));
+    }
+
+    assert_eq!(
+        rows,
+        vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
+        "the armed compile must stop at the fused body's splice-capability closeout: the local \
+         composition lands, the fused body lowers to completion, and no dynamic invocation \
+         segment consumed the capability the splice issued. If this row is red because the stop \
+         MOVED, the comment beside the D2f installer in core.rs is now stale and must be restated \
+         to the new measured stop rather than this assertion being relaxed"
+    );
+    assert_eq!(
+        realized,
+        vec![
+            (D2jCause::Exact, vec![FusionCompositionLayer::Inner]),
+            (D2jCause::ReHomed, vec![FusionCompositionLayer::Inner]),
+        ],
+        "exactly one of the two planned composed edges is realized per compile, and it is the \
+         Inner one. The Outer edge's producer construct reaches no claim seat anywhere in the \
+         armed compile, so its composition is not merely refused -- it is never attempted. If \
+         this row is red because the Outer edge became reachable, that is the mechanism \
+         advancing and the measurement must be restated, not widened to an inequality"
+    );
+
+    // The arm is scoped, so an unarmed compile must still reach the ordinary
+    // baseline. Without this the row above would pass just as well if arming
+    // had silently stopped working.
+    let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+    let mut declarations = std::collections::BTreeMap::new();
+    declarations.insert(
+        crate::cranelift_backend::planning::D2J_DECLARATION,
+        &declaration,
+    );
+    let unarmed = crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+        crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+            "ken-d2f-unarmed-stop",
+        )
+        .expect("object module"),
+        "ken_d2f_unarmed_stop",
+        cranelift_module::Linkage::Export,
+        &entry,
+        &crate::NativeSeedEnvironment::empty(),
+        declarations,
+        None,
+        false,
+        None,
+        None,
+        Some(oriented),
+    )
+    .err();
+    assert!(
+        matches!(
+            &unarmed,
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "ComputationalMatch" && reason.contains("in-flight activation")
+        ),
+        "the POSITIVE control for the arm: unarmed, the same root must still reach the ordinary \
+         in-flight-activation baseline, so the armed row above is attributable to arming and not \
+         to a compile that refuses everywhere: {unarmed:?}"
+    );
+}
+
 #[test]
 fn d2f_0_the_applied_root_production_path_gate() {
     use crate::cranelift_backend::lowering::core::d2f_gate_arrivals_take;
@@ -3090,12 +3291,62 @@ fn d2f_0_the_applied_root_production_path_gate() {
 /// `Some(oriented)` — **never a direct builder or emitter call** — and resolves
 /// exactly one key, one id and one descriptor.
 ///
-/// **Both planes are read by the same call**, `build_static_continuation_fusion_plan`,
-/// differing only in the argument that is genuinely different between the two
-/// lanes — `Some(oriented)` against `None`. That is what makes `0` and `1` one
-/// currency instead of an arrival field compared against a plane length, and it
-/// is also the non-constancy proof: the same instrument answers both ways in
-/// this test, so neither number is a shape it returns for anything.
+/// **Both planes are read by the same call**, `build_static_continuation_fusion_plan`.
+/// That is what makes `0` and `1` **one currency** instead of an arrival field
+/// compared against a plane length, and it is also the non-constancy proof: the
+/// same instrument answers both ways in this test, so neither number is a shape
+/// it returns for anything handed to it.
+///
+/// **CORRECTION, and it is the load-bearing kind.** An earlier version of this
+/// block said the two reads differ *"only in the argument that is genuinely
+/// different between the two lanes — `Some(oriented)` against `None`."*
+/// **That attribution is false.** The seed row and the positive row differ in
+/// **four** things at once: a different planner, a different expression,
+/// different declarations, **and** the oriented argument. So those two rows
+/// establish a shared **return-type currency** and nothing more — they cannot
+/// attribute the `0`/`1` difference to `oriented`, because three other
+/// variables moved with it. The currency claim survives; the causal one never
+/// held.
+///
+/// **The one-variable cell below is what attribution needs**, and it is the
+/// `D2h` soundness discriminator (Steward `evt_2n6n5hnxyh0cg`). It re-reads the
+/// **same planner, same expression, same declarations** as the positive, with
+/// the oriented plan **withheld** — `None`. One variable moves.
+///
+/// The fork it was given had two branches: plane **0** means the attribution
+/// holds, plane **1** means a candidate forms without the plan and is a stop.
+///
+/// **MEASURED: neither. It REFUSES** —
+/// `OrientedSubcontinuationPlanV1` / *"checked subcontinuation markers have no
+/// checked plan metadata"*. The markers are still on the expression and the
+/// plan they require is gone, so the builder rejects the combination rather
+/// than quietly resolving nothing.
+///
+/// **What that refusal is, stated on its own axis.** It is raised by the
+/// `OrientedSubcontinuationPlanV1` validator **before** transport, before any
+/// candidate is formed, and therefore before any key, ID or descriptor exists.
+/// So it is a **fail-closed plan-dependence refusal** — the marked expression
+/// will not proceed without the plan its markers require.
+///
+/// **It is NOT plane 0, and it is NOT a cardinality result.** Nothing here
+/// counts candidates, because the path stops upstream of counting. ⇒ **This row
+/// attributes nothing about the `0`/`1` cardinality**, and must not be read as
+/// the attribution the one-variable cell was added to supply.
+///
+/// On the **plan-dependence axis alone**, it is a stronger answer than plane 0
+/// would have been: plane 0 would say a candidate failed to form, this says the
+/// pipeline refuses before it could be asked for one. That is the only axis on
+/// which "stronger" is a claim this row can carry.
+///
+/// **It is asserted as the refusal it is, not re-mapped onto the fork's zero
+/// branch.** Folding an unanticipated outcome into the nearest anticipated one
+/// is how a measurement stops being one, and this row would have read as a
+/// clean plane-0 confirmation for every future reader.
+///
+/// `px8j` is retained beside it as the **distinct seed absence comparator**,
+/// with no plan injected, because it answers a different question: what an
+/// unmarked seed-lane compile does, not what withholding a plan does to a
+/// marked one.
 ///
 /// **The production compile and the planner derivation are independent, and
 /// that is the only reason their agreement says anything.** Neither reads the
@@ -3178,6 +3429,45 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
     )
     .expect("the checked twin resolves a plane");
 
+    // ── THE ONE-VARIABLE CELL — the `D2h` soundness discriminator ──
+    //
+    // Same planner, same expression, same declarations as the positive above.
+    // The ONLY thing that moves is the oriented plan, withheld. This is what
+    // the seed row cannot do: that row changes four things at once, so it
+    // establishes a shared return-type currency and attributes nothing.
+    //
+    // Plane 0 here means the candidate genuinely depends on the plan. Plane 1
+    // would mean a candidate forms without it -- fusion independent of
+    // `oriented` -- and that is a stop before D2/D3, not a number to record.
+    //
+    // MEASURED, and it is a THIRD outcome the fork did not name: withholding
+    // the plan resolves neither plane 0 nor plane 1. It REFUSES. The markers
+    // are still on the expression and the plan they require is gone, so the
+    // builder rejects the combination rather than quietly resolving nothing.
+    //
+    // The refusal is raised BEFORE transport, before a candidate is formed, and
+    // so before any key, ID or descriptor exists. It is a fail-closed
+    // plan-dependence refusal and NOT a cardinality result: nothing here counts
+    // candidates, because the path stops upstream of counting. On the
+    // plan-dependence axis alone it is stronger than plane 0 would have been --
+    // that is the only axis on which "stronger" is a claim this row carries.
+    //
+    // It is recorded as the refusal it is, NOT re-mapped onto the fork's
+    // zero branch. Re-mapping an unanticipated outcome onto the nearest
+    // anticipated one is how a measurement stops being one.
+    let withheld = crate::cranelift_backend::planning::build_static_continuation_fusion_plan(
+        &planner,
+        &entry,
+        &declarations,
+        None,
+    );
+    let withheld_refuses_for_missing_metadata = matches!(
+        &withheld,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            if *construct == "OrientedSubcontinuationPlanV1"
+                && reason.contains("no checked plan metadata")
+    );
+
     // ---- row 1: the seed, which carries no marker at all.
     let seed_expr = host_result_closure_match(px8j_equal_payload_hole_placement(
         Px8jSelectedScopePlacement::BeforeReturnHole,
@@ -3240,11 +3530,16 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
             ),
             // row 3 -- refused by the validator, before the builder
             (stripped_refusal, stripped_arrivals.len()),
+            // the ONE-VARIABLE cell: same planner, expression and declarations
+            // as the positive, oriented plan withheld. Neither plane -- a
+            // refusal, which is a stronger answer than plane 0.
+            withheld_refuses_for_missing_metadata,
         ),
         (
             (true, 1, 1, 1, 0),
             (false, 0, 0, 0, 0),
             (true, 0),
+            true,
         ),
         "D0: the checked twin must reach the builder through the production entry with \
          Some(oriented) and resolve exactly one key, one id and one descriptor at definition \
@@ -3726,6 +4021,7 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
     };
     let frames = [
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &inner_cases,
             default: &inner_default,
             env: &[],
@@ -3740,6 +4036,7 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
             answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
         },
         ComputationalEliminatorFrame {
+            splice_capability: None,
             cases: &outer_cases,
             default: &outer_default,
             env: &[],
@@ -3809,8 +4106,12 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_compositions: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -4231,6 +4532,7 @@ fn oriented_test_ih_plan() -> crate::OrientedSubcontinuationPlanV1 {
             result_interface: oriented_test_interface(frame_id as u8 + 1),
             callee_segment_site_id: 9,
             callee_frame_templates: vec![frame_id],
+            composed_frame_templates: Vec::new(),
             parent_frame_template_id: Some(frame_id),
             parent_segment_site_id: Some(9),
             caller_interface: oriented_test_interface(frame_id as u8 + 1),
@@ -4692,6 +4994,7 @@ fn occurrence_exact_marker_fixture(
         result_interface: oriented_test_interface(1),
         callee_segment_site_id: 9,
         callee_frame_templates: vec![0],
+        composed_frame_templates: Vec::new(),
         parent_frame_template_id: Some(0),
         parent_segment_site_id: Some(9),
         caller_interface: oriented_test_interface(1),
@@ -9255,6 +9558,7 @@ fn rtfp_segment(
         ContinuationCursorId(7),
         None,
         None,
+        SegmentComposition::Ordinary,
     )
 }
 
@@ -24984,6 +25288,7 @@ fn d8f_plan_with(
         result_interface: oriented_test_interface(1),
         callee_segment_site_id: 9,
         callee_frame_templates: vec![7],
+        composed_frame_templates: Vec::new(),
         parent_frame_template_id: Some(7),
         parent_segment_site_id: Some(9),
         caller_interface: oriented_test_interface(1),
@@ -32586,4 +32891,726 @@ fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
          weakening the key; a row that stops refusing is D2k-1b's repair and retires this \
          control."
     );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` — control 1 of the atomic `DP`+`D1`+`D2`+`D3`
+/// object. The BASE uncomposed population law, and the regression net for
+/// `89ee005b`.**
+///
+/// Architect `evt_2f0nnwtzqy65m`, which **withdrew** the earlier authorized
+/// population. The base checked plan must keep the singleton sequences it has
+/// today: the outer slot and its call name **only** the outer frame, and the
+/// inner slot names **only** the inner frame. The producer's membership is
+/// transported at the **composition splice that creates it**, never promised in
+/// advance by a base call template that describes a layer no uncomposed segment
+/// contains.
+///
+/// **This test exists because the opposite was built and measured.** `89ee005b`
+/// populated the outer slot with the rooted `ParentFrame` closure — statically
+/// true, and it made `ReHomed` refuse with
+/// *"does not carry its exact checked frame sequence: expected={0, 1}
+/// instantiated={0}"*. `ReHomed` reaches `instantiate_checked_invocation_segment`
+/// **unarmed**, with a one-layer segment, so a base template that promises the
+/// inner frame is promising a layer that is not there. That commit is preserved
+/// as negative evidence and is not a candidate.
+///
+/// ⇒ **`ParentFrame` proves static nesting only, never dynamic segment
+/// membership.** The two are different relations and this control is what keeps
+/// them apart, because the static one is *true* and therefore tempting.
+///
+/// **Both halves are asserted together and that is deliberate.** The population
+/// law alone would pass against a plan nobody consumes; the refusal alone would
+/// pass for any reason, including a compile that failed earlier. Together they
+/// say: the base sequences are singletons **and** the three roots still reach
+/// exactly the ordinary refusal that fact produces.
+///
+/// **Nothing here is keyed on a fixture constant.** The roles are derived from
+/// the plan's own control witnesses — root is `DistinguishedRoot`, producer is
+/// its `ParentFrame` child — so renumbering the fixture cannot make this pass by
+/// coincidence, and the test states the *law* rather than the fixture's current
+/// integers.
+///
+/// **Promise class: durable invariant.** The base uncomposed population is a
+/// singleton per slot for as long as membership is composition-time; the
+/// literals are `1` (a singleton's length) and the refusal sentence each root
+/// already produces. It does **not** go red when the atomic object arms — the
+/// composed path adds membership at the splice and leaves these base templates
+/// alone. A red here means base population crept back, which is the thing
+/// `89ee005b` demonstrated is unlawful.
+#[test]
+fn r3_the_base_uncomposed_slot_population_stays_singleton_and_rehomed_expects_no_inner_frame() {
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause, D2J_DECLARATION};
+
+    /// One cause through the production entry, unarmed and uncomposed.
+    fn compile_cause(cause: D2jCause, symbol: &str) -> Option<CraneliftBackendError> {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+            crate::cranelift_backend::artifact::new_object_module_for_lowering_tests("ken-r3-base")
+                .expect("object module"),
+            symbol,
+            cranelift_module::Linkage::Export,
+            &entry,
+            &crate::NativeSeedEnvironment::empty(),
+            declarations,
+            None,
+            false,
+            None,
+            None,
+            Some(oriented),
+        )
+        .err()
+    }
+
+    let mut rows = Vec::new();
+    for (cause, symbol) in [
+        (D2jCause::Exact, "ken_r3_base_exact"),
+        (D2jCause::ReHomed, "ken_r3_base_rehomed"),
+        (D2jCause::ProducerArity, "ken_r3_base_arity"),
+    ] {
+        let (_, _, oriented) = d2j_checked_fixture_under(cause);
+
+        // Roles by control witness, never by fixture constant.
+        let root = oriented
+            .frames
+            .iter()
+            .find(|frame| frame.control_witness == crate::OrientedControlWitnessV1::DistinguishedRoot)
+            .expect("the checked twin has a distinguished root frame");
+        let producer = oriented
+            .frames
+            .iter()
+            .find(|frame| {
+                frame.control_witness
+                    == crate::OrientedControlWitnessV1::ParentFrame(root.frame_id)
+            })
+            .expect("the checked twin has a producer frame parented to the root");
+
+        let outer_slot = oriented
+            .computational_ih_slots
+            .iter()
+            .find(|slot| slot.frame_template_id == root.frame_id)
+            .expect("the root frame has its own binder slot");
+        let inner_slot = oriented
+            .computational_ih_slots
+            .iter()
+            .find(|slot| slot.frame_template_id == producer.frame_id)
+            .expect("the producer frame has its own binder slot");
+        let call = match oriented.computational_ih_calls.as_slice() {
+            [only] => only.clone(),
+            other => panic!("the twin carries exactly one checked IH call: {}", other.len()),
+        };
+
+        rows.push((
+            cause,
+            outer_slot.frame_templates.clone(),
+            inner_slot.frame_templates.clone(),
+            call.callee_frame_templates.clone(),
+            compile_cause(cause, symbol),
+        ));
+    }
+
+    let observed: Vec<(D2jCause, Vec<u64>, Vec<u64>, Vec<u64>, bool)> = rows
+        .iter()
+        .map(|(cause, outer, inner, callee, error)| {
+            let ordinary = matches!(
+                error,
+                Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                    if *construct == "ComputationalMatch"
+                        && reason.contains("in-flight activation")
+            );
+            (*cause, outer.clone(), inner.clone(), callee.clone(), ordinary)
+        })
+        .collect();
+
+    let (root_id, producer_id) = {
+        let (_, _, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+        let root = oriented
+            .frames
+            .iter()
+            .find(|frame| frame.control_witness == crate::OrientedControlWitnessV1::DistinguishedRoot)
+            .expect("root frame")
+            .frame_id;
+        let producer = oriented
+            .frames
+            .iter()
+            .find(|frame| {
+                frame.control_witness == crate::OrientedControlWitnessV1::ParentFrame(root)
+            })
+            .expect("producer frame")
+            .frame_id;
+        (root, producer)
+    };
+
+    let expected: Vec<(D2jCause, Vec<u64>, Vec<u64>, Vec<u64>, bool)> = [
+        D2jCause::Exact,
+        D2jCause::ReHomed,
+        D2jCause::ProducerArity,
+    ]
+    .into_iter()
+    .map(|cause| {
+        (
+            cause,
+            vec![root_id],
+            vec![producer_id],
+            vec![root_id],
+            true,
+        )
+    })
+    .collect();
+
+    assert_eq!(
+        observed, expected,
+        "the BASE uncomposed plan must keep singleton sequences -- outer slot and its call naming \
+         only the root frame, inner slot naming only the producer frame -- and all three roots must \
+         still reach the ordinary in-flight-activation refusal. A callee sequence containing the \
+         producer frame here promises a layer no uncomposed segment carries: it is what made \
+         ReHomed refuse with \"does not carry its exact checked frame sequence\" at 89ee005b, which \
+         is preserved as negative evidence. Membership is transported at the composition splice \
+         that creates it; ParentFrame proves static nesting only, never dynamic segment membership. \
+         Rows are (cause, outer slot, inner slot, call callee, reached the ordinary refusal). \
+         errors={:?}",
+        rows.iter().map(|(cause, _, _, _, error)| (cause, error)).collect::<Vec<_>>()
+    );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `DP` — the composition-time membership
+/// population law: what the checked source may claim, and what a claim is worth
+/// to the binding fingerprint.**
+///
+/// `composed_frame_templates` is new planner population, so the question that
+/// decides whether it is safe is not "does the lawful case work" but **"can it
+/// be made to say nothing, and does anything notice?"** Every row here is a way
+/// the sequence could have been vacuous, and every one is a refusal rather than
+/// a tolerated shape.
+///
+/// | row | claim | verdict |
+/// |---|---|---|
+/// | lawful | a frame of this segment, not already named | accepted |
+/// | stale | a frame the plan does not contain | refused |
+/// | repeat | the same frame twice in one sequence | refused |
+/// | overlap | a frame the ordinary sequence already names | refused |
+///
+/// **Why `overlap` is a refusal and not a harmless duplicate.** The ordinary and
+/// composed sequences are concatenated to build a composed segment's expectation.
+/// A frame in both would be expected twice, and the instantiator would meet it as
+/// *"one invocation instantiates a checked frame template more than once"* — a
+/// Runtime error blaming the segment for a defect that is in the plan. Refusing
+/// at `validate` puts the diagnosis where the mistake is.
+///
+/// **The fingerprint row is the one that is easy to omit and expensive to lose.**
+/// The two sequences are encoded back to back, so `([outer], [inner])` and
+/// `([outer, inner], [])` are the same frame ids in the same order — and until
+/// the composed sequence carries a length prefix they hash **identically**. The
+/// binding fingerprint is what makes a template's identity depend on what it
+/// claims, so two templates whose composition-time claims differ must not agree
+/// on it. Asserting `!=` here is asserting that the separator is load-bearing.
+///
+/// **What this does NOT cover, stated rather than implied.** `validate` also
+/// refuses a composed frame from another checked segment. This fixture has one
+/// segment site, so that row has no witness here and is **not** exercised — the
+/// closure exists in the validator and this test is not evidence for it.
+///
+/// **Promise class: durable invariant.** Acceptance and refusal of authored
+/// claims, plus the inequality of two fingerprints that describe different
+/// claims. It carries no literal frame ids of its own: every id is read off the
+/// fixture's own plan, and the one literal is the count `2`, which is what makes
+/// a repeat a repeat.
+#[test]
+fn dp_composition_time_membership_is_validated_and_changes_the_binding_fingerprint() {
+    // The lawful claim: `outer` keeps the ordinary sequence and `inner` — a real
+    // frame of the same segment that the ordinary sequence does not name — is
+    // claimed as a composition-time member.
+    let base = oriented_test_ih_plan();
+    let ordinary = base
+        .computational_ih_calls
+        .first()
+        .expect("the IH fixture carries a call template")
+        .clone();
+    let outer = *ordinary
+        .callee_frame_templates
+        .first()
+        .expect("the ordinary sequence is non-empty");
+    let inner = base
+        .frames
+        .iter()
+        .map(|frame| frame.frame_id)
+        .find(|frame_id| !ordinary.callee_frame_templates.contains(frame_id))
+        .expect("the fixture has a frame the ordinary sequence does not name");
+    let stale = base
+        .frames
+        .iter()
+        .map(|frame| frame.frame_id)
+        .max()
+        .expect("the fixture has frames")
+        + 1;
+
+    /// Re-seal the first call template's composition-time claim and revalidate.
+    ///
+    /// The fingerprint is recomputed, never left stale: a plan that fails only
+    /// because its fingerprint no longer matches would refuse for a reason that
+    /// has nothing to do with the claim under test, and every row below would
+    /// pass for the wrong reason.
+    fn under(
+        base: &crate::OrientedSubcontinuationPlanV1,
+        composed: Vec<u64>,
+    ) -> (crate::OrientedSubcontinuationPlanV1, Result<(), &'static str>) {
+        let mut plan = base.clone();
+        let call = plan
+            .computational_ih_calls
+            .first_mut()
+            .expect("the IH fixture carries a call template");
+        call.composed_frame_templates = composed;
+        call.occurrence_binding_fingerprint =
+            crate::compiler_private_computational_ih_call_binding_fingerprint(call);
+        let verdict = plan.validate();
+        (plan, verdict)
+    }
+
+    let (lawful, lawful_verdict) = under(&base, vec![inner]);
+    let (_, stale_verdict) = under(&base, vec![stale]);
+    let (_, repeat_verdict) = under(&base, vec![inner, inner]);
+    let (_, overlap_verdict) = under(&base, vec![outer]);
+
+    // The separator row. Same ids, same order, different claim: one says
+    // "`inner` joins only when composed", the other says "`inner` is always a
+    // member". Their binding fingerprints must disagree.
+    let composed_claim = lawful
+        .computational_ih_calls
+        .first()
+        .expect("the lawful plan kept its call template")
+        .occurrence_binding_fingerprint;
+    let folded_claim = {
+        let mut call = ordinary.clone();
+        call.callee_frame_templates = vec![outer, inner];
+        call.composed_frame_templates = Vec::new();
+        crate::compiler_private_computational_ih_call_binding_fingerprint(&call)
+    };
+
+    // The claim survives transport. A population the checked source authors and
+    // the decoder drops is a population Runtime never sees.
+    let decoded = crate::OrientedSubcontinuationPlanV1::decode(&lawful.canonical_bytes())
+        .expect("the lawful plan round-trips");
+    let decoded_claim = decoded
+        .computational_ih_calls
+        .first()
+        .expect("the decoded plan kept its call template")
+        .composed_frame_templates
+        .clone();
+
+    assert_eq!(
+        (
+            lawful_verdict,
+            stale_verdict,
+            repeat_verdict,
+            overlap_verdict,
+            composed_claim == folded_claim,
+            decoded_claim.as_slice(),
+        ),
+        (
+            Ok(()),
+            Err("computational IH call names a stale composed frame"),
+            Err("computational IH call repeats a composed frame"),
+            Err("computational IH call composes a frame it already names"),
+            false,
+            [inner].as_slice(),
+        ),
+        "DP: a composition-time claim naming a real, not-already-named frame of this segment is \
+         accepted; a stale frame, a repeat, and a frame the ordinary sequence already names are \
+         each refused by their own sentence; the claim changes the binding fingerprint, so \
+         'inner joins when composed' and 'inner is always a member' are not the same template; \
+         and the claim survives encode/decode. A row that stops refusing means the population \
+         can be made vacuous; a fingerprint that starts agreeing means the two sequences were \
+         encoded without a separator and a composition-time claim became invisible to the \
+         identity that is supposed to bind it."
+    );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — affine selector net 3: the splice
+/// capability is spendable exactly once, and every other way of presenting one
+/// refuses.**
+///
+/// Architect `evt_4g2hmsr8tb3bm` requires that *"missing, escaped, replayed, or
+/// doubly consumed capability must refuse."* Three of those four are properties
+/// of the ledger itself and are pinned here, unarmed.
+///
+/// | row | presented | verdict |
+/// |---|---|---|
+/// | ordinary edge | no capability at all | `Ordinary`, and NOT an error |
+/// | the splice's edge | an outstanding capability | `Composed`, ledger emptied |
+/// | replay / double consume | the same id a second time | refused |
+/// | escaped / forged | an id this ledger never issued | refused |
+///
+/// **Why "no capability" must be a non-error and is asserted as one.** Every
+/// edge in the compile that is not a splice's carries `None`, so a refusal there
+/// would reject every ordinary segment. It is the row most likely to be dropped
+/// as uninteresting and the one whose loss would be loudest.
+///
+/// **Why the replay row cannot be inferred from the escape row.** They differ in
+/// the state that makes them wrong: a replayed id WAS outstanding and was spent,
+/// a forged id never existed. A single `contains` check answers both, which is
+/// exactly why both are asserted — a future issuer that recycled ids would keep
+/// the escape row green and break the replay row.
+///
+/// **The issuer is asserted monotone in the same breath.** Reuse would let a
+/// later issue answer for a spent id, turning a replay into a silent acceptance;
+/// the two fresh ids being distinct is what forecloses that.
+///
+/// **What this does NOT cover, stated rather than implied.** The *unconsumed*
+/// row's refusal lives in the splice's closeout, which needs a function builder
+/// and an armed region. What is pinned here is the state that closeout fires on:
+/// after an issue with no consume the capability is **still spendable**, which
+/// is precisely the leak the closeout refuses. The refusal itself is owed with
+/// the armed nets.
+///
+/// **Promise class: durable invariant.** Affine consumption of a capability:
+/// one spend succeeds, every other presentation refuses. It carries no fixture
+/// literals — the ids come from the issuer under test.
+#[test]
+fn d3_the_splice_capability_is_spendable_exactly_once_and_every_other_presentation_refuses() {
+    let seed_env = NativeSeedEnvironment::empty();
+    let mut lowering = root_authority_test_lowering(&seed_env);
+
+    // An edge with no capability: the common case, and it must be ordinary
+    // rather than an error.
+    let ordinary = lowering.consume_splice_capability(None);
+
+    let first = lowering.issue_splice_capability();
+    let second = lowering.issue_splice_capability();
+    let issuer_is_monotone = first != second;
+
+    // The splice's own edge spends its capability once.
+    let spent = lowering.consume_splice_capability(Some(first));
+    let outstanding_after_spend = lowering.outstanding_splice_capabilities.contains(&first);
+
+    // The same id again: a replay, from a `Copy` of the edge that already spent.
+    let replayed = lowering.consume_splice_capability(Some(first));
+
+    // The state the closeout fires on: `second` was issued and never consumed,
+    // so it is still spendable. That is the leak, observed where it starts.
+    let unconsumed_is_still_spendable = lowering
+        .outstanding_splice_capabilities
+        .contains(&second);
+
+    // An id this ledger never issued. Taken past the issuer's high-water mark so
+    // it cannot collide with anything outstanding.
+    let forged = lowering.consume_splice_capability(Some(
+        crate::cranelift_backend::lowering::SpliceCompositionCapabilityId(u64::MAX),
+    ));
+
+    fn refusal(result: &Result<SegmentComposition, CraneliftBackendError>) -> bool {
+        matches!(
+            result,
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("consumed twice, or consumed after its splice closed")
+        )
+    }
+
+    assert_eq!(
+        (
+            ordinary.as_ref().ok().copied(),
+            spent.as_ref().ok().copied(),
+            outstanding_after_spend,
+            refusal(&replayed),
+            refusal(&forged),
+            issuer_is_monotone,
+            unconsumed_is_still_spendable,
+        ),
+        (
+            Some(SegmentComposition::Ordinary),
+            Some(SegmentComposition::Composed),
+            false,
+            true,
+            true,
+            true,
+            true,
+        ),
+        "D3 net 3: an edge with no capability is Ordinary and not an error; the splice's edge \
+         spends its capability once, selects Composed, and leaves nothing outstanding; a replay \
+         of that same id and an id this ledger never issued each refuse with the splice's own \
+         sentence; the issuer never repeats an id, so no later issue can answer for a spent one; \
+         and an issued-but-unconsumed capability remains spendable, which is the leak the \
+         splice's closeout refuses. ordinary={ordinary:?} spent={spent:?} replayed={replayed:?} \
+         forged={forged:?}"
+    );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `AC-D3-SELF` — the recursive self edge's
+/// call site is not its callee body, and on this witness that is the ONLY way
+/// to see it.**
+///
+/// The Steward measured the inputs and wrote them into the frame: on the `R3`
+/// twin the claim's **`seat`, its `producer_body`, and its redirect's callee
+/// entry all print `37`**, while the consuming call is **`17`**. The coincidence
+/// is three-way.
+///
+/// ⇒ **A control whose expected values are every `37` passes under the fold it
+/// is supposed to catch.** Folding call site into body type-checks — the two are
+/// the same type — and three of the four identities agree, so any assertion
+/// drawn from those three is satisfied by the wrong code. Separating `17` from
+/// `37` is the whole content of this control.
+///
+/// **It exercises the production decision, not a copy.** The emission seam and
+/// this test both call `fusion_self_edge_identities`, which exists for exactly
+/// that reason: an assertion that re-spelled the choice locally would agree with
+/// itself no matter what the seam did.
+///
+/// **The three-way coincidence is asserted too**, not as a property worth
+/// preserving but as the *precondition of this test's own value*. If a future
+/// fixture separates those three, the fold stops being invisible and a reader
+/// should know this control was built for a harder case than the one they have.
+///
+/// **Promise class: durable invariant.** The self edge keys on the callee body
+/// and records the consuming call as its call site, and those are different
+/// occurrences. The literals are the claim's own measured origins, read from the
+/// claim rather than written in.
+#[test]
+fn ac_d3_self_the_recursive_edges_call_site_is_separated_from_its_callee_body() {
+    use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause, D2J_DECLARATION};
+
+    let (entry, declaration, oriented) = d2j_checked_fixture_under(D2jCause::Exact);
+    let mut declarations = std::collections::BTreeMap::new();
+    declarations.insert(D2J_DECLARATION, &declaration);
+    let mut planner =
+        crate::cranelift_backend::planning::plan_static_transition_graph(&entry, &declarations)
+            .expect("the checked twin plans");
+    let plane = crate::cranelift_backend::planning::build_static_continuation_fusion_plan(
+        &planner,
+        &entry,
+        &declarations,
+        Some(&oriented),
+    )
+    .expect("the checked twin resolves a plane");
+    planner
+        .install_static_continuation_fusions(plane)
+        .expect("the resolved plane installs");
+    let ledger =
+        crate::cranelift_backend::planning::FusionRegionClaimLedger::preflight(&planner)
+            .expect("the installed region preflights a claim");
+    let fusion = *ledger
+        .planned()
+        .iter()
+        .next()
+        .expect("the twin installs exactly one region");
+    let claim = ledger.claim(fusion).expect("the region's claim is outstanding");
+
+    // The production decision, called rather than restated.
+    let (edge_body, edge_call_site) =
+        crate::cranelift_backend::lowering::units::fusion_self_edge_identities(
+            claim.producer_body(),
+            claim.consuming_call(),
+        );
+
+    assert_eq!(
+        (
+            // The edge keys on the CALLEE BODY and records the CONSUMING CALL.
+            edge_body == claim.producer_body(),
+            edge_call_site == claim.consuming_call(),
+            // ...and those are different occurrences. This is the row the fold
+            // fails.
+            edge_body != edge_call_site,
+            // The precondition that makes the row above the only witness: three
+            // of the four identities agree, so nothing drawn from them can see
+            // the fold.
+            claim.seat() == claim.producer_body(),
+            claim.redirect().callee_origin() == claim.producer_body(),
+        ),
+        (true, true, true, true, true),
+        "AC-D3-SELF: the definition-local recursive edge must key on the claim's callee body and \
+         record the claim's consuming call as its call site, and those must be different \
+         occurrences. On this witness the seat, the producer body and the redirect's callee entry \
+         all agree, so an assertion drawn from any of them is satisfied by a build that folded \
+         call site into body; the body-versus-call-site inequality is the only row that is not. \
+         body={edge_body:?} call_site={edge_call_site:?} seat={:?} redirect_callee={:?}",
+        claim.seat(),
+        claim.redirect().callee_origin()
+    );
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local composition
+/// ledger's affine refusals, each reached by its own perturbation.**
+///
+/// **MEASURED:** on the `Exact` and `ReHomed` planner witnesses, with the
+/// fusion plane installed, the ledger plans exactly the two composed edges;
+/// consuming an identity it never planned, one under an owner that is not the
+/// edge's, one against a target the identity does not name, and one twice, are
+/// each refused with that fact's own message; a closeout with a planned member
+/// unconsumed is refused; and the whole-population closeout succeeds only when
+/// every planned member has been consumed and both omission sets equal `F_t`.
+///
+/// **CLAIMED:** `dom(planned) = dom(consumed)` is affine and total, and no half
+/// of it passes for the other.
+///
+/// **THE GAP, and it is two named clauses rather than a hedge.** Two of the
+/// closeout's clauses are **not reachable by any perturbation of this ledger**,
+/// and neither is claimed as measured:
+///
+/// - the per-fusion `{Outer, Inner}` layer law is IMPLIED by the population
+///   equality above it plus the planner's own preflight, which already refuses
+///   a body-owning fusion that does not carry exactly one of each. It is kept
+///   because that implication routes through a law this ledger does not own,
+///   and a redundant refusal naming a silent-wrong-answer path earns its line.
+/// - the cross-ledger disjointness is implied by `claim_exact` refusing an
+///   identity outside `O` — an `F` member cannot enter the ordinary ledger to
+///   be found in both.
+///
+/// **Promise class: durable invariant.** Every assertion is over sets and over
+/// refusal identity, never over a count of edges: this witness plans two, and a
+/// row that said "two" would red the moment a second fusion was installed
+/// without saying anything about affinity.
+#[test]
+fn d3_the_fusion_local_composition_ledger_is_affine_and_total() {
+    use crate::cranelift_backend::lowering::units::{declare_unit_bundle, FusionCompositionLedger};
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, d2j_installed_plan_under, D2jCause, D2J_DECLARATION,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
+
+    for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        // The SAME installed witness the planner-side partition control uses.
+        let plan = d2j_installed_plan_under(cause, &entry, &declarations, &oriented)
+            .expect("the witness installs");
+
+        let mut module = crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+            "ken-d3-composition-ledger",
+        )
+        .expect("object module");
+        let bundle = declare_unit_bundle(&mut module, &plan).expect("bundle declares");
+
+        // The planned population and the fusion-local targets, read from the
+        // planner rather than from the ledger the assertions are about.
+        let planned = plan.fusion_composed_edges().clone();
+        let fused_targets = planned
+            .values()
+            .map(|edge| edge.target())
+            .collect::<BTreeSet<_>>();
+        assert!(
+            !planned.is_empty(),
+            "{cause:?}: the witness must plan at least one composed edge, or every row below \
+             passes vacuously over an empty population"
+        );
+
+        let open = || FusionCompositionLedger::open(&plan, &bundle).expect("ledger opens");
+
+        // ---- The declaration pass actually omitted `F_t`, read from the
+        // bundle it produced rather than from the plan.
+        for target in &fused_targets {
+            assert!(
+                bundle.continuation(*target).is_none(),
+                "{cause:?}: a fusion-local target keeps a declared Function, so its selected body \
+                 would be realized twice"
+            );
+        }
+
+        // ---- Refusal 1: an identity this ledger never planned.
+        //
+        // The unplanned identity is a REAL planner-issued ordinary identity,
+        // not a fabricated one. A fabricated key could be refused merely for
+        // being unrecognizable; an ordinary identity is the case the guard
+        // actually has to catch, because it is exactly what a fork that
+        // misrouted `O` into this ledger would present.
+        let ordinary = plan
+            .ordinary_continuation_call_identities()
+            .expect("ordinary identities");
+        if let Some(stranger) = ordinary.iter().next() {
+            let mut ledger = open();
+            let error = ledger
+                .consume(stranger, stranger.emission_owner(), stranger.target())
+                .expect_err("an unplanned identity must be refused");
+            assert!(
+                format!("{error:?}").contains("the planner never composed"),
+                "{cause:?}: {error:?}"
+            );
+        }
+
+        // ---- Refusals 2 and 3: a wrong owner and a wrong target, each named.
+        for (identity, edge) in &planned {
+            let wrong_owner = planned
+                .values()
+                .map(|other| other.emission_owner())
+                .find(|owner| *owner != edge.emission_owner());
+            if let Some(wrong_owner) = wrong_owner {
+                let mut ledger = open();
+                let error = ledger
+                    .consume(identity, wrong_owner, identity.target())
+                    .expect_err("a foreign emission owner must be refused");
+                assert!(
+                    format!("{error:?}").contains("was consumed while defining"),
+                    "{cause:?}: {error:?}"
+                );
+            }
+            let wrong_target = fused_targets.iter().find(|target| **target != edge.target());
+            if let Some(wrong_target) = wrong_target {
+                let mut ledger = open();
+                let error = ledger
+                    .consume(identity, edge.emission_owner(), *wrong_target)
+                    .expect_err("a disagreeing target must be refused");
+                assert!(
+                    format!("{error:?}").contains("was consumed against"),
+                    "{cause:?}: {error:?}"
+                );
+            }
+
+            // ---- Refusal 4: the replay.
+            let mut ledger = open();
+            ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect("the exact consumption is accepted");
+            let error = ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect_err("a second consumption of one identity must be refused");
+            assert!(
+                format!("{error:?}").contains("consumed twice"),
+                "{cause:?}: {error:?}"
+            );
+        }
+
+        // ---- Refusal 5: a planned member left unconsumed. THE case that reads
+        // as success because nothing was emitted for it.
+        let mut ledger = open();
+        for target in &fused_targets {
+            ledger.record_definition_omitted(*target);
+        }
+        let error = ledger
+            .close(&BTreeSet::new())
+            .expect_err("an unrealized composition must be refused at close");
+        assert!(
+            format!("{error:?}").contains("never realized"),
+            "{cause:?}: {error:?}"
+        );
+
+        // ---- Refusal 6: the definition pass did not omit `F_t`.
+        let mut ledger = open();
+        for (identity, edge) in &planned {
+            ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect("consumes");
+        }
+        let error = ledger
+            .close(&BTreeSet::new())
+            .expect_err("a definition pass that omitted nothing must be refused");
+        assert!(
+            format!("{error:?}").contains("definition pass's omitted"),
+            "{cause:?}: {error:?}"
+        );
+
+        // ---- The positive: every planned member consumed, both omission sets
+        // equal to `F_t`, and nothing shared with the ordinary ledger.
+        let mut ledger = open();
+        for (identity, edge) in &planned {
+            ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect("consumes");
+        }
+        for target in &fused_targets {
+            ledger.record_definition_omitted(*target);
+        }
+        ledger
+            .close(&ordinary)
+            .expect("the total, affine, disjoint closeout succeeds");
+    }
 }

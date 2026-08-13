@@ -312,6 +312,7 @@ fn px8tr_nested_post_effect_fixture() -> (
         result_interface: px8tr_test_interface(1),
         callee_segment_site_id: 9,
         callee_frame_templates: vec![7],
+        composed_frame_templates: Vec::new(),
         parent_frame_template_id: Some(7),
         parent_segment_site_id: Some(9),
         caller_interface: px8tr_test_interface(1),

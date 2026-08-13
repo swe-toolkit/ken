@@ -78,8 +78,12 @@ fn run_checked_bounded_nat_fixture(
         unsupported: Vec::new(),
         body_emission_authority: BodyEmissionAuthority::FunctionizedUnits,
         continuation_claims: None,
+        fusion_compositions: None,
         static_worker_fields: Default::default(),
         fusion_claims: None,
+        fused_consumer_authority: None,
+        outstanding_splice_capabilities: BTreeSet::new(),
+        next_splice_capability: 0,
         continuation_candidates: None,
         checked_call_ledger: None,
         defining_unit: None,
@@ -306,6 +310,7 @@ fn run_checked_bounded_nat_fixture(
                     compiler.enter_source_occurrence_plan(match_origin)?;
                     let frames = [EliminatorFrame::Computational(
                         ComputationalEliminatorFrame {
+                            splice_capability: None,
                             cases: &cases,
                             default: &default,
                             env: &[],

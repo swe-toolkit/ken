@@ -2678,6 +2678,19 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// a standalone unit. Empty until `install_fusion_owned_bodies` moves a
     /// fully validated scratch map in; there is deliberately no other writer.
     fusion_owned_bodies: BTreeMap<StaticOriginId, FusionOwnedBody>,
+    /// **`D3` — the exact call edges an installed fusion COMPOSES, one record
+    /// per edge, keyed by the call's whole opaque identity.**
+    ///
+    /// Ruled at `evt_1t3f4e8100rb5`. A composed edge lowers its target's
+    /// selected body in the caller and hands the result straight to the
+    /// caller's already-active computational eliminator; it emits no call and
+    /// returns no SSA word.
+    ///
+    /// **Keyed by identity, never by target, body, origin, owner or spelling.**
+    /// The injective call-target law makes each target's liveness the outcome of
+    /// its own unique identity, so this map is exactly "which edges compose" and
+    /// nothing has to scan an incoming population to find out.
+    fusion_composed_calls: BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
     /// Whether body ownership has been installed. **Not derivable from the map's
     /// emptiness:** a plan with no fused regions installs an empty map, and a
     /// second install against it must still refuse.
@@ -7848,6 +7861,51 @@ fn continuation_keys_equal_under_mutation(
     }
 }
 
+/// **`D3` — one exact call edge a fusion composes, with the coordinates the
+/// emitter needs and no others.**
+///
+/// Ruled at `evt_1t3f4e8100rb5`. Every member is copied from a relation that
+/// already resolved it; nothing here is re-derived at the emitter, and nothing
+/// is a coincidence key.
+///
+/// `layer` records WHICH of the two ruled checked bindings selected this edge.
+/// It is provenance, not a selector: the map is keyed by call identity, and two
+/// layers of one fusion are two records rather than one record with a flag.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct FusionComposedEdge {
+    fusion: StaticContinuationFusionId,
+    target: ContinuationSpecializationId,
+    emission_owner: ContinuationEmissionOwner,
+    consumer_continuation_origin: StaticOriginId,
+    producer_construct_origin: StaticOriginId,
+    layer: FusionCompositionLayer,
+}
+
+/// Which ruled checked binding selected a composed edge.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum FusionCompositionLayer {
+    /// Selected by the fusion key's checked CONSUMER binding.
+    Outer,
+    /// Selected by the fusion key's checked PRODUCER-ARGUMENT binding.
+    Inner,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl FusionComposedEdge {
+    pub(in crate::cranelift_backend) fn fusion(&self) -> StaticContinuationFusionId {
+        self.fusion
+    }
+    pub(in crate::cranelift_backend) fn target(&self) -> ContinuationSpecializationId {
+        self.target
+    }
+    pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
+        self.emission_owner
+    }
+    pub(in crate::cranelift_backend) fn layer(&self) -> FusionCompositionLayer {
+        self.layer
+    }
+}
+
 fn intern_specialization(
     interned: &mut BTreeMap<ContinuationSpecializationKey, ContinuationSpecializationId>,
     units: &mut Vec<PlannedContinuationSpecialization>,
@@ -7946,6 +8004,15 @@ thread_local! {
     static WEAKEN_CONTINUATION_DECREASING_MEASURE: Cell<bool> = const { Cell::new(false) };
     static SUPPRESS_POST_SPECIALIZATION_DESCENT: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_STATIC_BODY_TRIPLE: Cell<bool> = const { Cell::new(false) };
+    /// Suppress ONLY the binder-to-body resolution rule in preflight.
+    ///
+    /// This exists so a control can show that its perturbation left every OTHER
+    /// preflight rule green. Asserting "the new rule refused" alone cannot say
+    /// that: a perturbed key that also trips `BinderAgreement` would refuse
+    /// under either rule, and a reader could not tell the discriminator from a
+    /// proxy. Suppressing the one rule and observing the SAME perturbed key
+    /// issue a claim is what makes the attribution exact.
+    static SUPPRESS_BINDER_BODY_RESOLUTION: Cell<bool> = const { Cell::new(false) };
     static MUTATE_PRIMARY_FUSION_KEY_DERIVATION: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
 }
@@ -8021,6 +8088,13 @@ fn envelope_defect() -> EnvelopeDefect {
 #[cfg(test)]
 pub(in crate::cranelift_backend) fn set_primary_fusion_key_derivation_mutated(armed: bool) {
     MUTATE_PRIMARY_FUSION_KEY_DERIVATION.with(|cell| cell.set(armed));
+}
+
+/// `D3` — suppress the binder-to-body resolution rule, and nothing else, so a
+/// control can attribute its refusal to that rule rather than to a proxy.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn set_binder_body_resolution_suppressed(armed: bool) {
+    SUPPRESS_BINDER_BODY_RESOLUTION.with(|cell| cell.set(armed));
 }
 
 #[cfg(test)]
@@ -8402,6 +8476,20 @@ pub(in crate::cranelift_backend) struct CheckedTransportCoordinate {
     slot_occurrence_path: Vec<u64>,
     call_template_id: u64,
     call_occurrence_path: Vec<u64>,
+}
+
+impl CheckedTransportCoordinate {
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D2`** — the consumer frame identity
+    /// this coordinate already carries, exposed read-only.
+    ///
+    /// Read, never re-derived. The fused body re-enters **this** frame rather
+    /// than looking one up, so the identity the claim was preflighted against
+    /// is the identity the checked consumer then validates. Nothing new is
+    /// planned for it and no second authority is introduced: the coordinate is
+    /// already a member of the complete key the claim's identity came from.
+    pub(in crate::cranelift_backend) fn frame_id(&self) -> u64 {
+        self.frame_id
+    }
 }
 
 /// What is in scope while descending; a member stays `None` until its marker is
@@ -9288,6 +9376,18 @@ pub(in crate::cranelift_backend) enum FusionClaimRefusal {
     SelfRedirection,
     /// A checked binder or the admitted ledger root disagrees with the key.
     BinderAgreement,
+    /// The consuming callee is not the binder the key names, or that binder's
+    /// hypothesis does not resolve to the producer body.
+    ///
+    /// **This is the relation BETWEEN the two facts [`Self::BinderAgreement`]
+    /// checks, and it is why that rule is not sufficient on its own.**
+    /// `BinderAgreement` establishes two MARGINAL facts — that the key's
+    /// consuming binder sits at the admitted frame and recursive position, and
+    /// that the admitted result root equals the invocation callee entry. Each
+    /// is a statement about one operand. Neither says that the hypothesis THAT
+    /// binder names is a recursive invocation of THAT body, which is the fact
+    /// the fused self edge is emitted against.
+    BinderBodyResolution,
     /// The ordered input projection is unavailable or disagrees with the frame
     /// the ABI declared for it.
     InputAvailability,
@@ -9321,6 +9421,11 @@ impl FusionClaimRefusal {
             Self::BinderAgreement => {
                 "a static continuation fusion claim's checked binders do not agree with the key's \
                  recursive position, admitted continuation origin, or admitted result root"
+            }
+            Self::BinderBodyResolution => {
+                "a static continuation fusion claim's consuming callee is not the checked binder \
+                 its key names, or that binder's hypothesis does not resolve to the producer body \
+                 the claim redirects into"
             }
             Self::InputAvailability => {
                 "a static continuation fusion claim's ordered input projection is unavailable or \
@@ -9401,7 +9506,17 @@ impl FusionRegionClaimLedger {
         let mut claimed_frames = BTreeSet::new();
         let mut claimed_suffixes = BTreeSet::new();
 
-        for view in plan.continuation_fusions()? {
+        let views = plan.continuation_fusions()?;
+        // The planner's own binding authority, derived ONCE and only when there
+        // is a claim to check with it. A compile with no installed fusion pays
+        // nothing, which keeps this rule off the cost of every other compile.
+        let ih_bindings = if views.is_empty() {
+            BTreeMap::new()
+        } else {
+            build_checked_ih_bindings(plan)?
+        };
+
+        for view in views {
             let id = view.id();
             let key = view.key();
 
@@ -9457,6 +9572,46 @@ impl FusionRegionClaimLedger {
                 || key.admitted.result_root != key.invocation_callee_entry
             {
                 return Err(fusion_claim_error(FusionClaimRefusal::BinderAgreement));
+            }
+
+            // The binder-to-body relation, which the two rules above do NOT
+            // entail. Ruled at `evt_2rw6vhq8xrqcm`.
+            //
+            // `BinderAgreement` proves two MARGINAL facts: the key's consuming
+            // binder sits at the admitted frame and recursive position, and the
+            // admitted result root equals the invocation callee entry. Both are
+            // statements about a single operand, and a key can satisfy both
+            // while the hypothesis its binder names invokes some OTHER body --
+            // which is precisely the fact `D3` emits the definition-local fused
+            // self edge against.
+            //
+            // Two steps, because "the exact consuming callee" is half the
+            // claim. First the callee is re-resolved through the planner's own
+            // binding authority rather than taken from the key -- the key
+            // ASSERTS a `consumer_binding`, and nothing above re-derives it.
+            // Then that binder is resolved to a body and required to be the one
+            // the claim redirects into.
+            //
+            // ⇒ **Only ONE comparison is written, and the other two are
+            // entailed.** `InvocationTriple` above already forced
+            // `redirect.callee_origin() == key.invocation_callee_entry`, and
+            // the claim below is constructed with `producer_body:
+            // key.invocation_callee_entry`. So comparing the resolved body
+            // against all three would be one gate and two restatements, and a
+            // branch that cannot fail reads as a check while being none.
+            #[cfg(test)]
+            let resolution_armed = !SUPPRESS_BINDER_BODY_RESOLUTION.with(Cell::get);
+            #[cfg(not(test))]
+            let resolution_armed = true;
+            if resolution_armed {
+                if ih_bindings.get(&key.consuming_callee).copied() != Some(key.consumer_binding) {
+                    return Err(fusion_claim_error(FusionClaimRefusal::BinderBodyResolution));
+                }
+                if fusion_resolved_binder_body(plan, key.consumer_binding)?
+                    != Some(key.invocation_callee_entry)
+                {
+                    return Err(fusion_claim_error(FusionClaimRefusal::BinderBodyResolution));
+                }
             }
 
             // Ordinary input availability: the ordered projection the key
@@ -9844,6 +9999,65 @@ fn fusion_unique_static_body_triple(
         return Ok(None);
     }
     Ok(matching.into_iter().next())
+}
+
+/// Resolve one checked induction hypothesis to the body it invokes.
+///
+/// ## The relation, and why it needs its own derivation
+///
+/// A [`CheckedIhBinding`] names a **frame and a recursive position** and no
+/// body. The body it denotes is reached through the frame's own scrutinee: the
+/// hypothesis at position `p` is the recursive result for the scrutinee's
+/// argument at `p`, and that argument carries the producer as its body. So the
+/// route is scrutinee, then the argument at the binder's recursive position,
+/// then that argument's body.
+///
+/// ⇒ **The recursive position is USED here, not merely compared.** Preflight's
+/// [`FusionClaimRefusal::BinderAgreement`] only checks the position against the
+/// key's own copy of it, which two equal numbers satisfy without either naming
+/// an argument that exists. Indexing the scrutinee's arguments by it is what
+/// makes the position select something.
+///
+/// ## MEASURED
+///
+/// On the three `D2j` causes that install a key, the consumer binding resolves
+/// to exactly the key's `invocation_callee_entry` — `Exact` (10, 0) to 37,
+/// `ReHomed` (6, 0) to 33, `ProducerArity` (10, 0) to 38.
+///
+/// **And the route is not landing there by construction.** The same resolution
+/// applied to each key's PRODUCER argument binding lands on a DIFFERENT body
+/// every time — 34, 30 and 35 respectively, which is the producer's own
+/// outgoing edge rather than the one being redirected. A derivation that
+/// returned the redirect target whatever it was given could not do that.
+///
+/// ## The closure step, and why a non-closure argument REFUSES
+///
+/// On all three witnesses the argument is a [`RuntimeExpr::LexicalClosure`] and
+/// the body is its child. An argument that is not a closure has no body, so
+/// there is no hypothesis-invoked body to compare and the relation is
+/// **unproved rather than false**. Returning the argument itself would make the
+/// comparison answer a question it was not asked, so this refuses instead. The
+/// population is three witness families, and a shape outside them is refused,
+/// not guessed at.
+fn fusion_resolved_binder_body(
+    plan: &StaticTransitionPlan<'_>,
+    binding: CheckedIhBinding,
+) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+    let scrutinee = plan.semantic.child_origin(binding.frame_origin, 0)?;
+    let Some(argument) = plan
+        .semantic
+        .child_origins(scrutinee)?
+        .get(binding.recursive_position as usize)
+        .copied()
+    else {
+        return Ok(None);
+    };
+    match plan.planned_occurrence_expr(argument)? {
+        RuntimeExpr::LexicalClosure { .. } => {
+            Ok(Some(plan.semantic.child_origin(argument, 0)?))
+        }
+        _ => Ok(None),
+    }
 }
 
 /// Descend the checked wrappers to the occurrence they carry.
@@ -10532,7 +10746,33 @@ fn validate_continuation_specialization_closure(
                 "continuation edge token disagrees with its exact target",
             ));
         }
-        reached.insert(target.id);
+        // ---- `D3` — CALL TARGET IS INJECTIVE. Ruled at `evt_7akh94dvqeqap`.
+        //
+        // The checks above prove key/unit bijection, unique tokens, token/target
+        // agreement, and that every unit is REACHED. Reachability is surjective
+        // and says nothing about the other direction: two distinct tokens may
+        // name one unit and every check above still passes.
+        //
+        // **That gap is what pushed a liveness rule into the emitter.** Without
+        // injectivity here, "may this specialization stop being declared?" is a
+        // question about a call POPULATION, and the emitter grew an
+        // all-incoming-calls scan to answer it -- a scan no lawful source can
+        // make fail, defending an invalid planner state late. With injectivity,
+        // the question is answered by one identity's own disposition and the
+        // scan is unnecessary rather than merely unreachable.
+        //
+        // ⇒ Deliberately a SEPARATE refusal from the duplicate-token check
+        // above. A repeated token is one edge planned twice; two distinct
+        // tokens on one target is an ALIAS -- two edges the planner believes are
+        // different, resolving to one unit. They are different defects and a
+        // control for one must not pass by tripping the other.
+        if !reached.insert(target.id) {
+            return Err(planner_error(
+                "two distinct continuation planned edges name one specialization unit, so the \
+                 planner's call and unit populations are not bijective and a specialization's \
+                 liveness is not decided by its own edge",
+            ));
+        }
     }
     if reached.len() != units.len() {
         return Err(planner_error(
@@ -10862,6 +11102,7 @@ impl<'src> Planner<'src> {
                 // Empty by construction: body ownership is installed only from
                 // validated claims, which cannot exist before the plan does.
                 fusion_owned_bodies: BTreeMap::new(),
+                fusion_composed_calls: BTreeMap::new(),
                 fusion_bodies_installed: false,
             },
             store_interner: BTreeMap::new(),
@@ -13842,11 +14083,302 @@ impl<'src> StaticTransitionPlan<'src> {
         // No caller convention can exclude that, so it is excluded here by
         // ordering: the check below is the last thing that can fail, and the two
         // commits after it are infallible.
+        // ---- `D3` — MINT THE COMPOSED EDGES. Ruled `evt_1t3f4e8100rb5`.
+        //
+        // Two layers per fusion, each selected by one of the key's checked IH
+        // bindings and by nothing else. The bindings are the relation the
+        // grounding turn established: the consumer binding names the outer
+        // frame, the producer-argument binding names the inner one, and they
+        // differ precisely BECAUSE they are the two composition layers.
+        //
+        // Every refusal is above the transaction line, and each names a
+        // distinct way the join can be wrong rather than collapsing them into
+        // one "could not resolve".
+        let mut composed: BTreeMap<ContinuationCallIdentity, FusionComposedEdge> = BTreeMap::new();
+        let specializations = self.continuation_units()?;
+        let specialization_calls = self.continuation_calls()?;
+        for view in self.continuation_fusions()? {
+            let fusion = view.id();
+            if !owned.contains(&fusion) {
+                continue;
+            }
+            let key = view.key();
+            for (layer, frame, owner) in [
+                (
+                    FusionCompositionLayer::Outer,
+                    key.consumer_binding.frame_origin,
+                    key.consumer_owner,
+                ),
+                (
+                    FusionCompositionLayer::Inner,
+                    key.producer_argument_binding.frame_origin,
+                    key.producer_owner,
+                ),
+            ] {
+                let mut matching = specializations
+                    .iter()
+                    .filter(|unit| {
+                        unit.continuation_origin() == frame && unit.consumer_owner() == owner
+                    });
+                let Some(unit) = matching.next() else {
+                    return Err(planner_error(
+                        "a static continuation fusion's checked binding names a continuation \
+                         frame that no generated specialization eliminates, so the edge it would \
+                         compose does not exist",
+                    ));
+                };
+                if matching.next().is_some() {
+                    return Err(planner_error(
+                        "two generated continuation specializations answer one static \
+                         continuation fusion's checked binding frame and owner, so which edge it \
+                         composes is ambiguous",
+                    ));
+                }
+
+                // The target's UNIQUE edge. Uniqueness is the injective
+                // call-target law above, so this reads a fact the closure
+                // validator already refused any violation of -- it does not
+                // re-derive it.
+                let mut edges = specialization_calls
+                    .iter()
+                    .filter(|call| call.target() == unit.id());
+                let Some(call) = edges.next() else {
+                    return Err(planner_error(
+                        "a static continuation fusion composes a specialization no exact call \
+                         reaches, so there is no edge to compose at",
+                    ));
+                };
+                if edges.next().is_some() {
+                    return Err(planner_error(
+                        "a composed continuation specialization has more than one exact planned \
+                         edge, which the injective call-target law forbids",
+                    ));
+                }
+                if call.emission_owner() != ContinuationEmissionOwner::Predeclared(owner) {
+                    return Err(planner_error(
+                        "a composed continuation edge is emitted by an owner other than the one \
+                         the fusion's checked binding names, so composing it would lower a \
+                         selected body in a function that does not hold its operands",
+                    ));
+                }
+                let identity = self
+                    .continuation_call_binding_for(
+                        call.producer_construct_origin(),
+                        call.continuation_origin(),
+                        call.producer_alternative(),
+                        call.recursive_position(),
+                    )?
+                    .ok_or_else(|| {
+                        planner_error(
+                            "a composed continuation edge has no binding under its own four-field \
+                             selector, so the identity the composition is keyed by cannot be named",
+                        )
+                    })?;
+                if identity.target() != unit.id() {
+                    return Err(planner_error(
+                        "a composed continuation edge's re-resolved identity names a different \
+                         specialization than the edge it was read from",
+                    ));
+                }
+                if composed
+                    .insert(
+                        identity,
+                        FusionComposedEdge {
+                            fusion,
+                            target: unit.id(),
+                            emission_owner: call.emission_owner(),
+                            consumer_continuation_origin: frame,
+                            producer_construct_origin: call.producer_construct_origin(),
+                            layer,
+                        },
+                    )
+                    .is_some()
+                {
+                    return Err(planner_error(
+                        "one exact continuation call identity is composed twice, so which fused \
+                         region owns the edge is undetermined",
+                    ));
+                }
+            }
+        }
+
+        // ---- `D3` — THE FUSION-SCOPED JOIN, and it is validated as ONE
+        // ---- structure rather than by origin coincidence. Ruled
+        // ---- `evt_6kn9ckdnbf0ph` §2.
+        //
+        // The two objects carry the two halves of the mechanism and neither is
+        // widened to hold the other's: `FusionComposedEdge` says WHICH exact
+        // continuation edge is locally composed, and `FusionRegionClaim` says
+        // WHICH checked call consumes the worker produced inside that
+        // composition. **The ordinary consuming call is deliberately absent
+        // from `dom(FusionComposedEdge)`** — it has no `ContinuationCall
+        // Identity` and is not a specialization target, and inventing a union
+        // edge for it would erase exactly that distinction.
+        //
+        // So the only join asserted is `edge.fusion == claim.fusion`, exactly
+        // once per layer, both directions.
+        let mut layers_by_fusion: BTreeMap<
+            StaticContinuationFusionId,
+            BTreeSet<FusionCompositionLayer>,
+        > = BTreeMap::new();
+        for edge in composed.values() {
+            if !owned.contains(&edge.fusion) {
+                return Err(planner_error(
+                    "a composed continuation edge names a fusion that owns no producer body, so \
+                     the claim half of the composition join does not exist",
+                ));
+            }
+            if !layers_by_fusion.entry(edge.fusion).or_default().insert(edge.layer) {
+                return Err(planner_error(
+                    "one static continuation fusion minted two composed edges at the same \
+                     composition layer, so its outer and inner selections are not distinct",
+                ));
+            }
+        }
+        for fusion in owned.iter().copied() {
+            let layers = layers_by_fusion.remove(&fusion).unwrap_or_default();
+            if layers
+                != BTreeSet::from([FusionCompositionLayer::Outer, FusionCompositionLayer::Inner])
+            {
+                return Err(planner_error(
+                    "a body-owning static continuation fusion does not carry exactly one outer and \
+                     one inner composed edge, so the two ruled composition layers are not both \
+                     realized",
+                ));
+            }
+        }
+
+        // ---- `D3` — THE EXACT PARTITIONS `P = O ⊎ F` AND `T = O_t ⊎ F_t`.
+        //
+        // Asserted as SET relations, never as counts: two populations of the
+        // same size can be the wrong two, and every downstream narrowing reads
+        // `O`/`O_t` rather than re-deriving them.
+        let planned_identities = self.continuation_call_identities()?;
+        let fused_identities = composed.keys().cloned().collect::<BTreeSet<_>>();
+        if !fused_identities.is_subset(&planned_identities) {
+            return Err(planner_error(
+                "a composed continuation identity is not in the exact planned call population, so \
+                 the fusion-local domain is not a subset of the population it partitions",
+            ));
+        }
+        let fused_targets = composed.values().map(|edge| edge.target).collect::<BTreeSet<_>>();
+        let planned_targets = specializations.iter().map(|unit| unit.id()).collect::<BTreeSet<_>>();
+        if !fused_targets.is_subset(&planned_targets) {
+            return Err(planner_error(
+                "a composed continuation edge names a specialization target outside the planned \
+                 unit population, so the fusion-local target range is not a subset of the \
+                 population it partitions",
+            ));
+        }
+        // The residual halves, and the partition law restated in the direction
+        // a reader checks: disjointness plus coverage, each named separately
+        // because they fail for different reasons.
+        let residual_identities = planned_identities
+            .difference(&fused_identities)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let residual_targets = planned_targets
+            .difference(&fused_targets)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if !residual_identities.is_disjoint(&fused_identities)
+            || residual_identities
+                .union(&fused_identities)
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != planned_identities
+        {
+            return Err(planner_error(
+                "the ordinary and fusion-local continuation identity populations are not a \
+                 partition of the exact planned population",
+            ));
+        }
+        if !residual_targets.is_disjoint(&fused_targets)
+            || residual_targets
+                .union(&fused_targets)
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != planned_targets
+        {
+            return Err(planner_error(
+                "the ordinary and fusion-local continuation target populations are not a partition \
+                 of the planned specialization population",
+            ));
+        }
+
         ledger.check_body_owned(&owned)?;
         self.fusion_owned_bodies = scratch;
+        self.fusion_composed_calls = composed;
         self.fusion_bodies_installed = true;
         ledger.commit_body_owned(owned);
         Ok(())
+    }
+
+    /// **`D3` — every exact planned continuation call identity, `P`.**
+    ///
+    /// The one projection both halves of the partition are derived from, so
+    /// `O` and `F` cannot disagree about which population they partition.
+    pub(in crate::cranelift_backend) fn continuation_call_identities(
+        &self,
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        self.continuation_calls()?
+            .iter()
+            .map(|call| {
+                self.continuation_call_binding_for(
+                    call.producer_construct_origin(),
+                    call.continuation_origin(),
+                    call.producer_alternative(),
+                    call.recursive_position(),
+                )?
+                .ok_or_else(|| {
+                    planner_error(
+                        "a planned continuation call has no binding under its own four-field \
+                         selector, so the exact planned identity population cannot be built",
+                    )
+                })
+            })
+            .collect()
+    }
+
+    /// **`D3` — the ORDINARY residual identities `O = P \ F`.**
+    ///
+    /// **This is the single plan-authoritative narrowing, and it exists so
+    /// that no consumer filters for itself.** Ruled `evt_48rwarx25pj2p` §3:
+    /// the candidate ledger, the claim ledger, declaration, definition,
+    /// resolution, direct-call verification and the `D8` composed-discharge
+    /// machinery all read *this*, so every landed ordinary law stays literally
+    /// true over its own complete domain rather than being weakened to tolerate
+    /// an absence.
+    ///
+    /// Repeated filtering at each consumer would be a second authority over
+    /// which edges are ordinary, and the two would drift silently.
+    pub(in crate::cranelift_backend) fn ordinary_continuation_call_identities(
+        &self,
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        let mut identities = self.continuation_call_identities()?;
+        identities.retain(|identity| !self.fusion_composed_calls.contains_key(identity));
+        Ok(identities)
+    }
+
+    /// **`D3` — the ORDINARY residual targets `O_t = T \ F_t`.**
+    ///
+    /// The target-side twin of [`Self::ordinary_continuation_call_identities`].
+    /// A fusion-local target omits its declaration, definition and resolution,
+    /// so this is the population those three passes range over.
+    pub(in crate::cranelift_backend) fn ordinary_continuation_targets(
+        &self,
+    ) -> Result<BTreeSet<ContinuationSpecializationId>, CraneliftBackendError> {
+        let fused = self
+            .fusion_composed_calls
+            .values()
+            .map(|edge| edge.target)
+            .collect::<BTreeSet<_>>();
+        Ok(self
+            .continuation_units()?
+            .iter()
+            .map(|unit| unit.id())
+            .filter(|id| !fused.contains(id))
+            .collect())
     }
 
     /// **`D5a` checkpoint 1 — the units that receive a declared and defined
@@ -13873,6 +14405,26 @@ impl<'src> StaticTransitionPlan<'src> {
             // axis, exactly as `unit.body_occurrence()` does.
             .filter(|unit| !dispositions.contains_key(&unit.body_occurrence()))
             .collect())
+    }
+
+    /// **`D3` — the composed edge for this exact call identity, if any.**
+    ///
+    /// **Probed by WHOLE identity.** An identity with no record takes the
+    /// existing `DirectCall` path unchanged; there is no target, body, owner or
+    /// origin question asked here, and no incoming-domain scan anywhere.
+    pub(in crate::cranelift_backend) fn fusion_composed_edge(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<&FusionComposedEdge> {
+        self.fusion_composed_calls.get(identity)
+    }
+
+    /// Every composed edge the planner minted, for the transport-instance
+    /// closeout to check consumption against.
+    pub(in crate::cranelift_backend) fn fusion_composed_edges(
+        &self,
+    ) -> &BTreeMap<ContinuationCallIdentity, FusionComposedEdge> {
+        &self.fusion_composed_calls
     }
 
     /// **`D5a` checkpoint 1 — the call edges that survive the retarget.**
@@ -16091,7 +16643,9 @@ pub(in crate::cranelift_backend) use tests::contspec_nested_fixture;
 /// `D2f` Deliverable 0 — the shared checked-witness fixture, re-exported so the
 /// full-compile gate consumes the very constructor the planner controls do.
 #[cfg(test)]
-pub(in crate::cranelift_backend) use tests::{D2J_DECLARATION, D2jCause, d2j_checked_fixture_under};
+pub(in crate::cranelift_backend) use tests::{
+    d2j_checked_fixture_under, d2j_installed_plan_under, D2jCause, D2J_DECLARATION,
+};
 
 #[cfg(test)]
 mod tests {
@@ -16481,6 +17035,7 @@ mod tests {
             result_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
             callee_segment_site_id: 9,
             callee_frame_templates: vec![D2G_OUTER_FRAME],
+            composed_frame_templates: Vec::new(),
             parent_frame_template_id: Some(D2G_OUTER_FRAME),
             parent_segment_site_id: Some(9),
             caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
@@ -17269,6 +17824,15 @@ mod tests {
             result_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
             callee_segment_site_id: 9,
             callee_frame_templates: vec![D2G_OUTER_FRAME],
+            // `RT-LEXICAL-R3-FUSION-EMITTER` `DP` — the checked source's
+            // composition-time claim: when a fusion splice builds this
+            // invocation's segment, the producer frame joins it, qualified by
+            // the same single invocation source and affine instance.
+            //
+            // The ordinary sequence above is UNCHANGED, which is what keeps the
+            // uncomposed segments of this same template covering exactly
+            // `{outer}`. `89ee005b` widened that one instead and refused them.
+            composed_frame_templates: vec![D2G_INNER_FRAME],
             parent_frame_template_id: Some(D2G_OUTER_FRAME),
             parent_segment_site_id: Some(9),
             caller_interface: d2g_interface(D2G_OUTER_FRAME as u8 + 1),
@@ -17952,6 +18516,38 @@ mod tests {
         )
     }
 
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fully installed planner
+    /// witness for one cause: fusions interned, region claims preflighted,
+    /// fusion-owned bodies installed.**
+    ///
+    /// One constructor, so a control outside this module measures the SAME
+    /// installed plan the partition control inside it does. The interning and
+    /// installation steps are module-private, which is what previously forced
+    /// any consumer to be written in here beside them; the alternative was a
+    /// second inline copy of the sequence, and two copies of an installation
+    /// order is exactly how two controls come to disagree about the witness
+    /// they share.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn d2j_installed_plan_under<'src>(
+        cause: D2jCause,
+        entry: &'src RuntimeExpr,
+        declarations: &BTreeMap<&'static str, &'src crate::RuntimeDeclaration>,
+        oriented: &crate::OrientedSubcontinuationPlanV1,
+    ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
+        let _ = cause;
+        let mut plan = plan_static_transition_graph(entry, declarations)?;
+        let resolved =
+            build_static_continuation_fusion_plan(&plan, entry, declarations, Some(oriented))?;
+        let mut plane = StaticContinuationFusionPlan::default();
+        for key in resolved.installed_keys().to_vec() {
+            plane.intern(key)?;
+        }
+        plan.install_static_continuation_fusions(plane)?;
+        let mut claims = FusionRegionClaimLedger::preflight(&plan)?;
+        plan.install_fusion_owned_bodies(&mut claims)?;
+        Ok(plan)
+    }
+
     /// Build the plane for one cause: mutated source, correct plan.
     #[cfg(test)]
     fn d2j_plane_under(
@@ -18187,6 +18783,7 @@ mod tests {
                     FusionClaimRefusal::InvocationTriple,
                     FusionClaimRefusal::SelfRedirection,
                     FusionClaimRefusal::BinderAgreement,
+                    FusionClaimRefusal::BinderBodyResolution,
                     FusionClaimRefusal::InputAvailability,
                     FusionClaimRefusal::ResultLane,
                     FusionClaimRefusal::OverlappingClaim,
@@ -18328,6 +18925,532 @@ mod tests {
             "one claim is issued for the canonical witness with the key's own members, and each \
              ruled rule refuses on its own moved operand -- the refusals share this assertion \
              with the issued claim so none of them can hold because preflight issued nothing"
+        );
+    }
+
+    /// Preflight the witness with the key perturbed and the binder-to-body rule
+    /// suppressed, so a row can read what EVERY OTHER rule did with that key.
+    #[cfg(test)]
+    fn d2f_preflight_exact_without_resolution(
+        perturb: impl FnOnce(&mut Vec<StaticContinuationFusionKey>),
+    ) -> Result<FusionRegionClaimLedger, CraneliftBackendError> {
+        set_binder_body_resolution_suppressed(true);
+        let result = d2f_preflight_exact(perturb);
+        set_binder_body_resolution_suppressed(false);
+        result
+    }
+
+    /// **`D3` — the consuming callee's binder must RESOLVE to the producer body,
+    /// and neither marginal binder fact establishes that.**
+    ///
+    /// Ruled at `evt_2rw6vhq8xrqcm`: `BinderAgreement` proves the key's
+    /// consuming binder sits at the admitted frame and recursive position, and
+    /// that the admitted result root equals the invocation callee entry. It does
+    /// not prove the relation BETWEEN them — that the hypothesis that binder
+    /// names invokes that body — which is the fact `D3`'s definition-local fused
+    /// self edge is emitted against.
+    ///
+    /// ## Why each row is paired with a SUPPRESSED twin
+    ///
+    /// A row asserting only "the perturbed key refused" cannot distinguish this
+    /// rule from an earlier proxy: a perturbation that also trips
+    /// `BinderAgreement` refuses either way, and the classified cause would then
+    /// be reporting which rule ran FIRST rather than which rule was needed.
+    /// Suppressing this one rule and observing the SAME key **issue a claim** is
+    /// what proves the four marginal checks — frame identity, recursive
+    /// position, admitted result root, and the redirect triple — all stayed
+    /// green under that perturbation. The pairs are the control; the refusals
+    /// alone are not.
+    ///
+    /// **MEASURED** on the checked applied `Exact` witness. Moving the admitted
+    /// frame and the consuming binder's frame TOGETHER to the producer's own
+    /// `ComputationalMatch` keeps every marginal check satisfied — the two
+    /// frames still agree with each other, the positions are untouched, and the
+    /// result root and redirect are untouched — and the binder then resolves to
+    /// body 34, the producer's OWN outgoing edge, rather than to the redirected
+    /// body 37. Independently, pointing `consuming_callee` at the producer's
+    /// hypothesis occurrence 29, whose binder is a real binding and a DIFFERENT
+    /// one, refuses at the same rule while suppressing it issues.
+    /// **CLAIMED:** no fused region is claimed whose consuming callee is not the
+    /// binder its key names, or whose binder's hypothesis invokes a body other
+    /// than the one the claim redirects into.
+    /// **THE GAP:** this pins **preflight** and the planner's binding authority.
+    /// It pins no emission — no self edge is built here — and the resolution's
+    /// closure step is measured on the three `D2j` causes that install a key,
+    /// so a constructor argument outside that population is refused rather than
+    /// shown correct.
+    #[test]
+    fn d3_the_consuming_binder_must_resolve_to_the_redirected_producer_body() {
+        // The lawful witness still issues WITH the rule armed. Without this the
+        // refusals below would be equally consistent with a rule that refuses
+        // everything -- which is the shape that already cost this node one
+        // guard.
+        let lawful = d2f_refusal_of(d2f_preflight_exact(|_| ()));
+
+        // The EXACT-CALLEE half: the key keeps its own binder but points
+        // `consuming_callee` at the producer's hypothesis occurrence, whose
+        // binding is real and DIFFERENT. So this fails because the binders
+        // disagree, not because one is absent.
+        let moved_callee = |keys: &mut Vec<StaticContinuationFusionKey>| {
+            keys[0].consuming_callee = keys[0].producer_argument_origin;
+        };
+
+        // The BODY half, and it has to be a COHERENT relabel to reach the
+        // resolution at all.
+        //
+        // ⇒ **Moving the binder's frame alone does NOT test this.** That was
+        // the first shape written here, and a mutation proof killed it: with
+        // only the frame moved, `consuming_callee` no longer matches its own
+        // binding, so the callee half above answers first and the resolution
+        // never runs. The comparison it was meant to exercise could be replaced
+        // by a tautology with the row still green.
+        //
+        // So all three members move together onto the PRODUCER's hypothesis:
+        // the callee occurrence, its true binding, and the admitted frame that
+        // binding must agree with. The key is now internally consistent and
+        // still wrong -- it names a hypothesis that invokes body 34, the
+        // producer's own outgoing edge, while claiming to redirect body 37.
+        let relabelled_binder = |keys: &mut Vec<StaticContinuationFusionKey>| {
+            keys[0].consuming_callee = keys[0].producer_argument_origin;
+            keys[0].consumer_binding = keys[0].producer_argument_binding;
+            keys[0].admitted.continuation_origin =
+                keys[0].producer_argument_binding.frame_origin;
+        };
+
+        let rows = vec![
+            ("lawful witness, rule armed", lawful),
+            (
+                "consuming callee moved, rule armed",
+                d2f_refusal_of(d2f_preflight_exact(moved_callee)),
+            ),
+            (
+                "consuming callee moved, rule suppressed",
+                d2f_refusal_of(d2f_preflight_exact_without_resolution(moved_callee)),
+            ),
+            (
+                "binder relabelled to the producer's, rule armed",
+                d2f_refusal_of(d2f_preflight_exact(relabelled_binder)),
+            ),
+            (
+                "binder relabelled to the producer's, rule suppressed",
+                d2f_refusal_of(d2f_preflight_exact_without_resolution(relabelled_binder)),
+            ),
+        ];
+
+        assert_eq!(
+            rows,
+            vec![
+                ("lawful witness, rule armed", "issued".to_string()),
+                (
+                    "consuming callee moved, rule armed",
+                    "BinderBodyResolution".to_string()
+                ),
+                (
+                    "consuming callee moved, rule suppressed",
+                    "issued".to_string()
+                ),
+                (
+                    "binder relabelled to the producer's, rule armed",
+                    "BinderBodyResolution".to_string()
+                ),
+                (
+                    "binder relabelled to the producer's, rule suppressed",
+                    "issued".to_string()
+                ),
+            ],
+            "each perturbation refuses AT the binder-to-body relation, and the same key issues \
+             once that one rule is suppressed -- so the four marginal checks stayed green and \
+             the refusal is not an earlier proxy answering for them"
+        );
+    }
+
+    /// **`D3` grounding — THE TWO COMPOSED CONTINUATION EDGES ARE NAMED BY THE
+    /// FUSION KEY'S TWO CHECKED IH BINDINGS, and each target's incoming call
+    /// domain is closed.**
+    ///
+    /// Ruled at `evt_1t3f4e8100rb5`: before any body change, the exact two-edge
+    /// composition population must be grounded, and if the planner cannot derive
+    /// both exact identities and their exact consumer edges **without a new
+    /// source fact**, the implementer must stop and report the missing relation.
+    /// This is that grounding, made durable rather than left in a probe.
+    ///
+    /// **THE DERIVATION CLOSES, and the relation is already checked.** The key's
+    /// two `CheckedIhBinding`s name the two layers exactly:
+    ///
+    /// - `consumer_binding.frame_origin` is the OUTER specialization's
+    ///   continuation origin -- 10 on `Exact`, 6 on `ReHomed`;
+    /// - `producer_argument_binding.frame_origin` is the INNER one's -- 25 and
+    ///   21.
+    ///
+    /// ⇒ **This is the same pair whose NON-equality the preflight comment above
+    /// documents.** That comment records them as "different checked frames by
+    /// design (measured 25 and 10)" and warns that asserting them equal would
+    /// refuse the witness. The two frames are the two composition layers, which
+    /// is why they differ -- so the fact that already forbids one check is what
+    /// supplies this one.
+    ///
+    /// A structural substitute exists and is deliberately NOT used: on both
+    /// witnesses `child_origins(producer_body)` is a one-element run holding the
+    /// inner frame. It agrees here, but it is a positional read of the body's
+    /// shape rather than a checked relation, and it would stop agreeing the
+    /// moment a producer body carried more than one child.
+    ///
+    /// **MEASURED:** both witnesses, fusion plane installed, claims preflighted.
+    /// Each specialization's complete incoming `ContinuationCallIdentity` domain
+    /// is enumerated; the outer and inner classifications are disjoint and each
+    /// selects exactly one specialization.
+    /// **CLAIMED:** the composition population the ruled relation must mint is
+    /// derivable from relations that already exist, so no new source fact is
+    /// required at the minting seat.
+    /// **THE GAP:** this pins the DERIVATION of the two edges. It pins no
+    /// emitter behaviour and no composition disposition.
+    ///
+    /// ---- SUPERSEDED NOTE, kept because it recorded a real finding and its
+    /// ---- conclusion was overtaken. Ruled at `evt_7akh94dvqeqap`.
+    ///
+    /// This section used to read that every incoming domain here is a singleton
+    /// and that the ruled "every incoming identity is composed" partition was
+    /// therefore satisfied vacuously, with two source fixtures owed to fix it.
+    /// **The singleton measurement stands; the conclusion drawn from it does
+    /// not.** The residual-direct-caller population is now REJECTED as a planner
+    /// alias by [`validate_continuation_specialization_closure`]'s injective
+    /// call-target law, so it is not a lawful state to preserve and no source
+    /// fixture is owed for it. The same-body sibling has a planner-relation
+    /// control of its own. **A specialization's liveness is decided by its own
+    /// unique edge**, so there is no incoming-domain scan left for a singleton
+    /// domain to make vacuous.
+    #[test]
+    fn d3_the_two_composed_edges_are_named_by_the_keys_checked_bindings() {
+        let mut rows = Vec::new();
+        for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+            let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2J_DECLARATION, &declaration);
+            let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let resolved =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("the witness resolves a plane");
+            let mut plane = StaticContinuationFusionPlan::default();
+            for key in resolved.installed_keys().to_vec() {
+                plane.intern(key).expect("interns");
+            }
+            plan.install_static_continuation_fusions(plane)
+                .expect("installs");
+            let ledger = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+            let id = *ledger.planned().iter().next().expect("one region");
+            let claim = ledger.claim(id).expect("outstanding");
+
+            let key = plan
+                .continuation_fusions()
+                .expect("views")
+                .into_iter()
+                .find(|view| view.id() == id)
+                .expect("the installed view")
+                .key()
+                .clone();
+
+            let specialization_at = |frame: StaticOriginId, owner: PredeclaredFunctionId| {
+                let matching = plan
+                    .continuation_units()
+                    .expect("units")
+                    .into_iter()
+                    .filter(|unit| {
+                        unit.continuation_origin() == frame && unit.consumer_owner() == owner
+                    })
+                    .map(|unit| unit.id())
+                    .collect::<Vec<_>>();
+                matching
+            };
+            let outer = specialization_at(key.consumer_binding.frame_origin, claim.consumer_owner());
+            let inner = specialization_at(
+                key.producer_argument_binding.frame_origin,
+                claim.producer_owner(),
+            );
+            let incoming = |target: ContinuationSpecializationId| {
+                plan.continuation_calls()
+                    .expect("calls")
+                    .iter()
+                    .filter(|call| call.target() == target)
+                    .count()
+            };
+
+            rows.push((
+                cause,
+                outer.len(),
+                inner.len(),
+                outer != inner,
+                outer.first().map(|id| incoming(*id)),
+                inner.first().map(|id| incoming(*id)),
+            ));
+        }
+
+        assert_eq!(
+            rows,
+            vec![
+                (D2jCause::Exact, 1, 1, true, Some(1), Some(1)),
+                (D2jCause::ReHomed, 1, 1, true, Some(1), Some(1)),
+            ],
+            "each checked binding selects EXACTLY ONE specialization, the outer and inner \
+             selections are disjoint, and each target's complete incoming call domain is a \
+             singleton -- so the composition population derives from existing relations, and the \
+             composed-vs-residual partition is measured DEGENERATE on this family"
+        );
+    }
+
+    /// **`D3` — the fusion mints exactly TWO composed edges, one per ruled
+    /// checked binding, keyed by whole call identity.**
+    ///
+    /// Ruled at `evt_1t3f4e8100rb5`. The outer layer is selected by the key's
+    /// checked consumer binding, the inner by its checked producer-argument
+    /// binding, each conjoined with the owner that binding belongs to. Every
+    /// other edge in the compile is unrecorded and keeps the byte-identical
+    /// `DirectCall` path.
+    ///
+    /// **MEASURED** on both witnesses: two records, distinct identities,
+    /// distinct targets, one `Outer` and one `Inner`, and the emission owner of
+    /// each is the `Predeclared` owner its binding names -- `Exact` outer at
+    /// frame 10 under unit 3 and inner at frame 25 under unit 2; `ReHomed`
+    /// outer at 6 under unit 1 and inner at 21 under unit 3.
+    /// **CLAIMED:** the composition population is exactly the two ruled layers,
+    /// so no third edge can be composed and neither layer can be composed twice.
+    /// **THE GAP:** this pins the PLANNER relation. No edge is consumed here --
+    /// the funnel, the local selected-body lowering, `ComposedCall` and the
+    /// transport-instance closeout are owed, and until they land these records
+    /// are minted and unread.
+    #[test]
+    fn d3_the_fusion_mints_exactly_two_composed_edges_one_per_checked_binding() {
+        let mut rows = Vec::new();
+        for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+            let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2J_DECLARATION, &declaration);
+            let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let resolved =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("the witness resolves a plane");
+            let mut plane = StaticContinuationFusionPlan::default();
+            for key in resolved.installed_keys().to_vec() {
+                plane.intern(key).expect("interns");
+            }
+            plan.install_static_continuation_fusions(plane)
+                .expect("installs");
+            let mut claims = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+            plan.install_fusion_owned_bodies(&mut claims)
+                .expect("ownership installs");
+
+            let edges = plan.fusion_composed_edges();
+            let mut layers = edges
+                .values()
+                .map(|edge| (edge.layer(), edge.target(), edge.emission_owner()))
+                .collect::<Vec<_>>();
+            layers.sort_by_key(|(layer, _, _)| match layer {
+                FusionCompositionLayer::Outer => 0,
+                FusionCompositionLayer::Inner => 1,
+            });
+            let distinct_targets = edges
+                .values()
+                .map(|edge| edge.target())
+                .collect::<BTreeSet<_>>()
+                .len();
+            rows.push((cause, edges.len(), distinct_targets, layers));
+        }
+
+        assert_eq!(
+            rows,
+            vec![
+                (
+                    D2jCause::Exact,
+                    2,
+                    2,
+                    vec![
+                        (
+                            FusionCompositionLayer::Outer,
+                            ContinuationSpecializationId(1),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(3)),
+                        ),
+                        (
+                            FusionCompositionLayer::Inner,
+                            ContinuationSpecializationId(0),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(2)),
+                        ),
+                    ],
+                ),
+                (
+                    D2jCause::ReHomed,
+                    2,
+                    2,
+                    vec![
+                        (
+                            FusionCompositionLayer::Outer,
+                            ContinuationSpecializationId(1),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(1)),
+                        ),
+                        (
+                            FusionCompositionLayer::Inner,
+                            ContinuationSpecializationId(0),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(3)),
+                        ),
+                    ],
+                ),
+            ],
+            "exactly two composed edges per fusion, one per ruled checked binding, on DISTINCT \
+             targets, each emitted by the owner its own binding names"
+        );
+    }
+
+    /// **`D3` — `P = O ⊎ F` and `T = O_t ⊎ F_t`, as exact SET relations, and
+    /// the fusion-scoped join between the two composition objects.**
+    ///
+    /// Ruled `evt_48rwarx25pj2p` §3 (the single residual projection) and
+    /// `evt_6kn9ckdnbf0ph` §2 (the join is `edge.fusion == claim.fusion`, and
+    /// the ordinary consuming call is deliberately NOT in
+    /// `dom(FusionComposedEdge)`).
+    ///
+    /// **MEASURED** on both witnesses: the exact planned identity population is
+    /// the two composed edges and nothing else, so `O` is empty and `F = P`;
+    /// the target population is likewise wholly fused. Each fusion carries
+    /// exactly one `Outer` and one `Inner` layer, and each names a fusion that
+    /// owns a producer body.
+    /// **CLAIMED:** the ordinary and fusion-local populations partition the
+    /// planned ones exactly -- disjoint and covering -- on identities and on
+    /// targets, so a consumer reading `O`/`O_t` sees every ordinary member and
+    /// no fused one.
+    /// **THE GAP, stated because a wholly-fused family cannot exercise the
+    /// residual half:** `O` and `O_t` are EMPTY here, so this row measures the
+    /// partition's shape and the join, not the residual path's behaviour. The
+    /// population that makes `O` non-empty is the same-body composed/ordinary
+    /// discriminator (`evt_6kn9ckdnbf0ph` §5), which is owed with the local
+    /// lowering; until it lands, nothing here should be read as evidence that
+    /// an ordinary identity survives beside a fused one.
+    #[test]
+    fn d3_the_ordinary_and_fusion_local_populations_partition_the_planned_ones() {
+        let mut rows = Vec::new();
+        for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+            let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2J_DECLARATION, &declaration);
+            let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let resolved =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("the witness resolves a plane");
+            let mut plane = StaticContinuationFusionPlan::default();
+            for key in resolved.installed_keys().to_vec() {
+                plane.intern(key).expect("interns");
+            }
+            plan.install_static_continuation_fusions(plane)
+                .expect("installs");
+            let mut claims = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+            plan.install_fusion_owned_bodies(&mut claims)
+                .expect("ownership installs");
+
+            let planned = plan.continuation_call_identities().expect("planned identities");
+            let ordinary = plan
+                .ordinary_continuation_call_identities()
+                .expect("ordinary identities");
+            let fused = plan
+                .fusion_composed_edges()
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            let planned_targets = plan
+                .continuation_units()
+                .expect("units")
+                .iter()
+                .map(|unit| unit.id())
+                .collect::<BTreeSet<_>>();
+            let ordinary_targets = plan
+                .ordinary_continuation_targets()
+                .expect("ordinary targets");
+            let fused_targets = plan
+                .fusion_composed_edges()
+                .values()
+                .map(|edge| edge.target())
+                .collect::<BTreeSet<_>>();
+
+            // The partition, asserted as SETS in both directions rather than as
+            // sizes: disjoint, and covering.
+            assert!(
+                ordinary.is_disjoint(&fused),
+                "{cause:?}: an identity is both ordinary and fusion-local"
+            );
+            assert_eq!(
+                ordinary.union(&fused).cloned().collect::<BTreeSet<_>>(),
+                planned,
+                "{cause:?}: O union F must be exactly the planned identity population"
+            );
+            assert!(
+                ordinary_targets.is_disjoint(&fused_targets),
+                "{cause:?}: a target is both ordinary and fusion-local"
+            );
+            assert_eq!(
+                ordinary_targets
+                    .union(&fused_targets)
+                    .cloned()
+                    .collect::<BTreeSet<_>>(),
+                planned_targets,
+                "{cause:?}: O_t union F_t must be exactly the planned target population"
+            );
+
+            // The join, per fusion, from the edge side and the claim side.
+            let mut layers: BTreeMap<StaticContinuationFusionId, Vec<FusionCompositionLayer>> =
+                BTreeMap::new();
+            for edge in plan.fusion_composed_edges().values() {
+                assert!(
+                    claims.claim(edge.fusion()).is_some(),
+                    "{cause:?}: a composed edge names a fusion with no claim"
+                );
+                layers.entry(edge.fusion()).or_default().push(edge.layer());
+            }
+            let mut join = layers.into_values().collect::<Vec<_>>();
+            for entry in &mut join {
+                entry.sort();
+            }
+
+            rows.push((
+                cause,
+                planned.len(),
+                ordinary.len(),
+                fused.len(),
+                planned_targets.len(),
+                ordinary_targets.len(),
+                fused_targets.len(),
+                join,
+            ));
+        }
+
+        assert_eq!(
+            rows,
+            vec![
+                (
+                    D2jCause::Exact,
+                    2,
+                    0,
+                    2,
+                    2,
+                    0,
+                    2,
+                    vec![vec![
+                        FusionCompositionLayer::Outer,
+                        FusionCompositionLayer::Inner
+                    ]],
+                ),
+                (
+                    D2jCause::ReHomed,
+                    2,
+                    0,
+                    2,
+                    2,
+                    0,
+                    2,
+                    vec![vec![
+                        FusionCompositionLayer::Outer,
+                        FusionCompositionLayer::Inner
+                    ]],
+                ),
+            ],
+            "both witnesses are WHOLLY fused: every planned identity and every target is \
+             fusion-local, the residual halves are empty, and the single fusion carries exactly \
+             one outer and one inner layer"
         );
     }
 
@@ -31268,6 +32391,205 @@ mod tests {
                 "AC-2 {field:?}: omission did not produce the named wrong-unit conflation"
             );
         }
+    }
+
+    /// Build one planned edge for a target, with the token fields the closure
+    /// validator checks taken from that target's own key.
+    ///
+    /// Taking them from the key is what makes the negative row below reach the
+    /// NEW check: a hand-picked token would trip "edge token disagrees with its
+    /// exact target" first, and a control that refuses at an earlier rule has
+    /// not exercised the rule it names.
+    #[cfg(test)]
+    fn contspec_edge_for(
+        unit: &PlannedContinuationSpecialization,
+        call_site_sequence: u32,
+    ) -> PlannedContinuationSpecializationCall {
+        PlannedContinuationSpecializationCall {
+            token: ContinuationSpecializationCallToken {
+                producer_owner: unit.key.producer_owner,
+                emission_owner: unit.key.emission_owner,
+                producer_result_origin: unit.key.producer_result_origin,
+                producer_construct_origin: unit.key.producer_construct_origin,
+                producer_alternative: unit.key.producer_alternative,
+                call_site_sequence,
+                target: unit.id,
+                worker: unit.key.worker.clone(),
+            },
+        }
+    }
+
+    /// **`D3` — CALL TARGET IS INJECTIVE, and an interning ALIAS refuses at
+    /// planner closure rather than being defended late in the emitter.**
+    ///
+    /// Ruled at `evt_7akh94dvqeqap`. The closure validator already proved
+    /// key/unit bijection, unique tokens, token/target agreement and surjective
+    /// reachability. It did **not** prove that two distinct edges cannot name
+    /// one unit, and that gap is what had pushed an all-incoming-calls liveness
+    /// scan into lowering -- a scan no lawful source can make fail.
+    ///
+    /// **The negative reaches the NEW rule and not an older one, which is the
+    /// whole difficulty of this row.** The two keys differ **only** in a field
+    /// inside `continuation_inputs`, and no such field appears in the call
+    /// token; both edges therefore still agree with their target on every field
+    /// the existing check compares. Under exact interning they are two units and
+    /// the population is bijective; under `OmitProjection` they conflate to one
+    /// unit and the two distinct edges become an alias.
+    ///
+    /// **MEASURED:** exact interning gives two units, two distinct edges, two
+    /// distinct targets, and closure passes. The same two keys and the same two
+    /// edges under `OmitProjection` give one unit and refuse at the duplicate
+    /// TARGET rule -- not at the duplicate-token rule, which is a separate
+    /// defect and is left free to fire on its own row.
+    /// **CLAIMED:** a specialization's liveness is decided by its own unique
+    /// edge, because the planner refuses any state in which it would not be.
+    /// **THE GAP:** this is planner closure only. It pins no emitter behaviour
+    /// and no composition disposition; the `ComposedCall`/`DirectCall` outcome
+    /// this law makes well-defined is owed with the relation.
+    #[test]
+    fn d3_two_distinct_planned_edges_may_not_name_one_specialization() {
+        let plan = contspec_plan();
+        let base_key = plan.continuation_specializations[0].key.clone();
+        let field = ContinuationProjectionOmission::Ordinal;
+
+        let mut aliasing_key = base_key.clone();
+        mutate_projection_field(&mut aliasing_key.continuation_inputs[0], field);
+        assert_ne!(
+            base_key, aliasing_key,
+            "the two keys must be exactly distinct, or the row tests nothing"
+        );
+
+        // Exact interning: two units, two edges, bijective.
+        let mut interned = BTreeMap::new();
+        let mut units = Vec::new();
+        intern_specialization(&mut interned, &mut units, base_key.clone()).expect("interns");
+        intern_specialization(&mut interned, &mut units, aliasing_key.clone()).expect("interns");
+        let exact_units = units.len();
+        let edges = vec![
+            contspec_edge_for(&units[0], 0),
+            contspec_edge_for(&units[1], 0),
+        ];
+        let exact = validate_continuation_specialization_closure(&interned, &units, &edges);
+
+        // The SAME two keys under projection-omitting interning: one unit.
+        let mut aliased_interned = BTreeMap::new();
+        let mut aliased_units = Vec::new();
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::OmitProjection(field)));
+        intern_specialization(&mut aliased_interned, &mut aliased_units, base_key.clone())
+            .expect("interns");
+        intern_specialization(&mut aliased_interned, &mut aliased_units, aliasing_key)
+            .expect("interns");
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::Exact));
+        let aliased_unit_count = aliased_units.len();
+        // Two DISTINCT edges -- different call-site sequences, so the
+        // duplicate-token rule cannot be what answers -- both landing on the one
+        // conflated unit.
+        let aliased_edges = vec![
+            contspec_edge_for(&aliased_units[0], 0),
+            contspec_edge_for(&aliased_units[0], 1),
+        ];
+        assert_ne!(
+            aliased_edges[0].token, aliased_edges[1].token,
+            "the two edges must be distinct tokens, or this row would refuse at the duplicate-\
+             token rule instead of the one it names"
+        );
+        let aliased = validate_continuation_specialization_closure(
+            &aliased_interned,
+            &aliased_units,
+            &aliased_edges,
+        );
+
+        let refusal = |result: Result<(), CraneliftBackendError>| match result {
+            Ok(()) => "closed".to_string(),
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(message))) => {
+                message
+            }
+            Err(other) => format!("other: {other:?}"),
+        };
+
+        assert_eq!(
+            (
+                exact_units,
+                refusal(exact),
+                aliased_unit_count,
+                refusal(aliased)
+            ),
+            (
+                2,
+                "closed".to_string(),
+                1,
+                "two distinct continuation planned edges name one specialization unit, so the \
+                 planner's call and unit populations are not bijective and a specialization's \
+                 liveness is not decided by its own edge"
+                    .to_string()
+            ),
+            "exact interning closes with two units and two edges; the same two keys conflated by \
+             projection omission refuse at the duplicate-TARGET rule, with both edges still \
+             agreeing with their target on every field the older checks compare"
+        );
+    }
+
+    /// **`D3` — A SAME-BODY SIBLING IS TWO UNITS WITH TWO EDGES, and body
+    /// equality is never liveness authority.**
+    ///
+    /// Ruled at `evt_7akh94dvqeqap` point 3. Two exact, closure-valid full keys
+    /// that share the worker body and provenance but differ on one legitimate
+    /// identity coordinate must intern to distinct units with distinct edges, so
+    /// that composing one can never suppress the other.
+    ///
+    /// **This is a PLANNER-RELATION row and deliberately not a source program.**
+    /// It says nothing about whether a Ken program can produce this population --
+    /// ten measured configurations did not -- and it must not be read as source
+    /// reachability. It uses the exact interning path, never a coarsening
+    /// mutation.
+    ///
+    /// **MEASURED:** worker body and full worker provenance equal, one identity
+    /// coordinate differs, two distinct units, two distinct edges, closure
+    /// passes.
+    /// **CLAIMED:** shared body cannot alias two specializations, so a rule that
+    /// keyed liveness on body would be deciding the sibling's fate too.
+    /// **THE GAP:** the composed/direct halves of this row -- that only the
+    /// composed unit leaves the executable population -- need the composition
+    /// relation and are owed with it.
+    #[test]
+    fn d3_a_same_body_sibling_interns_as_two_units_with_two_edges() {
+        let plan = contspec_plan();
+        let left = plan.continuation_specializations[0].key.clone();
+        let mut right = left.clone();
+        // One legitimate identity coordinate, chosen because it is NOT part of
+        // the worker provenance: the sibling stays same-body by construction.
+        right.recursive_position += 1;
+        right.recursive_positions.insert(right.recursive_position);
+
+        let mut interned = BTreeMap::new();
+        let mut units = Vec::new();
+        let (left_id, _) =
+            intern_specialization(&mut interned, &mut units, left.clone()).expect("interns");
+        let (right_id, _) =
+            intern_specialization(&mut interned, &mut units, right.clone()).expect("interns");
+        let edges = vec![
+            contspec_edge_for(&units[0], 0),
+            contspec_edge_for(&units[1], 0),
+        ];
+        let closed =
+            validate_continuation_specialization_closure(&interned, &units, &edges).is_ok();
+
+        assert_eq!(
+            (
+                left.worker == right.worker,
+                left.worker.body_origin == right.worker.body_origin,
+                left != right,
+                left_id != right_id,
+                edges[0].token.target != edges[1].token.target,
+                closed,
+            ),
+            (true, true, true, true, true, true),
+            "the sibling shares worker provenance AND body origin, differs on one identity \
+             coordinate, and still interns to a DISTINCT unit with a distinct edge -- so no \
+             body-keyed rule could compose one without deciding the other"
+        );
     }
 
     /// AC-3 prefix collision. The prefix is deliberately equal while the exact

@@ -1502,6 +1502,18 @@ impl OrientedSubcontinuationPlanCollector {
                 result_interface: seed.result_interface.clone(),
                 callee_segment_site_id: slot.segment_site_id,
                 callee_frame_templates,
+                // `RT-LEXICAL-R3-FUSION-EMITTER` `DP` — EMPTY, and deliberately
+                // so. Composition-time membership is a claim that this
+                // invocation's segment gains a frame when a fusion splice
+                // builds it, and nothing in the erasure walk establishes that
+                // relation: the walk sees static nesting, which is a different
+                // relation and is not evidence for this one.
+                //
+                // Empty is the fail-closed value. A composed segment that then
+                // presents an extra layer is REFUSED for exact coverage, so a
+                // real program reaches a refusal rather than a silent
+                // acceptance until the checked source can author this.
+                composed_frame_templates: Vec::new(),
                 parent_frame_template_id,
                 parent_segment_site_id: parent.map(|frame| frame.segment_site_id),
                 caller_interface,

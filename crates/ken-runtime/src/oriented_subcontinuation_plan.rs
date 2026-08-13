@@ -112,6 +112,35 @@ pub struct CheckedComputationalIHCallTemplateV1 {
     pub result_interface: CheckedAnswerInterfaceV1,
     pub callee_segment_site_id: u64,
     pub callee_frame_templates: Vec<u64>,
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `DP` — composition-time membership, and
+    /// it is a SEPARATE sequence because one call template serves segments of
+    /// two different shapes in one compile.**
+    ///
+    /// The frames that join this invocation's segment **only when that segment
+    /// is created by composition at a fusion splice**, in the order they occur.
+    /// `callee_frame_templates` describes the ordinary segment and is untouched;
+    /// this describes the composed one. Both are qualified by the **same single
+    /// invocation source and affine instance** — composition does not mint a
+    /// second source.
+    ///
+    /// **Why it cannot be folded into `callee_frame_templates`.** MEASURED on
+    /// the `D2j` `Exact` twin with the emitter armed: one call template is
+    /// entered **twice in a single compile** — instance `1` from
+    /// `lower_fused_producer_through_suffix` with a two-layer composed segment,
+    /// and instance `2` from `define_unit_bodies` with a one-layer ordinary
+    /// one. Widening the shared base sequence covers the first and refuses the
+    /// second with *"does not carry its exact checked frame sequence:
+    /// expected={0, 1} instantiated={0}"*. That is the same refusal `89ee005b`
+    /// produced for `ReHomed`, reached by a second, independent route.
+    ///
+    /// **This is planner-authored and Runtime only validates it.** Membership is
+    /// never derived from the Runtime segment's shape, from a frame's
+    /// `ParentFrame` witness (static nesting is a different relation), from a
+    /// shared `segment_site_id`, or from the presence of a fusion. An empty
+    /// sequence means the checked source establishes no composition-time
+    /// membership, and a composed segment that then presents an extra layer is
+    /// **refused**, never accepted.
+    pub composed_frame_templates: Vec<u64>,
     pub parent_frame_template_id: Option<u64>,
     pub parent_segment_site_id: Option<u64>,
     pub caller_interface: CheckedAnswerInterfaceV1,
@@ -148,7 +177,12 @@ fn validate_marker_locations(
 }
 
 impl OrientedSubcontinuationPlanV1 {
-    pub const REPRESENTATION_RULE_VERSION: u32 = 4;
+    /// Bumped to `5` by `RT-LEXICAL-R3-FUSION-EMITTER` `DP`, which added the
+    /// composition-time frame sequence to the computational-IH call encoding.
+    /// A `4`-encoded plan does not carry that length prefix, so decoding one
+    /// under these rules would read the following field as a count. The version
+    /// is what turns that into a refusal instead of a misparse.
+    pub const REPRESENTATION_RULE_VERSION: u32 = 5;
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = ORIENTED_SUBCONTINUATION_PLAN_V1_HEADER.to_vec();
@@ -252,6 +286,13 @@ impl OrientedSubcontinuationPlanV1 {
             put_u64(&mut out, call.callee_segment_site_id);
             put_u64(&mut out, call.callee_frame_templates.len() as u64);
             for frame in &call.callee_frame_templates {
+                put_u64(&mut out, *frame);
+            }
+            // `DP` — the composition-time sequence travels with the ordinary
+            // one. Length-prefixed like every other sequence here, so an empty
+            // one costs a zero and round-trips as `Vec::new()`.
+            put_u64(&mut out, call.composed_frame_templates.len() as u64);
+            for frame in &call.composed_frame_templates {
                 put_u64(&mut out, *frame);
             }
             put_optional_u64(&mut out, call.parent_frame_template_id);
@@ -469,6 +510,12 @@ impl OrientedSubcontinuationPlanV1 {
             for _ in 0..frame_count {
                 callee_frame_templates.push(take_u64(&mut bytes)?);
             }
+            let composed_count = usize::try_from(take_u64(&mut bytes)?)
+                .map_err(|_| "computational IH call composed frame count overflows usize")?;
+            let mut composed_frame_templates = Vec::with_capacity(composed_count);
+            for _ in 0..composed_count {
+                composed_frame_templates.push(take_u64(&mut bytes)?);
+            }
             let parent_frame_template_id = take_optional_u64(&mut bytes)?;
             let parent_segment_site_id = take_optional_u64(&mut bytes)?;
             let caller_interface = CheckedAnswerInterfaceV1::new(take_bytes(&mut bytes)?.to_vec())?;
@@ -484,6 +531,7 @@ impl OrientedSubcontinuationPlanV1 {
                 result_interface,
                 callee_segment_site_id,
                 callee_frame_templates,
+                composed_frame_templates,
                 parent_frame_template_id,
                 parent_segment_site_id,
                 caller_interface,
@@ -612,6 +660,36 @@ impl OrientedSubcontinuationPlanV1 {
                 .any(|frame| self.frame(*frame).is_none())
             {
                 return Err("computational IH call names a stale callee frame");
+            }
+            // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `DP` — the composition-time
+            // ---- sequence, checked to the same standard as the ordinary one.
+            //
+            // An empty sequence is the ordinary state and says the checked
+            // source establishes no composition-time membership here. A
+            // non-empty one is an authored claim, and every way it could be
+            // vacuous or ambiguous is refused rather than tolerated: a stale
+            // frame, a repeat inside itself, an overlap with the ordinary
+            // sequence (which would instantiate one identity twice and be
+            // caught later as a Runtime error rather than a plan defect), and a
+            // frame from a different checked segment.
+            //
+            // The segment-site equality is a CLOSURE on an authored claim, not
+            // the source of it. Sharing a site never makes a frame a member —
+            // this only refuses a claim that a frame outside the segment is one.
+            let mut composed_seen = BTreeSet::new();
+            for frame_id in &call.composed_frame_templates {
+                let frame = self
+                    .frame(*frame_id)
+                    .ok_or("computational IH call names a stale composed frame")?;
+                if !composed_seen.insert(*frame_id) {
+                    return Err("computational IH call repeats a composed frame");
+                }
+                if call.callee_frame_templates.contains(frame_id) {
+                    return Err("computational IH call composes a frame it already names");
+                }
+                if frame.segment_site_id != call.callee_segment_site_id {
+                    return Err("computational IH call composes a frame from another segment");
+                }
             }
             match (call.parent_frame_template_id, call.parent_segment_site_id) {
                 (Some(parent_id), Some(parent_segment)) => {
@@ -769,6 +847,16 @@ pub fn compiler_private_computational_ih_call_binding_fingerprint(
     put_bytes(&mut bytes, &call.result_interface.canonical);
     put_u64(&mut bytes, call.callee_segment_site_id);
     for frame in &call.callee_frame_templates {
+        put_u64(&mut bytes, *frame);
+    }
+    // `DP` — length-prefixed, unlike the sequence above it. Two sequences run
+    // back to back here, so concatenating them unprefixed would let
+    // `([0], [1])` and `([0, 1], [])` hash identically and a composition-time
+    // member would be indistinguishable from an ordinary one to the binding
+    // fingerprint. The ordinary sequence keeps its historical unprefixed
+    // encoding; only the new neighbour needs the separator.
+    put_u64(&mut bytes, call.composed_frame_templates.len() as u64);
+    for frame in &call.composed_frame_templates {
         put_u64(&mut bytes, *frame);
     }
     put_optional_u64(&mut bytes, call.parent_frame_template_id);
@@ -1003,6 +1091,7 @@ mod tests {
                 result_interface: interface(&[frame_id as u8 + 1]),
                 callee_segment_site_id: 10,
                 callee_frame_templates: vec![frame_id],
+                composed_frame_templates: Vec::new(),
                 parent_frame_template_id: Some(frame_id),
                 parent_segment_site_id: Some(10),
                 caller_interface: interface(&[frame_id as u8 + 1]),

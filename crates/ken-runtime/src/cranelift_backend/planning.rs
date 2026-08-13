@@ -15,8 +15,8 @@ mod static_transition;
 
 pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::{
-    BodyEmissionDisposition, FusionClaimRefusal, FusionOwnedBody, FusionRegionClaim,
-    FusionRegionClaimLedger,
+    BodyEmissionDisposition, FusionClaimRefusal, FusionComposedEdge, FusionCompositionLayer,
+    FusionOwnedBody, FusionRegionClaim, FusionRegionClaimLedger,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///
@@ -39,7 +39,7 @@ pub(in crate::cranelift_backend) use static_transition::{
 /// `D2f` Deliverable 0 — THE shared checked-witness fixture constructor.
 #[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::{
-    d2j_checked_fixture_under, D2jCause, D2J_DECLARATION,
+    d2j_checked_fixture_under, d2j_installed_plan_under, D2jCause, D2J_DECLARATION,
 };
 pub(super) use static_transition::plan_static_transition_graph_with_symbols;
 #[cfg(test)]

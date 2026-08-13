@@ -23,6 +23,7 @@
 
 use super::*;
 use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope};
+use crate::cranelift_backend::planning::{FusionComposedEdge, FusionCompositionLayer};
 
 use cranelift_module::FuncId;
 
@@ -951,13 +952,19 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     // continuation specialization, before any body is defined. The symbol
     // carries a dense ordinal only so the linker sees distinct names; the map
     // is keyed by the planner's typed identity, never by that string.
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — over `O_t`, the ORDINARY residual
+    // targets. A fusion-local target's selected body is lowered at its exact
+    // call edge and never becomes a callable `Function`, so declaring one here
+    // would mint a symbol nothing defines -- the undefined phantom the
+    // executable/template split above exists to prevent, arriving by a second
+    // route.
     let mut continuations = BTreeMap::new();
-    for (ordinal, unit) in plan.continuation_units()?.into_iter().enumerate() {
+    for (ordinal, unit) in plan.ordinary_continuation_targets()?.into_iter().enumerate() {
         let name = format!("ken_continuation_{ordinal}");
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
             .map_err(|err| backend_module(err.to_string()))?;
-        if continuations.insert(unit.id(), id).is_some() {
+        if continuations.insert(unit, id).is_some() {
             return Err(backend_module(
                 "two continuation descriptors claim one planned specialization".to_string(),
             ));
@@ -1027,20 +1034,14 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
     bundle: &UnitBundle,
 ) -> Result<BTreeMap<ContinuationCallIdentity, FuncId>, CraneliftBackendError> {
     let mut resolved = BTreeMap::new();
-    for call in plan.continuation_calls()? {
-        let identity = plan
-            .continuation_call_binding_for(
-                call.producer_construct_origin(),
-                call.continuation_origin(),
-                call.producer_alternative(),
-                call.recursive_position(),
-            )?
-            .ok_or_else(|| {
-                backend_module(
-                    "a projected causal call has no binding under its own four-field selector"
-                        .to_string(),
-                )
-            })?;
+    // **`D3` — the ORDINARY residual domain `O`, from the one plan-authoritative
+    // accessor.** A fusion-local identity omits its target resolution entirely
+    // (Architect `evt_48rwarx25pj2p` §3), so it must not be looked up here: its
+    // target has no forward-declared `Function` to resolve to, and asking would
+    // raise the never-declared refusal below for an identity that is *lawfully*
+    // absent. Narrowing the INPUT is what keeps that refusal meaningful for the
+    // ordinary population instead of weakening it to tolerate an absence.
+    for identity in plan.ordinary_continuation_call_identities()? {
         let target = bundle.continuation(identity.target()).ok_or_else(|| {
             backend_module(
                 "a projected causal identity names a continuation specialization that was never \
@@ -1531,6 +1532,409 @@ pub(super) fn continuation_case_binder_run(
     Ok(run)
 }
 
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the projected facts one
+/// continuation specialization's SELECTED CASE BODY is lowered from.**
+///
+/// Exactly the members [`lower_continuation_selected_case_body`] reads, and no
+/// more. The frame-shaped members of the definition pass's own projection --
+/// slots, offsets, header, consumer owner -- are absent because a local
+/// composition has no frame: it lowers the same body with no `Function`, no
+/// descriptor and no ABI of its own.
+pub(super) struct ContinuationSelectedCaseBody {
+    pub(super) id: ContinuationSpecializationId,
+    pub(super) continuation_origin: StaticOriginId,
+    pub(super) producer_alternative: u32,
+    pub(super) recursive_position: u32,
+    pub(super) worker_closure_origin: StaticOriginId,
+    pub(super) worker_body_origin: StaticOriginId,
+    pub(super) worker_declared_arity: u32,
+    pub(super) worker_capture_count: usize,
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — lower a continuation
+/// specialization's exact selected case body, given its operands.**
+///
+/// **This is a factoring, not a new mechanism, and that is the point.**
+/// Architect `evt_6kn9ckdnbf0ph` rules that a fusion-local identity replaces
+/// **only its direct-call realization**: the body it would have executed, the
+/// two static-worker bindings, the binder run and the environment are all
+/// unchanged. So the local composition and the standalone definition must lower
+/// **the same body from the same plan** -- and the only way to say that and
+/// have it stay true is for there to be one function, called from both seats.
+/// A second copy here would be a second authority over what the selected case
+/// body IS, and the two would drift with nothing able to see it.
+///
+/// **What differs between the two callers is the OPERANDS, and nothing
+/// else.** The definition pass loads `ordinary` and `carried_inputs` from its
+/// own frame's `Parameter` and `Capture` slots at the descriptor's offsets; the
+/// local composition receives the very same two runs assembled at the call
+/// edge, from the planner's ordinary envelope and its continuation-input
+/// projection. Both are the target specialization's own ordinary envelope in
+/// its own order -- that is why the same body can consume either.
+///
+/// **It returns the phase-bearing [`LoweringOperand`], and writes no result
+/// slot.** The definition pass stores it to its frame's `Result` offset; the
+/// local composition hands it straight to the caller's existing eliminator.
+/// Neither seat's disposal belongs here, and putting one here would give the
+/// other a store it must then undo.
+pub(super) fn lower_continuation_selected_case_body(
+    compiler: &mut Lowering<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    facts: &ContinuationSelectedCaseBody,
+    envelope: &[ContinuationOrdinaryEnvelopeRole],
+    ordinary: &[LoweringOperand],
+    carried_inputs: &[LoweringOperand],
+    // `D5a` — `Some` exactly when the CALLER resolved a generated execution
+    // context for this specialization's worker body into its own function.
+    // Supplied rather than re-asked of the planner: an issued context the
+    // caller did not resolve is not a context the induction hypothesis may
+    // name, and that is a fact about the caller's function, not about the plan.
+    retargeted_worker_body: Option<StaticOriginId>,
+) -> Result<LoweringOperand, CraneliftBackendError> {
+    // The ordered capture segment for the selected worker: the
+    // envelope's `WorkerCapture` roles, in capture-ordinal order,
+    // taking each one's operand from its own Parameter position.
+    let mut worker_captures = Vec::new();
+    for (position, role) in envelope.iter().enumerate() {
+        if matches!(role, ContinuationOrdinaryEnvelopeRole::WorkerCapture { .. }) {
+            worker_captures.push(ordinary[position].clone());
+        }
+    }
+    if worker_captures.len() != facts.worker_capture_count {
+        return Err(backend_module(
+            "the ordinary envelope's worker-capture segment disagrees with the selected \
+             worker's capture count"
+                .to_string(),
+        ));
+    }
+
+    // `D6a` -- THE INDUCTION HYPOTHESIS'S ROUTE, and only its.
+    //
+    // `retargeted_worker_body` is `Some` exactly when
+    // `continuation_context_for` issued a generated execution context
+    // for this `(specialization, worker body)` pair AND the retarget
+    // below resolved it into this function. Both halves are required,
+    // which is why this reads the retarget's own outcome rather than
+    // re-asking the planner: an issued context this unit did not
+    // resolve is not a context this binding can name.
+    //
+    // `None` is the ordinary, lawful answer -- every pre-`D5a`
+    // specialization, and every unit in the governed-bracket witness.
+    // The hypothesis then takes the raw route, appending nothing, and
+    // the two bindings below are route-identical. That is a degenerate
+    // route pair, not a collapsed one.
+    //
+    // Not re-derived at the call site. Both bindings below name the
+    // same body origin, so no comparison available there can tell them
+    // apart -- see `StaticWorkerCallRoute`.
+    let induction_route = match retargeted_worker_body {
+        Some(_) => StaticWorkerCallRoute::GeneratedContext,
+        None => StaticWorkerCallRoute::RawWorker,
+    };
+    // `D6c` — CROSS-ROUTING, the hypothesis half. It takes the raw route
+    // while this unit DID resolve a context; the argument below takes
+    // the context route. Only where a context was actually resolved:
+    // on a route-degenerate unit both members lawfully carry
+    // `RawWorker`, so there is no crossing to make and the arm declines
+    // rather than counting an application it did not perform.
+    #[cfg(test)]
+    let induction_route = if crate::cranelift_backend::lowering::d6c_selection_mutation()
+        == crate::cranelift_backend::lowering::D6cSelectionMutation::CrossRouteTargets
+        && retargeted_worker_body.is_some()
+    {
+        crate::cranelift_backend::lowering::record_d6c_selection_application();
+        StaticWorkerCallRoute::RawWorker
+    } else {
+        induction_route
+    };
+
+    // The EXISTING constructor, with the projected identity and arity.
+    let worker = compiler.construct_static_worker_binding(
+        facts.worker_closure_origin,
+        facts.worker_body_origin,
+        facts.worker_declared_arity,
+        facts.worker_capture_count,
+        worker_captures.clone(),
+        induction_route,
+        // `D8i` — an induction hypothesis answers for no composed
+        // source continuation. Stated explicitly: this is a positive
+        // claim about the hypothesis's role, not the absence of one.
+        ContinuationDischarge::DirectSpecializationCall,
+    )?;
+
+    // `D6a` -- the selected recursive constructor argument.
+    //
+    // The SAME closure occurrence, body origin, declared arity and
+    // ordered capture operands as the induction hypothesis above, built
+    // through the same constructor and validated against the same raw
+    // template contract. What the two represent still differs: the
+    // argument is the closure the source scope binds, while the
+    // hypothesis is that closure as this specialization eliminates it.
+    //
+    // The ROUTE is `RawWorker` unconditionally here, and that is not
+    // the same as saying it differs from the hypothesis's. When
+    // `induction_route` above resolved to `RawWorker` -- no context
+    // issued -- the two bindings are route-identical, and they are
+    // still two bindings for two positions of the run. The route is
+    // what will separate them at the call edge in `D6b` *where a
+    // context exists*; it is not what makes them two.
+    //
+    // Nothing new crosses the ABI. This adds no slot, carrier, tag,
+    // descriptor or source occurrence -- it is a second compiler-only
+    // binding over operands this frame has already loaded.
+    // `D6c` — the three binding-construction mutations, under test only.
+    // Each moves ONE argument handed to the existing constructor; the
+    // constructor itself, the hypothesis above and the run below are all
+    // untouched, so the guard that refuses is the one that owns the
+    // moved input.
+    #[cfg(test)]
+    let (argument_body_origin, argument_captures, argument_route) = {
+        use crate::cranelift_backend::lowering::D6cSelectionMutation as Mutation;
+        match crate::cranelift_backend::lowering::d6c_selection_mutation() {
+            // A body this unit did not select. The substituted value
+            // is a REAL planner-issued origin -- this continuation's own
+            // frame occurrence -- rather than an arithmetic neighbour.
+            // A fabricated id could be refused merely for being unknown;
+            // a real origin naming the wrong role is the case the guard
+            // actually has to catch. The control asserts it differs from
+            // the selected body.
+            Mutation::WrongClosureBody => {
+                crate::cranelift_backend::lowering::record_d6c_selection_application();
+                (
+                    facts.continuation_origin,
+                    worker_captures.clone(),
+                    StaticWorkerCallRoute::RawWorker,
+                )
+            }
+            // A capture run that is not the envelope's worker-capture
+            // segment: drop an operand where there is one, otherwise add
+            // one the envelope holds.
+            //
+            // The counter fires ONLY if the vector actually changed.
+            // A unit with no captures and no ordinary operand to borrow
+            // leaves this arm the IDENTITY, and counting an application
+            // there would report a perturbation that never happened --
+            // which is precisely how a control comes to prove the
+            // opposite of what it claims.
+            Mutation::WrongCaptureRun => {
+                let mut perturbed = worker_captures.clone();
+                if perturbed.pop().is_none() {
+                    perturbed.extend(ordinary.first().cloned());
+                }
+                if perturbed.len() != worker_captures.len() {
+                    crate::cranelift_backend::lowering::record_d6c_selection_application();
+                }
+                (
+                    facts.worker_body_origin,
+                    perturbed,
+                    StaticWorkerCallRoute::RawWorker,
+                )
+            }
+            // The argument takes the context route. Paired with the
+            // hypothesis taking the raw route above, this is the
+            // cross-routing the two members must never permit.
+            //
+            // Only where a context was actually resolved. On a
+            // route-degenerate unit both members lawfully carry
+            // `RawWorker`, so there is no crossing to perform; applying
+            // it there would move a route no law distinguishes and count
+            // an application for a perturbation with no content.
+            Mutation::CrossRouteTargets if retargeted_worker_body.is_some() => {
+                crate::cranelift_backend::lowering::record_d6c_selection_application();
+                (
+                    facts.worker_body_origin,
+                    worker_captures.clone(),
+                    StaticWorkerCallRoute::GeneratedContext,
+                )
+            }
+            _ => (
+                facts.worker_body_origin,
+                worker_captures.clone(),
+                StaticWorkerCallRoute::RawWorker,
+            ),
+        }
+    };
+    #[cfg(not(test))]
+    let (argument_body_origin, argument_captures, argument_route) = (
+        facts.worker_body_origin,
+        worker_captures,
+        StaticWorkerCallRoute::RawWorker,
+    );
+    let recursive_argument = compiler.construct_static_worker_binding(
+        facts.worker_closure_origin,
+        argument_body_origin,
+        facts.worker_declared_arity,
+        facts.worker_capture_count,
+        argument_captures,
+        argument_route,
+        // `D8i` — the SPECIALIZATION's selected recursive argument.
+        // Direct, and the contrast with `D8d`'s composed argument is
+        // the point: the same source closure at the same position
+        // carries an authority on the composed path and none here,
+        // because only the composed consumption stands in for a causal
+        // call the producer never made.
+        ContinuationDischarge::DirectSpecializationCall,
+    )?;
+
+    // Exact body recovery: the selected case of the computational
+    // frame this continuation belongs to, by its own alternative.
+    let frame_occurrence =
+        compiler.retained_body_occurrence(facts.continuation_origin)?;
+    let RuntimeExpr::ComputationalMatch { cases, .. } = frame_occurrence.expr else {
+        return Err(backend_module(
+            "a continuation origin does not resolve to a computational frame".to_string(),
+        ));
+    };
+    let alternative = facts.producer_alternative as usize;
+    let case = cases.get(alternative).ok_or_else(|| {
+        backend_module(
+            "the projected producer alternative is outside the frame's case run"
+                .to_string(),
+        )
+    })?;
+    let body = compiler.case_body_occurrence(
+        frame_occurrence.static_origin,
+        alternative,
+        &case.body,
+    )?;
+    // The semantic case environment, through the sole binding
+    // authority, in the order `continuation_case_binder_run` states:
+    // the IH prefix, then ALL the constructor arguments in source
+    // order -- the selected recursive one included, as `D6a`'s
+    // compiler-only member -- then this frame's continuation inputs.
+    //
+    // This site chooses nothing. It maps a plan onto operands; the
+    // order is the plan's, and the plan is a pure function of the
+    // planner's own coordinates.
+    let plan = continuation_case_binder_run(
+        case.argument_binders,
+        &case.recursive_positions,
+        facts.recursive_position,
+        envelope,
+        carried_inputs.len(),
+    )?;
+    let mut env: Vec<LoweringEnvironmentBinding> = Vec::with_capacity(plan.len());
+    for source in &plan {
+        let binding = match *source {
+            ContinuationCaseBinderSource::InductionHypothesis => {
+                LoweringEnvironmentBinding::StaticWorker(worker.clone())
+            }
+            ContinuationCaseBinderSource::SelectedRecursiveArgument {
+                source_position,
+            } => {
+                // The plan only ever names the ruled position here;
+                // segment 1 hard-stops on any other. Re-checking it is
+                // what keeps that a fact this site verifies rather than
+                // one it inherits.
+                if source_position != facts.recursive_position {
+                    return Err(backend_module(format!(
+                        "the binder run names a selected recursive argument at source \
+                         position {source_position}, but this specialization projects a \
+                         worker for position {}",
+                        facts.recursive_position
+                    )));
+                }
+                LoweringEnvironmentBinding::StaticWorker(recursive_argument.clone())
+            }
+            ContinuationCaseBinderSource::Ordinary(index) => {
+                let operand = ordinary.get(index).ok_or_else(|| {
+                    backend_module(
+                        "the binder run names an ordinary-envelope index this frame loaded \
+                         no operand for"
+                            .to_string(),
+                    )
+                })?;
+                LoweringEnvironmentBinding::Value(operand.clone())
+            }
+            ContinuationCaseBinderSource::ContinuationInput(ordinal) => {
+                let operand = carried_inputs.get(ordinal).ok_or_else(|| {
+                    backend_module(
+                        "the binder run names a continuation input ordinal this frame \
+                         loaded no operand for"
+                            .to_string(),
+                    )
+                })?;
+                LoweringEnvironmentBinding::Value(operand.clone())
+            }
+        };
+        env.push(binding);
+    }
+
+    // `D6b` — the same instant, structured. The trace below renders the
+    // ROUTE of each static-worker member; this record carries the body
+    // origin beside it, which is what lets a control ask whether the
+    // mixed pair is over ONE body rather than merely mixed.
+    #[cfg(test)]
+    crate::cranelift_backend::lowering::record_d6b_specialization_body(
+        crate::cranelift_backend::lowering::D6bSpecializationBody {
+            unit: facts.id,
+            worker_body_origin: facts.worker_body_origin,
+            retargeted: retargeted_worker_body,
+            worker_call_targets: compiler
+                .function_local
+                .worker_calls
+                .keys()
+                .copied()
+                .collect(),
+            raw_worker_call_targets: compiler
+                .function_local
+                .raw_worker_calls
+                .keys()
+                .copied()
+                .collect(),
+            members: env
+                .iter()
+                .enumerate()
+                .filter_map(|(position, binding)| match binding {
+                    LoweringEnvironmentBinding::StaticWorker(worker) => {
+                        Some((position, worker.route, worker.body_origin))
+                    }
+                    LoweringEnvironmentBinding::Value(_) => None,
+                })
+                .collect(),
+        },
+    );
+    #[cfg(test)]
+    d5a_trace(format!(
+        "  SPEC-BODY {:?} alt={} binders={} ordinary={} envelope={:?} env=[{}]",
+        facts.id,
+        facts.producer_alternative,
+        case.argument_binders,
+        ordinary.len(),
+        envelope,
+        env.iter()
+            // `D6a` -- the ROUTE is printed, not just the arm. Both
+            // static-worker members name the same closure, body and
+            // arity, so an arm-only rendering shows two identical
+            // entries and a change collapsing the two routes would be
+            // invisible in this log.
+            //
+            // The converse does not hold, and a reader of this log
+            // must not assume it: two entries rendering the SAME route
+            // is the lawful route-degenerate case (no context issued),
+            // not evidence that one binding was reused for both
+            // members. Only a witness whose planner issues a context
+            // renders a mixed pair, and only there does this log
+            // discriminate the routes at all.
+            .map(|binding| match binding {
+                LoweringEnvironmentBinding::StaticWorker(worker) => match worker.route {
+                    StaticWorkerCallRoute::RawWorker => "StaticWorker(RawWorker)",
+                    StaticWorkerCallRoute::GeneratedContext =>
+                        "StaticWorker(GeneratedContext)",
+                },
+                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) =>
+                    "Carried",
+                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
+                    "Specialized",
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    let lowered = compiler.lower_expr(builder, body, &env)?;
+
+    Ok(lowered)
+}
+
 /// **`RT-CONTSPEC-ACTIVATE` `D2` — define each declared continuation target
 /// from its own projected contract.**
 ///
@@ -1579,10 +1983,42 @@ pub(super) fn define_continuation_bodies<M: Module>(
     // separately emitted caller; a continuation function is exactly that, so
     // it declares its own worker refs rather than borrowing another's.
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the ORDINARY residual targets
+    // `O_t`, and the fusion-local complement recorded as this pass's own
+    // omission.
+    //
+    // **The omission is recorded HERE, in the pass that would otherwise have
+    // emitted the body**, and the closeout compares it with `F_t`. A statement
+    // made elsewhere about what this loop does would agree with itself; this is
+    // the loop's own decision, and if it ever stopped omitting, the recorded set
+    // would shrink and the range equality would say so.
+    let ordinary_targets = compiler.static_transition_plan.ordinary_continuation_targets()?;
+    for omitted in compiler
+        .static_transition_plan
+        .continuation_units()?
+        .iter()
+        .map(|unit| unit.id())
+        .filter(|id| !ordinary_targets.contains(id))
+        .collect::<Vec<_>>()
+    {
+        compiler
+            .fusion_compositions
+            .as_mut()
+            .ok_or_else(|| {
+                backend_module(
+                    "a fusion-local continuation target was omitted from the definition pass \
+                     with no composition ledger open to record it; the omission would then be \
+                     invisible to the range equality that is the only thing requiring it"
+                        .to_string(),
+                )
+            })?
+            .record_definition_omitted(omitted);
+    }
     let emissions = compiler
         .static_transition_plan
         .continuation_units()?
         .into_iter()
+        .filter(|unit| ordinary_targets.contains(&unit.id()))
         .map(|unit| {
             let (offsets, _frame_bytes) = unit.slot_offsets()?;
             Ok(OwnedContinuationEmission {
@@ -2035,346 +2471,34 @@ pub(super) fn define_continuation_bodies<M: Module>(
                     });
             }
 
-            // The ordered capture segment for the selected worker: the
-            // envelope's `WorkerCapture` roles, in capture-ordinal order,
-            // taking each one's operand from its own Parameter position.
-            let mut worker_captures = Vec::new();
-            for (position, role) in envelope.iter().enumerate() {
-                if matches!(role, ContinuationOrdinaryEnvelopeRole::WorkerCapture { .. }) {
-                    worker_captures.push(ordinary[position].clone());
-                }
-            }
-            if worker_captures.len() != unit.worker_capture_count {
-                return Err(backend_module(
-                    "the ordinary envelope's worker-capture segment disagrees with the selected \
-                     worker's capture count"
-                        .to_string(),
-                ));
-            }
-
-            // `D6a` -- THE INDUCTION HYPOTHESIS'S ROUTE, and only its.
+            // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the selected case body,
+            // through the ONE authority both realizations share.
             //
-            // `retargeted_worker_body` is `Some` exactly when
-            // `continuation_context_for` issued a generated execution context
-            // for this `(specialization, worker body)` pair AND the retarget
-            // below resolved it into this function. Both halves are required,
-            // which is why this reads the retarget's own outcome rather than
-            // re-asking the planner: an issued context this unit did not
-            // resolve is not a context this binding can name.
-            //
-            // ⭐ `None` is the ordinary, lawful answer -- every pre-`D5a`
-            // specialization, and every unit in the governed-bracket witness.
-            // The hypothesis then takes the raw route, appending nothing, and
-            // the two bindings below are route-identical. That is a degenerate
-            // route pair, not a collapsed one.
-            //
-            // ⛔ Not re-derived at the call site. Both bindings below name the
-            // same body origin, so no comparison available there can tell them
-            // apart -- see `StaticWorkerCallRoute`.
-            let induction_route = match retargeted_worker_body {
-                Some(_) => StaticWorkerCallRoute::GeneratedContext,
-                None => StaticWorkerCallRoute::RawWorker,
-            };
-            // `D6c` — CROSS-ROUTING, the hypothesis half. It takes the raw route
-            // while this unit DID resolve a context; the argument below takes
-            // the context route. ⛔ Only where a context was actually resolved:
-            // on a route-degenerate unit both members lawfully carry
-            // `RawWorker`, so there is no crossing to make and the arm declines
-            // rather than counting an application it did not perform.
-            #[cfg(test)]
-            let induction_route = if crate::cranelift_backend::lowering::d6c_selection_mutation()
-                == crate::cranelift_backend::lowering::D6cSelectionMutation::CrossRouteTargets
-                && retargeted_worker_body.is_some()
-            {
-                crate::cranelift_backend::lowering::record_d6c_selection_application();
-                StaticWorkerCallRoute::RawWorker
-            } else {
-                induction_route
-            };
-
-            // The EXISTING constructor, with the projected identity and arity.
-            let worker = compiler.construct_static_worker_binding(
-                unit.worker_closure_origin,
-                unit.worker_body_origin,
-                unit.worker_declared_arity,
-                unit.worker_capture_count,
-                worker_captures.clone(),
-                induction_route,
-                // `D8i` — an induction hypothesis answers for no composed
-                // source continuation. Stated explicitly: this is a positive
-                // claim about the hypothesis's role, not the absence of one.
-                ContinuationDischarge::DirectSpecializationCall,
-            )?;
-
-            // `D6a` -- the selected recursive constructor argument.
-            //
-            // ⭐ The SAME closure occurrence, body origin, declared arity and
-            // ordered capture operands as the induction hypothesis above, built
-            // through the same constructor and validated against the same raw
-            // template contract. What the two represent still differs: the
-            // argument is the closure the source scope binds, while the
-            // hypothesis is that closure as this specialization eliminates it.
-            //
-            // ⛔ The ROUTE is `RawWorker` unconditionally here, and that is not
-            // the same as saying it differs from the hypothesis's. When
-            // `induction_route` above resolved to `RawWorker` -- no context
-            // issued -- the two bindings are route-identical, and they are
-            // still two bindings for two positions of the run. The route is
-            // what will separate them at the call edge in `D6b` *where a
-            // context exists*; it is not what makes them two.
-            //
-            // ⛔ Nothing new crosses the ABI. This adds no slot, carrier, tag,
-            // descriptor or source occurrence -- it is a second compiler-only
-            // binding over operands this frame has already loaded.
-            // `D6c` — the three binding-construction mutations, under test only.
-            // Each moves ONE argument handed to the existing constructor; the
-            // constructor itself, the hypothesis above and the run below are all
-            // untouched, so the guard that refuses is the one that owns the
-            // moved input.
-            #[cfg(test)]
-            let (argument_body_origin, argument_captures, argument_route) = {
-                use crate::cranelift_backend::lowering::D6cSelectionMutation as Mutation;
-                match crate::cranelift_backend::lowering::d6c_selection_mutation() {
-                    // A body this unit did not select. ⛔ The substituted value
-                    // is a REAL planner-issued origin -- this continuation's own
-                    // frame occurrence -- rather than an arithmetic neighbour.
-                    // A fabricated id could be refused merely for being unknown;
-                    // a real origin naming the wrong role is the case the guard
-                    // actually has to catch. The control asserts it differs from
-                    // the selected body.
-                    Mutation::WrongClosureBody => {
-                        crate::cranelift_backend::lowering::record_d6c_selection_application();
-                        (
-                            unit.continuation_origin,
-                            worker_captures.clone(),
-                            StaticWorkerCallRoute::RawWorker,
-                        )
-                    }
-                    // A capture run that is not the envelope's worker-capture
-                    // segment: drop an operand where there is one, otherwise add
-                    // one the envelope holds.
-                    //
-                    // ⛔ The counter fires ONLY if the vector actually changed.
-                    // A unit with no captures and no ordinary operand to borrow
-                    // leaves this arm the IDENTITY, and counting an application
-                    // there would report a perturbation that never happened --
-                    // which is precisely how a control comes to prove the
-                    // opposite of what it claims.
-                    Mutation::WrongCaptureRun => {
-                        let mut perturbed = worker_captures.clone();
-                        if perturbed.pop().is_none() {
-                            perturbed.extend(ordinary.first().cloned());
-                        }
-                        if perturbed.len() != worker_captures.len() {
-                            crate::cranelift_backend::lowering::record_d6c_selection_application();
-                        }
-                        (
-                            unit.worker_body_origin,
-                            perturbed,
-                            StaticWorkerCallRoute::RawWorker,
-                        )
-                    }
-                    // The argument takes the context route. Paired with the
-                    // hypothesis taking the raw route above, this is the
-                    // cross-routing the two members must never permit.
-                    //
-                    // ⛔ Only where a context was actually resolved. On a
-                    // route-degenerate unit both members lawfully carry
-                    // `RawWorker`, so there is no crossing to perform; applying
-                    // it there would move a route no law distinguishes and count
-                    // an application for a perturbation with no content.
-                    Mutation::CrossRouteTargets if retargeted_worker_body.is_some() => {
-                        crate::cranelift_backend::lowering::record_d6c_selection_application();
-                        (
-                            unit.worker_body_origin,
-                            worker_captures.clone(),
-                            StaticWorkerCallRoute::GeneratedContext,
-                        )
-                    }
-                    _ => (
-                        unit.worker_body_origin,
-                        worker_captures.clone(),
-                        StaticWorkerCallRoute::RawWorker,
-                    ),
-                }
-            };
-            #[cfg(not(test))]
-            let (argument_body_origin, argument_captures, argument_route) = (
-                unit.worker_body_origin,
-                worker_captures,
-                StaticWorkerCallRoute::RawWorker,
-            );
-            let recursive_argument = compiler.construct_static_worker_binding(
-                unit.worker_closure_origin,
-                argument_body_origin,
-                unit.worker_declared_arity,
-                unit.worker_capture_count,
-                argument_captures,
-                argument_route,
-                // `D8i` — the SPECIALIZATION's selected recursive argument.
-                // ⛔ Direct, and the contrast with `D8d`'s composed argument is
-                // the point: the same source closure at the same position
-                // carries an authority on the composed path and none here,
-                // because only the composed consumption stands in for a causal
-                // call the producer never made.
-                ContinuationDischarge::DirectSpecializationCall,
-            )?;
-
-            // Exact body recovery: the selected case of the computational
-            // frame this continuation belongs to, by its own alternative.
-            let frame_occurrence =
-                compiler.retained_body_occurrence(unit.continuation_origin)?;
-            let RuntimeExpr::ComputationalMatch { cases, .. } = frame_occurrence.expr else {
-                return Err(backend_module(
-                    "a continuation origin does not resolve to a computational frame".to_string(),
-                ));
-            };
-            let alternative = unit.producer_alternative as usize;
-            let case = cases.get(alternative).ok_or_else(|| {
-                backend_module(
-                    "the projected producer alternative is outside the frame's case run"
-                        .to_string(),
-                )
-            })?;
-            let body = compiler.case_body_occurrence(
-                frame_occurrence.static_origin,
-                alternative,
-                &case.body,
-            )?;
-            // The semantic case environment, through the sole binding
-            // authority, in the order `continuation_case_binder_run` states:
-            // the IH prefix, then ALL the constructor arguments in source
-            // order -- the selected recursive one included, as `D6a`'s
-            // compiler-only member -- then this frame's continuation inputs.
-            //
-            // ⛔ This site chooses nothing. It maps a plan onto operands; the
-            // order is the plan's, and the plan is a pure function of the
-            // planner's own coordinates.
-            let plan = continuation_case_binder_run(
-                case.argument_binders,
-                &case.recursive_positions,
-                unit.recursive_position,
-                envelope,
-                carried_inputs.len(),
-            )?;
-            let mut env: Vec<LoweringEnvironmentBinding> = Vec::with_capacity(plan.len());
-            for source in &plan {
-                let binding = match *source {
-                    ContinuationCaseBinderSource::InductionHypothesis => {
-                        LoweringEnvironmentBinding::StaticWorker(worker.clone())
-                    }
-                    ContinuationCaseBinderSource::SelectedRecursiveArgument {
-                        source_position,
-                    } => {
-                        // The plan only ever names the ruled position here;
-                        // segment 1 hard-stops on any other. Re-checking it is
-                        // what keeps that a fact this site verifies rather than
-                        // one it inherits.
-                        if source_position != unit.recursive_position {
-                            return Err(backend_module(format!(
-                                "the binder run names a selected recursive argument at source \
-                                 position {source_position}, but this specialization projects a \
-                                 worker for position {}",
-                                unit.recursive_position
-                            )));
-                        }
-                        LoweringEnvironmentBinding::StaticWorker(recursive_argument.clone())
-                    }
-                    ContinuationCaseBinderSource::Ordinary(index) => {
-                        let operand = ordinary.get(index).ok_or_else(|| {
-                            backend_module(
-                                "the binder run names an ordinary-envelope index this frame loaded \
-                                 no operand for"
-                                    .to_string(),
-                            )
-                        })?;
-                        LoweringEnvironmentBinding::Value(operand.clone())
-                    }
-                    ContinuationCaseBinderSource::ContinuationInput(ordinal) => {
-                        let operand = carried_inputs.get(ordinal).ok_or_else(|| {
-                            backend_module(
-                                "the binder run names a continuation input ordinal this frame \
-                                 loaded no operand for"
-                                    .to_string(),
-                            )
-                        })?;
-                        LoweringEnvironmentBinding::Value(operand.clone())
-                    }
-                };
-                env.push(binding);
-            }
-
-            // `D6b` — the same instant, structured. The trace below renders the
-            // ROUTE of each static-worker member; this record carries the body
-            // origin beside it, which is what lets a control ask whether the
-            // mixed pair is over ONE body rather than merely mixed.
-            #[cfg(test)]
-            crate::cranelift_backend::lowering::record_d6b_specialization_body(
-                crate::cranelift_backend::lowering::D6bSpecializationBody {
-                    unit: unit.id,
+            // The operands are this frame's own: `ordinary` from the
+            // `Parameter` slots and `carried_inputs` from the `Capture` slots,
+            // each at the offset the descriptor assigns it. What the shared
+            // function does with them is identical to what a fusion-local
+            // composition does with the run assembled at its call edge, which
+            // is exactly the property that makes the two realizations the same
+            // body.
+            let lowered = lower_continuation_selected_case_body(
+                compiler,
+                &mut builder,
+                &ContinuationSelectedCaseBody {
+                    id: unit.id,
+                    continuation_origin: unit.continuation_origin,
+                    producer_alternative: unit.producer_alternative,
+                    recursive_position: unit.recursive_position,
+                    worker_closure_origin: unit.worker_closure_origin,
                     worker_body_origin: unit.worker_body_origin,
-                    retargeted: retargeted_worker_body,
-                    worker_call_targets: compiler
-                        .function_local
-                        .worker_calls
-                        .keys()
-                        .copied()
-                        .collect(),
-                    raw_worker_call_targets: compiler
-                        .function_local
-                        .raw_worker_calls
-                        .keys()
-                        .copied()
-                        .collect(),
-                    members: env
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(position, binding)| match binding {
-                            LoweringEnvironmentBinding::StaticWorker(worker) => {
-                                Some((position, worker.route, worker.body_origin))
-                            }
-                            LoweringEnvironmentBinding::Value(_) => None,
-                        })
-                        .collect(),
+                    worker_declared_arity: unit.worker_declared_arity,
+                    worker_capture_count: unit.worker_capture_count,
                 },
-            );
-            #[cfg(test)]
-            d5a_trace(format!(
-                "  SPEC-BODY {:?} alt={} binders={} ordinary={} envelope={:?} env=[{}]",
-                unit.id,
-                unit.producer_alternative,
-                case.argument_binders,
-                ordinary.len(),
                 envelope,
-                env.iter()
-                    // `D6a` -- the ROUTE is printed, not just the arm. Both
-                    // static-worker members name the same closure, body and
-                    // arity, so an arm-only rendering shows two identical
-                    // entries and a change collapsing the two routes would be
-                    // invisible in this log.
-                    //
-                    // ⛔ The converse does not hold, and a reader of this log
-                    // must not assume it: two entries rendering the SAME route
-                    // is the lawful route-degenerate case (no context issued),
-                    // not evidence that one binding was reused for both
-                    // members. Only a witness whose planner issues a context
-                    // renders a mixed pair, and only there does this log
-                    // discriminate the routes at all.
-                    .map(|binding| match binding {
-                        LoweringEnvironmentBinding::StaticWorker(worker) => match worker.route {
-                            StaticWorkerCallRoute::RawWorker => "StaticWorker(RawWorker)",
-                            StaticWorkerCallRoute::GeneratedContext =>
-                                "StaticWorker(GeneratedContext)",
-                        },
-                        LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) =>
-                            "Carried",
-                        LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
-                            "Specialized",
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            let lowered = compiler.lower_expr(&mut builder, body, &env)?;
+                &ordinary,
+                &carried_inputs,
+                retargeted_worker_body,
+            )?;
 
             // The Result slot is WRITTEN here and never read.
             let word = match lowered {
@@ -2923,6 +3047,26 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
 /// **The claim is READ, not consumed.** The takeover at the consumer's seat is
 /// the one consumption, and consuming here would make a definition spend the
 /// affine right the redirect's seat still needs.
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — which origin keys the recursive self
+/// edge and which origin records its call site.**
+///
+/// A two-line function because the choice is the whole content: the map key and
+/// `origin` are the **callee body**, and `call_site_origin` is the **consuming
+/// call**. They are different occurrences and this is the only place that says
+/// so, so a control can assert the production decision instead of a copy of it.
+///
+/// **Why it is worth naming at all.** On the `R3` witness the claim's `seat`,
+/// its `producer_body` and its redirect's callee entry ALL print `37` while the
+/// consuming call is `17`. A fold of call site into body type-checks, and a
+/// control whose expected values are every `37` still passes under the fold —
+/// separating `17` from `37` is the only thing that catches it.
+pub(super) fn fusion_self_edge_identities(
+    producer_body: StaticOriginId,
+    consuming_call: StaticOriginId,
+) -> (StaticOriginId, StaticOriginId) {
+    (producer_body, consuming_call)
+}
+
 pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
     module: &mut M,
     compiler: &mut Lowering<'_>,
@@ -2935,9 +3079,27 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         producer_owner: PredeclaredFunctionId,
         consumer_owner: PredeclaredFunctionId,
         producer_body: StaticOriginId,
+        /// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the CALL SITE the moved
+        /// suffix's claimed IH invocation is authorized at. Deliberately kept
+        /// beside `producer_body` rather than folded into it: this is the
+        /// occurrence that calls, that is the body called, and in this fixture
+        /// they are different origins that a numeric coincidence elsewhere
+        /// could hide.
+        consuming_call: StaticOriginId,
+        consuming_callee: StaticOriginId,
+        redirect_callee: StaticOriginId,
         continuation_origin: StaticOriginId,
+        /// `RT-LEXICAL-R3-FUSION-EMITTER` `D2` — the claim's consumer frame
+        /// identity, re-entered locally inside the fused function.
+        checked_frame_id: u64,
         slots: Vec<AbiSlot>,
         offsets: Vec<u32>,
+        /// The INSTALLED fusion frame's whole header, carried rather than
+        /// rebuilt from its parts. `D3`'s recursive self edge targets this
+        /// definition, so it must present the frame contract the region was
+        /// installed with; reassembling a header here is how it would come to
+        /// differ in a field nobody thought to copy.
+        header: AbiFrameHeader,
         header_parameters: u32,
         header_captures: u32,
     }
@@ -2971,9 +3133,17 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                     producer_owner: claim.producer_owner(),
                     consumer_owner: claim.consumer_owner(),
                     producer_body: claim.producer_body(),
+                    consuming_call: claim.consuming_call(),
+                    consuming_callee: claim.consuming_callee(),
+                    redirect_callee: claim.redirect().callee_origin(),
                     continuation_origin: claim.continuation_origin(),
+                    // `D2` -- the consumer frame identity the claim was
+                    // preflighted against, carried so the fused body re-enters
+                    // THAT frame rather than resolving one of its own.
+                    checked_frame_id: claim.checked_transport().frame_id(),
                     slots: fusion.slots().to_vec(),
                     offsets,
+                    header: fusion.header(),
                     header_parameters: fusion.header().parameters,
                     header_captures: fusion.header().captures,
                 })
@@ -3041,6 +3211,118 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         // invocation is the edge that reaches this function, not one inside it.
         let declared_calls = call_edges.declare_in_func(fusion.producer_owner, module, &mut func)?;
         function_local.unit_calls = declared_calls.static_bodies;
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE DEFINITION-LOCAL
+        // ---- FUSION-RECURSIVE SELF EDGE (Architect, via `evt_6fzg11hpvfp4w`).
+        //
+        // The suffix moved into this function, and its claimed IH invocation is
+        // a **recursive call to this same `Fusion(id)`** — not a no-op forward
+        // of a current result, and not a call to the standalone producer, whose
+        // body this definition now owns.
+        //
+        // Without this the fused body reaches
+        // `call_declared_unit(producer_body)` against a table holding only the
+        // producer's inherited edges and refuses with *"retained body ... has no
+        // graph-derived call target in this unit"*. That refusal is correct and
+        // stays: this supplies the edge the body genuinely contains rather than
+        // relaxing the check.
+        //
+        // **Authorized from the preflighted claim, never from the failure.** The
+        // ruling forbids inferring this edge from a lookup miss, from numeric
+        // coincidence between origins, from body shape, or from ambient
+        // "inside a fusion" state — so each fact below is read off `claim`.
+        //
+        // **Call-site identity is kept distinct from body identity.** The key
+        // and `origin` are the callee body; `call_site_origin` is
+        // `claim.consuming_call()`. In this fixture the body and the claim's
+        // seat both print `37` while the consuming call is `17`; folding them
+        // would compile and would make a wrong-call-site edge indistinguishable
+        // from a right one.
+        //
+        // **The header and slots are the installed FUSION frame's**, never the
+        // producer's — the callee is this fused definition, so the frame
+        // contract is the one it was installed with.
+        //
+        // This is a **separate, definition-local obligation** from the external
+        // consumer-to-fusion redirect, which remains the sole affine external
+        // redirect. It consumes no region claim and records no redirect.
+        // The half of the ruled verification that is genuinely derivable HERE:
+        // the redirect's producer entry and the claim's producer body must be
+        // the same occurrence. They reach the claim by different routes --
+        // `producer_body` from `invocation_callee_entry` via the unique static
+        // body triple, `redirect` from `fusion_redirect_target` -- so their
+        // agreement is a real cross-check rather than a field compared with
+        // itself.
+        //
+        // MEASURED, and stated rather than implied: `consuming_callee` does NOT
+        // equal `producer_body` and must not be compared to it. On this witness
+        // the consuming call is `17`, its callee occurrence `16`, and the
+        // producer body `37`. The callee reaches the body through an IH
+        // BINDING, and `CheckedIhBinding` names a `frame_origin` and a recursive
+        // position -- not a body. An earlier draft of this guard compared the
+        // two ids directly and refused every lawful region.
+        //
+        // ---- CORRECTION. An earlier revision of THIS comment said that
+        // ---- resolution "is established at preflight". That was FALSE.
+        //
+        // Architect, relayed at `evt_45xd3px862ejs`: preflight's
+        // `BinderAgreement` proves only marginal facts -- that the consuming
+        // callee is an IH at the admitted frame and recursive position, and that
+        // the result root equals the invocation callee entry. It does NOT prove
+        // that this exact callee/binder resolves to that producer body.
+        //
+        // ---- AND THAT RELATION IS NOW CLOSED, PLANNER-SIDE. Ruled at
+        // ---- `evt_2rw6vhq8xrqcm`; landed as
+        // ---- `FusionClaimRefusal::BinderBodyResolution`.
+        //
+        // Preflight now re-resolves the consuming callee through the planner's
+        // own binding authority and resolves that binder to a body, refusing
+        // BEFORE the claim is issued unless it is the body being redirected. So
+        // by the time a claim reaches this seat the relation is a checked
+        // property of the certificate, not an assumption -- and `producer_body`
+        // is that checked common result.
+        //
+        // ⇒ **What lowering keeps is still exactly the independent cross-check
+        // below, and closing the relation upstream is not a licence to grow
+        // it.** A second body authority here was ruled out in the same message:
+        // re-deriving the binder relation in lowering would create a second
+        // planner, and `ih_bindings` and `SemanticIr::child_origin` are
+        // planner-private precisely so that cannot happen quietly.
+        if fusion.redirect_callee != fusion.producer_body {
+            return Err(backend_module(
+                "a fused region's redirect names a producer entry other than the claim's producer \
+                 body, so the definition-local recursive edge would target a body this claim \
+                 never admitted"
+                    .to_string(),
+            ));
+        }
+        // The two identities, chosen by one shared function so the control that
+        // separates them exercises the production decision rather than a copy of
+        // it.
+        let (self_edge_body, self_edge_call_site) =
+            fusion_self_edge_identities(fusion.producer_body, fusion.consuming_call);
+        let self_edge = DeclaredUnitCall {
+            function: module.declare_func_in_func(id, &mut func),
+            origin: self_edge_body,
+            call_site_origin: self_edge_call_site,
+            header: fusion.header,
+            slots: slots.to_vec(),
+            offsets: offsets.to_vec(),
+        };
+        // INSERTED, and its absence beforehand is required rather than assumed —
+        // the producer's inherited edges must not already answer for this body,
+        // or the suffix would have two answers to one lookup and the standalone
+        // producer would stay reachable beside its fused definition.
+        if function_local
+            .unit_calls
+            .insert(self_edge_body, self_edge)
+            .is_some()
+        {
+            return Err(backend_module(
+                "a fused definition already holds a call target for the body it owns, so its \
+                 recursive suffix edge would be one of two answers to the same lookup"
+                    .to_string(),
+            ));
+        }
         function_local.declaration_calls = declared_calls.declarations;
         function_local.worker_calls = worker_targets.declare_in_func(module, &mut func);
         // No retarget happens in a fused body, so the two tables agree. Populated
@@ -3168,6 +3450,28 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                 let binding = LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
                     CarriedBoundaryWord { word },
                 ));
+                // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the CURRENT FUSED
+                // FRAME's ordered operand run, recorded in this same single
+                // walk and in descriptor order.
+                //
+                // `fused_redirect_inputs` resolves `claim.inputs()` by indexing
+                // `defining_abi_operands` of the function making the call. Until
+                // the suffix moved in, that function was always the consumer's
+                // predeclared unit, which populates the run in its own slot
+                // walk. The fused definition never did, so the recursive self
+                // edge above refused with *"names entry ABI position 0 outside
+                // the calling function's 0 operands"* — an empty run, not a
+                // wrong one.
+                //
+                // Written HERE rather than reassembled afterwards for the reason
+                // the ordinary unit body states: one walk loads each slot once,
+                // and a second pass that rebuilds the order is how the operand
+                // run comes to disagree with the descriptor it was declared
+                // from.
+                compiler
+                    .function_local
+                    .defining_abi_operands
+                    .push(LoweringOperand::Carried(CarriedBoundaryWord { word }));
                 match slot.kind {
                     AbiSlotKind::Parameter => parameters.push(binding),
                     _ => captures.push(binding),
@@ -3207,14 +3511,29 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             let lowered = {
                 let ambient =
                     AmbientBodyAuthority::bind(compiler, causal_owner, fusion.producer_owner);
+                // `RT-LEXICAL-R3-FUSION-EMITTER` `D1` — arm the interior switch
+                // for the extent of THIS region's body, and no longer.
+                //
+                // The key is the region's own `continuation_origin` and the fact
+                // is its own `consumer_owner`; both come from the claim, so
+                // nothing downstream infers either. Restored to whatever was
+                // held on the way out rather than cleared, for the same reason
+                // `AmbientBodyAuthority` restores: a nested definition pass must
+                // not be handed `None` when its caller held a key.
+                let enclosing_switch = compiler.fused_consumer_authority.replace((
+                    fusion.continuation_origin,
+                    fusion.consumer_owner,
+                ));
                 let lowered = fuse_producer_through_consumer_suffix(
                     compiler,
                     &mut builder,
                     fusion.producer_body,
                     fusion.continuation_origin,
+                    fusion.checked_frame_id,
                     &parameters,
                     &captures,
                 );
+                compiler.fused_consumer_authority = enclosing_switch;
                 ambient.release(compiler);
                 lowered?
             };
@@ -3305,6 +3624,7 @@ fn fuse_producer_through_consumer_suffix(
     builder: &mut FunctionBuilder<'_>,
     producer_body: StaticOriginId,
     continuation_origin: StaticOriginId,
+    checked_frame_id: u64,
     parameters: &[LoweringEnvironmentBinding],
     captures: &[LoweringEnvironmentBinding],
 ) -> Result<LoweringOperand, CraneliftBackendError> {
@@ -3321,6 +3641,7 @@ fn fuse_producer_through_consumer_suffix(
         builder,
         body,
         continuation_origin,
+        checked_frame_id,
         cases,
         default,
         parameters,
@@ -3959,24 +4280,11 @@ impl ContinuationCandidateLedger {
         // The SAME projection the claim ledger's `planned` is read from, so the
         // candidate population cannot drift from the population whose
         // obligations `D2` will derive out of it.
-        let candidates = plan
-            .continuation_calls()?
-            .iter()
-            .map(|call| {
-                plan.continuation_call_binding_for(
-                    call.producer_construct_origin(),
-                    call.continuation_origin(),
-                    call.producer_alternative(),
-                    call.recursive_position(),
-                )?
-                .ok_or_else(|| {
-                    backend_module(
-                        "a planned continuation call has no binding at its own four coordinates,                          so the candidate population cannot be built from the projection that                          produced it"
-                            .to_string(),
-                    )
-                })
-            })
-            .collect::<Result<BTreeSet<_>, _>>()?;
+        // **`D3` — `O`, not `P`.** A fusion-local identity is settled in the
+        // sibling composition ledger, never here, so admitting it as a candidate
+        // would make totality-at-close demand a `CandidateDisposition` it must
+        // not have. `evt_6kn9ckdnbf0ph` §2 forbids giving it one.
+        let candidates = plan.ordinary_continuation_call_identities()?;
         // **`D3` — the candidate population AS THE LIVE PLAN PROJECTED IT.**
         //
         // Recorded here rather than rebuilt in a test, and the difference is
@@ -4103,24 +4411,11 @@ impl ContinuationClaimLedger {
         // is recorded because `close()` asserts the four sets equal and a set
         // that is *implied* by another is not the same evidence as one that was
         // read independently -- the load-bearing pairs are declared and emitted.
-        let planned = plan
-            .continuation_calls()?
-            .iter()
-            .map(|call| {
-                plan.continuation_call_binding_for(
-                    call.producer_construct_origin(),
-                    call.continuation_origin(),
-                    call.producer_alternative(),
-                    call.recursive_position(),
-                )?
-                .ok_or_else(|| {
-                    backend_module(
-                        "a projected causal call has no binding under its own four-field selector"
-                            .to_string(),
-                    )
-                })
-            })
-            .collect::<Result<BTreeSet<_>, CraneliftBackendError>>()?;
+        // **`D3` — `O`.** `close()` asserts `resolved = declared = planned` over
+        // this set, and all three narrow together: a fusion-local identity is
+        // absent from every one of them, so each law stays literally true over
+        // its own complete domain rather than being widened to accept a gap.
+        let planned = plan.ordinary_continuation_call_identities()?;
         Ok(Self {
             resolved,
             claims,
@@ -4475,6 +4770,302 @@ impl ContinuationClaimLedger {
         }
         Ok(())
     }
+
+    /// **`D3` — every identity this ordinary ledger has TOUCHED, in any role.**
+    ///
+    /// The union of claimed, declared, direct-emitted and composed-discharged.
+    /// It exists for exactly one consumer: the fusion-local ledger's closeout,
+    /// which asserts its own consumed population is disjoint from this one.
+    ///
+    /// **A union, not `planned`.** Asserting disjointness against `planned`
+    /// would test the partition the planner already validated -- `O ∩ F = ∅` is
+    /// checked at preflight and would be re-checked here against the same
+    /// derivation. What has to be disjoint is what the two ledgers ACTUALLY
+    /// recorded: a fusion-local identity that reached any ordinary role is a
+    /// direct-plus-composed double realization, and it is that event, not the
+    /// planner's arithmetic, that this makes visible.
+    pub(super) fn touched_identities(&self) -> BTreeSet<ContinuationCallIdentity> {
+        self.claims
+            .iter()
+            .filter(|(_, consumed)| consumed.is_some())
+            .map(|(identity, _)| identity.clone())
+            .chain(self.declared.iter().cloned())
+            .chain(self.emitted.iter().cloned())
+            .chain(self.composed.iter().cloned())
+            .collect()
+    }
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the SIBLING affine ledger for the
+/// fusion-local realizations `F`.**
+///
+/// **A sibling, not a widening, and Architect `evt_6kn9ckdnbf0ph` is
+/// explicit about why.** An ordinary identity's obligation is discharged by an
+/// emitted call whose callee is decoded back out of the finished CLIF; a
+/// fusion-local identity emits no call at all, so there is no instruction for
+/// any such gate to read. Putting both in one ledger would mean either
+/// weakening the direct laws to tolerate a member with no instruction, or
+/// giving the composed member an instruction it does not have. Two ledgers over
+/// two disjoint domains keeps each law literally true over its own complete
+/// domain -- which is the same reason `O` was narrowed at the input rather than
+/// the laws being relaxed.
+///
+/// **This is NOT the `FusionRegionClaimLedger` and does not touch it.** The
+/// region claim carries the producer/consumer relation and is spent at the
+/// redirect and takeover seats; consuming a composition here does not spend it,
+/// and call `17/13` stays on the region claim and out of `dom(FusionComposedEdge)`
+/// entirely.
+///
+/// ## The affine law, and what each half refuses
+///
+/// `dom(planned) = dom(consumed)`, with the target range equal to `F_t`:
+///
+/// - an identity with **no planned edge** is refused -- a composition seat was
+///   reached for something the planner never composed;
+/// - a **second** consumption of one identity is refused, whether in the same
+///   function or another one, which is the replay case;
+/// - a consumption whose **owner or target** disagrees with the planned edge is
+///   refused, each named separately so the refusal says which fact moved;
+/// - at close, each fusion's CONSUMED layers must be exactly one `Outer` and one
+/// `Inner`. The layer is deliberately **not** checked at consumption: the
+///   seat has no authority over it independent of the edge itself, so a
+///   per-consumption comparison would read the edge's layer and compare it with
+///   itself. What is real is the whole-artifact statement that both ruled layers
+///   of each fusion were actually realized rather than merely planned, and that
+///   is asserted where that population exists;
+/// - a planned member **never consumed** is refused at close -- the case that
+///   reads as success because nothing happened;
+/// - a consumed identity that **also reached the ordinary ledger** in any role
+///   is refused, which is the direct-plus-composed double realization.
+pub(super) struct FusionCompositionLedger {
+    /// `F` — the planned fusion-local realizations, keyed by exact identity.
+    ///
+    /// The WHOLE composed edge is retained, not the fields a consumption
+    /// happens to check. A consumption is validated against the planner's own
+    /// record; re-deriving any of owner, layer or target here would make this
+    /// ledger a second authority over the composition it is supposed to audit.
+    planned: BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
+    /// `None` until consumed; then the emission owner that consumed it.
+    consumed: BTreeMap<ContinuationCallIdentity, Option<ContinuationEmissionOwner>>,
+    /// The specialization targets the DECLARATION pass actually omitted, read
+    /// from that pass's own output rather than re-derived.
+    ///
+    /// Not derived from `planned` at close. Deriving it would compare the
+    /// planner's `F_t` with itself and pass for a pass that omitted nothing --
+    /// which is precisely the failure this range equality exists to catch.
+    declaration_omitted: BTreeSet<ContinuationSpecializationId>,
+    /// The specialization targets the DEFINITION pass actually omitted.
+    ///
+    /// **Kept separate from the declaration set, and both are closed against
+    /// `F_t`.** The two passes fail differently: a declaration that does not
+    /// omit leaves an undefined phantom symbol, and a definition that does not
+    /// omit emits a standalone `Function` for a body already lowered locally --
+    /// a second realization of one edge. One merged set would be satisfied by
+    /// either pass alone.
+    definition_omitted: BTreeSet<ContinuationSpecializationId>,
+}
+
+impl FusionCompositionLedger {
+    /// Open over the planner's composed-edge relation, once per artifact.
+    ///
+    /// The declaration omission is seeded from the BUNDLE -- the declaration
+    /// pass's own output -- rather than from the plan. That is the whole
+    /// point: a `declare_unit_bundle` that stopped filtering would leave this
+    /// set empty and the closeout would say so, where a plan-derived set would
+    /// agree with the plan no matter what was declared.
+    pub(super) fn open(
+        plan: &StaticTransitionPlan<'_>,
+        bundle: &UnitBundle,
+    ) -> Result<Self, CraneliftBackendError> {
+        let planned = plan.fusion_composed_edges().clone();
+        let consumed = planned.keys().cloned().map(|identity| (identity, None)).collect();
+        let declaration_omitted = plan
+            .continuation_units()?
+            .iter()
+            .map(|unit| unit.id())
+            .filter(|id| bundle.continuation(*id).is_none())
+            .collect();
+        Ok(Self {
+            planned,
+            consumed,
+            declaration_omitted,
+            definition_omitted: BTreeSet::new(),
+        })
+    }
+
+    /// Record that the DEFINITION pass omitted this specialization's body.
+    ///
+    /// Recorded where the omission happens, in the loop that would otherwise
+    /// have emitted the `Function`, so the evidence is the pass's own decision
+    /// rather than a statement about it made elsewhere.
+    pub(super) fn record_definition_omitted(&mut self, target: ContinuationSpecializationId) {
+        self.definition_omitted.insert(target);
+    }
+
+    /// Consume ONE fusion-local composition, at its exact call edge.
+    ///
+    /// Each fact is checked against the planned edge's own record with its own
+    /// refusal, so a red names the fact that moved rather than reporting a
+    /// generic mismatch.
+    ///
+    /// `target` is the CALL IDENTITY's own recorded target, supplied by the
+    /// seat, not the edge's. The two are separate planner facts about one call,
+    /// so this is a real comparison; passing the edge's own target back in would
+    /// be an identity.
+    pub(super) fn consume(
+        &mut self,
+        identity: &ContinuationCallIdentity,
+        defining: ContinuationEmissionOwner,
+        target: ContinuationSpecializationId,
+    ) -> Result<(StaticContinuationFusionId, FusionCompositionLayer), CraneliftBackendError> {
+        let edge = self.planned.get(identity).ok_or_else(|| {
+            backend_module(
+                "a fusion-local composition was consumed for an identity the planner never \
+                 composed; a composition seat reached for an unplanned identity is a lowering \
+                 that decided for itself which edges are local"
+                    .to_string(),
+            )
+        })?;
+        if edge.emission_owner() != defining {
+            return Err(backend_module(format!(
+                "a fusion-local composition planned for emission owner {:?} was consumed while \
+                 defining {defining:?}; the composition is lowered into the consumer's own \
+                 function and a foreign one would place the producer's body in a frame that \
+                 never held its operands",
+                edge.emission_owner()
+            )));
+        }
+        if edge.target() != target {
+            return Err(backend_module(format!(
+                "a fusion-local composition planned for target {:?} was consumed against {target:?}; \
+                 the composed edge names the exact specialization whose selected body is lowered \
+                 locally, and another one is another body",
+                edge.target()
+            )));
+        }
+        let fusion = edge.fusion();
+        let layer = edge.layer();
+        let consumed = self.consumed.get_mut(identity).ok_or_else(|| {
+            backend_module(
+                "a fusion-local composition has a planned edge but no consumption slot; the two \
+                 maps are built from one population and disagreeing means one was rebuilt"
+                    .to_string(),
+            )
+        })?;
+        if let Some(previous) = consumed {
+            return Err(backend_module(format!(
+                "a fusion-local composition was consumed twice, first by {previous:?}; one \
+                 composed call edge is realized once, and a second consumption is a replay \
+                 whether it happens in this function or another"
+            )));
+        }
+        *consumed = Some(defining);
+        Ok((fusion, layer))
+    }
+
+    /// The closeout, over three populations.
+    ///
+    /// Every comparison is between SETS. Two populations of the same size can
+    /// be the wrong two, and a count would pass for a pass that consumed one
+    /// composition and omitted a different target.
+    pub(super) fn close(
+        self,
+        ordinary_touched: &BTreeSet<ContinuationCallIdentity>,
+    ) -> Result<(), CraneliftBackendError> {
+        let planned = self.planned.keys().cloned().collect::<BTreeSet<_>>();
+        let consumed = self
+            .consumed
+            .iter()
+            .filter(|(_, consumed)| consumed.is_some())
+            .map(|(identity, _)| identity.clone())
+            .collect::<BTreeSet<_>>();
+        if consumed != planned {
+            let missing = planned.difference(&consumed).count();
+            let extra = consumed.difference(&planned).count();
+            return Err(backend_module(format!(
+                "the consumed fusion-local composition population is not the planned one: \
+                 {missing} planned compositions were never realized, and {extra} realizations \
+                 name identities that were never planned. An unrealized composition is the case \
+                 that reads as success because nothing was emitted for it"
+            )));
+        }
+        // `F_t` — the target range, against what the passes actually omitted.
+        let planned_targets = self
+            .planned
+            .values()
+            .map(FusionComposedEdge::target)
+            .collect::<BTreeSet<_>>();
+        for (pass, omitted) in [
+            ("declaration", &self.declaration_omitted),
+            ("definition", &self.definition_omitted),
+        ] {
+            if *omitted != planned_targets {
+                let missing = planned_targets.difference(omitted).count();
+                let extra = omitted.difference(&planned_targets).count();
+                return Err(backend_module(format!(
+                    "the {pass} pass's omitted continuation target population is not the \
+                     fusion-local range F_t: {missing} fusion-local targets were still {pass}ed, \
+                     and {extra} ordinary targets were omitted. A fusion-local target that keeps \
+                     its standalone Function is a second realization of one edge"
+                )));
+            }
+        }
+        // BOTH RULED LAYERS OF EACH FUSION WERE ACTUALLY REALIZED.
+        //
+        // The planner's preflight already requires each body-owning fusion to
+        // CARRY exactly one `Outer` and one `Inner` composed edge. This is the
+        // consumption-side dual and is a different statement: it says both of
+        // them were lowered locally. Over `consumed`, never over `planned` --
+        // over `planned` it would re-assert the preflight law against the same
+        // records and would pass for an artifact that realized neither.
+        let mut consumed_layers: BTreeMap<
+            StaticContinuationFusionId,
+            BTreeSet<FusionCompositionLayer>,
+        > = BTreeMap::new();
+        for identity in &consumed {
+            let edge = self.planned.get(identity).ok_or_else(|| {
+                backend_module(
+                    "a consumed fusion-local composition has no planned edge at close; \
+                     consumption cannot record an identity the planned map does not hold"
+                        .to_string(),
+                )
+            })?;
+            if !consumed_layers.entry(edge.fusion()).or_default().insert(edge.layer()) {
+                return Err(backend_module(format!(
+                    "static continuation fusion {:?} realized its {:?} composition layer twice; \
+                     one fusion has one composed edge per layer",
+                    edge.fusion(),
+                    edge.layer()
+                )));
+            }
+        }
+        for (fusion, layers) in &consumed_layers {
+            if *layers
+                != BTreeSet::from([FusionCompositionLayer::Outer, FusionCompositionLayer::Inner])
+            {
+                return Err(backend_module(format!(
+                    "static continuation fusion {fusion:?} did not realize both ruled composition \
+                     layers locally; it consumed {layers:?}, and a composition missing one layer \
+                     is half a fusion with the other half still expecting a call that was omitted"
+                )));
+            }
+        }
+        // THE DISJOINTNESS, against what the ordinary ledger RECORDED.
+        //
+        // Not against `planned`, which the planner's own partition already
+        // settles. What this catches is an identity that was composed locally
+        // AND reached an ordinary role -- claimed, declared, directly emitted or
+        // composed-discharged -- which is one call edge realized twice.
+        let both = consumed.intersection(ordinary_touched).count();
+        if both > 0 {
+            return Err(backend_module(format!(
+                "{both} continuation call identities were realized both as a fusion-local \
+                 composition and in an ordinary role; one call edge is realized exactly once, \
+                 and an identity in both ledgers has been emitted twice under one obligation"
+            )));
+        }
+        Ok(())
+    }
 }
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2 — open the ONE cross-pass causal
@@ -4520,6 +5111,15 @@ pub(super) fn open_continuation_claim_ledger(
         ));
     }
     compiler.continuation_claims = Some(ContinuationClaimLedger::open(
+        &compiler.static_transition_plan,
+        bundle,
+    )?);
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local sibling opens on
+    // the SAME boundary and for the same reason: one artifact has exactly one
+    // of it, and every composition seat consumes into it. Sharing the lifetime
+    // is what makes the two ledgers siblings over disjoint domains rather than
+    // one ledger with a second kind of member.
+    compiler.fusion_compositions = Some(FusionCompositionLedger::open(
         &compiler.static_transition_plan,
         bundle,
     )?);
@@ -4575,6 +5175,26 @@ pub(super) fn close_continuation_claim_ledger(
     // Totality and disjointness FIRST, then the derived subset, then the
     // unchanged equality over it.
     let call_obligations = candidates.close()?;
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local sibling closes
+    // BEFORE the ordinary ledger is consumed, because its disjointness clause
+    // reads what that ledger RECORDED and `close` takes it by value.
+    //
+    // The order also decides which red a reader sees first, and this is the
+    // useful one: a fusion-local composition that was never realized, or one
+    // realized twice, explains an ordinary population that then looks short. The
+    // reverse order reports the symptom and consumes the evidence.
+    let ordinary_touched = compiler
+        .continuation_claims
+        .as_ref()
+        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?
+        .touched_identities();
+    compiler
+        .fusion_compositions
+        .take()
+        .ok_or_else(|| {
+            backend_module("the fusion-local composition ledger went missing".to_string())
+        })?
+        .close(&ordinary_touched)?;
     compiler
         .continuation_claims
         .take()
