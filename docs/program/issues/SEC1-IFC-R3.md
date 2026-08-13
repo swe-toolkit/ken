@@ -122,7 +122,11 @@ origin: "verify-implementer authorized hard-stop on SEC1-IFC AC-R3 (2026-07-27),
 > ⭐ **It is escalated to the operator and it gates the entire by-proof half
 > of `Sec1`.**
 >
-> ### ⛔ And the Z3-free widening is VACUOUS — do not frame it
+> ### And the Z3-free widening is VACUOUS — do not frame it
+>
+> **SUPERSEDED 2026-08-13. The conclusion "do not frame it" STANDS. The reason
+> below is wrong, and it was measured wrong rather than merely incomplete —
+> read the correction under it before citing any of this.**
 >
 > ⚠ Recorded so nobody re-derives it as available work. `attempt_d` hardcodes
 > `Term::IntLit` where the **kernel is already generic**: `obs.rs:84` gates on
@@ -134,6 +138,37 @@ origin: "verify-implementer authorized hard-stop on SEC1-IFC AC-R3 (2026-07-27),
 > ⇒ Generalizing the prover off `IntLit` has **no second registered type to
 > generalize to**. It would change no observable behavior and produce a green
 > WP over nothing. ⛔ Not work.
+
+### The correction, measured by `SEC1-R3-MINIMAL-ROUTE` at `69b57bce`
+
+**The outcome above is right. Its reason is not, and a right answer resting on
+a false reason survives until someone tests the reason.**
+
+"No second registered type to generalize to" is false. There are three
+candidates, and **they are refused for three different causes** — which the
+single word "vacuous" collapses:
+
+| candidate | why no certificate | kind of reason |
+|---|---|---|
+| `Char` | its carrier lowers to `Int` **definitionally**, so it needs no second certificate | structural |
+| `eq_float` / `eq_float32` | their specified IEEE semantics are **explicitly non-proof equality**: `NaN ≠ NaN` breaks the reflexivity propositional equality requires, and IEEE equates `+0` and `-0` while substituting one changes the sign of a later division | contract |
+| a future distinct opaque primitive | **possible, and it grows the trusted base** | cost |
+
+**The third row is the one that matters and it is an operator decision.**
+`declare_deceq_certificate` (`crates/ken-kernel/src/check.rs:1253`) calls
+`declare_postulate` **twice** before registering the pair — *"decidable
+equality sound"* at `:1302` and *"decidable equality complete"* at `:1308`.
+⇒ **Each new primitive registrant admits exactly two trusted-base entries.**
+Verified by the Steward against the source, not carried from the report.
+
+Two citations in the superseded block are also stale: the sole caller is
+`numbers.rs:403`, and the second registry the old reasoning could not see is
+`decimal_char.rs:262-264`, which registers `Char` through
+`numeric_env.set_eq_entry` — a **surface dispatch** entry, not a `DecEqCert`.
+That distinction is why the one-caller count looked conclusive and was not.
+
+**Nothing here is a recommendation to register anything.** TCB growth is the
+operator's call under the Steward playbook, and it is routed as such.
 
 ## RE-DERIVED 2026-08-13 — the escalation named the wrong component
 
