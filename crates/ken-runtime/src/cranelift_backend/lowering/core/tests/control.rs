@@ -3086,7 +3086,18 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// **testing** that it does. The route is the `ken-cli` integration harness that
 /// `px7l_checked_host_recursive_bind` and `px8l_recursive_decl_native` already
 /// establish — real Ken source through the ordinary front end — not another
-/// `D2jCause`.
+/// `D2jCause`. Its entry point is
+/// `ken_cli::build_native_program(source, SourceFormat::Ken, name, &dir)` on an
+/// inline source string, so the witness is authored as Ken and the checked form
+/// is whatever the front end makes of it.
+///
+/// **The shape that source has to reach** is a computational match over a
+/// datatype whose recursive field transports a static worker, with the case body
+/// APPLYING that field rather than the hypothesis. Whether Ken's surface admits
+/// such a program at all is the open question, and if it does not, that is the
+/// result to report — the fixture must not be weakened to make this control
+/// runnable, because a control armed against a shape the checker never emits is
+/// worth less than an honest gap.
 ///
 /// **What the same probe DID establish**, on both roots, read directly out of
 /// the recorded run: `[(0, Some(TransportId(0))), (1, Some(TransportId(0)))]` —
