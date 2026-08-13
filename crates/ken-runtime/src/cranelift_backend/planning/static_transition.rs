@@ -2678,6 +2678,19 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// a standalone unit. Empty until `install_fusion_owned_bodies` moves a
     /// fully validated scratch map in; there is deliberately no other writer.
     fusion_owned_bodies: BTreeMap<StaticOriginId, FusionOwnedBody>,
+    /// **`D3` — the exact call edges an installed fusion COMPOSES, one record
+    /// per edge, keyed by the call's whole opaque identity.**
+    ///
+    /// Ruled at `evt_1t3f4e8100rb5`. A composed edge lowers its target's
+    /// selected body in the caller and hands the result straight to the
+    /// caller's already-active computational eliminator; it emits no call and
+    /// returns no SSA word.
+    ///
+    /// **Keyed by identity, never by target, body, origin, owner or spelling.**
+    /// The injective call-target law makes each target's liveness the outcome of
+    /// its own unique identity, so this map is exactly "which edges compose" and
+    /// nothing has to scan an incoming population to find out.
+    fusion_composed_calls: BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
     /// Whether body ownership has been installed. **Not derivable from the map's
     /// emptiness:** a plan with no fused regions installs an empty map, and a
     /// second install against it must still refuse.
@@ -7848,6 +7861,51 @@ fn continuation_keys_equal_under_mutation(
     }
 }
 
+/// **`D3` — one exact call edge a fusion composes, with the coordinates the
+/// emitter needs and no others.**
+///
+/// Ruled at `evt_1t3f4e8100rb5`. Every member is copied from a relation that
+/// already resolved it; nothing here is re-derived at the emitter, and nothing
+/// is a coincidence key.
+///
+/// `layer` records WHICH of the two ruled checked bindings selected this edge.
+/// It is provenance, not a selector: the map is keyed by call identity, and two
+/// layers of one fusion are two records rather than one record with a flag.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct FusionComposedEdge {
+    fusion: StaticContinuationFusionId,
+    target: ContinuationSpecializationId,
+    emission_owner: ContinuationEmissionOwner,
+    consumer_continuation_origin: StaticOriginId,
+    producer_construct_origin: StaticOriginId,
+    layer: FusionCompositionLayer,
+}
+
+/// Which ruled checked binding selected a composed edge.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum FusionCompositionLayer {
+    /// Selected by the fusion key's checked CONSUMER binding.
+    Outer,
+    /// Selected by the fusion key's checked PRODUCER-ARGUMENT binding.
+    Inner,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl FusionComposedEdge {
+    pub(in crate::cranelift_backend) fn fusion(&self) -> StaticContinuationFusionId {
+        self.fusion
+    }
+    pub(in crate::cranelift_backend) fn target(&self) -> ContinuationSpecializationId {
+        self.target
+    }
+    pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
+        self.emission_owner
+    }
+    pub(in crate::cranelift_backend) fn layer(&self) -> FusionCompositionLayer {
+        self.layer
+    }
+}
+
 fn intern_specialization(
     interned: &mut BTreeMap<ContinuationSpecializationKey, ContinuationSpecializationId>,
     units: &mut Vec<PlannedContinuationSpecialization>,
@@ -11044,6 +11102,7 @@ impl<'src> Planner<'src> {
                 // Empty by construction: body ownership is installed only from
                 // validated claims, which cannot exist before the plan does.
                 fusion_owned_bodies: BTreeMap::new(),
+                fusion_composed_calls: BTreeMap::new(),
                 fusion_bodies_installed: false,
             },
             store_interner: BTreeMap::new(),
@@ -14024,8 +14083,128 @@ impl<'src> StaticTransitionPlan<'src> {
         // No caller convention can exclude that, so it is excluded here by
         // ordering: the check below is the last thing that can fail, and the two
         // commits after it are infallible.
+        // ---- `D3` — MINT THE COMPOSED EDGES. Ruled `evt_1t3f4e8100rb5`.
+        //
+        // Two layers per fusion, each selected by one of the key's checked IH
+        // bindings and by nothing else. The bindings are the relation the
+        // grounding turn established: the consumer binding names the outer
+        // frame, the producer-argument binding names the inner one, and they
+        // differ precisely BECAUSE they are the two composition layers.
+        //
+        // Every refusal is above the transaction line, and each names a
+        // distinct way the join can be wrong rather than collapsing them into
+        // one "could not resolve".
+        let mut composed: BTreeMap<ContinuationCallIdentity, FusionComposedEdge> = BTreeMap::new();
+        let specializations = self.continuation_units()?;
+        let specialization_calls = self.continuation_calls()?;
+        for view in self.continuation_fusions()? {
+            let fusion = view.id();
+            if !owned.contains(&fusion) {
+                continue;
+            }
+            let key = view.key();
+            for (layer, frame, owner) in [
+                (
+                    FusionCompositionLayer::Outer,
+                    key.consumer_binding.frame_origin,
+                    key.consumer_owner,
+                ),
+                (
+                    FusionCompositionLayer::Inner,
+                    key.producer_argument_binding.frame_origin,
+                    key.producer_owner,
+                ),
+            ] {
+                let mut matching = specializations
+                    .iter()
+                    .filter(|unit| {
+                        unit.continuation_origin() == frame && unit.consumer_owner() == owner
+                    });
+                let Some(unit) = matching.next() else {
+                    return Err(planner_error(
+                        "a static continuation fusion's checked binding names a continuation \
+                         frame that no generated specialization eliminates, so the edge it would \
+                         compose does not exist",
+                    ));
+                };
+                if matching.next().is_some() {
+                    return Err(planner_error(
+                        "two generated continuation specializations answer one static \
+                         continuation fusion's checked binding frame and owner, so which edge it \
+                         composes is ambiguous",
+                    ));
+                }
+
+                // The target's UNIQUE edge. Uniqueness is the injective
+                // call-target law above, so this reads a fact the closure
+                // validator already refused any violation of -- it does not
+                // re-derive it.
+                let mut edges = specialization_calls
+                    .iter()
+                    .filter(|call| call.target() == unit.id());
+                let Some(call) = edges.next() else {
+                    return Err(planner_error(
+                        "a static continuation fusion composes a specialization no exact call \
+                         reaches, so there is no edge to compose at",
+                    ));
+                };
+                if edges.next().is_some() {
+                    return Err(planner_error(
+                        "a composed continuation specialization has more than one exact planned \
+                         edge, which the injective call-target law forbids",
+                    ));
+                }
+                if call.emission_owner() != ContinuationEmissionOwner::Predeclared(owner) {
+                    return Err(planner_error(
+                        "a composed continuation edge is emitted by an owner other than the one \
+                         the fusion's checked binding names, so composing it would lower a \
+                         selected body in a function that does not hold its operands",
+                    ));
+                }
+                let identity = self
+                    .continuation_call_binding_for(
+                        call.producer_construct_origin(),
+                        call.continuation_origin(),
+                        call.producer_alternative(),
+                        call.recursive_position(),
+                    )?
+                    .ok_or_else(|| {
+                        planner_error(
+                            "a composed continuation edge has no binding under its own four-field \
+                             selector, so the identity the composition is keyed by cannot be named",
+                        )
+                    })?;
+                if identity.target() != unit.id() {
+                    return Err(planner_error(
+                        "a composed continuation edge's re-resolved identity names a different \
+                         specialization than the edge it was read from",
+                    ));
+                }
+                if composed
+                    .insert(
+                        identity,
+                        FusionComposedEdge {
+                            fusion,
+                            target: unit.id(),
+                            emission_owner: call.emission_owner(),
+                            consumer_continuation_origin: frame,
+                            producer_construct_origin: call.producer_construct_origin(),
+                            layer,
+                        },
+                    )
+                    .is_some()
+                {
+                    return Err(planner_error(
+                        "one exact continuation call identity is composed twice, so which fused \
+                         region owns the edge is undetermined",
+                    ));
+                }
+            }
+        }
+
         ledger.check_body_owned(&owned)?;
         self.fusion_owned_bodies = scratch;
+        self.fusion_composed_calls = composed;
         self.fusion_bodies_installed = true;
         ledger.commit_body_owned(owned);
         Ok(())
@@ -14055,6 +14234,26 @@ impl<'src> StaticTransitionPlan<'src> {
             // axis, exactly as `unit.body_occurrence()` does.
             .filter(|unit| !dispositions.contains_key(&unit.body_occurrence()))
             .collect())
+    }
+
+    /// **`D3` — the composed edge for this exact call identity, if any.**
+    ///
+    /// **Probed by WHOLE identity.** An identity with no record takes the
+    /// existing `DirectCall` path unchanged; there is no target, body, owner or
+    /// origin question asked here, and no incoming-domain scan anywhere.
+    pub(in crate::cranelift_backend) fn fusion_composed_edge(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<&FusionComposedEdge> {
+        self.fusion_composed_calls.get(identity)
+    }
+
+    /// Every composed edge the planner minted, for the transport-instance
+    /// closeout to check consumption against.
+    pub(in crate::cranelift_backend) fn fusion_composed_edges(
+        &self,
+    ) -> &BTreeMap<ContinuationCallIdentity, FusionComposedEdge> {
+        &self.fusion_composed_calls
     }
 
     /// **`D5a` checkpoint 1 — the call edges that survive the retarget.**
@@ -18790,6 +18989,107 @@ mod tests {
              selections are disjoint, and each target's complete incoming call domain is a \
              singleton -- so the composition population derives from existing relations, and the \
              composed-vs-residual partition is measured DEGENERATE on this family"
+        );
+    }
+
+    /// **`D3` — the fusion mints exactly TWO composed edges, one per ruled
+    /// checked binding, keyed by whole call identity.**
+    ///
+    /// Ruled at `evt_1t3f4e8100rb5`. The outer layer is selected by the key's
+    /// checked consumer binding, the inner by its checked producer-argument
+    /// binding, each conjoined with the owner that binding belongs to. Every
+    /// other edge in the compile is unrecorded and keeps the byte-identical
+    /// `DirectCall` path.
+    ///
+    /// **MEASURED** on both witnesses: two records, distinct identities,
+    /// distinct targets, one `Outer` and one `Inner`, and the emission owner of
+    /// each is the `Predeclared` owner its binding names -- `Exact` outer at
+    /// frame 10 under unit 3 and inner at frame 25 under unit 2; `ReHomed`
+    /// outer at 6 under unit 1 and inner at 21 under unit 3.
+    /// **CLAIMED:** the composition population is exactly the two ruled layers,
+    /// so no third edge can be composed and neither layer can be composed twice.
+    /// **THE GAP:** this pins the PLANNER relation. No edge is consumed here --
+    /// the funnel, the local selected-body lowering, `ComposedCall` and the
+    /// transport-instance closeout are owed, and until they land these records
+    /// are minted and unread.
+    #[test]
+    fn d3_the_fusion_mints_exactly_two_composed_edges_one_per_checked_binding() {
+        let mut rows = Vec::new();
+        for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+            let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2J_DECLARATION, &declaration);
+            let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let resolved =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("the witness resolves a plane");
+            let mut plane = StaticContinuationFusionPlan::default();
+            for key in resolved.installed_keys().to_vec() {
+                plane.intern(key).expect("interns");
+            }
+            plan.install_static_continuation_fusions(plane)
+                .expect("installs");
+            let mut claims = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+            plan.install_fusion_owned_bodies(&mut claims)
+                .expect("ownership installs");
+
+            let edges = plan.fusion_composed_edges();
+            let mut layers = edges
+                .values()
+                .map(|edge| (edge.layer(), edge.target(), edge.emission_owner()))
+                .collect::<Vec<_>>();
+            layers.sort_by_key(|(layer, _, _)| match layer {
+                FusionCompositionLayer::Outer => 0,
+                FusionCompositionLayer::Inner => 1,
+            });
+            let distinct_targets = edges
+                .values()
+                .map(|edge| edge.target())
+                .collect::<BTreeSet<_>>()
+                .len();
+            rows.push((cause, edges.len(), distinct_targets, layers));
+        }
+
+        assert_eq!(
+            rows,
+            vec![
+                (
+                    D2jCause::Exact,
+                    2,
+                    2,
+                    vec![
+                        (
+                            FusionCompositionLayer::Outer,
+                            ContinuationSpecializationId(1),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(3)),
+                        ),
+                        (
+                            FusionCompositionLayer::Inner,
+                            ContinuationSpecializationId(0),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(2)),
+                        ),
+                    ],
+                ),
+                (
+                    D2jCause::ReHomed,
+                    2,
+                    2,
+                    vec![
+                        (
+                            FusionCompositionLayer::Outer,
+                            ContinuationSpecializationId(1),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(1)),
+                        ),
+                        (
+                            FusionCompositionLayer::Inner,
+                            ContinuationSpecializationId(0),
+                            ContinuationEmissionOwner::Predeclared(PredeclaredFunctionId(3)),
+                        ),
+                    ],
+                ),
+            ],
+            "exactly two composed edges per fusion, one per ruled checked binding, on DISTINCT \
+             targets, each emitted by the owner its own binding names"
         );
     }
 
