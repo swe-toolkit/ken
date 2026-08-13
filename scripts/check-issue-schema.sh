@@ -13,7 +13,18 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ISSUES_DIR="${1:-$REPO_ROOT/docs/program/issues}"
+
+# --strict promotes the pass-3 frontier warnings to failures. See pass 3.
+strict=0
+args=()
+for a in "$@"; do
+  case "$a" in
+    --strict) strict=1 ;;
+    *) args+=("$a") ;;
+  esac
+done
+
+ISSUES_DIR="${args[0]:-$REPO_ROOT/docs/program/issues}"
 
 REQUIRED_FIELDS=(id title status owner size gate depends_on blocks github origin)
 VALID_STATUSES=(draft ready active in-review merged closed)
@@ -83,6 +94,7 @@ fi
 
 all_ids=()
 declare -A id_to_file
+declare -A id_to_status
 
 for f in "${files[@]}"; do
   base="$(basename "$f" .md)"
@@ -129,6 +141,7 @@ for f in "${files[@]}"; do
       file_ok=0
     else
       id_to_file["$id_val"]="$f"
+      id_to_status["$id_val"]="$status_val"
       all_ids+=("$id_val")
     fi
   fi
@@ -161,6 +174,58 @@ for f in "${files[@]}"; do
       fi
     done < <(list_items "$raw")
   done
+done
+
+# --- pass 3: a `ready` node's dependencies must actually have landed ----
+#
+# A node at `ready` is on the frontier: any team may pull it and start. If one
+# of its `depends_on` has not landed, that team spends a turn discovering the
+# node's premise is false -- which is exactly what happened to Runtime on
+# RT-DESCENT-RETIRE (2026-08-13), whose D1 census found 89 intact residual rows
+# because RT-RECURSOR-TRANSPORT was still `ready`. `status` is hand-maintained
+# and `depends_on` is hand-maintained, so nothing but this check keeps them
+# consistent.
+#
+# `merged` and `closed` both satisfy a dependency: closed means
+# resolved-without-landing, so there is nothing left to wait for.
+#
+# `active` and `in-review` are softer than `draft`/`ready`: the accepted-partial
+# policy means an in-flight node may already have landed the part a successor
+# needs, and only a human reading both frames can tell.
+#
+# NON-BLOCKING BY DEFAULT, AND THAT IS DELIBERATE. This job gates every PR in
+# the repo. A `ready` node with an unlanded dependency is a Steward bookkeeping
+# error, and blocking every team's merges on it costs far more than the turn it
+# saves -- the repo has no users and uptime is not what we are protecting.
+# Pass `--strict` to make it exit non-zero: the Steward's release procedure
+# (playbook section 4e, which already re-reads successor status before every
+# release) runs it that way, so the hard stop lands on the seat that owns the
+# field rather than on everyone else.
+
+for f in "${files[@]}"; do
+  fm="$(extract_frontmatter "$f")"
+  [ -z "$fm" ] && continue
+
+  self_status="$(strip_quotes "$(get_field "$fm" status)")"
+  [ "$self_status" = "ready" ] || continue
+
+  raw="$(get_field "$fm" depends_on)"
+  [ -z "$raw" ] && continue
+
+  while IFS= read -r ref; do
+    [ -z "$ref" ] && continue
+    dep_status="${id_to_status[$ref]:-}"
+    case "$dep_status" in
+      merged|closed|"") ;;
+      active|in-review)
+        echo "WARN $f: ready, but depends_on '$ref' is '$dep_status' -- confirm the accepted partial it needs has landed" >&2
+        ;;
+      *)
+        echo "WARN $f: ready, but depends_on '$ref' is '$dep_status' (nothing has landed) -- a team pulling this node will find its premise false" >&2
+        [ "$strict" -eq 1 ] && fail=1
+        ;;
+    esac
+  done < <(list_items "$raw")
 done
 
 if [ "$fail" -ne 0 ]; then

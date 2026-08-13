@@ -244,6 +244,24 @@ kick.** Leaders do not compact their members; compaction is yours.
 
 Run the successor check in `../steward.md`, section 4, as the last step.
 
+**First run `scripts/check-issue-schema.sh --strict`.** It fails when a node at
+`status: ready` has a `depends_on` still at `draft` or `ready` — nothing has
+landed, so any team pulling it finds the premise false. It warns, without
+failing, when a dependency is `active` or `in-review`; that case is legitimate
+under the accepted-partial policy, and only reading both frames settles it.
+
+**The tell that you need this:** you flipped a node `ready` because its frame
+was finished. A written frame and a landed dependency are different facts, and
+the frontmatter records only the first.
+
+Runtime lost a turn to this on 2026-08-13: it pulled `RT-DESCENT-RETIRE`, whose
+`D1` census found 89 intact residual rows because `RT-RECURSOR-TRANSPORT` was
+itself still `ready`. Two more nodes carried the same defect, one of them
+saying *"framed and not released"* in its own body while sitting at `ready`.
+
+CI runs the script without `--strict` on purpose: this is Steward bookkeeping,
+and a slip here must not block every team's merges.
+
 ## A kickoff is a live signal until you explicitly retract it
 
 Learned twice. If you kick a WP off and then hold, re-scope, or re-route it,
