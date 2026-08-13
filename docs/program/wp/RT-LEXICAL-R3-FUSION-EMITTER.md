@@ -542,10 +542,125 @@ nothing you inherit from `#6d`.**
 > Architect's — the incompleteness of a work package is immaterial to whether the
 > code is on `main`.**
 
+> ### THE POST-FIELD DIRECT CALL IS WITHDRAWN. THE FUSED CALL IS EMITTED AT
+> ### THE CHECKED CONSUMING-CALL SEAM. Steward, 2026-08-13, folding Architect
+> ### `evt_5edhqyyhw4585` into operative scope. **THIS IS THE NEWEST BOX. It
+> ### CORRECTS the box below it — that box's SEAT and CLOSURE stand, its
+> ### DIRECT-CALL ACTION and its parameter assembly do NOT.**
+>
+> **Runtime built the ruled dispatch, and measurement refuted its parameter
+> half on both roots. The Architect took the refutation rather than discounting
+> it — the seventh premise on this seam to fall to a probe.** Continue from
+> exact `3a97acee0f396d2b8605dfb8042705fc859441df`.
+>
+> #### What was wrong, stated as two axes
+>
+> The prior ruling assembled the fused call from *"the already-lowered recursive
+> producer field parameter run."* Measured, both armed roots: **that run is
+> `[Spec(Closure)]` — the producer's compiler-only worker, which has no durable
+> lane and can never be an ABI operand.** The producer constructor (39 Exact,
+> 35 ReHomed) has **exactly one field, and it is the recursive one**, so there
+> was no other candidate operand at that seat and no planner relation named one.
+> Runtime refused rather than substituting, which was correct.
+>
+> ⇒ **The field run supplies the local WORKER BINDING. The checked consuming
+> call supplies the fused INVOCATION PARAMETERS. These are different axes**, and
+> the earlier phrase conflated them. **This is the same axis already corrected
+> once at `evt_6kn9ckdnbf0ph`**, where a falsifier assuming a compiler-only
+> worker must appear in a composed call's declared operand run was withdrawn.
+> Do not re-derive it a third time.
+>
+> #### The literal answer
+>
+> The fusion target's ordinary parameter is **the original checked producer
+> invocation's ordered explicit argument run**. On both governed roots that run
+> has **length one**: the sole argument of the claim's checked consuming `Call`
+> — **call 17 on Exact, call 13 on ReHomed** — the source `Unit` argument. The
+> recursive constructor field is the callee/worker binding; it is not an argument
+> and **must never cross the ABI**.
+>
+> **No existing planner record names that projection**, and the authorities stop
+> exactly one fact short: `FusionRegionClaim` names the exact `consuming_call`,
+> its callee binding, producer body, redirect and fusion; the producer/fusion ABI
+> descriptor names the number and layout of ordinary parameter slots; and
+> `claim.inputs()` names **only** the continuation-capture suffix. Neither the
+> synthetic static-body edge seat nor `FusionOwnedOuterRealization` maps
+> parameter ordinal 0 to a source operand.
+>
+> #### The planner closure to add
+>
+> Extend the already move-only region claim with **one ordered, planner-authored
+> invocation-parameter projection**, derived only *after* the fusion key has
+> selected its exact consuming `Call` and checked callee binding. For each fused
+> `Parameter` ABI slot, record the corresponding positional argument child of
+> that exact call **in source order**. Validate before issuing the claim that:
+> (1) child 0 is the claim's `consuming_callee` and its checked binding resolves
+> to the claim's producer body; (2) the ordered argument count equals the
+> producer descriptor and fused header parameter count; (3) every recorded
+> argument origin is an actual positional child of that same call; and (4) the
+> producer-capture run is **empty** on this admitted population — a future
+> non-empty producer-capture population is **a new ABI disposition and refuses
+> here**, rather than being folded into parameters or into `claim.inputs()`.
+>
+> **This projection is closure carried by `FusionRegionClaim` — NOT a new fusion
+> identity member and NOT a second candidate relation.** Lowering receives a
+> read-only `claim.parameters()`-style view; it does **not** call `child_origin`,
+> scan source, or rebuild the list.
+>
+> #### The emitter correction
+>
+> **The post-field `R` fork becomes NON-CALLING.** It may select the exact `R`
+> identity and claim, but it must keep the compiler-only worker in the local
+> environment and lower that `R` target's exact selected case body **locally** —
+> no `R` specialization call, no boundary conversion. That caller-side descent is
+> the entry path to the already-planned consuming call; **it is not permission to
+> define or call the omitted `R` specialization target.**
+>
+> At the exact static-worker call seam, after that call's explicit arguments have
+> been lowered in normal source order and **before any affine mutation**: select
+> by `claim.consuming_call == static_origin`, then close on the checked
+> callee/worker body, consumer/emission owner, fusion, redirect target and
+> producer body; require the visited argument origins and ordered operands to
+> equal the claim's parameter projection **exactly**; require every ordinary
+> operand to satisfy the fused ABI slot it fills; append `claim.inputs()` as the
+> **distinct** checked capture suffix in its recorded order; and call the
+> already-declared fusion target through the normal descriptor-driven ABI.
+>
+> **The definition-local fusion self edge remains NON-CONSUMING.** Only the
+> external call emitted in the claim's consumer owner consumes the claim, and
+> only after the call is accepted. Failure leaves the claim outstanding and emits
+> no partial settlement.
+>
+> #### Acceptance — the corrected armed chain
+>
+> Armed Exact and ReHomed must each show: one `R` local selected-body descent;
+> the exact consuming call reached **once** in the consumer owner; parameter
+> projection length 1 with the singleton ordinary operand coming **from that
+> call's argument, never from field 29/25 or construct 39/35**; Exact's two
+> checked captures appended in order and ReHomed's zero-capture comparator; one
+> external fusion call and one post-success claim consumption; the existing
+> definition-local self edge still non-consuming; and **zero** `R` specialization
+> calls, **zero** direct post-field fusion calls, **zero** `Closure` in an ABI
+> run, **zero** ordinary-funnel entry, **zero** worker escape through
+> `ground_value`.
+>
+> **Add red controls** for a moved argument origin, a reordered/short/long
+> parameter projection, a wrong consuming call, a wrong worker body, non-empty
+> producer captures, premature consumption, and **reintroduction of the
+> post-field direct call**. If the locally lowered `R` body does not reach the
+> claim's exact consuming call with the projected run, **stop before mutation and
+> report — do not widen the source scan.**
+>
+> **The capture-half work and its controls SURVIVE. The direct-call action and
+> its false parameter assembly do NOT.** Every previously owed R3 control remains
+> owed and unshrunk. Production stays unarmed and there is no QA route until this
+> corrected chain and those controls are green.
+
 > ### THE TAKEOVER SEAT IS RULED — the pre-call outer-realization dispatch
 > ### at the `P2b → P2c` seam. Steward, 2026-08-13, folding Architect
-> ### `evt_2564nv6yqqs2q` into operative scope. **THIS IS THE NEWEST BOX AND
-> ### IT SUPERSEDES EVERY EARLIER STATEMENT ABOUT WHERE R3 TAKES OVER.**
+> ### `evt_2564nv6yqqs2q` into operative scope. **CORRECTED BY THE BOX ABOVE:
+> ### the seat and its closure checks stand; the DIRECT CALL at this seat is
+> ### WITHDRAWN and its parameter assembly was refuted by measurement.**
 >
 > **The fourth route was a missing seat, not a projection, and the measurement
 > settled it before the ruling was written.** Runtime ran a reverted chronology
