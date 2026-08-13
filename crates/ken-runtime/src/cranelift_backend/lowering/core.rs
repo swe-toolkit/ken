@@ -2278,7 +2278,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // (32 on `ReHomed`). The fused body then lowers to completion, `Ok`, and
     // the refusal above is its EXIT closeout rather than a lowering failure.
     //
-    // **⚠ THE STOP IS NOT A REGRESSION AND THE DISTINCTION IS LOAD-BEARING.**
+    // **THE STOP IS NOT A REGRESSION AND THE DISTINCTION IS LOAD-BEARING.**
     // `lower_fused_producer_through_suffix` issues the splice capability, and
     // its closeout has THREE arms: spent, outstanding, and *descent failed*, in
     // which the capability is **withdrawn and the original error propagates**.
@@ -2294,7 +2294,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // 25 / 21 — a different frame. And of the TWO planned composed edges, only
     // the `Inner` reaches a claim seat at all: the `Outer`'s producer construct
     // (39 on `Exact`, 35 on `ReHomed`) reaches **no claim seat anywhere in the
-    // armed compile**. ⛔ Do not read either fact as settling which repair is
+    // armed compile**. Do not read either fact as settling which repair is
     // owed — three readings survive and none has been probed.
     //
     // **THE PREVIOUS MEASURED STOP**, superseded and recorded so the movement is
@@ -10633,18 +10633,18 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         recursive_position: usize,
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
-        // ⭐⭐ **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local fork, and
+        // **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local fork, and
         // it is HERE, at the funnel every direct consumption seat passes
         // through.**
         //
-        // ⛔ Not at either caller. This node has now paid three times for an
+        // Not at either caller. This node has now paid three times for an
         // instrument or a settlement placed at one consumer while another
         // reached the same machinery by a different route -- the paragraph
         // below this one records the last time. A fork at the retained-frame
         // seat alone would leave the detached-result seat emitting a direct
         // call for an identity the planner composed.
         //
-        // ⛔ **Probed by WHOLE identity, and the probe is total.** An identity
+        // **Probed by WHOLE identity, and the probe is total.** An identity
         // with no composed edge takes the byte-identical direct path below;
         // nothing about its target, body, owner or origin is consulted, and
         // there is no domain scan. `F` is empty unless a fusion was installed,
@@ -10654,7 +10654,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             .fusion_composed_edge(identity)
             .is_some()
         {
-            // ⛔ Returns BEFORE the `DirectCall` settlement below. A fusion-local
+            // Returns BEFORE the `DirectCall` settlement below. A fusion-local
             // identity is not a `DirectCall`, is not a `ComposedCall`, and is
             // not in the candidate ledger's domain at all -- `O` is what that
             // ledger opens over. Settling one here would put an `F` member into
@@ -10728,20 +10728,20 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     ///
     /// Architect `evt_6kn9ckdnbf0ph` step 1: *"assemble that target
     /// specialization's ordinary envelope and ordered continuation inputs
-    /// through its existing planner projections."* ⭐ **That is not a step the
+    /// through its existing planner projections."* **That is not a step the
     /// local composition adds — it is the step the direct call already
     /// performed**, and this factoring is what makes "the same operands" a fact
     /// rather than a claim. The two realizations differ in what they DO with
     /// these runs, and in nothing about how the runs are built.
     ///
-    /// ⛔ **The two runs are returned separately and are not concatenated
+    /// **The two runs are returned separately and are not concatenated
     /// here.** A direct call wants them end to end as one operand run; a local
     /// composition consumes them at different seats, because they are the
     /// target body's `Parameter` and `Capture` runs and the body reads each from
     /// its own place. Concatenating here would force the composition to split on
     /// a length, which is a boundary neither seat owns.
     ///
-    /// ⛔ Every guard below is the direct path's own, moved unchanged: the
+    /// Every guard below is the direct path's own, moved unchanged: the
     /// selected closure's identity/arity/capture agreement, the envelope's
     /// order and provenance, the assembled cardinality against the DECLARED
     /// parameter count, the injectivity of resolved immediate slots, and both
@@ -11040,7 +11040,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         );
         // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the two runs stay SEPARATE.
         //
-        // ⛔ They used to be one vector, because the one consumer that existed
+        // They used to be one vector, because the one consumer that existed
         // concatenated them into a call's operand run. The local composition
         // consumes them at different seats -- the ordinary envelope is the
         // target body's `Parameter` run and the continuation inputs are its
@@ -11431,7 +11431,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     /// 4. emit **no** target call, result slot, `emit_result`, `ground_value`
     ///    or ABI conversion for that identity.
     ///
-    /// ⭐⭐ **What is replaced is the REALIZATION, not the source.** The
+    /// **What is replaced is the REALIZATION, not the source.** The
     /// producer's construct origin, its ownership and its body are all
     /// unchanged; what moves is where the exact continuation specialization is
     /// lowered — from a standalone `Function` reached across a result ABI, to
@@ -11440,7 +11440,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     /// identity is held to exactly the same operand and body contract as an
     /// ordinary one.
     ///
-    /// ⛔ **No result slot and no `emit_result`.** The definition pass wrote the
+    /// **No result slot and no `emit_result`.** The definition pass wrote the
     /// body's answer to its frame's `Result` offset because a callee has to;
     /// there is no frame and no callee here, and the operand is handed straight
     /// to the caller's eliminator. The inner local result may be the specialized
@@ -11450,7 +11450,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
     /// between two compiler-local steps and crosses no ABI**, which is the whole
     /// property the composition exists to obtain.
     ///
-    /// ⛔ **This does not touch the `FusionRegionClaimLedger`.** Consuming a
+    /// **This does not touch the `FusionRegionClaimLedger`.** Consuming a
     /// composition does not spend the region claim; redirect and takeover remain
     /// the sole redirect and claim-consumption seats.
     fn compose_continuation_locally(
@@ -11478,14 +11478,14 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // The affine consumption, BEFORE any operand is assembled and before a
         // single instruction is emitted.
         //
-        // ⛔ The order is the mechanism. A composition that is going to be
+        // The order is the mechanism. A composition that is going to be
         // refused -- unknown identity, foreign owner, disagreeing target, or a
         // replay -- must be refused with nothing emitted for it, exactly as the
         // direct path claims before it calls. Consuming afterwards would leave a
         // locally lowered body in the caller's block that the refusal cannot
         // retract.
         //
-        // ⛔ The target handed in is the CALL IDENTITY's own, not the edge's, so
+        // The target handed in is the CALL IDENTITY's own, not the edge's, so
         // the ledger's comparison is between two separate planner facts about
         // one call rather than a record against itself.
         let target = identity.target();
@@ -11516,7 +11516,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // `D5a` — whether THIS function retargeted the target's worker body to a
         // generated execution context, read from this function's own two tables.
         //
-        // ⛔ Not re-asked of the planner. An issued context this function did
+        // Not re-asked of the planner. An issued context this function did
         // not resolve is not a context the induction hypothesis may name, and
         // the definition pass reads its own retarget outcome for exactly that
         // reason. The two tables are what the retarget itself writes: it
@@ -11533,7 +11533,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         };
         // Step 2 — the target's OWN checked authority, for the body's extent.
         //
-        // ⛔ Bound and released around the lowering rather than for this whole
+        // Bound and released around the lowering rather than for this whole
         // function: the caller's body resumes under its own authority the moment
         // the composed operand is in hand. The release runs on the error path
         // too, which is why the result is held rather than `?`-ed -- an early
@@ -11559,7 +11559,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // Step 3 — the phase-bearing operand, straight back to the caller's
         // existing exact eliminator.
         //
-        // ⛔ `checked`, and this is the ruled third caller of it. The doc on
+        // `checked`, and this is the ruled third caller of it. The doc on
         // `RoutedAnswer::checked` names two and forbids a third without a
         // ruling; `evt_6kn9ckdnbf0ph` is that ruling. The value returned IS the
         // result of the exact continuation specialization the identity names --
@@ -11782,7 +11782,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             defining_owner,
         )?;
         // The direct call's operand run: the ordinary envelope followed by the
-        // continuation inputs in ordinal order. ⛔ The order is asserted by the
+        // continuation inputs in ordinal order. The order is asserted by the
         // callee's own declared slot walk, which is what the assembly above
         // validated each half against separately.
         let mut inputs = operands.ordinary;

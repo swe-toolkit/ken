@@ -2770,7 +2770,7 @@ struct Lowering<'a> {
     /// the fusion-local realizations `F`, held over the same span as
     /// `continuation_claims` and opened and closed on the same boundary.
     ///
-    /// ⛔ A sibling, not an arm of the ledger above. `O` and `F` are disjoint
+    /// A sibling, not an arm of the ledger above. `O` and `F` are disjoint
     /// domains with different evidence: an ordinary obligation is discharged by
     /// a call decoded back out of the finished CLIF, and a fusion-local one
     /// emits no call for any such gate to read. One ledger over both would have
@@ -6039,7 +6039,7 @@ pub(in crate::cranelift_backend) enum D8oBodyKey {
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local compositions this
 /// compile actually REALIZED, in order.**
 ///
-/// ⛔ Recorded at the composition seat AFTER the affine consumption succeeded,
+/// Recorded at the composition seat AFTER the affine consumption succeeded,
 /// so a refused composition contributes nothing. The ledger already knows what
 /// was planned; what no ledger can report — because the compile refuses before
 /// its closeout — is which planned members a given artifact managed to reach.
@@ -15269,7 +15269,7 @@ enum SourceComputationalAnswerRoute {
 /// assembled at its exact call edge.**
 ///
 /// The two runs are the target specialization's own `Parameter` and `Capture`
-/// runs, in the planner's order. ⛔ Separate fields rather than one operand
+/// runs, in the planner's order. Separate fields rather than one operand
 /// vector: a direct call concatenates them, a local composition consumes them
 /// at two different seats, and a pre-concatenated run would force the second
 /// caller to split on a length that neither seat owns.
@@ -15281,7 +15281,7 @@ struct ContinuationCallOperands {
     /// continuation's own consumer. Carried because the local composition binds
     /// it as the ambient defining unit, exactly as the definition pass does.
     consumer_owner: PredeclaredFunctionId,
-    /// The planner's ordinary envelope, as the assembly consumed it. ⛔ Carried
+    /// The planner's ordinary envelope, as the assembly consumed it. Carried
     /// so the body lowering reads the SAME sequence the operands were assembled
     /// from, including any test perturbation, rather than re-projecting it.
     envelope: Vec<ContinuationOrdinaryEnvelopeRole>,

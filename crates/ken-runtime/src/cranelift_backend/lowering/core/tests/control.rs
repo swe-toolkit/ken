@@ -2821,7 +2821,7 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// constructor, and the fused body lowers to completion — the refusal is that
 /// body's EXIT closeout, not a lowering failure.
 ///
-/// ⚠ **It is not a regression, and the distinction is load-bearing.** The
+/// **It is not a regression, and the distinction is load-bearing.** The
 /// capability's closeout has three arms — spent, outstanding, and *descent
 /// failed*, which **withdraws** the capability and propagates the original
 /// error. Every previous armed compile on this witness took the third arm, so
@@ -2849,7 +2849,7 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// red is the mechanism reporting progress**, and the instruction is always to
 /// restate the measured stop, never to relax the assertion.
 ///
-/// ⛔ **The composition-population assertion is a sentinel too, and is the one
+/// **The composition-population assertion is a sentinel too, and is the one
 /// that must NOT be relaxed into an inequality.** `>= 1 realized` would stay
 /// green through both the repair and its absence.
 ///
@@ -2905,7 +2905,7 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
                     && reason.contains("no dynamic invocation segment consumed")
         );
         rows.push((cause, reached));
-        // ⛔ The LAYERS, not a count. A count of one is satisfied by the wrong
+        // The LAYERS, not a count. A count of one is satisfied by the wrong
         // one of the two planned edges, and which layer is realized is exactly
         // the fact the open question turns on.
         realized.push((
@@ -33508,7 +33508,7 @@ fn d3_the_fusion_local_composition_ledger_is_affine_and_total() {
 
         // ---- Refusal 1: an identity this ledger never planned.
         //
-        // ⛔ The unplanned identity is a REAL planner-issued ordinary identity,
+        // The unplanned identity is a REAL planner-issued ordinary identity,
         // not a fabricated one. A fabricated key could be refused merely for
         // being unrecognizable; an ordinary identity is the case the guard
         // actually has to catch, because it is exactly what a fork that

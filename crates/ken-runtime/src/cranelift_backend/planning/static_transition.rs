@@ -18520,7 +18520,7 @@ mod tests {
     /// witness for one cause: fusions interned, region claims preflighted,
     /// fusion-owned bodies installed.**
     ///
-    /// ⛔ One constructor, so a control outside this module measures the SAME
+    /// One constructor, so a control outside this module measures the SAME
     /// installed plan the partition control inside it does. The interning and
     /// installation steps are module-private, which is what previously forced
     /// any consumer to be written in here beside them; the alternative was a

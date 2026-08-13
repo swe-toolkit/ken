@@ -1554,7 +1554,7 @@ pub(super) struct ContinuationSelectedCaseBody {
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — lower a continuation
 /// specialization's exact selected case body, given its operands.**
 ///
-/// ⭐⭐ **This is a factoring, not a new mechanism, and that is the point.**
+/// **This is a factoring, not a new mechanism, and that is the point.**
 /// Architect `evt_6kn9ckdnbf0ph` rules that a fusion-local identity replaces
 /// **only its direct-call realization**: the body it would have executed, the
 /// two static-worker bindings, the binder run and the environment are all
@@ -1564,7 +1564,7 @@ pub(super) struct ContinuationSelectedCaseBody {
 /// A second copy here would be a second authority over what the selected case
 /// body IS, and the two would drift with nothing able to see it.
 ///
-/// ⛔ **What differs between the two callers is the OPERANDS, and nothing
+/// **What differs between the two callers is the OPERANDS, and nothing
 /// else.** The definition pass loads `ordinary` and `carried_inputs` from its
 /// own frame's `Parameter` and `Capture` slots at the descriptor's offsets; the
 /// local composition receives the very same two runs assembled at the call
@@ -1572,7 +1572,7 @@ pub(super) struct ContinuationSelectedCaseBody {
 /// projection. Both are the target specialization's own ordinary envelope in
 /// its own order -- that is why the same body can consume either.
 ///
-/// ⛔ **It returns the phase-bearing [`LoweringOperand`], and writes no result
+/// **It returns the phase-bearing [`LoweringOperand`], and writes no result
 /// slot.** The definition pass stores it to its frame's `Result` offset; the
 /// local composition hands it straight to the caller's existing eliminator.
 /// Neither seat's disposal belongs here, and putting one here would give the
@@ -1585,7 +1585,7 @@ pub(super) fn lower_continuation_selected_case_body(
     ordinary: &[LoweringOperand],
     carried_inputs: &[LoweringOperand],
     // `D5a` — `Some` exactly when the CALLER resolved a generated execution
-    // context for this specialization's worker body into its own function. ⛔
+    // context for this specialization's worker body into its own function.
     // Supplied rather than re-asked of the planner: an issued context the
     // caller did not resolve is not a context the induction hypothesis may
     // name, and that is a fact about the caller's function, not about the plan.
@@ -1618,13 +1618,13 @@ pub(super) fn lower_continuation_selected_case_body(
     // re-asking the planner: an issued context this unit did not
     // resolve is not a context this binding can name.
     //
-    // ⭐ `None` is the ordinary, lawful answer -- every pre-`D5a`
+    // `None` is the ordinary, lawful answer -- every pre-`D5a`
     // specialization, and every unit in the governed-bracket witness.
     // The hypothesis then takes the raw route, appending nothing, and
     // the two bindings below are route-identical. That is a degenerate
     // route pair, not a collapsed one.
     //
-    // ⛔ Not re-derived at the call site. Both bindings below name the
+    // Not re-derived at the call site. Both bindings below name the
     // same body origin, so no comparison available there can tell them
     // apart -- see `StaticWorkerCallRoute`.
     let induction_route = match retargeted_worker_body {
@@ -1633,7 +1633,7 @@ pub(super) fn lower_continuation_selected_case_body(
     };
     // `D6c` — CROSS-ROUTING, the hypothesis half. It takes the raw route
     // while this unit DID resolve a context; the argument below takes
-    // the context route. ⛔ Only where a context was actually resolved:
+    // the context route. Only where a context was actually resolved:
     // on a route-degenerate unit both members lawfully carry
     // `RawWorker`, so there is no crossing to make and the arm declines
     // rather than counting an application it did not perform.
@@ -1664,14 +1664,14 @@ pub(super) fn lower_continuation_selected_case_body(
 
     // `D6a` -- the selected recursive constructor argument.
     //
-    // ⭐ The SAME closure occurrence, body origin, declared arity and
+    // The SAME closure occurrence, body origin, declared arity and
     // ordered capture operands as the induction hypothesis above, built
     // through the same constructor and validated against the same raw
     // template contract. What the two represent still differs: the
     // argument is the closure the source scope binds, while the
     // hypothesis is that closure as this specialization eliminates it.
     //
-    // ⛔ The ROUTE is `RawWorker` unconditionally here, and that is not
+    // The ROUTE is `RawWorker` unconditionally here, and that is not
     // the same as saying it differs from the hypothesis's. When
     // `induction_route` above resolved to `RawWorker` -- no context
     // issued -- the two bindings are route-identical, and they are
@@ -1679,7 +1679,7 @@ pub(super) fn lower_continuation_selected_case_body(
     // what will separate them at the call edge in `D6b` *where a
     // context exists*; it is not what makes them two.
     //
-    // ⛔ Nothing new crosses the ABI. This adds no slot, carrier, tag,
+    // Nothing new crosses the ABI. This adds no slot, carrier, tag,
     // descriptor or source occurrence -- it is a second compiler-only
     // binding over operands this frame has already loaded.
     // `D6c` — the three binding-construction mutations, under test only.
@@ -1691,7 +1691,7 @@ pub(super) fn lower_continuation_selected_case_body(
     let (argument_body_origin, argument_captures, argument_route) = {
         use crate::cranelift_backend::lowering::D6cSelectionMutation as Mutation;
         match crate::cranelift_backend::lowering::d6c_selection_mutation() {
-            // A body this unit did not select. ⛔ The substituted value
+            // A body this unit did not select. The substituted value
             // is a REAL planner-issued origin -- this continuation's own
             // frame occurrence -- rather than an arithmetic neighbour.
             // A fabricated id could be refused merely for being unknown;
@@ -1710,7 +1710,7 @@ pub(super) fn lower_continuation_selected_case_body(
             // segment: drop an operand where there is one, otherwise add
             // one the envelope holds.
             //
-            // ⛔ The counter fires ONLY if the vector actually changed.
+            // The counter fires ONLY if the vector actually changed.
             // A unit with no captures and no ordinary operand to borrow
             // leaves this arm the IDENTITY, and counting an application
             // there would report a perturbation that never happened --
@@ -1734,7 +1734,7 @@ pub(super) fn lower_continuation_selected_case_body(
             // hypothesis taking the raw route above, this is the
             // cross-routing the two members must never permit.
             //
-            // ⛔ Only where a context was actually resolved. On a
+            // Only where a context was actually resolved. On a
             // route-degenerate unit both members lawfully carry
             // `RawWorker`, so there is no crossing to perform; applying
             // it there would move a route no law distinguishes and count
@@ -1768,7 +1768,7 @@ pub(super) fn lower_continuation_selected_case_body(
         argument_captures,
         argument_route,
         // `D8i` — the SPECIALIZATION's selected recursive argument.
-        // ⛔ Direct, and the contrast with `D8d`'s composed argument is
+        // Direct, and the contrast with `D8d`'s composed argument is
         // the point: the same source closure at the same position
         // carries an authority on the composed path and none here,
         // because only the composed consumption stands in for a causal
@@ -1803,7 +1803,7 @@ pub(super) fn lower_continuation_selected_case_body(
     // order -- the selected recursive one included, as `D6a`'s
     // compiler-only member -- then this frame's continuation inputs.
     //
-    // ⛔ This site chooses nothing. It maps a plan onto operands; the
+    // This site chooses nothing. It maps a plan onto operands; the
     // order is the plan's, and the plan is a pure function of the
     // planner's own coordinates.
     let plan = continuation_case_binder_run(
@@ -1909,7 +1909,7 @@ pub(super) fn lower_continuation_selected_case_body(
             // entries and a change collapsing the two routes would be
             // invisible in this log.
             //
-            // ⛔ The converse does not hold, and a reader of this log
+            // The converse does not hold, and a reader of this log
             // must not assume it: two entries rendering the SAME route
             // is the lawful route-degenerate case (no context issued),
             // not evidence that one binding was reused for both
@@ -1987,7 +1987,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
     // `O_t`, and the fusion-local complement recorded as this pass's own
     // omission.
     //
-    // ⛔ **The omission is recorded HERE, in the pass that would otherwise have
+    // **The omission is recorded HERE, in the pass that would otherwise have
     // emitted the body**, and the closeout compares it with `F_t`. A statement
     // made elsewhere about what this loop does would agree with itself; this is
     // the loop's own decision, and if it ever stopped omitting, the recorded set
@@ -2474,7 +2474,7 @@ pub(super) fn define_continuation_bodies<M: Module>(
             // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the selected case body,
             // through the ONE authority both realizations share.
             //
-            // ⛔ The operands are this frame's own: `ordinary` from the
+            // The operands are this frame's own: `ordinary` from the
             // `Parameter` slots and `carried_inputs` from the `Capture` slots,
             // each at the offset the descriptor assigns it. What the shared
             // function does with them is identical to what a fusion-local
@@ -4777,7 +4777,7 @@ impl ContinuationClaimLedger {
     /// It exists for exactly one consumer: the fusion-local ledger's closeout,
     /// which asserts its own consumed population is disjoint from this one.
     ///
-    /// ⛔ **A union, not `planned`.** Asserting disjointness against `planned`
+    /// **A union, not `planned`.** Asserting disjointness against `planned`
     /// would test the partition the planner already validated -- `O ∩ F = ∅` is
     /// checked at preflight and would be re-checked here against the same
     /// derivation. What has to be disjoint is what the two ledgers ACTUALLY
@@ -4799,7 +4799,7 @@ impl ContinuationClaimLedger {
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the SIBLING affine ledger for the
 /// fusion-local realizations `F`.**
 ///
-/// ⭐⭐ **A sibling, not a widening, and Architect `evt_6kn9ckdnbf0ph` is
+/// **A sibling, not a widening, and Architect `evt_6kn9ckdnbf0ph` is
 /// explicit about why.** An ordinary identity's obligation is discharged by an
 /// emitted call whose callee is decoded back out of the finished CLIF; a
 /// fusion-local identity emits no call at all, so there is no instruction for
@@ -4810,7 +4810,7 @@ impl ContinuationClaimLedger {
 /// domain -- which is the same reason `O` was narrowed at the input rather than
 /// the laws being relaxed.
 ///
-/// ⛔ **This is NOT the `FusionRegionClaimLedger` and does not touch it.** The
+/// **This is NOT the `FusionRegionClaimLedger` and does not touch it.** The
 /// region claim carries the producer/consumer relation and is spent at the
 /// redirect and takeover seats; consuming a composition here does not spend it,
 /// and call `17/13` stays on the region claim and out of `dom(FusionComposedEdge)`
@@ -4827,7 +4827,7 @@ impl ContinuationClaimLedger {
 /// - a consumption whose **owner or target** disagrees with the planned edge is
 ///   refused, each named separately so the refusal says which fact moved;
 /// - at close, each fusion's CONSUMED layers must be exactly one `Outer` and one
-///   `Inner`. ⛔ The layer is deliberately **not** checked at consumption: the
+/// `Inner`. The layer is deliberately **not** checked at consumption: the
 ///   seat has no authority over it independent of the edge itself, so a
 ///   per-consumption comparison would read the edge's layer and compare it with
 ///   itself. What is real is the whole-artifact statement that both ruled layers
@@ -4840,7 +4840,7 @@ impl ContinuationClaimLedger {
 pub(super) struct FusionCompositionLedger {
     /// `F` — the planned fusion-local realizations, keyed by exact identity.
     ///
-    /// ⛔ The WHOLE composed edge is retained, not the fields a consumption
+    /// The WHOLE composed edge is retained, not the fields a consumption
     /// happens to check. A consumption is validated against the planner's own
     /// record; re-deriving any of owner, layer or target here would make this
     /// ledger a second authority over the composition it is supposed to audit.
@@ -4850,13 +4850,13 @@ pub(super) struct FusionCompositionLedger {
     /// The specialization targets the DECLARATION pass actually omitted, read
     /// from that pass's own output rather than re-derived.
     ///
-    /// ⛔ Not derived from `planned` at close. Deriving it would compare the
+    /// Not derived from `planned` at close. Deriving it would compare the
     /// planner's `F_t` with itself and pass for a pass that omitted nothing --
     /// which is precisely the failure this range equality exists to catch.
     declaration_omitted: BTreeSet<ContinuationSpecializationId>,
     /// The specialization targets the DEFINITION pass actually omitted.
     ///
-    /// ⛔ **Kept separate from the declaration set, and both are closed against
+    /// **Kept separate from the declaration set, and both are closed against
     /// `F_t`.** The two passes fail differently: a declaration that does not
     /// omit leaves an undefined phantom symbol, and a definition that does not
     /// omit emits a standalone `Function` for a body already lowered locally --
@@ -4869,7 +4869,7 @@ impl FusionCompositionLedger {
     /// Open over the planner's composed-edge relation, once per artifact.
     ///
     /// The declaration omission is seeded from the BUNDLE -- the declaration
-    /// pass's own output -- rather than from the plan. ⛔ That is the whole
+    /// pass's own output -- rather than from the plan. That is the whole
     /// point: a `declare_unit_bundle` that stopped filtering would leave this
     /// set empty and the closeout would say so, where a plan-derived set would
     /// agree with the plan no matter what was declared.
@@ -4895,7 +4895,7 @@ impl FusionCompositionLedger {
 
     /// Record that the DEFINITION pass omitted this specialization's body.
     ///
-    /// ⛔ Recorded where the omission happens, in the loop that would otherwise
+    /// Recorded where the omission happens, in the loop that would otherwise
     /// have emitted the `Function`, so the evidence is the pass's own decision
     /// rather than a statement about it made elsewhere.
     pub(super) fn record_definition_omitted(&mut self, target: ContinuationSpecializationId) {
@@ -4908,7 +4908,7 @@ impl FusionCompositionLedger {
     /// refusal, so a red names the fact that moved rather than reporting a
     /// generic mismatch.
     ///
-    /// ⛔ `target` is the CALL IDENTITY's own recorded target, supplied by the
+    /// `target` is the CALL IDENTITY's own recorded target, supplied by the
     /// seat, not the edge's. The two are separate planner facts about one call,
     /// so this is a real comparison; passing the edge's own target back in would
     /// be an identity.
@@ -4965,7 +4965,7 @@ impl FusionCompositionLedger {
 
     /// The closeout, over three populations.
     ///
-    /// ⛔ Every comparison is between SETS. Two populations of the same size can
+    /// Every comparison is between SETS. Two populations of the same size can
     /// be the wrong two, and a count would pass for a pass that consumed one
     /// composition and omitted a different target.
     pub(super) fn close(
@@ -5012,10 +5012,10 @@ impl FusionCompositionLedger {
         }
         // BOTH RULED LAYERS OF EACH FUSION WERE ACTUALLY REALIZED.
         //
-        // ⭐ The planner's preflight already requires each body-owning fusion to
+        // The planner's preflight already requires each body-owning fusion to
         // CARRY exactly one `Outer` and one `Inner` composed edge. This is the
         // consumption-side dual and is a different statement: it says both of
-        // them were lowered locally. ⛔ Over `consumed`, never over `planned` --
+        // them were lowered locally. Over `consumed`, never over `planned` --
         // over `planned` it would re-assert the preflight law against the same
         // records and would pass for an artifact that realized neither.
         let mut consumed_layers: BTreeMap<
@@ -5052,7 +5052,7 @@ impl FusionCompositionLedger {
         }
         // THE DISJOINTNESS, against what the ordinary ledger RECORDED.
         //
-        // ⛔ Not against `planned`, which the planner's own partition already
+        // Not against `planned`, which the planner's own partition already
         // settles. What this catches is an identity that was composed locally
         // AND reached an ordinary role -- claimed, declared, directly emitted or
         // composed-discharged -- which is one call edge realized twice.
@@ -5179,7 +5179,7 @@ pub(super) fn close_continuation_claim_ledger(
     // BEFORE the ordinary ledger is consumed, because its disjointness clause
     // reads what that ledger RECORDED and `close` takes it by value.
     //
-    // ⛔ The order also decides which red a reader sees first, and this is the
+    // The order also decides which red a reader sees first, and this is the
     // useful one: a fusion-local composition that was never realized, or one
     // realized twice, explains an ordinary population that then looks short. The
     // reverse order reports the symptom and consumes the evidence.
