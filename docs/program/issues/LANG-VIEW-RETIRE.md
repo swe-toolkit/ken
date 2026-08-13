@@ -5,7 +5,7 @@ status: ready
 owner: language
 size: M
 gate: none
-depends_on: [LANG-SURFACE-RECORD-LITERAL]
+depends_on: [LANG-RECORD-STACK-OVERFLOW]
 blocks: []
 github: null
 origin: Operator instruction 2026-08-13, raised from a `view` fixture in the record-literal candidate. Spec basis is SURF-1 as recorded at spec/30-surface/36-effects.md:410 (`1.6.4 view retired`), 33-declarations.md:60, and 31-lexical.md:591; 31-lexical.md:656 records the implementation gap in the spec's own words.

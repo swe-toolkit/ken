@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 14:24:07Z — from 231 issue file(s) in `docs/program/issues/`.
+2026-08-13 14:30:02Z — from 231 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -122,7 +122,7 @@ the committed file matches the generator's output.
 | `LANG-LEX-NUMERIC-FORMS` | The lexer implements none of the numeric literal forms 31-lexical and 35-numbers list besides bare decimal -- no `1_000` separators, no `0xFF`/`0b1010`/`0o17` radix integers, no `0x1p-3` hex float -- and `1e-9`, which both spec tables give as the canonical Float example, does not lex as a float at all because the exponent branch is gated on having seen a dot | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1881 |
 | `LANG-LEX-PROJECTION-ADJACENCY` | The positional-projection lexer guard tests raw character adjacency, so exactly one of four spacing variants fails -- `p.1.2`, `p.1 .2` and `p. 1 .2` all lex as two projections while `p. 1.2` lexes as `Dot, FloatLit(1.2)` -- and the refusal comes from the number scanner rather than from any grammar rule | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/1864 |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
-| `LANG-PARSER-DEPTH-HONEST` | The record-literal arc's parser depth control has never measured depth at any SHA -- it builds match arms with `=>`, which is not a Ken token, so it dies in the lexer on the first arm and never reaches depth one; a 143-line `parser.rs` rework was written to satisfy it, so that rework's justification is unmeasured and its disposition needs a working instrument first | ready | language | S | none | — |
+| `LANG-RECORD-STACK-OVERFLOW` | The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token | ready | language | M | none | — |
 | `LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC` | The selector's non-universe classifier arm reports the elaborator's own refusal as KernelRejected and fabricates a Type(?0) expectation that Omega would equally satisfy | merged | language | S | none | — |
 | `LANG-SELECTOR-SORT-SPLIT-ELAB` | Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates | merged | language | L | none | — |
 | `LANG-SORT-META-CAPABILITY` | Rule whether a term/sort metavariable representation is authorized -- the elaborator cannot today leave a selected result undecided between Type and Omega, so the spec's conditional ambiguity clause has an unreachable antecedent | draft | spec-enclave | S | none | — |
@@ -275,6 +275,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `LANG-RECORD-STACK-OVERFLOW` — The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token
 - `LANG-SURFACE-BLOCK-COMMENTS` — `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate
 - `LANG-SURFACE-LITERAL-ESCAPES` — The lexer performs NO escape processing -- its single string form pushes every character verbatim, so the escape repertoire that SPEC-LITERAL-ESCAPE-PIN just closed is entirely unimplemented, and Char literals, byte literals, byte strings and raw triple strings do not exist at all despite String, Char and Bytes all being built prelude targets
 - `LANG-SURFACE-RECORD-LITERAL` — `33 §2` names record literals `{ x = 1, y = 2 }`, punning `{ x, y }` and functional update `{ p | y = 3 }` as having their expected definitional behaviour, and none of the three parses -- expression-position `{` has no arm in `parse_atom_expr_base` at all, so the brace fork the sibling frame warned about does not exist here: refinement braces live in `parse_type`, which is a separate parser
@@ -311,8 +312,7 @@ is itself not yet `merged`/`closed`:
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE` (status: ready)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: draft)
-- `LANG-PARSER-DEPTH-HONEST` blocked by `LANG-SURFACE-RECORD-LITERAL` (status: ready)
-- `LANG-VIEW-RETIRE` blocked by `LANG-SURFACE-RECORD-LITERAL` (status: ready)
+- `LANG-VIEW-RETIRE` blocked by `LANG-RECORD-STACK-OVERFLOW` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
