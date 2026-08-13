@@ -936,6 +936,18 @@ fn check_positional_named_record(
     Some(check_record(cx, None, &fields, expected, span))
 }
 
+/// A record literal carries no inferable type on its own (`§37`'s
+/// named-field-owner types have no canonical "the" record type to project
+/// a synthesized answer from) — pulled out of `infer`'s body for the same
+/// per-arm-footprint reason as `check_pair_or_record` above.
+#[inline(never)]
+fn infer_record_requires_expected_type(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "cannot infer record literal type without an expected named record type".into(),
+    })
+}
+
 fn infer_pair(
     cx: &mut ElabCtx<'_>,
     components: &[RExpr],
@@ -956,15 +968,29 @@ fn infer_pair(
     Ok((Term::Ascript(Box::new(pair), Box::new(ty.clone())), ty))
 }
 
+/// Dispatch glue for `RExpr::RPair`, pulled out of `check`'s own body so its
+/// two-callee branch (and the `Option<Result<_>>` it inspects) does not sit
+/// in `check`'s stack frame. `check` is a single giant match reached by
+/// every checked expression in every compile, including ones that use no
+/// record syntax at all; in an unoptimized build, locals a match arm
+/// introduces are paid by every call regardless of which arm actually runs,
+/// so a wide dispatcher's own frame size is worth keeping minimal per arm.
+#[inline(never)]
+fn check_pair_or_record(
+    cx: &mut ElabCtx<'_>,
+    components: &[RExpr],
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    match check_positional_named_record(cx, components, expected, span) {
+        Some(result) => result,
+        None => check_pair(cx, components, expected, span),
+    }
+}
+
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
     match expr {
-        RExpr::RPair(components, span) => {
-            if let Some(result) = check_positional_named_record(cx, components, expected, span) {
-                result
-            } else {
-                check_pair(cx, components, expected, span)
-            }
-        }
+        RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
             check_record(cx, base.as_deref(), fields, expected, span)
         }
@@ -3358,10 +3384,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         }
 
         RExpr::RPair(components, span) => infer_pair(cx, components, span),
-        RExpr::RRecord { span, .. } => Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: "cannot infer record literal type without an expected named record type".into(),
-        }),
+        RExpr::RRecord { span, .. } => infer_record_requires_expected_type(span),
 
         RExpr::RPi(_, a, b, span) => infer_pi(cx, a, b, span),
 
