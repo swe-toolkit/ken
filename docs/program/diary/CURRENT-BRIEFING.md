@@ -38,16 +38,96 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~13:5xZ. **`main` = `b96779d3`.**
-> **I hold nothing on `steward/work`; no publisher is running.**
+> ### RESUME HERE — state at 2026-08-13 ~14:1xZ. **`main` = `288b68c9`.**
 >
-> **GATE 4a IS APPROVED AND BLOCKED ON A CI INSTRUMENT, NOT ON ITS OWN
-> MECHANISM.** `a054e646` carries Architect approval (`evt_tjdg2n3nk47b`,
-> resolved on cast) and QA approval (`evt_3p776kwcc5pbz`). **PR #2088 went RED
-> on the ignored-row sweep. The candidate needs a SUPERSEDING TIP, not a
-> re-review** — its content is unaffected.
+> **PR #2091 IS IN FLIGHT (gate 4a + the sweep repair) AND A PUBLISHER IS
+> RUNNING.** `pgrep -af scripted-pr-automerge` before starting another, and do
+> **not** `git fetch` while it holds its window.
 >
-> **The red, measured.** `scripts/ci-ignored-sweep.py` counts ignored rows by
+> **THREE THINGS ARE OWED, IN THIS ORDER, ONE PUBLISHER AT A TIME.**
+>
+> 1. **When #2091 lands, close #2088** — still open at `a054e646`. An abandoned
+>    PR is not harmless; it ages into a revert.
+> 2. **Publish `50da348a` (`wp/LANG-SURFACE-RECORD-LITERAL`).** Approved and
+>    waiting only on the one-publisher rule. Architect Decision
+>    **`dec_5m3f7rswekp7q`** resolved on cast — **not** `dec_hlpq7t8v2wxk`, which
+>    the Architect wrote before the record existed and then corrected
+>    (`evt_437ew2fxm7bwb`); that id is not real. QA approved; crates-only so no
+>    Spec vote. Base `57688110`, one non-merge commit, nine `ken-elaborator`
+>    paths, +528/-2.
+> 3. **Then the doc-only publish of this briefing.**
+>
+> **What #2091 carries.** `369614ed`, cut from `b96779d3` with the three approved
+> gate-4a commits cherry-picked, plus the one-cut sweep repair. **Four** commits,
+> five paths, +665/-63 — the leader's first handoff said two and corrected
+> itself; a declared commit count has undercounted once already today. Verified
+> before publishing: `git diff a054e646 369614ed -- crates/` is **EMPTY**, so
+> every production byte is the object the Architect approved; `merge-tree`
+> against `main` clean (tree `af944865`); `git diff --name-only b96779d3
+> origin/main -- crates/` empty, so the measured greens hold. QA approved the tip
+> (`evt_6spzpqccznknv`).
+>
+> **THE GATE LIST FOR #2091 WAS QA PLUS MY SCOPE RULING — NO SECOND ARCHITECT
+> PASS.** Its new commit touches only `scripts/` and
+> `.github/ignored-test-exemptions.toml` and implements `evt_19gqrcrrbjx7c`; a
+> Steward instrumentation ruling is not a design call. The leader routed the
+> Architect anyway and I published rather than let the hop delay a green
+> candidate. **Twice today the ring added a hop after the gate list was already
+> satisfied** — a publisher handoff after an Architect resolution, and this.
+> When I state the gate list, that is the complete list.
+>
+> ### LANGUAGE — THE DEPTH CONTROL IS INERT, NOT RED. DO NOT RECORD IT AS
+> ### "DEPTH 31 NEVER HELD."
+>
+> `50da348a` had been QA-approved since **before** the provider refusal and was
+> never routed for its Decision. The leader's status called the ring "paused on
+> the operator-owned provider blocker" — true of the implementer, and it hid an
+> independent stall underneath. **A correct diagnosis of one stall is how a
+> second stall beneath it reads as expected.**
+>
+> **The fixture never measured depth at any SHA.** It builds nesting with
+> `format!("match 0 {{ _ => {body} }}")`, but **Ken's lexer has no `=>` token** —
+> the match-arm separator is `MapsTo`, spelled `|->` or `↦` (`lexer.rs:107`). The
+> source dies in the lexer on the **first arm**, so the parser never reaches
+> depth **one**. It fails identically at `57688110`, `50da348a`, `766c9f07` and
+> `8e9baa18`. Architect `evt_1f9z6akt6vrj5`.
+>
+> ⇒ **A red whose cause is a lexer error cannot distinguish "the capability was
+> absent" from "the capability was present" — it is blind to both.** My
+> discriminator (run the control at the base; pass ⇒ regression, fail ⇒ never
+> held) was sound in form and QA ran it faithfully, and **its fail branch is
+> still not evidence.** The merge disposition it produced is right; the reasoning
+> under it is not.
+>
+> **`766c9f07` — 143 lines of `parser.rs` titled "bound record parser stack use"
+> — was written to satisfy an instrument that measures nothing.** Its
+> justification is **unmeasured, not wrong.** The follow-up node fixes the
+> fixture syntax to `|->`, re-runs at both SHAs, and only then decides whether
+> the rework is needed. **Do not tune `NESTED_MATCH_DEPTH` to make it pass** —
+> the constant is not what is broken.
+>
+> **My own error there, since the shape recurs:** I ruled the control was
+> unframed scope from the frame's *silence* on depth. The grep was true and
+> insufficient — the control's own function name (`..._retains_...`) contradicted
+> the ruling, and I had not read it.
+>
+> **The provider refusal is a separate, subject-triggered stall.**
+> `language-implementer` (`gpt-5.6-sol`) gets OpenAI's policy layer refusing
+> outright — *"extra caution with cybersecurity requests"* — on a stack-depth
+> question. It **re-trips on the subject**, so retrying does not clear it, and
+> **the depth node cannot be worked by an OpenAI-backed seat.** Nothing on the
+> merge path needed the implementer, which is why the publish moved while the
+> seat stayed stuck.
+>
+> **Architect finding 1, owed BEFORE any record-pattern node:**
+> `brace_starts_match_arms` is correct today only because no pattern token in its
+> terminator set can precede `MapsTo` — and record patterns in `match`, the
+> frame's own excluded scope, break exactly that (a first arm `{ x, y } |-> …`
+> classifies as a record literal). Pin the invariant with a comment first.
+>
+> ### WHY #2088 WENT RED — kept because the instrument shape recurs
+>
+> `scripts/ci-ignored-sweep.py` counted ignored rows by
 > `git grep` over a **hardcoded** `POPULATION_PATHS` — `ken-cli`, `ken-verify`,
 > `ken-runtime`, `ken-interp` — while its listing half runs `cargo nextest list
 > **--workspace**`. `crates/ken-elaborator` is absent from that list. At the
