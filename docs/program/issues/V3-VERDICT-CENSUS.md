@@ -1,7 +1,7 @@
 ---
 id: V3-VERDICT-CENSUS
 title: "Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search"
-status: ready
+status: active
 owner: verify
 size: S
 gate: none
