@@ -25,7 +25,37 @@ pub struct SourceToken {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaKind {
     Whitespace,
+    /// `-- …` (`31 §5`).
     LineComment,
+    /// `--- …` (`31 §5`, D2) -- a line comment attaching to the following
+    /// declaration rather than by the generic positional rule.
+    DocLineComment,
+    /// `{- … -}`, nestable (`31 §5`, D1).
+    BlockComment,
+    /// `{-- … --}` (`31 §5`, D2) -- attaches like `DocLineComment`; does not
+    /// nest (only the plain block form does).
+    DocBlockComment,
+}
+
+impl TriviaKind {
+    /// D3: only doc comments attach to the FOLLOWING declaration by rule;
+    /// ordinary comments use the existing positional Leading/Trailing/
+    /// Interstitial heuristic unchanged.
+    fn is_doc_comment(self) -> bool {
+        matches!(
+            self,
+            TriviaKind::DocLineComment | TriviaKind::DocBlockComment
+        )
+    }
+
+    /// Every comment kind (excluding pure whitespace) participates in
+    /// attachment -- widening this, and not just the doc kinds, is what
+    /// keeps `attach_comments`/`validate_attachment_totality` from silently
+    /// losing block comments the way an unwidened `LineComment`-only filter
+    /// would (LANG-SURFACE-BLOCK-COMMENTS D3).
+    fn is_comment(self) -> bool {
+        !matches!(self, TriviaKind::Whitespace)
+    }
 }
 
 /// One contiguous trivia fragment in the original source.
@@ -247,14 +277,37 @@ fn append_trivia(
 ) -> Result<(), ElabError> {
     let mut cursor = start;
     while cursor < end {
-        let (kind, next) = if src[cursor..end].starts_with("--") {
+        // Specific before general, exactly matching
+        // `Lexer::skip_ws_comments`'s dispatch order (`31 §5`,
+        // LANG-SURFACE-BLOCK-COMMENTS AC-1): `{--` before `{-`; `---`
+        // (folded into the same `--` scan, since a doc line comment is a
+        // line comment whose text starts with a dash) before `--`.
+        let (kind, next) = if src[cursor..end].starts_with("{--") {
+            (
+                TriviaKind::DocBlockComment,
+                scan_doc_block_comment_end(src, cursor, end)?,
+            )
+        } else if src[cursor..end].starts_with("{-") {
+            (
+                TriviaKind::BlockComment,
+                scan_nested_block_comment_end(src, cursor, end)?,
+            )
+        } else if src[cursor..end].starts_with("---") {
+            let next = src[cursor..end]
+                .find('\n')
+                .map_or(end, |offset| cursor + offset);
+            (TriviaKind::DocLineComment, next)
+        } else if src[cursor..end].starts_with("--") {
             let next = src[cursor..end]
                 .find('\n')
                 .map_or(end, |offset| cursor + offset);
             (TriviaKind::LineComment, next)
         } else {
             let mut next = cursor;
-            while next < end && !src[next..end].starts_with("--") {
+            while next < end
+                && !src[next..end].starts_with("--")
+                && !src[next..end].starts_with("{-")
+            {
                 let ch = src[next..end].chars().next().ok_or_else(|| {
                     ElabError::Internal("trivia cursor was not on a UTF-8 boundary".into())
                 })?;
@@ -289,6 +342,66 @@ fn append_trivia(
     Ok(())
 }
 
+/// Rescan `{- … -}` starting at `src[start..]` (already confirmed to begin
+/// with `{-`) and return the byte offset immediately after its matching
+/// close, mirroring `Lexer::skip_nested_block_comment` exactly. Bounded to
+/// `end` -- the position `Lexer::skip_ws_comments` already established as
+/// this gap's far boundary -- so a close that is not found by `end` is not a
+/// normal unterminated-comment case (the semantic lexer would already have
+/// raised that and this code would never run) but the two scanners
+/// disagreeing, reported as an internal error rather than misattributed to
+/// the user's source.
+fn scan_nested_block_comment_end(src: &str, start: usize, end: usize) -> Result<usize, ElabError> {
+    let mut pos = start + 2; // consumed opening '{-'
+    let mut depth: usize = 1;
+    while pos < end {
+        if src[pos..end].starts_with("{-") {
+            pos += 2;
+            depth += 1;
+            continue;
+        }
+        if src[pos..end].starts_with("-}") {
+            pos += 2;
+            depth -= 1;
+            if depth == 0 {
+                return Ok(pos);
+            }
+            continue;
+        }
+        let ch = src[pos..end].chars().next().ok_or_else(|| {
+            ElabError::Internal("trivia cursor was not on a UTF-8 boundary".into())
+        })?;
+        pos += ch.len_utf8();
+    }
+    Err(ElabError::Internal(format!(
+        "lossless rescan disagrees with the lexer: block comment opened at {} is not \
+         closed by {} (the lexer already accepted this range as trivia)",
+        start, end
+    )))
+}
+
+/// Rescan `{-- … --}` starting at `src[start..]` (already confirmed to begin
+/// with `{--`), mirroring `Lexer::skip_doc_block_comment` exactly --
+/// non-nesting, scans for the first literal `--}`. Same `end`-boundary
+/// reasoning as `scan_nested_block_comment_end`.
+fn scan_doc_block_comment_end(src: &str, start: usize, end: usize) -> Result<usize, ElabError> {
+    let mut pos = start + 3; // consumed opening '{--'
+    while pos < end {
+        if src[pos..end].starts_with("--}") {
+            return Ok(pos + 3);
+        }
+        let ch = src[pos..end].chars().next().ok_or_else(|| {
+            ElabError::Internal("trivia cursor was not on a UTF-8 boundary".into())
+        })?;
+        pos += ch.len_utf8();
+    }
+    Err(ElabError::Internal(format!(
+        "lossless rescan disagrees with the lexer: doc block comment opened at {} is not \
+         closed by {} (the lexer already accepted this range as trivia)",
+        start, end
+    )))
+}
+
 fn attach_comments(
     src: &str,
     tokens: &[SourceToken],
@@ -307,7 +420,7 @@ fn attach_comments(
 
     trivia
         .iter()
-        .filter(|item| item.kind == TriviaKind::LineComment)
+        .filter(|item| item.kind.is_comment())
         .map(|comment| {
             let previous = real_tokens
                 .iter()
@@ -318,10 +431,31 @@ fn attach_comments(
                 .iter()
                 .find(|token| token.span.start >= comment.span.end)
                 .copied();
-            let previous_home = previous
+            let next_home = next
                 .and_then(|token| smallest_enclosing(&node_spans, &token.span))
                 .unwrap_or_else(|| root.clone());
-            let next_home = next
+
+            // D3: a doc comment attaches to the FOLLOWING declaration by an
+            // unconditional rule, not the positional heuristic below --
+            // "attaches to the following declaration" is stated as a
+            // guarantee, not an emergent property of where it happens to
+            // sit. A trailing doc comment with no following declaration at
+            // all (end of file) has no following home; it is Interstitial
+            // at the root, same as any other homeless comment.
+            if comment.kind.is_doc_comment() {
+                let (placement, home_span) = if next.is_some() {
+                    (CommentPlacement::Leading, next_home)
+                } else {
+                    (CommentPlacement::Interstitial, root.clone())
+                };
+                return CommentAttachment {
+                    comment_span: comment.span.clone(),
+                    home_span,
+                    placement,
+                };
+            }
+
+            let previous_home = previous
                 .and_then(|token| smallest_enclosing(&node_spans, &token.span))
                 .unwrap_or_else(|| root.clone());
             let common_home = previous.zip(next).and_then(|(before, after)| {
@@ -676,7 +810,7 @@ fn validate_attachment_totality(
 ) -> Result<(), ElabError> {
     let comments: HashSet<(usize, usize)> = trivia
         .iter()
-        .filter(|item| item.kind == TriviaKind::LineComment)
+        .filter(|item| item.kind.is_comment())
         .map(|item| (item.span.start, item.span.end))
         .collect();
     let homes: HashSet<(usize, usize)> = attachments

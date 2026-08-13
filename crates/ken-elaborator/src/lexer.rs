@@ -159,17 +159,97 @@ impl<'s> Lexer<'s> {
         Some(c)
     }
 
-    fn skip_ws_comments(&mut self) {
+    /// Skip whitespace and every comment form (`31 §5`): line `-- …`, doc
+    /// line `--- …`, nestable block `{- … -}`, and doc block `{-- … --}`.
+    /// Classification is specific-before-general at each dispatch point
+    /// (`---` before `--`; `{--` before `{-`), matching
+    /// `lossless.rs::append_trivia`'s independent rescan of the same bytes
+    /// exactly -- LANG-SURFACE-BLOCK-COMMENTS AC-1 is the two scanners never
+    /// disagreeing about where a comment ends.
+    fn skip_ws_comments(&mut self) -> Result<(), ElabError> {
         loop {
             while self.cur().map(|c| c.is_whitespace()).unwrap_or(false) {
                 self.advance();
             }
-            if self.src[self.pos..].starts_with("--") {
+            if self.src[self.pos..].starts_with("{--") {
+                self.skip_doc_block_comment()?;
+            } else if self.src[self.pos..].starts_with("{-") {
+                self.skip_nested_block_comment()?;
+            } else if self.src[self.pos..].starts_with("--") {
+                // Covers both `--` and `---` -- a doc line comment is a line
+                // comment whose text happens to start with a dash; both scan
+                // identically to end-of-line/EOF (a line comment cannot nest
+                // and cannot fail, `31 §5`).
                 while self.cur().map(|c| c != '\n').unwrap_or(false) {
                     self.advance();
                 }
             } else {
                 break;
+            }
+        }
+        Ok(())
+    }
+
+    /// `{- … -}`, nestable (`31 §5`, D1). Depth starts at 1 after the opening
+    /// `{-`; each further `{-` increments, each `-}` decrements, and the
+    /// comment ends the instant depth reaches 0. A nested `{--` partially
+    /// matches this `{-` check (2 of its 3 characters), incrementing depth
+    /// with the extra `-` left as ordinary body content on the next
+    /// iteration -- deliberate, not a gap: only the outer, block-opening
+    /// position is classification-sensitive to `{--` vs `{-`; once inside a
+    /// `{- -}` body, only balance (`{-`/`-}`) matters. `start` anchors the
+    /// unterminated-comment span at the opening `{-`, through EOF.
+    fn skip_nested_block_comment(&mut self) -> Result<(), ElabError> {
+        let start = self.pos;
+        self.advance();
+        self.advance(); // consume '{-'
+        let mut depth: usize = 1;
+        loop {
+            if self.src[self.pos..].starts_with("{-") {
+                self.advance();
+                self.advance();
+                depth += 1;
+                continue;
+            }
+            if self.src[self.pos..].starts_with("-}") {
+                self.advance();
+                self.advance();
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(());
+                }
+                continue;
+            }
+            if self.advance().is_none() {
+                return Err(ElabError::ParseError {
+                    msg: "unterminated block comment".to_string(),
+                    span: Span::new(start, self.pos),
+                });
+            }
+        }
+    }
+
+    /// `{-- … --}` (`31 §5`, D2). Deliberately NOT nesting -- the spec marks
+    /// only the plain block form "(nestable)"; a doc block scans for the
+    /// first literal `--}` and treats everything else, including anything
+    /// that looks like a nested `{-`/`{--`, as ordinary body content.
+    fn skip_doc_block_comment(&mut self) -> Result<(), ElabError> {
+        let start = self.pos;
+        self.advance();
+        self.advance();
+        self.advance(); // consume '{--'
+        loop {
+            if self.src[self.pos..].starts_with("--}") {
+                self.advance();
+                self.advance();
+                self.advance();
+                return Ok(());
+            }
+            if self.advance().is_none() {
+                return Err(ElabError::ParseError {
+                    msg: "unterminated doc block comment".to_string(),
+                    span: Span::new(start, self.pos),
+                });
             }
         }
     }
@@ -515,7 +595,7 @@ impl<'s> Lexer<'s> {
     }
 
     fn next_token_inner(&mut self) -> Result<(Token, Span), ElabError> {
-        self.skip_ws_comments();
+        self.skip_ws_comments()?;
         let start = self.pos;
 
         let c = match self.cur() {
@@ -856,6 +936,15 @@ impl<'s> Lexer<'s> {
                 "theorem" => Token::KwTheorem,
                 "axiom" => Token::KwAxiom,
                 "proof" => Token::KwProof,
+                // `true`/`false` -- Bool literals (`31 §3`, `:512`). The
+                // prelude's `Bool` already has `True`/`False` constructors
+                // (prelude.rs), so this is a pure lexical spelling: route
+                // straight to the existing ConId path rather than adding a
+                // literal token/AST/elaboration path. `True`/`False`
+                // (capitalized) already resolve via the fallthrough below,
+                // unaffected -- this adds the lowercase spelling alongside it.
+                "true" => Token::ConId("True".to_string()),
+                "false" => Token::ConId("False".to_string()),
                 "l" => Token::Ident("level".to_string()),
                 _ => {
                     let first = s.chars().next().unwrap();
