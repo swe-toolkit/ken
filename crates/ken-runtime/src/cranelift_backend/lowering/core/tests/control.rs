@@ -3142,6 +3142,43 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// Control 2 is not merely hard to author from source; **as stated it is
 /// self-defeating at the classifier**, one gate above anything this file tests.
 ///
+/// **CORRECTION to the paragraph above, Architect `evt_7mg1x1vqe7qph`: the
+/// predicate is EXISTENTIAL OVER BRANCHES, not universal.** The loop
+/// `return Ok(true)`s on the **first** branch that references its IH binder
+/// range, so an *entirely* selected-argument-only match is ordinary, while a
+/// selected-argument-only **branch** is lawful inside a `ComputationalMatch`
+/// that some *other* branch has earned. The sentence above says "a body" where
+/// the code says "any branch"; read it as scoped to the whole-match case.
+///
+/// **The prescribed multi-branch construction was then built and measured, and
+/// it is blocked by a DIFFERENT fact than the one this row first reported.** A
+/// three-constructor `Tree` with one self-calling branch and one field-only
+/// branch — the ruled shape exactly — still censuses **0** computational
+/// matches. The decisive detail is that nothing was folded away: the erased
+/// program retains **two** declarations, `main` and `size`, and `size` carries
+/// **3 ordinary matches, 0 computational, 0 recursive positions**. The
+/// self-calling branch is present and is still not IH-referencing.
+///
+/// ⇒ **The multi-branch route needs one IH-referencing branch to earn the
+/// classification, and NO surface branch is one.** Two independent mechanisms,
+/// each measured:
+///
+/// 1. **Surface recursion is named general recursion checked by SCT, not
+///    eliminator compilation.** A self-call erases to a
+///    `RecursiveDeclarationCall` — the same self-reference `px8l`'s own row
+///    asserts is retained — and never to a reference into the IH binder range.
+/// 2. **The prelude's hand-built `ITree` eliminator never reaches erasure.** A
+///    `bind`-using program erases to **exactly one declaration, `main`**, with
+///    zero matches of any kind: `bind` is specialized away at the checked-host
+///    boundary, so the one eliminator in the system that *does* carry IH binders
+///    is not in the erased IR to be matched on.
+///
+/// **This is reported, not routed around.** The existential refinement is
+/// correct and it is not what was blocking; the blocker is that the surface has
+/// no producer of an IH-binder reference at all. Naming which of the two claims
+/// moved matters more than the negative: the first report's *reason* was too
+/// broad, and its *conclusion* survives for a narrower reason.
+///
 /// **THE GAP, stated as its own sentence.** MEASURED: eight real-source programs,
 /// including two of this repo's own integration programs, produce zero
 /// `ComputationalMatch` nodes. CLAIMED, and NOT proven: that *no* Ken program
