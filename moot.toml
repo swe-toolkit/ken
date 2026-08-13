@@ -12,8 +12,8 @@
 # **25 seats — native Codex harness** (`harness = "codex"`, the operator's
 # ChatGPT/Codex subscription). Two tiers, by role shape rather than by team:
 #   - `gpt-5.6-sol`   — implementers, and the seats that author or audit deeply
-#                       (spec-author, conformance-validator, architect,
-#                       librarian, doc-author, research).
+#                       (spec-author, conformance-validator, librarian,
+#                       doc-author, research, runtime-implementer).
 #   - `gpt-5.6-terra` — leaders and QA (coordination + verification).
 # Effort is `model_reasoning_effort` on these seats, NOT `effort`.
 #
@@ -22,12 +22,21 @@
 # `model_reasoning_effort`), all on `claude-opus-5[1m]`:
 #   - `steward`             — operator proxy / workflow authority.
 #   - `adversary`           — standing red team.
-#   - `runtime-implementer` — reseated from `gpt-5.6-sol` on 2026-07-25 per the
-#                             operator: early results show Opus 5 is the stronger
-#                             coding model. ⚠ This is the one seat where the
-#                             MODELS.md tier table is deliberately overridden —
-#                             a T2 build seat running a T1 model. Treat the tier
-#                             table as a DEFAULT, not a constraint.
+#   - `architect`           — reseated from `gpt-5.6-sol` on 2026-08-13 per the
+#                             operator, swapping with `runtime-implementer`.
+#
+# ⚠ THE 2026-08-13 SWAP. `runtime-implementer` had been on Opus 5 since
+# 2026-07-25 (operator: early results showed it the stronger coding model) and
+# `architect` on `gpt-5.6-sol`. Those two seats exchanged models on 2026-08-13.
+# The count is unchanged at 25 / 3; the MEMBERSHIP is not, so a reader who
+# remembers "the implementer is the Claude seat" is now wrong.
+#
+# ⇒ The old note called `runtime-implementer` "the one seat where the MODELS.md
+# tier table is deliberately overridden — a T2 build seat running a T1 model."
+# That override has MOVED, not ended: `architect` is T1 and now runs a T1 model,
+# which is the table's default, while `runtime-implementer` is back on the tier
+# its role shape implies. **Treat the tier table as a DEFAULT, not a
+# constraint** — that lesson survives the swap even though its example does not.
 #
 # ⛔ The two harnesses need DIFFERENT operational handling, and conflating them
 # has cost real time. Codex seats: strand on a convo mention (repair with a bare
@@ -35,6 +44,15 @@
 # for literal text. Claude Code seats: do not strand on mentions, and `moot
 # compact` is no-op-prone there — prefer `send-keys`. See
 # `agent/playbooks/federation/steward.md` §2c for the full mechanics.
+#
+# ⚠ THE 2026-08-13 SWAP MOVED THE STRANDING RISK, and this is its most practical
+# consequence. `architect` stranded on nearly every mention on 2026-08-13 — five
+# stacked pastes, then six — and it is the seat every scope fork routes through.
+# On the Claude Code harness it should stop. Conversely `runtime-implementer`
+# inherits the Codex behaviour it did not have: it will now strand on mentions,
+# it will take `moot compact` reliably, and it needs `send-keys -l` for literal
+# text. ⇒ Move the per-tick composer check FROM the architect pane TO the
+# implementer pane; do not keep watching the seat that no longer has the fault.
 
 [convo]
 api_url = "https://mootup.io"
@@ -75,9 +93,11 @@ startup_prompt = "You are Ken's Steward (operator proxy, workflow authority). Re
 
 [agents.architect]
 display_name = "architect"
-model = "gpt-5.6-sol"
-harness = "codex"
-model_reasoning_effort = "high"
+# Reseated from `gpt-5.6-sol` to Opus 5 on 2026-08-13 per the operator, swapping
+# seats with `runtime-implementer`. Claude Code harness, so `effort` — NOT
+# `model_reasoning_effort`, and no `harness` key.
+model = "claude-opus-5[1m]"
+effort = "high"
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
@@ -193,8 +213,12 @@ startup_prompt = "You lead Ken's Runtime team. Read agent/COORDINATION.md (feder
 
 [agents.runtime-implementer]
 display_name = "Runtime implementer"
-model = "claude-opus-5[1m]"
-effort = "high"
+# Reseated from `claude-opus-5[1m]` back to `gpt-5.6-sol` on 2026-08-13 per the
+# operator, swapping seats with `architect`. Codex harness, so
+# `model_reasoning_effort` — NOT `effort`.
+model = "gpt-5.6-sol"
+harness = "codex"
+model_reasoning_effort = "high"
 startup_prompt = "You are the Runtime team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/runtime/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-qa]
