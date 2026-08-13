@@ -643,10 +643,26 @@ pub(in crate::cranelift_backend) fn d2e_take_binder_assemblies() -> Vec<D2eBinde
 
 /// Record one assembled hypothesis prefix.
 ///
-/// Total and lossless over the prefix: a binding that is not a recursor closure
-/// contributes nothing, which is the same "nothing to record" answer any other
-/// non-recursor value gets, and it would show up as a short prefix rather than
-/// as a silently reordered one.
+/// A binding that is not a recursor closure contributes nothing, which is the
+/// same "nothing to record" answer any other non-recursor value gets, and a
+/// dropped hypothesis shows up as a short prefix rather than as a silently
+/// reordered one.
+///
+/// ⛔ **It was described here as "total and lossless over the prefix", and that
+/// is now WITHDRAWN — it is blind to a static-worker induction hypothesis, which
+/// is a real gap rather than a filter.** `assembled_prefix` is built from
+/// `sibling_position`, which only a `Lowered::ComputationalRecursorClosure`
+/// carries. Since the composed eliminator's two-member worker wiring
+/// (`RT-LEXICAL-R3-FUSION-EMITTER` `D3`), a recursive position whose field
+/// transports a worker assembles a [`LoweringEnvironmentBinding::StaticWorker`]
+/// hypothesis instead, and this recorder skips it.
+///
+/// ⇒ So an **empty** `assembled_prefix` has two causes: no hypothesis was
+/// assembled, and every hypothesis was a worker. A control reading emptiness as
+/// the first would be reading the second. Nothing asserts on it for the worker
+/// population today, which is why this is a note rather than a red; widening the
+/// record means giving the worker member a coordinate to report, which changes
+/// what this row means rather than adding to it.
 #[cfg(test)]
 fn d2e_record_binder_assembly(
     case: &crate::RuntimeComputationalMatchCase,
@@ -4607,6 +4623,56 @@ impl StaticWorkerFieldLedger {
                     ),
                 ));
             }
+            // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ARMED COMPILE NOW
+            // ---- STOPS HERE, and this arm had never been evaluated on this
+            // ---- witness before.
+            //
+            // Until the two-member binder wiring landed at the composed
+            // eliminator (`core.rs`, the reversed IH prefix), the armed compile
+            // refused *earlier* -- at `specialized_at`, before it ever assembled
+            // the case run -- so no transport was minted on this witness and this
+            // close was never reached with a live obligation. **The red is the
+            // increment working, not a regression it introduced.**
+            //
+            // MEASURED, identically on both armed roots (`Exact`, `ReHomed`),
+            // by instrumenting the assembled run and every exact-`Var` call:
+            //
+            // ```text
+            // env[0] = Worker(body=34, transport=None)      <- induction hypothesis
+            // env[1] = Worker(body=34, transport=Some(0))   <- selected recursive field
+            // the ONLY exact-Var call in the case body: Var(0)  -> transport None
+            // ```
+            //
+            // ⇒ Two distinct members over the **same** joined worker, exactly as
+            // ruled, with the single transport on segment 2 alone -- and the case
+            // body's own recursive call names the *hypothesis*. So the transport
+            // is minted and nothing consumes it, and this close fires.
+            //
+            // **CLAIMED by this refusal:** the worker is dropped. **THE GAP:** on
+            // this witness it is not. The identical body is bound at `env[0]` and
+            // *is* called; what no consumption exists for is this particular
+            // transport identity. The refusal's own last clause -- *"no other
+            // transport's consumption discharges it"* -- is true and is precisely
+            // the thing in question, because the sibling member carries no
+            // transport at all rather than a second one.
+            //
+            // ⛔ **Two landed laws collide here and neither is wrong.** `D6a`
+            // requires ALL constructor arguments to be bound, the selected
+            // recursive one included, or every later binder shifts by one. The
+            // conservation ledger requires every rebound transport to be consumed,
+            // or a worker is silently discarded. A body that reaches its recursive
+            // producer through the hypothesis satisfies the first and violates the
+            // second. The specialization sibling in `units.rs` cannot see this: it
+            // builds both members through `construct_static_worker_binding`, so
+            // NEITHER carries a transport and no obligation is ever opened.
+            //
+            // ⛔ **Do not repair this by moving the transport onto the hypothesis.**
+            // It makes this witness green and mirrors the same red onto any body
+            // that does reference the field, and the ruling assigns the
+            // recognition-to-rebind transport to segment 2 alone. Whether a
+            // recognition that produced two members is discharged by one
+            // consumption among them is a ledger-shape question, and it is routed
+            // rather than taken here.
             if !self.consumed.contains_key(transport) {
                 return Err(unsupported(
                     "StaticWorkerBinding",

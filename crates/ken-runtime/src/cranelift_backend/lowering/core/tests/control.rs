@@ -2894,7 +2894,7 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
                 if *construct == "StaticWorkerBinding"
-                    && reason.contains("requires an ordinary specialized constructor field")
+                    && reason.contains("never consumed at an exact-Var call")
         );
         rows.push((cause, reached));
         realized_outer.push((
@@ -2917,28 +2917,38 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must stop at the computational recursor's selected recursive \
-         argument: the composed answer discharged its own computational frame, the unchanged \
-         operand routed through the remaining stack, and the worker-transporting field is now \
-         REACHED by an eliminator that wants an ordinary specialized field. That is the next \
-         link. If this row is red because the stop MOVED, the comment beside the D2f installer \
+        "the armed compile must stop at the STATIC-WORKER FIELD LEDGER's close: the composed \
+         eliminator now builds the ruled two-member binder run, so the selected recursive \
+         field is rebound into binding authority as a transport, the case body's own recursive \
+         call names the transport-free induction hypothesis beside it, and the close finds the \
+         transport minted and never consumed. \
+         SUPERSEDED STOP, recorded rather than deleted: through `91e06d51` this row matched \
+         `requires an ordinary specialized constructor field` -- the seat had no disposition for \
+         a recursive position whose field transports a worker, and refused before it ever \
+         assembled the run. That stop is CLEARED by the two-member wiring; the ledger close is a \
+         link BEYOND it, not the same one renamed. \
+         If this row is red because the stop MOVED again, the comment beside the D2f installer \
          in core.rs is now stale and must be restated to the new measured stop rather than this \
          assertion being relaxed"
     );
     assert_eq!(
         realized_outer,
         vec![
-            (D2jCause::Exact, 0usize, 0usize),
-            (D2jCause::ReHomed, 0usize, 0usize),
+            (D2jCause::Exact, 1usize, 1usize),
+            (D2jCause::ReHomed, 1usize, 1usize),
         ],
-        "R is UNREACHED at this stop, and that is a statement about ORDER rather than about R. \
-         The eliminator-role axis moved the I path's stop into the fused body's own definition, \
-         which runs before `define_unit_bodies` -- so the compile now ends before the consumer \
-         unit's body, where the R descent and the fused invocation live. \
-         SUPERSEDED EXPECTATION, recorded rather than deleted: both were (1, 1) at `ddb04292`, \
-         measured, with the descent and the invocation pinned as a pair. This row must return to \
-         (1, 1) when the I path clears its stop -- if it is red because these became non-zero, \
-         that is the advance and the pair expectation is what to restore"
+        "R is REACHED again, and the descent and the fused invocation are pinned as a PAIR -- \
+         one outer dispatch and one fused invocation per compile, never a count on either alone. \
+         THE RESTORATION THIS ROW ASKED FOR, and it arrived by the predicted route: the pair was \
+         (1, 1) at `ddb04292`, went to (0, 0) when the eliminator-role axis moved the I path's \
+         stop into the fused body's own definition -- which runs BEFORE `define_unit_bodies`, so \
+         the compile ended ahead of the consumer unit's body where both live -- and returns to \
+         (1, 1) now that the two-member binder wiring carries the I path past that stop. The \
+         (0, 0) reading was a statement about ORDER and never about R, and it is kept here \
+         because a future reader meeting a (0, 0) red needs to know it has been lawful once. \
+         ⛔ Never relax either element to an inequality: `>= 1` on the pair stays green through \
+         a compile that reaches the descent and drops the invocation, which is the one \
+         asymmetry this row exists to catch"
     );
     assert_eq!(
         realized,
