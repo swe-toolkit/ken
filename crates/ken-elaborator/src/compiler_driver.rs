@@ -2063,7 +2063,7 @@ fn checked_computational_ih_templates(
 /// `compile_native_program_sources` now **consumes this same transaction**, so
 /// there is one producer rather than a test path running beside production.
 ///
-/// ⛔ **The caller cannot author any of it.** The returned
+/// **The caller cannot author any of it.** The returned
 /// [`NativeProgramPreparationV1`] is immutable and has no public constructor, no
 /// compiler-private seed enters through this signature, and no plan, marker or
 /// seed collector becomes reachable from outside. A control built on it reads
