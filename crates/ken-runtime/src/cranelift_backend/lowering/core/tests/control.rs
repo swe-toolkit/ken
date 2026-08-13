@@ -2761,6 +2761,17 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// four being its only callers, not by a measurement over program shapes.
 /// Stated so a reader knows which kind of claim it is.
 ///
+/// ⇒ **"Production compile" in this row's NAME means that delegation graph, and
+/// NOT a compile of real Ken source.** The fixtures here are `D2jCause`
+/// synthetic programs, as at every control on this seat. Measured 2026-08-13
+/// and recorded in full on
+/// [`d2f_the_two_binder_projections_share_one_source_field_transport`]: the
+/// ordinary front end emits **no `ComputationalMatch` at all** across eight
+/// real-source programs, including `px7p`'s own green integration program — so
+/// there is no real-source witness available to any row here, and the name
+/// should not be read as claiming one. The gap is reported and unrepaired: the
+/// classifier admitting this shape is a checker change, not this seat's.
+///
 /// **Named rather than cited by line**, because a line number goes stale
 /// silently and then points at unrelated real content — a reader who follows it
 /// gets a confident wrong answer instead of a missing one.
