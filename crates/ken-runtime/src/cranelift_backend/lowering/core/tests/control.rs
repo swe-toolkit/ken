@@ -3653,9 +3653,14 @@ fn d2f_0_the_applied_root_production_path_gate() {
 ///
 /// CLAIMED: recording the input populations does not alter compilation output.
 ///
-/// THE GAP: this does not attribute any enumerator exit. A non-empty walked
-/// population beside empty keys exhausts this observation route and licenses no
-/// conclusion about which planner relation declined the candidates.
+/// THE GAP: `d2f_0_the_applied_root_production_path_gate` pins the five input
+/// populations at `(4, 2, 0, 2, 1)` for the perturbed `ExactSuffix` and
+/// `CallIdentity` causes, while
+/// `r3_4b_input_observation_is_artifact_identical_when_disabled` pins the same
+/// tuple for unperturbed `Exact`. The latter resolves one key and descriptor;
+/// the former two resolve none. The `walked` input-population count is sound,
+/// but it does not move when a downstream relation declines, so it cannot
+/// establish whether a decline occurred or attribute one.
 ///
 /// Promise class: durable invariant.
 #[test]

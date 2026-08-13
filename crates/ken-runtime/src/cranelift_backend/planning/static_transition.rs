@@ -10050,6 +10050,9 @@ pub(in crate::cranelift_backend) fn build_static_continuation_fusion_plan(
         fusion.walked_admitted_continuation_discoveries =
             _walked_admitted_continuation_discoveries;
     }
+    // On this same `oriented = None` branch the helper above returns
+    // `(Vec::new(), 0)`, so `fusion` is exactly `default()` in every build,
+    // including test builds.
     let Some(oriented) = oriented else {
         return Ok(fusion);
     };
@@ -18998,7 +19001,11 @@ mod tests {
             let plane = match mutate {
                 None => resolved,
                 Some(carrier) => {
-                    // The operand moved, and nothing else. The key is otherwise
+                    // Within the tuple returned below, the operand moved and
+                    // nothing else. The mutated plan itself is synthetic
+                    // `::default()` and carries no enumerator input count; a
+                    // `walked` difference would be attributable to that
+                    // synthetic branch, not to the carrier. The key is otherwise
                     // the one production derived, so a refusal here is
                     // attributable to the carrier and not to a hand-built key.
                     let mut key = resolved.installed_keys()[0].clone();
