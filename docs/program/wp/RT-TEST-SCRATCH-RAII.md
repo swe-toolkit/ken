@@ -34,6 +34,41 @@ are not all the same defect**:
 `temp_output_dir` at `native_execution_differential.rs:3302`, which returns a
 bare `PathBuf` with a nanosecond suffix and no cleanup on any path.
 
+> ### `std::env::temp_dir()` IS NOT THE ONLY AXIS, AND THE OTHER ONE LEAKS MORE PER RUN
+>
+> **Added 2026-08-13 after the eighth recurrence.** The enumeration above, and
+> `AC-3`'s residue census below, were both keyed on `std::env::temp_dir()`.
+> **The site that filled the volume that day does not call it.**
+>
+> `r3_4b_observation_feature_is_native_artifact_identical` — the two-compilation
+> identity control landed by `RT-4B-OBSERVATION-FEATURE-GATE` — keys its scratch
+> on `std::process::id()` under **`CARGO_TARGET_TMPDIR`**, and removes nothing.
+> Because it is an *artifact-level* A/B it must not share a Cargo target
+> directory, so each run leaves **two full target trees**. Ten accumulated runs
+> across implementer and QA were **11G**, against `/workspaces/ken` at 97% used.
+>
+> ⇒ **Enumerate on BOTH axes.** A grep for `temp_dir` returns zero hits on the
+> single largest leaker in the tree, and the direction of that failure is the
+> bad one: `AC-3` would report a complete residue census over a population that
+> never contained it.
+>
+> **The per-run mass, not the per-run count, is what makes this the priority
+> case.** The `temp_dir` sites leak ~1200 small directories an hour; this one
+> leaks two Cargo target trees per invocation. Both fill the volume; only one is
+> visible to a directory count.
+>
+> **It is partly covered already, and you must not treat that as done.**
+> `RT-4B-UNIQUENESS-GATE-REACH` carries `AC-9`, which cleans this one site up,
+> because that node's `AC-6` re-runs the control and re-arms the leak by
+> construction. **`AC-9` is a point fix on one fixture; this node owns the
+> class.** If `AC-9` has already landed when you start, the site is migrated
+> rather than absent — classify it, do not skip it.
+>
+> **Keep the failure artifacts on failure.** For this fixture the two divergent
+> target trees *are* the evidence when the identity control reds. Remove on
+> success; preserve on failure and say where. That is a real instance of the
+> deliberate-outlive question the node already flags as open.
+
 **`Drop`, not an explicit cleanup call.** A scratch directory removed at the
 end of a test body leaks precisely when the test fails — which is when runs are
 most frequent and the volume is under the most pressure. `Drop` runs during
@@ -68,10 +103,14 @@ migrated fixture and show the same zero delta. **This is the AC the node exists
 for** — the success path is the easy half and the failure path is where the
 mass came from.
 
-**AC-3 — the residue is accounted.** After the migration, enumerate every
-remaining `env::temp_dir()` site and classify it as fixed-name or migrated.
-**A count of unclassified sites must be zero.** Without this the next audit
-cannot tell "examined and fine" from "missed."
+**AC-3 — the residue is accounted, ON BOTH AXES.** After the migration,
+enumerate every remaining `env::temp_dir()` site **and** every
+`CARGO_TARGET_TMPDIR` site, and classify each as fixed-name, migrated, or
+deliberately outliving its test. **A count of unclassified sites must be zero,
+and the report must state both populations separately.** Without this the next
+audit cannot tell "examined and fine" from "missed" — and a census over one
+axis alone reports complete while missing the largest leaker, which is exactly
+how this node reached its eighth recurrence.
 
 **AC-4 — no fixture's assertions changed.** This is a lifetime fix. If a test's
 expected values move, stop and say why.
