@@ -62,19 +62,61 @@
 >
 > Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~17:2xZ. **`main` = `0da7b96b`+.**
-> **BOTH RINGS WORKING — do not kick either. A publisher is in its window.**
+> ### RESUME HERE — state at 2026-08-13 ~18:3xZ. **`main` = after PR #2114.**
+> **BOTH RINGS WORKING — do not kick either. Publish queue is EMPTY.**
 >
-> **Runtime — `RT-4B-UNIQUENESS-GATE-REACH`**, anchor `evt_5z91smqzjpnck`.
-> Follows `81f46822`, does not run beside it (same files, one lane).
-> **Language — `LANG-SURFACE-LITERAL-ESCAPES`**, anchor `evt_1geg939by8h4r`.
+> **Runtime — `RT-4B-WALKED-CONSTANCY`**, anchor `evt_7s6enk2syyct1`
+> (re-kick; the first kick `evt_3haj2jas0n876` fired before the frame was on
+> `main` and Runtime correctly refused it). Comment-only, XS, **four sites**.
+> **Amended twice — D3/AC-6 and D4/AC-7 — and the frame now says no further
+> amendment is coming. Hold to that.**
+> **Language — `LANG-SURFACE-LITERAL-ESCAPES`**, anchor `evt_32763was18rw6`.
+> The leader had been stalled awaiting clarification on the duplicate
+> `LANG-RECORD-STACK-OVERFLOW` kickoff; cleared. **Next ready is
+> `LANG-SURFACE-BLOCK-COMMENTS` and the leader takes it without returning to
+> the Steward.**
 >
-> **PUBLISH QUEUE, IN ORDER:** (1) Steward corpus `5baf3d6b`, in window;
-> (2) Runtime `81f46822` — QA-approved, **runtime-leader owes the merge
-> Decision, do not publish before it lands**; (3) doc commits `d7d008a3` +
-> `d1cf32f2`.
+> ### 4b IS UNBLOCKED AND ITS NEXT INCREMENT IS FRAMED
 >
-> ### R3 GATE 4b — C2 HAS STILL NEVER BEEN MEASURED. READ THIS BEFORE ANY 4b WORK.
+> **`RT-4B-C2-REACHABILITY` is `closed`, answered with the second licensing
+> row: reachable, BUT THE REACHING BUILD DIFFERS FROM PRODUCTION.** The D2f
+> record, storage, note/take and sole write are all `#[cfg(test)]`, and C2 is a
+> `ken-elaborator` integration test whose Runtime dependency carries default
+> features only. The answer is recorded in the node, not only in the thread.
+>
+> **The Architect ruled (`evt_4a1pf1jfmdemd`): a default-off feature is INSIDE
+> the 4b envelope** — one of the two mechanisms his original 4b ruling named.
+> **4b is not blocked on the envelope, not awaiting a count, and not blocked on
+> cross-crate gate expressibility.**
+>
+> **`RT-4B-OBSERVATION-FEATURE-GATE` (`ready`, M) is Runtime's next node.** Its
+> five review conditions are ACs. **The one that bites: identity must be proven
+> across TWO COMPILATIONS, not a runtime toggle inside one.** A feature is a
+> compile-time property; the landed switch proves the *recording* inert, not the
+> *feature*. Cargo unifies features across a build graph, so the two cannot
+> coexist in one compilation — and the two builds must not share a
+> `CARGO_TARGET_DIR` or the comparison reads one artifact against itself.
+>
+> `RT-4B-UNIQUENESS-GATE-REACH` stays `draft` until that identity proof lands,
+> then re-points at C2. `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` stays `draft`
+> behind it. **Do not cut either.**
+>
+> ### OPEN TO THE OPERATOR — VERIFY IS IDLE AND FRAMING CANNOT FIX IT
+>
+> **`SEC1-IFC-R3` is Verify's only open node**, and it needs an SMT/Z3 backend
+> that **is not a dependency of this workspace at all**. `AC-R3b`/`AC-R3c`
+> cannot be discharged without building the prover backend, which the node's own
+> scope bans — **the frame is unsatisfiable as written.** The Z3-free widening
+> is recorded vacuous: `declare_deceq_certificate` has exactly one caller,
+> registering `Int`, so there is no second type to generalize to.
+>
+> **Escalated 2026-07-27, unanswered as of 2026-08-13.** Re-raise it; do not
+> re-derive it as framing debt.
+
+> ### R3 GATE 4b — WHY C2 HAS NEVER BEEN MEASURED. READ THIS BEFORE ANY 4b WORK.
+>
+> **The reachability half of this block is now ANSWERED — see the block above.
+> What follows is why the measurement was never taken, and it is still live.**
 >
 > **A previous version of this block said the observation route was exhausted
 > and that "there was nothing to fuse" was dead. BOTH WERE WRONG and are
@@ -95,10 +137,18 @@
 > key and one descriptor. THIS PLANNER FUSES.** The artifact-identity control
 > drives `d2j_checked_fixture_under(D2jCause::Exact)` — **not `C2_MIXED_SOURCE`.**
 >
-> **`C2`'s walked count is UNMEASURED, exactly where 4b stood before the
-> increment.** `RT-4B-UNIQUENESS-GATE-REACH` and `RT-4B-UNIQUENESS-GATE-ATTRIBUTION`
-> are **both `draft`; do not cut either.** Pointed as written, reach would count
-> the same comparators.
+> **`C2`'s walked count is UNMEASURED.** `RT-4B-UNIQUENESS-GATE-REACH` and
+> `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` are **both `draft`; do not cut either.**
+> Pointed as written, reach would count the same comparators.
+>
+> **And a `walked` count would not have settled it anyway.** Measured on the
+> two landed assertions: `(walked, frames, recursive, slots, calls)` is
+> `(4, 2, 0, 2, 1)` for `ExactSuffix` and `CallIdentity` (0 keys) **and for
+> `Exact` (1 key)** — the perturbation moves the outcome and leaves all five
+> numbers unchanged. `walked` is the enumerator's INPUT size, so **no claim
+> about candidate formation can be supported by it, on any cause.**
+> `RT-4B-WALKED-CONSTANCY` is landing that sentence into the observation's own
+> doc.
 >
 > **THE ACTUAL BLOCKER, unchanged since 4b opened: cross-crate gate
 > expressibility.** The observation is `#[cfg(test)]` inside `ken-runtime`; C2
