@@ -1,7 +1,7 @@
 ---
 id: RT-4B-C2-REACHABILITY
 title: "Establish whether a witness driving through `ken-elaborator` can reach the `D2f` observation at all, and at what cost -- the question 4b opened with, never answered, and the reason every 4b measurement so far has been taken on in-crate D2j fixtures instead of the real C2 source; the answer decides whether the reach node re-points or 4b's honest status becomes blocked-on-cross-crate-expressibility rather than awaiting-a-count"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
