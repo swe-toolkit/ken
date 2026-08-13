@@ -11,6 +11,12 @@ github: null
 origin: Architect evt_7011z8x4x2j3d naming the one-function attribution start and explicitly NOT authorizing it, on the stated condition that the size increment return a non-empty population. It did -- `(4, 2, 0, 2, 1)` at RT-4B-ENUMERATION-INPUT-SIZE. Steward taking the scope question to the Architect 2026-08-13. DRAFT until that scope call lands.
 ---
 
+> **TRIGGER NOT MET — `reach > 0` was never measured on the population in
+> question (Architect `evt_6hfw027f43cgg`). The `(4, 2, 0, 2, 1)` reading came
+> from D2j comparators PERTURBED so fusion cannot form, not from `C2`. See the
+> banner on [[RT-4B-UNIQUENESS-GATE-REACH]], which is also pulled back to
+> `draft`. This node stays `draft` and is further from lawful than before.**
+>
 > **SPLIT 2026-08-13 (Architect `evt_5gck3qg72xe37`). THIS NODE IS NOW THE
 > CONDITIONAL HALF ONLY, AND IT IS NOT LAWFUL YET.**
 >
