@@ -542,6 +542,139 @@ nothing you inherit from `#6d`.**
 > Architect's — the incompleteness of a work package is immaterial to whether the
 > code is on `main`.**
 
+> ### THE `I` ANSWER DISCHARGES ITS OWN EXACT FRAME FIRST, THEN CONTINUES.
+> ### Steward, 2026-08-13, folding Architect `evt_43ng4f578mdvv` into operative
+> ### scope. **NEWEST BOX. It corrects the earlier phrase "feed the
+> ### phase-bearing result directly to the caller's existing outer
+> ### eliminator" — the missing word was AFTER.**
+>
+> **The comparator killed the dichotomy before the ruling was written.** I
+> authorized one bounded unarmed comparator; it returned a **third** answer that
+> neither candidate reading was. **The seat is SHARED and CORRECT** — same
+> construct 36/32, same eliminator continuation 25/21, same defining unit, on
+> both the ordinary and the armed path. **Only the PHASE differs.** Unarmed, the
+> value arrives `Carried` (an ABI result word), which never enters static case
+> selection and takes runtime dispatch. Armed, the composition delivers
+> `Specialized(Constructor)`, a compile-time template, which **forces** the
+> static-selection branch — and that branch trapped on `D2gOut::Node` against
+> cases over `D2gIn::{Node, Leaf}`.
+>
+> ⇒ **It was neither fusion-specific mis-seating NOR a latent ordinary-path
+> defect that arming merely exposes.** Both readings were wrong. Do not
+> re-litigate this with either of them.
+>
+> #### The literal answer
+>
+> The locally composed `I` result is **the answer of the exact computational
+> frame the `I` specialization has ALREADY eliminated**. It belongs *after* that
+> frame, on the remaining continuation stack. **It is not the scrutinee of that
+> same frame** — feeding it back to the just-consumed frame is precisely the
+> observed trap. The shared seat must bypass exactly the matching `D2gIn` frame
+> and present the still-specialized `D2gOut` value to the remaining outer
+> eliminator, which may then select `D2gOut::Node`, destructure field 0, and
+> reach `constructor_field_bindings`. **If no eliminator remains, the operand is
+> the answer and returns unchanged.**
+>
+> **No phase conversion is authorized.** `Carried` vs `Specialized` is
+> representation phase, not semantic role. Converting the local result to
+> `Carried` would **hide the wrong-frame replay behind runtime dispatch** and
+> discard the compile-time constructor the worker-field rebind needs. The
+> specialized template stays specialized. The unarmed comparator stays
+> byte-identical and **unclassified** — it proved only that an opaque ABI word
+> reaches the shared seat, never what that word denotes.
+>
+> #### The mechanism: a second routed-answer axis, NOT a new seat
+>
+> Keep `lower_computational_match_value_composed` as the shared meeting point.
+> **Do not overload `SourceComputationalAnswerRoute`** — that axis records the
+> exact predecessor route used by carried dispatch. Add a separate, exhaustive
+> eliminator-role disposition: ordinary values and ordinary call results are
+> `Scrutinee`; a successful fusion-local `I` composition is
+> `AnswerAfterComputationalFrame { continuation_origin }`.
+>
+> **The second variant is issued ONLY from the already-selected
+> `FusionComposedEdge`**, and its origin is that edge's planner-authored
+> `consumer_continuation_origin` — never constructor spelling, result shape,
+> defining unit, or a search.
+>
+> **Issuer closure, before ledger consumption and before the selected body is
+> lowered:** the identity is in `dom(FusionComposedEdge)` with layer `Inner`;
+> the current head is `EliminatorFrame::Computational`; the head's
+> `static_origin` **exactly** equals the edge's `consumer_continuation_origin`;
+> and the target selected-body facts name that same origin. A missing head, an
+> `Ordinary`/`Active`/`PendingLet`/`InvocationReturn` head, or an origin
+> disagreement **refuses before affine consumption or any emitted instruction**.
+> The detached-result consumer, which cannot present this exact current-frame
+> proof, **must refuse** an `I` composition rather than infer a destination.
+>
+> **At the consumer**, handle `AnswerAfterComputationalFrame` **before phase
+> classification and before entering or selecting the head frame**: re-check
+> that the actual head is the recorded computational frame, remove **exactly one**
+> frame, clear the disposition to `Scrutinee`, then return the operand unchanged
+> if the tail is empty, or continue the same operand at the same phase with its
+> existing predecessor route through the remaining eliminators. **Never remove
+> zero frames, two frames, or "the first computational frame found."** This is
+> exact-head discharge.
+>
+> #### Acceptance
+>
+> Exact and ReHomed must each show, in order: one `Inner` local composition;
+> disposition `AnswerAfterComputationalFrame(25/21)`; the same shared seat at
+> construct 36/32; **exactly one** matching `D2gIn` head discharged **without
+> case selection**; **zero** attempts to select `D2gOut::Node` against
+> `D2gIn::{Node, Leaf}`; the unchanged specialized `D2gOut::Node` continuing to
+> the remaining `D2gOut` eliminator; that eliminator selecting its `Node` case
+> and entering the constructor-field extension/binding seat for field 29/25; and
+> the transport ledger observing one recognition and one matching mint/rebind.
+>
+> **Keep the unarmed comparator unchanged.** Add red controls for: omitting the
+> answer disposition (**must reproduce the measured wrong-datatype trap**), wrong
+> recorded origin, wrong head kind, dropping zero or two frames, applying the
+> disposition to the ordinary direct path, converting the result to `Carried`,
+> and consuming the composition ledger before a destination mismatch refuses.
+>
+> **The shipped `R` consuming-call chain is unaffected.** This advances only the
+> `I` result-to-rebind link; production stays unarmed and every outstanding R3
+> control remains unshrunk.
+
+> ### ACCEPTED LIMITATION — `consume`'s seat guard STAYS VACUOUS, and that is
+> ### a decision, not an oversight. Steward, 2026-08-13. **Do not re-file it
+> ### and do not "simplify" it.**
+>
+> The Adversary found `consume`'s guard compares `claim.seat() != seat` where
+> both of its only two callers derive `seat` from the very claim being consumed,
+> making it `claim.seat() != claim.seat()` across the whole caller population.
+> Its preferred repair was to drop the parameter and read `claim.seat()` inside
+> `consume`, making the mismatch unrepresentable.
+>
+> **That repair is REFUTED by measurement, and it is the reason the read was
+> ordered first.** `seat()` returns `self.redirect.call_site_origin()` — the
+> redirected edge's own call-site origin in the consumer's body — and its own
+> doc says it is **not** the consuming `Call` and not the construct origin.
+> Measured on both armed roots: **seat 37/33 against consuming call 17/13.**
+> They are **different coordinates**, so collapsing the parameter would
+> permanently and silently foreclose the cross-check their distinctness leaves
+> room for.
+>
+> **The other repair does not exist here either.** Passing an independently
+> derived seat means passing `static_origin` — but by this seam's own selector
+> `static_origin` **is** the consuming call, so it would refuse every lawful
+> consumption. Every remaining source is circular: `unit_calls` is keyed by the
+> seat, and `target.call_site_origin` is the value the redirect wrote from
+> `claim.seat()`.
+>
+> ⇒ **The derivation that would make this a live check does not exist at either
+> caller today.** The guard stays, the parameter stays, and the reason is
+> recorded at the call site. A future third caller can revisit it; a future
+> reader must not collapse it on the assumption that the coordinates match.
+>
+> **Also corrected:** the comment above the affine mutation claimed *"all
+> fallible validation is above"*, which was false — and its obvious repair,
+> hoisting `consume`, is the defect, because that would settle a claim for a
+> call that had not been built. It now says the narrower true thing:
+> **everything hoistable is above the action; the one check whose answer can
+> only change AS A RESULT of the action is below, where it must be.**
+
 > ### STANDING REVIEW LENS FOR THIS NODE — WATCH FOR A GUARD WHOSE OPERAND IS
 > ### READ OFF THE OBJECT IT IS GUARDING. Steward, 2026-08-13, promoting an
 > ### Adversary recurrence (`evt_3r7vb1a5ck5jy`) above either instance.
