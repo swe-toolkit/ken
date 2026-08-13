@@ -180,6 +180,41 @@ pub(in crate::cranelift_backend) fn with_d2f_worker_body_mutation<R>(
     run()
 }
 
+/// Test-only corruption of the consuming-call identity presented to the claim
+/// closure after the production selector has selected the exact claim.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D2fConsumingCallMutation {
+    Exact,
+    UseProjectedArgumentOccurrence,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2F_CONSUMING_CALL_MUTATION: std::cell::Cell<D2fConsumingCallMutation> =
+        const { std::cell::Cell::new(D2fConsumingCallMutation::Exact) };
+}
+
+/// Run one compile with a single post-selection consuming-call defect. The
+/// guard restores exact behaviour if lowering returns early or unwinds.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_d2f_consuming_call_mutation<R>(
+    mutation: D2fConsumingCallMutation,
+    run: impl FnOnce() -> R,
+) -> R {
+    struct Restore(D2fConsumingCallMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D2F_CONSUMING_CALL_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = D2F_CONSUMING_CALL_MUTATION.with(|cell| cell.replace(mutation));
+    let _restore = Restore(previous);
+    run()
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -13232,6 +13267,46 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 "a fused consuming call was reached outside both the claim's consumer owner and \
                  the region's own fused definition; only the external call emitted in the \
                  consumer owner realizes the region",
+            ));
+        }
+        // The production selector above supplies the exact Call occurrence.
+        // The test mutation is deliberately downstream of that selection and
+        // of the definition-local decline. It substitutes a real occurrence
+        // the external descent visited in this compile's projected argument
+        // run. The run itself remains unchanged and is checked independently
+        // below.
+        let checked_consuming_call = static_origin;
+        #[cfg(test)]
+        let checked_consuming_call = match D2F_CONSUMING_CALL_MUTATION.with(std::cell::Cell::get) {
+            D2fConsumingCallMutation::Exact => checked_consuming_call,
+            D2fConsumingCallMutation::UseProjectedArgumentOccurrence => {
+                let alternative = visited_arguments
+                    .and_then(|visited| visited.first())
+                    .copied()
+                    .expect("the governed R3 descent visited its projected argument run");
+                assert!(
+                    ![
+                        checked_consuming_call,
+                        claim.seat(),
+                        claim.producer_body(),
+                        claim.redirect().callee_origin(),
+                    ]
+                    .contains(&alternative),
+                    "the alternative occurrence must not collapse call-site and callee/body \
+                     identity"
+                );
+                alternative
+            }
+        };
+        if checked_consuming_call != claim.consuming_call() {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "the selected fused consuming Call occurrence {checked_consuming_call:?} is \
+                     not the claim's exact consuming Call {:?}; its ordered ordinary parameter \
+                     run belongs to another call site",
+                    claim.consuming_call(),
+                ),
             ));
         }
         if worker.body_origin != claim.producer_body()

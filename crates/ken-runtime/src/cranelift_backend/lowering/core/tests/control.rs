@@ -3317,6 +3317,142 @@ fn r3_fused_worker_body_refuses_before_claim_consumption() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the selected Call occurrence must be
+/// the claim's exact consuming Call before its ordered ordinary parameter run
+/// can enter the fused target.
+///
+/// **MEASURED:** after the real selector chooses the claim on both armed roots,
+/// substituting a real occurrence from that call's same-compile projected
+/// argument run reaches the consuming-call closure and refuses with zero claim
+/// consumptions and zero fused invocations. Exact selection completes at one
+/// and one.
+///
+/// **CLAIMED:** the field supplies the local worker binding, the claim's exact
+/// consuming Call supplies the ordered ordinary parameter run, and the checked
+/// worker body closes independently against `claim.producer_body()`.
+///
+/// **THE GAP:** this pins the consuming-call relation after exact selection. It
+/// does not pin producer captures, premature claim consumption, or the
+/// post-field direct-call route.
+///
+/// **Promise class: durable invariant.** The alternative is selected from the
+/// exact descent's real same-compile projected run while excluding the claim's
+/// consuming call, seat, producer body, and redirect callee. No origin literal,
+/// sentinel, hand-built claim, or coincident call-site/callee identity can
+/// discharge it.
+#[test]
+fn r3_fused_wrong_consuming_call_refuses_before_claim_consumption() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_consuming_call_mutation, D2fConsumingCallMutation, D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fConsumingCallMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let error = with_d2f_consuming_call_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-consuming-call",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("selected fused consuming Call occurrence")
+                    && reason.contains("not the claim's exact consuming Call") =>
+            {
+                "consuming-call refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fConsumingCallMutation::Exact, "exact"),
+            (
+                D2fConsumingCallMutation::UseProjectedArgumentOccurrence,
+                "wrong-call",
+            ),
+        ] {
+            let symbol = format!("ken_r3_consuming_call_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fConsumingCallMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fConsumingCallMutation::UseProjectedArgumentOccurrence,
+                "consuming-call refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fConsumingCallMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fConsumingCallMutation::UseProjectedArgumentOccurrence,
+                "consuming-call refusal",
+                0,
+                0,
+            ),
+        ],
+        "exact selection completes and consumes once; a different real occurrence from the \
+         call's projected run reaches the named closure and refuses before either affine event"
+    );
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.
