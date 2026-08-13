@@ -46,6 +46,61 @@
 > and the implementer is working from `main`.** The WP branch is merged and
 > deleted on origin — a resumed seat must start from `main`, not from a branch.
 >
+> ### TERNARY PARTIAL `be769a17` LANDED — PR #2057, blob-verified on all 8 files
+>
+> 3 commits from `f8f853b8`, 8 files all `crates/`, suite 915 (916 minus the one
+> control retired atomically with its mechanism).
+>
+> **THE FOURTH ROUTE IS LOCATED AND IT IS A MISSING SEAT, NOT A PROJECTION** —
+> ring tip `8b35361a`, comment-only on top of `be769a17`, 915 green.
+> `take_fused_region_at` is offered **only** on the source-machine
+> `ComputationalMatchScrutinee` continuation and is **entered zero times** on
+> both roots, so the takeover is never offered — not declined. **The guard is
+> load-bearing:** `redirect_fused_producer_invocations` did install the
+> consumer's call, so without takeover the body would **both call the fused
+> function and lower the same producer inline** — the forbidden second lowering.
+> Relaxing it lets a duplicate through rather than advancing the compile.
+>
+> **Routed to the Architect at `evt_1ff5k2b4cwvxj`: where does the takeover seat
+> belong.** Fourth time on this node an instrument at one consumer was blind to
+> another route (same shape as the `D1`/`D2` `DirectCall` move to the shared
+> funnel). Precedent says a seat every route passes through; **which** point has
+> been refuted six times when chosen at depth, so the implementer deliberately
+> did not pick. I pre-authorized the scope to move the seat and invited a probe.
+>
+> **Step 2's armed falsifier chain is UNRUN, NOT FAILING** — it cannot run until
+> that seat exists. State it that way.
+>
+> **SQUASH-MERGE TRAP, seen again and worth the line:** `git log origin/main..8b35361a`
+> shows **4** commits because `main` squash-merged three of them; the real diff
+> vs `main` is **2 files**. Judge by content, never by ancestry.
+>
+> **What it delivered:** the ternary `P = O ⊎ I ⊎ R` with `R` =
+> `FusionOwnedOuterRealization` selected by the checked consumer binding plus the
+> call-target bijection (coordinate equalities are a **closure check after
+> selection**, never a selector); the splice-capability census forked as the
+> ruling allowed — `SpliceCompositionCapabilityId` and
+> `SegmentComposition::Composed` **retired**, `composed_frame_templates`
+> **preserved** because it is checked-source **wire-format** state, so retiring
+> it would be a format break rather than removal of dead authority (now zero
+> readers under `crates/`); and the Adversary's vacuity finding repaired **inside**
+> the rewrite — `I ∩ R = ∅` is now genuinely **live** (under the binary form it
+> was algebra), and `O` comes from the single derivation the accessor calls, so
+> validated and consumed cannot drift **because there is one derivation**, not
+> because a check compares two.
+>
+> **THE ARMED STOP IS A DELIBERATE GUARD, NOT AN INCOMPLETE TURN.** A fourth
+> projection still routes `R` into call machinery; the shared funnel now refuses
+> `R` outright, fails closed, and names the residual. **Next unit's first step is
+> finding and narrowing that projection; the falsifier chain runs after it.**
+> Still owed: both same-body controls (`I`-vs-`O`, `R`-vs-`O`), selector nets 2
+> and 4, corrected-seam controls, inner-slot witness, self-edge discriminator,
+> route exclusions.
+>
+> **The implementer handled the squash-merge trap correctly** — `11177a3c` is not
+> an ancestor of `f8f853b8` and reads as never landed by SHA forever; it checked
+> **content** (`git diff ... -- crates/` empty) rather than ancestry.
+>
 > **ADVERSARY FINDING `evt_5nx5mft2yzyfa` — TRIAGED: confirmed defect, FOLDED
 > into the in-flight unit at `evt_6rk65rc5r4q7f`. DO NOT re-file it as a node.**
 > The `D3` partition validation that landed in `11177a3c` is **vacuous** —
