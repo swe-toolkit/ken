@@ -9805,6 +9805,16 @@ impl FusionRegionClaimLedger {
             // 3. Every recorded argument origin is an actual positional child of
             //    THAT SAME call. Taken by construction from `call_children`, so
             //    there is no origin here the call does not own.
+            //
+            // Ordering is structural rather than selected. The `Call` planning
+            // arm constructs `[callee] ++ args` by extending from the source
+            // argument slice. `plan_sequence` may plan that run in reverse, but
+            // writes every occurrence back at its original `enumerate` ordinal;
+            // `SemanticSourceSeed::expression` then copies that positional slice
+            // into the child-origin arena, and `child_origins` returns the same
+            // validated slice. Therefore this `skip(1)` preserves source argument
+            // order. No map, sort, keyed lookup, or second ordering decision
+            // exists between the source walk and this projection.
             let mut invocation_parameters =
                 call_children.iter().skip(1).copied().collect::<Vec<_>>();
             #[cfg(test)]
@@ -9819,6 +9829,11 @@ impl FusionRegionClaimLedger {
                     *first = key.consuming_callee;
                 }
                 FusionClaimParameterMutation::DropLast => {
+                    // Both governed roots are unary, so this produces the same
+                    // empty `Vec` as an absent parameter projection. The claim
+                    // representation has no presence bit: the two states are
+                    // deliberately indistinguishable and reach the same count
+                    // check below.
                     invocation_parameters.pop().ok_or_else(|| {
                         planner_error(
                             "the claim-parameter mutation requires a non-empty argument run",

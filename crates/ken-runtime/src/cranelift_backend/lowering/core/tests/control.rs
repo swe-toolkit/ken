@@ -3023,10 +3023,15 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// lowering independently closes the same ordered projection against the
 /// arguments it actually visited before the claim is consumed.
 ///
-/// **THE GAP:** both governed roots have one explicit argument, so they cannot
-/// exhibit a non-trivial permutation. Reordering remains an owed control whose
-/// subject requires a lawful multi-argument fused witness; this test does not
-/// relabel replacement as reordering.
+/// **THE GAP:** both governed roots have one explicit argument, so their only
+/// permutation is the identity. A non-identity reorder is unrepresentable on
+/// this population, and the production projection has no independent ordering
+/// choice: its index is the source-child traversal index. A synthetic
+/// multi-argument witness would measure a population production does not have.
+/// Also, shortening a unary run produces the same empty `Vec` as an absent
+/// projection; because the claim has no presence bit, that row establishes the
+/// shared zero-versus-one count refusal, not an independent distinction between
+/// wrong length and absence.
 #[test]
 fn r3_fused_parameter_projection_refuses_before_claim_consumption() {
     use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
