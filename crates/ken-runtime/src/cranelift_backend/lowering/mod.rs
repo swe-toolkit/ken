@@ -15257,10 +15257,43 @@ struct ContinuationCallOperands {
     continuation_inputs: Vec<LoweringOperand>,
 }
 
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the SECOND axis of a routed answer:
+/// what role the value plays at the eliminator that receives it.**
+///
+/// Architect `evt_43ng4f578mdvv`. `SourceComputationalAnswerRoute` says how
+/// checked the value is; this says whether the eliminator should ELIMINATE it or
+/// has already been discharged by whoever produced it. The two are independent
+/// and neither is derivable from the other, which is why this is a second field
+/// rather than a third route variant.
+///
+/// ⛔ **This is not a phase and never converts one.** A `Specialized` operand
+/// stays specialized and a `Carried` one stays carried across the whole
+/// disposition; what changes is which frame consumes it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EliminatorRole {
+    /// The ordinary role: the receiving eliminator eliminates this value.
+    /// **Every value and every call result is this**, and the exhaustive match
+    /// at the shared consumer has no wildcard so a future third role must be a
+    /// compile error there rather than silently taking this arm.
+    Scrutinee,
+    /// The value is the ANSWER of the computational frame at
+    /// `continuation_origin`, which has therefore already been discharged by
+    /// the producer that issued this.
+    ///
+    /// ⛔ **Issuable by ONE authority only** — an already-selected `Inner`
+    /// `FusionComposedEdge`, carrying that edge's planner-authored consumer
+    /// continuation. Nothing else may mint it, and it is never inferred from
+    /// the operand's shape.
+    AnswerAfterComputationalFrame { continuation_origin: StaticOriginId },
+}
+
 #[derive(Clone)]
 struct RoutedAnswer {
     value: LoweringOperand,
     route: SourceComputationalAnswerRoute,
+    /// `D3` — the eliminator-role axis. `Scrutinee` on every constructor except
+    /// the one Inner composition seat.
+    role: EliminatorRole,
 }
 
 impl RoutedAnswer {
@@ -15269,6 +15302,7 @@ impl RoutedAnswer {
         Self {
             value,
             route: SourceComputationalAnswerRoute::DirectScrutinee,
+            role: EliminatorRole::Scrutinee,
         }
     }
 
@@ -15284,6 +15318,19 @@ impl RoutedAnswer {
         Self {
             value,
             route: SourceComputationalAnswerRoute::CheckedSelectedRecursor,
+            role: EliminatorRole::Scrutinee,
+        }
+    }
+
+    /// **`D3` — the Inner composition's answer, and the ONLY producer of the
+    /// non-`Scrutinee` role.** The continuation origin is the composed edge's
+    /// planner-authored consumer continuation, supplied by the seat that
+    /// already selected that edge; this constructor derives nothing.
+    fn composed_answer(value: LoweringOperand, continuation_origin: StaticOriginId) -> Self {
+        Self {
+            value,
+            route: SourceComputationalAnswerRoute::CheckedSelectedRecursor,
+            role: EliminatorRole::AnswerAfterComputationalFrame { continuation_origin },
         }
     }
 
