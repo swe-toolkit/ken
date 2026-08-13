@@ -84,6 +84,35 @@ fn surf1_d3_ascii_identifier_boundary_rejects_non_ascii_letters() {
     }
 }
 
+/// LANG-PRELUDE-COLLECTIONS AC-7 -- the offending character renders as an
+/// escaped/debug representation, not raw. `NonAsciiIdentifierCharacter`'s
+/// population is exactly the non-ASCII alphabetic scalars this rule
+/// rejects, which includes invisible combining marks with no independent
+/// glyph (Unicode `Other_Alphabetic`, `is_alphabetic() == true`, but no
+/// base character to attach to when standalone). U+0670 ARABIC LETTER
+/// SUPERSCRIPT ALEF is one: a lone diagnostic printing it raw between
+/// quotes would show nothing between the quotes, leaving the author unable
+/// to tell what character to delete. `{:?}` prints `'\u{670}'` instead.
+#[test]
+fn surf1_d3_invisible_identifier_character_renders_escaped_not_raw() {
+    let invisible = '\u{0670}';
+    assert!(
+        !invisible.is_control() && invisible.is_alphabetic(),
+        "fixture must be a non-control, alphabetic (so lexer-reachable) scalar"
+    );
+    let src = format!("fn f ({invisible} : Type) : Type = Type");
+    let error = non_ascii_identifier_error(&src, invisible);
+    let rendered = error.to_string();
+    assert!(
+        rendered.contains(&format!("{invisible:?}")),
+        "the escaped/debug form must appear in the diagnostic: {rendered:?}"
+    );
+    assert!(
+        !rendered.contains(&format!("'{invisible}'")),
+        "the raw, invisible character must NOT appear bare between quotes: {rendered:?}"
+    );
+}
+
 #[test]
 fn surf_ident_tr39_shape_b_names_the_ascii_only_identifier_rule() {
     let cyrillic = non_ascii_identifier_error("fn surf_ident_bad (а : Type) : Type = Type", 'а');

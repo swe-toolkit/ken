@@ -513,8 +513,27 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 /// only that observation leaves an emitted native object unchanged. The
 /// feature makes the C2 observation reachable to this crate, but this
 /// increment deliberately does not measure that witness or any planner result.
+///
+/// Runs on a spawned thread with the crate's existing 256 MiB full-compile
+/// test convention (`map_build_acceptance.rs`, `cc3_parsing_cursor_decoder_
+/// acceptance.rs`, `l3_strings_surface_acceptance.rs`), not the harness's
+/// 2 MiB default test-thread stack -- a resource convention for a worker
+/// that runs a full native compile, not a production/runtime stack change.
 #[test]
 fn r3_4b_feature_artifact_worker() {
+    run_with_big_stack(r3_4b_feature_artifact_worker_impl);
+}
+
+fn run_with_big_stack<F: FnOnce() + Send + 'static>(f: F) {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024 * 1024)
+        .spawn(f)
+        .expect("spawn big-stack test thread")
+        .join()
+        .expect("test thread panicked");
+}
+
+fn r3_4b_feature_artifact_worker_impl() {
     let Some(output_dir) = std::env::var_os(R3_4B_ARTIFACT_OUTPUT).map(PathBuf::from) else {
         return;
     };

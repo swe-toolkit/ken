@@ -255,7 +255,7 @@ impl fmt::Display for ElabError {
             }
             ElabError::NonAsciiIdentifierCharacter { character, span } => write!(
                 f,
-                "non-ASCII identifier character '{}' at {}-{}: identifiers are ASCII-only",
+                "non-ASCII identifier character {:?} at {}-{}: identifiers are ASCII-only",
                 character, span.start, span.end,
             ),
             ElabError::InvalidEscape { span, reason } => {

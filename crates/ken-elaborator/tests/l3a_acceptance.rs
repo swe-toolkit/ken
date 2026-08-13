@@ -7,12 +7,12 @@
 //! equality), AC6 (verified `sort` emits the conjoined `is_sorted ∧ Perm`
 //! obligation). Spec: `spec/30-surface/37-strings-collections.md`.
 //!
-//! The combinator / `unfoldUpTo` / `sort` views are declared here (driving the
-//! recursive-view-through-SCT wiring in `elab.rs`); the prelude (`prelude.rs`)
-//! supplies the types + Ω constants. `filter` is deferred — it needs Boolean
-//! branching, but `Bool` is an opaque primitive (not `data Bool = True | False`
-//! ), so it is not pattern-matchable, and a CBV `if` primitive would
-//! double-evaluate a recursive branch — a separate change (tracked follow-on).
+//! `map`/`fold`/`zip`/`filter` moved to the prelude
+//! (LANG-PRELUDE-COLLECTIONS); `unfoldUpTo` / `sort` views remain declared
+//! here (driving the recursive-view-through-SCT wiring in `elab.rs`), since
+//! `unfoldUpTo` is the no-coinduction infinitude idiom rather than a
+//! combinator and `sort` emits an undischarged obligation that must not
+//! reach the prelude.
 
 use ken_elaborator::{ElabEnv, NumericLitVal, ObligationKind};
 use ken_interp::eval::{eval, prim_reduce, EvalStore, EvalVal};
@@ -22,27 +22,9 @@ fn mk_env() -> ElabEnv {
     ElabEnv::new().expect("base env")
 }
 
-/// Declare the L3a combinator / `unfoldUpTo` / `insert` views (no refinement
+/// Declare the L3a `unfoldUpTo` / `insert` views (no refinement
 /// obligations). `sort` is declared per-test (AC6 asserts its obligation).
 fn setup_combinators(env: &mut ElabEnv) {
-    // `map : (a → b) → List a → List b` — functor.
-    env.elaborate_decl(
-        "fn map (a b : Type) (f : a → b) (xs : List a) : List b = \
-         match xs { Nil |-> Nil b ; Cons h t |-> Cons b (f h) (map a b f t) }",
-    )
-    .expect("map elaborates");
-    // `fold : (a → b → b) → b → List a → b` — foldr.
-    env.elaborate_decl(
-        "fn fold (a b : Type) (f : a → b → b) (z : b) (xs : List a) : b = \
-         match xs { Nil |-> z ; Cons h t |-> f h (fold a b f z t) }",
-    )
-    .expect("fold elaborates");
-    // `zip : List a → List b → List (Prod a b)`.
-    env.elaborate_decl(
-        "fn zip (a b : Type) (xs : List a) (ys : List b) : List (Prod a b) = \
-         match xs { Nil |-> Nil (Prod a b) ; Cons h t |-> match ys { Nil |-> Nil (Prod a b) ; Cons k u |-> Cons (Prod a b) (MkProd a b h k) (zip a b t u) } }",
-    )
-    .expect("zip elaborates");
     // `unfoldUpTo : (s → Option (Prod a s)) → Nat → s → List a` — fuel-bounded
     // inductive unfold (the no-coinduction infinitude demo, `37 §5`).
     env.elaborate_decl(
@@ -319,7 +301,7 @@ fn string_is_not_list_char_but_convertible() {
 #[test]
 fn functor_law_emits_obligation_cross_decl_resolves() {
     let mut env = mk_env();
-    setup_combinators(&mut env); // declares `map` in a separate declaration
+    setup_combinators(&mut env); // `map` now comes from the prelude (`mk_env`)
 
     // `map_id : map id xs ≡ xs`, stated in a declaration SEPARATE from `map`.
     // The cross-declaration lowercase reference `map` resolves via the landed
