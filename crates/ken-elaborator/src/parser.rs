@@ -1587,6 +1587,18 @@ impl Parser {
     /// Keyword spellings are `(oracle)` — the exact tokens are finalized by
     /// the build team. This implementation uses `foreign`, `pure` (as a
     /// contextual ident), and effect labels as ConIds.
+    ///
+    /// `Token::Str` is escape-decoded uniformly for every string literal in
+    /// the language (LANG-SURFACE-LITERAL-ESCAPES), which made `\0` and every
+    /// other Unicode control character newly expressible inside a `foreign`
+    /// symbol/library name -- a C-ABI name-truncation vector once a loader
+    /// consumer lands. `reject_foreign_name_control_characters` is
+    /// producer-side hygiene for exactly that: it rejects control characters
+    /// in these two names only. It is deliberately NOT a well-formed-C-
+    /// symbol-name policy (no length/charset/leading-digit rule), does not
+    /// validate any other string in the language, and must never move to
+    /// `lexer.rs` -- that site decodes every string literal, and a check
+    /// there would forbid `"\0"` in ordinary string data.
     fn parse_foreign_decl(&mut self, start: usize) -> Result<Decl, ElabError> {
         self.advance(); // consume 'foreign'
         let (name, _) = self.expect_ident()?;
@@ -1595,7 +1607,10 @@ impl Parser {
         self.expect(&Token::Eq)?;
         // symbol string literal
         let symbol = match self.advance() {
-            (Token::Str(s), _) => s,
+            (Token::Str(s), span) => {
+                Self::reject_foreign_name_control_characters("symbol", &s, span)?;
+                s
+            }
             (other, span) => {
                 return Err(ElabError::ParseError {
                     msg: format!("expected string literal for symbol name, found {:?}", other),
@@ -1605,7 +1620,10 @@ impl Parser {
         };
         // library string literal
         let library = match self.advance() {
-            (Token::Str(s), _) => s,
+            (Token::Str(s), span) => {
+                Self::reject_foreign_name_control_characters("library", &s, span)?;
+                s
+            }
             (other, span) => {
                 return Err(ElabError::ParseError {
                     msg: format!(
@@ -1651,6 +1669,29 @@ impl Parser {
             visits,
             span: Span::new(start, end),
         })
+    }
+
+    /// LANG-FOREIGN-NAME-CONTROL-CHARS D1. Rejects a `foreign` symbol/
+    /// library name (already escape-decoded by the shared lexer) that
+    /// contains a Unicode control character -- at minimum U+0000. This is
+    /// producer-side hygiene only: NOT a well-formed-C-symbol-name policy
+    /// (no charset/length/leading-digit rule), and it validates no other
+    /// string in the language. `span` is the string literal's own span, so
+    /// the diagnostic points at the offending literal, not the `foreign`
+    /// keyword.
+    fn reject_foreign_name_control_characters(
+        which: &'static str,
+        decoded: &str,
+        span: Span,
+    ) -> Result<(), ElabError> {
+        if let Some(character) = decoded.chars().find(|c| c.is_control()) {
+            return Err(ElabError::ForeignNameControlCharacter {
+                which,
+                character,
+                span,
+            });
+        }
+        Ok(())
     }
 
     /// Parse `[...]` effect-row syntax (`36 §1.5`).
