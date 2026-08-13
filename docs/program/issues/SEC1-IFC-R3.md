@@ -348,6 +348,51 @@ blockers are stated here in prose and must be read as binding.
   that is a finding about the spec's premise.
 - ⛔ Sec1ct / Sec2 / Sec4 / Sec5.
 
+## CARRIED FORWARD 2026-08-13: the §7 gate, in gradeable form
+
+**Architect, `dec_12fmcqfzy6ky9`, resolving `V3-KRIPKE-DECOMPOSITION`
+(`bb99b23d`, #2135). It is parked here because the node that will land the
+vertical slice does not exist yet, and this is the live Verify node the work
+feeds. Whoever frames that slice: this is an AC, not background.**
+
+> **After any V3 increment, `trusted_base()` must not have grown by an adequacy
+> or a checker-soundness postulate.**
+
+**Why it is stated as a measurement and not as prose.** Spec `23 §7` — the
+prover adds nothing to the trusted base — is the binding constraint on this
+whole lane, and as prose **it is a constraint the build cannot fail.** That is
+what forces adequacy and `check_cert` soundness to be kernel-**checked** rather
+than asserted: the only other way to have them is to **admit** them, which
+grows the TCB by exactly what `§7` forbids.
+
+**The leak path is real and already in this codebase, not hypothetical.**
+`declare_deceq_certificate` (`check.rs:1253`) admits its soundness and
+completeness obligations through **two `declare_postulate` calls** (`:1302`,
+`:1308`) and registers them, so they appear in `trusted_base()`. ⇒ **A
+"theorem" silently becoming an axiom is an existing route**, which is why the
+gate has to be an assertion on `trusted_base()` rather than a promise in a
+frame.
+
+**Two things the Architect deliberately did NOT decide**, and neither is the
+Steward's to close: **where the kernel-facing proof artifacts should live**
+(that needs its own framing with the enclave — the measurable gate is the
+constraint any answer must satisfy, not the answer), and whether V3 proceeds at
+all.
+
+**Note for the operator's open fork.** The same mechanism sits on both sides of
+it. Widening decidable equality **deliberately** spends two irreducible
+postulates per registrant; the V3 lane can spend the same currency
+**accidentally**, by admitting adequacy instead of proving it. One fork arm
+buys TCB growth knowingly and the other can leak it — and until this gate is
+written as an AC, only the first is visible.
+
+Also affirmed as a **soundness** argument rather than a scheduling preference:
+implementing the translation before the enclave fixes the theory would make the
+proof obligation conform to an implementation choice, and **a proof that
+inherits its statement from the code it checks cannot detect a defect in that
+code.** Likewise, reusing `FormRef` / `KripkeCountermodel` as a head start is a
+real hazard — an advisory model must not appear to license a verdict.
+
 ## Validation — ⛔ TARGETED ONLY
 
 ⛔ **NEVER `--workspace`** (operator, `agent/COORDINATION.md §12`).

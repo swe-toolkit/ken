@@ -1,7 +1,7 @@
 ---
 id: V3-KRIPKE-DECOMPOSITION
 title: "The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing"
-status: active
+status: merged
 owner: verify
 size: M
 gate: none
