@@ -79,6 +79,16 @@ because **an envelope part that stays prose is one the build cannot fail.**
 - **AC-7 — the report states what this does NOT establish.** It makes a C2
   measurement possible. It says nothing about whether the planner fuses for C2,
   nothing about any enumerator exit, and it does not re-point the reach node.
+- **AC-8 — audit the structural traits before widening any `cfg`.** Moving a
+  field from `#[cfg(test)]` to `#[cfg(any(test, feature = ...))]` changes which
+  builds carry it, and a field on a type deriving `PartialEq`/`Eq`/`Hash`/`Ord`
+  **changes equality, hashing or ordering in exactly those builds.** Three
+  greps, all three must come back empty for a "zero footprint" claim to hold:
+  does the type derive a structural trait; is it a field of a container that
+  derives one; does anything compare two values of it. **`StaticContinuationFusionPlan`
+  fails the first today** (`planning/static_transition.rs:8977` — `Eq, PartialEq`,
+  with `walked` gated), so state what your gating does to its equality rather
+  than claiming zero footprint.
 
 ## Pre-stated licensing — read BEFORE reporting
 
