@@ -145,6 +145,41 @@ fn d2f_emitter_test_armed() -> bool {
     false
 }
 
+/// Test-only corruption of the checked static worker presented at the fused
+/// consuming-call closure boundary.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D2fWorkerBodyMutation {
+    Exact,
+    UseConsumingCallOrigin,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2F_WORKER_BODY_MUTATION: std::cell::Cell<D2fWorkerBodyMutation> =
+        const { std::cell::Cell::new(D2fWorkerBodyMutation::Exact) };
+}
+
+/// Run one compile with a single worker-body defect installed. The guard
+/// restores exact behaviour if lowering returns early or unwinds.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_d2f_worker_body_mutation<R>(
+    mutation: D2fWorkerBodyMutation,
+    run: impl FnOnce() -> R,
+) -> R {
+    struct Restore(D2fWorkerBodyMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D2F_WORKER_BODY_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = D2F_WORKER_BODY_MUTATION.with(|cell| cell.replace(mutation));
+    let _restore = Restore(previous);
+    run()
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -13115,6 +13150,24 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             .claim(fusion)
             .expect("the claim was present at the filter above")
             .clone();
+
+        // The population-side control changes the binding presented to this
+        // closure only after the exact consuming call selected the claim. The
+        // replacement is another real occurrence in the same compile, never a
+        // sentinel or a hand-built claim.
+        #[cfg(test)]
+        let worker = {
+            let mut worker = worker.clone();
+            match D2F_WORKER_BODY_MUTATION.with(std::cell::Cell::get) {
+                D2fWorkerBodyMutation::Exact => {}
+                D2fWorkerBodyMutation::UseConsumingCallOrigin => {
+                    worker.body_origin = static_origin;
+                }
+            }
+            worker
+        };
+        #[cfg(test)]
+        let worker = &worker;
 
         // ---- CLOSURE, COMPLETE, BEFORE ANY MUTATION.
         let defining = self.defining_unit.ok_or_else(|| {

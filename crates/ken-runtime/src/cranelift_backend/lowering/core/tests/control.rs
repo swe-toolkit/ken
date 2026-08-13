@@ -3029,9 +3029,11 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// choice: its index is the source-child traversal index. A synthetic
 /// multi-argument witness would measure a population production does not have.
 /// Also, shortening a unary run produces the same empty `Vec` as an absent
-/// projection; because the claim has no presence bit, that row establishes the
-/// shared zero-versus-one count refusal, not an independent distinction between
-/// wrong length and absence.
+/// projection; because the claim has no presence bit, that row proves an empty
+/// parameter run refuses. It does not distinguish wrong length from absence.
+/// Reorder and length-versus-presence become owed when a multi-argument fused
+/// invocation exists in the governed population; no such witness is
+/// manufactured here.
 #[test]
 fn r3_fused_parameter_projection_refuses_before_claim_consumption() {
     use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
@@ -3180,6 +3182,138 @@ fn r3_fused_parameter_projection_refuses_before_claim_consumption() {
         "the exact projection completes and consumes once; a same-length moved origin reaches \
          lowering's own ordered comparison, while short and long projections stop in preflight; \
          every refusal occurs before claim consumption and before a fused invocation is recorded"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the checked worker presented at the
+/// exact consuming call must name the claim's producer body before the affine
+/// claim can be spent.
+///
+/// **MEASURED:** after the real selector chooses the claim on both armed roots,
+/// replacing the worker binding's body with that same real consuming-call
+/// occurrence reaches the worker-body closure and refuses with zero claim
+/// consumptions and zero fused invocations. The exact binding completes at one
+/// and one.
+///
+/// **CLAIMED:** a fused invocation cannot enter a worker body other than the
+/// producer body and redirect callee the region claim closed over, and refusal
+/// leaves the affine claim outstanding.
+///
+/// **THE GAP:** this pins the worker-body relation after exact call selection.
+/// It does not pin the consuming-call selector, producer captures, the
+/// post-field route, or a failure after the declared call starts building.
+///
+/// **Promise class: durable invariant.** The assertion is relational over the
+/// real selector outcome, the named refusal, and both affine events; it freezes
+/// no origin literal or population count.
+#[test]
+fn r3_fused_worker_body_refuses_before_claim_consumption() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_worker_body_mutation, D2fEmitterTestArm, D2fWorkerBodyMutation,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fWorkerBodyMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let error = with_d2f_worker_body_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-worker-body",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("checked worker body")
+                    && reason.contains("is not the claim's producer body") =>
+            {
+                "worker-body refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fWorkerBodyMutation::Exact, "exact"),
+            (D2fWorkerBodyMutation::UseConsumingCallOrigin, "wrong-body"),
+        ] {
+            let symbol = format!("ken_r3_worker_body_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fWorkerBodyMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fWorkerBodyMutation::UseConsumingCallOrigin,
+                "worker-body refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fWorkerBodyMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fWorkerBodyMutation::UseConsumingCallOrigin,
+                "worker-body refusal",
+                0,
+                0,
+            ),
+        ],
+        "the exact worker body completes and consumes once; replacing that binding's body with \
+         the selected consuming-call occurrence reaches the named closure and refuses before \
+         either affine event"
     );
 }
 

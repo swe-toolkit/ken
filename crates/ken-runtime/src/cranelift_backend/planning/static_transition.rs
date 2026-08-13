@@ -11781,6 +11781,9 @@ impl<'src> Planner<'src> {
         for (ordinal, expression) in expressions.iter().enumerate().rev() {
             let planned = self.plan_expr(expression, ctx, next, next_kind, ordinal as u32)?;
             next = planned.entry;
+            // Fusion-claim parameter order depends on this original-ordinal
+            // write-back: reverse planning changes the execution chain, never
+            // the positional child slice that reaches the semantic arena.
             occurrences[ordinal] = Some(planned.occurrence);
             next_kind = EdgeKind::Continue;
         }
