@@ -38,34 +38,65 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~14:1xZ. **`main` = `288b68c9`.**
+> ### RESUME HERE — state at 2026-08-13 ~14:4xZ. **`main` = `310e91c7`.**
+> **I hold nothing; no publisher is running. BOTH TEAMS ARE WORKING.**
 >
-> **PR #2091 IS IN FLIGHT (gate 4a + the sweep repair) AND A PUBLISHER IS
-> RUNNING.** `pgrep -af scripted-pr-automerge` before starting another, and do
-> **not** `git fetch` while it holds its window.
+> **Landed today, in order:** `#2091` gate 4a + the one-cut sweep repair (tree
+> `af944865` verified), `#2093` two new language frames, `#2094` the
+> `language-implementer` reseat. `#2088` and `#2092` are **closed**, each with
+> its reason in the PR — an abandoned PR ages into a revert.
 >
-> **THREE THINGS ARE OWED, IN THIS ORDER, ONE PUBLISHER AT A TIME.**
+> **Runtime** is on the next R3 increment (`evt_rygsspfm35qw`), subject
+> `checked_computational_ih_slot_unconsumed`. **Language** is on
+> `LANG-RECORD-STACK-OVERFLOW` (`evt_10zxe4cyxc9d4`) with
+> `LANG-VIEW-RETIRE` queued behind it on the same `parser.rs` lane — that one is
+> a **standing operator instruction**, so do not let it drift.
 >
-> 1. **When #2091 lands, close #2088** — still open at `a054e646`. An abandoned
->    PR is not harmless; it ages into a revert.
-> 2. **Publish `50da348a` (`wp/LANG-SURFACE-RECORD-LITERAL`).** Approved and
->    waiting only on the one-publisher rule. Architect Decision
->    **`dec_5m3f7rswekp7q`** resolved on cast — **not** `dec_hlpq7t8v2wxk`, which
->    the Architect wrote before the record existed and then corrected
->    (`evt_437ew2fxm7bwb`); that id is not real. QA approved; crates-only so no
->    Spec vote. Base `57688110`, one non-merge commit, nine `ken-elaborator`
->    paths, +528/-2.
-> 3. **Then the doc-only publish of this briefing.**
+> ### THE THING I GOT WRONG TODAY THAT COST THE MOST: I PUBLISHED A SHA WHOSE CI
+> ### HISTORY I NEVER READ
 >
-> **What #2091 carries.** `369614ed`, cut from `b96779d3` with the three approved
-> gate-4a commits cherry-picked, plus the one-cut sweep repair. **Four** commits,
-> five paths, +665/-63 — the leader's first handoff said two and corrected
-> itself; a declared commit count has undercounted once already today. Verified
-> before publishing: `git diff a054e646 369614ed -- crates/` is **EMPTY**, so
-> every production byte is the object the Architect approved; `merge-tree`
-> against `main` clean (tree `af944865`); `git diff --name-only b96779d3
-> origin/main -- crates/` empty, so the measured greens hold. QA approved the tip
-> (`evt_6spzpqccznknv`).
+> I published `50da348a` as `#2092` on an Architect Decision plus a QA approval,
+> having verified the merge tree, the path intersection and the base drift.
+> **It had two red CI runs sitting on it already.** It aborts a real compile:
+>
+> ```
+> SIGABRT ken-cli::mrc_4a_cross_crate_census mrc_4a_cross_crate_census_and_its_controls
+> fatal runtime error: stack overflow, aborting
+> ```
+>
+> ⇒ **NEW STANDING CHECK, BEFORE ANY PUBLISH: read the candidate SHA's existing
+> check runs.** `gh api repos/swe-toolkit/ken/commits/<sha>/check-runs`. A
+> candidate that was already red does not become green by being reviewed, and
+> **every path-level check I ran is structurally blind to a semantic
+> regression** — I treated that set as complete.
+>
+> **Four facts on that defect, each from a run:** `50da348a` has never been
+> CI-green (run `31550144839`, 2026-08-12, same abort); `main` is green, so it is
+> not inherited; **`766c9f07`'s 143-line "bound record parser stack use" does NOT
+> fix it** — `8e9baa18` contains that rework and still aborts; and `766c9f07` was
+> never CI'd alone. The arc's own depth fixture never detected it because it
+> built arms with `=>`, and Ken has no such token (`MapsTo` is `|->`/`↦`,
+> `lexer.rs:107`), so it died in the lexer at every SHA. **Do not record "depth
+> 31 never held"** — a lexer-error red is blind in both directions.
+>
+> **`191a4659` LIVES ONLY IN THE IMPLEMENTER WORKTREE** — one commit past
+> `origin`'s `8e9baa18`, correcting that fixture to `|->`. Unpushed, and the
+> reseated session did not author it. If it is still unpushed, that is the first
+> thing to save.
+>
+> ### TWO PUBLISHER FAILURE MODES OBSERVED TODAY
+>
+> **A 502 on the post-merge verification reads as a failed publish.** `#2094`
+> exited non-zero with `502 Bad Gateway` and **had already merged** (`310e91c7`).
+> Check `gh pr view <n> --json state,mergeCommit` before retrying; a retry would
+> have published a duplicate. It did **not** set the freeze marker — check
+> `$(git rev-parse --git-common-dir)/ken-publisher-FROZEN` anyway.
+>
+> **The publisher is exclusive by design** — one fetch/check/merge/verify
+> critical section under a `flock`, which is the only reason "the tree we
+> checked is the tree that landed" holds. A queue behind it is correct
+> behaviour, not a stall. Its fixed opening wait (~780s) runs before the first
+> poll, so a green PR sitting unmerged for ten minutes is normal.
 >
 > **THE GATE LIST FOR #2091 WAS QA PLUS MY SCOPE RULING — NO SECOND ARCHITECT
 > PASS.** Its new commit touches only `scripts/` and
