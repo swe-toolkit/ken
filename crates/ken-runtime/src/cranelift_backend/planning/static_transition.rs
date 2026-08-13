@@ -7882,7 +7882,7 @@ pub(in crate::cranelift_backend) struct FusionComposedEdge {
 }
 
 /// Which ruled checked binding selected a composed edge.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) enum FusionCompositionLayer {
     /// Selected by the fusion key's checked CONSUMER binding.
     Outer,
@@ -14202,12 +14202,183 @@ impl<'src> StaticTransitionPlan<'src> {
             }
         }
 
+        // ---- `D3` — THE FUSION-SCOPED JOIN, and it is validated as ONE
+        // ---- structure rather than by origin coincidence. Ruled
+        // ---- `evt_6kn9ckdnbf0ph` §2.
+        //
+        // The two objects carry the two halves of the mechanism and neither is
+        // widened to hold the other's: `FusionComposedEdge` says WHICH exact
+        // continuation edge is locally composed, and `FusionRegionClaim` says
+        // WHICH checked call consumes the worker produced inside that
+        // composition. **The ordinary consuming call is deliberately absent
+        // from `dom(FusionComposedEdge)`** — it has no `ContinuationCall
+        // Identity` and is not a specialization target, and inventing a union
+        // edge for it would erase exactly that distinction.
+        //
+        // So the only join asserted is `edge.fusion == claim.fusion`, exactly
+        // once per layer, both directions.
+        let mut layers_by_fusion: BTreeMap<
+            StaticContinuationFusionId,
+            BTreeSet<FusionCompositionLayer>,
+        > = BTreeMap::new();
+        for edge in composed.values() {
+            if !owned.contains(&edge.fusion) {
+                return Err(planner_error(
+                    "a composed continuation edge names a fusion that owns no producer body, so \
+                     the claim half of the composition join does not exist",
+                ));
+            }
+            if !layers_by_fusion.entry(edge.fusion).or_default().insert(edge.layer) {
+                return Err(planner_error(
+                    "one static continuation fusion minted two composed edges at the same \
+                     composition layer, so its outer and inner selections are not distinct",
+                ));
+            }
+        }
+        for fusion in owned.iter().copied() {
+            let layers = layers_by_fusion.remove(&fusion).unwrap_or_default();
+            if layers
+                != BTreeSet::from([FusionCompositionLayer::Outer, FusionCompositionLayer::Inner])
+            {
+                return Err(planner_error(
+                    "a body-owning static continuation fusion does not carry exactly one outer and \
+                     one inner composed edge, so the two ruled composition layers are not both \
+                     realized",
+                ));
+            }
+        }
+
+        // ---- `D3` — THE EXACT PARTITIONS `P = O ⊎ F` AND `T = O_t ⊎ F_t`.
+        //
+        // Asserted as SET relations, never as counts: two populations of the
+        // same size can be the wrong two, and every downstream narrowing reads
+        // `O`/`O_t` rather than re-deriving them.
+        let planned_identities = self.continuation_call_identities()?;
+        let fused_identities = composed.keys().cloned().collect::<BTreeSet<_>>();
+        if !fused_identities.is_subset(&planned_identities) {
+            return Err(planner_error(
+                "a composed continuation identity is not in the exact planned call population, so \
+                 the fusion-local domain is not a subset of the population it partitions",
+            ));
+        }
+        let fused_targets = composed.values().map(|edge| edge.target).collect::<BTreeSet<_>>();
+        let planned_targets = specializations.iter().map(|unit| unit.id()).collect::<BTreeSet<_>>();
+        if !fused_targets.is_subset(&planned_targets) {
+            return Err(planner_error(
+                "a composed continuation edge names a specialization target outside the planned \
+                 unit population, so the fusion-local target range is not a subset of the \
+                 population it partitions",
+            ));
+        }
+        // The residual halves, and the partition law restated in the direction
+        // a reader checks: disjointness plus coverage, each named separately
+        // because they fail for different reasons.
+        let residual_identities = planned_identities
+            .difference(&fused_identities)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let residual_targets = planned_targets
+            .difference(&fused_targets)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if !residual_identities.is_disjoint(&fused_identities)
+            || residual_identities
+                .union(&fused_identities)
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != planned_identities
+        {
+            return Err(planner_error(
+                "the ordinary and fusion-local continuation identity populations are not a \
+                 partition of the exact planned population",
+            ));
+        }
+        if !residual_targets.is_disjoint(&fused_targets)
+            || residual_targets
+                .union(&fused_targets)
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != planned_targets
+        {
+            return Err(planner_error(
+                "the ordinary and fusion-local continuation target populations are not a partition \
+                 of the planned specialization population",
+            ));
+        }
+
         ledger.check_body_owned(&owned)?;
         self.fusion_owned_bodies = scratch;
         self.fusion_composed_calls = composed;
         self.fusion_bodies_installed = true;
         ledger.commit_body_owned(owned);
         Ok(())
+    }
+
+    /// **`D3` — every exact planned continuation call identity, `P`.**
+    ///
+    /// The one projection both halves of the partition are derived from, so
+    /// `O` and `F` cannot disagree about which population they partition.
+    pub(in crate::cranelift_backend) fn continuation_call_identities(
+        &self,
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        self.continuation_calls()?
+            .iter()
+            .map(|call| {
+                self.continuation_call_binding_for(
+                    call.producer_construct_origin(),
+                    call.continuation_origin(),
+                    call.producer_alternative(),
+                    call.recursive_position(),
+                )?
+                .ok_or_else(|| {
+                    planner_error(
+                        "a planned continuation call has no binding under its own four-field \
+                         selector, so the exact planned identity population cannot be built",
+                    )
+                })
+            })
+            .collect()
+    }
+
+    /// **`D3` — the ORDINARY residual identities `O = P \ F`.**
+    ///
+    /// ⛔ **This is the single plan-authoritative narrowing, and it exists so
+    /// that no consumer filters for itself.** Ruled `evt_48rwarx25pj2p` §3:
+    /// the candidate ledger, the claim ledger, declaration, definition,
+    /// resolution, direct-call verification and the `D8` composed-discharge
+    /// machinery all read *this*, so every landed ordinary law stays literally
+    /// true over its own complete domain rather than being weakened to tolerate
+    /// an absence.
+    ///
+    /// Repeated filtering at each consumer would be a second authority over
+    /// which edges are ordinary, and the two would drift silently.
+    pub(in crate::cranelift_backend) fn ordinary_continuation_call_identities(
+        &self,
+    ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
+        let mut identities = self.continuation_call_identities()?;
+        identities.retain(|identity| !self.fusion_composed_calls.contains_key(identity));
+        Ok(identities)
+    }
+
+    /// **`D3` — the ORDINARY residual targets `O_t = T \ F_t`.**
+    ///
+    /// The target-side twin of [`Self::ordinary_continuation_call_identities`].
+    /// A fusion-local target omits its declaration, definition and resolution,
+    /// so this is the population those three passes range over.
+    pub(in crate::cranelift_backend) fn ordinary_continuation_targets(
+        &self,
+    ) -> Result<BTreeSet<ContinuationSpecializationId>, CraneliftBackendError> {
+        let fused = self
+            .fusion_composed_calls
+            .values()
+            .map(|edge| edge.target)
+            .collect::<BTreeSet<_>>();
+        Ok(self
+            .continuation_units()?
+            .iter()
+            .map(|unit| unit.id())
+            .filter(|id| !fused.contains(id))
+            .collect())
     }
 
     /// **`D5a` checkpoint 1 — the units that receive a declared and defined
@@ -19090,6 +19261,162 @@ mod tests {
             ],
             "exactly two composed edges per fusion, one per ruled checked binding, on DISTINCT \
              targets, each emitted by the owner its own binding names"
+        );
+    }
+
+    /// **`D3` — `P = O ⊎ F` and `T = O_t ⊎ F_t`, as exact SET relations, and
+    /// the fusion-scoped join between the two composition objects.**
+    ///
+    /// Ruled `evt_48rwarx25pj2p` §3 (the single residual projection) and
+    /// `evt_6kn9ckdnbf0ph` §2 (the join is `edge.fusion == claim.fusion`, and
+    /// the ordinary consuming call is deliberately NOT in
+    /// `dom(FusionComposedEdge)`).
+    ///
+    /// **MEASURED** on both witnesses: the exact planned identity population is
+    /// the two composed edges and nothing else, so `O` is empty and `F = P`;
+    /// the target population is likewise wholly fused. Each fusion carries
+    /// exactly one `Outer` and one `Inner` layer, and each names a fusion that
+    /// owns a producer body.
+    /// **CLAIMED:** the ordinary and fusion-local populations partition the
+    /// planned ones exactly -- disjoint and covering -- on identities and on
+    /// targets, so a consumer reading `O`/`O_t` sees every ordinary member and
+    /// no fused one.
+    /// **THE GAP, stated because a wholly-fused family cannot exercise the
+    /// residual half:** `O` and `O_t` are EMPTY here, so this row measures the
+    /// partition's shape and the join, not the residual path's behaviour. The
+    /// population that makes `O` non-empty is the same-body composed/ordinary
+    /// discriminator (`evt_6kn9ckdnbf0ph` §5), which is owed with the local
+    /// lowering; until it lands, nothing here should be read as evidence that
+    /// an ordinary identity survives beside a fused one.
+    #[test]
+    fn d3_the_ordinary_and_fusion_local_populations_partition_the_planned_ones() {
+        let mut rows = Vec::new();
+        for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+            let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2J_DECLARATION, &declaration);
+            let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let resolved =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("the witness resolves a plane");
+            let mut plane = StaticContinuationFusionPlan::default();
+            for key in resolved.installed_keys().to_vec() {
+                plane.intern(key).expect("interns");
+            }
+            plan.install_static_continuation_fusions(plane)
+                .expect("installs");
+            let mut claims = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+            plan.install_fusion_owned_bodies(&mut claims)
+                .expect("ownership installs");
+
+            let planned = plan.continuation_call_identities().expect("planned identities");
+            let ordinary = plan
+                .ordinary_continuation_call_identities()
+                .expect("ordinary identities");
+            let fused = plan
+                .fusion_composed_edges()
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            let planned_targets = plan
+                .continuation_units()
+                .expect("units")
+                .iter()
+                .map(|unit| unit.id())
+                .collect::<BTreeSet<_>>();
+            let ordinary_targets = plan
+                .ordinary_continuation_targets()
+                .expect("ordinary targets");
+            let fused_targets = plan
+                .fusion_composed_edges()
+                .values()
+                .map(|edge| edge.target())
+                .collect::<BTreeSet<_>>();
+
+            // The partition, asserted as SETS in both directions rather than as
+            // sizes: disjoint, and covering.
+            assert!(
+                ordinary.is_disjoint(&fused),
+                "{cause:?}: an identity is both ordinary and fusion-local"
+            );
+            assert_eq!(
+                ordinary.union(&fused).cloned().collect::<BTreeSet<_>>(),
+                planned,
+                "{cause:?}: O union F must be exactly the planned identity population"
+            );
+            assert!(
+                ordinary_targets.is_disjoint(&fused_targets),
+                "{cause:?}: a target is both ordinary and fusion-local"
+            );
+            assert_eq!(
+                ordinary_targets
+                    .union(&fused_targets)
+                    .cloned()
+                    .collect::<BTreeSet<_>>(),
+                planned_targets,
+                "{cause:?}: O_t union F_t must be exactly the planned target population"
+            );
+
+            // The join, per fusion, from the edge side and the claim side.
+            let mut layers: BTreeMap<StaticContinuationFusionId, Vec<FusionCompositionLayer>> =
+                BTreeMap::new();
+            for edge in plan.fusion_composed_edges().values() {
+                assert!(
+                    claims.claim(edge.fusion()).is_some(),
+                    "{cause:?}: a composed edge names a fusion with no claim"
+                );
+                layers.entry(edge.fusion()).or_default().push(edge.layer());
+            }
+            let mut join = layers.into_values().collect::<Vec<_>>();
+            for entry in &mut join {
+                entry.sort();
+            }
+
+            rows.push((
+                cause,
+                planned.len(),
+                ordinary.len(),
+                fused.len(),
+                planned_targets.len(),
+                ordinary_targets.len(),
+                fused_targets.len(),
+                join,
+            ));
+        }
+
+        assert_eq!(
+            rows,
+            vec![
+                (
+                    D2jCause::Exact,
+                    2,
+                    0,
+                    2,
+                    2,
+                    0,
+                    2,
+                    vec![vec![
+                        FusionCompositionLayer::Outer,
+                        FusionCompositionLayer::Inner
+                    ]],
+                ),
+                (
+                    D2jCause::ReHomed,
+                    2,
+                    0,
+                    2,
+                    2,
+                    0,
+                    2,
+                    vec![vec![
+                        FusionCompositionLayer::Outer,
+                        FusionCompositionLayer::Inner
+                    ]],
+                ),
+            ],
+            "both witnesses are WHOLLY fused: every planned identity and every target is \
+             fusion-local, the residual halves are empty, and the single fusion carries exactly \
+             one outer and one inner layer"
         );
     }
 
