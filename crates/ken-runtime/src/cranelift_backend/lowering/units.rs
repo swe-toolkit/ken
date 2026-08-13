@@ -951,12 +951,8 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     // continuation specialization, before any body is defined. The symbol
     // carries a dense ordinal only so the linker sees distinct names; the map
     // is keyed by the planner's typed identity, never by that string.
-    // `D3` — the EXECUTABLE subset, not the complete template population. A
-    // specialization an installed fusion has subsumed gets no symbol here, and
-    // therefore no body below and no resolvable target in `resolve_continuation_
-    // targets`; preflight has already refused if any caller still needed one.
     let mut continuations = BTreeMap::new();
-    for (ordinal, unit) in plan.executable_continuation_units()?.into_iter().enumerate() {
+    for (ordinal, unit) in plan.continuation_units()?.into_iter().enumerate() {
         let name = format!("ken_continuation_{ordinal}");
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
@@ -1045,15 +1041,6 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
                         .to_string(),
                 )
             })?;
-        // `D3` — omit ONLY the mapped identity, never every call whose target is
-        // subsumed. Ruled at `evt_713gc922d1d7g`, and the distinction is the
-        // point: a target-wide skip would silently drop a second caller, whereas
-        // preflight has already REFUSED any such caller. So reaching here with a
-        // subsumed target and no mapping is impossible by construction, and an
-        // unmapped identity resolves and emits exactly as before.
-        if plan.continuation_call_fusion_forward(&identity).is_some() {
-            continue;
-        }
         let target = bundle.continuation(identity.target()).ok_or_else(|| {
             backend_module(
                 "a projected causal identity names a continuation specialization that was never \
@@ -1592,12 +1579,9 @@ pub(super) fn define_continuation_bodies<M: Module>(
     // separately emitted caller; a continuation function is exactly that, so
     // it declares its own worker refs rather than borrowing another's.
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
-    // `D3` — the same executable subset the declaration pass read. Reading the
-    // complete population here would define a body for a specialization that
-    // was never declared.
     let emissions = compiler
         .static_transition_plan
-        .executable_continuation_units()?
+        .continuation_units()?
         .into_iter()
         .map(|unit| {
             let (offsets, _frame_bytes) = unit.slot_offsets()?;
@@ -4133,18 +4117,6 @@ pub(in crate::cranelift_backend) enum CandidateDisposition {
     /// The exact deferred bridge scope completed successfully with this
     /// candidate still unconsumed.
     InlineNoCall,
-    /// **`D3` — the edge took the fused answer instead of calling.**
-    ///
-    /// Ruled at `evt_713gc922d1d7g`. Neither [`Self::DirectCall`] nor
-    /// [`Self::InlineNoCall`], and giving it its own arm is what makes the
-    /// closeout able to tell them apart: a `DirectCall` asserts an emitted call
-    /// instruction this seat must NOT have, and an `InlineNoCall` asserts the
-    /// candidate went unconsumed, which is false -- it was consumed by
-    /// forwarding.
-    ///
-    /// Exactly one mapped token is forwarded, exactly once, with no emitted call
-    /// instruction, and it must not also settle under another disposition.
-    FusionForward,
 }
 
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the binding-candidate ledger, a
@@ -4467,14 +4439,7 @@ impl ContinuationClaimLedger {
         // and the projected header/slots/offsets, which is exactly what
         // `call_declared_unit_target` consumes. Reusing it is what keeps this
         // on the existing unit-call ABI instead of inventing a second one.
-        //
-        // `D3` — the executable subset, so a subsumed specialization that
-        // somehow reached `resolved` fails HERE rather than being handed a
-        // contract for a `Function` nobody defined. `resolved` is already
-        // filtered, which is exactly why this reads the narrower population:
-        // agreeing with the filter costs nothing and disagreeing with it is the
-        // defect worth surfacing.
-        let units = plan.executable_continuation_units()?;
+        let units = plan.continuation_units()?;
         self.resolved
             .iter()
             .filter(|(identity, _)| identity.emission_owner() == defining)

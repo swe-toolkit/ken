@@ -8101,15 +8101,8 @@ impl<'a> Lowering<'a> {
         }
 
         // Closure: no continuation call may be emitted that was not recorded.
-        // `D3` — the executable subset, the same one declaration, definition and
-        // callable-edge resolution read. A specialization an installed fusion
-        // subsumed has no declared `Function`, so it can be the callee of no
-        // emitted call; requiring a `FuncId` for it here would refuse every
-        // armed fused compile at a closure that has nothing to close over it.
-        // Excluding it does not weaken the closure -- a call it cannot be the
-        // target of cannot escape the scan.
         let mut specialization_callees = BTreeSet::new();
-        for unit in self.static_transition_plan.executable_continuation_units()? {
+        for unit in self.static_transition_plan.continuation_units()? {
             let id = bundle.continuation(unit.id()).ok_or_else(|| {
                 backend_module(
                     "a planned continuation specialization was never forward-declared".to_string(),
