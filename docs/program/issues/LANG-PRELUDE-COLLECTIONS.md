@@ -77,9 +77,29 @@ Recorded so the next sweep does not re-hunt them. All at `7f9eabbb`:
 - `35 §3` fixed-width overflow obligations (`ObligationKind::PartialPrim`) and
   `§5` conversions (`conversions.rs`).
 
+## Amended mid-flight 2026-08-13: `AC-7`, a one-character rider
+
+Adversary finding at `evt_7bt65xjjfsgr0`, verified by the Steward at
+`424ab5da`. `error.rs:256-260` formats a bare `char` with `Display` where its
+sibling `ForeignNameControlCharacter` (`:264-271`) correctly uses `{:?}` seven
+lines below. It is the only site in the file that prints a bare `char` with
+`{}`.
+
+**The variant's population is exactly the invisible characters** — any non-ASCII
+character in an identifier, including `Cf` format characters and bidi
+overrides. So a zero-width character prints as `''` with nothing between the
+quotes, and U+202E reorders the remainder of the terminal line including the
+span numbers.
+
+This is independent of the `Cf` threat-model question holding
+`LANG-FOREIGN-NAME-FORMAT-CHARS`: that one is about deceiving a reader of
+source, this is the compiler's own output. The Contention and "Not this node"
+sections were swept to admit `error.rs` for this change and nothing else.
+
 ## Not this node
 
 - `sort`, `unfoldUpTo`, `Array`, `DecEq`/`Ord` instances, the combinator laws.
+- Anything in `error.rs` beyond `AC-7`'s single format specifier.
 - Changing any combinator's meaning, argument order, or binder structure. The
   L3a declaration text is the pinned shape and moves unchanged.
 - Extending `Bool`. The measurement is that it is already matchable.
