@@ -10009,6 +10009,21 @@ impl FusionRegionClaimLedger {
         self.claims.get(&fusion)
     }
 
+    /// Move the exact selected claim out of the outstanding population without
+    /// recording a successful consumption.
+    ///
+    /// Test-only: this represents a claim that escaped after the outer selector
+    /// closed against it. It neither constructs a second claim nor writes the
+    /// consumed ledger, so the production outstanding check remains the sole
+    /// detector for the corrupted state.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn escape_selected_claim_for_test(
+        &mut self,
+        fusion: StaticContinuationFusionId,
+    ) -> bool {
+        self.claims.remove(&fusion).is_some()
+    }
+
     /// **Consume the claim for `fusion` at `seat`, atomically and exactly once.**
     ///
     /// The seat is checked against the claim's own [`FusionRegionClaim::seat`]

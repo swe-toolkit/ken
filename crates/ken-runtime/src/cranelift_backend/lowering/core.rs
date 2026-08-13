@@ -356,6 +356,59 @@ fn d2f_post_field_direct_call_is_excluded() -> bool {
         == D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall
 }
 
+/// Test-only loss of the real claim after the outer selector has selected it
+/// and completed closure, but before the selected body may be lowered.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum D2fOuterClaimStateMutation {
+    Exact,
+    EscapeAfterClosure,
+}
+
+#[cfg(test)]
+thread_local! {
+    static D2F_OUTER_CLAIM_STATE_MUTATION: std::cell::Cell<D2fOuterClaimStateMutation> =
+        const { std::cell::Cell::new(D2fOuterClaimStateMutation::Exact) };
+    static D2F_OUTER_CLAIM_STATE_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Run one compile with the selected outer claim removed from the outstanding
+/// population after closure. The application count distinguishes the intended
+/// post-closure corruption from an earlier selector refusal.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_d2f_outer_claim_state_mutation<R>(
+    mutation: D2fOuterClaimStateMutation,
+    run: impl FnOnce() -> R,
+) -> (R, usize) {
+    struct Restore(D2fOuterClaimStateMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            D2F_OUTER_CLAIM_STATE_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous =
+        D2F_OUTER_CLAIM_STATE_MUTATION.with(|cell| cell.replace(mutation));
+    D2F_OUTER_CLAIM_STATE_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    let _restore = Restore(previous);
+    let result = run();
+    let applications =
+        D2F_OUTER_CLAIM_STATE_MUTATION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
+/// The production detector, separate from the test-only ledger corruption so
+/// mutation proof can retain the escaped population while relaxing only this
+/// check.
+fn fusion_outer_claim_is_outstanding(
+    ledger: &FusionRegionClaimLedger,
+    fusion: StaticContinuationFusionId,
+) -> bool {
+    ledger.claim(fusion).is_some()
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -11008,6 +11061,41 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization does not close against its region claim on \
                  continuation origin, selected case body, or producer/redirect body",
+            ));
+        }
+        // The population-side control moves THIS exact, already-selected claim
+        // out of the outstanding map after every closure check above. It does
+        // not call `consume`, write the consumed ledger, construct a claim, or
+        // touch a sibling ledger.
+        #[cfg(test)]
+        if D2F_OUTER_CLAIM_STATE_MUTATION.with(std::cell::Cell::get)
+            == D2fOuterClaimStateMutation::EscapeAfterClosure
+        {
+            let escaped = self
+                .fusion_claims
+                .as_mut()
+                .expect("the selected claim's ledger remains installed")
+                .escape_selected_claim_for_test(realization.fusion());
+            assert!(
+                escaped,
+                "the selected claim must still be outstanding at corruption"
+            );
+            D2F_OUTER_CLAIM_STATE_MUTATION_APPLICATIONS.with(|cell| {
+                cell.set(cell.get().saturating_add(1));
+            });
+        }
+        let ledger = self.fusion_claims.as_ref().ok_or_else(|| {
+            unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization was dispatched with no region claim ledger open",
+            )
+        })?;
+        if !fusion_outer_claim_is_outstanding(ledger, realization.fusion()) {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer realization's selected region claim is no longer \
+                 outstanding after closure; the claim is spent, replayed or escaped, and local \
+                 descent would realize one region twice",
             ));
         }
         // ---- THE ACTION IS NON-CALLING. Architect `evt_5edhqyyhw4585`.

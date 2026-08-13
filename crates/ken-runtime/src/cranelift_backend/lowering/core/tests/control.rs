@@ -3913,6 +3913,158 @@ fn r3_fused_post_field_direct_call_reintroduction_refuses_before_emission() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the outer realization may descend
+/// only while its exact selected region claim remains outstanding after
+/// identity and closure.
+///
+/// **MEASURED:** both governed roots select and close against their real claim.
+/// Moving that same move-only claim out of the outstanding map immediately
+/// afterward reaches the production outstanding detector once and refuses with
+/// zero successful consumptions and zero fused invocations. Exact compilation
+/// completes with one of each.
+///
+/// **CLAIMED:** opaque identity selection and closure do not license replay.
+/// The claim must remain outstanding at the boundary where the R selector
+/// enters its locally lowered body.
+///
+/// **THE GAP:** the mutation represents one lawful corrupted ledger state -- an
+/// escaped selected claim. It does not separately instantiate duplicate storage
+/// or a second attempted consumption, whose affine behavior belongs to the
+/// ledger's own controls. It proves this real R selector refuses non-outstanding
+/// state before emission, settlement or invocation.
+///
+/// **Promise class: durable invariant.** The assertion relates selected-claim
+/// state to the selector boundary and affine events without freezing a fusion,
+/// owner, body, call, projection, capture count or target coordinate.
+#[test]
+fn r3_fused_outer_selector_refuses_an_escaped_selected_claim() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_outer_claim_state_mutation, D2fEmitterTestArm,
+        D2fOuterClaimStateMutation,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fOuterClaimStateMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications) = with_d2f_outer_claim_state_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-outer-claim-state",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            applications,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("selected region claim")
+                && reason.contains("no longer outstanding after closure") =>
+            {
+                "non-outstanding selected-claim refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fOuterClaimStateMutation::Exact, "exact"),
+            (
+                D2fOuterClaimStateMutation::EscapeAfterClosure,
+                "escaped",
+            ),
+        ] {
+            let symbol = format!("ken_r3_outer_claim_state_{prefix}_{suffix}");
+            let (error, applications, consumptions, invocations) =
+                compile(cause, mutation, &symbol);
+            rows.push((
+                cause,
+                mutation,
+                classify(&error),
+                applications,
+                consumptions,
+                invocations,
+            ));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fOuterClaimStateMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fOuterClaimStateMutation::EscapeAfterClosure,
+                "non-outstanding selected-claim refusal",
+                1,
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fOuterClaimStateMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fOuterClaimStateMutation::EscapeAfterClosure,
+                "non-outstanding selected-claim refusal",
+                1,
+                0,
+                0,
+            ),
+        ],
+        "both exact roots consume and invoke once; escaping the same selected claim after closure \
+         reaches the independent outstanding detector once and refuses before either affine event"
+    );
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.
