@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 18:50:33Z — from 241 issue file(s) in `docs/program/issues/`.
+2026-08-13 18:53:24Z — from 241 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -276,7 +276,7 @@ the committed file matches the generator's output.
 | `SURF-SPACE-CELLS` | The `space` block surface — cells and `becomes` — is unbuilt, while its entire desugaring target (the `State` effect: Get/Put/run_state) is built and live | merged | language | M–L | none | https://github.com/swe-toolkit/ken/pull/1152 |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | draft | verify | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
-| `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | ready | verify | S | none | — |
+| `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | active | verify | S | none | — |
 | `V4-RESIDUAL` | The Kripke countermodel is an inert shell: it is never related to `φ` at all — no interpretation of the formula, no recursive forcing evaluator — and V3's prose `description` is stuffed into `FormRef`, a slot meant for a structural subformula reference | merged | verify | L | G2-G3 | 1117 |
 | `VIS-BR-LITERAL` | visibility walk: raw-string prefixes br and cr are unrecognized by the literal scanner | merged | runtime | XS | none | — |
 
@@ -299,7 +299,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-TEST-SCRATCH-RAII` — Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SEC1-R3-MINIMAL-ROUTE` — SEC1-IFC-R3 was escalated as needing an SMT backend, and that named the one component the program has already deferred by policy while leaving the binding one unidentified -- prover.rs:317 lists FOUR deferred components and nobody has measured which is minimally sufficient for AC-R3c; also re-derive the recorded claim that widening decidable equality is vacuous, which is true of one registry and false of a second that already holds Char
-- `V3-VERDICT-CENSUS` — Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search
 
 ## Blockers
 
@@ -344,7 +343,7 @@ is itself not yet `merged`/`closed`:
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-R3-FUSION-EMITTER` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-KRIPKE-DECOMPOSITION` blocked by `V3-VERDICT-CENSUS` (status: ready)
+- `V3-KRIPKE-DECOMPOSITION` blocked by `V3-VERDICT-CENSUS` (status: active)
 - `V3-KRIPKE-DECOMPOSITION` blocked by `SEC1-R3-MINIMAL-ROUTE` (status: ready)
 
 ## Gate progress
