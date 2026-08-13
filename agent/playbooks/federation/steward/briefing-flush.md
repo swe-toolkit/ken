@@ -10,12 +10,33 @@ metadata:
 # Briefing flush
 
 `docs/program/diary/CURRENT-BRIEFING.md` is the Steward's durable resume
-pointer and the operator's live read. It holds **the last 24 hours and nothing
-else.**
+pointer and the operator's live read. **It holds ONE block: the current one.**
 
-Everything older belongs in the dated diary, `docs/program/diary/YYYY/Mon/DD.md`
-(`diary/INDEX.md` describes that store). **Budget: under 250 lines.** Over
-that, flush before writing anything new.
+Three files, and keeping them separate is what keeps the briefing small:
+
+| content | file |
+|---|---|
+| the current window, one block | `CURRENT-BRIEFING.md` |
+| permanent undated material — operator rulings, preserved refs, standing traps | `diary/STANDING.md` |
+| what happened on day X | `diary/YYYY/Mon/DD.md`, see `diary/INDEX.md` |
+
+**Budget: under 250 lines.** Over that, flush before writing anything new.
+
+**"Last 24 hours" is the wrong test and it failed in practice.** It licenses
+keeping superseded blocks because they are recent; one flush under that rule
+left four stacked checkpoints and the file stayed at 1946 lines. **The test is
+current, not recent** — a superseded block moves even if it is an hour old.
+
+## The trigger — a 24h schedule, separate from the watchdog tick
+
+Operator, 2026-08-13: the flush fires on **its own 24-hour interval**, not off
+the fleet watchdog. Use `CronCreate`, and pick an off-`:00` minute.
+
+⚠ **`CronCreate` is SESSION-ONLY and auto-expires after 7 days.** It dies with
+your session, silently. ⇒ **Re-arm it at session start and after every
+compaction, in the same breath as the watchdog** — the watchdog re-arm note at
+the top of `CURRENT-BRIEFING.md` names both. A schedule that only exists in the
+session that created it is not a schedule; the playbook is the durable half.
 
 ## The procedure
 
@@ -25,16 +46,16 @@ Run it **once a day**, and **delegate it** — Agent tool, `model: sonnet`.
    can revert uncommitted edits, and your verification then passes vacuously
    against the reverted file.
 2. **Dispatch**, instructing the subagent to:
-   - move every block older than 24 hours into the dated file for **the day the
-     block describes**, creating `YYYY/Mon/DD.md` as needed;
+   - move **every block that is not the current one** into the dated file for
+     **the day the block describes**, creating `YYYY/Mon/DD.md` as needed;
    - **move, never summarize and never drop** — the diary is the archive;
    - append under a `## Steward briefing` heading, preserving existing content
      in a day file that already exists;
-   - leave **standing, undated content in place**: operator rulings, preserved
-     refs, standing traps, and the where-durable-law-lives pointers.
-3. **Verify it moved rather than deleted, before committing.** Old total should
-   equal the new briefing plus everything added to dated files. A flush that
-   loses content is worse than a long file.
+   - keep the file header, the one current block, and nothing else.
+3. **Require a byte-level round-trip check**, not just line arithmetic: kept
+   head plus moved bodies plus kept tail must reproduce the original file
+   exactly. Line counts alone pass when content is reworded in place. A flush
+   that loses content is worse than a long file.
 4. Commit and publish doc-only.
 
 ## Why delegated

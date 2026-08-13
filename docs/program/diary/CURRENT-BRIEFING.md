@@ -53,8 +53,14 @@
 
 ## LIVE
 
-> **Re-arm the watchdog on every resume** — it is process-local and dies with
-> every MCP restart. Builds allowed, targeted only, never `--workspace`.
+> **Re-arm TWO things on every resume**, both process-local and both silently
+> dead after an MCP restart or compaction:
+> 1. **the watchdog tick** (`set_interval`);
+> 2. **the daily briefing flush** (`CronCreate`, off-`:00` minute) — it is
+>    session-only and auto-expires after 7 days. See
+>    `agent/playbooks/federation/steward/briefing-flush.md`.
+>
+> Builds allowed, targeted only, never `--workspace`.
 
 > ### RESUME HERE — state at 2026-08-13 ~14:4xZ. **`main` = `310e91c7`.**
 > **I hold nothing; no publisher is running. BOTH TEAMS ARE WORKING.**
