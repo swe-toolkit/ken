@@ -126,11 +126,26 @@
 > clause is proportionate. **Coverage was three surfaces of eleven files — the
 > unhunted list is NOT cleared.**
 >
-> **STILL OFF `main`, and the rule below says land them at a green seam:**
-> `wp/LANG-SURFACE-RECORD-LITERAL` at `8e9baa18` (3 commits, 10 `crates/` files,
-> QA-approved, Language stood down with the operator); `wp/CAT-CAPEX`
-> `31d1efcb` (2 commits, 1 `crates/` file); `wp/LIB-LINEAR-CAUSAL-OBLIGATION-
-> CALCULUS` and `wp/catalog-style-guide` (doc-only).
+> **STILL OFF `main`:** `wp/LIB-LINEAR-CAUSAL-OBLIGATION-CALCULUS` and
+> `wp/catalog-style-guide` (doc-only). **That is the whole list now.**
+>
+> **`wp/LANG-SURFACE-RECORD-LITERAL` `8e9baa18` is NOT a candidate — it is RED.**
+> See the measured box below: eight SIGABRT stack overflows while `main` was
+> green. Branch preserved, PR #2062 closed. It needs the overflow fixed, not a
+> publisher.
+>
+> **`wp/CAT-CAPEX` `31d1efcb` IS ALREADY LANDED — do not publish it, and do not
+> re-add it to this list.** Verified 2026-08-13 by blob identity: both of its
+> deliverables are byte-identical on `main` —
+> `catalog/packages/Capability/Filesystem/Authority.ken.md` at
+> `3ada325b` and `crates/ken-elaborator/tests/cat_capex_authority.rs` at
+> `23e8a161`. **`git log origin/main..31d1efcb` still reports 2 commits, and
+> that reading is wrong** — the publisher squash-merges, so a landed SHA reads
+> as never-landed forever. The branch's base is **902 commits** behind, so its
+> two-way diff against `main` shows a huge false delete (a whole
+> `Json.ken.md`, among others) that has nothing to do with its deliverables.
+> **Ask blob identity on the deliverables, never ancestry and never the
+> two-way stat.**
 > **THE NEVER-MERGE LIST IS A PUBLISH-TARGET BAN, NOT A CONTENT BAN — rationale
 > reconstructed and evidenced 2026-08-13.** It had carried none, so it was being
 > read as "this code may never reach `main`", which would have held
