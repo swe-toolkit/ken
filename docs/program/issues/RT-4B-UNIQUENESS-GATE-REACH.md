@@ -1,18 +1,42 @@
 ---
 id: RT-4B-UNIQUENESS-GATE-REACH
 title: "Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all"
-status: draft
+status: ready
 owner: runtime
 size: S
 gate: none
-depends_on: [RT-4B-C2-REACHABILITY]
+depends_on: [RT-4B-OBSERVATION-FEATURE-GATE]
 blocks: [RT-4B-UNIQUENESS-GATE-ATTRIBUTION]
 github: null
 origin: Architect evt_5gck3qg72xe37 ruling the Steward's single attribution node be SPLIT, on the Steward's own sizing caveat (evt_24j7cjr1bhvzr) that exit 12 may never be reached. Reach is pure recording inside the already-authorized 4b observation gate and needs no exception; attribution is a builder change and stays conditional. Split taken by the Steward 2026-08-13.
 ---
 
-> **PULLED BACK TO `draft` 2026-08-13, SAME DAY, BEFORE ANY WORK STARTED.
-> DO NOT CUT THIS NODE. Architect `evt_6hfw027f43cgg`, verified by the Steward.**
+> **RE-POINTED AND RETURNED TO `ready` 2026-08-13, after
+> `RT-4B-OBSERVATION-FEATURE-GATE` removed the blocker named at the bottom of
+> this note. Read the frame; three of its fixed inputs changed.**
+>
+> **What the predecessor did and did not deliver.** It made the D2f observation
+> reachable from `ken-elaborator` behind a default-off feature, and proved the
+> feature inert across two Cargo compilations. **It did not measure C2** — its
+> identity control drives a purpose-built `R3_4B_IDENTITY_SOURCE`, and its own
+> doc comment says so. So C2's count remains exactly as unmeasured as it was;
+> what changed is that it is now *possible* to measure.
+>
+> **A correction the Steward measured while re-pointing, which the original
+> note did not catch:** `fusion_unique_static_body_triple` has **two**
+> production call sites, not one. `:10367` in the enumeration loop is the
+> elimination; `:8927` in `rederive_fusion_key` turns the same `None` into a
+> hard planner error on an already-formed key. A counter inside the function
+> body sums two different populations and looks exactly like a clean answer.
+>
+> **The C2 witness also cannot supply artifact bytes** — it reaches an
+> immutable pre-object preparation and emits no native object — so the old
+> AC-2 was unsatisfiable on the witness the node exists to measure.
+>
+> ---
+>
+> **The original pull-back, retained because its lesson is the reusable part.
+> Architect `evt_6hfw027f43cgg`, verified by the Steward.**
 >
 > **The measurement this node was built on is about the wrong population.**
 > `(4, 2, 0, 2, 1)` is asserted on `arrived_empty` in
@@ -50,6 +74,12 @@ origin: Architect evt_5gck3qg72xe37 ruling the Steward's single attribution node
 > that 4b opened with is still unsolved and is the actual blocker** — this frame
 > asked for something its own fixed inputs made impossible. Re-pointing at C2 is
 > a scope question, not an edit.
+>
+> **(That last paragraph was true when written and is now discharged:
+> `RT-4B-OBSERVATION-FEATURE-GATE` solved the cross-crate expressibility
+> problem, and the scope question it called for was taken by the Steward
+> above. Read it as the record of why this node waited, not as current
+> status.)**
 
 ## What this is, and why it is its own node
 
