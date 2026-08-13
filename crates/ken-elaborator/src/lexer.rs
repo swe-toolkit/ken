@@ -16,7 +16,6 @@ use num_bigint::BigInt;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     // V0 keywords
-    KwView,
     KwConst,
     KwFn,
     KwProc,
@@ -465,7 +464,6 @@ impl<'s> Lexer<'s> {
                 s.push(self.advance().unwrap());
             }
             let tok = match s.as_str() {
-                "view" => Token::KwView,
                 "const" => Token::KwConst,
                 "fn" => Token::KwFn,
                 "proc" => Token::KwProc,

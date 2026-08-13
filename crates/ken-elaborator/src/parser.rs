@@ -80,20 +80,6 @@ impl Parser {
         }
     }
 
-    fn expect_legacy_view_name(&mut self) -> Result<(String, Span), ElabError> {
-        let (tok, span) = self.advance();
-        match tok {
-            Token::Ident(s) | Token::ConId(s) => Ok((s, span)),
-            Token::KwConst => Ok(("const".to_string(), span)),
-            Token::KwFn => Ok(("fn".to_string(), span)),
-            Token::KwProc => Ok(("proc".to_string(), span)),
-            other => Err(ElabError::ParseError {
-                msg: format!("expected identifier, found {:?}", other),
-                span,
-            }),
-        }
-    }
-
     fn expect_con(&mut self) -> Result<(String, Span), ElabError> {
         let (tok, span) = self.advance();
         match tok {
@@ -192,7 +178,6 @@ impl Parser {
                 construct: "mut".to_string(),
                 span: self.peek_span().clone(),
             }),
-            Token::KwView => self.parse_view_decl(start, false, DefKeyword::View),
             Token::KwConst => self.parse_view_decl(start, false, DefKeyword::Const),
             Token::KwFn => self.parse_view_decl(start, false, DefKeyword::Fn),
             Token::KwProc => self.parse_view_decl(start, false, DefKeyword::Proc),
@@ -231,7 +216,7 @@ impl Parser {
             Token::KwPackage => self.parse_boundary_decl(start, BoundaryKind::Package),
             other => Err(ElabError::ParseError {
                 msg: format!(
-                    "expected 'view', 'const', 'fn', 'proc', 'let', 'prove', 'prop', 'theorem', 'proof', \
+                    "expected 'const', 'fn', 'proc', 'let', 'prove', 'prop', 'theorem', 'proof', \
                      'law', 'data', 'def', 'foreign', 'temporal', 'record', 'class', 'instance', \
                      'derive', 'module', 'import', 'export', \
                      'pub', 'program', 'package', or 'space proc', found {:?}",
@@ -525,11 +510,7 @@ impl Parser {
         keyword: DefKeyword,
     ) -> Result<Decl, ElabError> {
         self.advance(); // consume definition keyword
-        let (name, _) = if keyword == DefKeyword::View {
-            self.expect_legacy_view_name()?
-        } else {
-            self.expect_ident()?
-        };
+        let (name, _) = self.expect_ident()?;
 
         let mut params = Vec::new();
         if matches!(self.peek(), Token::LParen) && matches!(self.lookahead(1), Token::RParen) {

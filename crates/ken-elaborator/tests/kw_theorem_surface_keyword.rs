@@ -49,7 +49,7 @@ fn theorem_elaborates_and_formats_while_retired_spelling_is_an_identifier() {
         ElabError::ParseError { msg, span } => {
             assert_eq!(
                 msg,
-                "expected 'view', 'const', 'fn', 'proc', 'let', 'prove', 'prop', \
+                "expected 'const', 'fn', 'proc', 'let', 'prove', 'prop', \
                  'theorem', 'proof', 'law', 'data', 'def', 'foreign', 'temporal', \
                  'record', 'class', 'instance', 'derive', 'module', 'import', 'export', \
                  'pub', 'program', 'package', or 'space proc', found Ident(\"lemma\")"

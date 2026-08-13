@@ -35,7 +35,7 @@ fn all_def_keywords_share_named_auto_and_sole_dictionary_bindings() {
 
     let explicit = elab(
         &mut env,
-        "view explicit_name : Bool where (chosen : Flag Int), (other : Flag Bool) = chosen.tag",
+        "const explicit_name : Bool where (chosen : Flag Int), (other : Flag Bool) = chosen.tag",
     );
     assert!(
         explicit.is_ok(),

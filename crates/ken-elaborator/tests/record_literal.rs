@@ -27,8 +27,8 @@ fn named_literals_follow_declaration_order_not_written_order() {
     let trusted_before = env.env.trusted_base();
     env.elaborate_file(
         "record Triple { first : Int, second : Int, third : Int }\n\
-         view ordered : Triple = { first = 1, second = 2, third = 3 }\n\
-         view permuted : Triple = { third = 3, first = 1, second = 2 }",
+         const ordered : Triple = { first = 1, second = 2, third = 3 }\n\
+         const permuted : Triple = { third = 3, first = 1, second = 2 }",
     )
     .expect("three-field literals elaborate");
     let expected = Term::pair(
@@ -57,7 +57,7 @@ fn dependent_field_values_use_prior_literal_fields() {
     let mut env = ElabEnv::empty().expect("prelude");
     env.elaborate_file(
         "record Dependent { carrier : Type, value : carrier }\n\
-         view dependent : Dependent = { value = 1, carrier = Int }",
+         const dependent : Dependent = { value = 1, carrier = Int }",
     )
     .expect("dependent literal fields elaborate in declaration order");
     assert_eq!(pair_depth(&body(&env, "dependent")), 2);
@@ -72,8 +72,8 @@ fn puns_resolve_in_the_enclosing_scope_and_follow_field_names() {
     let mut env = ElabEnv::empty().expect("prelude");
     env.elaborate_file(
         "record Point { x : Int, y : Int }\n\
-         view explicit (y : Int) (x : Int) : Point = { x = x, y = y }\n\
-         view punned (y : Int) (x : Int) : Point = { y, x }",
+         fn explicit (y : Int) (x : Int) : Point = { x = x, y = y }\n\
+         fn punned (y : Int) (x : Int) : Point = { y, x }",
     )
     .expect("shadowed puns elaborate");
     assert_eq!(body(&env, "explicit"), body(&env, "punned"));
@@ -89,8 +89,8 @@ fn record_literals_are_unparenthesized_application_arguments() {
     let mut env = ElabEnv::empty().expect("prelude");
     env.elaborate_file(
         "record Point { x : Int, y : Int }\n\
-         view consume (p : Point) : Int = p.x\n\
-         view applied : Int = consume { x = 1, y = 2 }",
+         fn consume (p : Point) : Int = p.x\n\
+         const applied : Int = consume { x = 1, y = 2 }",
     )
     .expect("unparenthesized record-literal application argument elaborates");
 }
@@ -105,12 +105,12 @@ fn update_rebuilds_from_projections_and_is_eta_respecting() {
     let mut env = ElabEnv::empty().expect("prelude");
     env.elaborate_file(
         "record Point { x : Int, y : Int }\n\
-         view unchanged (p : Point) : Point = { p | }\n\
-         view replaced (p : Point) : Point = { p | y = 3 }\n\
-         view rebuilt (p : Point) : Point = { x = p.x, y = 3 }\n\
-         view replaced_both (p : Point) : Point = { p | x = 1, y = 3 }\n\
-         view rebuilt_both (p : Point) : Point = { x = 1, y = 3 }\n\
-         view identity (p : Point) : Point = p",
+         fn unchanged (p : Point) : Point = { p | }\n\
+         fn replaced (p : Point) : Point = { p | y = 3 }\n\
+         fn rebuilt (p : Point) : Point = { x = p.x, y = 3 }\n\
+         fn replaced_both (p : Point) : Point = { p | x = 1, y = 3 }\n\
+         fn rebuilt_both (p : Point) : Point = { x = 1, y = 3 }\n\
+         fn identity (p : Point) : Point = p",
     )
     .expect("empty and single-field updates elaborate");
     let unchanged = env.env.lookup(env.globals["unchanged"]).unwrap();
@@ -152,7 +152,7 @@ fn missing_duplicate_and_foreign_fields_refuse_at_source_spans() {
         .unwrap();
 
     let missing = "{ x = 1 }";
-    let missing_source = format!("view bad : Point = {missing}");
+    let missing_source = format!("const bad : Point = {missing}");
     let missing_start = missing_source.find(missing).unwrap();
     let error = env
         .elaborate_decl(&missing_source)
@@ -168,7 +168,7 @@ fn missing_duplicate_and_foreign_fields_refuse_at_source_spans() {
         other => panic!("wrong missing-field error: {other:?}"),
     }
 
-    let duplicate = "view bad_dup : Point = { x = 1, x = 2, y = 3 }";
+    let duplicate = "const bad_dup : Point = { x = 1, x = 2, y = 3 }";
     let second = duplicate.rfind("x = 2").unwrap();
     match env.elaborate_decl(duplicate).expect_err("duplicate field") {
         ElabError::TypeMismatch { span, reason } => {
@@ -178,7 +178,7 @@ fn missing_duplicate_and_foreign_fields_refuse_at_source_spans() {
         other => panic!("wrong duplicate error: {other:?}"),
     }
 
-    let foreign = "view bad_foreign : Point = { x = 1, z = 2, y = 3 }";
+    let foreign = "const bad_foreign : Point = { x = 1, z = 2, y = 3 }";
     let z = foreign.find("z = 2").unwrap();
     match env.elaborate_decl(foreign).expect_err("foreign field") {
         ElabError::UnresolvedCon { name, span } => {
@@ -199,12 +199,12 @@ fn brace_neighbours_and_declaration_regressions_remain_live() {
     let mut env = ElabEnv::empty().expect("prelude");
     env.elaborate_file(
         "record Point { x : Int, y : Int }\n\
-         view literal : Point = { x = 1, y = 2 }\n\
+         const literal : Point = { x = 1, y = 2 }\n\
          def Nonnegative = { n : Int | Equal Int n n }\n\
          class Pick A { select : A }\n\
          instance Pick Bool { select = True }\n\
          module M { const ok : Bool = True }\n\
-         view positional : Point = (1, 2)",
+         const positional : Point = (1, 2)",
     )
     .expect("all AC-5 neighbours and positional construction elaborate");
 }

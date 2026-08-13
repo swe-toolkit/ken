@@ -328,7 +328,7 @@ fn class_declaration_requires_initialized_class_env_without_mutation() {
 /// constrained view as class-dependent and refuses it without mutation.
 #[test]
 fn constrained_view_requires_initialized_class_env_without_mutation() {
-    let decls = parse_decls("view legacy_constrained : Bool where (chosen : Flag Int) = True")
+    let decls = parse_decls("const legacy_constrained : Bool where (chosen : Flag Int) = True")
         .expect("parse constrained view fixture");
     let rdecl = resolve_decl(&decls[0]).expect("resolve constrained view fixture");
     assert!(matches!(

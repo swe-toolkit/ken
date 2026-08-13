@@ -989,6 +989,15 @@ fn check_pair_or_record(
 }
 
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
+    // FRAME BUDGET: this match is reached by every checked expression in
+    // every compile, and in an unoptimized build a new arm's locals are paid
+    // by every call regardless of which arm runs (LANG-RECORD-STACK-OVERFLOW,
+    // b4d38b8a). A wide, fixed-depth recursion elsewhere (register_decimal_char's
+    // 31-level match cascade, unrelated to any arm here) sits close to the
+    // guard page as a result: ~115 KiB of headroom out of a 2 MiB thread
+    // stack remained at the deepest call after that node's repair -- cleared
+    // by inches, not a mile. Keep new arm bodies as a call to a separate
+    // (ideally #[inline(never)]) function; don't build locals inline here.
     match expr {
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
@@ -4534,7 +4543,7 @@ fn class_field_declared_row(keyword: DefKeyword, field_name: &str) -> crate::eff
         DefKeyword::Proc => {
             crate::effects::RowType::singleton(format!("proc class field `{}`", field_name))
         }
-        DefKeyword::Const | DefKeyword::Fn | DefKeyword::View => crate::effects::RowType::empty(),
+        DefKeyword::Const | DefKeyword::Fn => crate::effects::RowType::empty(),
     }
 }
 
@@ -4582,7 +4591,7 @@ fn check_class_field_marker(
                 field_name
             ),
         }),
-        DefKeyword::View | DefKeyword::Const | DefKeyword::Fn | DefKeyword::Proc => Ok(()),
+        DefKeyword::Const | DefKeyword::Fn | DefKeyword::Proc => Ok(()),
     }
 }
 
@@ -4847,9 +4856,6 @@ pub fn check_surface_purity(
         } => (*keyword, *is_space_op, visits, constraints.as_slice()),
         _ => return Ok(()),
     };
-    if keyword == DefKeyword::View {
-        return Ok(());
-    }
 
     let declared = surface_declared_row_type(rdecl)?.unwrap_or_else(crate::effects::RowType::empty);
     let bound_dict_classes = collect_bound_dictionary_params(rdecl.ty.as_ref(), class_env);
@@ -4932,7 +4938,6 @@ pub fn check_surface_purity(
                 });
             }
         }
-        DefKeyword::View => {}
     }
 
     if !matches!(keyword, DefKeyword::Proc) && visits.is_some() {
