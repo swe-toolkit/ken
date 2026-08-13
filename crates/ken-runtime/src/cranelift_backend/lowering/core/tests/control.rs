@@ -2890,8 +2890,8 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
         let reached = matches!(
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
-                if *construct == "ContinuationSpecialization"
-                    && reason.contains("reached the detached-result seat")
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("reached the shared continuation call funnel")
         );
         rows.push((cause, reached));
         // The LAYERS, not a count. A count of one is satisfied by the wrong
@@ -2909,11 +2909,11 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must stop at the detached-result seat, on the R (Outer) identity: it \
-         is still projected as a causal call there, and under the ternary partition it must be \
-         realized by the fusion-owned body instead of reaching any call seat. If this row is red \
-         because the stop MOVED, the comment beside the D2f installer in core.rs is now stale and \
-         must be restated to the new measured stop rather than this assertion being relaxed"
+        "the armed compile must stop at the shared call funnel's R guard: three projections have \
+         been narrowed to O and one still routes the fusion-owned outer identity to a call seat \
+         it has no call edge for. The guard is fail-closed and names the residual. If this row is \
+         red because the stop MOVED, the comment beside the D2f installer in core.rs is now stale \
+         and must be restated to the new measured stop rather than this assertion being relaxed"
     );
     assert_eq!(
         realized,

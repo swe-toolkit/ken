@@ -8124,11 +8124,25 @@ impl<'a> Lowering<'a> {
         }
 
         // Closure: no continuation call may be emitted that was not recorded.
+        // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — over `O_t`, the ORDINARY
+        // targets. `I_t` and `R_t` have no declared `Function` by construction:
+        // an `I` target's selected body is lowered at its call edge and an `R`
+        // target's is emitted once as the fusion-owned body. Demanding a
+        // `FuncId` for either asks the bundle for a symbol the declaration pass
+        // deliberately did not mint.
+        //
+        // ⛔ This is a narrowing of the CALLEE population the emission scan
+        // recognises, not a weakening of the closure. The scan still refuses any
+        // recorded emission naming a specialization callee, and a fusion-local
+        // target emits no call at all -- so an emission for one would have to
+        // name a callee this set no longer contains, and the reverse direction
+        // above catches it.
         let mut specialization_callees = BTreeSet::new();
-        for unit in self.static_transition_plan.continuation_units()? {
-            let id = bundle.continuation(unit.id()).ok_or_else(|| {
+        for unit in self.static_transition_plan.ordinary_continuation_targets()? {
+            let id = bundle.continuation(unit).ok_or_else(|| {
                 backend_module(
-                    "a planned continuation specialization was never forward-declared".to_string(),
+                    "a planned ordinary continuation specialization was never forward-declared"
+                        .to_string(),
                 )
             })?;
             specialization_callees.insert(id);

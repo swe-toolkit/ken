@@ -15812,6 +15812,25 @@ impl<'src> StaticTransitionPlan<'src> {
                          selector, so its result edge cannot be projected",
                     )
                 })?;
+            // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — `O` ONLY.
+            //
+            // `evt_6bm54j10w1n88`: an `R` identity is realized once by the
+            // fusion-owned body and must never reach a call seat at all, and an
+            // `I` identity is realized at its own call edge by
+            // `compose_continuation_locally`. Projecting either as a residual
+            // result edge hands the detached-result seat a causal call for
+            // something that will never be a call -- which is exactly the
+            // refusal the armed compile stopped at.
+            //
+            // ⛔ Narrowed at the projection, not filtered at the seat. The seat
+            // rejects a multi-member projection outright, so a class it must
+            // ignore has to be absent rather than skipped, and one authority
+            // over which edges are ordinary is the whole point of `O`.
+            if self.fusion_composed_calls.contains_key(&identity)
+                || self.fusion_outer_realizations.contains_key(&identity)
+            {
+                continue;
+            }
             edges.push(ContinuationResultEdge {
                 producer_result_origin: call.producer_result_origin(),
                 producer_construct_origin: call.producer_construct_origin(),

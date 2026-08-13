@@ -2264,17 +2264,22 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // asserted here:
     //
     // ```text
-    // Unsupported(ContinuationSpecialization,
-    //   "a projected causal call reached the detached-result seat with a unit
-    //    result that is not a specialized constructor, ...")
+    // Unsupported(StaticContinuationFusion,
+    //   "a fusion-owned outer identity reached the shared continuation call
+    //    funnel; ... whichever projection routed it here is naming a call that
+    //    does not exist")
     // ```
     //
-    // **That is the `R` identity, and it is the next piece rather than a
-    // defect.** Under the ternary partition `P = O ⊎ I ⊎ R` (Architect
+    // **That guard is the mechanism working, and the residual is exactly one
+    // unnarrowed projection.** Under `P = O ⊎ I ⊎ R` (Architect
     // `evt_6bm54j10w1n88`) the Outer consumer-binding identity is realized once
-    // by the existing fusion-owned body and region claim and must never reach a
-    // call seat at all. It still reaches this one because the residual-edge
-    // projection has not yet been narrowed to `O`.
+    // by the fusion-owned body and region claim, emits no call, and must never
+    // reach a call seat. Three projections have been narrowed to `O` — the
+    // residual result edges, the definition pass's target range, and the emitted
+    // -call closure's callee population — and each narrowing advanced the stop.
+    // A fourth still routes `R` here; the guard refuses rather than letting it
+    // take whichever path it lands in, which is why the stop is a refusal and
+    // never a silently duplicated realization.
     //
     // **THE SPLICE-CAPABILITY STOP IS RETIRED WITH ITS MECHANISM**, not moved:
     // `StaticContinuationFusion: "a fusion-composition splice issued a
@@ -10627,6 +10632,28 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // nothing about its target, body, owner or origin is consulted, and
         // there is no domain scan. `F` is empty unless a fusion was installed,
         // so this is inert on every artifact that has none.
+        // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — `R` MUST NEVER REACH THIS
+        // FUNNEL, and reaching it is a refusal rather than a second fork.
+        //
+        // `evt_6bm54j10w1n88`: the Outer consumer-binding identity is realized
+        // once by the fusion-owned body, emits no call, and lowers no second
+        // selected body. So there is nothing for this seat to do with one --
+        // composing it here would duplicate a realization that already
+        // happened, and calling it would emit the call the mechanism removes.
+        //
+        // ⛔ Fail-closed by design. If a projection still routes an `R`
+        // identity here, that projection is the defect and this names it at the
+        // seat rather than letting the identity take whichever path it lands in.
+        if self
+            .static_transition_plan
+            .fusion_outer_realizations()
+            .contains_key(identity)
+        {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "a fusion-owned outer identity reached the shared continuation call funnel; it is                  realized once by the fusion-owned body and has no call edge, so whichever                  projection routed it here is naming a call that does not exist",
+            ));
+        }
         if self
             .static_transition_plan
             .fusion_composed_edge(identity)
