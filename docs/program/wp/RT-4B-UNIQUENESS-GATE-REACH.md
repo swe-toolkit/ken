@@ -75,6 +75,52 @@ including the `(4, 2, 0, 2, 1)` this node was built on, was taken on in-crate
 D2j fixtures — and the three unperturbed rows of that same assertion show the
 planner **does** fuse. C2's count is what has never been measured.
 
+## D3 — record what the feature's inertness now rests on
+
+**Folded from an Adversary finding on `0902e62f` (`evt_qq5h94eq504j`),
+triaged and evidence-corrected by the Steward. One sentence of doc, at the
+feature's own declaration.**
+
+**The inertness argument changed KIND when the gate widened, and nothing marks
+the change.** Under `cfg(test)` the `walked` field **did not exist** in a
+non-test build, so a structural-equality divergence in production was
+impossible by construction — the compiler enforced it. Under
+`cfg(any(test, feature = "r3-4b-observation"))` the field exists **whenever the
+feature is on**, and the only thing keeping it out of a production build is
+that no `Cargo.toml` enables it.
+
+⇒ **That is a fact about configuration, not about code. It can change without
+touching any file that states the invariant, and nothing goes red when it
+does.**
+
+State at the feature declaration: that inertness rests on no crate enabling
+this feature on a non-dev dependency edge, and that the check is
+`cargo tree -e features,no-dev`.
+
+> ### The Adversary's precedent is REAL but its stated form is WRONG. Do not copy it.
+>
+> The finding named `crates/ken-cli/Cargo.toml:25` — which enables the sibling
+> `px8-ds-test-support` feature — as *"a normal `[dependencies]` edge, not
+> dev"*, and concluded it is *"compiled into the shipped CLI today."*
+> **Measured: line 25 sits under `[dev-dependencies]`** (the section opens at
+> line 24; the plain `[dependencies]` entry for `ken-runtime` is line 22 and
+> carries no features). **It is the only enabling edge in the workspace.**
+>
+> ⇒ **`px8-ds-test-support` is NOT in the shipped CLI binary**, and writing
+> that sentence into a durable doc would plant a false fact in exactly the
+> place people go to check one.
+>
+> **The real effect is narrower and it still matters here.** A dev-dependency
+> enabling a feature unifies it across the whole `cargo test` build graph, so
+> any test build that includes `ken-cli` compiles `ken-runtime` **with**
+> `px8-ds-test-support`. **That is precisely why AC-6's control needs
+> `--no-default-features` and two separate target directories** — feature-on
+> and feature-off artifacts cannot coexist in one compilation.
+>
+> **So: cite the mechanism, not the misread edge.** The precedent worth naming
+> is that a test-support feature already leaks across this workspace's test
+> graph — not that one ships.
+
 ## Acceptance criteria
 
 - **AC-1 — the count is taken at `:10367`**, not inside the function body, not
@@ -100,6 +146,12 @@ planner **does** fuse. C2's count is what has never been measured.
   with the counter added: `r3_4b_observation_feature_is_native_artifact_identical`.
 - **AC-7 — the report states the licensing limit in the artifact itself.** Reach
   attributes nothing: it cannot see which arm fired, and it must not claim to.
+- **AC-8 — D3's sentence names the CONDITION and the CHECK**, not just the
+  current state. "No crate enables this today" is the fact that expires;
+  "inertness rests on no crate enabling it on a non-dev edge, check with
+  `cargo tree -e features,no-dev`" is the one that stays useful. **Do not
+  repeat the `ken-cli:25` claim as written** — verify the section yourself
+  before citing that line at all.
 
 > ### Do NOT write an AC requiring artifact identity on the C2 run. It is not available.
 >
