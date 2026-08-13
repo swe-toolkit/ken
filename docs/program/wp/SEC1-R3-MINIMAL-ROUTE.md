@@ -3,6 +3,11 @@
 **Owner: verify. Size: S. Gate: none — this reports; `SEC1-IFC-R3` keeps `G-Sec`.**
 **This node REPORTS. It builds nothing and registers nothing.**
 
+**Amended 2026-08-13 with D0 and AC-7**, carrying two non-blocking review
+findings from the census candidate `3ebf6092`. They are wording fixes to a
+document, they touch no number and no conclusion, and they do not change this
+node's question.
+
 **Base: re-derive `origin/main` at cut time.** Fixed inputs measured at
 `3cfdfdce`.
 
@@ -20,6 +25,40 @@
 | other equality primitives of the right shape | `numbers.rs:467` (`eq_float`), `:471` (`eq_float32`) |
 | the posture that may make this the operator's call | `docs/adr/0013-int-decidable-equality-kernel-posture.md` |
 | the deferral that must not be quietly revisited | `docs/program/03-program-of-work.md:182` |
+
+## D0 — two wording fixes to the census document you just landed
+
+**Carried from the review of `3ebf6092` (`evt_2r397jbyxr6w4`), both non-blocking
+and explicitly allowed to ride a later increment.** They are here because this
+is the next Verify turn and the document is a sibling of the one you are about
+to write. **Do them first; they are minutes.**
+
+**Fix 1 — ground the non-interference claim instead of asserting it.** The
+census's Method says *"Both are side-effect free, so the observation did not
+change the following real attempt."* **Every number in the document depends on
+that sentence**, and it is the one thing in it that is asserted rather than
+grounded. It is also cheaply grounded, close to a type-level fact:
+
+- `ipc_search(ctx: &Context, phi: &Term, depth: usize) -> Option<Term>` and
+  `check(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResult<()>`
+  take **only shared references**;
+- `crates/ken-kernel/src` contains no `RefCell`, `Cell`, `Mutex` or `OnceCell`,
+  so **there is no interior mutability for a shared reference to hide.**
+
+Add that as a clause. **Re-derive both halves yourself at cut time** rather than
+copying them from this frame — a grounding you did not check is the same
+assertion with a citation attached.
+
+**Fix 2 — the `ifc::` row's zeros are a different kind of zero.** In the
+Distribution table `ifc::` reads `0 | 0 | 0 | 0`, which is indistinguishable
+from *ran and found no obligations*. It means *selected zero tests*. The
+document does disambiguate it — in the Coverage boundary section at the very
+end, **which is exactly the too-far-from-the-number carrier this arc keeps
+paying for.** Put `—` or `not run` in those cells, or drop the row and leave it
+to the coverage section.
+
+**Neither fix touches a number or a conclusion**, and neither is licence to
+revisit the census's findings.
 
 ## D1 — which of the four is minimally sufficient for `AC-R3c`
 
@@ -82,7 +121,12 @@ is that only a solver suffices, report that; the ruling at
   re-run the same search. **Distinguish "the language forbids this" from "I did
   not find a way"** — they license different next steps.
 - **AC-6 — nothing is registered, built or changed.** `git diff` under
-  `crates/` is empty.
+  `crates/` is empty. **D0 edits a document under `docs/`, which this
+  condition does not cover and must not be read as forbidding.**
+- **AC-7 — D0's non-interference grounding is RE-DERIVED, not copied.** Check
+  both signatures and run the interior-mutability grep yourself. **A citation
+  you did not verify is the original assertion wearing a `file:line`** — and
+  this node exists because an escalation was believed for exactly that reason.
 
 ## Pre-stated licensing — read BEFORE reporting
 
