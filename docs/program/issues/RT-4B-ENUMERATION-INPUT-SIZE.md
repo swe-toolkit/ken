@@ -1,13 +1,13 @@
 ---
 id: RT-4B-ENUMERATION-INPUT-SIZE
 title: "Gate 4b's observer records whether an oriented plan ARRIVED but not how large the population it walks is, so `keys = []` cannot be read as either lawful absence or a missing producer relation -- and the scalar that would settle it is the admitted-discovery ledger's length, not the oriented plan's, because that ledger is what candidate enumeration actually iterates"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2109
 origin: Architect ruling evt_7b6d8jf1jd4qy authorizing the size field inside 4b's observation gate, plus the Steward's follow-up measurement at evt_ky5f547e6hjz establishing that enumeration does not distinguish any of its thirteen exits. Scope, ownership and sequencing taken by the Steward 2026-08-13.
 ---
 
