@@ -38,7 +38,24 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~03:3xZ. **`main` = `4ca4fb58`.**
+> ### RESUME HERE — state at 2026-08-13 ~03:5xZ. **`main` = `6d5a2d84`.**
+>
+> **THE R3 FORK IS CLOSED AND RUNTIME IS IMPLEMENTING.** Architect
+> `evt_6kn9ckdnbf0ph` (durable `39ff9d8f`) took **reading two**: the falsifier
+> was a false alarm against the mechanism — it tested the pre-mechanism ABI
+> input run — and is **withdrawn**, replaced by a post-implementation chain
+> falsifier. **Call 17/37 stays OFF `FusionComposedEdge`**, on
+> `FusionRegionClaim`. **The owed-and-unhomed stop-comment correction is HOMED**
+> to this implementation turn and must carry a control that goes red. Released
+> at `evt_40xt053gtt9md`; the implementer is rebasing `e25ba27d` → `6d5a2d84`.
+> **Full amendment is the newest box at the top of the frame's stop-4 region —
+> read that, not this line.** Everything below in this block about an open
+> question or an unhomed item is HISTORY.
+>
+> **Next Steward action: none until Runtime hands back.** Six mechanisms were
+> refuted on this seam before this one; the seventh is the first built against a
+> falsifier that survives contact. If it fails, it fails as a **stop**, not as a
+> silent green.
 >
 > **THE FRONTIER SURVEY WAS RUN AND THE ANSWER IS: THERE IS NO FRAMABLE WORK.
 > Do not re-derive this.** Every idle ring is idle for a measured reason, not
