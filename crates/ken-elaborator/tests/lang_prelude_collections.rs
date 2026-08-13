@@ -63,7 +63,12 @@ fn peel_app(term: &Term) -> (Option<GlobalId>, Vec<Term>) {
 /// `Nat`-typed head terms in order. Panics if the spine is not a `List Nat`
 /// shape (only `Cons`/`Nil` heads, each `Cons` applied to exactly the type
 /// arg + head + tail).
-fn whnf_list_elements(env: &ElabEnv, nil_id: GlobalId, cons_id: GlobalId, term: &Term) -> Vec<Term> {
+fn whnf_list_elements(
+    env: &ElabEnv,
+    nil_id: GlobalId,
+    cons_id: GlobalId,
+    term: &Term,
+) -> Vec<Term> {
     let mut elements = Vec::new();
     let mut cur = whnf(&env.env, &Context::new(), term);
     loop {
@@ -116,7 +121,10 @@ fn ac2_filter_computes_and_rejects_at_least_one_element() {
         Some(zero_id),
         "the single surviving element must be Zero; got {kept_head:?} {kept_args:?}"
     );
-    assert!(kept_args.is_empty(), "Zero takes no arguments; got {kept_args:?}");
+    assert!(
+        kept_args.is_empty(),
+        "Zero takes no arguments; got {kept_args:?}"
+    );
 }
 
 /// AC-5 -- the trusted base does not grow. `sort`'s `is_sorted ∧ Perm`
