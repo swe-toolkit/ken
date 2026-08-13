@@ -2051,11 +2051,28 @@ fn checked_computational_ih_templates(
 
 /// Compile one exact checked Program I `main` through lowering and linked
 /// process-artifact production as a single identity-consistent transaction.
-pub fn compile_native_program_sources(
+/// `RT-LEXICAL-R3` gate 4a — **the production pre-object PREPARATION
+/// transaction**, and the one producer of everything the native build knows
+/// before object emission.
+///
+/// This is an EXTRACTION, not a new surface. It is the exact former prefix of
+/// [`compile_native_program_sources`] — selected-main admission, closure
+/// normalization, compiler-derived IH seeds, plan-bearing erasure, total-seed
+/// validation, exact marker binding, and the planned Runtime program — stopping
+/// immediately before `build_bound_process_starter_executable_artifact`.
+/// `compile_native_program_sources` now **consumes this same transaction**, so
+/// there is one producer rather than a test path running beside production.
+///
+/// ⛔ **The caller cannot author any of it.** The returned
+/// [`NativeProgramPreparationV1`] is immutable and has no public constructor, no
+/// compiler-private seed enters through this signature, and no plan, marker or
+/// seed collector becomes reachable from outside. A control built on it reads
+/// what production produced and nothing else — which is the whole point, since a
+/// control able to author the fact it tests measures nothing.
+pub fn prepare_native_program_sources(
     package_name: &str,
     sources: Vec<CompilerSource>,
-    output_dir: impl AsRef<Path>,
-) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
+) -> Result<NativeProgramPreparationV1, NativeProgramBuildError> {
     let manifest = CompilerManifest::new(package_name, Vec::new());
     if package_name.is_empty() {
         return Err(NativeProgramBuildError::Driver(
@@ -2090,6 +2107,9 @@ pub fn compile_native_program_sources(
     let plan =
         native_entrypoint_plan(&checked, &symbols).map_err(NativeProgramBuildError::Driver)?;
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
+    // Gate 4a: retained on the preparation so a control can compare the EMBEDDED
+    // plan bytes against a full native build's, rather than recomputing them.
+    let plan_bytes_retained = plan_bytes.clone();
     let plan_transport_hash = fingerprint(&plan_bytes);
     let host_spine =
         checked_host_spine_v1(&env.prelude_env, &symbols).map_err(NativeProgramBuildError::Driver)?;
@@ -2428,6 +2448,104 @@ pub fn compile_native_program_sources(
         .metadata
         .trusted_base_delta
         .retain(|symbol, _| runtime_targets.contains(symbol));
+    Ok(NativeProgramPreparationV1 {
+        package: Box::new(package),
+        plan: Box::new(plan),
+        plan_bytes: plan_bytes_retained,
+        plan_transport_hash,
+        host_spine: Box::new(host_spine),
+        closure: Box::new(closure),
+        executable_closure,
+        executable_entrypoint: Box::new(executable_entrypoint),
+        runtime_program: Box::new(runtime_program),
+        selected,
+    })
+}
+
+/// The immutable result of [`prepare_native_program_sources`].
+///
+/// Fields are private with read-only accessors: nothing here can be constructed,
+/// mutated, or partially supplied by a caller. Cross-crate integration needs the
+/// type to be public; it does not need it to be a builder, and it is not one.
+///
+/// ⚠ **The large members are BOXED, and that is load-bearing rather than
+/// stylistic.** Extracting this transaction adds one stack frame at the seam:
+/// `prepare` builds every local, and the returned aggregate is then written into
+/// `compile_native_program_sources`'s slot. Returning it inline was measured to
+/// **overflow the stack** on a debug build — `px7p`'s
+/// `selected_ok_field_reaches_both_real_executors`, green at the base, aborted
+/// with `fatal runtime error: stack overflow`. Boxing reduces the returned
+/// aggregate to pointers and the row is green again. Do not unbox these to
+/// "simplify" the type.
+#[derive(Clone, Debug)]
+pub struct NativeProgramPreparationV1 {
+    package: Box<CheckedCorePackage>,
+    plan: Box<NativeEntrypointPlanV1>,
+    plan_bytes: Vec<u8>,
+    plan_transport_hash: u64,
+    host_spine: Box<crate::erasure::CheckedHostSpineV1>,
+    closure: Box<TargetClosure>,
+    executable_closure: BTreeSet<StableSymbol>,
+    executable_entrypoint: Box<ExecutableEntrypointPackage>,
+    runtime_program: Box<ken_runtime::RuntimeProgram>,
+    selected: Vec<SelectedTargetReport>,
+}
+
+impl NativeProgramPreparationV1 {
+    /// The planned Runtime program exactly as production carries it into object
+    /// emission.
+    pub fn runtime_program(&self) -> &ken_runtime::RuntimeProgram {
+        &self.runtime_program
+    }
+
+    /// The canonical entrypoint plan bytes embedded by this transaction.
+    pub fn plan_bytes(&self) -> &[u8] {
+        &self.plan_bytes
+    }
+
+    pub fn plan_transport_hash(&self) -> u64 {
+        self.plan_transport_hash
+    }
+
+    pub fn plan(&self) -> &NativeEntrypointPlanV1 {
+        &self.plan
+    }
+
+    /// The declarations this transaction owns, which are exactly the ones erased
+    /// into the runtime program.
+    pub fn executable_closure(&self) -> &BTreeSet<StableSymbol> {
+        &self.executable_closure
+    }
+}
+
+/// Elaborate, plan, and lower one Ken program to a linked native artifact.
+///
+/// Gate 4a: this now **consumes** [`prepare_native_program_sources`] rather than
+/// re-deriving its prefix, so the preparation a control observes and the
+/// preparation production emits from are the same object.
+pub fn compile_native_program_sources(
+    package_name: &str,
+    sources: Vec<CompilerSource>,
+    output_dir: impl AsRef<Path>,
+) -> Result<NativeProgramBuildOutput, NativeProgramBuildError> {
+    let NativeProgramPreparationV1 {
+        package,
+        plan,
+        plan_bytes: _,
+        plan_transport_hash,
+        host_spine,
+        closure,
+        executable_closure,
+        executable_entrypoint,
+        runtime_program,
+        selected,
+    } = prepare_native_program_sources(package_name, sources)?;
+    let package = *package;
+    let plan = *plan;
+    let host_spine = *host_spine;
+    let closure = *closure;
+    let executable_entrypoint = *executable_entrypoint;
+    let runtime_program = *runtime_program;
     let artifact = ken_runtime::build_bound_process_starter_executable_artifact(
         &runtime_program,
         &ken_runtime::BoundProcessEntrypoint {
