@@ -140,6 +140,160 @@ pub struct Lexer<'s> {
     previous_token_was_dot: bool,
 }
 
+/// One classified comment form (`31 §5`), returned by [`classify_comment`]
+/// alongside the byte offset immediately after its close. Shared between
+/// `Lexer::skip_ws_comments` and `lossless::append_trivia`'s independent
+/// rescan of the same source bytes, so the two cannot disagree about which
+/// comment starts at a position, or where it ends, by construction
+/// (LANG-COMMENT-CLASSIFIER-SHARED D1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CommentKind {
+    /// `-- …` (`31 §5`).
+    Line,
+    /// `--- …` (`31 §5`, D2).
+    DocLine,
+    /// `{- … -}`, nestable (`31 §5`, D1).
+    Block,
+    /// `{-- … --}` (`31 §5`, D2); deliberately non-nesting.
+    DocBlock,
+}
+
+/// Which block form failed to close before the shared classifier's `end`
+/// bound. Only the two block forms can fail this way -- a line/doc-line
+/// comment always ends at `\n` or `end` and never errors -- so this type
+/// carries no `Line`/`DocLine` case, making an "unterminated line comment"
+/// unrepresentable rather than an unreachable match arm.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BlockCommentForm {
+    Block,
+    DocBlock,
+}
+
+/// A block-form comment scan reached `end` before finding its close.
+/// Each caller turns this into the `ElabError` appropriate to what `end`
+/// means there: the lexer's `end` is real end-of-source, so this is a
+/// genuine unterminated comment (`ElabError::ParseError`); the lossless
+/// layer's `end` is the boundary the lexer already accepted as trivia, so
+/// reaching it there means the two scanners disagree, not a user-facing
+/// error (`ElabError::Internal`).
+pub(crate) struct UnterminatedComment {
+    pub(crate) form: BlockCommentForm,
+    pub(crate) start: usize,
+}
+
+/// Classify the comment form starting at `src[pos..end]`, or `None` if `pos`
+/// is not the start of any comment -- whitespace handling is each caller's
+/// own concern (`31 §5`). Bounded to `end`: the lexer passes `src.len()`
+/// (EOF); the lossless layer passes the far edge of the inter-token gap it
+/// is rescanning. That bound is safe for the lexer to share, not merely
+/// convenient: `materialize_partition` establishes that an inter-token
+/// region contains whole trivia, so a comment never straddles a token
+/// boundary, and the lexer's own bound (EOF) and the lossless layer's bound
+/// (the next token's start) coincide on every comment either one actually
+/// scans.
+///
+/// Specific-before-general, and this is the one site it happens at
+/// (LANG-COMMENT-CLASSIFIER-SHARED AC-1): `{--` before `{-`, since `{--`
+/// partially matches `{-` on its first two characters. `---` is not a
+/// separate top-level arm -- see the reasoning at the `--` arm below.
+pub(crate) fn classify_comment(
+    src: &str,
+    pos: usize,
+    end: usize,
+) -> Result<Option<(CommentKind, usize)>, UnterminatedComment> {
+    if src[pos..end].starts_with("{--") {
+        let next = scan_doc_block_comment_end(src, pos, end)?;
+        Ok(Some((CommentKind::DocBlock, next)))
+    } else if src[pos..end].starts_with("{-") {
+        let next = scan_nested_block_comment_end(src, pos, end)?;
+        Ok(Some((CommentKind::Block, next)))
+    } else if src[pos..end].starts_with("--") {
+        // Covers both `--` and `---` -- a doc line comment is a line
+        // comment whose text happens to start with a dash; both scan
+        // identically to end-of-line/EOF (a line comment cannot nest and
+        // cannot fail, `31 §5`). Folded into one arm rather than ordered as
+        // two, so there is no `---`-before-`--` ordering to duplicate: the
+        // kind distinction below is a discriminant read AFTER the shared
+        // end computation, not a second dispatch point.
+        let next = src[pos..end].find('\n').map_or(end, |offset| pos + offset);
+        let kind = if src[pos..end].starts_with("---") {
+            CommentKind::DocLine
+        } else {
+            CommentKind::Line
+        };
+        Ok(Some((kind, next)))
+    } else {
+        Ok(None)
+    }
+}
+
+/// `{- … -}`, nestable (`31 §5`, D1). Depth starts at 1 after the opening
+/// `{-`; each further `{-` increments, each `-}` decrements, and the
+/// comment ends the instant depth reaches 0. A nested `{--` partially
+/// matches this `{-` check (2 of its 3 characters), incrementing depth with
+/// the extra `-` left as ordinary body content on the next iteration --
+/// deliberate, not a gap: only the outer, block-opening position is
+/// classification-sensitive to `{--` vs `{-`; once inside a `{- -}` body,
+/// only balance (`{-`/`-}`) matters.
+fn scan_nested_block_comment_end(
+    src: &str,
+    start: usize,
+    end: usize,
+) -> Result<usize, UnterminatedComment> {
+    let mut pos = start + 2; // consumed opening '{-'
+    let mut depth: usize = 1;
+    while pos < end {
+        if src[pos..end].starts_with("{-") {
+            pos += 2;
+            depth += 1;
+            continue;
+        }
+        if src[pos..end].starts_with("-}") {
+            pos += 2;
+            depth -= 1;
+            if depth == 0 {
+                return Ok(pos);
+            }
+            continue;
+        }
+        let ch = src[pos..end]
+            .chars()
+            .next()
+            .expect("pos < end on a valid str slice always yields a char");
+        pos += ch.len_utf8();
+    }
+    Err(UnterminatedComment {
+        form: BlockCommentForm::Block,
+        start,
+    })
+}
+
+/// `{-- … --}` (`31 §5`, D2). Deliberately NOT nesting -- the spec marks
+/// only the plain block form "(nestable)"; a doc block scans for the first
+/// literal `--}` and treats everything else, including anything that looks
+/// like a nested `{-`/`{--`, as ordinary body content.
+fn scan_doc_block_comment_end(
+    src: &str,
+    start: usize,
+    end: usize,
+) -> Result<usize, UnterminatedComment> {
+    let mut pos = start + 3; // consumed opening '{--'
+    while pos < end {
+        if src[pos..end].starts_with("--}") {
+            return Ok(pos + 3);
+        }
+        let ch = src[pos..end]
+            .chars()
+            .next()
+            .expect("pos < end on a valid str slice always yields a char");
+        pos += ch.len_utf8();
+    }
+    Err(UnterminatedComment {
+        form: BlockCommentForm::DocBlock,
+        start,
+    })
+}
+
 impl<'s> Lexer<'s> {
     pub fn new(src: &'s str) -> Self {
         Self {
@@ -161,97 +315,38 @@ impl<'s> Lexer<'s> {
 
     /// Skip whitespace and every comment form (`31 §5`): line `-- …`, doc
     /// line `--- …`, nestable block `{- … -}`, and doc block `{-- … --}`.
-    /// Classification is specific-before-general at each dispatch point
-    /// (`---` before `--`; `{--` before `{-`), matching
-    /// `lossless.rs::append_trivia`'s independent rescan of the same bytes
-    /// exactly -- LANG-SURFACE-BLOCK-COMMENTS AC-1 is the two scanners never
-    /// disagreeing about where a comment ends.
+    /// Classification and both end-scanners live in the shared
+    /// [`classify_comment`] (LANG-COMMENT-CLASSIFIER-SHARED D1/D2), the same
+    /// function `lossless.rs::append_trivia` rescans with independently --
+    /// making the two scanners' agreement about where a comment ends
+    /// structural rather than merely tested-against. This loop only skips
+    /// whitespace and advances `self.pos` by whatever the classifier
+    /// reports, discarding the comment kind it does not need.
+    /// `{--}` is an opener, not a closed comment -- `}` alone is not the
+    /// doc-block closer `--}` -- so the shortest empty doc block comment is
+    /// `{----}` (opener `{--` immediately followed by closer `--}`,
+    /// LANG-COMMENT-CLASSIFIER-SHARED AC-9).
     fn skip_ws_comments(&mut self) -> Result<(), ElabError> {
         loop {
             while self.cur().map(|c| c.is_whitespace()).unwrap_or(false) {
                 self.advance();
             }
-            if self.src[self.pos..].starts_with("{--") {
-                self.skip_doc_block_comment()?;
-            } else if self.src[self.pos..].starts_with("{-") {
-                self.skip_nested_block_comment()?;
-            } else if self.src[self.pos..].starts_with("--") {
-                // Covers both `--` and `---` -- a doc line comment is a line
-                // comment whose text happens to start with a dash; both scan
-                // identically to end-of-line/EOF (a line comment cannot nest
-                // and cannot fail, `31 §5`).
-                while self.cur().map(|c| c != '\n').unwrap_or(false) {
-                    self.advance();
+            match classify_comment(self.src, self.pos, self.src.len()) {
+                Ok(Some((_kind, next))) => self.pos = next,
+                Ok(None) => break,
+                Err(UnterminatedComment { form, start }) => {
+                    let msg = match form {
+                        BlockCommentForm::Block => "unterminated block comment",
+                        BlockCommentForm::DocBlock => "unterminated doc block comment",
+                    };
+                    return Err(ElabError::ParseError {
+                        msg: msg.to_string(),
+                        span: Span::new(start, self.src.len()),
+                    });
                 }
-            } else {
-                break;
             }
         }
         Ok(())
-    }
-
-    /// `{- … -}`, nestable (`31 §5`, D1). Depth starts at 1 after the opening
-    /// `{-`; each further `{-` increments, each `-}` decrements, and the
-    /// comment ends the instant depth reaches 0. A nested `{--` partially
-    /// matches this `{-` check (2 of its 3 characters), incrementing depth
-    /// with the extra `-` left as ordinary body content on the next
-    /// iteration -- deliberate, not a gap: only the outer, block-opening
-    /// position is classification-sensitive to `{--` vs `{-`; once inside a
-    /// `{- -}` body, only balance (`{-`/`-}`) matters. `start` anchors the
-    /// unterminated-comment span at the opening `{-`, through EOF.
-    fn skip_nested_block_comment(&mut self) -> Result<(), ElabError> {
-        let start = self.pos;
-        self.advance();
-        self.advance(); // consume '{-'
-        let mut depth: usize = 1;
-        loop {
-            if self.src[self.pos..].starts_with("{-") {
-                self.advance();
-                self.advance();
-                depth += 1;
-                continue;
-            }
-            if self.src[self.pos..].starts_with("-}") {
-                self.advance();
-                self.advance();
-                depth -= 1;
-                if depth == 0 {
-                    return Ok(());
-                }
-                continue;
-            }
-            if self.advance().is_none() {
-                return Err(ElabError::ParseError {
-                    msg: "unterminated block comment".to_string(),
-                    span: Span::new(start, self.pos),
-                });
-            }
-        }
-    }
-
-    /// `{-- … --}` (`31 §5`, D2). Deliberately NOT nesting -- the spec marks
-    /// only the plain block form "(nestable)"; a doc block scans for the
-    /// first literal `--}` and treats everything else, including anything
-    /// that looks like a nested `{-`/`{--`, as ordinary body content.
-    fn skip_doc_block_comment(&mut self) -> Result<(), ElabError> {
-        let start = self.pos;
-        self.advance();
-        self.advance();
-        self.advance(); // consume '{--'
-        loop {
-            if self.src[self.pos..].starts_with("--}") {
-                self.advance();
-                self.advance();
-                self.advance();
-                return Ok(());
-            }
-            if self.advance().is_none() {
-                return Err(ElabError::ParseError {
-                    msg: "unterminated doc block comment".to_string(),
-                    span: Span::new(start, self.pos),
-                });
-            }
-        }
     }
 
     fn is_ascii_ident_continue(c: char) -> bool {
