@@ -38,10 +38,71 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~12:1xZ. **`main` = `35b6389a`.**
+> ### RESUME HERE — state at 2026-08-13 ~12:5xZ. **`main` = `66c718c9`.**
 >
-> **THE RING IS WORKING. Both Runtime seats took the kickoff at
-> `evt_4mgjxadg404mn` and are live.** Nothing is owed to me until they hand back.
+> **TWO SEATS WERE RESEATED BY OPERATOR INSTRUCTION AND THE SWAP CHANGES YOUR
+> OPERATIONAL HABITS, not just a config line.** `architect` is now
+> **Opus 5 (1M), high**; `runtime-implementer` is now **`gpt-5.6-sol`, high**.
+> A straight exchange, landed in `moot.toml` at PR #2086, both verified on their
+> own pane footers — **never infer a running model from config; read the
+> footer.**
+>
+> **THE STRANDING FAULT MOVED WITH THE HARNESS, and this is the part that costs
+> time if missed.** Codex seats strand convo mentions in the composer. The
+> Architect stranded on nearly every mention on 2026-08-13 — five stacked
+> pastes, then six — and on Claude Code it should stop. **The implementer
+> inherits it**: watch that pane now, not the Architect's. Repairs differ by
+> state — composer text with **no** `Working` line is stranded (bare `Enter`);
+> composer text **with** `Working` and a `tab to queue message` hint is not yet
+> stranded (send `Tab`, which delivers automatically at end of turn). The
+> capacity modal **defaults to a model downgrade**: `Down` then `Enter` picks
+> "Keep waiting" and preserves T1.
+>
+> **Pane ids changed on reseat.** Re-resolve with `tmux list-panes -a -F
+> "#{pane_id} #{pane_title}"`; do not trust a remembered id.
+>
+> **RUNTIME IS ON R3 GATE 4a**, branch `wp/RT-LEXICAL-R3-GATE4A`, committed
+> `72093dbf`, base `5e5998f1`, worktree clean.
+>
+> **DO NOT PUBLISH `72093dbf` — it carries a measured regression**, flagged in
+> its own commit message as well as at `evt_7fj5rt590nw6k`. `ken-cli`
+> `px7p::selected_ok_field_reaches_both_real_executors` stack-overflows,
+> confirmed as the change and not the base. **Two dead ends are already
+> eliminated and must not be re-spent:** boxing the large members did **not**
+> fix it (the boxing stays because it is right on its own terms), and
+> `RUST_MIN_STACK=16777216` **does** fix it — which establishes pure stack
+> pressure from the added frame, not infinite recursion. Next step is deleting
+> the `let x = *x;` unboxing block and re-measuring. **Never resolve it with
+> `RUST_MIN_STACK`** — that hides it from CI and from every other caller.
+>
+> **The 4a cut itself is DONE and both prohibitions held** —
+> `prepare_native_program_sources` is the exact former prefix split immediately
+> before `build_bound_process_starter_executable_artifact`, consumed by
+> `compile_native_program_sources` so there is one producer;
+> `NativeProgramPreparationV1` is immutable; the plan-bearing erasure was not
+> exposed and no second collector exists. **Still owed:** the gate-4a equality
+> control. 4b untouched, gates 5-6 held, production unarmed.
+>
+> **THE BASE-STALENESS CHECK FIRED TWICE IN ONE HOUR, once on the ring and once
+> on me.** Run `git diff --stat origin/main <tip>` at **handback**, and read the
+> **deletion count on every path** — a delete on a file nobody touched means the
+> base moved mid-turn. Re-deriving the base at **cut** time does not discharge
+> it; it is a measurement with an expiry. A scope-filtered diff reads clean for
+> the same reason the damage is invisible.
+>
+> **`architect/work` is 1220 commits on an ancient base** (merge-base
+> `721eedce`, 461,952 deletions against `main`). Checkpoint records only —
+> **never publishable**, and nothing is at risk in it. Do not try to land it.
+>
+> **`/workspaces/ken` shows `moot.toml` modified and that is CORRECT.** That
+> worktree sits behind `main`; its working copy is byte-identical to what
+> landed. **Do not revert it** — reverting restores the old seat config for the
+> next `moot up`. It resolves when that worktree advances.
+>
+> ---
+>
+> **The ring took the kickoff at `evt_4mgjxadg404mn`** and delivered C1/C2-source
+> as PR #2084; the gate-4a ruling `evt_5r8ka125spqm9` is folded in at PR #2085.
 >
 > **The witness-source question is RULED and R3 has resumed** — Architect
 > `evt_10ayk8fbjsz74`, folded into the frame at `35b6389a` (PR #2082). Two
