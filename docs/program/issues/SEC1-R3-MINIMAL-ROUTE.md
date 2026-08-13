@@ -1,13 +1,13 @@
 ---
 id: SEC1-R3-MINIMAL-ROUTE
 title: "SEC1-IFC-R3 was escalated as needing an SMT backend, and that named the one component the program has already deferred by policy while leaving the binding one unidentified -- prover.rs:317 lists FOUR deferred components and nobody has measured which is minimally sufficient for AC-R3c; also re-derive the recorded claim that widening decidable equality is vacuous, which is true of one registry and false of a second that already holds Char"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none
 depends_on: []
 blocks: [V3-KRIPKE-DECOMPOSITION]
-github: null
+github: 2124
 origin: Steward re-derivation 2026-08-13 of SEC1-IFC-R3's 2026-07-27 escalation, prompted by the operator asking what capability the absent solver integration costs. The escalation named Z3; measurement showed Z3 is one of four components at prover.rs:317 and is the one 03-program-of-work.md:182 already defers until the catalog can measure throughput. Operator directed this lane 2026-08-13.
 ---
 

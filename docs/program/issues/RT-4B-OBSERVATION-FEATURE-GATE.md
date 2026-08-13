@@ -1,13 +1,13 @@
 ---
 id: RT-4B-OBSERVATION-FEATURE-GATE
 title: "Re-gate the existing D2f observation behind an off-by-default Runtime feature with a doc-hidden feature-scoped accessor, and prove the feature inert by comparing artifacts from TWO COMPILATIONS -- not a runtime toggle inside one, which is what the landed switch already proves and is a different claim; this is the increment the C2 answer made conditional, and it is what unblocks re-pointing the reach node at the real witness"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: []
 blocks: [RT-4B-UNIQUENESS-GATE-REACH]
-github: null
+github: 2123
 origin: Architect ruling evt_4a1pf1jfmdemd, holding that a default-off feature is one of the two mechanisms his original 4b ruling named and is therefore the envelope used as written, with five conditions he will review against. Conditional on RT-4B-C2-REACHABILITY's row-two answer (evt_29jjd4rrytnex, read at 9f22d70c). Framed by the Steward 2026-08-13.
 ---
 

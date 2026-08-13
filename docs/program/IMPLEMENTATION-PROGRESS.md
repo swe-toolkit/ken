@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 20:08:39Z — from 242 issue file(s) in `docs/program/issues/`.
+2026-08-13 20:19:06Z — from 242 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -162,7 +162,7 @@ the committed file matches the generator's output.
 | `Q-RESIDUE` | the Track Q rework residue — 10 tests, folded from Q3-Q7 | closed | runtime | S | none | 818 |
 | `RT-4B-C2-REACHABILITY` | Establish whether a witness driving through `ken-elaborator` can reach the `D2f` observation at all, and at what cost -- the question 4b opened with, never answered, and the reason every 4b measurement so far has been taken on in-crate D2j fixtures instead of the real C2 source; the answer decides whether the reach node re-points or 4b's honest status becomes blocked-on-cross-crate-expressibility rather than awaiting-a-count | closed | runtime | S | none | — |
 | `RT-4B-ENUMERATION-INPUT-SIZE` | Gate 4b's observer records whether an oriented plan ARRIVED but not how large the population it walks is, so `keys = []` cannot be read as either lawful absence or a missing producer relation -- and the scalar that would settle it is the admitted-discovery ledger's length, not the oriented plan's, because that ledger is what candidate enumeration actually iterates | merged | runtime | S | none | 2109 |
-| `RT-4B-OBSERVATION-FEATURE-GATE` | Re-gate the existing D2f observation behind an off-by-default Runtime feature with a doc-hidden feature-scoped accessor, and prove the feature inert by comparing artifacts from TWO COMPILATIONS -- not a runtime toggle inside one, which is what the landed switch already proves and is a different claim; this is the increment the C2 answer made conditional, and it is what unblocks re-pointing the reach node at the real witness | ready | runtime | M | none | — |
+| `RT-4B-OBSERVATION-FEATURE-GATE` | Re-gate the existing D2f observation behind an off-by-default Runtime feature with a doc-hidden feature-scoped accessor, and prove the feature inert by comparing artifacts from TWO COMPILATIONS -- not a runtime toggle inside one, which is what the landed switch already proves and is a different claim; this is the increment the C2 answer made conditional, and it is what unblocks re-pointing the reach node at the real witness | merged | runtime | M | none | 2123 |
 | `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` | Gate 4b's observation route is exhausted -- four admitted discoveries enter enumeration and zero candidates leave, and none of the fourteen elimination routes is attributed; the Architect named `fusion_unique_static_body_triple` as the cheapest and most informative place to recover attribution, but instrumenting one gate is only decisive if the eliminations actually happen there, and nothing measured says they do | draft | runtime | S | none | — |
 | `RT-4B-UNIQUENESS-GATE-REACH` | Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all | ready | runtime | S | none | — |
 | `RT-4B-WALKED-CONSTANCY` | Two assertions landed in one candidate compose into a result neither states -- the five input populations read `(4, 2, 0, 2, 1)` identically whether fusion forms or is perturbed so it cannot, so `walked` discriminates input size and nothing downstream of it; the observation's own doc calls this a gap in attribution, which is a weaker claim than what was measured, and the next reader of a non-zero walked count is one node away | merged | runtime | XS | none | 2116 |
@@ -253,7 +253,7 @@ the committed file matches the generator's output.
 | `SEAL-2` | carrier producer closure, over a derived enumeration | merged | foundation | M | none | PR #912 @ 4ac9141e (origin/main, CI green) |
 | `SEC1-IFC-R3` | [Sec1-reduce] cannot be reified yet: NO production path can return Verdict::Disproved, so the verdict D5 requires is unreachable and every Disproved in sec1_acceptance is hand-rigged | draft | verify | M | G-Sec | — |
 | `SEC1-IFC` | Reify the three named Sec1 stubs — two of them are the SOLE NETS for Sec1's two trusted surfaces, and both are placeholders under a green suite | merged | verify | M | G-Sec | https://github.com/swe-toolkit/ken/pull/1094 |
-| `SEC1-R3-MINIMAL-ROUTE` | SEC1-IFC-R3 was escalated as needing an SMT backend, and that named the one component the program has already deferred by policy while leaving the binding one unidentified -- prover.rs:317 lists FOUR deferred components and nobody has measured which is minimally sufficient for AC-R3c; also re-derive the recorded claim that widening decidable equality is vacuous, which is true of one registry and false of a second that already holds Char | ready | verify | S | none | — |
+| `SEC1-R3-MINIMAL-ROUTE` | SEC1-IFC-R3 was escalated as needing an SMT backend, and that named the one component the program has already deferred by policy while leaving the binding one unidentified -- prover.rs:317 lists FOUR deferred components and nobody has measured which is minimally sufficient for AC-R3c; also re-derive the recorded claim that widening decidable equality is vacuous, which is true of one registry and false of a second that already holds Char | merged | verify | S | none | 2124 |
 | `SEC4-TCB` | Sec4's trust-model conformance seed is fully authored and nothing executes it — Sec1/Sec1ct/Sec2 each have an acceptance suite bound to their seed, Sec4 has none | merged | verify | M | G5 | — |
 | `SPAN-SEAL` | seal the BufferSpan producer surface | merged | foundation | M | none | — |
 | `SPEC-31-WIDTH-ERRATUM` | spec 31-lexical mandates a 96-column canonical width while the formatting conformance suite asserts 88 in 18 places and cites 31 §1d as its source — rule the exact value and reconcile | closed | spec | S | none | https://github.com/swe-toolkit/ken/pull/1054 |
@@ -287,7 +287,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `LANG-SURFACE-BLOCK-COMMENTS` — `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate
-- `RT-4B-OBSERVATION-FEATURE-GATE` — Re-gate the existing D2f observation behind an off-by-default Runtime feature with a doc-hidden feature-scoped accessor, and prove the feature inert by comparing artifacts from TWO COMPILATIONS -- not a runtime toggle inside one, which is what the landed switch already proves and is a different claim; this is the increment the C2 answer made conditional, and it is what unblocks re-pointing the reach node at the real witness
+- `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
@@ -298,7 +298,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-TEST-SCRATCH-RAII` — Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
-- `SEC1-R3-MINIMAL-ROUTE` — SEC1-IFC-R3 was escalated as needing an SMT backend, and that named the one component the program has already deferred by policy while leaving the binding one unidentified -- prover.rs:317 lists FOUR deferred components and nobody has measured which is minimally sufficient for AC-R3c; also re-derive the recorded claim that widening decidable equality is vacuous, which is true of one registry and false of a second that already holds Char
 
 ## Blockers
 
@@ -335,7 +334,6 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-4B-UNIQUENESS-GATE-REACH` blocked by `RT-4B-OBSERVATION-FEATURE-GATE` (status: ready)
 - `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: ready)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: ready)
@@ -344,7 +342,6 @@ is itself not yet `merged`/`closed`:
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-R3-FUSION-EMITTER` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `V3-KRIPKE-DECOMPOSITION` blocked by `SEC1-R3-MINIMAL-ROUTE` (status: ready)
 
 ## Gate progress
 
