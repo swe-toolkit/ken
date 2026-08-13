@@ -256,6 +256,31 @@ Bundle both into your next publish.
 
 A step, not a courtesy.
 
+> ### NAME THE LANDED SQUASH, OR `merge-base...tip`. NEVER A BARE TIP SHA.
+>
+> **Measured 2026-08-13, Adversary finding on #2103.** The notification named
+> `448604e1`, the pre-squash branch head. A reviewer who anchors on it runs
+> `git show` and reads **one commit**:
+>
+> ```
+> git show --stat 448604e1           ->   2 files, +44/-3
+> git diff --stat b4d38b8a 448604e1  ->  10 files, +87/-62
+> ```
+>
+> They see a two-line lexer edit and a test, **find none of the enum removals
+> the notification described, and git gives them no error.** It reads as
+> complete.
+>
+> **A branch head names a tree containing everything and a commit containing
+> only the last step.** The reviewer wants the range; the archaeologist wants
+> the squash; the bare SHA silently serves neither. **One clause fixes it** —
+> name the squash that landed on `main`, or write the range explicitly.
+>
+> This is why the habit forms: the tip SHA is the object review votes are cast
+> on, so it is the one in front of you. **The reviewing audience and the
+> reading audience need different identifiers.** Give the reading audience
+> theirs.
+
 **Doc-only merges do not concern the Adversary** (operator, 2026-07-29). Do not
 notify it for them. Frames, tracker flips, node registrations, counters, and
 corpus edits are not its surface.
