@@ -144,6 +144,18 @@ this feature on a non-dev dependency edge, and that the check is
   the only thing separating your result from a counter that never ran.
 - **AC-6 — the landed two-compilation identity control still passes**, unchanged,
   with the counter added: `r3_4b_observation_feature_is_native_artifact_identical`.
+- **AC-9 — that control must not leak its scratch.** It keys its root on
+  `std::process::id()` under `CARGO_TARGET_TMPDIR` and **never removes it**, so
+  every invocation leaves a directory holding **two full Cargo target trees**.
+  **Measured 2026-08-13: ten leaked roots totalling 11G** across the
+  `runtime-implementer` and `runtime-qa` worktrees, on a volume that had
+  reached **97% full with 7.3G free** — with two build lanes live and Runtime's
+  own nested compilations still to come. The Steward reclaimed them (all owning
+  PIDs dead) and free space went to 19G.
+  ⇒ **Remove the root on success**, or place it so the existing scratch reaper
+  can. **Leave it on failure** — the artifacts are the evidence — and say which
+  at the site. **A full disk wedges every seat on the box, not just this one**,
+  so this is a fleet cost rather than a tidiness one.
 - **AC-7 — the report states the licensing limit in the artifact itself.** Reach
   attributes nothing: it cannot see which arm fired, and it must not claim to.
 - **AC-8 — D3's sentence names the CONDITION and the CHECK**, not just the
