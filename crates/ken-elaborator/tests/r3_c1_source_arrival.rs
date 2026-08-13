@@ -46,6 +46,19 @@
 //!   than inherited.** Do not simply update the numbers — the whole point of the
 //!   row is that the conclusion changes when they move.
 //!
+//! ## The discriminator was RUN, and it names which assertion carries the row
+//!
+//! MEASURED by dropping both selectors at the fold site — `Join xs ys |-> Zero`,
+//! the same mutation `nc14_data_match_lowering.rs` already uses as its AC-4
+//! discriminator. **Both rows red, at the selector-occurrence relation**, which
+//! is the assertion that should carry them.
+//!
+//! It also showed what does NOT discriminate: the
+//! `computational_recursive_hypotheses` assertion stays **green** under that
+//! mutation, because that field is the *motive* gate alone. See the note at
+//! `RELATION 3`. A reader who took that one assertion for "the match is
+//! classified computational" would be repeating this node's own history.
+//!
 //! Nothing here arms anything. No classifier, checker, marker, plan, or Runtime
 //! mechanism is touched; the control reads production through public API only.
 
@@ -324,10 +337,20 @@ fn assert_nested_result_producer_arrives(package_name: &str, kind: CompilerTarge
     );
     let carrying = carrying[0];
 
-    // RELATION 3 — the classifier answers TRUE on that match.
+    // RELATION 3 — the MOTIVE gate answers TRUE on that match.
+    //
+    // ⛔ This field is NOT the whole classifier, and the difference was measured
+    // rather than reasoned. `checked_match_uses_computational_recursive_
+    // hypothesis` is the conjunction of this field with "some branch references
+    // its recursive binder range"; this field alone is
+    // `validate_supported_match_motive`, which answers TRUE for any
+    // `ConstantType` motive. The discriminator below confirms it: dropping both
+    // selectors leaves THIS assertion green and reds the occurrence relation, so
+    // reading this row as "the match is classified computational" would be
+    // exactly the overstatement this file's header warns about.
     assert!(
         carrying.computational_recursive_hypotheses,
-        "{label}: the lifted-family match is classified computational"
+        "{label}: the lifted-family match's motive is computationally classified"
     );
 
     // RELATION 4 + 5 — the Join branch's recursive-position run, and the two
