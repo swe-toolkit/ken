@@ -56,6 +56,10 @@ detector and script repair, briefing rewrites, promotion ladders, tracker
 archaeology, publisher hardening. These are real and they are not your job
 while a team is idle. Park them and move on.
 
+**The daily briefing flush (§4g) is NOT on that list.** It is a delegated
+dispatch that costs you one tool call, and skipping it is what produced a
+4648-line resume pointer.
+
 ## 2. The writing standard
 
 Operator, 2026-07-26: *"I need you to update your skill to value simplicity and
@@ -206,6 +210,16 @@ Commit it to `steward/work` on every state change. It reaches `main` through
 the tracker-sync commit in the merge procedure — see
 `steward/merge-procedure.md`.
 
+## 4g. The briefing is a POINTER, and it is flushed daily
+
+`docs/program/diary/CURRENT-BRIEFING.md` holds **the last 24 hours, under 250
+lines.** Older blocks go to the dated diary. **Flush it once a day, delegated
+to a `model: sonnet` subagent** — procedure in `steward/briefing-flush.md`.
+
+Nothing reds when it grows, so it is enforced by schedule or not at all: it
+reached 4648 lines across 19 unflushed days, having already been rewritten to
+be small once.
+
 ## 4e. Stay one release ahead of the frontier
 
 Operator, 2026-07-28: *"ensure that there is at least one WP ahead of the
@@ -251,6 +265,7 @@ need at the point of use; do not work from memory of it.
 | What lands on `main` and when: the accepted-base and partial-WP policies | `steward/merge-policy.md` |
 | Merging: the nine-step procedure and corpus git routing | `steward/merge-procedure.md` |
 | Compaction: your own and the teams' | `steward/compaction.md` |
+| The daily briefing flush, delegated to a T2 subagent | `steward/briefing-flush.md` |
 | The watchdog and the comms-drop backstop | `steward/watchdog.md` |
 | Hard-stop escalation, symptom inventory, the 60-minute WIP audit | `steward/escalation.md` |
 
