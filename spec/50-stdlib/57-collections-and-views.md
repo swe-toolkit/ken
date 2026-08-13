@@ -301,7 +301,7 @@ against landed machinery, not hand-waved:
 | **representation (iso)** | `Σ`-record `{ to; from; to_from; from_to }`, concrete | now (fast-follow) |
 | **refinement** | rides landed refinement types `{x:A|φ}` (`ast.rs TRefine`, parser `parse_refinement_type`, `21 §6.1`; lowers to carrier + kernel-re-checked obligation, `21 §6.3`/`22`). A refinement view is a projection whose focus is `{x:A|P x}` | now |
 | **indexed** | a key/position view `Key → Option A` / a lens family; plain Ken (full maps are CAT-4) | now |
-| **quotient-respecting** | **setoid-morphism form** `{ project : A→B; respects : (x y : A) → R x y → Equal B (project x) (project y) }` — a plain `Σ`-record, **no quotient type needed** (the field is `project`, not a lowercase `view`, so it never collides with the live `KwView` keyword — `§4.1`); **quotient-carrier form** (a view *out of* `A/R`) needs a surface path the parser lacks (`§4.3`) | setoid now; carrier later |
+| **quotient-respecting** | **setoid-morphism form** `{ project : A→B; respects : (x y : A) → R x y → Equal B (project x) (project y) }` — a plain `Σ`-record, **no quotient type needed** (the field remains `project`; retiring the `view` keyword frees `view` for ordinary identifier use — `§4.1`); **quotient-carrier form** (a view *out of* `A/R`) needs a surface path the parser lacks (`§4.3`) | setoid now; carrier later |
 | **obligation-producing** | the Ward / L12 / L14 seam — rides landed refinement-obligation machinery (`capabilities.rs attenuate` already emits a kernel-re-checked refinement obligation). **Boundary only** per frame — state the seam, coordinate Lane B / L12 / L14, do not fully specify | seam stated, deferred |
 
 ### 4.3 Concrete now, polymorphic later — the one shared surface wall
