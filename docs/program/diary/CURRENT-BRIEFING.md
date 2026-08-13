@@ -38,7 +38,62 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~04:3xZ. **`main` = `f8f853b8`.**
+> ### RESUME HERE — state at 2026-08-13 ~12:1xZ. **`main` = `35b6389a`.**
+>
+> **THE RING IS WORKING. Both Runtime seats took the kickoff at
+> `evt_4mgjxadg404mn` and are live.** Nothing is owed to me until they hand back.
+>
+> **The witness-source question is RULED and R3 has resumed** — Architect
+> `evt_10ayk8fbjsz74`, folded into the frame at `35b6389a` (PR #2082). Two
+> deliverables are with the ring:
+>
+> - **C1-source-arrival** — commit the saved public-API nested-result probe as a
+>   durable control, asserting the *relations* (unchanged
+>   `NESTED_LIFT_NAT_THREE_SOURCE`, `liftSize` retained, Join recpos `[2,3]`,
+>   selector occurrences `[1,0]` in range, non-empty erased census under both
+>   Executable and Library), **not** the census alone.
+> - **C2-source** — one mixed nested / `Fork (Bool -> Bag a)` candidate under one
+>   lifted-family match, then a six-gate boundary walk that **stops at the first
+>   missing relation**. Five stop conditions bind; a named stop is a complete
+>   result, not a failure.
+>
+> **THE PREMISE THAT MUST NOT COME BACK: "surface Ken emits no
+> `ComputationalMatch`" is REFUTED.** The producer probe at `d30e20ee` measured a
+> retained generated lifted-family `ComputationalMatch` in erased Runtime IR from
+> real source. The only valid narrow statements are that the **eight sampled**
+> programs were zero and that the then-current seat controls were synthetic.
+> Corrected in three places — frame `#2080`, source rows `f5afd91f` (#2081), and
+> the ruling fold. **If you find a fourth site still asserting it, that is a real
+> find, not a stale read.**
+>
+> **C1 proves CHECKER-TO-RUNTIME-IR ARRIVAL ONLY.** `ih_slots = 0`,
+> `ih_invocations = 0` — it says nothing about fusion-plan population or R3
+> composed-seat arrival. **Production stays unarmed**; full-pipeline acceptance
+> and arming are blocked on what the boundary walk finds.
+>
+> **Two transport failures cost the ring ~50 minutes this morning; check for them
+> before diagnosing thought.** Five mentions stranded unsubmitted in the
+> Architect's composer (bare `Enter` cleared it), and it then hit the capacity
+> modal that **defaults to a model downgrade** — `Down` then `Enter` selects
+> "Keep waiting" and preserves T1. Neither is visible from convo: the posts
+> exist and were delivered.
+>
+> **A publisher SURVIVES your compaction.** `pub-withdraw.log` stopping mid-wait
+> reads exactly like a killed process; it was not. `pgrep -af
+> scripted-pr-automerge` before restarting, or you get two on one PR.
+>
+> **RETIREMENT CAMPAIGN POSITION.** Three of five residual classes retired
+> (`TransparentDeclarationClosure`, `SeedClosureCall`, `ProducerMatchCall`), plus
+> `RT-FNUNIT-RESULT-TOKEN`. **`RT-DESCENT-RETIRE` now has exactly ONE unmet
+> dependency — `RT-RECURSOR-TRANSPORT`** — which is blocked on
+> `RT-LEXICAL-RECURSOR-CONSUMERS` and this node. Both successor frames were
+> refreshed 2026-08-12 and are shovel-ready, so §4e is satisfied.
+>
+> ---
+>
+> **BELOW THIS LINE IS THE ~04:3xZ STATE, kept for its measured detail.** Its
+> `main` SHA and its "routed to the Architect" framing are both superseded by the
+> block above; the takeover-seat question it routes was answered.
 >
 > **R3 PARTIAL `11177a3c` IS LANDED** — PR #2053, 25 commits, 11 `crates/`
 > files, CI green, blob identity verified on all 11, Adversary notified at
