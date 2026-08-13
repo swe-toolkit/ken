@@ -542,6 +542,45 @@ nothing you inherit from `#6d`.**
 > Architect's — the incompleteness of a work package is immaterial to whether the
 > code is on `main`.**
 
+> ### STANDING REVIEW LENS FOR THIS NODE — WATCH FOR A GUARD WHOSE OPERAND IS
+> ### READ OFF THE OBJECT IT IS GUARDING. Steward, 2026-08-13, promoting an
+> ### Adversary recurrence (`evt_3r7vb1a5ck5jy`) above either instance.
+>
+> **Three instances now, all in the R3 ledger work, all of which passed
+> review:**
+>
+> 1. **The `D3` partition check on `f8f853b8`** — a validator whose expected
+>    side was derived from its actual side, so the law it asserted was a
+>    theorem. Landed, then found vacuous.
+> 2. **`consume`'s seat guard** — `claim.seat() != seat` where **both** of its
+>    only two callers derive `seat` from the very claim being consumed
+>    (`core.rs:12635` → `:12765`, and `core.rs:5031` → `:5038`). The comparison
+>    is `claim.seat() != claim.seat()` **across the whole caller population** —
+>    not a per-site slip.
+> 3. **A child-0 identity refusal copied into the claim derivation**, which
+>    reddened `d3_the_consuming_binder_must_resolve_to_the_redirected_producer_body`
+>    — a control that deliberately suppresses the binder-body rule to prove its
+>    refusals are not answered by an earlier proxy. **The copy was exactly that
+>    proxy.** Caught by the implementer, and it looked like defence in depth.
+>
+> **Why this belongs in the frame rather than in three commit messages.** A
+> vacuous guard **subtracts nothing that exists**, so nothing goes red and no
+> falsifier fires — it is invisible to every instrument this node runs. What it
+> costs is that its error text **declares a hazard it does not cover**, and an
+> auditor asking "is this mutation guarded?" reads the refusal and counts it.
+> **The individual guards are not findable by looking for them; the shape is.**
+>
+> **The disposition when you find one: make the mismatch unrepresentable rather
+> than checked** — read the operand inside the callee and delete the parameter.
+> A guard that cannot be got wrong beats a guard that is verified, and it needs
+> no custodian.
+>
+> **One caveat that is part of the rule.** Before collapsing a parameter, check
+> whether the two operands are genuinely the same coordinate. If they are
+> distinct, an **independently derived** operand turns the vacuous guard into a
+> real cross-check, and collapsing it forecloses that permanently and silently.
+> Establish the fact; do not assume it in either direction.
+
 > ### THE POST-FIELD DIRECT CALL IS WITHDRAWN. THE FUSED CALL IS EMITTED AT
 > ### THE CHECKED CONSUMING-CALL SEAM. Steward, 2026-08-13, folding Architect
 > ### `evt_5edhqyyhw4585` into operative scope. **THIS IS THE NEWEST BOX. It
