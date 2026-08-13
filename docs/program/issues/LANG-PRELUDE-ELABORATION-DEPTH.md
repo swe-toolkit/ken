@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-ELABORATION-DEPTH
 title: "Elaboration has an unstated stack requirement that exceeds Rust's 2 MiB spawned-thread default: every compilation elaborates the whole prelude, `elab.rs:997` measures ~115 KiB of headroom out of 2 MiB, and thirteen sites across four crates independently bumped their thread to 256 MiB without any stated rule -- so the rest of `37 §9` is a queue of prelude additions spending a margin nobody measures and no site states"
-status: draft
+status: ready
 owner: language
 size: S
 gate: none
@@ -11,17 +11,31 @@ github: null
 origin: "PR #2144 CI failure (run 31752261297, job 94620375276): `LANG-PRELUDE-COLLECTIONS` added four recursive prelude declarations and a nested-compile worker died with `fatal runtime error: stack overflow` on a source that calls none of them. Architect correction at evt_54y1jadrfk9eq established the mechanism is elaboration depth at prelude registration, not the runtime recursion the Steward first hypothesised. Steward census at c1b9a1e8 established there is no production stack_size site anywhere in crates/."
 ---
 
-## Flip condition, stated so this does not read as unstarted work
+## READY as of 2026-08-13: the flip condition was met, and the result strengthens the node
 
-**This node is `draft` because two of its fixed inputs do not exist yet**, not
-because it is unframed. Flip it to `ready` when Language reports the `#2144`
-measurement (`evt_57nhyt3wn2cvw`): the `r3_4b` worker under a 256 MiB thread,
-and that test at the candidate versus at `main`. Those two results decide D2's
-starting point and whether D3 is in scope at all.
+Filed `draft` pending the `#2144` measurement. **That measurement landed and
+flipped this node to `ready`.** `LANG-PRELUDE-COLLECTIONS` merged at
+`60b78c95` (PR #2144, superseding tip `52ffffbe`), and the discriminator was run
+both ways:
 
-**The node does not evaporate if the stack fix turns CI green.** A green CI
-tells us the worker's thread was too small; it tells us nothing about how much
-margin the prelude has left, which is the question here.
+| configuration | result |
+|---|---|
+| unmodified worker, at the candidate | **red** |
+| unmodified worker, at `main` | **green** |
+| candidate plus the 256 MiB worker repair | **green** |
+
+**Read the middle row.** The failure is attributable to the candidate, not to a
+test fragile on any base — and *candidate red, `main` green* means **`main` was
+already at the edge.** That worker was one prelude declaration away from
+failing on **any** future addition, whatever its shape. Architect at
+`evt_649r77rhx56vj`, and it is measured rather than inferred.
+
+⇒ **D3 is the live question, not the optional one.** The alarm is being switched
+off, and we now know exactly how close it was when it last rang.
+
+**The node never depended on CI staying red.** A green CI says the worker's
+thread was too small. It says nothing about how much margin the prelude has
+left, which is the whole question here.
 
 ## What this is
 

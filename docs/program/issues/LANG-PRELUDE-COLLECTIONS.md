@@ -1,13 +1,13 @@
 ---
 id: LANG-PRELUDE-COLLECTIONS
 title: "`37 §9` requires the List combinators delivered in the prelude and they are declared inside a test file instead -- `prelude.rs` supplies `data List` and no operation over it, so a program that imports the prelude has a list type and no way to map over it; and `filter` was deferred on the ground that `Bool` is an opaque non-matchable primitive, which is no longer true, with the promised follow-on never filed"
-status: ready
+status: merged
 owner: language
 size: S-M
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2144
 origin: Steward measurement 2026-08-13 at origin/main=7f9eabbb, taken running the stay-one-release-ahead check after LANG-COMMENT-CLASSIFIER-SHARED merged and left Language with no successor. Five other candidate surface gaps were measured first and all five were already delivered; this one is real.
 ---
 
