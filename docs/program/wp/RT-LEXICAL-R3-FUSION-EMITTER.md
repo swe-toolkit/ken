@@ -675,6 +675,62 @@ nothing you inherit from `#6d`.**
 > **everything hoistable is above the action; the one check whose answer can
 > only change AS A RESULT of the action is below, where it must be.**
 
+> ### RESTATE THE CONTROLS. DO NOT CHANGE THE CLASSIFIER. Steward, 2026-08-13,
+> ### folding Architect `evt_7mg1x1vqe7qph`. **This amends the control list;
+> ### read it before authoring any further control at this seat.**
+>
+> **The classifier is a semantic boundary, not an incidental gate to widen for a
+> test.** A match belongs on the composed-eliminator route **only when its
+> checked body actually references a computational-IH binder**. A match whose
+> branches use only selected constructor arguments carries no such obligation,
+> so classifying it as an ordinary `Match` is **correct**. Changing it to admit a
+> test shape would move a semantic boundary to suit an instrument.
+>
+> **THE CORRECTION THAT REOPENS CONTROL 2 — classification is WHOLE-MATCH
+> EXISTENTIAL.** An *entirely* selected-argument-only match is ordinary. But a
+> selected-argument-only **branch** can still appear in a lawful
+> `ComputationalMatch` **when another branch independently references its IH
+> binder**. ⇒ Control 2's witness **is authorable**, in a different fixture shape
+> than the one measured impossible. Do not read the negative below as "control 2
+> cannot exist."
+>
+> #### The measured negative that produced this, landed in #2076
+>
+> Control 2 **as originally stated** is self-defeating at the classifier: the
+> shape it needed is exactly the property that makes the classifying predicate
+> answer false, so such a body is classified ordinary and **never reaches the
+> composed eliminator at all**. Measured across **eight real-source programs**
+> through `ken_cli::build_native_program`, censusing the checker's own erased
+> output: **zero `ComputationalMatch` nodes**, including `px7p`'s own green
+> integration program.
+>
+> **TWO FALSE GREENS, and they generalize beyond control 2.** A program that
+> **compiled cleanly censused entirely zero** — the checker had folded it away,
+> so `BUILT` measured nothing — and `px7p`'s green program has no computational
+> match either. ⇒ **A green build at this seat is equally consistent with the
+> seat never being reached. Assert on the emitted IR, never on exit status.**
+>
+> #### The standing claim about every green row here, landed in #2077
+>
+> **Every control reaching this seat — control 1 INCLUDED — uses a synthetic
+> fixture, and that is now MEASURED rather than suspected.** This is the `D0`
+> history observed directly instead of inferred from prose. Treat it as a claim
+> about the **trust level of every green row at this seat**, not as a footnote to
+> control 2.
+>
+> **The stated gap, which is part of the finding:** eight witnesses plus one
+> predicate read is **not** an enumeration of the surface, and the gate above
+> that predicate can be satisfied from source — so the closure argument covers
+> **the second gate only**.
+>
+> **Authorship constraint stays in force** (Steward, `evt_hy6m92f4sw84`): produce
+> every witness with the **real checker from real source through the ordinary
+> front end**. No hand-built checked form, no builder called directly. When
+> object-emission debt threatens to hide a classification, **move the stopping
+> point** — as Runtime did to the public erasure entry — rather than weakening
+> the fixture. "The front end will not admit this witness" remains an acceptable
+> result to report.
+
 > ### STANDING REVIEW LENS FOR THIS NODE — WATCH FOR A GUARD WHOSE OPERAND IS
 > ### READ OFF THE OBJECT IT IS GUARDING. Steward, 2026-08-13, promoting an
 > ### Adversary recurrence (`evt_3r7vb1a5ck5jy`) above either instance.
