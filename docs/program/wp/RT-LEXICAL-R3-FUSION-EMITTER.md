@@ -542,6 +542,122 @@ nothing you inherit from `#6d`.**
 > Architect's — the incompleteness of a work package is immaterial to whether the
 > code is on `main`.**
 
+> ### THE TAKEOVER SEAT IS RULED — the pre-call outer-realization dispatch
+> ### at the `P2b → P2c` seam. Steward, 2026-08-13, folding Architect
+> ### `evt_2564nv6yqqs2q` into operative scope. **THIS IS THE NEWEST BOX AND
+> ### IT SUPERSEDES EVERY EARLIER STATEMENT ABOUT WHERE R3 TAKES OVER.**
+>
+> **The fourth route was a missing seat, not a projection, and the measurement
+> settled it before the ruling was written.** Runtime ran a reverted chronology
+> trace at `8b35361a` (915 passed, 0 failed, 4 ignored; probes fully removed,
+> production never armed) and it selected the first discriminator branch on
+> **both** roots, on every one of its four conditions. The decisive fact is
+> negative and exact: **`take_fused_region_at` is attempted ZERO times in either
+> compile — zero attempts, not zero successes.** So the source-machine
+> `ComputationalMatchScrutinee` hook is not merely later than the seat; it never
+> executes on these shapes at all. The ordinary continuation funnel is likewise
+> too late — an `R` identity reaching it already means the outer realization was
+> missed.
+>
+> **The seat.** One named outer-realization dispatch at the producer-dispatcher's
+> post-field, pre-call boundary — the existing `P2b → P2c` seam. Lower the
+> producer constructor's complete recursive field run exactly as today; resolve
+> the exact `ContinuationCallIdentity`; query it in
+> `FusionOwnedOuterRealization`; if absent take the **byte-identical** ordinary
+> path; if present require the exact same-fusion outstanding `FusionRegionClaim`
+> and dispatch before any ordinary continuation-call resolution or emission.
+>
+> **The selector is the opaque identity relation ALONE.** Coordinate equalities
+> against continuation origin, selected body, producer body, or redirect body are
+> **closure checks after selection** — never a search key, never a fallback
+> selector, never source-tree inference. This is the same discipline that has
+> already failed three times on this node when a coordinate was used to select.
+>
+> **Both roots are load-bearing and must not be averaged.** Exact is the
+> non-degenerate case: construct 39, continuation 10, defining unit 3, one
+> already-lowered parameter, **two** captures projected in order from the
+> consumer unit's two `Carried` entry-ABI operands. ReHomed is the lawful
+> zero-capture comparator: construct 35, continuation 6, defining unit 1, one
+> parameter, **zero** captures. **ReHomed alone cannot discriminate an assembly
+> that drops captures** — Runtime flagged this rather than smoothing it, and it
+> is why net 3 below is an acceptance row.
+>
+> #### Closure required BEFORE any mutation
+>
+> For an `R` identity, all of the following are validated before any call or
+> affine-ledger mutation: defining owner equals both the realization's emission
+> owner and the claim's consumer owner; realization and claim name the same
+> fusion; consumer continuation, selected case body and producer body close
+> exactly against the claim; the claim is outstanding — not spent, escaped,
+> replayed or consumed; the recorded redirect/target exists in this
+> `Function.unit_calls` at the claim-issued lookup/call-site authority; the
+> lowered field run has exactly the target's ordinary parameter arity and phase;
+> every capture is projected from `claim.inputs()` through the current producer
+> environment / entry ABI with exact owner, position, order, phase and arity; and
+> no source-tree walk, origin scan, body coincidence or reconstruction of
+> planner-private relations is used anywhere.
+>
+> **Any missing or non-unique fact is a refusal BEFORE emission. A malformed `R`
+> must NOT fall through to an ordinary continuation call.**
+>
+> #### The action, and the affine closeout
+>
+> Emit exactly one call to the already-declared fusion target, arguments being
+> the already-lowered recursive producer field parameter run followed by the
+> checked capture run from `claim.inputs()`, through the **normal** call
+> ABI/emitter — do not invent a second call encoding. Treat the returned
+> specialized value as this seat's result and continue the existing
+> answer route/eliminator exactly once. Do **not** lower the `R` selected body
+> again, call an `R` continuation specialization, or rematerialize the producer
+> constructor as a second realization.
+>
+> **All fallible validation precedes affine mutation.** Call emission and claim
+> settlement commit as one successful transition: the claim becomes consumed
+> exactly once only when the call is accepted. **A failed call build leaves the
+> claim outstanding and produces no partial settlement.**
+>
+> **The fail-closed `R` refusal in the ordinary funnel STAYS as a backstop.**
+> Correct execution makes it unreachable. Deleting or relaxing it is forbidden
+> until the armed exclusion proves zero `R` arrivals there.
+>
+> #### Source-machine residue — a bounded census, authorized here
+>
+> Census `take_fused_region_at` and its `ComputationalMatchScrutinee` hook **by
+> their real call/authority gate**. No live non-R3 consumer after this dispatch
+> lands ⇒ retire method, hook and any now-dead ledger surface **atomically**. An
+> independently governed consumer ⇒ preserve only that **measured** population
+> and state its authority explicitly. They must not survive as a second R3
+> takeover path, and **no unmeasured claim that a factored helper preserves their
+> evaluation order is accepted** — the trace did not observe that route, and
+> Runtime correctly declined to claim it did.
+>
+> #### Acceptance — the armed ordered chain, nothing shrunk
+>
+> On **both** Exact and ReHomed: (1) the `R` dispatch is selected exactly once,
+> after the full field run and before any consumer-body fusion emission; (2) the
+> exact declared fusion target is called exactly once; (3) Exact supplies one
+> parameter plus captures 0 and 1 **in order**, and a dropped, duplicated,
+> swapped or source-derived capture must **fail**; (4) ReHomed supplies one
+> parameter and exactly zero captures; (5) the claim is consumed exactly once
+> after successful emission; (6) zero `R` continuation calls, zero second `R`
+> selected-body lowering, zero R3 source-machine takeover, zero `R`
+> ordinary-funnel entry, and zero worker escape through `ground_value` / ABI
+> conversion; (7) `I` still composes exactly once and `O` remains
+> **byte-identical**.
+>
+> **The previously owed controls remain owed and are NOT shrunk by this ruling:**
+> the `I`-vs-`O` and `R`-vs-`O` same-body controls, selector nets 2 and 4, the
+> corrected-seam controls, the inner-slot witness, the self-edge discriminator,
+> and the route exclusions. **Add red controls** for wrong fusion, wrong owner,
+> wrong target/lookup authority, missing declared target, incomplete capture
+> projection, duplicate/spent claim, mutation-before-failure, and forced routing
+> of `R` into either the source hook or the ordinary funnel.
+>
+> **Production remains UNARMED.** This ruling authorizes the implementation and
+> the bounded source-hook census. It does **not** authorize route relaxation,
+> source inference, fixture weakening, or QA routing before the armed chain and
+> every control are green.
+
 > ### THE FORK IS CLOSED — READING TWO. RUNTIME IS RELEASED. Steward,
 > ### 2026-08-13, recording Architect `evt_6kn9ckdnbf0ph` (durable
 > ### `39ff9d8f`). **THE BOX BELOW IS RESOLVED; READ IT AS HISTORY.**
