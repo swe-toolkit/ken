@@ -242,6 +242,70 @@ impl Parser {
         }
     }
 
+    fn parse_record_expr(&mut self) -> Result<Expr, ElabError> {
+        use crate::ast::RecordExprField;
+        let start = self.peek_span().start;
+        self.advance();
+        let (first, first_span) = self.expect_ident()?;
+        let mut base = None;
+        let mut fields = Vec::new();
+        if matches!(self.peek(), Token::Pipe) {
+            self.advance();
+            base = Some(Box::new(Expr::EVar(first, first_span)));
+        } else {
+            let value = if matches!(self.peek(), Token::Eq) {
+                self.advance();
+                self.parse_expr()?
+            } else if matches!(self.peek(), Token::Comma | Token::RBrace) {
+                Expr::EVar(first.clone(), first_span.clone())
+            } else {
+                return Err(ElabError::ParseError {
+                    msg: "expected equals, comma, closing brace, or pipe after record field".into(),
+                    span: self.peek_span().clone(),
+                });
+            };
+            fields.push(RecordExprField {
+                name: first,
+                value,
+                name_span: first_span,
+            });
+        }
+        let mut need_comma = !fields.is_empty();
+        while !matches!(self.peek(), Token::RBrace) {
+            if need_comma {
+                self.expect(&Token::Comma)?;
+            }
+            if matches!(self.peek(), Token::RBrace) {
+                break;
+            }
+            let (name, name_span) = self.expect_ident()?;
+            let value = if matches!(self.peek(), Token::Eq) {
+                self.advance();
+                self.parse_expr()?
+            } else if matches!(self.peek(), Token::Comma | Token::RBrace) {
+                Expr::EVar(name.clone(), name_span.clone())
+            } else {
+                return Err(ElabError::ParseError {
+                    msg: "expected equals, comma, or closing brace after record field".into(),
+                    span: self.peek_span().clone(),
+                });
+            };
+            fields.push(RecordExprField {
+                name,
+                value,
+                name_span,
+            });
+            need_comma = true;
+        }
+        self.expect(&Token::RBrace)?;
+        let end = self.tokens[self.pos - 1].1.end;
+        Ok(Expr::ERecord {
+            base,
+            fields,
+            span: Span::new(start, end),
+        })
+    }
+
     fn parse_boundary_decl(&mut self, start: usize, kind: BoundaryKind) -> Result<Decl, ElabError> {
         self.advance(); // consume `program` / `package`
         let mut end = self.tokens[self.pos.saturating_sub(1)].1.end;
@@ -1981,6 +2045,13 @@ impl Parser {
                     {
                         break;
                     }
+                    // The brace after a `match` scrutinee opens its arm block,
+                    // while a record-literal argument opens with the same token.
+                    // Classify from the first record-field/arm delimiter without
+                    // consuming either form.
+                    if self.brace_starts_match_arms() {
+                        break;
+                    }
                     if !self.can_start_atom_expr() {
                         break;
                     }
@@ -1993,10 +2064,28 @@ impl Parser {
         }
     }
 
+    fn brace_starts_match_arms(&self) -> bool {
+        if !matches!(self.peek(), Token::LBrace) {
+            return false;
+        }
+        let mut offset = 1;
+        loop {
+            match self.lookahead(offset) {
+                Token::MapsTo => return true,
+                Token::RBrace if offset == 1 => return true,
+                Token::Eq | Token::Comma | Token::Pipe | Token::RBrace | Token::Eof => {
+                    return false;
+                }
+                _ => offset += 1,
+            }
+        }
+    }
+
     fn can_start_atom_expr(&self) -> bool {
         matches!(
             self.peek(),
-            Token::Ident(_)
+            Token::LBrace
+                | Token::Ident(_)
                 | Token::ConId(_)
                 | Token::KwType
                 | Token::LParen
@@ -2277,6 +2366,7 @@ impl Parser {
         use crate::ast::NumLit;
         let start = self.peek_span().start;
         match self.peek().clone() {
+            Token::LBrace => self.parse_record_expr(),
             Token::KwIf => self.parse_if_expr(),
             Token::Nat(n) => {
                 let span = self.peek_span().clone();
@@ -2474,6 +2564,7 @@ impl Parser {
                             span,
                         },
                         Expr::EPair(components, _) => Expr::EPair(components, span),
+                        Expr::ERecord { base, fields, .. } => Expr::ERecord { base, fields, span },
                         Expr::EProj(e, field, _) => Expr::EProj(e, field, span),
                         Expr::EPosProj(e, index, _) => Expr::EPosProj(e, index, span),
                         Expr::EPi(x, a, b, _) => Expr::EPi(x, a, b, span),
