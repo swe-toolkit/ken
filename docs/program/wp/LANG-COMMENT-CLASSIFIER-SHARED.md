@@ -122,6 +122,39 @@ comment-only entry point to spare it the discriminant.
   if the code moved. A diff that deletes it is a stop.
 - **AC-6 — no new red in CI.** Targeted locally: `-p ken-elaborator`. Never
   `--workspace` on the box.
+- **AC-7 — an unrelated one-line rider, carried because it is in your crate's
+  test surface and does not deserve a node.**
+  `tests/lang_foreign_name_control_chars.rs:62-63` is the positive control for
+  `LANG-FOREIGN-NAME-CONTROL-CHARS`, and it is keyed on **absence of error**
+  where the property is **presence of value**:
+
+  ```rust
+  env.elaborate_decl("const has_nul : String = \"a\\0b\"")
+      .expect("an ordinary string literal containing \\0 must still elaborate");
+  ```
+
+  It discriminates correctly against the mutation it was written for — a check
+  wrongly moved into `lexer.rs`. **It does not reach one step wider:** if a
+  later change made the lexer silently **drop or normalize** control characters
+  in string data rather than reject them, this stays green while the capability
+  it exists to protect is gone. Adversary finding at `evt_cxbze6z3yns8`, which
+  correctly declined to prescribe a repair without one read first.
+
+  **That read is done, and the repair exists.** `const` dispatches to
+  `parse_view_decl(start, false, DefKeyword::Const)` (`parser.rs:181`), so a
+  `const` declaration is a `Decl::ViewDecl { keyword: DefKeyword::Const, body,
+  .. }` whose `body` is `Expr::EStr(String, Span)` (`ast.rs:615`). The decoded
+  value is reachable exactly the way `Decl::ForeignDecl { symbol, .. }` exposes
+  it.
+
+  ⇒ **Assert the value, in the idiom already one file over.** Go through
+  `parse_decls` and `assert_eq!` the `EStr` payload against `"a\0b"`, matching
+  `d0_foreign_names_decode_escapes_uniformly`'s
+  `assert_eq!(symbol, "sym'bol", …)`. **No new accessor is needed, and adding
+  one would be the wrong answer.**
+
+  This rider is severable: if it turns out to cost more than a few lines, say
+  so and drop it rather than growing the node. It is not the node's purpose.
 
 ## Not this node
 

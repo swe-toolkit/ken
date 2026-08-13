@@ -49,6 +49,22 @@ lexer's, and `reconstruct() == src` cannot supply it — it is byte-preserving
 under either attribution. `AC-3` is one direct offset comparison, and it stands
 independently of how the classifier is factored.
 
+## One severable rider, folded rather than given a node
+
+`AC-7` carries a one-line strengthening of
+`LANG-FOREIGN-NAME-CONTROL-CHARS`'s positive control, which is keyed on
+absence-of-error where the property is presence-of-value (Adversary,
+`evt_cxbze6z3yns8`). The Adversary declined to prescribe a repair without one
+read: whether a `const` exposes its literal the way `Decl::ForeignDecl {
+symbol, .. }` does.
+
+**Measured 2026-08-13 — it does.** `const` dispatches to `parse_view_decl` with
+`DefKeyword::Const` (`parser.rs:181`), yielding a `ViewDecl` whose `body` is
+`Expr::EStr(String, Span)` (`ast.rs:615`). So the repair is one `assert_eq!` in
+the existing `d0_foreign_names_decode_escapes_uniformly` idiom, not a new
+accessor. Severity is low, no defect is present, and it is folded here rather
+than filed because it is one line in the same crate's test surface.
+
 ## Not this node
 
 - Any change to what a comment form means, where it attaches, or whether doc
