@@ -7958,6 +7958,13 @@ impl FusionComposedEdge {
     pub(in crate::cranelift_backend) fn layer(&self) -> FusionCompositionLayer {
         self.layer
     }
+    /// **`D3` — the planner-authored consumer continuation this edge composes
+    /// at.** The one authority for the frame an Inner composition may answer
+    /// for; lowering closes it against the actual stack head and derives
+    /// nothing.
+    pub(in crate::cranelift_backend) fn consumer_continuation_origin(&self) -> StaticOriginId {
+        self.consumer_continuation_origin
+    }
 }
 
 fn intern_specialization(

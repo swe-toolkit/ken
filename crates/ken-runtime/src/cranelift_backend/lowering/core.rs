@@ -2265,9 +2265,18 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     //
     // ```text
     // Unsupported(StaticWorkerBinding,
-    //   "constructor ... at origin 30/26 transports a static worker in field 0
-    //    (field origin 29/25 ...) that no static elimination rebinds")
+    //   "a computational recursor's selected recursive argument requires an
+    //    ordinary specialized constructor field, and this field transports a
+    //    static worker ...")
     // ```
+    //
+    // **The eliminator-role axis landed and the datatype trap is gone.**
+    // `evt_43ng4f578mdvv`: the Inner composition issues
+    // `AnswerAfterComputationalFrame` from its edge's planner-authored consumer
+    // continuation, the shared consumer re-checks the actual stack head, removes
+    // exactly one frame, clears the role and routes the UNCHANGED same-phase
+    // operand on. The worker-transporting field is now REACHED by an eliminator
+    // instead of dying in a statically unselected match.
     //
     // **Four links of the ordered chain now hold on both roots.** The `R` local
     // selected-body descent completes; inside it the claim's exact checked
@@ -2279,8 +2288,10 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // invocation with no descent is a call assembled from operands nobody
     // lowered.
     //
-    // **What remains is the next link: the rebind / transport mint — and it is
-    // LOCATED.** MEASURED on both armed roots, probes reverted:
+    // **What remains is the next link.** The census below was taken BEFORE the
+    // role axis landed and its second row is now superseded — recorded rather
+    // than deleted, because the first row still holds and the movement is what
+    // makes the advance auditable. MEASURED then, probes reverted:
     //
     // ```text
     // recognize   construct=30 defining=unit 2      (Exact)
@@ -4520,6 +4531,7 @@ impl<'a> Lowering<'a> {
                             position,
                             &lowered_args,
                             producer_env,
+                            eliminators,
                         )? {
                             // The call's own value is the result after the
                             // consumed computational frame, and it is never
@@ -5171,6 +5183,62 @@ impl<'a> Lowering<'a> {
         scrutinee: RoutedAnswer,
         eliminators: &[EliminatorFrame<'_>],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ANSWER DISPOSITION,
+        // ---- processed BEFORE phase classification and head selection.
+        // ---- Architect `evt_43ng4f578mdvv`.
+        //
+        // ⛔ Exhaustive over the role axis with no wildcard: `Scrutinee` falls
+        // through to the unchanged ordinary path below, and a future third role
+        // must be a compile error here rather than silently taking it.
+        //
+        // ⛔ **The operand is not touched.** Same value, same phase, same route
+        // — a `Specialized` answer stays specialized. What this does is remove
+        // the ONE frame the producer already discharged and hand the value on;
+        // converting the phase would be a different mechanism and is exactly
+        // what the ruling forbids.
+        match scrutinee.role {
+            EliminatorRole::Scrutinee => {}
+            EliminatorRole::AnswerAfterComputationalFrame { continuation_origin } => {
+                // The exact head is RE-CHECKED here, against the actual stack,
+                // rather than trusted from the issuer. The composition seat
+                // closed it too; this is the consumption-side dual, and it is
+                // the one that sees the stack as it actually stands at delivery.
+                let Some(EliminatorFrame::Computational(head)) = eliminators.first() else {
+                    return Err(unsupported(
+                        "StaticContinuationFusion",
+                        "a composed answer was delivered with no computational frame at the head \
+                         of the eliminator stack, so the frame it claims to have discharged is \
+                         not the one waiting for it",
+                    ));
+                };
+                if head.static_origin != continuation_origin {
+                    return Err(unsupported(
+                        "StaticContinuationFusion",
+                        format!(
+                            "a composed answer names discharged continuation {continuation_origin:?} \
+                             while the eliminator stack's head is {:?}; discharging a frame that \
+                             is not the head would leave the real head expecting a scrutinee it \
+                             never receives",
+                            head.static_origin
+                        ),
+                    ));
+                }
+                // EXACTLY ONE frame is removed. Not zero -- the producer already
+                // ran it -- and not two, which would discharge a frame nobody
+                // answered for.
+                let remaining = &eliminators[1..];
+                let cleared = RoutedAnswer {
+                    value: scrutinee.value,
+                    route: scrutinee.route,
+                    role: EliminatorRole::Scrutinee,
+                };
+                return if remaining.is_empty() {
+                    Ok(cleared.value)
+                } else {
+                    self.lower_computational_match_value_composed(builder, cleared, remaining)
+                };
+            }
+        }
         let incoming_route = scrutinee.route;
         let scrutinee = scrutinee.value;
         let Some(eliminator) = eliminators.first().copied() else {
@@ -5212,6 +5280,7 @@ impl<'a> Lowering<'a> {
                     frame.answer_route = RoutedAnswer {
                         value: LoweringOperand::Carried(word),
                         route: incoming_route,
+                        role: EliminatorRole::Scrutinee,
                     }
                     .raise(frame.answer_route);
                     #[cfg(test)]
@@ -5343,6 +5412,7 @@ impl<'a> Lowering<'a> {
                             RoutedAnswer {
                                 value,
                                 route: incoming_route,
+                                role: EliminatorRole::Scrutinee,
                             },
                             suffix,
                         )
@@ -6919,6 +6989,7 @@ impl<'a> Lowering<'a> {
                     let RoutedAnswer {
                         value,
                         route: incoming_route,
+                        role: incoming_role,
                     } = value;
                     if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
                         control.continuation = Self::discard_source_prefix(control.continuation);
@@ -6971,7 +7042,7 @@ impl<'a> Lowering<'a> {
                                     },
                                 )),
                             };
-                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::Terminal(SourceContinuationTerminal::ResumeOuter {
                             expected,
@@ -7008,7 +7079,7 @@ impl<'a> Lowering<'a> {
                                 let mut prefix = edge.target.terminal_active_prefix;
                                 prefix.push(EliminatorFrame::InvocationReturn);
                                 self.lower_computational_match_value_composed(
-                                    builder, RoutedAnswer { value, route: incoming_route }, &prefix,
+                                    builder, RoutedAnswer { value, route: incoming_route, role: incoming_role }, &prefix,
                                 )?
                             };
                             match edge.target.join_plan.representation {
@@ -7118,9 +7189,9 @@ impl<'a> Lowering<'a> {
                                 self.disposition_statically_unselected_source_subtree(
                                     body.static_origin,
                                 )?;
-                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
-                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else {
                                 let body_env = env_with_operands([value], &env);
                                 SourceMachineState::Eval {
@@ -7133,7 +7204,7 @@ impl<'a> Lowering<'a> {
                         SourceContinuation::CheckedRecursiveInvocationReturn { instance, next } => {
                             self.leave_checked_recursive_invocation(instance)?;
                             control.continuation = *next;
-                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::CheckedComputationalIHInvocationReturn {
                             call_template_id,
@@ -7150,7 +7221,7 @@ impl<'a> Lowering<'a> {
                             }
                             let value = self.finish_checked_computational_ih_marker(value)?;
                             control.continuation = *next;
-                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::ReturnFromSelectedCase { delimiter, next } => {
                             let scope =
@@ -7179,7 +7250,7 @@ impl<'a> Lowering<'a> {
                             })?;
                             control.selected = previous;
                             control.continuation = *next;
-                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::ApplyRecursorSelection { layer, next } => {
                             #[cfg(test)]
@@ -7220,7 +7291,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     answer_route,
                                     next,
                                 };
-                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                            SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                         }
                         SourceContinuation::UnwindRecursorSegment {
                             mut stack,
@@ -7269,10 +7340,10 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                             next,
                                         }),
                                     };
-                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else {
                                 control.continuation = *next;
-                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route }, control }
+                                SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             }
                         }
                         SourceContinuation::ConstructArgument {
@@ -7607,6 +7678,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         value: RoutedAnswer {
                                             value,
                                             route: incoming_route,
+                                            role: EliminatorRole::Scrutinee,
                                         },
                                         control,
                                     };
@@ -7648,6 +7720,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     value: RoutedAnswer {
                                         value,
                                         route: incoming_route,
+                                        role: EliminatorRole::Scrutinee,
                                     },
                                     control,
                                 };
@@ -7711,6 +7784,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     answer_route: RoutedAnswer {
                                         value: LoweringOperand::Carried(word),
                                         route: incoming_route,
+                                        role: EliminatorRole::Scrutinee,
                                     }
                                     .raise(answer_route),
                                 };
@@ -10354,6 +10428,9 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         recursive_position: usize,
         fields: &[LoweringOperand],
         producer_env: &[LoweringEnvironmentBinding],
+        // `D3` — the ACTUAL eliminator stack at this seat, so the composition
+        // closes against the real head rather than a remembered origin.
+        eliminators: &[EliminatorFrame<'_>],
     ) -> Result<Option<RoutedAnswer>, CraneliftBackendError> {
         let alternative = u32::try_from(producer_alternative).map_err(|_| {
             unsupported("ComputationalMatch", "case index exceeds addressable range")
@@ -10402,6 +10479,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             fields,
             recursive_position,
             producer_env,
+            eliminators,
         )?;
         Ok(Some(claimed))
     }
@@ -10867,6 +10945,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         fields: &[LoweringOperand],
         recursive_position: usize,
         producer_env: &[LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'_>],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         // **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local fork, and
         // it is HERE, at the funnel every direct consumption seat passes
@@ -10957,6 +11036,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 fields,
                 recursive_position,
                 producer_env,
+                eliminators,
             );
         }
         let answer = self.claim_and_call_resolved_continuation_inner(
@@ -11752,6 +11832,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         fields: &[LoweringOperand],
         recursive_position: usize,
         producer_env: &[LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'_>],
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let identity = identity.clone();
         let defining = self.defining_unit.ok_or_else(|| {
@@ -11767,6 +11848,47 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                  context currently being defined",
             )
         })?;
+        // ---- `D3` — THE ELIMINATOR-ROLE CLOSURE, before the affine consumption
+        // ---- and before the selected body is lowered. `evt_43ng4f578mdvv`.
+        //
+        // The Inner edge is already selected above; this closes the frame it is
+        // about to answer for. ⛔ All four facts, and none of them selects
+        // anything: the edge's planner-authored consumer continuation, the
+        // ACTUAL computational stack head, that head's exact origin, and the
+        // target's own selected-body continuation origin.
+        let Some(EliminatorFrame::Computational(head)) = eliminators.first() else {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                "an Inner composition was reached with no computational frame at the head of the \
+                 eliminator stack; the detached-result seat holds none, and this refuses rather \
+                 than inferring which frame the composed answer would discharge",
+            ));
+        };
+        let edge = self
+            .static_transition_plan
+            .fusion_composed_edge(&identity)
+            .cloned()
+            .ok_or_else(|| {
+                unsupported(
+                    "StaticContinuationFusion",
+                    "an Inner composition seat was reached for an identity with no composed edge; \
+                     the fork above selected it, so a disagreement here means two authorities \
+                     over which edges are locally composed",
+                )
+            })?;
+        let discharged = edge.consumer_continuation_origin();
+        if head.static_origin != discharged {
+            return Err(unsupported(
+                "StaticContinuationFusion",
+                format!(
+                    "an Inner composition would answer for continuation {discharged:?} while the \
+                     eliminator stack's head is {:?}; answering for a frame that is not the head \
+                     leaves the real head expecting a scrutinee it never receives",
+                    head.static_origin
+                ),
+            ));
+        }
+
         // The affine consumption, BEFORE any operand is assembled and before a
         // single instruction is emitted.
         //
@@ -11859,7 +11981,11 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // affine consumption already recorded above. What changed is that the
         // result arrives without a call, not that a weaker producer now raises
         // the route.
-        Ok(RoutedAnswer::checked(lowered))
+        // ⛔ The ANSWER role, and this is its only issuer. The continuation
+        // origin is the composed edge's planner-authored consumer continuation,
+        // closed above against the actual stack head; nothing here derives it
+        // from the operand's shape or from the target's origin.
+        Ok(RoutedAnswer::composed_answer(lowered, discharged))
     }
 
     fn claim_and_call_resolved_continuation_inner(
@@ -12467,9 +12593,16 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 ))
             })
             .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+        // `D3` — the detached-result seat holds NO eliminator stack: the active
+        // computational frame is already gone by the time the result exists.
+        // Architect `evt_43ng4f578mdvv` is explicit that a detached-result
+        // consumption REFUSES rather than inferring a destination, so the empty
+        // slice is the honest input and the composition seat refuses on it.
+        // Passing the retained-frame seat's stack, or fabricating one, would be
+        // exactly the inference the ruling forbids.
         Ok(self
             .claim_and_call_resolved_continuation(
-                builder, &identity, &field_run, position, unit_env,
+                builder, &identity, &field_run, position, unit_env, &[],
             )?
             .value)
     }

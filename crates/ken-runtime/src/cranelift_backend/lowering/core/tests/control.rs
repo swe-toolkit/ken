@@ -2894,7 +2894,7 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
                 if *construct == "StaticWorkerBinding"
-                    && reason.contains("that no static elimination rebinds")
+                    && reason.contains("requires an ordinary specialized constructor field")
         );
         rows.push((cause, reached));
         realized_outer.push((
@@ -2917,24 +2917,28 @@ fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must stop at the static-worker TRANSPORT ledger: the R descent \
-         completed, the fused invocation was emitted at the claim's exact consuming call and the \
-         claim was consumed, and the producer construct's worker field is not yet rebound by any \
-         static elimination. That rebind is the next link of the ordered chain. If this row is \
-         red because the stop MOVED, the comment beside the D2f installer in core.rs is now \
-         stale and must be restated to the new measured stop rather than this assertion being \
-         relaxed"
+        "the armed compile must stop at the computational recursor's selected recursive \
+         argument: the composed answer discharged its own computational frame, the unchanged \
+         operand routed through the remaining stack, and the worker-transporting field is now \
+         REACHED by an eliminator that wants an ordinary specialized field. That is the next \
+         link. If this row is red because the stop MOVED, the comment beside the D2f installer \
+         in core.rs is now stale and must be restated to the new measured stop rather than this \
+         assertion being relaxed"
     );
     assert_eq!(
         realized_outer,
         vec![
-            (D2jCause::Exact, 1usize, 1usize),
-            (D2jCause::ReHomed, 1usize, 1usize),
+            (D2jCause::Exact, 0usize, 0usize),
+            (D2jCause::ReHomed, 0usize, 0usize),
         ],
-        "each armed root must realize exactly ONE R local descent and emit exactly ONE fused \
-         invocation at the claim's consuming call. Counted per compile and as a pair, because a \
-         descent with no invocation is the region left unrealized and an invocation with no \
-         descent is a call assembled from operands nobody lowered"
+        "R is UNREACHED at this stop, and that is a statement about ORDER rather than about R. \
+         The eliminator-role axis moved the I path's stop into the fused body's own definition, \
+         which runs before `define_unit_bodies` -- so the compile now ends before the consumer \
+         unit's body, where the R descent and the fused invocation live. \
+         SUPERSEDED EXPECTATION, recorded rather than deleted: both were (1, 1) at `ddb04292`, \
+         measured, with the descent and the invocation pinned as a pair. This row must return to \
+         (1, 1) when the I path clears its stop -- if it is red because these became non-zero, \
+         that is the advance and the pair expectation is what to restore"
     );
     assert_eq!(
         realized,
