@@ -86,7 +86,7 @@ pub(in crate::cranelift_backend) fn seed_callee_unit_ports() -> usize {
 
 /// **`R3` — a TEST-ONLY arm for the `D2f` emitter installer.**
 ///
-/// ⛔ **This does not arm anything in production.** `D2F_EMITTER_ARMED` stays
+/// **This does not arm anything in production.** `D2F_EMITTER_ARMED` stays
 /// `false` and is the only authority a production compile consults; this switch
 /// is `#[cfg(test)]`, defaults to off, and is reset by the guard below.
 ///
@@ -2284,7 +2284,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // field 29 on `Exact` (26 / 25 on `ReHomed`), the only worker field in the
     // compile, built after every call and never rebound.
     //
-    // ⛔ **That order was the pre-mechanism one and was NOT a refutation.**
+    // **That order was the pre-mechanism one and was NOT a refutation.**
     // Architect `evt_6kn9ckdnbf0ph`: the worker is a compiler-local intermediate
     // BETWEEN two lowering steps of the composition, never an operand of either
     // ordinary call ABI — so it not appearing in a declared operand run says

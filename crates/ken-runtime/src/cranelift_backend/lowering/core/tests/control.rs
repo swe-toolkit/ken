@@ -2833,7 +2833,7 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// instruction is always to restate the measured stop, never to relax the
 /// assertion.
 ///
-/// ⛔ Production stays unarmed. `D2F_EMITTER_ARMED` is `false`; the arm here is
+/// Production stays unarmed. `D2F_EMITTER_ARMED` is `false`; the arm here is
 /// the `cfg(test)` RAII `D2fEmitterTestArm`, which disarms on drop so a
 /// panicking assertion cannot leak an armed gate into the next test on this
 /// thread.

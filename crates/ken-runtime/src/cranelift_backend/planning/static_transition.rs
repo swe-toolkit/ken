@@ -14342,7 +14342,7 @@ impl<'src> StaticTransitionPlan<'src> {
 
     /// **`D3` — the ORDINARY residual identities `O = P \ F`.**
     ///
-    /// ⛔ **This is the single plan-authoritative narrowing, and it exists so
+    /// **This is the single plan-authoritative narrowing, and it exists so
     /// that no consumer filters for itself.** Ruled `evt_48rwarx25pj2p` §3:
     /// the candidate ledger, the claim ledger, declaration, definition,
     /// resolution, direct-call verification and the `D8` composed-discharge
