@@ -1,7 +1,7 @@
 ---
 id: RT-4B-WALKED-CONSTANCY
 title: "Two assertions landed in one candidate compose into a result neither states -- the five input populations read `(4, 2, 0, 2, 1)` identically whether fusion forms or is perturbed so it cannot, so `walked` discriminates input size and nothing downstream of it; the observation's own doc calls this a gap in attribution, which is a weaker claim than what was measured, and the next reader of a non-zero walked count is one node away"
-status: ready
+status: active
 owner: runtime
 size: XS
 gate: none
