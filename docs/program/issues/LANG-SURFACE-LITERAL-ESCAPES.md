@@ -1,13 +1,13 @@
 ---
 id: LANG-SURFACE-LITERAL-ESCAPES
 title: "The lexer performs NO escape processing -- its single string form pushes every character verbatim, so the escape repertoire that SPEC-LITERAL-ESCAPE-PIN just closed is entirely unimplemented, and Char literals, byte literals, byte strings and raw triple strings do not exist at all despite String, Char and Bytes all being built prelude targets"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2119
 origin: Unblocked by SPEC-LITERAL-ESCAPE-PIN merging at PR #1947 (spec fbdc0268, conformance seed conformance/surface/literals/seed-escapes.md). Research surface-gap sweep evt_6qeeebh5m3fba ranked character, byte and string-escape literals as three M-shaped closures blocked on that pin; Steward measured the lexer at origin/main 762a9b44 and cut them as ONE node -- see "Why this is one node and not three". Steward-filed (agents cannot create tracked work per COORDINATION 2).
 ---
 

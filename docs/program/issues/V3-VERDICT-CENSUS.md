@@ -1,13 +1,13 @@
 ---
 id: V3-VERDICT-CENSUS
 title: "Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search"
-status: active
+status: merged
 owner: verify
 size: S
 gate: none
 depends_on: []
 blocks: [V3-KRIPKE-DECOMPOSITION]
-github: null
+github: 2120
 origin: Operator question 2026-08-13 -- what capability does Ken lack from the absent solver integration, and which terms become checkable. The Steward's answer established that no term becomes checkable (the solver is oracle-not-authority, spec 23 line 244) and that the real cost is that unproved obligations enter trusted_base() via emit_unknown_hole (prover.rs:493). The size of that cost has never been measured. Operator directed this lane 2026-08-13.
 ---
 
