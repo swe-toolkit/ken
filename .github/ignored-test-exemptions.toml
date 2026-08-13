@@ -9,11 +9,6 @@ class = "blocked-upstream-relation"
 readmission = "RT-CLOSURE-BOUNDARY-LANE"
 
 [[exemption]]
-test_path = "ken-elaborator::r3_c2_source_mixed_branch::c2_gate_4a_preparation_consumes_every_compiler_derived_slot"
-class = "blocked-upstream-relation"
-readmission = "checked_computational_ih_slot_unconsumed"
-
-[[exemption]]
 test_path = "ken-runtime::boundary_value_clif::tests::b2v_ac10_a_deep_acyclic_chain_adopts_at_thirty_thousand"
 class = "policy-cost"
 readmission = "not applicable: the fast depth-3000 instance is the standing gate"

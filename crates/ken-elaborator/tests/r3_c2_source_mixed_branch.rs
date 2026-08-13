@@ -3,8 +3,8 @@
 //!
 //! **This is an AUTHORIZED ATTEMPT, not a claim that every gate passes.** The
 //! ruling is explicit that a stop with the exact boundary named is a complete
-//! result. Gates 1-3 are positive and asserted below. **Gate 4a is the stop**,
-//! and it is documented rather than asserted-as-passing.
+//! result. Gates 1-3 and gate 4a are positive and asserted below. Gate 4b is
+//! still unreached.
 //!
 //! ## The candidate
 //!
@@ -35,42 +35,35 @@
 //! | 1 | checked mixed match exists, classified computational via the selector branch | **POSITIVE**, asserted |
 //! | 2 | `Fork` branch has a recursive position but no recursive-range reference | **POSITIVE**, asserted |
 //! | 3 | erased Runtime IR retains that match and `Fork`'s recursive-position identity | **POSITIVE**, asserted |
-//! | 4a | compiler-derived IH slots/calls and validated oriented plan | **STOP — see below** |
+//! | 4a | compiler-derived IH slots/calls and validated oriented plan | **POSITIVE**, asserted |
 //! | 4b | existing Runtime static-fusion planner population | not reached |
 //! | 5 | `R3` composed-seat arrival for the `Fork` branch | not reached |
 //! | 6 | shared transport, `ConstructorChild` resolution, consume-once, green close | not reached |
 //!
-//! ## GATE 4a — THE EXACT STOP
+//! ## GATE 4a — THE RET-PAYLOAD RELATION
 //!
 //! The compiler-owned pre-object preparation seam now makes the plan-bearing
 //! path readable without entering object emission. The C2 source below extends
 //! the original fixture with a real `main` whose `ProcessInput` selects the
 //! value passed to `liftSize`; it cannot fold to `[main]`.
 //!
-//! Preparation refuses before producing an immutable result:
-//!
-//! ```text
-//! Erasure(ExpressionLowering {
-//!   symbol: declaration:r3_c2_mixed_native_pkg::main,
-//!   lane: "checked_computational_ih_slot_unconsumed",
-//!   reason: "not every supplied computational IH slot template was consumed exactly once",
-//! })
-//! ```
-//!
-//! This is the ordered 4a stop: total compiler-derived slot-seed consumption is
-//! the first missing relation. No caller-authored plan or marker was introduced,
-//! and no classifier, checker, marker, enumeration, fusion candidate, Runtime
-//! representation, ledger, or closure-boundary mechanism was changed. Gate 4b
-//! and gates 5-6 were not reached; production remains unarmed.
+//! Normalization places the mixed computational match inside the checked HostIO
+//! `Ret` payload. That payload now uses the existing plan-aware value lowering,
+//! so all three compiler-derived slot templates are consumed exactly once and
+//! preparation returns the immutable planned Runtime program. No caller-authored
+//! plan or marker was introduced, and no classifier, checker, marker,
+//! enumeration, fusion candidate, Runtime representation, ledger, or
+//! closure-boundary mechanism was changed. Gate 4b and gates 5-6 remain
+//! unreached; production remains unarmed.
 //!
 //! ## Promise class
 //!
-//! **Durable invariant** for gates 1-3: they assert relations — the existence of
+//! **Durable invariant** for gates 1-4a: they assert relations — the existence of
 //! a classifier-earning selector branch, and a sibling branch that carries a
 //! recursive position while referencing none of it — which any extension
-//! preserving the mixed shape keeps green. Gate 4a's stop is documented in prose
-//! here and deliberately **not** asserted, because asserting a blocked
-//! measurement would pin the blockage as the expectation.
+//! preserving the mixed shape keeps green. Gate 4a additionally requires the
+//! production preparation to consume the compiler-derived slot population and
+//! return successfully.
 //!
 //! No classifier, checker, marker, oriented plan, planner census, fusion
 //! candidate, ledger, or Runtime mechanism is touched. Production stays unarmed.
@@ -424,19 +417,21 @@ fn c2_source_mixed_branch_walk_gates_one_to_three() {
          identity -- the selected-argument branch survives to Runtime IR as itself"
     );
 
-    // ---- GATE 4a is the STOP. It is documented in this file's header and is
-    // deliberately NOT asserted here: the plan-bearing preparation refuses at
-    // total compiler-derived slot-seed consumption. Asserting that refusal as
-    // expected behaviour would pin the blockage rather than the intended
-    // relation.
+    // Gate 4a is asserted by the production preparation control below.
 }
 
-/// Transition sentinel for the ordered gate-4a relation. This is a positive
-/// control, not an assertion that the present refusal is expected behaviour.
-/// Retire the ignore only when preparation consumes every compiler-derived C2
-/// slot seed exactly once and returns the immutable planned Runtime program.
+/// Durable invariant for the ordered gate-4a relation.
+///
+/// MEASURED: this real-source C2 witness reaches production preparation, whose
+/// total-consumption validator accepts all compiler-derived slot templates.
+///
+/// CLAIMED: a computational match normalized into a checked HostIO `Ret` payload
+/// retains the same slot population through plan-aware value lowering.
+///
+/// THE GAP: successful preparation alone could be a zero-slot false green;
+/// `c2_source_mixed_branch_walk_gates_one_to_three` independently proves the
+/// same source retains the `[2, 3]` and `[1]` recursive-position runs.
 #[test]
-#[ignore = "gate 4a stops at checked_computational_ih_slot_unconsumed"]
 fn c2_gate_4a_preparation_consumes_every_compiler_derived_slot() {
     let preparation = prepare_native_program_sources(
         "r3_c2_mixed_native_pkg",

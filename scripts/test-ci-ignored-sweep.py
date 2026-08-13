@@ -344,8 +344,8 @@ class IgnoredSweepTests(unittest.TestCase):
         classes = [row["class"] for row in rows]
         self.assertEqual(classes.count("policy-cost"), 1)
         self.assertEqual(classes.count("placeholder-no-assertions"), 3)
-        self.assertEqual(classes.count("blocked-upstream-relation"), 2)
-        self.assertEqual(len({row["test_path"] for row in rows}), 6)
+        self.assertEqual(classes.count("blocked-upstream-relation"), 1)
+        self.assertEqual(len({row["test_path"] for row in rows}), 5)
         for row in rows:
             if row["class"] == "placeholder-no-assertions":
                 self.assertIn("assert", row["readmission"])
@@ -436,9 +436,9 @@ class IgnoredSweepTests(unittest.TestCase):
             with self.assertRaises(SWEEP.SweepError) as mismatch:
                 SWEEP.verify_lists(all_listing, selected_listing, 46, rows)
             diagnostic = str(mismatch.exception)
-            self.assertIn("source attribute census reports 52 ignored rows", diagnostic)
+            self.assertIn("source attribute census reports 51 ignored rows", diagnostic)
             self.assertIn("2646 total discovered tests", diagnostic)
-            self.assertIn("53 rows matching the ignored-only filter", diagnostic)
+            self.assertIn("52 rows matching the ignored-only filter", diagnostic)
             self.assertIn("ken-runtime::ken-runtime::base_debt_0", diagnostic)
 
             selected_document = json.loads(selected_listing.read_text())

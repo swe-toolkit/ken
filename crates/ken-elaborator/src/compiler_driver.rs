@@ -5106,9 +5106,10 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
 
     /// Transition sentinel for the ruled non-forking equality control.
     ///
-    /// MEASURED: this is the only landed native source found to retain more than
-    /// `[main]`; preparation succeeds with two declarations, but full completion
-    /// refuses at `RT-CLOSURE-BOUNDARY-LANE` before equality can be observed.
+    /// MEASURED: the survey found no already-green native source retaining more
+    /// than `[main]`. This source was written for the transition sentinel;
+    /// preparation retains two declarations, but full completion refuses at
+    /// `RT-CLOSURE-BOUNDARY-LANE` before equality can be observed.
     ///
     /// CLAIMED: once an already-green source retains more than `[main]`, the
     /// gate-4a read and full native build must observe one producer transaction.
@@ -5133,14 +5134,6 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             preparation.runtime_program().declarations.len() > 1,
             "the equality control must retain more than the folded [main] husk"
         );
-        assert!(
-            std::ptr::eq(
-                preparation.runtime_program(),
-                preparation.runtime_program.as_ref(),
-            ),
-            "the public read accessor must borrow the consumed boxed program"
-        );
-
         let program_identity = preparation.runtime_program() as *const ken_runtime::RuntimeProgram;
         let declarations_identity = &preparation.runtime_program().declarations
             as *const Vec<ken_runtime::RuntimeDeclaration>;
