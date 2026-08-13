@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 21:41:42Z — from 244 issue file(s) in `docs/program/issues/`.
+2026-08-13 21:46:38Z — from 244 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -131,7 +131,7 @@ the committed file matches the generator's output.
 | `LANG-SORT-META-CAPABILITY` | Rule whether a term/sort metavariable representation is authorized -- the elaborator cannot today leave a selected result undecided between Type and Omega, so the spec's conditional ambiguity clause has an unreachable antecedent | draft | spec-enclave | S | none | — |
 | `LANG-SPACE-PRESTATE-BIND` | `old` in a block-space operation's `ensures` still fails closed, though the cell environment it was waiting for now exists -- bind s_pre/s_post and elaborate the Hoare pair against the state transformer | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1848 |
 | `LANG-STRUCTURAL-RESULT-ELAB` | Implement the structural-result selector in the elaborator -- derive the field/evidence/result association from the kernel method telescope and elaborate `structural result of x` to the hidden recursive method result | merged | language | L | none | — |
-| `LANG-SURFACE-BLOCK-COMMENTS` | `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate | ready | language | M | none | — |
+| `LANG-SURFACE-BLOCK-COMMENTS` | `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate | merged | language | M | none | — |
 | `LANG-SURFACE-DECIMAL-PRECISION` | `Decimal` is specified with an arbitrary-precision coefficient and the spec explicitly forecloses a fixed-width one, but the surface caps it at `i64` across three carriers -- `Token::DecimalLit(i64, i32)`, `NumLit::Decimal(i64, i32)`, and `NumericLitVal::Decimal { coeff: i64 }` -- and the lexer refuses a wider coefficient outright | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1876 |
 | `LANG-SURFACE-IF` | `if e then t else f` is required by 32-grammar §3 and is wholly absent -- no token, no keyword-map entry, no parser arm, no AST node -- while its stated elaboration target (real matchable `data Bool = True | False`) has been pre-registered since ES2 | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1819 |
 | `LANG-SURFACE-INT-PRECISION` | `Int` is specified arbitrary-precision and the kernel already carries `Term::IntLit(num_bigint::BigInt)`, but the surface truncates to `NumLit::Int(i128)` through a lossy `n as i128` cast, and the lexer implements none of the `0x`/`0b`/`0o`/`_` forms that 31-lexical lists | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1871 |
@@ -288,7 +288,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `LANG-SURFACE-BLOCK-COMMENTS` — `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate
+- `LANG-COMMENT-CLASSIFIER-SHARED` — The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
@@ -324,7 +324,6 @@ is itself not yet `merged`/`closed`:
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE` (status: ready)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: draft)
-- `LANG-COMMENT-CLASSIFIER-SHARED` blocked by `LANG-SURFACE-BLOCK-COMMENTS` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)

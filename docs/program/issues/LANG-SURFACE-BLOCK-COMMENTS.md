@@ -1,7 +1,7 @@
 ---
 id: LANG-SURFACE-BLOCK-COMMENTS
 title: "`31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
