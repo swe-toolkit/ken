@@ -147,8 +147,35 @@
 >
 > ⇒ **Publishing any of these SHAs AS A TARGET would land a known-defective
 > intermediate. Publishing a later tip that CONTAINS one is a different act and
-> is not prohibited.** `8e9baa18` is such a tip and is clear to publish; it is
-> exactly the "recut at a green seam" case the operator's rule describes.
+> is not prohibited.**
+>
+> > #### MEASURED THE SAME HOUR — `8e9baa18` IS NOT PROHIBITED, AND IT IS ALSO
+> > #### NOT GREEN. I conflated the two.
+> >
+> > I concluded from the above that the tip was "clear to publish." **It is
+> > not.** Published as PR #2062 and **CI came back red while `main` was green**
+> > (run `31670194325`), so it is attributable to the cut, not inherited.
+> > **Eight distinct tests abort with SIGABRT** across all four shards on
+> > `fatal runtime error: stack overflow, aborting`:
+> > `host_reply_selects_the_continuation_outcome`,
+> > `linked_console_broken_pipe_reaches_ken_instead_of_signal_termination`,
+> > `mrc_4a_cross_crate_census_and_its_controls`,
+> > `nested_err_payload_reaches_both_real_executors`,
+> > `public_source_observes_raw_argv_environment_cwd_bytes_in_field_order`,
+> > `real_source_builds_one_identity_bound_linked_process_artifact`,
+> > `selected_err_field_reaches_both_real_executors`,
+> > `two_vis_nodes_resume_once_in_source_order`.
+> >
+> > **None is a record-literal test**, so the 232-line recursive-descent rework
+> > in `parser.rs` overflows on unrelated programs. The branch's own depth
+> > control bounds the **record** path only. **This is a real regression, so the
+> > operator's "ignore tests if necessary" latitude does NOT apply** — that
+> > covers an incidental red row, not eight SIGABRTs.
+> >
+> > **PR #2062 closed; the branch is preserved.** The work stays QA-approved on
+> > its own terms and needs the overflow fixed before it can land. **The lesson
+> > is the standing one: `not prohibited` and `releasable` are different
+> > properties, and so are `QA-approved` and `green`.**
 >
 > > ## STANDING OPERATOR RULE, 2026-08-13 — MERGE TIMING IS MINE
 > >
