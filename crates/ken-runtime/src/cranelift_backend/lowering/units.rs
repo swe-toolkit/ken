@@ -23,7 +23,9 @@
 
 use super::*;
 use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope};
-use crate::cranelift_backend::planning::{FusionComposedEdge, FusionCompositionLayer};
+use crate::cranelift_backend::planning::{
+    FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization,
+};
 
 use cranelift_module::FuncId;
 
@@ -3598,6 +3600,42 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
         if let Some(ledger) = compiler.fusion_claims.as_mut() {
             ledger.record_defined(fusion.id)?;
         }
+        // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — `R` IS REALIZED HERE, and
+        // ---- this body's emission is the whole of its realization.
+        //
+        // Architect `evt_6bm54j10w1n88`: the Outer consumer-binding identity
+        // emits no call, reaches no call funnel and lowers no second selected
+        // body. What realizes it is the fusion-owned body this loop just built,
+        // whose selected case body IS the one that identity names -- the
+        // planner closed that equality against the region claim before
+        // installing the relation.
+        //
+        // ⛔ Recorded AFTER the body is verified and immediately before it is
+        // defined, so a body that failed verification never claims to have
+        // realized anything. ⛔ It is not a consumption: there is no call to
+        // spend, and the record exists so a planned `R` whose owned body was
+        // never emitted is refused at close rather than reading as success
+        // because nothing happened.
+        let realized = compiler
+            .static_transition_plan
+            .fusion_outer_realizations()
+            .iter()
+            .filter(|(_, realization)| realization.fusion() == fusion.id)
+            .map(|(identity, realization)| (identity.clone(), realization.target()))
+            .collect::<Vec<_>>();
+        for (identity, target) in realized {
+            compiler
+                .fusion_compositions
+                .as_mut()
+                .ok_or_else(|| {
+                    backend_module(
+                        "a fusion-owned body realized an outer identity with no composition \
+                         ledger open to record it, so the realization would be unaccounted"
+                            .to_string(),
+                    )
+                })?
+                .record_outer_realized(&identity, fusion.id, target)?;
+        }
         let mut ctx = module.make_context();
         std::mem::swap(&mut ctx.func, &mut func);
         module
@@ -4837,6 +4875,35 @@ impl ContinuationClaimLedger {
 ///   reads as success because nothing happened;
 /// - a consumed identity that **also reached the ordinary ledger** in any role
 ///   is refused, which is the direct-plus-composed double realization.
+/// **`D3` — which fusion class a specialization target belongs to.**
+///
+/// The omission sets are tagged with it so `I_t` and `R_t` close SEPARATELY.
+/// One merged set is satisfied by either class alone, and the two omissions
+/// fail differently: an undeclared `I_t` leaves a body nothing lowers locally,
+/// while an undeclared `R_t` leaves one the fusion-owned body already emits.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum FusionTargetClass {
+    /// `I` — locally composed at its own call edge.
+    LocallyComposed,
+    /// `R` — realized by the fusion-owned body.
+    FusionOwned,
+}
+
+fn fusion_target_classes(
+    inner: &BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
+    outer: &BTreeMap<ContinuationCallIdentity, FusionOwnedOuterRealization>,
+) -> BTreeMap<ContinuationSpecializationId, FusionTargetClass> {
+    inner
+        .values()
+        .map(|edge| (edge.target(), FusionTargetClass::LocallyComposed))
+        .chain(
+            outer
+                .values()
+                .map(|realization| (realization.target(), FusionTargetClass::FusionOwned)),
+        )
+        .collect()
+}
+
 pub(super) struct FusionCompositionLedger {
     /// `F` — the planned fusion-local realizations, keyed by exact identity.
     ///
@@ -4845,6 +4912,13 @@ pub(super) struct FusionCompositionLedger {
     /// record; re-deriving any of owner, layer or target here would make this
     /// ledger a second authority over the composition it is supposed to audit.
     planned: BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
+    /// `R` — the fusion-owned outer realizations. Held here for its TARGET
+    /// RANGE and its planned-versus-realized equality only; the affine lifetime
+    /// of an `R` identity belongs to the region claim and the owned body, and
+    /// nothing here consumes one.
+    planned_outer: BTreeMap<ContinuationCallIdentity, FusionOwnedOuterRealization>,
+    /// `None` until the fusion-owned body realized it; then that body's fusion.
+    realized_outer: BTreeMap<ContinuationCallIdentity, Option<StaticContinuationFusionId>>,
     /// `None` until consumed; then the emission owner that consumed it.
     consumed: BTreeMap<ContinuationCallIdentity, Option<ContinuationEmissionOwner>>,
     /// The specialization targets the DECLARATION pass actually omitted, read
@@ -4853,7 +4927,7 @@ pub(super) struct FusionCompositionLedger {
     /// Not derived from `planned` at close. Deriving it would compare the
     /// planner's `F_t` with itself and pass for a pass that omitted nothing --
     /// which is precisely the failure this range equality exists to catch.
-    declaration_omitted: BTreeSet<ContinuationSpecializationId>,
+    declaration_omitted: BTreeMap<ContinuationSpecializationId, FusionTargetClass>,
     /// The specialization targets the DEFINITION pass actually omitted.
     ///
     /// **Kept separate from the declaration set, and both are closed against
@@ -4862,7 +4936,7 @@ pub(super) struct FusionCompositionLedger {
     /// omit emits a standalone `Function` for a body already lowered locally --
     /// a second realization of one edge. One merged set would be satisfied by
     /// either pass alone.
-    definition_omitted: BTreeSet<ContinuationSpecializationId>,
+    definition_omitted: BTreeMap<ContinuationSpecializationId, FusionTargetClass>,
 }
 
 impl FusionCompositionLedger {
@@ -4878,18 +4952,25 @@ impl FusionCompositionLedger {
         bundle: &UnitBundle,
     ) -> Result<Self, CraneliftBackendError> {
         let planned = plan.fusion_composed_edges().clone();
+        let planned_outer = plan.fusion_outer_realizations().clone();
         let consumed = planned.keys().cloned().map(|identity| (identity, None)).collect();
+        let realized_outer =
+            planned_outer.keys().cloned().map(|identity| (identity, None)).collect();
+        let classes = fusion_target_classes(&planned, &planned_outer);
         let declaration_omitted = plan
             .continuation_units()?
             .iter()
             .map(|unit| unit.id())
             .filter(|id| bundle.continuation(*id).is_none())
+            .filter_map(|id| classes.get(&id).map(|class| (id, *class)))
             .collect();
         Ok(Self {
             planned,
+            planned_outer,
             consumed,
+            realized_outer,
             declaration_omitted,
-            definition_omitted: BTreeSet::new(),
+            definition_omitted: BTreeMap::new(),
         })
     }
 
@@ -4899,7 +4980,61 @@ impl FusionCompositionLedger {
     /// have emitted the `Function`, so the evidence is the pass's own decision
     /// rather than a statement about it made elsewhere.
     pub(super) fn record_definition_omitted(&mut self, target: ContinuationSpecializationId) {
-        self.definition_omitted.insert(target);
+        let classes = fusion_target_classes(&self.planned, &self.planned_outer);
+        if let Some(class) = classes.get(&target) {
+            self.definition_omitted.insert(target, *class);
+        }
+    }
+
+    /// **`D3` — `R` was realized by the fusion-owned body that emits it.**
+    ///
+    /// ⛔ Not a consumption and not affine against `consumed`: an `R` identity
+    /// never reaches a call seat, so there is nothing here to spend. What this
+    /// records is that the owned body which realizes it was actually emitted,
+    /// so a planned `R` with no emitted body is refused at close rather than
+    /// reading as success because nothing happened.
+    pub(super) fn record_outer_realized(
+        &mut self,
+        identity: &ContinuationCallIdentity,
+        fusion: StaticContinuationFusionId,
+        target: ContinuationSpecializationId,
+    ) -> Result<(), CraneliftBackendError> {
+        let planned = self.planned_outer.get(identity).ok_or_else(|| {
+            backend_module(
+                "a fusion-owned body realized an outer identity the planner never recorded, so \
+                 the realization is not one the R relation authorized"
+                    .to_string(),
+            )
+        })?;
+        if planned.fusion() != fusion {
+            return Err(backend_module(format!(
+                "a fusion-owned outer identity planned for {:?} was realized by {fusion:?}; one \
+                 region realizes its own outer identity and never another's",
+                planned.fusion()
+            )));
+        }
+        if planned.target() != target {
+            return Err(backend_module(format!(
+                "a fusion-owned outer identity planned for target {:?} was realized against \
+                 {target:?}, so the body emitted is not the one the identity names",
+                planned.target()
+            )));
+        }
+        let realized = self.realized_outer.get_mut(identity).ok_or_else(|| {
+            backend_module(
+                "a planned outer realization has no realization slot; the two maps are built from \
+                 one population and disagreeing means one was rebuilt"
+                    .to_string(),
+            )
+        })?;
+        if let Some(previous) = realized {
+            return Err(backend_module(format!(
+                "a fusion-owned outer identity was realized twice, first by {previous:?}; one \
+                 owned body emits its selected body once"
+            )));
+        }
+        *realized = Some(fusion);
+        Ok(())
     }
 
     /// Consume ONE fusion-local composition, at its exact call edge.
@@ -4989,39 +5124,52 @@ impl FusionCompositionLedger {
                  that reads as success because nothing was emitted for it"
             )));
         }
-        // `F_t` — the target range, against what the passes actually omitted.
-        let planned_targets = self
+        // `I_t` and `R_t` — the two target ranges, closed SEPARATELY against
+        // what each pass actually omitted, so one class cannot satisfy the
+        // other's omission.
+        let inner_targets = self
             .planned
             .values()
             .map(FusionComposedEdge::target)
+            .collect::<BTreeSet<_>>();
+        let outer_targets = self
+            .planned_outer
+            .values()
+            .map(FusionOwnedOuterRealization::target)
             .collect::<BTreeSet<_>>();
         for (pass, omitted) in [
             ("declaration", &self.declaration_omitted),
             ("definition", &self.definition_omitted),
         ] {
-            if *omitted != planned_targets {
-                let missing = planned_targets.difference(omitted).count();
-                let extra = omitted.difference(&planned_targets).count();
-                return Err(backend_module(format!(
-                    "the {pass} pass's omitted continuation target population is not the \
-                     fusion-local range F_t: {missing} fusion-local targets were still {pass}ed, \
-                     and {extra} ordinary targets were omitted. A fusion-local target that keeps \
-                     its standalone Function is a second realization of one edge"
-                )));
+            for (class, expected, name) in [
+                (FusionTargetClass::LocallyComposed, &inner_targets, "I_t"),
+                (FusionTargetClass::FusionOwned, &outer_targets, "R_t"),
+            ] {
+                let actual = omitted
+                    .iter()
+                    .filter(|(_, tag)| **tag == class)
+                    .map(|(target, _)| *target)
+                    .collect::<BTreeSet<_>>();
+                if actual != *expected {
+                    let missing = expected.difference(&actual).count();
+                    let extra = actual.difference(expected).count();
+                    return Err(backend_module(format!(
+                        "the {pass} pass's omitted {name} population is not the planned one: \
+                         {missing} were still {pass}ed, and {extra} were omitted without \
+                         belonging to that class. A fusion-local target that keeps its standalone \
+                         Function is a second realization of one edge"
+                    )));
+                }
             }
         }
-        // BOTH RULED LAYERS OF EACH FUSION WERE ACTUALLY REALIZED.
+        // EXACTLY ONE CONSUMED `Inner` PER FUSION.
         //
-        // The planner's preflight already requires each body-owning fusion to
-        // CARRY exactly one `Outer` and one `Inner` composed edge. This is the
-        // consumption-side dual and is a different statement: it says both of
-        // them were lowered locally. Over `consumed`, never over `planned` --
-        // over `planned` it would re-assert the preflight law against the same
-        // records and would pass for an artifact that realized neither.
-        let mut consumed_layers: BTreeMap<
-            StaticContinuationFusionId,
-            BTreeSet<FusionCompositionLayer>,
-        > = BTreeMap::new();
+        // ⚠ **Restated, not relaxed.** This row previously required `{Outer,
+        // Inner}` per fusion, which was correct while both layers were composed
+        // edges. Under `P = O ⊎ I ⊎ R` the `Outer` layer is NOT in this ledger
+        // at all -- it is realized by the fusion-owned body -- so demanding it
+        // here would demand a consumption that must never happen.
+        let mut inner_per_fusion: BTreeMap<StaticContinuationFusionId, usize> = BTreeMap::new();
         for identity in &consumed {
             let edge = self.planned.get(identity).ok_or_else(|| {
                 backend_module(
@@ -5030,33 +5178,56 @@ impl FusionCompositionLedger {
                         .to_string(),
                 )
             })?;
-            if !consumed_layers.entry(edge.fusion()).or_default().insert(edge.layer()) {
+            if edge.layer() != FusionCompositionLayer::Inner {
+                return Err(backend_module(
+                    "a composition ledger member is not at the Inner layer; the Outer layer is \
+                     realized by the fusion-owned body and must never be consumed as a local \
+                     composition"
+                        .to_string(),
+                ));
+            }
+            *inner_per_fusion.entry(edge.fusion()).or_default() += 1;
+        }
+        for (fusion, count) in &inner_per_fusion {
+            if *count != 1 {
                 return Err(backend_module(format!(
-                    "static continuation fusion {:?} realized its {:?} composition layer twice; \
-                     one fusion has one composed edge per layer",
-                    edge.fusion(),
-                    edge.layer()
+                    "static continuation fusion {fusion:?} consumed {count} local compositions; \
+                     exactly one Inner identity per fusion is composed at its call edge"
                 )));
             }
         }
-        for (fusion, layers) in &consumed_layers {
-            if *layers
-                != BTreeSet::from([FusionCompositionLayer::Outer, FusionCompositionLayer::Inner])
-            {
-                return Err(backend_module(format!(
-                    "static continuation fusion {fusion:?} did not realize both ruled composition \
-                     layers locally; it consumed {layers:?}, and a composition missing one layer \
-                     is half a fusion with the other half still expecting a call that was omitted"
-                )));
-            }
+
+        // `R` — planned versus REALIZED, so an outer identity whose owned body
+        // was never emitted is refused rather than reading as success.
+        let planned_outer = self.planned_outer.keys().cloned().collect::<BTreeSet<_>>();
+        let realized_outer = self
+            .realized_outer
+            .iter()
+            .filter(|(_, realized)| realized.is_some())
+            .map(|(identity, _)| identity.clone())
+            .collect::<BTreeSet<_>>();
+        if realized_outer != planned_outer {
+            let missing = planned_outer.difference(&realized_outer).count();
+            let extra = realized_outer.difference(&planned_outer).count();
+            return Err(backend_module(format!(
+                "the realized fusion-owned outer population is not the planned one: {missing} \
+                 planned outer identities were never realized by an emitted owned body, and \
+                 {extra} realizations name identities that were never planned"
+            )));
         }
+
         // THE DISJOINTNESS, against what the ordinary ledger RECORDED.
         //
         // Not against `planned`, which the planner's own partition already
         // settles. What this catches is an identity that was composed locally
         // AND reached an ordinary role -- claimed, declared, directly emitted or
         // composed-discharged -- which is one call edge realized twice.
-        let both = consumed.intersection(ordinary_touched).count();
+        let both = consumed
+            .union(&realized_outer)
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .intersection(ordinary_touched)
+            .count();
         if both > 0 {
             return Err(backend_module(format!(
                 "{both} continuation call identities were realized both as a fusion-local \

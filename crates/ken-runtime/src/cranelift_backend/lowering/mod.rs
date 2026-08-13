@@ -2824,28 +2824,6 @@ struct Lowering<'a> {
     /// that runs here is the *consumer's* `Predeclared` owner, and it is
     /// restored to the producer's on the way out.
     fused_consumer_authority: Option<(StaticOriginId, PredeclaredFunctionId)>,
-    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the outstanding splice
-    /// capabilities, and this set is what makes them AFFINE.**
-    ///
-    /// A capability is issued into this set by the checked fusion-composition
-    /// splice and removed by the one segment construction that consumes the
-    /// splice's pending semantic edge. Because
-    /// `ComputationalEliminatorFrame` is `Copy`, the id alone cannot be affine
-    /// — a copied edge carries a copied id. Membership here is the single
-    /// spendable fact, so a **replayed** id finds nothing outstanding and
-    /// refuses, and an **unconsumed** one is still present when the splice
-    /// closes its scope and refuses there.
-    ///
-    /// **It contributes no frame and proves no membership.** Which frames a
-    /// composed segment covers is `composed_frame_templates`, authored by the
-    /// checked plan. This proves only *which dynamic construction is the
-    /// splice* (Architect `evt_4g2hmsr8tb3bm`).
-    outstanding_splice_capabilities: BTreeSet<SpliceCompositionCapabilityId>,
-    /// Monotone issuer for the ids above. Never reused within a compile, so a
-    /// spent id can never be answered by a later issue.
-    next_splice_capability: u64,
-    /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`** — the binding-candidate
-    /// ledger, a sibling of the claim ledger on the same artifact lifetime.
     continuation_candidates: Option<units::ContinuationCandidateLedger>,
     /// **`RT-DECL-CLOSURE-PORT` `D5a`** — the emission owner of the context
     /// currently being defined, in the generalized domain.
@@ -8146,11 +8124,25 @@ impl<'a> Lowering<'a> {
         }
 
         // Closure: no continuation call may be emitted that was not recorded.
+        // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — over `O_t`, the ORDINARY
+        // targets. `I_t` and `R_t` have no declared `Function` by construction:
+        // an `I` target's selected body is lowered at its call edge and an `R`
+        // target's is emitted once as the fusion-owned body. Demanding a
+        // `FuncId` for either asks the bundle for a symbol the declaration pass
+        // deliberately did not mint.
+        //
+        // ⛔ This is a narrowing of the CALLEE population the emission scan
+        // recognises, not a weakening of the closure. The scan still refuses any
+        // recorded emission naming a specialization callee, and a fusion-local
+        // target emits no call at all -- so an emission for one would have to
+        // name a callee this set no longer contains, and the reverse direction
+        // above catches it.
         let mut specialization_callees = BTreeSet::new();
-        for unit in self.static_transition_plan.continuation_units()? {
-            let id = bundle.continuation(unit.id()).ok_or_else(|| {
+        for unit in self.static_transition_plan.ordinary_continuation_targets()? {
+            let id = bundle.continuation(unit).ok_or_else(|| {
                 backend_module(
-                    "a planned continuation specialization was never forward-declared".to_string(),
+                    "a planned ordinary continuation specialization was never forward-declared"
+                        .to_string(),
                 )
             })?;
             specialization_callees.insert(id);
@@ -13902,14 +13894,6 @@ fn dynamic_host_result_producer_case<'a>(
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the affine splice capability's
 /// identity.**
 ///
-/// Issued by the checked fusion-composition splice, carried on that splice's own
-/// pending semantic edge, and consumed exactly once by the segment that edge
-/// joins. It names no frame and proves no membership: the checked plan remains
-/// the sole author of both frame sequences. All this proves is that a given
-/// dynamic segment construction **is** the checked splice the already-authored
-/// composed sequence applies to (Architect `evt_4g2hmsr8tb3bm`).
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct SpliceCompositionCapabilityId(u64);
 
 #[derive(Clone, Copy)]
 struct ComputationalEliminatorFrame<'a> {
@@ -13920,7 +13904,6 @@ struct ComputationalEliminatorFrame<'a> {
     /// semantic edge; the outstanding-set on `Lowering` is what makes it affine,
     /// because this struct is `Copy` and a token on a `Copy` value can be
     /// duplicated. Copying the frame copies the id; only one copy can spend it.
-    splice_capability: Option<SpliceCompositionCapabilityId>,
     cases: &'a [crate::RuntimeComputationalMatchCase],
     default: &'a RuntimeTrap,
     env: &'a [LoweringEnvironmentBinding],
@@ -14054,7 +14037,6 @@ struct RecursorInvocationSegment {
     /// own shape: a segment does not become `Composed` by presenting an extra
     /// layer, and one that does so without the capability is refused for exact
     /// coverage exactly as before.
-    composition: SegmentComposition,
     origin: RecursorProducerOriginId,
     /// Declaration-order field position inside the one selected constructor
     /// case. Siblings share `origin`; this position distinguishes their
@@ -14245,11 +14227,9 @@ impl RecursorInvocationSegment {
         resume_cursor: ContinuationCursorId,
         checked_invocation: Option<CheckedRecursiveInvocationInstance>,
         computational_ih_slot_template_id: Option<u64>,
-        composition: SegmentComposition,
     ) -> Self {
         let open_control_obligations = open_control_obligations(&unwind);
         Self {
-            composition,
             origin,
             sibling_position,
             selection,
@@ -14304,64 +14284,20 @@ fn decompose_computational_recursor(
         LoweringOperand::Carried(word) => (LoweringOperand::Carried(word), None),
     }
 }
-/// **`RT-LEXICAL-R3-FUSION-EMITTER` `DP` — which of an invocation template's two
-/// authored sequences this segment is measured against.**
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` — the checked sequence a dynamic invocation
+/// segment is measured against.**
 ///
-/// This is a **selector, never a source of membership.** It says which segment
-/// shape is being built; the plan says which frames belong to that shape. With
-/// an empty `composed_frame_templates` the two are identical and `Composed`
-/// changes nothing, which is exactly the A/B that shows the membership is
-/// planner-authored rather than inferred from the presence of a fusion.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SegmentComposition {
-    /// The ordinary segment, built where the checked marker was crossed.
-    Ordinary,
-    /// The segment built by a fusion composition splice, which draws the
-    /// producer and the consuming suffix into one emission region.
-    Composed,
-}
-
-impl Lowering<'_> {
-    /// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — issue one affine splice capability.
-    fn issue_splice_capability(&mut self) -> SpliceCompositionCapabilityId {
-        let id = SpliceCompositionCapabilityId(self.next_splice_capability);
-        self.next_splice_capability = self
-            .next_splice_capability
-            .checked_add(1)
-            .expect("compiler-private splice capability issuer exhausted");
-        self.outstanding_splice_capabilities.insert(id);
-        id
-    }
-
-    /// Spend the capability an edge carries, **at most once**.
-    ///
-    /// An edge with no capability is an ordinary edge and yields `Ordinary` —
-    /// that is the common case and not an error. An edge that *names* a
-    /// capability which is no longer outstanding is a **replay**, and it
-    /// refuses: the id survives the `Copy` of the frame, so this is the only
-    /// place the second copy can be caught.
-    fn consume_splice_capability(
-        &mut self,
-        capability: Option<SpliceCompositionCapabilityId>,
-    ) -> Result<SegmentComposition, CraneliftBackendError> {
-        let Some(capability) = capability else {
-            return Ok(SegmentComposition::Ordinary);
-        };
-        if !self.outstanding_splice_capabilities.remove(&capability) {
-            return Err(unsupported(
-                "StaticContinuationFusion",
-                "a fusion-composition splice capability was consumed twice, or consumed after its \
-                 splice closed; the checked splice composes exactly one segment",
-            ));
-        }
-        Ok(SegmentComposition::Composed)
-    }
-}
-
+/// The `SegmentComposition` selector and its `Composed` arm were retired with
+/// the splice capability (Architect `evt_6bm54j10w1n88`): the capability was
+/// their only producer, so after its removal no caller could ever have selected
+/// the composed sequence. `composed_frame_templates` itself is NOT retired — it
+/// is an encoded, decoded and validated field of `OrientedSubcontinuationPlanV1`
+/// authored by the checked source, so it has a live producer and a live
+/// validator, and the ruling's second branch applies: it is preserved, and this
+/// path no longer reads it.
 fn checked_invocation_frame_templates(
     plan: &crate::OrientedSubcontinuationPlanV1,
     source: InvocationTemplateRef,
-    composition: SegmentComposition,
 ) -> Result<Vec<u64>, CraneliftBackendError> {
     match source {
         // A same-SCC template carries no composition-time population, so a
@@ -14379,13 +14315,7 @@ fn checked_invocation_frame_templates(
             }),
         InvocationTemplateRef::ComputationalIHCall(call_template_id) => plan
             .computational_ih_call(call_template_id)
-            .map(|call| {
-                let mut templates = call.callee_frame_templates.clone();
-                if composition == SegmentComposition::Composed {
-                    templates.extend(call.composed_frame_templates.iter().copied());
-                }
-                templates
-            })
+            .map(|call| call.callee_frame_templates.clone())
             .ok_or_else(|| {
                 unsupported(
                     "OrientedSubcontinuationPlanV1",
@@ -14398,10 +14328,8 @@ fn instantiate_checked_invocation_segment(
     plan: &crate::OrientedSubcontinuationPlanV1,
     invocation: CheckedRecursiveInvocationInstance,
     segment: &mut RecursorInvocationSegment,
-    composition: SegmentComposition,
 ) -> Result<(), CraneliftBackendError> {
-    let frame_templates =
-        checked_invocation_frame_templates(plan, invocation.source, composition)?;
+    let frame_templates = checked_invocation_frame_templates(plan, invocation.source)?;
     let expected = frame_templates.iter().copied().collect::<BTreeSet<_>>();
     let mut instantiated = BTreeSet::new();
     // ⭐ Set equality alone cannot see a PERMUTATION (`dec_s30rdnb1dvgk` item
@@ -14575,7 +14503,6 @@ fn compose_oriented_subcontinuation(
     // so composition is decided where the capability was spent rather than
     // re-derived here from ambient state. Nothing in this function can make a
     // segment composed.
-    let composition = segment.composition;
     segment.validate_open_control_obligations()?;
     let invocation = invocation.or(segment.checked_invocation);
     if let Some(invocation) = invocation {
@@ -14585,7 +14512,7 @@ fn compose_oriented_subcontinuation(
                 "dynamic invocation has no checked oriented plan",
             )
         })?;
-        instantiate_checked_invocation_segment(plan, invocation, &mut segment, composition)?;
+        instantiate_checked_invocation_segment(plan, invocation, &mut segment)?;
     }
     let producer_origin = segment.origin;
     let sibling_position = segment.sibling_position;
@@ -14837,19 +14764,7 @@ fn compose_oriented_subcontinuation(
             // mixed-frame guard moved the compile to *"dynamic splice edge
             // disagrees with its checked static parent"* here. One membership
             // law, two sites that encode it; the first refusal named only one.
-            let expected_child_frames = match composition {
-                SegmentComposition::Ordinary => call.callee_frame_templates.clone(),
-                SegmentComposition::Composed => {
-                    let mut frames = call.callee_frame_templates.clone();
-                    frames.extend(call.composed_frame_templates.iter().copied());
-                    frames.sort_by_key(|frame_id| {
-                        plan.frame(*frame_id)
-                            .expect("checked frame exists after plan validation")
-                            .semantic_position
-                    });
-                    frames
-                }
-            };
+            let expected_child_frames = call.callee_frame_templates.clone();
             if call.parent_frame_template_id != Some(edge.parent_frame_template_id)
                 || call.parent_segment_site_id != Some(edge.segment_site_id)
                 || call.callee_segment_site_id != edge.segment_site_id
@@ -15088,7 +15003,6 @@ fn installed_oriented_eliminator_frames(
             EliminatorFrame::Computational(ComputationalEliminatorFrame {
                 // `D3` — an INSTALLED segment's frames carry no capability: the
                 // splice's edge already spent it to build this segment.
-                splice_capability: None,
                 cases: &layer.cases,
                 default: &layer.default,
                 env: &layer.outer_env,
@@ -16855,8 +16769,7 @@ impl<'a> Lowering<'a> {
         // same operand `compose_oriented_subcontinuation` uses. Nothing ambient
         // is consulted, so marker consumption and composition cannot disagree
         // about which segment the splice built.
-        let composition = invocation.composition;
-        instantiate_checked_invocation_segment(plan, instance, invocation, composition)?;
+        instantiate_checked_invocation_segment(plan, instance, invocation)?;
         Ok(LoweringOperand::Specialized(value))
     }
 
@@ -17116,7 +17029,6 @@ impl<'a> Lowering<'a> {
             &[SourceSelectedContinuation<'_>],
         )>,
         recursive_unit_body: Option<StaticOriginId>,
-        splice_capability: Option<SpliceCompositionCapabilityId>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE CONSUMPTION POINT.
         //
@@ -17130,7 +17042,6 @@ impl<'a> Lowering<'a> {
         // Taken BEFORE any of the construction below can fail, so a refusal
         // downstream cannot leave the capability outstanding and silently
         // re-spendable by a later edge.
-        let composition = self.consume_splice_capability(splice_capability)?;
         let recursive_unit_body = recursive_unit_body.or_else(|| match &recursive {
             LoweringOperand::Specialized(Lowered::Closure { body, .. }) => Some(*body),
             LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
@@ -17190,11 +17101,6 @@ impl<'a> Lowering<'a> {
             .as_ref()
             .map(|(_, invocation)| invocation.dynamic_splice_edges.clone())
             .unwrap_or_default();
-        let segment_payload_composition = payload
-            .as_ref()
-            .map_or(SegmentComposition::Ordinary, |(_, invocation)| {
-                invocation.composition
-            });
         let (selection, unwind) =
             if let Some((_, invocation)) = payload {
                 let splice_caller = splice_caller.ok_or_else(|| {
@@ -17307,18 +17213,6 @@ impl<'a> Lowering<'a> {
         // capabilities meeting on one segment would be two splices composing one
         // construction, which is not a shape the checked plan can describe, so it
         // refuses rather than picking one.
-        let segment_composition = match (segment_payload_composition, composition) {
-            (SegmentComposition::Composed, SegmentComposition::Composed) => {
-                return Err(unsupported(
-                    "StaticContinuationFusion",
-                    "two fusion-composition splices claim one dynamic invocation segment",
-                ));
-            }
-            (SegmentComposition::Composed, _) | (_, SegmentComposition::Composed) => {
-                SegmentComposition::Composed
-            }
-            _ => SegmentComposition::Ordinary,
-        };
         let mut invocation = RecursorInvocationSegment::new(
             segment_origin,
             segment_sibling_position,
@@ -17327,7 +17221,6 @@ impl<'a> Lowering<'a> {
             resume_cursor,
             segment_checked_invocation,
             computational_ih_slot_template_id,
-            segment_composition,
         );
         invocation.recursive_unit_body = segment_recursive_unit_body;
         invocation.dynamic_splice_edges = segment_dynamic_splice_edges;

@@ -16,7 +16,7 @@ mod static_transition;
 pub(super) use static_transition::build_static_continuation_fusion_plan;
 pub(in crate::cranelift_backend) use static_transition::{
     BodyEmissionDisposition, FusionClaimRefusal, FusionComposedEdge, FusionCompositionLayer,
-    FusionOwnedBody, FusionRegionClaim, FusionRegionClaimLedger,
+    FusionOwnedBody, FusionOwnedOuterRealization, FusionRegionClaim, FusionRegionClaimLedger,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///
