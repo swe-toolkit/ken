@@ -23,6 +23,7 @@
 
 use super::*;
 use super::core::{AmbientBodyAuthority, CheckedFrameFunctionScope};
+use crate::cranelift_backend::planning::{FusionComposedEdge, FusionCompositionLayer};
 
 use cranelift_module::FuncId;
 
@@ -951,13 +952,19 @@ pub(in crate::cranelift_backend) fn declare_unit_bundle<M: Module>(
     // continuation specialization, before any body is defined. The symbol
     // carries a dense ordinal only so the linker sees distinct names; the map
     // is keyed by the planner's typed identity, never by that string.
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — over `O_t`, the ORDINARY residual
+    // targets. A fusion-local target's selected body is lowered at its exact
+    // call edge and never becomes a callable `Function`, so declaring one here
+    // would mint a symbol nothing defines -- the undefined phantom the
+    // executable/template split above exists to prevent, arriving by a second
+    // route.
     let mut continuations = BTreeMap::new();
-    for (ordinal, unit) in plan.continuation_units()?.into_iter().enumerate() {
+    for (ordinal, unit) in plan.ordinary_continuation_targets()?.into_iter().enumerate() {
         let name = format!("ken_continuation_{ordinal}");
         let id = module
             .declare_function(&name, Linkage::Local, &sig)
             .map_err(|err| backend_module(err.to_string()))?;
-        if continuations.insert(unit.id(), id).is_some() {
+        if continuations.insert(unit, id).is_some() {
             return Err(backend_module(
                 "two continuation descriptors claim one planned specialization".to_string(),
             ));
@@ -1976,10 +1983,42 @@ pub(super) fn define_continuation_bodies<M: Module>(
     // separately emitted caller; a continuation function is exactly that, so
     // it declares its own worker refs rather than borrowing another's.
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the ORDINARY residual targets
+    // `O_t`, and the fusion-local complement recorded as this pass's own
+    // omission.
+    //
+    // ⛔ **The omission is recorded HERE, in the pass that would otherwise have
+    // emitted the body**, and the closeout compares it with `F_t`. A statement
+    // made elsewhere about what this loop does would agree with itself; this is
+    // the loop's own decision, and if it ever stopped omitting, the recorded set
+    // would shrink and the range equality would say so.
+    let ordinary_targets = compiler.static_transition_plan.ordinary_continuation_targets()?;
+    for omitted in compiler
+        .static_transition_plan
+        .continuation_units()?
+        .iter()
+        .map(|unit| unit.id())
+        .filter(|id| !ordinary_targets.contains(id))
+        .collect::<Vec<_>>()
+    {
+        compiler
+            .fusion_compositions
+            .as_mut()
+            .ok_or_else(|| {
+                backend_module(
+                    "a fusion-local continuation target was omitted from the definition pass \
+                     with no composition ledger open to record it; the omission would then be \
+                     invisible to the range equality that is the only thing requiring it"
+                        .to_string(),
+                )
+            })?
+            .record_definition_omitted(omitted);
+    }
     let emissions = compiler
         .static_transition_plan
         .continuation_units()?
         .into_iter()
+        .filter(|unit| ordinary_targets.contains(&unit.id()))
         .map(|unit| {
             let (offsets, _frame_bytes) = unit.slot_offsets()?;
             Ok(OwnedContinuationEmission {
@@ -4731,6 +4770,259 @@ impl ContinuationClaimLedger {
         }
         Ok(())
     }
+
+    /// **`D3` — every identity this ordinary ledger has TOUCHED, in any role.**
+    ///
+    /// The union of claimed, declared, direct-emitted and composed-discharged.
+    /// It exists for exactly one consumer: the fusion-local ledger's closeout,
+    /// which asserts its own consumed population is disjoint from this one.
+    ///
+    /// ⛔ **A union, not `planned`.** Asserting disjointness against `planned`
+    /// would test the partition the planner already validated -- `O ∩ F = ∅` is
+    /// checked at preflight and would be re-checked here against the same
+    /// derivation. What has to be disjoint is what the two ledgers ACTUALLY
+    /// recorded: a fusion-local identity that reached any ordinary role is a
+    /// direct-plus-composed double realization, and it is that event, not the
+    /// planner's arithmetic, that this makes visible.
+    pub(super) fn touched_identities(&self) -> BTreeSet<ContinuationCallIdentity> {
+        self.claims
+            .iter()
+            .filter(|(_, consumed)| consumed.is_some())
+            .map(|(identity, _)| identity.clone())
+            .chain(self.declared.iter().cloned())
+            .chain(self.emitted.iter().cloned())
+            .chain(self.composed.iter().cloned())
+            .collect()
+    }
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the SIBLING affine ledger for the
+/// fusion-local realizations `F`.**
+///
+/// ⭐⭐ **A sibling, not a widening, and Architect `evt_6kn9ckdnbf0ph` is
+/// explicit about why.** An ordinary identity's obligation is discharged by an
+/// emitted call whose callee is decoded back out of the finished CLIF; a
+/// fusion-local identity emits no call at all, so there is no instruction for
+/// any such gate to read. Putting both in one ledger would mean either
+/// weakening the direct laws to tolerate a member with no instruction, or
+/// giving the composed member an instruction it does not have. Two ledgers over
+/// two disjoint domains keeps each law literally true over its own complete
+/// domain -- which is the same reason `O` was narrowed at the input rather than
+/// the laws being relaxed.
+///
+/// ⛔ **This is NOT the `FusionRegionClaimLedger` and does not touch it.** The
+/// region claim carries the producer/consumer relation and is spent at the
+/// redirect and takeover seats; consuming a composition here does not spend it,
+/// and call `17/13` stays on the region claim and out of `dom(FusionComposedEdge)`
+/// entirely.
+///
+/// ## The affine law, and what each half refuses
+///
+/// `dom(planned) = dom(consumed)`, with the target range equal to `F_t`:
+///
+/// - an identity with **no planned edge** is refused -- a composition seat was
+///   reached for something the planner never composed;
+/// - a **second** consumption of one identity is refused, whether in the same
+///   function or another one, which is the replay case;
+/// - a consumption whose **owner, layer or target** disagrees with the planned
+///   edge is refused, each named separately so the refusal says which fact
+///   moved;
+/// - a planned member **never consumed** is refused at close -- the case that
+///   reads as success because nothing happened;
+/// - a consumed identity that **also reached the ordinary ledger** in any role
+///   is refused, which is the direct-plus-composed double realization.
+pub(super) struct FusionCompositionLedger {
+    /// `F` — the planned fusion-local realizations, keyed by exact identity.
+    ///
+    /// ⛔ The WHOLE composed edge is retained, not the fields a consumption
+    /// happens to check. A consumption is validated against the planner's own
+    /// record; re-deriving any of owner, layer or target here would make this
+    /// ledger a second authority over the composition it is supposed to audit.
+    planned: BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
+    /// `None` until consumed; then the emission owner that consumed it.
+    consumed: BTreeMap<ContinuationCallIdentity, Option<ContinuationEmissionOwner>>,
+    /// The specialization targets the DECLARATION pass actually omitted, read
+    /// from that pass's own output rather than re-derived.
+    ///
+    /// ⛔ Not derived from `planned` at close. Deriving it would compare the
+    /// planner's `F_t` with itself and pass for a pass that omitted nothing --
+    /// which is precisely the failure this range equality exists to catch.
+    declaration_omitted: BTreeSet<ContinuationSpecializationId>,
+    /// The specialization targets the DEFINITION pass actually omitted.
+    ///
+    /// ⛔ **Kept separate from the declaration set, and both are closed against
+    /// `F_t`.** The two passes fail differently: a declaration that does not
+    /// omit leaves an undefined phantom symbol, and a definition that does not
+    /// omit emits a standalone `Function` for a body already lowered locally --
+    /// a second realization of one edge. One merged set would be satisfied by
+    /// either pass alone.
+    definition_omitted: BTreeSet<ContinuationSpecializationId>,
+}
+
+impl FusionCompositionLedger {
+    /// Open over the planner's composed-edge relation, once per artifact.
+    ///
+    /// The declaration omission is seeded from the BUNDLE -- the declaration
+    /// pass's own output -- rather than from the plan. ⛔ That is the whole
+    /// point: a `declare_unit_bundle` that stopped filtering would leave this
+    /// set empty and the closeout would say so, where a plan-derived set would
+    /// agree with the plan no matter what was declared.
+    pub(super) fn open(
+        plan: &StaticTransitionPlan<'_>,
+        bundle: &UnitBundle,
+    ) -> Result<Self, CraneliftBackendError> {
+        let planned = plan.fusion_composed_edges().clone();
+        let consumed = planned.keys().cloned().map(|identity| (identity, None)).collect();
+        let declaration_omitted = plan
+            .continuation_units()?
+            .iter()
+            .map(|unit| unit.id())
+            .filter(|id| bundle.continuation(*id).is_none())
+            .collect();
+        Ok(Self {
+            planned,
+            consumed,
+            declaration_omitted,
+            definition_omitted: BTreeSet::new(),
+        })
+    }
+
+    /// Record that the DEFINITION pass omitted this specialization's body.
+    ///
+    /// ⛔ Recorded where the omission happens, in the loop that would otherwise
+    /// have emitted the `Function`, so the evidence is the pass's own decision
+    /// rather than a statement about it made elsewhere.
+    pub(super) fn record_definition_omitted(&mut self, target: ContinuationSpecializationId) {
+        self.definition_omitted.insert(target);
+    }
+
+    /// Consume ONE fusion-local composition, at its exact call edge.
+    ///
+    /// The four facts are checked against the planned edge's own record, each
+    /// with its own refusal, so a red names the fact that moved rather than
+    /// reporting a generic mismatch.
+    pub(super) fn consume(
+        &mut self,
+        identity: &ContinuationCallIdentity,
+        defining: ContinuationEmissionOwner,
+        layer: FusionCompositionLayer,
+        target: ContinuationSpecializationId,
+    ) -> Result<StaticContinuationFusionId, CraneliftBackendError> {
+        let edge = self.planned.get(identity).ok_or_else(|| {
+            backend_module(
+                "a fusion-local composition was consumed for an identity the planner never \
+                 composed; a composition seat reached for an unplanned identity is a lowering \
+                 that decided for itself which edges are local"
+                    .to_string(),
+            )
+        })?;
+        if edge.emission_owner() != defining {
+            return Err(backend_module(format!(
+                "a fusion-local composition planned for emission owner {:?} was consumed while \
+                 defining {defining:?}; the composition is lowered into the consumer's own \
+                 function and a foreign one would place the producer's body in a frame that \
+                 never held its operands",
+                edge.emission_owner()
+            )));
+        }
+        if edge.layer() != layer {
+            return Err(backend_module(format!(
+                "a fusion-local composition planned at layer {:?} was consumed as {layer:?}; the \
+                 two ruled layers are selected by different checked bindings of the fusion key \
+                 and are not substitutable",
+                edge.layer()
+            )));
+        }
+        if edge.target() != target {
+            return Err(backend_module(format!(
+                "a fusion-local composition planned for target {:?} was consumed against {target:?}; \
+                 the composed edge names the exact specialization whose selected body is lowered \
+                 locally, and another one is another body",
+                edge.target()
+            )));
+        }
+        let fusion = edge.fusion();
+        let consumed = self.consumed.get_mut(identity).ok_or_else(|| {
+            backend_module(
+                "a fusion-local composition has a planned edge but no consumption slot; the two \
+                 maps are built from one population and disagreeing means one was rebuilt"
+                    .to_string(),
+            )
+        })?;
+        if let Some(previous) = consumed {
+            return Err(backend_module(format!(
+                "a fusion-local composition was consumed twice, first by {previous:?}; one \
+                 composed call edge is realized once, and a second consumption is a replay \
+                 whether it happens in this function or another"
+            )));
+        }
+        *consumed = Some(defining);
+        Ok(fusion)
+    }
+
+    /// The closeout, over three populations.
+    ///
+    /// ⛔ Every comparison is between SETS. Two populations of the same size can
+    /// be the wrong two, and a count would pass for a pass that consumed one
+    /// composition and omitted a different target.
+    pub(super) fn close(
+        self,
+        ordinary_touched: &BTreeSet<ContinuationCallIdentity>,
+    ) -> Result<(), CraneliftBackendError> {
+        let planned = self.planned.keys().cloned().collect::<BTreeSet<_>>();
+        let consumed = self
+            .consumed
+            .iter()
+            .filter(|(_, consumed)| consumed.is_some())
+            .map(|(identity, _)| identity.clone())
+            .collect::<BTreeSet<_>>();
+        if consumed != planned {
+            let missing = planned.difference(&consumed).count();
+            let extra = consumed.difference(&planned).count();
+            return Err(backend_module(format!(
+                "the consumed fusion-local composition population is not the planned one: \
+                 {missing} planned compositions were never realized, and {extra} realizations \
+                 name identities that were never planned. An unrealized composition is the case \
+                 that reads as success because nothing was emitted for it"
+            )));
+        }
+        // `F_t` — the target range, against what the passes actually omitted.
+        let planned_targets = self
+            .planned
+            .values()
+            .map(FusionComposedEdge::target)
+            .collect::<BTreeSet<_>>();
+        for (pass, omitted) in [
+            ("declaration", &self.declaration_omitted),
+            ("definition", &self.definition_omitted),
+        ] {
+            if *omitted != planned_targets {
+                let missing = planned_targets.difference(omitted).count();
+                let extra = omitted.difference(&planned_targets).count();
+                return Err(backend_module(format!(
+                    "the {pass} pass's omitted continuation target population is not the \
+                     fusion-local range F_t: {missing} fusion-local targets were still {pass}ed, \
+                     and {extra} ordinary targets were omitted. A fusion-local target that keeps \
+                     its standalone Function is a second realization of one edge"
+                )));
+            }
+        }
+        // THE DISJOINTNESS, against what the ordinary ledger RECORDED.
+        //
+        // ⛔ Not against `planned`, which the planner's own partition already
+        // settles. What this catches is an identity that was composed locally
+        // AND reached an ordinary role -- claimed, declared, directly emitted or
+        // composed-discharged -- which is one call edge realized twice.
+        let both = consumed.intersection(ordinary_touched).count();
+        if both > 0 {
+            return Err(backend_module(format!(
+                "{both} continuation call identities were realized both as a fusion-local \
+                 composition and in an ordinary role; one call edge is realized exactly once, \
+                 and an identity in both ledgers has been emitted twice under one obligation"
+            )));
+        }
+        Ok(())
+    }
 }
 
 /// **`RT-DECL-CLOSURE-PORT` `D5a` checkpoint 2 — open the ONE cross-pass causal
@@ -4776,6 +5068,15 @@ pub(super) fn open_continuation_claim_ledger(
         ));
     }
     compiler.continuation_claims = Some(ContinuationClaimLedger::open(
+        &compiler.static_transition_plan,
+        bundle,
+    )?);
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local sibling opens on
+    // the SAME boundary and for the same reason: one artifact has exactly one
+    // of it, and every composition seat consumes into it. Sharing the lifetime
+    // is what makes the two ledgers siblings over disjoint domains rather than
+    // one ledger with a second kind of member.
+    compiler.fusion_compositions = Some(FusionCompositionLedger::open(
         &compiler.static_transition_plan,
         bundle,
     )?);
@@ -4831,6 +5132,26 @@ pub(super) fn close_continuation_claim_ledger(
     // Totality and disjointness FIRST, then the derived subset, then the
     // unchanged equality over it.
     let call_obligations = candidates.close()?;
+    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the fusion-local sibling closes
+    // BEFORE the ordinary ledger is consumed, because its disjointness clause
+    // reads what that ledger RECORDED and `close` takes it by value.
+    //
+    // ⛔ The order also decides which red a reader sees first, and this is the
+    // useful one: a fusion-local composition that was never realized, or one
+    // realized twice, explains an ordinary population that then looks short. The
+    // reverse order reports the symptom and consumes the evidence.
+    let ordinary_touched = compiler
+        .continuation_claims
+        .as_ref()
+        .ok_or_else(|| backend_module("the continuation claim ledger went missing".to_string()))?
+        .touched_identities();
+    compiler
+        .fusion_compositions
+        .take()
+        .ok_or_else(|| {
+            backend_module("the fusion-local composition ledger went missing".to_string())
+        })?
+        .close(&ordinary_touched)?;
     compiler
         .continuation_claims
         .take()

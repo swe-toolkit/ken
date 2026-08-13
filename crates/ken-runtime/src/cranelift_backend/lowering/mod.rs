@@ -2765,6 +2765,16 @@ struct Lowering<'a> {
     /// the whole unit-definition pass so a token claimed at one producer
     /// occurrence cannot be claimed again at another.
     continuation_claims: Option<units::ContinuationClaimLedger>,
+    /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3`** — the SIBLING affine ledger for
+    /// the fusion-local realizations `F`, held over the same span as
+    /// `continuation_claims` and opened and closed on the same boundary.
+    ///
+    /// ⛔ A sibling, not an arm of the ledger above. `O` and `F` are disjoint
+    /// domains with different evidence: an ordinary obligation is discharged by
+    /// a call decoded back out of the finished CLIF, and a fusion-local one
+    /// emits no call for any such gate to read. One ledger over both would have
+    /// to weaken the direct laws to tolerate a member with no instruction.
+    fusion_compositions: Option<units::FusionCompositionLedger>,
     /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1b-i`** — the conservation ledger
     /// for compiler-only static-worker constructor fields. See
     /// [`StaticWorkerFieldLedger`]; closed by

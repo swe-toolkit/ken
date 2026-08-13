@@ -2512,6 +2512,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let mut func_ctx = FunctionBuilderContext::new();
     let mut compiler = Lowering {
         continuation_claims: None,
+        fusion_compositions: None,
         static_worker_fields: StaticWorkerFieldLedger::default(),
         // `D2f` — the preflighted ledger, moved in whole. Handed over rather
         // than rebuilt here: preflight read the plan BEFORE ownership was
