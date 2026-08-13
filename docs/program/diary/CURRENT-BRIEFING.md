@@ -38,7 +38,64 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~12:5xZ. **`main` = `66c718c9`.**
+> ### RESUME HERE — state at 2026-08-13 ~13:5xZ. **`main` = `b96779d3`.**
+> **I hold nothing on `steward/work`; no publisher is running.**
+>
+> **GATE 4a IS APPROVED AND BLOCKED ON A CI INSTRUMENT, NOT ON ITS OWN
+> MECHANISM.** `a054e646` carries Architect approval (`evt_tjdg2n3nk47b`,
+> resolved on cast) and QA approval (`evt_3p776kwcc5pbz`). **PR #2088 went RED
+> on the ignored-row sweep. The candidate needs a SUPERSEDING TIP, not a
+> re-review** — its content is unaffected.
+>
+> **The red, measured.** `scripts/ci-ignored-sweep.py` counts ignored rows by
+> `git grep` over a **hardcoded** `POPULATION_PATHS` — `ken-cli`, `ken-verify`,
+> `ken-runtime`, `ken-interp` — while its listing half runs `cargo nextest list
+> **--workspace**`. `crates/ken-elaborator` is absent from that list. At the
+> candidate: census **50**, ken-elaborator ignores **2**
+> (`src/compiler_driver.rs:5120`, `tests/r3_c2_source_mixed_branch.rs:439`),
+> listing **52**. At `main`, ken-elaborator ignores **0**. ⇒ **Gate 4a is the
+> first candidate to put an `#[ignore]` outside those four crates, and both of
+> its ignores are ones the Architect REQUIRED it to keep.** The two halves of
+> one instrument count different populations; neither half is broken on its own.
+>
+> **MY RULING IS `evt_19gqrcrrbjx7c` — read it there, it is one cut.** Headlines:
+> derive the census population from the workspace scope the listing already uses
+> (**do not append one path** — a hardcoded list drifts at the next crate's
+> first ignored row); do not weaken the sweep, silence the rows, or relocate the
+> tests to a scanned crate; and add class **`blocked-upstream-relation`** —
+> fully authored, would execute, but a **named** upstream relation is absent so
+> a run asserts nothing. Its `readmission` must name that relation as a
+> **symbol** and the row's `#[ignore = "..."]` reason must name the **same** one,
+> so retirement is greppable.
+>
+> **The job name lies in a way that invites merging past a real gate.** It reads
+> "ignored-row sweep (findings non-blocking)", but `build + test` fails with
+> `ignored-row-sweep did not pass`. **Non-blocking describes its findings, not
+> the job.**
+>
+> **Gate 4a's actual result: THE REFUSAL MOVED.** It now stops **upstream inside
+> the R3 mechanism** at `checked_computational_ih_slot_unconsumed` — production's
+> own total-consumption validator — instead of downstream on unrelated
+> closure-boundary debt. Read as "still stopped" it looks like nothing; it
+> converted an instrument gap into a named first missing relation, which is what
+> 4a was ordered to find. The stack regression is fixed **without** raising any
+> limit. Both sentinels stay `#[ignore]`d and framed as blocked transitions,
+> **not** equality evidence. 4b unreached, gates 5-6 held, production unarmed.
+>
+> **Two findings are owed on the next R3 increment** (landed at `#2089`, newest
+> frame box): a **tautological assert** — the **fourth** hit of this node's
+> vacuous-guard lens — and a const claiming **landed provenance** in the diff
+> that authors it.
+>
+> **A RESOLVED ARCHITECT DECISION IS ITSELF THE PUBLISH SIGNAL.** I published
+> `#2088` on the resolution; the leader's publisher handoff arrived afterwards
+> and crossed it. Do not wait for a ring relay on a crates-only candidate.
+>
+> ---
+>
+> **State at ~12:5xZ follows.** Its `main` SHA is superseded; everything below
+> about the reseat, the base-moved detector and the held-tip hazards still
+> stands.
 >
 > **TWO SEATS WERE RESEATED BY OPERATOR INSTRUCTION AND THE SWAP CHANGES YOUR
 > OPERATIONAL HABITS, not just a config line.** `architect` is now
