@@ -540,6 +540,16 @@ pub(in crate::cranelift_backend) fn d2f_production_fusion_planes_take() -> Vec<u
 /// **There is no resolved-count field**, on purpose: it would be `keys.len()`
 /// read a second time, and an assertion comparing the two would restate one
 /// read rather than check anything.
+///
+/// **Measured constancy boundary.**
+/// `d2f_0_the_applied_root_production_path_gate` pins the five input
+/// populations at `(4, 2, 0, 2, 1)` for the perturbed `ExactSuffix` and
+/// `CallIdentity` causes, while
+/// `r3_4b_input_observation_is_artifact_identical_when_disabled` pins the same
+/// tuple for unperturbed `Exact`. The latter resolves one key and descriptor;
+/// the former two resolve none. The `walked` input-population count is sound,
+/// but it does not move when a downstream relation declines, so it cannot
+/// establish whether a decline occurred or attribute one.
 #[cfg(test)]
 #[derive(Clone, Debug)]
 pub(in crate::cranelift_backend) struct D2fGateArrival {
