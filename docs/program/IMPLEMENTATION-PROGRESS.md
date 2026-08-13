@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 19:56:33Z — from 242 issue file(s) in `docs/program/issues/`.
+2026-08-13 20:08:39Z — from 242 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -164,7 +164,7 @@ the committed file matches the generator's output.
 | `RT-4B-ENUMERATION-INPUT-SIZE` | Gate 4b's observer records whether an oriented plan ARRIVED but not how large the population it walks is, so `keys = []` cannot be read as either lawful absence or a missing producer relation -- and the scalar that would settle it is the admitted-discovery ledger's length, not the oriented plan's, because that ledger is what candidate enumeration actually iterates | merged | runtime | S | none | 2109 |
 | `RT-4B-OBSERVATION-FEATURE-GATE` | Re-gate the existing D2f observation behind an off-by-default Runtime feature with a doc-hidden feature-scoped accessor, and prove the feature inert by comparing artifacts from TWO COMPILATIONS -- not a runtime toggle inside one, which is what the landed switch already proves and is a different claim; this is the increment the C2 answer made conditional, and it is what unblocks re-pointing the reach node at the real witness | ready | runtime | M | none | — |
 | `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` | Gate 4b's observation route is exhausted -- four admitted discoveries enter enumeration and zero candidates leave, and none of the fourteen elimination routes is attributed; the Architect named `fusion_unique_static_body_triple` as the cheapest and most informative place to recover attribution, but instrumenting one gate is only decisive if the eliminations actually happen there, and nothing measured says they do | draft | runtime | S | none | — |
-| `RT-4B-UNIQUENESS-GATE-REACH` | Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all | draft | runtime | S | none | — |
+| `RT-4B-UNIQUENESS-GATE-REACH` | Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all | ready | runtime | S | none | — |
 | `RT-4B-WALKED-CONSTANCY` | Two assertions landed in one candidate compose into a result neither states -- the five input populations read `(4, 2, 0, 2, 1)` identically whether fusion forms or is perturbed so it cannot, so `walked` discriminates input size and nothing downstream of it; the observation's own doc calls this a gap in attribution, which is a weaker claim than what was measured, and the next reader of a non-zero walked count is one node away | merged | runtime | XS | none | 2116 |
 | `RT-AGG-COMPOSE` | escaping two Resources into one aggregate (Prod (Resource _) (Resource _)) fails at erasure — checked endpoints do not compose | draft | runtime | TBD | none | — |
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
@@ -334,7 +334,8 @@ is itself not yet `merged`/`closed`:
 - `PX8` blocked by `PX8-F-CAP-41` (status: draft)
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
-- `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: draft)
+- `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
+- `RT-4B-UNIQUENESS-GATE-REACH` blocked by `RT-4B-OBSERVATION-FEATURE-GATE` (status: ready)
 - `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: ready)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: ready)
