@@ -18634,6 +18634,129 @@ mod tests {
         );
     }
 
+    /// **`D3` grounding — THE TWO COMPOSED CONTINUATION EDGES ARE NAMED BY THE
+    /// FUSION KEY'S TWO CHECKED IH BINDINGS, and each target's incoming call
+    /// domain is closed.**
+    ///
+    /// Ruled at `evt_1t3f4e8100rb5`: before any body change, the exact two-edge
+    /// composition population must be grounded, and if the planner cannot derive
+    /// both exact identities and their exact consumer edges **without a new
+    /// source fact**, the implementer must stop and report the missing relation.
+    /// This is that grounding, made durable rather than left in a probe.
+    ///
+    /// **THE DERIVATION CLOSES, and the relation is already checked.** The key's
+    /// two `CheckedIhBinding`s name the two layers exactly:
+    ///
+    /// - `consumer_binding.frame_origin` is the OUTER specialization's
+    ///   continuation origin -- 10 on `Exact`, 6 on `ReHomed`;
+    /// - `producer_argument_binding.frame_origin` is the INNER one's -- 25 and
+    ///   21.
+    ///
+    /// ⇒ **This is the same pair whose NON-equality the preflight comment above
+    /// documents.** That comment records them as "different checked frames by
+    /// design (measured 25 and 10)" and warns that asserting them equal would
+    /// refuse the witness. The two frames are the two composition layers, which
+    /// is why they differ -- so the fact that already forbids one check is what
+    /// supplies this one.
+    ///
+    /// A structural substitute exists and is deliberately NOT used: on both
+    /// witnesses `child_origins(producer_body)` is a one-element run holding the
+    /// inner frame. It agrees here, but it is a positional read of the body's
+    /// shape rather than a checked relation, and it would stop agreeing the
+    /// moment a producer body carried more than one child.
+    ///
+    /// **MEASURED:** both witnesses, fusion plane installed, claims preflighted.
+    /// Each specialization's complete incoming `ContinuationCallIdentity` domain
+    /// is enumerated; the outer and inner classifications are disjoint and each
+    /// selects exactly one specialization.
+    /// **CLAIMED:** the composition population the ruled relation must mint is
+    /// derivable from relations that already exist, so no new source fact is
+    /// required at the minting seat.
+    /// **THE GAP, and it is the reason the partition is not yet exercised:**
+    /// **every incoming domain here is a SINGLETON.** Both specializations have
+    /// exactly one incoming call and it is the composed one, so "a target leaves
+    /// declaration only when EVERY incoming identity is composed" is satisfied
+    /// vacuously -- there is no witness with a residual direct caller, and none
+    /// with a same-body sibling. The ruling requires controls for both, and this
+    /// fixture family cannot supply either.
+    #[test]
+    fn d3_the_two_composed_edges_are_named_by_the_keys_checked_bindings() {
+        let mut rows = Vec::new();
+        for cause in [D2jCause::Exact, D2jCause::ReHomed] {
+            let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+            let mut declarations = BTreeMap::new();
+            declarations.insert(D2J_DECLARATION, &declaration);
+            let mut plan = plan_static_transition_graph(&entry, &declarations).expect("plannable");
+            let resolved =
+                build_static_continuation_fusion_plan(&plan, &entry, &declarations, Some(&oriented))
+                    .expect("the witness resolves a plane");
+            let mut plane = StaticContinuationFusionPlan::default();
+            for key in resolved.installed_keys().to_vec() {
+                plane.intern(key).expect("interns");
+            }
+            plan.install_static_continuation_fusions(plane)
+                .expect("installs");
+            let ledger = FusionRegionClaimLedger::preflight(&plan).expect("claims");
+            let id = *ledger.planned().iter().next().expect("one region");
+            let claim = ledger.claim(id).expect("outstanding");
+
+            let key = plan
+                .continuation_fusions()
+                .expect("views")
+                .into_iter()
+                .find(|view| view.id() == id)
+                .expect("the installed view")
+                .key()
+                .clone();
+
+            let specialization_at = |frame: StaticOriginId, owner: PredeclaredFunctionId| {
+                let matching = plan
+                    .continuation_units()
+                    .expect("units")
+                    .into_iter()
+                    .filter(|unit| {
+                        unit.continuation_origin() == frame && unit.consumer_owner() == owner
+                    })
+                    .map(|unit| unit.id())
+                    .collect::<Vec<_>>();
+                matching
+            };
+            let outer = specialization_at(key.consumer_binding.frame_origin, claim.consumer_owner());
+            let inner = specialization_at(
+                key.producer_argument_binding.frame_origin,
+                claim.producer_owner(),
+            );
+            let incoming = |target: ContinuationSpecializationId| {
+                plan.continuation_calls()
+                    .expect("calls")
+                    .iter()
+                    .filter(|call| call.target() == target)
+                    .count()
+            };
+
+            rows.push((
+                cause,
+                outer.len(),
+                inner.len(),
+                outer != inner,
+                outer.first().map(|id| incoming(*id)),
+                inner.first().map(|id| incoming(*id)),
+            ));
+        }
+
+        assert_eq!(
+            rows,
+            vec![
+                (D2jCause::Exact, 1, 1, true, Some(1), Some(1)),
+                (D2jCause::ReHomed, 1, 1, true, Some(1), Some(1)),
+            ],
+            "each checked binding selects EXACTLY ONE specialization, the outer and inner \
+             selections are disjoint, and each target's complete incoming call domain is a \
+             singleton -- so the composition population derives from existing relations, and the \
+             composed-vs-residual partition is measured DEGENERATE on this family"
+        );
+    }
+
     /// **`D2f` producer side — the claimed producer's body leaves the executable
     /// population, and only that body and only that edge.**
     ///
