@@ -1525,6 +1525,409 @@ pub(super) fn continuation_case_binder_run(
     Ok(run)
 }
 
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the projected facts one
+/// continuation specialization's SELECTED CASE BODY is lowered from.**
+///
+/// Exactly the members [`lower_continuation_selected_case_body`] reads, and no
+/// more. The frame-shaped members of the definition pass's own projection --
+/// slots, offsets, header, consumer owner -- are absent because a local
+/// composition has no frame: it lowers the same body with no `Function`, no
+/// descriptor and no ABI of its own.
+pub(super) struct ContinuationSelectedCaseBody {
+    pub(super) id: ContinuationSpecializationId,
+    pub(super) continuation_origin: StaticOriginId,
+    pub(super) producer_alternative: u32,
+    pub(super) recursive_position: u32,
+    pub(super) worker_closure_origin: StaticOriginId,
+    pub(super) worker_body_origin: StaticOriginId,
+    pub(super) worker_declared_arity: u32,
+    pub(super) worker_capture_count: usize,
+}
+
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — lower a continuation
+/// specialization's exact selected case body, given its operands.**
+///
+/// ⭐⭐ **This is a factoring, not a new mechanism, and that is the point.**
+/// Architect `evt_6kn9ckdnbf0ph` rules that a fusion-local identity replaces
+/// **only its direct-call realization**: the body it would have executed, the
+/// two static-worker bindings, the binder run and the environment are all
+/// unchanged. So the local composition and the standalone definition must lower
+/// **the same body from the same plan** -- and the only way to say that and
+/// have it stay true is for there to be one function, called from both seats.
+/// A second copy here would be a second authority over what the selected case
+/// body IS, and the two would drift with nothing able to see it.
+///
+/// ⛔ **What differs between the two callers is the OPERANDS, and nothing
+/// else.** The definition pass loads `ordinary` and `carried_inputs` from its
+/// own frame's `Parameter` and `Capture` slots at the descriptor's offsets; the
+/// local composition receives the very same two runs assembled at the call
+/// edge, from the planner's ordinary envelope and its continuation-input
+/// projection. Both are the target specialization's own ordinary envelope in
+/// its own order -- that is why the same body can consume either.
+///
+/// ⛔ **It returns the phase-bearing [`LoweringOperand`], and writes no result
+/// slot.** The definition pass stores it to its frame's `Result` offset; the
+/// local composition hands it straight to the caller's existing eliminator.
+/// Neither seat's disposal belongs here, and putting one here would give the
+/// other a store it must then undo.
+pub(super) fn lower_continuation_selected_case_body(
+    compiler: &mut Lowering<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    facts: &ContinuationSelectedCaseBody,
+    envelope: &[ContinuationOrdinaryEnvelopeRole],
+    ordinary: &[LoweringOperand],
+    carried_inputs: &[LoweringOperand],
+    // `D5a` — `Some` exactly when the CALLER resolved a generated execution
+    // context for this specialization's worker body into its own function. ⛔
+    // Supplied rather than re-asked of the planner: an issued context the
+    // caller did not resolve is not a context the induction hypothesis may
+    // name, and that is a fact about the caller's function, not about the plan.
+    retargeted_worker_body: Option<StaticOriginId>,
+) -> Result<LoweringOperand, CraneliftBackendError> {
+    // The ordered capture segment for the selected worker: the
+    // envelope's `WorkerCapture` roles, in capture-ordinal order,
+    // taking each one's operand from its own Parameter position.
+    let mut worker_captures = Vec::new();
+    for (position, role) in envelope.iter().enumerate() {
+        if matches!(role, ContinuationOrdinaryEnvelopeRole::WorkerCapture { .. }) {
+            worker_captures.push(ordinary[position].clone());
+        }
+    }
+    if worker_captures.len() != facts.worker_capture_count {
+        return Err(backend_module(
+            "the ordinary envelope's worker-capture segment disagrees with the selected \
+             worker's capture count"
+                .to_string(),
+        ));
+    }
+
+    // `D6a` -- THE INDUCTION HYPOTHESIS'S ROUTE, and only its.
+    //
+    // `retargeted_worker_body` is `Some` exactly when
+    // `continuation_context_for` issued a generated execution context
+    // for this `(specialization, worker body)` pair AND the retarget
+    // below resolved it into this function. Both halves are required,
+    // which is why this reads the retarget's own outcome rather than
+    // re-asking the planner: an issued context this unit did not
+    // resolve is not a context this binding can name.
+    //
+    // ⭐ `None` is the ordinary, lawful answer -- every pre-`D5a`
+    // specialization, and every unit in the governed-bracket witness.
+    // The hypothesis then takes the raw route, appending nothing, and
+    // the two bindings below are route-identical. That is a degenerate
+    // route pair, not a collapsed one.
+    //
+    // ⛔ Not re-derived at the call site. Both bindings below name the
+    // same body origin, so no comparison available there can tell them
+    // apart -- see `StaticWorkerCallRoute`.
+    let induction_route = match retargeted_worker_body {
+        Some(_) => StaticWorkerCallRoute::GeneratedContext,
+        None => StaticWorkerCallRoute::RawWorker,
+    };
+    // `D6c` — CROSS-ROUTING, the hypothesis half. It takes the raw route
+    // while this unit DID resolve a context; the argument below takes
+    // the context route. ⛔ Only where a context was actually resolved:
+    // on a route-degenerate unit both members lawfully carry
+    // `RawWorker`, so there is no crossing to make and the arm declines
+    // rather than counting an application it did not perform.
+    #[cfg(test)]
+    let induction_route = if crate::cranelift_backend::lowering::d6c_selection_mutation()
+        == crate::cranelift_backend::lowering::D6cSelectionMutation::CrossRouteTargets
+        && retargeted_worker_body.is_some()
+    {
+        crate::cranelift_backend::lowering::record_d6c_selection_application();
+        StaticWorkerCallRoute::RawWorker
+    } else {
+        induction_route
+    };
+
+    // The EXISTING constructor, with the projected identity and arity.
+    let worker = compiler.construct_static_worker_binding(
+        facts.worker_closure_origin,
+        facts.worker_body_origin,
+        facts.worker_declared_arity,
+        facts.worker_capture_count,
+        worker_captures.clone(),
+        induction_route,
+        // `D8i` — an induction hypothesis answers for no composed
+        // source continuation. Stated explicitly: this is a positive
+        // claim about the hypothesis's role, not the absence of one.
+        ContinuationDischarge::DirectSpecializationCall,
+    )?;
+
+    // `D6a` -- the selected recursive constructor argument.
+    //
+    // ⭐ The SAME closure occurrence, body origin, declared arity and
+    // ordered capture operands as the induction hypothesis above, built
+    // through the same constructor and validated against the same raw
+    // template contract. What the two represent still differs: the
+    // argument is the closure the source scope binds, while the
+    // hypothesis is that closure as this specialization eliminates it.
+    //
+    // ⛔ The ROUTE is `RawWorker` unconditionally here, and that is not
+    // the same as saying it differs from the hypothesis's. When
+    // `induction_route` above resolved to `RawWorker` -- no context
+    // issued -- the two bindings are route-identical, and they are
+    // still two bindings for two positions of the run. The route is
+    // what will separate them at the call edge in `D6b` *where a
+    // context exists*; it is not what makes them two.
+    //
+    // ⛔ Nothing new crosses the ABI. This adds no slot, carrier, tag,
+    // descriptor or source occurrence -- it is a second compiler-only
+    // binding over operands this frame has already loaded.
+    // `D6c` — the three binding-construction mutations, under test only.
+    // Each moves ONE argument handed to the existing constructor; the
+    // constructor itself, the hypothesis above and the run below are all
+    // untouched, so the guard that refuses is the one that owns the
+    // moved input.
+    #[cfg(test)]
+    let (argument_body_origin, argument_captures, argument_route) = {
+        use crate::cranelift_backend::lowering::D6cSelectionMutation as Mutation;
+        match crate::cranelift_backend::lowering::d6c_selection_mutation() {
+            // A body this unit did not select. ⛔ The substituted value
+            // is a REAL planner-issued origin -- this continuation's own
+            // frame occurrence -- rather than an arithmetic neighbour.
+            // A fabricated id could be refused merely for being unknown;
+            // a real origin naming the wrong role is the case the guard
+            // actually has to catch. The control asserts it differs from
+            // the selected body.
+            Mutation::WrongClosureBody => {
+                crate::cranelift_backend::lowering::record_d6c_selection_application();
+                (
+                    facts.continuation_origin,
+                    worker_captures.clone(),
+                    StaticWorkerCallRoute::RawWorker,
+                )
+            }
+            // A capture run that is not the envelope's worker-capture
+            // segment: drop an operand where there is one, otherwise add
+            // one the envelope holds.
+            //
+            // ⛔ The counter fires ONLY if the vector actually changed.
+            // A unit with no captures and no ordinary operand to borrow
+            // leaves this arm the IDENTITY, and counting an application
+            // there would report a perturbation that never happened --
+            // which is precisely how a control comes to prove the
+            // opposite of what it claims.
+            Mutation::WrongCaptureRun => {
+                let mut perturbed = worker_captures.clone();
+                if perturbed.pop().is_none() {
+                    perturbed.extend(ordinary.first().cloned());
+                }
+                if perturbed.len() != worker_captures.len() {
+                    crate::cranelift_backend::lowering::record_d6c_selection_application();
+                }
+                (
+                    facts.worker_body_origin,
+                    perturbed,
+                    StaticWorkerCallRoute::RawWorker,
+                )
+            }
+            // The argument takes the context route. Paired with the
+            // hypothesis taking the raw route above, this is the
+            // cross-routing the two members must never permit.
+            //
+            // ⛔ Only where a context was actually resolved. On a
+            // route-degenerate unit both members lawfully carry
+            // `RawWorker`, so there is no crossing to perform; applying
+            // it there would move a route no law distinguishes and count
+            // an application for a perturbation with no content.
+            Mutation::CrossRouteTargets if retargeted_worker_body.is_some() => {
+                crate::cranelift_backend::lowering::record_d6c_selection_application();
+                (
+                    facts.worker_body_origin,
+                    worker_captures.clone(),
+                    StaticWorkerCallRoute::GeneratedContext,
+                )
+            }
+            _ => (
+                facts.worker_body_origin,
+                worker_captures.clone(),
+                StaticWorkerCallRoute::RawWorker,
+            ),
+        }
+    };
+    #[cfg(not(test))]
+    let (argument_body_origin, argument_captures, argument_route) = (
+        facts.worker_body_origin,
+        worker_captures,
+        StaticWorkerCallRoute::RawWorker,
+    );
+    let recursive_argument = compiler.construct_static_worker_binding(
+        facts.worker_closure_origin,
+        argument_body_origin,
+        facts.worker_declared_arity,
+        facts.worker_capture_count,
+        argument_captures,
+        argument_route,
+        // `D8i` — the SPECIALIZATION's selected recursive argument.
+        // ⛔ Direct, and the contrast with `D8d`'s composed argument is
+        // the point: the same source closure at the same position
+        // carries an authority on the composed path and none here,
+        // because only the composed consumption stands in for a causal
+        // call the producer never made.
+        ContinuationDischarge::DirectSpecializationCall,
+    )?;
+
+    // Exact body recovery: the selected case of the computational
+    // frame this continuation belongs to, by its own alternative.
+    let frame_occurrence =
+        compiler.retained_body_occurrence(facts.continuation_origin)?;
+    let RuntimeExpr::ComputationalMatch { cases, .. } = frame_occurrence.expr else {
+        return Err(backend_module(
+            "a continuation origin does not resolve to a computational frame".to_string(),
+        ));
+    };
+    let alternative = facts.producer_alternative as usize;
+    let case = cases.get(alternative).ok_or_else(|| {
+        backend_module(
+            "the projected producer alternative is outside the frame's case run"
+                .to_string(),
+        )
+    })?;
+    let body = compiler.case_body_occurrence(
+        frame_occurrence.static_origin,
+        alternative,
+        &case.body,
+    )?;
+    // The semantic case environment, through the sole binding
+    // authority, in the order `continuation_case_binder_run` states:
+    // the IH prefix, then ALL the constructor arguments in source
+    // order -- the selected recursive one included, as `D6a`'s
+    // compiler-only member -- then this frame's continuation inputs.
+    //
+    // ⛔ This site chooses nothing. It maps a plan onto operands; the
+    // order is the plan's, and the plan is a pure function of the
+    // planner's own coordinates.
+    let plan = continuation_case_binder_run(
+        case.argument_binders,
+        &case.recursive_positions,
+        facts.recursive_position,
+        envelope,
+        carried_inputs.len(),
+    )?;
+    let mut env: Vec<LoweringEnvironmentBinding> = Vec::with_capacity(plan.len());
+    for source in &plan {
+        let binding = match *source {
+            ContinuationCaseBinderSource::InductionHypothesis => {
+                LoweringEnvironmentBinding::StaticWorker(worker.clone())
+            }
+            ContinuationCaseBinderSource::SelectedRecursiveArgument {
+                source_position,
+            } => {
+                // The plan only ever names the ruled position here;
+                // segment 1 hard-stops on any other. Re-checking it is
+                // what keeps that a fact this site verifies rather than
+                // one it inherits.
+                if source_position != facts.recursive_position {
+                    return Err(backend_module(format!(
+                        "the binder run names a selected recursive argument at source \
+                         position {source_position}, but this specialization projects a \
+                         worker for position {}",
+                        facts.recursive_position
+                    )));
+                }
+                LoweringEnvironmentBinding::StaticWorker(recursive_argument.clone())
+            }
+            ContinuationCaseBinderSource::Ordinary(index) => {
+                let operand = ordinary.get(index).ok_or_else(|| {
+                    backend_module(
+                        "the binder run names an ordinary-envelope index this frame loaded \
+                         no operand for"
+                            .to_string(),
+                    )
+                })?;
+                LoweringEnvironmentBinding::Value(operand.clone())
+            }
+            ContinuationCaseBinderSource::ContinuationInput(ordinal) => {
+                let operand = carried_inputs.get(ordinal).ok_or_else(|| {
+                    backend_module(
+                        "the binder run names a continuation input ordinal this frame \
+                         loaded no operand for"
+                            .to_string(),
+                    )
+                })?;
+                LoweringEnvironmentBinding::Value(operand.clone())
+            }
+        };
+        env.push(binding);
+    }
+
+    // `D6b` — the same instant, structured. The trace below renders the
+    // ROUTE of each static-worker member; this record carries the body
+    // origin beside it, which is what lets a control ask whether the
+    // mixed pair is over ONE body rather than merely mixed.
+    #[cfg(test)]
+    crate::cranelift_backend::lowering::record_d6b_specialization_body(
+        crate::cranelift_backend::lowering::D6bSpecializationBody {
+            unit: facts.id,
+            worker_body_origin: facts.worker_body_origin,
+            retargeted: retargeted_worker_body,
+            worker_call_targets: compiler
+                .function_local
+                .worker_calls
+                .keys()
+                .copied()
+                .collect(),
+            raw_worker_call_targets: compiler
+                .function_local
+                .raw_worker_calls
+                .keys()
+                .copied()
+                .collect(),
+            members: env
+                .iter()
+                .enumerate()
+                .filter_map(|(position, binding)| match binding {
+                    LoweringEnvironmentBinding::StaticWorker(worker) => {
+                        Some((position, worker.route, worker.body_origin))
+                    }
+                    LoweringEnvironmentBinding::Value(_) => None,
+                })
+                .collect(),
+        },
+    );
+    #[cfg(test)]
+    d5a_trace(format!(
+        "  SPEC-BODY {:?} alt={} binders={} ordinary={} envelope={:?} env=[{}]",
+        facts.id,
+        facts.producer_alternative,
+        case.argument_binders,
+        ordinary.len(),
+        envelope,
+        env.iter()
+            // `D6a` -- the ROUTE is printed, not just the arm. Both
+            // static-worker members name the same closure, body and
+            // arity, so an arm-only rendering shows two identical
+            // entries and a change collapsing the two routes would be
+            // invisible in this log.
+            //
+            // ⛔ The converse does not hold, and a reader of this log
+            // must not assume it: two entries rendering the SAME route
+            // is the lawful route-degenerate case (no context issued),
+            // not evidence that one binding was reused for both
+            // members. Only a witness whose planner issues a context
+            // renders a mixed pair, and only there does this log
+            // discriminate the routes at all.
+            .map(|binding| match binding {
+                LoweringEnvironmentBinding::StaticWorker(worker) => match worker.route {
+                    StaticWorkerCallRoute::RawWorker => "StaticWorker(RawWorker)",
+                    StaticWorkerCallRoute::GeneratedContext =>
+                        "StaticWorker(GeneratedContext)",
+                },
+                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) =>
+                    "Carried",
+                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
+                    "Specialized",
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    let lowered = compiler.lower_expr(builder, body, &env)?;
+
+    Ok(lowered)
+}
+
 /// **`RT-CONTSPEC-ACTIVATE` `D2` — define each declared continuation target
 /// from its own projected contract.**
 ///
@@ -2029,346 +2432,34 @@ pub(super) fn define_continuation_bodies<M: Module>(
                     });
             }
 
-            // The ordered capture segment for the selected worker: the
-            // envelope's `WorkerCapture` roles, in capture-ordinal order,
-            // taking each one's operand from its own Parameter position.
-            let mut worker_captures = Vec::new();
-            for (position, role) in envelope.iter().enumerate() {
-                if matches!(role, ContinuationOrdinaryEnvelopeRole::WorkerCapture { .. }) {
-                    worker_captures.push(ordinary[position].clone());
-                }
-            }
-            if worker_captures.len() != unit.worker_capture_count {
-                return Err(backend_module(
-                    "the ordinary envelope's worker-capture segment disagrees with the selected \
-                     worker's capture count"
-                        .to_string(),
-                ));
-            }
-
-            // `D6a` -- THE INDUCTION HYPOTHESIS'S ROUTE, and only its.
+            // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — the selected case body,
+            // through the ONE authority both realizations share.
             //
-            // `retargeted_worker_body` is `Some` exactly when
-            // `continuation_context_for` issued a generated execution context
-            // for this `(specialization, worker body)` pair AND the retarget
-            // below resolved it into this function. Both halves are required,
-            // which is why this reads the retarget's own outcome rather than
-            // re-asking the planner: an issued context this unit did not
-            // resolve is not a context this binding can name.
-            //
-            // ⭐ `None` is the ordinary, lawful answer -- every pre-`D5a`
-            // specialization, and every unit in the governed-bracket witness.
-            // The hypothesis then takes the raw route, appending nothing, and
-            // the two bindings below are route-identical. That is a degenerate
-            // route pair, not a collapsed one.
-            //
-            // ⛔ Not re-derived at the call site. Both bindings below name the
-            // same body origin, so no comparison available there can tell them
-            // apart -- see `StaticWorkerCallRoute`.
-            let induction_route = match retargeted_worker_body {
-                Some(_) => StaticWorkerCallRoute::GeneratedContext,
-                None => StaticWorkerCallRoute::RawWorker,
-            };
-            // `D6c` — CROSS-ROUTING, the hypothesis half. It takes the raw route
-            // while this unit DID resolve a context; the argument below takes
-            // the context route. ⛔ Only where a context was actually resolved:
-            // on a route-degenerate unit both members lawfully carry
-            // `RawWorker`, so there is no crossing to make and the arm declines
-            // rather than counting an application it did not perform.
-            #[cfg(test)]
-            let induction_route = if crate::cranelift_backend::lowering::d6c_selection_mutation()
-                == crate::cranelift_backend::lowering::D6cSelectionMutation::CrossRouteTargets
-                && retargeted_worker_body.is_some()
-            {
-                crate::cranelift_backend::lowering::record_d6c_selection_application();
-                StaticWorkerCallRoute::RawWorker
-            } else {
-                induction_route
-            };
-
-            // The EXISTING constructor, with the projected identity and arity.
-            let worker = compiler.construct_static_worker_binding(
-                unit.worker_closure_origin,
-                unit.worker_body_origin,
-                unit.worker_declared_arity,
-                unit.worker_capture_count,
-                worker_captures.clone(),
-                induction_route,
-                // `D8i` — an induction hypothesis answers for no composed
-                // source continuation. Stated explicitly: this is a positive
-                // claim about the hypothesis's role, not the absence of one.
-                ContinuationDischarge::DirectSpecializationCall,
-            )?;
-
-            // `D6a` -- the selected recursive constructor argument.
-            //
-            // ⭐ The SAME closure occurrence, body origin, declared arity and
-            // ordered capture operands as the induction hypothesis above, built
-            // through the same constructor and validated against the same raw
-            // template contract. What the two represent still differs: the
-            // argument is the closure the source scope binds, while the
-            // hypothesis is that closure as this specialization eliminates it.
-            //
-            // ⛔ The ROUTE is `RawWorker` unconditionally here, and that is not
-            // the same as saying it differs from the hypothesis's. When
-            // `induction_route` above resolved to `RawWorker` -- no context
-            // issued -- the two bindings are route-identical, and they are
-            // still two bindings for two positions of the run. The route is
-            // what will separate them at the call edge in `D6b` *where a
-            // context exists*; it is not what makes them two.
-            //
-            // ⛔ Nothing new crosses the ABI. This adds no slot, carrier, tag,
-            // descriptor or source occurrence -- it is a second compiler-only
-            // binding over operands this frame has already loaded.
-            // `D6c` — the three binding-construction mutations, under test only.
-            // Each moves ONE argument handed to the existing constructor; the
-            // constructor itself, the hypothesis above and the run below are all
-            // untouched, so the guard that refuses is the one that owns the
-            // moved input.
-            #[cfg(test)]
-            let (argument_body_origin, argument_captures, argument_route) = {
-                use crate::cranelift_backend::lowering::D6cSelectionMutation as Mutation;
-                match crate::cranelift_backend::lowering::d6c_selection_mutation() {
-                    // A body this unit did not select. ⛔ The substituted value
-                    // is a REAL planner-issued origin -- this continuation's own
-                    // frame occurrence -- rather than an arithmetic neighbour.
-                    // A fabricated id could be refused merely for being unknown;
-                    // a real origin naming the wrong role is the case the guard
-                    // actually has to catch. The control asserts it differs from
-                    // the selected body.
-                    Mutation::WrongClosureBody => {
-                        crate::cranelift_backend::lowering::record_d6c_selection_application();
-                        (
-                            unit.continuation_origin,
-                            worker_captures.clone(),
-                            StaticWorkerCallRoute::RawWorker,
-                        )
-                    }
-                    // A capture run that is not the envelope's worker-capture
-                    // segment: drop an operand where there is one, otherwise add
-                    // one the envelope holds.
-                    //
-                    // ⛔ The counter fires ONLY if the vector actually changed.
-                    // A unit with no captures and no ordinary operand to borrow
-                    // leaves this arm the IDENTITY, and counting an application
-                    // there would report a perturbation that never happened --
-                    // which is precisely how a control comes to prove the
-                    // opposite of what it claims.
-                    Mutation::WrongCaptureRun => {
-                        let mut perturbed = worker_captures.clone();
-                        if perturbed.pop().is_none() {
-                            perturbed.extend(ordinary.first().cloned());
-                        }
-                        if perturbed.len() != worker_captures.len() {
-                            crate::cranelift_backend::lowering::record_d6c_selection_application();
-                        }
-                        (
-                            unit.worker_body_origin,
-                            perturbed,
-                            StaticWorkerCallRoute::RawWorker,
-                        )
-                    }
-                    // The argument takes the context route. Paired with the
-                    // hypothesis taking the raw route above, this is the
-                    // cross-routing the two members must never permit.
-                    //
-                    // ⛔ Only where a context was actually resolved. On a
-                    // route-degenerate unit both members lawfully carry
-                    // `RawWorker`, so there is no crossing to perform; applying
-                    // it there would move a route no law distinguishes and count
-                    // an application for a perturbation with no content.
-                    Mutation::CrossRouteTargets if retargeted_worker_body.is_some() => {
-                        crate::cranelift_backend::lowering::record_d6c_selection_application();
-                        (
-                            unit.worker_body_origin,
-                            worker_captures.clone(),
-                            StaticWorkerCallRoute::GeneratedContext,
-                        )
-                    }
-                    _ => (
-                        unit.worker_body_origin,
-                        worker_captures.clone(),
-                        StaticWorkerCallRoute::RawWorker,
-                    ),
-                }
-            };
-            #[cfg(not(test))]
-            let (argument_body_origin, argument_captures, argument_route) = (
-                unit.worker_body_origin,
-                worker_captures,
-                StaticWorkerCallRoute::RawWorker,
-            );
-            let recursive_argument = compiler.construct_static_worker_binding(
-                unit.worker_closure_origin,
-                argument_body_origin,
-                unit.worker_declared_arity,
-                unit.worker_capture_count,
-                argument_captures,
-                argument_route,
-                // `D8i` — the SPECIALIZATION's selected recursive argument.
-                // ⛔ Direct, and the contrast with `D8d`'s composed argument is
-                // the point: the same source closure at the same position
-                // carries an authority on the composed path and none here,
-                // because only the composed consumption stands in for a causal
-                // call the producer never made.
-                ContinuationDischarge::DirectSpecializationCall,
-            )?;
-
-            // Exact body recovery: the selected case of the computational
-            // frame this continuation belongs to, by its own alternative.
-            let frame_occurrence =
-                compiler.retained_body_occurrence(unit.continuation_origin)?;
-            let RuntimeExpr::ComputationalMatch { cases, .. } = frame_occurrence.expr else {
-                return Err(backend_module(
-                    "a continuation origin does not resolve to a computational frame".to_string(),
-                ));
-            };
-            let alternative = unit.producer_alternative as usize;
-            let case = cases.get(alternative).ok_or_else(|| {
-                backend_module(
-                    "the projected producer alternative is outside the frame's case run"
-                        .to_string(),
-                )
-            })?;
-            let body = compiler.case_body_occurrence(
-                frame_occurrence.static_origin,
-                alternative,
-                &case.body,
-            )?;
-            // The semantic case environment, through the sole binding
-            // authority, in the order `continuation_case_binder_run` states:
-            // the IH prefix, then ALL the constructor arguments in source
-            // order -- the selected recursive one included, as `D6a`'s
-            // compiler-only member -- then this frame's continuation inputs.
-            //
-            // ⛔ This site chooses nothing. It maps a plan onto operands; the
-            // order is the plan's, and the plan is a pure function of the
-            // planner's own coordinates.
-            let plan = continuation_case_binder_run(
-                case.argument_binders,
-                &case.recursive_positions,
-                unit.recursive_position,
-                envelope,
-                carried_inputs.len(),
-            )?;
-            let mut env: Vec<LoweringEnvironmentBinding> = Vec::with_capacity(plan.len());
-            for source in &plan {
-                let binding = match *source {
-                    ContinuationCaseBinderSource::InductionHypothesis => {
-                        LoweringEnvironmentBinding::StaticWorker(worker.clone())
-                    }
-                    ContinuationCaseBinderSource::SelectedRecursiveArgument {
-                        source_position,
-                    } => {
-                        // The plan only ever names the ruled position here;
-                        // segment 1 hard-stops on any other. Re-checking it is
-                        // what keeps that a fact this site verifies rather than
-                        // one it inherits.
-                        if source_position != unit.recursive_position {
-                            return Err(backend_module(format!(
-                                "the binder run names a selected recursive argument at source \
-                                 position {source_position}, but this specialization projects a \
-                                 worker for position {}",
-                                unit.recursive_position
-                            )));
-                        }
-                        LoweringEnvironmentBinding::StaticWorker(recursive_argument.clone())
-                    }
-                    ContinuationCaseBinderSource::Ordinary(index) => {
-                        let operand = ordinary.get(index).ok_or_else(|| {
-                            backend_module(
-                                "the binder run names an ordinary-envelope index this frame loaded \
-                                 no operand for"
-                                    .to_string(),
-                            )
-                        })?;
-                        LoweringEnvironmentBinding::Value(operand.clone())
-                    }
-                    ContinuationCaseBinderSource::ContinuationInput(ordinal) => {
-                        let operand = carried_inputs.get(ordinal).ok_or_else(|| {
-                            backend_module(
-                                "the binder run names a continuation input ordinal this frame \
-                                 loaded no operand for"
-                                    .to_string(),
-                            )
-                        })?;
-                        LoweringEnvironmentBinding::Value(operand.clone())
-                    }
-                };
-                env.push(binding);
-            }
-
-            // `D6b` — the same instant, structured. The trace below renders the
-            // ROUTE of each static-worker member; this record carries the body
-            // origin beside it, which is what lets a control ask whether the
-            // mixed pair is over ONE body rather than merely mixed.
-            #[cfg(test)]
-            crate::cranelift_backend::lowering::record_d6b_specialization_body(
-                crate::cranelift_backend::lowering::D6bSpecializationBody {
-                    unit: unit.id,
+            // ⛔ The operands are this frame's own: `ordinary` from the
+            // `Parameter` slots and `carried_inputs` from the `Capture` slots,
+            // each at the offset the descriptor assigns it. What the shared
+            // function does with them is identical to what a fusion-local
+            // composition does with the run assembled at its call edge, which
+            // is exactly the property that makes the two realizations the same
+            // body.
+            let lowered = lower_continuation_selected_case_body(
+                compiler,
+                &mut builder,
+                &ContinuationSelectedCaseBody {
+                    id: unit.id,
+                    continuation_origin: unit.continuation_origin,
+                    producer_alternative: unit.producer_alternative,
+                    recursive_position: unit.recursive_position,
+                    worker_closure_origin: unit.worker_closure_origin,
                     worker_body_origin: unit.worker_body_origin,
-                    retargeted: retargeted_worker_body,
-                    worker_call_targets: compiler
-                        .function_local
-                        .worker_calls
-                        .keys()
-                        .copied()
-                        .collect(),
-                    raw_worker_call_targets: compiler
-                        .function_local
-                        .raw_worker_calls
-                        .keys()
-                        .copied()
-                        .collect(),
-                    members: env
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(position, binding)| match binding {
-                            LoweringEnvironmentBinding::StaticWorker(worker) => {
-                                Some((position, worker.route, worker.body_origin))
-                            }
-                            LoweringEnvironmentBinding::Value(_) => None,
-                        })
-                        .collect(),
+                    worker_declared_arity: unit.worker_declared_arity,
+                    worker_capture_count: unit.worker_capture_count,
                 },
-            );
-            #[cfg(test)]
-            d5a_trace(format!(
-                "  SPEC-BODY {:?} alt={} binders={} ordinary={} envelope={:?} env=[{}]",
-                unit.id,
-                unit.producer_alternative,
-                case.argument_binders,
-                ordinary.len(),
                 envelope,
-                env.iter()
-                    // `D6a` -- the ROUTE is printed, not just the arm. Both
-                    // static-worker members name the same closure, body and
-                    // arity, so an arm-only rendering shows two identical
-                    // entries and a change collapsing the two routes would be
-                    // invisible in this log.
-                    //
-                    // ⛔ The converse does not hold, and a reader of this log
-                    // must not assume it: two entries rendering the SAME route
-                    // is the lawful route-degenerate case (no context issued),
-                    // not evidence that one binding was reused for both
-                    // members. Only a witness whose planner issues a context
-                    // renders a mixed pair, and only there does this log
-                    // discriminate the routes at all.
-                    .map(|binding| match binding {
-                        LoweringEnvironmentBinding::StaticWorker(worker) => match worker.route {
-                            StaticWorkerCallRoute::RawWorker => "StaticWorker(RawWorker)",
-                            StaticWorkerCallRoute::GeneratedContext =>
-                                "StaticWorker(GeneratedContext)",
-                        },
-                        LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_)) =>
-                            "Carried",
-                        LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)) =>
-                            "Specialized",
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            let lowered = compiler.lower_expr(&mut builder, body, &env)?;
+                &ordinary,
+                &carried_inputs,
+                retargeted_worker_body,
+            )?;
 
             // The Result slot is WRITTEN here and never read.
             let word = match lowered {
