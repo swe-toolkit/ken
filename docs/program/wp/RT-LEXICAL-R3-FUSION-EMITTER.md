@@ -704,6 +704,107 @@ nothing you inherit from `#6d`.**
 > being convincing.** Carry the qualifier into every derived artifact, or the
 > qualifier dies at the first retelling.
 
+> ### SURFACE KEN IS THE WITNESS SOURCE. C1-SOURCE IS RELEASED; ONE BOUNDED
+> ### C2-SOURCE ATTEMPT IS AUTHORIZED. Steward, 2026-08-13, folding Architect
+> ### `evt_10ayk8fbjsz74` into operative scope. **THIS IS THE NEWEST CONTROL
+> ### RULING. It SUPERSEDES the "C1-source remains open" half of the box below
+> ### (`evt_7mg1x1vqe7qph`); that box's classifier prohibition STANDS.**
+>
+> **The premise "surface Ken has no erased-IR producer" is refuted, and the
+> lawful production source is named.** The nested-result association is:
+>
+> ```text
+> surface `recursive result for xs/ys`
+>   -> checked hidden recursive-result variables
+>   -> recursive binder range
+>   -> retained generated lifted-family ComputationalMatch
+>   -> erased Runtime IR
+> ```
+>
+> **No classifier change and no non-surface witness source are authorized.**
+>
+> **C1-source is a committed control now, and its assertions are RELATIONS, not
+> a census.** The saved public-API probe becomes durable. It must assert:
+> unchanged-in-substance `NESTED_LIFT_NAT_THREE_SOURCE` through the ordinary
+> front end; `liftSize` retained by production selection; its checked match
+> carries `computational_recursive_hypotheses=true`; the Join constructor has
+> recursive positions `[2,3]`; the two selector-produced occurrences are indices
+> `[1,0]`, both inside the recursive binder range; and Executable **and** Library
+> selection of `liftSize` each retain a non-empty erased `ComputationalMatch`
+> census with that recursive-position run. **Keep the direct `liftSize` target
+> row** — it discriminates retention from incidental reachability through
+> `liftSizeResult`.
+>
+> **STATE THE BOUNDARY ON THE CONTROL ITSELF.** `ih_slots = 0` and
+> `ih_invocations = 0` are load-bearing and they *limit* the conclusion:
+> **C1 proves CHECKER-TO-RUNTIME-IR ARRIVAL. It does not prove fusion-plan
+> population, and it does not prove arrival at the R3 composed seat.** A control
+> that reads as the latter is the same overstatement this node has already paid
+> for once.
+>
+> **C2-source — one candidate, extending the SAME nested generated-lift family.**
+> Not a return to ordinary direct recursion. Under one lifted-family match, both:
+>
+> 1. a nested recursive constructor branch whose explicit `recursive result for
+>    ...` selector **earns the whole match's computational classification** — the
+>    classifier witness; and
+> 2. a W-style recursive constructor such as `Fork (Bool -> Bag a)` whose branch
+>    **directly applies its selected function field** (e.g. `k True`) and does
+>    **not** select or invoke that position's hidden recursive result — the
+>    branch under test.
+>
+> Preserve a Type-classified motive. **Do not use the Omega spelling.** Surface
+> spelling and the result-combining expression may follow existing idioms; these
+> structural facts may not change.
+>
+> **The boundary walk, in order, production unarmed and then under the existing
+> test-only R3 arm.** Record each gate: (1) checked mixed match exists and is
+> classified computational *because of the selector branch*; (2) the `Fork` branch
+> has a recursive position but **no** recursive-range reference for it; (3) erased
+> Runtime IR retains that same `ComputationalMatch` and the `Fork` branch's
+> recursive-position identity; (4) checked IH slot/invocation metadata and
+> oriented/fusion-plan population — **including whether zero is a lawful absence
+> or the first missing producer relation**; (5) R3 composed-seat arrival for the
+> `Fork` branch; (6) if it arrives, paired IH/selected-argument projections share
+> one transport, the exact-`Var` call resolves to `ConstructorChild` rather than
+> `InductionHypothesis`, consumes once, and close is green.
+>
+> **THIS IS AN AUTHORIZED ATTEMPT, NOT AN INSTRUCTION TO MAKE EVERY GATE PASS.**
+> Stop at the first missing relation and report it:
+>
+> - source cannot elaborate with the fixed mixed shape ⇒ report the exact
+>   surface/type boundary;
+> - Runtime IR positive but checked IH/oriented metadata zero ⇒ stop and report
+>   the missing relation; **do not hand-author a plan or marker**;
+> - a production planner declines it ⇒ stop at the named planner refusal; **do
+>   not widen candidate enumeration**;
+> - reaches the seat without forming a `StaticWorkerBinding` ⇒ report the actual
+>   field class; **do not alter representation**;
+> - reaches the ledger and fails ⇒ report the exact coordinate; **do not relax
+>   close**.
+>
+> **Nothing is authorized to change:** classifier, checker, marker, oriented
+> plan, planner census, fusion candidate, fixture-only checked form, ledger, or
+> any Runtime mechanism.
+>
+> **The control list after this ruling.** C0 — real-source wholly
+> selected-argument-only match stays ordinary and never reaches the composed
+> route. **C1-source-arrival** — the committed nested-result probe above.
+> **C1-mechanism** — the existing synthetic Exact/ReHomed one-mint/two-projection
+> IH path, **explicitly conditional**. **C2-source** — the mixed nested/W-style
+> candidate, owed through the boundary walk; it becomes a positive control **only
+> if every gate through exact selected-argument consumption is positive**.
+> C3-C6 — duplicate, neither, foreign-equality and layout-provenance controls
+> stand as previously ruled.
+>
+> **What this does NOT discharge.** Full-pipeline R3 acceptance and production
+> arming remain blocked until the boundary walk shows whether a checker-produced
+> relation reaches the actual fusion seat. **The positive producer does not
+> retroactively make a synthetic row end-to-end** — it supplies the source family
+> from which the missing end-to-end row must now be attempted. The first report's
+> universal *reason* was wrong; its eight-row *result* was real, and so is the
+> narrower conclusion that the then-current seat controls were synthetic.
+
 > ### RESTATE THE CONTROLS. DO NOT CHANGE THE CLASSIFIER. Steward, 2026-08-13,
 > ### folding Architect `evt_7mg1x1vqe7qph`. **This amends the control list;
 > ### read it before authoring any further control at this seat.**
