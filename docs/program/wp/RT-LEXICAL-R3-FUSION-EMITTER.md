@@ -391,6 +391,62 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE FIXTURES CANNOT BE BUILT, AND THAT IS THE RESULT — the partition
+> ### guard may be defending a state the planner already makes unreachable.
+> ### Steward, 2026-08-13, recording `evt_1j3h4asztzp7n`. **THE FORK IS THE
+> ### ARCHITECT'S AND IS OPEN.**
+>
+> **`FIXTURE A` — a specialization with a residual direct caller — IS NOT
+> CONSTRUCTIBLE BY ANY LAWFUL PROGRAM, and the reason is structural.**
+> `intern_specialization` keys on the **whole** `ContinuationSpecializationKey`,
+> which already contains the fields distinguishing one call identity from
+> another (`producer_result_origin`, `producer_construct_origin`,
+> `producer_alternative`, `recursive_position`, `consumer_owner`,
+> `continuation_origin`, `worker`). Two distinct call identities agree on every
+> key field only if they are the same tuple ⇒ **distinct identities imply
+> distinct targets.**
+>
+> **The confirmation is that the tree already contains machinery for this
+> population, and it is a MUTATION.** `ContinuationInternMutation::{OmitProjection,
+> PrefixOnly}` exist precisely to **coarsen** that key so two keys intern to one
+> unit, and existing controls use them as **injected defects**. ⇒ A fixture
+> exhibiting a residual direct caller would be a program **plus a planner
+> defect** — the opposite of a durable preservation fixture, and it was
+> correctly not built under the mutation knob.
+>
+> **`FIXTURE B` — a same-body sibling — was NOT constructed and is NOT claimed
+> impossible.** Interning does not exclude it: two specializations may differ in
+> continuation origin or alternative while sharing a worker body occurrence. But
+> worker provenance is occurrence-keyed and each recursive field is its own
+> closure occurrence, so **ten measured configurations** — all eight `D2j`
+> causes plus a twice-applied declaration and an applied call wrapped in a
+> constructor — give ten sets of pairwise-distinct worker bodies. Duplicating
+> the call site does not help and says why: each application mints **its own**
+> specialization rather than a second edge into a shared one.
+>
+> **WHAT THE SEQUENCING BOUGHT, stated plainly.** The fixtures-first reasoning
+> is unchanged — on a singleton domain the partition cannot fail and would land
+> green carrying no information. **What changed is that the fixture cannot
+> supply the non-degenerate population either.** ⇒ The unit's escape hatch
+> ("stop and report; do not reshape the witness") fired exactly as bounded, and
+> it surfaced this **before** a mechanism was built on top of the guard rather
+> than after.
+>
+> **THE FORK, and the implementer explicitly declined to choose it:**
+>
+> - **(a) The guard is correct and deliberate defence in depth**, in which case
+>   the two controls are **structurally unreachable rather than owed**. **This
+>   repo already has that category and a precedent:**
+>   `FusionClaimRefusal::SelfRedirection`, whose doc says no witness reaches it
+>   and instructs that **no control claim one** — one sentence in a doc comment,
+>   not a fixture.
+> - **(b) The partition should be keyed on something other than incoming-call
+>   multiplicity.**
+>
+> **Do not read (a) as the cheap answer.** It converts two owed controls into a
+> documented unreachability claim, which is a claim that must itself be true —
+> see the standing rule that a documented limit is not a discharged claim.
+
 > ### THE ROUTE-C MECHANISM IS RULED — A PLANNER-AUTHORED, CALL-EDGE-LOCAL
 > ### CONTINUATION COMPOSITION. Steward, 2026-08-13, recording Architect
 > ### `evt_1t3f4e8100rb5`. **Read the ruling; this box is the frame
