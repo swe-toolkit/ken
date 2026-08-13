@@ -46,6 +46,31 @@
 > and the implementer is working from `main`.** The WP branch is merged and
 > deleted on origin — a resumed seat must start from `main`, not from a branch.
 >
+> **ADVERSARY FINDING `evt_5nx5mft2yzyfa` — TRIAGED: confirmed defect, FOLDED
+> into the in-flight unit at `evt_6rk65rc5r4q7f`. DO NOT re-file it as a node.**
+> The `D3` partition validation that landed in `11177a3c` is **vacuous** —
+> `static_transition.rs:14284-14307`, both conjuncts provably false because
+> `residual` is `planned.difference(fused)` and `fused ⊆ planned` is already
+> refused at `:14258`. **Nothing reads `residual_identities`/`residual_targets`**
+> (six lines in the whole tree, all inside the dead conditions), while consumers
+> derive `O` independently — so nothing checks that the blessed population is the
+> consumed one. **The two `is_subset` refusals at `:14258`/`:14267` are the real
+> content and must survive.** Directed repair: derive `residual` **from**
+> `ordinary_continuation_call_identities()`/`ordinary_continuation_targets()`,
+> which makes the law live and installs the missing validated-vs-consumed check.
+> Constraint: `fusion_composed_calls` is assigned at `:14311`, **after** the
+> block. **I had recorded that partition as settled and validated; it was
+> neither.**
+>
+> Adversary verified **clean** and not to be re-audited: the `cb60be03`
+> extraction is verbatim mechanically (zero removed-only lines; all 39
+> added-only lines plumbing), and the test arm is closed **by construction** —
+> `set_d2f_emitter_test_arm` is private with two callers and the guard is the
+> only exported surface. Low-severity open: `let _ = D2fEmitterTestArm::arm();`
+> drops immediately, so a refusal test can pass **vacuously** unarmed; one doc
+> clause is proportionate. **Coverage was three surfaces of eleven files — the
+> unhunted list is NOT cleared.**
+>
 > **STILL OFF `main`, and the rule below says land them at a green seam:**
 > `wp/LANG-SURFACE-RECORD-LITERAL` at `8e9baa18` (3 commits, 10 `crates/` files,
 > QA-approved, Language stood down with the operator); `wp/CAT-CAPEX`
