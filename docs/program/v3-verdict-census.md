@@ -20,7 +20,14 @@ inside `attempt_obligation` recorded, for each actual call:
   and present afterward.
 
 The observation used the existing search and kernel check; it did not reproduce
-their rules. Both are side-effect free, so the observation did not change the
+their rules. The relevant signatures are
+`ipc_search(ctx: &Context, phi: &Term, depth: usize) -> Option<Term>`
+(`crates/ken-elaborator/src/prover.rs:434`) and
+`check(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResult<()>`
+(`crates/ken-kernel/src/check.rs:386`): both receive only shared references. A
+source search under `crates/ken-kernel/src` found zero uses of `RefCell`,
+`Cell`, `Mutex`, or `OnceCell`, so the kernel check has no interior mutability
+hidden behind those shared references. Thus the observation did not change the
 following real attempt. The temporary observation was then removed. The final
 diff under `crates/ken-elaborator/src/prover.rs` is empty.
 
@@ -50,7 +57,7 @@ filtered out. No workspace command ran.
 | `sec1_acceptance` | 3 | 0 | 2 | 5 |
 | `t1_acceptance` | 3 | 0 | 5 | 8 |
 | `t2_acceptance` | 4 | 0 | 2 | 6 |
-| `ifc::` | 0 | 0 | 0 | 0 |
+| `ifc::` | — | — | — | **not run: filter selected zero tests** |
 | **Total** | **18** | **2** | **22** | **42** |
 
 The route and verdict cross-tabulation was:
