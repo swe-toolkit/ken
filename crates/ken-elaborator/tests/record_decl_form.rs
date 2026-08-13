@@ -27,8 +27,8 @@ fn point_named_projections_are_typed_through_the_shared_owner_registry() {
     let mut env = ElabEnv::empty().expect("prelude");
     env.elaborate_file(
         "record Point { x : Int, y : Int }\n\
-         view pointX (p : Point) : Int = p.x\n\
-         view pointY (p : Point) : Int = p.y",
+         fn pointX (p : Point) : Int = p.x\n\
+         fn pointY (p : Point) : Int = p.y",
     )
     .expect("Point declaration and named projections elaborate");
 
@@ -54,7 +54,7 @@ fn right_nested_third_and_dependent_record_fields_elaborate() {
     let mut env = ElabEnv::empty().expect("prelude");
     env.elaborate_file(
         "record Triple { first : Bool, second : Int, third : Bytes }\n\
-         view third (p : Triple) : Bytes = p.third\n\
+         fn third (p : Triple) : Bytes = p.third\n\
          record Dependent { carrier : Type, value : carrier }",
     )
     .expect("right-nested and dependent record fields elaborate");
@@ -69,7 +69,7 @@ fn class_instance_projection_is_unchanged_in_a_record_program() {
         "record Point { x : Int, y : Int }\n\
          class Pick A { select : A }\n\
          instance Pick Bool { select = True }\n\
-         view selected (d : Pick Bool) : Bool = d.select",
+         fn selected (d : Pick Bool) : Bool = d.select",
     )
     .expect("record and existing class/instance projection coexist");
 
@@ -91,8 +91,8 @@ fn shared_field_labels_keep_class_and_record_owners_distinct() {
         "record Stored { value : Int }\n\
          class Selected a { value : a }\n\
          instance Selected Bool { value = True }\n\
-         view storedValue (s : Stored) : Int = s.value\n\
-         view selectedValue (d : Selected Bool) : Bool = d.value",
+         fn storedValue (s : Stored) : Int = s.value\n\
+         fn selectedValue (d : Selected Bool) : Bool = d.value",
     )
     .expect("shared field labels retain distinct owners");
 
@@ -172,7 +172,7 @@ fn unknown_field_refuses_at_exact_span_and_positional_projection_survives() {
     env.elaborate_decl("record Point { x : Int, y : Int }")
         .expect("Point elaborates");
 
-    let bad = "view bad (p : Point) : Int = p.missing";
+    let bad = "fn bad (p : Point) : Int = p.missing";
     let start = bad.find("p.missing").expect("fixture contains projection");
     let error = env
         .elaborate_decl(bad)
@@ -186,8 +186,8 @@ fn unknown_field_refuses_at_exact_span_and_positional_projection_survives() {
     }
 
     env.elaborate_file(
-        "view pairFirst (p : ((first : Int) × Bool)) : Int = p.1\n\
-         view pairSecond (p : ((first : Int) × Bool)) : Bool = p.2",
+        "fn pairFirst (p : ((first : Int) × Bool)) : Int = p.1\n\
+         fn pairSecond (p : ((first : Int) × Bool)) : Bool = p.2",
     )
     .expect("positional .1/.2 projection remains live");
 }
