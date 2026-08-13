@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 14:12:52Z — from 230 issue file(s) in `docs/program/issues/`.
+2026-08-13 14:24:07Z — from 231 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -136,6 +136,7 @@ the committed file matches the generator's output.
 | `LANG-SURFACE-PAIR` | Pair literals, positional projections, and the Sigma type production are required by 32-grammar and wholly absent from the surface -- `Token::Times` is lexed for `×` and consumed by nothing, `(a, b)` is a parse error, and `.1`/`.2` fall outside the projection guard -- while the kernel's Sigma/Pair/Proj1/Proj2 are complete and already exercised by records | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1859 |
 | `LANG-SURFACE-RECORD-DECL` | `33 §2` specifies `record Point { x : Int, y : Int }` and `record` is already a reserved keyword, but the lexer emits no token for it and the parser has no declaration form -- while the elaboration target is complete and already exercised, since `class` elaborates to exactly the right-nested Sigma chain a record needs and `p.x` already parses and resolves, refusing only at `infer_proj` because that lookup scans the class registry | merged | language | M | none | — |
 | `LANG-SURFACE-RECORD-LITERAL` | `33 §2` names record literals `{ x = 1, y = 2 }`, punning `{ x, y }` and functional update `{ p | y = 3 }` as having their expected definitional behaviour, and none of the three parses -- expression-position `{` has no arm in `parse_atom_expr_base` at all, so the brace fork the sibling frame warned about does not exist here: refinement braces live in `parse_type`, which is a separate parser | ready | language | M | none | — |
+| `LANG-VIEW-RETIRE` | Operator ruling SURF-1 retired the single definition keyword `view` and split it into `const`/`fn`/`proc`, but the landed elaborator still accepts it -- and `view` is not an alias: it takes an EARLY RETURN out of the bidirectional purity check that `33 §1` calls a hard error, so every definition still spelled `view` has never been checked for the effect discipline the spec requires | ready | language | M | none | — |
 | `LIB-GATE-DECOUPLE` | main is red on two library documentation-census gates: the currency gate the operator decoupled from merges still fires from inside CI, and a doc-only merge invalidated the ledger unreported | merged | verify | S | none | 1039 |
 | `LOADER-CITE-ANCHOR` | LOADER-STALE-PREMISE cites the spec by line number (:147-158) — rots silently in the one catalog file outside the currency gate | merged | doc | XS | none | — |
 | `LOADER-STALE-PREMISE` | \"no disk loader yet\" is stale in 9 places — including already-landed library/ content | merged | doc | S | none | — |
@@ -311,6 +312,7 @@ is itself not yet `merged`/`closed`:
 - `KERNEL-NESTED-IND` blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE` (status: ready)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: draft)
 - `LANG-PARSER-DEPTH-HONEST` blocked by `LANG-SURFACE-RECORD-LITERAL` (status: ready)
+- `LANG-VIEW-RETIRE` blocked by `LANG-SURFACE-RECORD-LITERAL` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
