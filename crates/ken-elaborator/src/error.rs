@@ -48,6 +48,17 @@ pub enum ElabError {
     /// literal token; span starts at the backslash and excludes any
     /// interrupting delimiter, line boundary, or end of input.
     InvalidEscape { span: Span, reason: String },
+    /// A `foreign` declaration's symbol or library name decoded to a string
+    /// containing a Unicode control character (`38 §2.1`,
+    /// LANG-FOREIGN-NAME-CONTROL-CHARS). Producer-side hygiene only -- this
+    /// rejects control characters, it is not a well-formed-C-symbol policy,
+    /// and it discharges no validation the eventual loader consumer owes.
+    ForeignNameControlCharacter {
+        /// `"symbol"` or `"library"`.
+        which: &'static str,
+        character: char,
+        span: Span,
+    },
     /// A forbidden documentary name in an anonymous boundary header.
     NamedBoundaryHeader { name: String, span: Span },
     /// A `capabilities` item named no supported effect family.
@@ -250,6 +261,14 @@ impl fmt::Display for ElabError {
             ElabError::InvalidEscape { span, reason } => {
                 write!(f, "invalid escape at {}-{}: {}", span.start, span.end, reason)
             }
+            ElabError::ForeignNameControlCharacter { which, character, span } => write!(
+                f,
+                "foreign {} name at {}-{} contains the control character {:?} \
+                 (likely written as an escape, e.g. `\\0`); foreign names may not \
+                 contain Unicode control characters -- this rejects controls only, \
+                 it is not a well-formed-C-symbol-name check",
+                which, span.start, span.end, character,
+            ),
             ElabError::NamedBoundaryHeader { name, span } => write!(
                 f,
                 "named boundary header at {}-{}: '{}' is forbidden; \

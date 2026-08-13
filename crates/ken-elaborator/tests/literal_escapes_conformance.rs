@@ -324,12 +324,17 @@ fn d0_foreign_names_decode_escapes_uniformly() {
     use ken_elaborator::parser::parse_decls;
     use ken_elaborator::Decl;
 
-    let decls = parse_decls("foreign escaped : Int -> Int = \"sym\\tbol\" \"li\\\\b\"")
+    // Non-control escapes only (`\'`, `\\`) -- LANG-FOREIGN-NAME-CONTROL-CHARS
+    // (a direct Architect follow-up on this candidate) separately rejects a
+    // control character in these two names specifically, so `\t`/`\0`/etc.
+    // are no longer valid fixtures for "escape decoding reaches this site";
+    // they would now demonstrate the control-char check instead of D0.
+    let decls = parse_decls("foreign escaped : Int -> Int = \"sym\\'bol\" \"li\\\\b\"")
         .expect("foreign decl with escaped symbol/library names must parse");
     assert_eq!(decls.len(), 1);
     match &decls[0] {
         Decl::ForeignDecl { symbol, library, .. } => {
-            assert_eq!(symbol, "sym\tbol", "the symbol name must be escape-decoded");
+            assert_eq!(symbol, "sym'bol", "the symbol name must be escape-decoded");
             assert_eq!(library, "li\\b", "the library name must be escape-decoded");
         }
         other => panic!("expected ForeignDecl, got {other:?}"),
