@@ -10688,7 +10688,33 @@ fn validate_continuation_specialization_closure(
                 "continuation edge token disagrees with its exact target",
             ));
         }
-        reached.insert(target.id);
+        // ---- `D3` — CALL TARGET IS INJECTIVE. Ruled at `evt_7akh94dvqeqap`.
+        //
+        // The checks above prove key/unit bijection, unique tokens, token/target
+        // agreement, and that every unit is REACHED. Reachability is surjective
+        // and says nothing about the other direction: two distinct tokens may
+        // name one unit and every check above still passes.
+        //
+        // **That gap is what pushed a liveness rule into the emitter.** Without
+        // injectivity here, "may this specialization stop being declared?" is a
+        // question about a call POPULATION, and the emitter grew an
+        // all-incoming-calls scan to answer it -- a scan no lawful source can
+        // make fail, defending an invalid planner state late. With injectivity,
+        // the question is answered by one identity's own disposition and the
+        // scan is unnecessary rather than merely unreachable.
+        //
+        // ⇒ Deliberately a SEPARATE refusal from the duplicate-token check
+        // above. A repeated token is one edge planned twice; two distinct
+        // tokens on one target is an ALIAS -- two edges the planner believes are
+        // different, resolving to one unit. They are different defects and a
+        // control for one must not pass by tripping the other.
+        if !reached.insert(target.id) {
+            return Err(planner_error(
+                "two distinct continuation planned edges name one specialization unit, so the \
+                 planner's call and unit populations are not bijective and a specialization's \
+                 liveness is not decided by its own edge",
+            ));
+        }
     }
     if reached.len() != units.len() {
         return Err(planner_error(
@@ -18672,13 +18698,23 @@ mod tests {
     /// **CLAIMED:** the composition population the ruled relation must mint is
     /// derivable from relations that already exist, so no new source fact is
     /// required at the minting seat.
-    /// **THE GAP, and it is the reason the partition is not yet exercised:**
-    /// **every incoming domain here is a SINGLETON.** Both specializations have
-    /// exactly one incoming call and it is the composed one, so "a target leaves
-    /// declaration only when EVERY incoming identity is composed" is satisfied
-    /// vacuously -- there is no witness with a residual direct caller, and none
-    /// with a same-body sibling. The ruling requires controls for both, and this
-    /// fixture family cannot supply either.
+    /// **THE GAP:** this pins the DERIVATION of the two edges. It pins no
+    /// emitter behaviour and no composition disposition.
+    ///
+    /// ---- SUPERSEDED NOTE, kept because it recorded a real finding and its
+    /// ---- conclusion was overtaken. Ruled at `evt_7akh94dvqeqap`.
+    ///
+    /// This section used to read that every incoming domain here is a singleton
+    /// and that the ruled "every incoming identity is composed" partition was
+    /// therefore satisfied vacuously, with two source fixtures owed to fix it.
+    /// **The singleton measurement stands; the conclusion drawn from it does
+    /// not.** The residual-direct-caller population is now REJECTED as a planner
+    /// alias by [`validate_continuation_specialization_closure`]'s injective
+    /// call-target law, so it is not a lawful state to preserve and no source
+    /// fixture is owed for it. The same-body sibling has a planner-relation
+    /// control of its own. **A specialization's liveness is decided by its own
+    /// unique edge**, so there is no incoming-domain scan left for a singleton
+    /// domain to make vacuous.
     #[test]
     fn d3_the_two_composed_edges_are_named_by_the_keys_checked_bindings() {
         let mut rows = Vec::new();
@@ -31694,6 +31730,205 @@ mod tests {
                 "AC-2 {field:?}: omission did not produce the named wrong-unit conflation"
             );
         }
+    }
+
+    /// Build one planned edge for a target, with the token fields the closure
+    /// validator checks taken from that target's own key.
+    ///
+    /// Taking them from the key is what makes the negative row below reach the
+    /// NEW check: a hand-picked token would trip "edge token disagrees with its
+    /// exact target" first, and a control that refuses at an earlier rule has
+    /// not exercised the rule it names.
+    #[cfg(test)]
+    fn contspec_edge_for(
+        unit: &PlannedContinuationSpecialization,
+        call_site_sequence: u32,
+    ) -> PlannedContinuationSpecializationCall {
+        PlannedContinuationSpecializationCall {
+            token: ContinuationSpecializationCallToken {
+                producer_owner: unit.key.producer_owner,
+                emission_owner: unit.key.emission_owner,
+                producer_result_origin: unit.key.producer_result_origin,
+                producer_construct_origin: unit.key.producer_construct_origin,
+                producer_alternative: unit.key.producer_alternative,
+                call_site_sequence,
+                target: unit.id,
+                worker: unit.key.worker.clone(),
+            },
+        }
+    }
+
+    /// **`D3` — CALL TARGET IS INJECTIVE, and an interning ALIAS refuses at
+    /// planner closure rather than being defended late in the emitter.**
+    ///
+    /// Ruled at `evt_7akh94dvqeqap`. The closure validator already proved
+    /// key/unit bijection, unique tokens, token/target agreement and surjective
+    /// reachability. It did **not** prove that two distinct edges cannot name
+    /// one unit, and that gap is what had pushed an all-incoming-calls liveness
+    /// scan into lowering -- a scan no lawful source can make fail.
+    ///
+    /// **The negative reaches the NEW rule and not an older one, which is the
+    /// whole difficulty of this row.** The two keys differ **only** in a field
+    /// inside `continuation_inputs`, and no such field appears in the call
+    /// token; both edges therefore still agree with their target on every field
+    /// the existing check compares. Under exact interning they are two units and
+    /// the population is bijective; under `OmitProjection` they conflate to one
+    /// unit and the two distinct edges become an alias.
+    ///
+    /// **MEASURED:** exact interning gives two units, two distinct edges, two
+    /// distinct targets, and closure passes. The same two keys and the same two
+    /// edges under `OmitProjection` give one unit and refuse at the duplicate
+    /// TARGET rule -- not at the duplicate-token rule, which is a separate
+    /// defect and is left free to fire on its own row.
+    /// **CLAIMED:** a specialization's liveness is decided by its own unique
+    /// edge, because the planner refuses any state in which it would not be.
+    /// **THE GAP:** this is planner closure only. It pins no emitter behaviour
+    /// and no composition disposition; the `ComposedCall`/`DirectCall` outcome
+    /// this law makes well-defined is owed with the relation.
+    #[test]
+    fn d3_two_distinct_planned_edges_may_not_name_one_specialization() {
+        let plan = contspec_plan();
+        let base_key = plan.continuation_specializations[0].key.clone();
+        let field = ContinuationProjectionOmission::Ordinal;
+
+        let mut aliasing_key = base_key.clone();
+        mutate_projection_field(&mut aliasing_key.continuation_inputs[0], field);
+        assert_ne!(
+            base_key, aliasing_key,
+            "the two keys must be exactly distinct, or the row tests nothing"
+        );
+
+        // Exact interning: two units, two edges, bijective.
+        let mut interned = BTreeMap::new();
+        let mut units = Vec::new();
+        intern_specialization(&mut interned, &mut units, base_key.clone()).expect("interns");
+        intern_specialization(&mut interned, &mut units, aliasing_key.clone()).expect("interns");
+        let exact_units = units.len();
+        let edges = vec![
+            contspec_edge_for(&units[0], 0),
+            contspec_edge_for(&units[1], 0),
+        ];
+        let exact = validate_continuation_specialization_closure(&interned, &units, &edges);
+
+        // The SAME two keys under projection-omitting interning: one unit.
+        let mut aliased_interned = BTreeMap::new();
+        let mut aliased_units = Vec::new();
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::OmitProjection(field)));
+        intern_specialization(&mut aliased_interned, &mut aliased_units, base_key.clone())
+            .expect("interns");
+        intern_specialization(&mut aliased_interned, &mut aliased_units, aliasing_key)
+            .expect("interns");
+        CONTINUATION_INTERN_MUTATION
+            .with(|mutation| mutation.set(ContinuationInternMutation::Exact));
+        let aliased_unit_count = aliased_units.len();
+        // Two DISTINCT edges -- different call-site sequences, so the
+        // duplicate-token rule cannot be what answers -- both landing on the one
+        // conflated unit.
+        let aliased_edges = vec![
+            contspec_edge_for(&aliased_units[0], 0),
+            contspec_edge_for(&aliased_units[0], 1),
+        ];
+        assert_ne!(
+            aliased_edges[0].token, aliased_edges[1].token,
+            "the two edges must be distinct tokens, or this row would refuse at the duplicate-\
+             token rule instead of the one it names"
+        );
+        let aliased = validate_continuation_specialization_closure(
+            &aliased_interned,
+            &aliased_units,
+            &aliased_edges,
+        );
+
+        let refusal = |result: Result<(), CraneliftBackendError>| match result {
+            Ok(()) => "closed".to_string(),
+            Err(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(message))) => {
+                message
+            }
+            Err(other) => format!("other: {other:?}"),
+        };
+
+        assert_eq!(
+            (
+                exact_units,
+                refusal(exact),
+                aliased_unit_count,
+                refusal(aliased)
+            ),
+            (
+                2,
+                "closed".to_string(),
+                1,
+                "two distinct continuation planned edges name one specialization unit, so the \
+                 planner's call and unit populations are not bijective and a specialization's \
+                 liveness is not decided by its own edge"
+                    .to_string()
+            ),
+            "exact interning closes with two units and two edges; the same two keys conflated by \
+             projection omission refuse at the duplicate-TARGET rule, with both edges still \
+             agreeing with their target on every field the older checks compare"
+        );
+    }
+
+    /// **`D3` — A SAME-BODY SIBLING IS TWO UNITS WITH TWO EDGES, and body
+    /// equality is never liveness authority.**
+    ///
+    /// Ruled at `evt_7akh94dvqeqap` point 3. Two exact, closure-valid full keys
+    /// that share the worker body and provenance but differ on one legitimate
+    /// identity coordinate must intern to distinct units with distinct edges, so
+    /// that composing one can never suppress the other.
+    ///
+    /// **This is a PLANNER-RELATION row and deliberately not a source program.**
+    /// It says nothing about whether a Ken program can produce this population --
+    /// ten measured configurations did not -- and it must not be read as source
+    /// reachability. It uses the exact interning path, never a coarsening
+    /// mutation.
+    ///
+    /// **MEASURED:** worker body and full worker provenance equal, one identity
+    /// coordinate differs, two distinct units, two distinct edges, closure
+    /// passes.
+    /// **CLAIMED:** shared body cannot alias two specializations, so a rule that
+    /// keyed liveness on body would be deciding the sibling's fate too.
+    /// **THE GAP:** the composed/direct halves of this row -- that only the
+    /// composed unit leaves the executable population -- need the composition
+    /// relation and are owed with it.
+    #[test]
+    fn d3_a_same_body_sibling_interns_as_two_units_with_two_edges() {
+        let plan = contspec_plan();
+        let left = plan.continuation_specializations[0].key.clone();
+        let mut right = left.clone();
+        // One legitimate identity coordinate, chosen because it is NOT part of
+        // the worker provenance: the sibling stays same-body by construction.
+        right.recursive_position += 1;
+        right.recursive_positions.insert(right.recursive_position);
+
+        let mut interned = BTreeMap::new();
+        let mut units = Vec::new();
+        let (left_id, _) =
+            intern_specialization(&mut interned, &mut units, left.clone()).expect("interns");
+        let (right_id, _) =
+            intern_specialization(&mut interned, &mut units, right.clone()).expect("interns");
+        let edges = vec![
+            contspec_edge_for(&units[0], 0),
+            contspec_edge_for(&units[1], 0),
+        ];
+        let closed =
+            validate_continuation_specialization_closure(&interned, &units, &edges).is_ok();
+
+        assert_eq!(
+            (
+                left.worker == right.worker,
+                left.worker.body_origin == right.worker.body_origin,
+                left != right,
+                left_id != right_id,
+                edges[0].token.target != edges[1].token.target,
+                closed,
+            ),
+            (true, true, true, true, true, true),
+            "the sibling shares worker provenance AND body origin, differs on one identity \
+             coordinate, and still interns to a DISTINCT unit with a distinct edge -- so no \
+             body-keyed rule could compose one without deciding the other"
+        );
     }
 
     /// AC-3 prefix collision. The prefix is deliberately equal while the exact
