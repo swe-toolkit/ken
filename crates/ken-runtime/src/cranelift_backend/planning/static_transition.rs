@@ -9580,6 +9580,62 @@ pub(in crate::cranelift_backend) struct FusionRegionClaimLedger {
     body_owned_recorded: bool,
 }
 
+/// Test-only corruption of the claim's ordered invocation-parameter
+/// projection at its production derivation site.
+///
+/// The three variants move different properties. `MoveFirstToCallee` preserves
+/// the declared arity and therefore reaches lowering's independent
+/// visited-origin comparison. `DropLast` and `AppendCallee` change the arity
+/// and must be refused by preflight before a claim is issued.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum FusionClaimParameterMutation {
+    Exact,
+    MoveFirstToCallee,
+    DropLast,
+    AppendCallee,
+}
+
+#[cfg(test)]
+thread_local! {
+    static FUSION_CLAIM_PARAMETER_MUTATION: Cell<FusionClaimParameterMutation> =
+        const { Cell::new(FusionClaimParameterMutation::Exact) };
+    static R3_FUSION_CLAIM_CONSUMPTIONS: std::cell::RefCell<
+        Vec<(StaticContinuationFusionId, StaticOriginId)>,
+    > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Run one production compile with a single claim-parameter defect installed.
+/// The guard restores exact behaviour even if the compile unwinds.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_fusion_claim_parameter_mutation<R>(
+    mutation: FusionClaimParameterMutation,
+    run: impl FnOnce() -> R,
+) -> R {
+    struct Restore(FusionClaimParameterMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FUSION_CLAIM_PARAMETER_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = FUSION_CLAIM_PARAMETER_MUTATION.with(|cell| cell.replace(mutation));
+    let _restore = Restore(previous);
+    run()
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_r3_fusion_claim_consumptions() {
+    R3_FUSION_CLAIM_CONSUMPTIONS.with(|cell| cell.borrow_mut().clear());
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn r3_fusion_claim_consumptions(
+) -> Vec<(StaticContinuationFusionId, StaticOriginId)> {
+    R3_FUSION_CLAIM_CONSUMPTIONS.with(|cell| cell.borrow().clone())
+}
+
 #[cfg_attr(not(test), allow(dead_code))]
 impl FusionRegionClaimLedger {
     /// Derive one claim per installed fusion, refusing before anything is
@@ -9749,8 +9805,30 @@ impl FusionRegionClaimLedger {
             // 3. Every recorded argument origin is an actual positional child of
             //    THAT SAME call. Taken by construction from `call_children`, so
             //    there is no origin here the call does not own.
-            let invocation_parameters =
+            let mut invocation_parameters =
                 call_children.iter().skip(1).copied().collect::<Vec<_>>();
+            #[cfg(test)]
+            match FUSION_CLAIM_PARAMETER_MUTATION.with(Cell::get) {
+                FusionClaimParameterMutation::Exact => {}
+                FusionClaimParameterMutation::MoveFirstToCallee => {
+                    let first = invocation_parameters.first_mut().ok_or_else(|| {
+                        planner_error(
+                            "the claim-parameter mutation requires a non-empty argument run",
+                        )
+                    })?;
+                    *first = key.consuming_callee;
+                }
+                FusionClaimParameterMutation::DropLast => {
+                    invocation_parameters.pop().ok_or_else(|| {
+                        planner_error(
+                            "the claim-parameter mutation requires a non-empty argument run",
+                        )
+                    })?;
+                }
+                FusionClaimParameterMutation::AppendCallee => {
+                    invocation_parameters.push(key.consuming_callee);
+                }
+            }
             // 2. The ordered argument count equals the fused header's ordinary
             //    parameter count. ⛔ Against the DESCRIPTOR's own slot walk, not
             //    against the vector's length, which would compare the projection
@@ -9906,6 +9984,8 @@ impl FusionRegionClaimLedger {
             .remove(&fusion)
             .expect("the claim was present at the borrow above");
         self.consumed.insert(fusion, seat);
+        #[cfg(test)]
+        R3_FUSION_CLAIM_CONSUMPTIONS.with(|cell| cell.borrow_mut().push((fusion, seat)));
         Ok(claim)
     }
 

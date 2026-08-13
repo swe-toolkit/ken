@@ -3009,6 +3009,175 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the fused invocation accepts only
+/// the claim's exact ordered argument-origin projection, and a refusal cannot
+/// spend the affine region claim.
+///
+/// **MEASURED:** on both armed roots, the exact projection emits one fused call
+/// and consumes one claim. Replacing its sole origin with the consuming callee
+/// reaches lowering's visited-origin comparison and refuses with neither event;
+/// dropping or appending one origin refuses in preflight, also with neither
+/// event.
+///
+/// **CLAIMED:** the planner closes projection arity before issuing a claim, and
+/// lowering independently closes the same ordered projection against the
+/// arguments it actually visited before the claim is consumed.
+///
+/// **THE GAP:** both governed roots have one explicit argument, so they cannot
+/// exhibit a non-trivial permutation. Reordering remains an owed control whose
+/// subject requires a lawful multi-argument fused witness; this test does not
+/// relabel replacement as reordering.
+#[test]
+fn r3_fused_parameter_projection_refuses_before_claim_consumption() {
+    use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, with_fusion_claim_parameter_mutation, D2jCause,
+        FusionClaimParameterMutation,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: FusionClaimParameterMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(
+            crate::cranelift_backend::planning::D2J_DECLARATION,
+            &declaration,
+        );
+        let error = with_fusion_claim_parameter_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-parameter-projection",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("visited argument origins") =>
+            {
+                "visited-origin refusal"
+            }
+            Some(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
+                if reason
+                    == "a static continuation fusion claim's ordered input projection is \
+                       unavailable or disagrees with the capture run its own ABI frame declares" =>
+            {
+                "preflight arity refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (FusionClaimParameterMutation::Exact, "exact"),
+            (FusionClaimParameterMutation::MoveFirstToCallee, "moved"),
+            (FusionClaimParameterMutation::DropLast, "short"),
+            (FusionClaimParameterMutation::AppendCallee, "long"),
+        ] {
+            let symbol = format!("ken_r3_projection_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::MoveFirstToCallee,
+                "visited-origin refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::DropLast,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::AppendCallee,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::MoveFirstToCallee,
+                "visited-origin refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::DropLast,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::AppendCallee,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+        ],
+        "the exact projection completes and consumes once; a same-length moved origin reaches \
+         lowering's own ordered comparison, while short and long projections stop in preflight; \
+         every refusal occurs before claim consumption and before a fused invocation is recorded"
+    );
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.
