@@ -1,7 +1,7 @@
 ---
 id: LANG-COMMENT-CLASSIFIER-SHARED
 title: "The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
