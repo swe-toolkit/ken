@@ -5770,9 +5770,31 @@ impl<'a> Lowering<'a> {
                     // every later binder shifted down one slot. The cheap-looking
                     // option is the one already measured as a defect.
                     //
-                    // The choice between mirroring the specialization path's
-                    // two-member treatment and something else is a mechanism
-                    // decision, and it is routed rather than taken here.
+                    // ---- RULED, AND GROUNDED BEFORE IMPLEMENTATION.
+                    // ---- Architect `evt_5yhm9c78dm27s`: two distinct
+                    // ---- compiler-only `StaticWorkerBinding` members over the
+                    // ---- same joined worker -- the IH in the reversed
+                    // ---- recursive prefix, and the original static-worker
+                    // ---- argument in source-order constructor fields.
+                    //
+                    // ⭐ **The segment-2 half is NOT a new mechanism.**
+                    // `composed_recursive_argument_binding` already builds
+                    // exactly that binding from a `ComposedCallTarget` --
+                    // reading `selector()`, `worker()` and `call_identity()` to
+                    // build AND to authorize it -- and it already has one
+                    // production consumer, the deferred-constructor path. The
+                    // composed eliminator here is a SECOND consumer of it, which
+                    // is the same shape this node has now relearned five times:
+                    // the machinery exists at one caller and another route
+                    // reaches the same seat without it.
+                    //
+                    // ⛔ So the work is wiring this seat into that builder plus
+                    // the IH member and the `CheckedCaseBinderLayout` ordering
+                    // -- **not** authoring a second composed-binding authority.
+                    // Building one here would be the drift the existing builder's
+                    // single ownership exists to prevent.
+                    //
+                    // ⛔ **Do not restore the `D6a` skip shape**, above.
                     let induction_hypothesis = self.make_computational_recursor(
                         // ⭐ `AC-C4` clause 1 — the SPECIALIZED caller wraps
                         // explicitly, so the phase is stated at the call site
