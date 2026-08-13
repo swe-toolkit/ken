@@ -391,6 +391,91 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE ROUTE-C MECHANISM IS RULED — A PLANNER-AUTHORED, CALL-EDGE-LOCAL
+> ### CONTINUATION COMPOSITION. Steward, 2026-08-13, recording Architect
+> ### `evt_1t3f4e8100rb5`. **Read the ruling; this box is the frame
+> ### consequence and the sequencing.**
+>
+> **The class, in one sentence:** compose the exact continuation specialization
+> **at each planner-authorized call edge** — its selected body lowered in the
+> caller with the same complete phase-bearing operand run the direct call would
+> have received, flowing straight into the caller's existing computational
+> eliminator. **No intermediate `emit_result`, `ground_value`, result slot, call
+> ABI, or returned SSA word for that composed edge.** The existing redirect,
+> self-edge rule, takeover seat and `FusionRegionClaim` consumption are
+> unchanged — **the composition relation is not permission to spend the fusion
+> claim early.**
+>
+> **What the trace ruled out, so it is not re-proposed:** downstream forwarding
+> has no source value to forward; a specialization-local join would move the
+> outer eliminator, redirect and claim spend away from their measured seats and
+> need a second skip relation in the caller. And `StaticWorkerBinding` still
+> gets **no** runtime representation, carrier, slot, descriptor, token or ABI
+> member.
+>
+> **THIS IS NOT THE WITHDRAWN SUBSUMPTION AND NOT GENERIC INLINING.** The
+> authority is **one opaque exact `ContinuationCallIdentity`**, never a
+> target/body/origin/owner coincidence. The join is re-derived from existing
+> planner relations and **may not** search by constructor spelling, body, target
+> alone, shared origin, arity, ambient `defining_unit`, or whichever candidate
+> exists. Zero, ambiguity, duplicate domain, a call claimed by two fusions, a
+> fusion edge claimed by two incompatible calls, wrong emission owner, or
+> disagreement with either source relation **refuses before mutation**.
+>
+> **THE POPULATION RULE IS THE LOAD-BEARING CORRECTION.** For every
+> specialization, preflight enumerates its **complete** incoming
+> `ContinuationCallIdentity` domain and partitions it into composed and ordinary
+> direct edges. A specialization leaves declaration, definition and target
+> resolution **only when every incoming identity is proved composed at its own
+> call edge.** One residual direct caller keeps it live; a same-body sibling is
+> independent. **No fusion-body ownership fact, `enclosing_specialization`
+> match, or absence at one caller is sufficient to remove a target** — that
+> inference is exactly what was withdrawn.
+>
+> ### THE DERIVATION CLOSES, AND THE RELATION WAS ALREADY IN THE FILE
+>
+> **Grounded at `evt_62e7r7herf08c`: no new source fact is needed.** The two
+> composed edges are named exactly by the fusion key's two `CheckedIhBinding`s —
+> `consumer_binding.frame_origin` selects the OUTER layer, and
+> `producer_argument_binding.frame_origin` the INNER (Exact 10/25, ReHomed
+> 6/21). Each conjoined with the claim's `consumer_owner` / `producer_owner`
+> selects exactly one specialization, disjointly, from already-checked planner
+> facts in hand at preflight. **Mutation proof:** swapping the two bindings
+> takes both selections to zero, so the row is keyed on which binding names
+> which layer.
+>
+> **The preflight comment already recorded these bindings as "different checked
+> frames by design (measured 25 and 10)", warning that asserting them EQUAL
+> would refuse the very witness the class exists for. They differ because they
+> are the two composition layers** ⇒ **the fact that forbids one check is what
+> supplies this one.**
+>
+> **A structural substitute was found and rejected, and that was the harder
+> call:** `child_origins(producer_body)` is a one-element run holding the inner
+> frame on both witnesses. **It agrees and would have passed both witnesses** —
+> and it reads the body's shape rather than a checked relation, so it stops
+> agreeing the moment a producer body carries more than one child.
+>
+> ### STEWARD SEQUENCING — FIXTURES FIRST (`evt_4gq61qp9cg5xa`)
+>
+> **Every specialization's incoming domain is a SINGLETON on both witnesses, and
+> that singleton is the composed edge.** ⇒ the partition is satisfied
+> **vacuously**: *"every incoming identity is proved composed"* holds for **any**
+> implementation that composes the one edge, **including one that would remove a
+> target with a residual direct caller.** Green would carry no information, and
+> the vacuous thing would be the safeguard itself.
+>
+> **So the two blocked controls get their fixtures first** — a witness with a
+> residual non-fusion direct caller, and one with a same-body sibling. **The
+> objection that this means authoring against a relation that does not exist
+> dissolves once the fixtures are seen as programs rather than as tests of the
+> relation:** their correct behaviour today (specialization declared, defined,
+> target-resolved, called) **is exactly what must still be true afterwards.**
+> They land as ordinary positive coverage on the current tree and become the
+> partition's discriminators without being rewritten. If a fixture cannot be
+> built in the `D2j` family without a new capability, **stop and report** — do
+> not reshape the witness to make it authorable.
+
 > ### THE RECUT IS ACCEPTED AS EXACT NEGATIVE EVIDENCE, AND THE NEXT ROUTE-C
 > ### MECHANISM IS HELD FOR ONE MORE BOUNDED TRACE. Steward, 2026-08-13,
 > ### recording Architect `evt_mt5zxq1qd6bt` on tip `e30d33b9`.
