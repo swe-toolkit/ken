@@ -62,85 +62,75 @@
 >
 > Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~17:0xZ. **`main` = `89050686`.**
-> **I hold nothing except a publisher on the spec erratum. BOTH RINGS ARE WORKING — do not kick either.**
+> ### RESUME HERE — state at 2026-08-13 ~17:2xZ. **`main` = `0da7b96b`+.**
+> **BOTH RINGS WORKING — do not kick either. A publisher is in its window.**
 >
-> **Runtime — `RT-CONTSRC-FRAME-FINALIZE`**, kicked at anchor `evt_5mazfrtngffvg`.
-> Finish the two-stage continuation availability lifecycle so Stage 2 runs for
-> the five governed rows. **`D2k-1b` stays parked until it lands.**
+> **Runtime — `RT-4B-UNIQUENESS-GATE-REACH`**, anchor `evt_5z91smqzjpnck`.
+> Follows `81f46822`, does not run beside it (same files, one lane).
+> **Language — `LANG-SURFACE-LITERAL-ESCAPES`**, anchor `evt_1geg939by8h4r`.
 >
-> **Language — `LANG-SURFACE-LITERAL-ESCAPES`**, kicked at anchor
-> `evt_1geg939by8h4r`. The lexer does no escape processing at all; I verified
-> that against `origin/main` before sending it.
+> **PUBLISH QUEUE, IN ORDER:** (1) Steward corpus `5baf3d6b`, in window;
+> (2) Runtime `81f46822` — QA-approved, **runtime-leader owes the merge
+> Decision, do not publish before it lands**; (3) doc commits `d7d008a3` +
+> `d1cf32f2`.
 >
-> ### THE ERROR I MADE TODAY, AND IT IS THE ONE THIS FILE EXISTS TO PREVENT
+> ### R3 GATE 4b — THE OBSERVATION ROUTE IS EXHAUSTED
 >
-> **I kicked Language onto `LANG-RECORD-STACK-OVERFLOW`, which had already
-> merged as PR #2098 at `b4d38b8a`.** The node still said `status: ready`
-> because nobody flipped it when the PR landed. I read the status as the state
-> of the tree.
+> Measured `(4, 2, 0, 2, 1)`: **four admitted discoveries enter
+> `enumerate_live_fusion_candidates` and `keys = []` comes out.** The interning
+> loop has no decline path, so `keys.len() == candidates.len()` identically —
+> all four were eliminated inside enumeration.
 >
-> ⇒ **A node's `status:` is a claim ABOUT a node. Only the tree is evidence
-> about the code.** Before any kick: check that the work has not landed —
-> `gh pr list --search "<NODE-ID>" --state merged`, or grep the mechanism on
-> `origin/main`. The language leader caught this and blocked on a node-identity
-> question rather than assigning it, which cost one round trip instead of an
-> implementer turn.
+> **That kills exactly one explanation — "there was nothing to fuse" — and
+> licenses NOTHING about the planner.** Fourteen elimination routes, none
+> attributed, at least one documented lawful. **The full fourteen-exit census is
+> OUT** (Architect): all thirteen exits are bare `continue`s, so attributing
+> them means teaching enumeration to distinguish them — a builder change.
 >
-> **It compounded:** my kick also warned about a `=>`-vs-`|->` fixture trap that
-> the same PR had already repaired. **A stale node status makes every derived
-> claim in the kick stale too.**
+> **`RT-4B-UNIQUENESS-GATE-REACH` counts arrivals at exit 12 of 13** — a
+> call-site counter, no signature or control-flow change, inside the already
+> authorized observation gate.
+> - **reach = 0 ⇒ CLOSE `RT-4B-UNIQUENESS-GATE-ATTRIBUTION`, do not kick it.**
+>   That is a GOOD outcome: it narrows fourteen routes to eleven.
+> - **reach > 0 ⇒ attribution becomes lawful** against its five ACs.
 >
-> I flipped `LANG-RECORD-STACK-OVERFLOW`, `LANG-SURFACE-RECORD-LITERAL` and
-> `LANG-VIEW-RETIRE` to `merged`, and reverted a `depends_on` edge I had added
-> from the same wrong premise.
+> **Nobody may write "the uniqueness gate ate our candidates."** No node
+> licenses it, and the frames quarantine that exact sentence.
 >
-> ### GATE 4b IS ANSWERED AS FAR AS OBSERVATION CAN ANSWER IT
+> ### TWO ERRORS TODAY, BOTH THE SAME SHAPE: A CLAIM WIDER THAN ITS INSTRUMENT
 >
-> Runtime handed 4b back with a named stop, no candidate. **Three of its four
-> measured values did not mean what the handback read them as:**
-> `fusion_definitions = 0` is the **pinned expected value** ("zero until the
-> emitter exists"); `oriented_present` is a **boolean over an `Option`**, so it
-> says a plan arrived, not that a population did; and `keys = []` is exactly
-> `candidates.len() == 0` because the interning loop **has no decline path**
-> (Architect, `static_transition.rs:10030-10053`).
+> **1. I kicked Language onto already-merged work.** `LANG-RECORD-STACK-OVERFLOW`
+> merged as #2098 at `b4d38b8a` and still read `status: ready`. ⇒ **A node's
+> `status:` is a claim ABOUT a node; only the tree is evidence about the code.**
+> Every claim the kick derived from that frame went stale with it. **Corpus-wide
+> sweep done and clean — do not redo it.**
 >
-> **I measured all thirteen elimination exits in
-> `enumerate_live_fusion_candidates` (`:10242-10365`): NONE is distinguished** —
-> every one is a bare `continue` or bare early return. By the Architect's own
-> criterion that puts the per-gate census **out** of the observation gate.
+> **2. `RT-CONTSRC-FRAME-FINALIZE` is CLOSED, premise refuted by one probe.**
+> Stage 2 already runs and is correctly sequenced
+> (`finalize_continuation_availability_plan:1292`, called `:12174`); the five
+> governed rows carry **zero** projections and **zero** requirements. The
+> Architect withdrew his successor on the same measurement. **`D2k-1b` is
+> UNPARKED and was never blocked on it** — its real walls are `NativeJoinPlanV1`
+> / `StaticWorkerBinding`. The picture had been built from three code sites and
+> their doc comments, one of which is TRUE and simply never applied to those
+> rows.
 >
-> **`RT-4B-ENUMERATION-INPUT-SIZE` is framed and `ready`** behind
-> `RT-CONTSRC-FRAME-FINALIZE`. It records the **admitted-discovery ledger's**
-> length — not the oriented plan's, because the ledger is what enumeration
-> actually iterates — and its frame **pre-states what each outcome licenses**,
-> so no one needs a round trip to find out. Non-empty licenses **nothing about
-> the planner**.
+> ### PUBLISHER RULES
 >
-> ### THE PUBLISHER RULE — ASK THE PR, NOT THE PROCESS
+> `gh pr view N --json state,mergeCommit,statusCheckRollup`. **MERGED ⇒ never
+> restart.** `pgrep` errs BOTH ways — print the lines, never a boolean.
+> Pre-publish CI history: `gh api .../commits/<sha>/check-runs`, **422 = never
+> pushed = clean.** `gh` is not authed in a plain shell — mint via
+> `.devcontainer/mint-gh-token.sh` with `dangerouslyDisableSandbox`.
 >
-> ```
-> gh pr view N --json state,mergeCommit,statusCheckRollup
-> ```
->
-> **MERGED ⇒ never restart**, whatever `pgrep` says. **OPEN + checks running ⇒
-> wait.** **OPEN + checks done + `pgrep` empty ⇒ restart.**
->
-> **`pgrep` errs in BOTH directions** — it reported "not running" while a
-> publisher sat in its opening wait, and it also matches my own shell wrapper.
-> Print the matched lines; never collapse it to a boolean.
->
-> Before any publish: `gh api repos/swe-toolkit/ken/commits/<sha>/check-runs`.
-> **422 = never pushed = clean.** `gh` is not authenticated in a plain shell —
-> mint a token with `.devcontainer/mint-gh-token.sh` (needs
-> `dangerouslyDisableSandbox`).
+> **MERGE NOTIFICATIONS name the LANDED SQUASH or `merge-base...tip`, never a
+> bare tip SHA** (Adversary; now playbook M8). `git show <tip>` showed 2 files
+> when the change was 10, and git returns no error.
 >
 > ### LANDED 2026-08-13
 >
-> #2091 gate 4a + the one-cut sweep repair · #2093 two language frames · #2094
-> the `language-implementer` reseat to Sonnet 5 · #2095 checkpoint · #2096 the
-> C2 slot-consumption repair · #2097 the briefing flush (4648 to 356) · #2098
-> record literals + the dispatch-frame repair · #2099 the gate-4b ruling fold ·
-> **#2103 `LANG-VIEW-RETIRE`** (landed tree `5f5469c8`). Spec erratum
-> `93e92812` publishing. **#2088 and #2092 closed**, each with its reason in
-> the PR.
+> #2091 gate 4a · #2093 two language frames · #2094 the Sonnet 5 reseat · #2095
+> checkpoint · #2096 the C2 slot-consumption repair · #2097 the briefing flush ·
+> #2098 record literals + dispatch-frame repair · #2099 the gate-4b ruling fold ·
+> **#2103 `LANG-VIEW-RETIRE`** · **#2104 the KwView spec erratum** · **#2105 the
+> RT-CONTSRC closure + 4b size frame**. **#2088 and #2092 closed.**
