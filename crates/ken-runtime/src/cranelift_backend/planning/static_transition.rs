@@ -8978,6 +8978,8 @@ pub(in crate::cranelift_backend) struct StaticContinuationFusionDescriptor {
 pub(in crate::cranelift_backend) struct StaticContinuationFusionPlan {
     keys: Vec<StaticContinuationFusionKey>,
     descriptors: Vec<StaticContinuationFusionDescriptor>,
+    #[cfg(test)]
+    walked_admitted_continuation_discoveries: usize,
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -9059,6 +9061,13 @@ impl StaticContinuationFusionPlan {
         &self,
     ) -> &[StaticContinuationFusionDescriptor] {
         &self.descriptors
+    }
+
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn observed_walked_admitted_continuation_discoveries(
+        &self,
+    ) -> usize {
+        self.walked_admitted_continuation_discoveries
     }
 
     fn is_empty(&self) -> bool {
@@ -10033,12 +10042,18 @@ pub(in crate::cranelift_backend) fn build_static_continuation_fusion_plan(
     declarations: &BTreeMap<&str, &RuntimeDeclaration>,
     oriented: Option<&crate::OrientedSubcontinuationPlanV1>,
 ) -> Result<StaticContinuationFusionPlan, CraneliftBackendError> {
-    let candidates = enumerate_live_fusion_candidates(plan, entry, declarations, oriented)?;
+    let (candidates, _walked_admitted_continuation_discoveries) =
+        enumerate_live_fusion_candidates_with_input_size(plan, entry, declarations, oriented)?;
+    let mut fusion = StaticContinuationFusionPlan::default();
+    #[cfg(test)]
+    {
+        fusion.walked_admitted_continuation_discoveries =
+            _walked_admitted_continuation_discoveries;
+    }
     let Some(oriented) = oriented else {
-        return Ok(StaticContinuationFusionPlan::default());
+        return Ok(fusion);
     };
 
-    let mut fusion = StaticContinuationFusionPlan::default();
     for candidate in &candidates {
         let key = primary_fusion_key(candidate);
         let rederived = rederive_fusion_key(plan, oriented, &key)?;
@@ -10245,19 +10260,31 @@ fn enumerate_live_fusion_candidates(
     declarations: &BTreeMap<&str, &RuntimeDeclaration>,
     oriented: Option<&crate::OrientedSubcontinuationPlanV1>,
 ) -> Result<Vec<StaticContinuationFusionCandidate>, CraneliftBackendError> {
+    enumerate_live_fusion_candidates_with_input_size(plan, entry, declarations, oriented)
+        .map(|(candidates, _)| candidates)
+}
+
+fn enumerate_live_fusion_candidates_with_input_size(
+    plan: &StaticTransitionPlan<'_>,
+    entry: &RuntimeExpr,
+    declarations: &BTreeMap<&str, &RuntimeDeclaration>,
+    oriented: Option<&crate::OrientedSubcontinuationPlanV1>,
+) -> Result<(Vec<StaticContinuationFusionCandidate>, usize), CraneliftBackendError> {
     crate::cranelift_backend::planning::validate_oriented_subcontinuation_transport(
         entry,
         declarations,
         oriented,
     )?;
     let Some(oriented) = oriented else {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), 0));
     };
     let transport = build_checked_transport(plan, oriented)?;
     let ih_bindings = build_checked_ih_bindings(plan)?;
     let mut candidates = Vec::new();
+    let admitted_continuation_discoveries = fusion_root_source_for_future_enumerator(plan)?;
+    let walked_admitted_continuation_discoveries = admitted_continuation_discoveries.len();
 
-    for admitted in fusion_root_source_for_future_enumerator(plan)? {
+    for admitted in admitted_continuation_discoveries {
         let continuation_origin = admitted.continuation_origin;
         let RuntimeExpr::ComputationalMatch { cases, .. } =
             plan.planned_occurrence_expr(continuation_origin)?
@@ -10366,7 +10393,7 @@ fn enumerate_live_fusion_candidates(
             }
         }
     }
-    Ok(candidates)
+    Ok((candidates, walked_admitted_continuation_discoveries))
 }
 
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2i` — the root source fusion enumeration

@@ -555,17 +555,37 @@ pub(in crate::cranelift_backend) struct D2fGateArrival {
     /// gate pins that zero beside a resolved plane so the later `0 -> 1` is a
     /// statement about emission.
     pub(in crate::cranelift_backend) fusion_definitions: usize,
+    /// The admitted-continuation-discovery ledger entries the production
+    /// enumerator actually walked.
+    pub(in crate::cranelift_backend) walked_admitted_continuation_discoveries: usize,
+    /// The oriented plan's frame-template population.
+    pub(in crate::cranelift_backend) oriented_frames: usize,
+    /// The oriented plan's checked recursive-call-template population.
+    pub(in crate::cranelift_backend) oriented_recursive_calls: usize,
+    /// The oriented plan's computational-IH-slot-template population.
+    pub(in crate::cranelift_backend) oriented_computational_ih_slots: usize,
+    /// The oriented plan's computational-IH-call-template population.
+    pub(in crate::cranelift_backend) oriented_computational_ih_calls: usize,
 }
 
 #[cfg(test)]
 thread_local! {
     static D2F_GATE_ARRIVALS: std::cell::RefCell<Vec<D2fGateArrival>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    static D2F_GATE_OBSERVATION_ENABLED: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(true) };
 }
 
 #[cfg(test)]
 fn d2f_gate_note_arrival(arrival: D2fGateArrival) {
-    D2F_GATE_ARRIVALS.with(|cell| cell.borrow_mut().push(arrival));
+    if D2F_GATE_OBSERVATION_ENABLED.get() {
+        D2F_GATE_ARRIVALS.with(|cell| cell.borrow_mut().push(arrival));
+    }
+}
+
+#[cfg(test)]
+fn set_d2f_gate_observation_enabled(enabled: bool) {
+    D2F_GATE_OBSERVATION_ENABLED.set(enabled);
 }
 
 /// Drains every production fusion-builder arrival on this thread since the last
@@ -2191,6 +2211,20 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             .observed_descriptors()
             .to_vec(),
         fusion_definitions: static_transition_plan.observed_fusion_definition_count(),
+        walked_admitted_continuation_discoveries: static_continuation_fusion_plan
+            .observed_walked_admitted_continuation_discoveries(),
+        oriented_frames: oriented_subcontinuation_plan
+            .as_ref()
+            .map_or(0, |plan| plan.frames.len()),
+        oriented_recursive_calls: oriented_subcontinuation_plan
+            .as_ref()
+            .map_or(0, |plan| plan.recursive_calls.len()),
+        oriented_computational_ih_slots: oriented_subcontinuation_plan
+            .as_ref()
+            .map_or(0, |plan| plan.computational_ih_slots.len()),
+        oriented_computational_ih_calls: oriented_subcontinuation_plan
+            .as_ref()
+            .map_or(0, |plan| plan.computational_ih_calls.len()),
     });
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — THE FIRST BEHAVIOUR-CHANGING
     // STEP. Everything above this point observed the plane; from here the plane
