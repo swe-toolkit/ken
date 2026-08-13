@@ -40,8 +40,9 @@ pub(in crate::cranelift_backend) use static_transition::{
 #[cfg(test)]
 pub(in crate::cranelift_backend) use static_transition::{
     d2j_checked_fixture_under, d2j_installed_plan_under, r3_fusion_claim_consumptions,
-    reset_r3_fusion_claim_consumptions, with_fusion_claim_parameter_mutation, D2jCause,
-    FusionClaimParameterMutation, D2J_DECLARATION,
+    reset_r3_fusion_claim_consumptions, with_fusion_claim_parameter_mutation,
+    with_fusion_producer_capture_mutation, D2jCause, FusionClaimParameterMutation,
+    FusionProducerCaptureMutation, D2J_DECLARATION,
 };
 pub(super) use static_transition::plan_static_transition_graph_with_symbols;
 #[cfg(test)]

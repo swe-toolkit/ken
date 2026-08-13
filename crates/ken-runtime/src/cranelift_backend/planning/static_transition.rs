@@ -9596,13 +9596,50 @@ pub(in crate::cranelift_backend) enum FusionClaimParameterMutation {
     AppendCallee,
 }
 
+/// Test-only corruption of the producer-capture population after the fusion
+/// key has selected its real producer descriptor.
+///
+/// This moves only the selected descriptor's capture count presented to fusion
+/// admission. It does not invent a claim, source relation, capture authority,
+/// or ABI input; the production detector must refuse the new non-empty
+/// disposition before the fusion ABI is installed.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum FusionProducerCaptureMutation {
+    Exact,
+    ForceNonEmptyAfterSelection,
+}
+
 #[cfg(test)]
 thread_local! {
     static FUSION_CLAIM_PARAMETER_MUTATION: Cell<FusionClaimParameterMutation> =
         const { Cell::new(FusionClaimParameterMutation::Exact) };
+    static FUSION_PRODUCER_CAPTURE_MUTATION: Cell<FusionProducerCaptureMutation> =
+        const { Cell::new(FusionProducerCaptureMutation::Exact) };
     static R3_FUSION_CLAIM_CONSUMPTIONS: std::cell::RefCell<
         Vec<(StaticContinuationFusionId, StaticOriginId)>,
     > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Run one production compile with the selected producer's capture population
+/// changed from empty to non-empty. The guard restores exact behaviour even if
+/// planning returns early or unwinds.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_fusion_producer_capture_mutation<R>(
+    mutation: FusionProducerCaptureMutation,
+    run: impl FnOnce() -> R,
+) -> R {
+    struct Restore(FusionProducerCaptureMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FUSION_PRODUCER_CAPTURE_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = FUSION_PRODUCER_CAPTURE_MUTATION.with(|cell| cell.replace(mutation));
+    let _restore = Restore(previous);
+    run()
 }
 
 /// Run one production compile with a single claim-parameter defect installed.
@@ -9856,10 +9893,12 @@ impl FusionRegionClaimLedger {
             if invocation_parameters.len() != parameter_slots {
                 return Err(fusion_claim_error(FusionClaimRefusal::InputAvailability));
             }
-            // 4. The producer-capture run is EMPTY on this admitted population.
-            //    A future non-empty one is a new ABI disposition and refuses
-            //    here rather than being folded into the parameters or into
-            //    `inputs`.
+            // 4. Producer-capture emptiness was already closed at
+            //    `install_static_continuation_fusions`, against the selected
+            //    producer descriptor. The captures below are the DISTINCT
+            //    continuation-input suffix that becomes `claim.inputs()`;
+            //    reading them as producer captures would conflate the two ABI
+            //    axes the admission check exists to keep separate.
             if view.header().captures as usize != key.continuation_inputs.len() {
                 return Err(fusion_claim_error(FusionClaimRefusal::InputAvailability));
             }
@@ -15227,6 +15266,33 @@ impl<'src> StaticTransitionPlan<'src> {
                          the operand run its redirected invocation already passes is unknown",
                     )
                 })?;
+            // `R3` -- the producer-capture run and the continuation-capture
+            // suffix are different axes. The former is read from the selected
+            // producer descriptor here; the latter comes from
+            // `key.continuation_inputs` below and becomes `claim.inputs()`.
+            //
+            // This admitted population has no producer captures. A non-empty
+            // run is a new ABI disposition: it refuses before fusion-ABI
+            // installation rather than being folded into the ordinary
+            // parameter run or the continuation-capture suffix.
+            let producer_captures = producer.header.captures;
+            #[cfg(test)]
+            let producer_captures = if FUSION_PRODUCER_CAPTURE_MUTATION.with(Cell::get)
+                == FusionProducerCaptureMutation::ForceNonEmptyAfterSelection
+            {
+                // Population-side mutation only. The real producer descriptor
+                // has already been selected; no input or authority is added.
+                producer_captures.max(1)
+            } else {
+                producer_captures
+            };
+            if producer_captures != 0 {
+                return Err(planner_error(
+                    "a static continuation fusion's producer capture run is non-empty; this ABI \
+                     disposition cannot be folded into the fused invocation's ordinary \
+                     parameters or continuation-input capture suffix",
+                ));
+            }
             projections.push(abi::PlannedStaticContinuationFusionAbi {
                 id,
                 producer_parameters: producer.header.parameters,

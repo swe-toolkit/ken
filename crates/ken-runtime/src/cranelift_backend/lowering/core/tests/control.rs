@@ -3453,6 +3453,165 @@ fn r3_fused_wrong_consuming_call_refuses_before_claim_consumption() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- fusion admission accepts an empty
+/// producer-capture run only, independently of the checked continuation-capture
+/// suffix later exposed as `claim.inputs()`.
+///
+/// **MEASURED:** the real selected producer descriptor has zero captures on
+/// both governed roots. Exact retains its two checked continuation captures and
+/// completes at one claim consumption and one fused invocation; ReHomed retains
+/// its zero-capture comparator and also completes at one and one. Changing only
+/// the post-selection producer-capture count to non-empty reaches the named
+/// admission refusal on both roots at zero and zero.
+///
+/// **CLAIMED:** a non-empty producer-capture population is a new ABI
+/// disposition and refuses before fusion ABI installation, emission, affine
+/// claim consumption, or fused invocation. It is never folded into ordinary
+/// parameters or into the distinct `claim.inputs()` suffix.
+///
+/// **THE GAP:** this pins the producer descriptor's capture-count boundary and
+/// its separation from the real zero/two consumer suffixes. It does not define
+/// an ABI for producer captures, invent a capture input, or pin failures after
+/// the declared fused call begins building.
+///
+/// **Promise class: durable invariant.** The mutation is downstream of exact
+/// producer-descriptor selection and changes no source, claim, relation, or ABI
+/// input.
+#[test]
+fn r3_fused_nonempty_producer_captures_refuse_before_emission() {
+    use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, d2j_installed_plan_under,
+        r3_fusion_claim_consumptions, reset_r3_fusion_claim_consumptions,
+        with_fusion_producer_capture_mutation, D2jCause, FusionProducerCaptureMutation,
+        D2J_DECLARATION,
+    };
+
+    fn continuation_capture_count(cause: D2jCause) -> u32 {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let plan = d2j_installed_plan_under(cause, &entry, &declarations, &oriented)
+            .expect("the governed root installs its exact fusion plan");
+        let views = plan
+            .continuation_fusions()
+            .expect("the installed fusion plane rejoins its ABI");
+        assert_eq!(views.len(), 1, "one governed root installs one fusion");
+        views[0].header().captures
+    }
+
+    fn compile(
+        cause: D2jCause,
+        mutation: FusionProducerCaptureMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let error = with_fusion_producer_capture_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-producer-captures",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
+                if reason.contains("producer capture run is non-empty")
+                    && reason.contains("continuation-input capture suffix") =>
+            {
+                "producer-capture refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    assert_eq!(
+        (
+            continuation_capture_count(D2jCause::Exact),
+            continuation_capture_count(D2jCause::ReHomed),
+        ),
+        (2, 0),
+        "Exact retains its two checked continuation captures while ReHomed is the real \
+         zero-capture comparator; neither count is the producer-capture population"
+    );
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (FusionProducerCaptureMutation::Exact, "exact"),
+            (
+                FusionProducerCaptureMutation::ForceNonEmptyAfterSelection,
+                "nonempty-producer-captures",
+            ),
+        ] {
+            let symbol = format!("ken_r3_producer_captures_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                FusionProducerCaptureMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                FusionProducerCaptureMutation::ForceNonEmptyAfterSelection,
+                "producer-capture refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionProducerCaptureMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionProducerCaptureMutation::ForceNonEmptyAfterSelection,
+                "producer-capture refusal",
+                0,
+                0,
+            ),
+        ],
+        "both exact roots retain their real consumer-capture behaviour and complete once; a \
+         non-empty producer-capture population refuses before either affine event"
+    );
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.
