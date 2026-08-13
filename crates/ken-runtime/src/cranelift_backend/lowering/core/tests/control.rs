@@ -2765,12 +2765,16 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// NOT a compile of real Ken source.** The fixtures here are `D2jCause`
 /// synthetic programs, as at every control on this seat. Measured 2026-08-13
 /// and recorded in full on
-/// [`d2f_the_two_binder_projections_share_one_source_field_transport`]: the
-/// ordinary front end emits **no `ComputationalMatch` at all** across eight
-/// real-source programs, including `px7p`'s own green integration program — so
-/// there is no real-source witness available to any row here, and the name
-/// should not be read as claiming one. The gap is reported and unrepaired: the
-/// classifier admitting this shape is a checker change, not this seat's.
+/// [`d2f_the_two_binder_projections_share_one_source_field_transport`]: **eight
+/// SAMPLED real-source programs** censused zero `ComputationalMatch`, including
+/// `px7p`'s own green integration program. The name should not be read as
+/// claiming a real-source witness, because these fixtures are not one.
+///
+/// ⛔ **Do NOT read that as "the front end emits none."** It does emit them —
+/// measured 2026-08-13 via the nested-result selector path, which the eight
+/// programs did not exercise. What holds here is the narrower fact that **these
+/// rows' own fixtures are synthetic**, which is a statement about this file and
+/// not about the front end.
 ///
 /// **Named rather than cited by line**, because a line number goes stale
 /// silently and then points at unrelated real content — a reader who follows it
@@ -3110,11 +3114,28 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// runnable, because a control armed against a shape the checker never emits is
 /// worth less than an honest gap.
 ///
-/// **THAT QUESTION IS NOW ANSWERED, AND THE ANSWER IS THE HONEST GAP: the
-/// ordinary front end does not emit a `ComputationalMatch` at all.** Measured
-/// through `ken_cli::build_native_program` on real Ken source, censusing the
-/// checker's own erased output (`runtime_program.declarations`, whose only
-/// body-bearing kind is `Transparent`, so the census is not partial):
+/// **REFUTED, 2026-08-13, and the refutation leads because that is where a
+/// withdrawn claim otherwise survives.** The paragraph below once read *"the
+/// ordinary front end does not emit a `ComputationalMatch` at all"*. That is
+/// **false**. Architect `evt_2gzjt1zqy402z`'s bounded producer probe measured
+/// `NESTED_LIFT_NAT_THREE_SOURCE` — real source, ordinary front end — producing
+/// a **retained generated lifted-family `ComputationalMatch` in erased Runtime
+/// IR**, `recursive_positions = [2, 3]`, under both `Executable` and `Library`
+/// selection. Surface Ken **does** have an erased-IR producer, via the
+/// nested-result selector path (`recursive result for xs/ys`), which none of the
+/// eight programs below exercised.
+///
+/// **The only statement the table supports, and the only one to quote:** these
+/// eight *sampled* programs censused zero, and every then-current positive
+/// control at this seat was synthetic. Both halves are still true. Neither
+/// licenses a claim about the front end's whole output — the sample had no
+/// nested inductive with an explicit selector in it, so it could not have seen
+/// the producer that exists.
+///
+/// **THE SAMPLE, retained because it is still the evidence for what it covers.**
+/// Measured through `ken_cli::build_native_program` on real Ken source,
+/// censusing the checker's own erased output (`runtime_program.declarations`,
+/// whose only body-bearing kind is `Transparent`, so the census is not partial):
 ///
 /// | real-source program | `ComputationalMatch` | outcome |
 /// |---|---|---|
@@ -3160,8 +3181,8 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 /// self-calling branch is present and is still not IH-referencing.
 ///
 /// ⇒ **The multi-branch route needs one IH-referencing branch to earn the
-/// classification, and NO surface branch is one.** Two independent mechanisms,
-/// each measured:
+/// classification, and neither mechanism below supplies one.** Two independent
+/// mechanisms, each measured:
 ///
 /// 1. **Surface recursion is named general recursion checked by SCT, not
 ///    eliminator compilation.** A self-call erases to a
@@ -3174,10 +3195,24 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 ///    is not in the erased IR to be matched on.
 ///
 /// **This is reported, not routed around.** The existential refinement is
-/// correct and it is not what was blocking; the blocker is that the surface has
-/// no producer of an IH-binder reference at all. Naming which of the two claims
-/// moved matters more than the negative: the first report's *reason* was too
-/// broad, and its *conclusion* survives for a narrower reason.
+/// correct and it is not what was blocking. Naming which claim moved matters
+/// more than the negative: the first report's *reason* was too broad.
+///
+/// ⛔ **AND THE SENTENCE THAT ONCE CLOSED THIS PARAGRAPH IS ALSO REFUTED.** It
+/// read *"the blocker is that the surface has no producer of an IH-binder
+/// reference at all"*. There is one. Architect `evt_2gzjt1zqy402z`'s probe
+/// measured branch `ctor_577` of the generated lifted family, `argument_count =
+/// 4`, `recursive_positions = [2, 3]`, whose peeled body's variable occurrences
+/// are `[1, 0]` — **both inside the recursive range**, produced by the two
+/// `recursive result for xs/ys` selectors.
+///
+/// ⇒ **The two mechanisms above remain exactly true of what they name** —
+/// SCT-checked self-recursion, and the specialized-away `ITree` eliminator — and
+/// they were never the whole population. The nested-result selector path is a
+/// third mechanism neither of them covers, and it is the producer. **A list of
+/// two measured mechanisms was written as though it were a closed enumeration;
+/// that is the error to learn from here, and it is the second time on this row
+/// that a sample was reported in the voice of a population.**
 ///
 /// **THE GAP, stated as its own sentence.** MEASURED: eight real-source programs,
 /// including two of this repo's own integration programs, produce zero
@@ -3191,11 +3226,18 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
 ///
 /// **What this says about the node, and it is larger than control 2.** Every
 /// control that reaches this seat — control 1 included, green above — does so
-/// through a `D2jCause` synthetic fixture, and the reason is now measured rather
-/// than suspected: **the front end does not produce the shape.** That is exactly
-/// the `D0` history the scope ruling cited, observed directly instead of
-/// inherited. It is reported, deliberately not repaired: making the classifier
-/// admit this shape is a checker change and is not this seat's to make.
+/// through a `D2jCause` synthetic fixture. That much is measured rather than
+/// suspected, and it is the `D0` history the scope ruling cited, observed
+/// directly instead of inherited.
+///
+/// ⛔ **The REASON once given here was wrong and is withdrawn.** This paragraph
+/// read *"the front end does not produce the shape"*. It does produce it — see
+/// the refutation at the head of
+/// [`d2f_the_two_binder_projections_share_one_source_field_transport`]. So the
+/// synthetic-fixture fact stands, its explanation does not, and **why** these
+/// rows are synthetic is now open rather than answered: a real-source producer
+/// exists and no row here uses it. Read this as a debt with a known payer, not
+/// as a closed boundary.
 ///
 /// **What the same probe DID establish**, on both roots, read directly out of
 /// the recorded run: `[(0, Some(TransportId(0))), (1, Some(TransportId(0)))]` —
