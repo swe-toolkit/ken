@@ -38,7 +38,129 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~23:2xZ. **`main` = `689dabd7`.**
+> ### RESUME HERE — state at 2026-08-13 ~00:0xZ. **`main` = `07b20585`.**
+>
+> **THE PROBE ANSWERED THE FORK IN ONE RUN, AND THE ANSWER IS THE ORDERING
+> BRANCH** (`evt_7ydbavjbtxx97`). At the consumer's producer-call seat the
+> redirected fusion invocation **has not emitted yet** — it emits immediately
+> afterwards, in the same function, downstream of the very call the forward
+> replaces. **The forward seat is upstream of the value it is meant to
+> forward.**
+>
+> **What that rules out, as fact rather than recommendation:** the fused answer
+> is not merely out of scope at the forward seat — **it has not been produced by
+> any seat in that function yet.** So no operand selection at that seat could
+> ever have worked: not that position, not another position, not another operand
+> class, and **not a source relation**. That kills the other branch outright
+> rather than merely disfavouring it.
+>
+> **The counterfactual is in the same run**, so "does the redirect emit at all"
+> is not left to inference: with the disposition bypassed, the same consumer-side
+> invocation appears on both witnesses and that run reaches the old
+> `StaticWorkerBinding` refusal. The redirect is real and executes; the
+> disposition-active run simply refuses before reaching it.
+>
+> **The method note is the part to keep.** Getting both seats into ONE run took
+> three temporary bypasses. The implementer **had the ordering across two
+> configurations first and did not post it**, on the grounds that a
+> cross-configuration ordering is a weaker claim than it reads as. That judgement
+> is correct and is why this measurement is load-bearing where the previous four
+> premises were not.
+>
+> **THE SEQUENCING RULING PAID FOR ITSELF.** The Architect recorded the hold
+> (`evt_1yaespw07q1y3`) and did not rule; the probe cost minutes and eliminated
+> a full branch. Ruling blind would have been a coin flip.
+>
+> **NOW WITH THE ARCHITECT** (leader routed `evt_1cb67mps4crsy`, 00:01:23Z): does
+> the forward move, does the redirect move, or does a lawful new join establish
+> their order? **That is mechanism and it is the Architect's alone.** It is
+> grounding against the actual diff at `a3c25dae`, which is the right shape.
+> Held R3 unchanged at `a3c25dae`, 12 commits, base `07b20585`, unarmed,
+> unrouted, not a candidate.
+>
+
+> **A FOURTH PREMISE WAS REFUTED, AND I RULED THE SEQUENCING AGAIN
+> (`evt_6j04882rsx096`): the bounded probe runs BEFORE the Architect rules.**
+> The Architect had already ruled the forward disposition
+> (`evt_713gc922d1d7g` — the region-owned call is an exact `FusionForward`, not
+> a surviving standalone call). The implementer **built it exactly as ruled**,
+> rebased onto `07b20585`, and its own fail-closed guard then measured the
+> ruled operand premise **false on both witnesses**: recursive position 0 holds
+> `Lowered::Closure`, and there is **no `Carried` anywhere in that field run**.
+> Removing the emitted specialization call removed the only value the forward
+> was to carry.
+>
+> **NEW TIP `a3c25dae`, 12 commits, base `07b20585`**, with the full 11-commit
+> rebase mapping published and a **zero-`crates/` delta** proof, so every
+> region-scoped verdict re-attaches. Unarmed, unrouted, not a candidate.
+>
+> **THE GUARD REFUSING IS THE MECHANISM WORKING** — recorded so it is not
+> re-litigated. A forward that had silently taken the closure would have been
+> the fifth inert fix and far more expensive to find. Declining to hunt the
+> fused answer elsewhere was also correct: choosing a different operand source
+> is the reserved decision, not an implementation detail.
+>
+> **THE FORK IS A QUESTION OF FACT, WHICH IS WHY THE PROBE COMES FIRST.** Has
+> the redirected fusion invocation emitted by the time the producer-call seat
+> has lowered its fields? If yes, the forward needs a **source relation** rather
+> than the ruled field position. If no, the forward seat is **upstream** of the
+> value and the **ordering** is what must change. Two branches, two different
+> repairs, one probe at the redirect seat. **Ruling blind is a one-in-two chance
+> of a fifth refuted premise at the cost of a full Architect turn plus a
+> dispatch plus a grounding turn plus a re-route.**
+>
+> **THE PATTERN, now four for four:** every mechanism prescribed for this seam
+> has been refuted by measurement — terminalization, the generic funnel, receipt
+> ordering, and now the forward's operand premise. **The classification has
+> survived all four untouched.** What keeps failing is the layer beneath it, the
+> same way each time: prescribed against the emitter's documented intent,
+> refuted by the measured control flow. The one time we measured first, it
+> retired a question three ruling cycles could not settle and surfaced route C.
+>
+> **Independent confirmation the sequencing is right:** the Architect, on its
+> own post-compaction turn and before reading my ruling, said it would *"issue
+> only the bounded causal-read disposition this evidence supports."*
+>
+> **I HOLD TWO DOC-ONLY COMMITS AND THE HOLD IS CORRECT RIGHT NOW** — freshly
+> derived, not inherited. The implementer rebased onto `07b20585` at 23:42 and
+> is mid-probe on that base; publishing would stale a rebase minutes old. **Ship
+> them the moment the ring is between turns.**
+>
+
+> **THE RING HOLDS THE NEXT MOVE. There is nothing to frame and nothing to
+> start.** The Architect owes a ruling on the flagged not-surviving judgement
+> (routed by `runtime-leader` at 23:23Z; the Architect pane was stranded on two
+> pastes — I cleared it and it went to work). Held R3 is unchanged at
+> `9177c6ce`, unarmed, unrouted. **Do not manufacture work while this is out.**
+>
+> **PUBLISHED PR #2042 (doc-only, `07b20585`).** The four held commits are on
+> `main`; blob identity verified on both files; `steward/work` reset. **The base
+> the ring must name from now on is `07b20585`** — `689dabd7` is now stale in
+> the same way `d5912acd` was, and both are named in artifacts below. Posted to
+> the thread at `evt_59s1yqvrv3xkb`.
+>
+> **Why I published into an idle ring rather than holding again.** Zero
+> `crates/` delta, so no held verdict is disturbed, and the Architect had
+> already instructed a rebase at the next natural seam — which absorbs it for
+> free. **The hold was re-derived, not inherited.** Holding this same class of
+> commit once cost three hours of a `main` that described a stop already closed.
+>
+> **CLOSED THIS TICK — `CI-OLD-PRESTATE-ROW-CURRENCY`.** `verify-qa` was
+> awaiting "renewed Spec and Architect votes" on work **already on `main`**:
+> `2bc6cb80` touches one file, its blob is byte-identical to `origin/main`'s,
+> and it landed as squash `3a36d13c`. Told both Verify seats to stand down
+> (`evt_15877p8y3s9h4`). **Third occurrence of the squash-head-reads-unlanded
+> shape** — ancestry is the wrong instrument, blob identity is the right one.
+>
+> **IDLENESS IS NOT BACKLOG RIGHT NOW, and I re-checked rather than assuming.**
+> Verify's only open node is `SEC1-IFC-R3`, `draft`, with the operator. Kernel
+> is Runtime-blocked at `AC-K12` plus an unanswered TCB call. Language is with
+> the operator. **The doc track — the one sanctioned concurrent lane — has zero
+> open nodes; do not manufacture doc work.** The `integrator` roster line is a
+> tombstone and its "PR #365" is not an open loop (merged 2026-07-08 as
+> `3859aaff`).
+>
+> ### The detail behind the above — still current except for `main`
 >
 > > **THE STOP THIS NODE HAS BEEN ON SINCE `evt_2m62086x60c94` IS CLOSED.**
 > > `evt_11werhky391ds`: armed on both witnesses, **the `StaticWorkerBinding`
