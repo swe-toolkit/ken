@@ -3,8 +3,8 @@
 //!
 //! **This is an AUTHORIZED ATTEMPT, not a claim that every gate passes.** The
 //! ruling is explicit that a stop with the exact boundary named is a complete
-//! result. Gates 1-3 are positive and asserted below. **Gate 4 is the stop**, and
-//! it is documented rather than asserted-as-passing.
+//! result. Gates 1-3 are positive and asserted below. **Gate 4a is the stop**,
+//! and it is documented rather than asserted-as-passing.
 //!
 //! ## The candidate
 //!
@@ -35,49 +35,40 @@
 //! | 1 | checked mixed match exists, classified computational via the selector branch | **POSITIVE**, asserted |
 //! | 2 | `Fork` branch has a recursive position but no recursive-range reference | **POSITIVE**, asserted |
 //! | 3 | erased Runtime IR retains that match and `Fork`'s recursive-position identity | **POSITIVE**, asserted |
-//! | 4 | checked IH slot/invocation metadata and oriented/fusion-plan population | **STOP — see below** |
+//! | 4a | compiler-derived IH slots/calls and validated oriented plan | **STOP — see below** |
+//! | 4b | existing Runtime static-fusion planner population | not reached |
 //! | 5 | `R3` composed-seat arrival for the `Fork` branch | not reached |
 //! | 6 | shared transport, `ConstructorChild` resolution, consume-once, green close | not reached |
 //!
-//! ## GATE 4 — THE STOP, AND WHY ITS ZERO IS NOT A RESULT
+//! ## GATE 4a — THE EXACT STOP
 //!
-//! The ruling asks whether a zero here is *lawful absence* or *the first missing
-//! producer relation*. **It is measurably neither yet — it is UNMEASURED**, for
-//! two independent reasons, both recorded so nobody re-derives them:
+//! The compiler-owned pre-object preparation seam now makes the plan-bearing
+//! path readable without entering object emission. The C2 source below extends
+//! the original fixture with a real `main` whose `ProcessInput` selects the
+//! value passed to `liftSize`; it cannot fold to `[main]`.
 //!
-//! 1. **The readable erasure entry cannot compute the markers at all.**
-//!    `erase_checked_core_package_for_target` calls
-//!    `erase_checked_package_with_host_root(package, targets, None, None)` —
-//!    `native_plans = None`. IH slot markers are emitted only where the
-//!    plan-bearing path supplies `branch_slot_templates`. Observing zero on this
-//!    path is near-tautological and is evidence about the entry point, not the
-//!    source.
-//! 2. **The plan-bearing route refuses before it can be read.** Driving the same
-//!    candidate through `ken_cli::build_native_program` — with an input-dependent
-//!    scrutinee, so the checker cannot fold the program away — refuses at object
-//!    emission with the pre-existing **`RT-CLOSURE-BOUNDARY-LANE`** debt:
-//!    *"a closure cannot cross the boundary: it is runtime-local and live-domain
-//!    only, and it has no durable lane"*. That is the same debt already keeping
-//!    the `px8l` and `px7l` rows `#[ignore]`d. It is not this node's, and
-//!    repairing it is not authorized by this ruling.
+//! Preparation refuses before producing an immutable result:
 //!
-//! ⇒ **Gate 4 is blocked on unrelated pre-existing debt, not answered.** Under
-//! the ruling's stop conditions this is where the walk ends: no plan or marker
-//! may be hand-authored to get past it, and none was.
+//! ```text
+//! Erasure(ExpressionLowering {
+//!   symbol: declaration:r3_c2_mixed_native_pkg::main,
+//!   lane: "checked_computational_ih_slot_unconsumed",
+//!   reason: "not every supplied computational IH slot template was consumed exactly once",
+//! })
+//! ```
 //!
-//! **A foldaway trap worth recording, because it produced a false green first.**
-//! With a closed literal scrutinee the native build *succeeds* and erases to
-//! `decls = [main]` with a census of all zeros — the whole computation constant
-//! -folded. A green build there would have "measured" gate 4 while observing
-//! nothing at all. The input-dependent scrutinee is what turned that false green
-//! into the real refusal above.
+//! This is the ordered 4a stop: total compiler-derived slot-seed consumption is
+//! the first missing relation. No caller-authored plan or marker was introduced,
+//! and no classifier, checker, marker, enumeration, fusion candidate, Runtime
+//! representation, ledger, or closure-boundary mechanism was changed. Gate 4b
+//! and gates 5-6 were not reached; production remains unarmed.
 //!
 //! ## Promise class
 //!
 //! **Durable invariant** for gates 1-3: they assert relations — the existence of
 //! a classifier-earning selector branch, and a sibling branch that carries a
 //! recursive position while referencing none of it — which any extension
-//! preserving the mixed shape keeps green. Gate 4's stop is documented in prose
+//! preserving the mixed shape keeps green. Gate 4a's stop is documented in prose
 //! here and deliberately **not** asserted, because asserting a blocked
 //! measurement would pin the blockage as the expectation.
 //!
@@ -89,15 +80,16 @@ use ken_elaborator::checked_core::{
     CheckedCoreMatchBranchView, CheckedCoreMatchView, StableSymbol, SymbolNamespace,
 };
 use ken_elaborator::compiler_driver::{
-    compile_ken_package_sources, CompilerManifest, CompilerSource, CompilerTargetKind,
-    TargetSelector,
+    compile_ken_package_sources, prepare_native_program_sources, CompilerManifest, CompilerSource,
+    CompilerTargetKind, TargetSelector,
 };
 use ken_elaborator::erasure::erase_checked_core_package_for_target;
 
 /// The `C1` family extended with the W-style `Fork`. The `Join` branch's
 /// selectors and the `Fork` branch's direct `k True` application are the two
 /// structural facts the ruling fixes; they must not be edited.
-const C2_MIXED_SOURCE: &str = "data Bag (a : Type) : Type where { \
+const C2_MIXED_SOURCE: &str = "program capabilities FS APartial\n\
+    data Bag (a : Type) : Type where { \
       Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a ; \
       Fork : (Bool -> Bag a) -> Bag a \
     }\n\
@@ -123,7 +115,26 @@ const C2_MIXED_SOURCE: &str = "data Bag (a : Type) : Type where { \
     const liftSizeResult : Nat = liftSize \
       (LiftNode (Join LiftRose \
         (One LiftRose LiftLeaf) \
-        (One LiftRose (LiftNode (Empty LiftRose)))))";
+        (One LiftRose (LiftNode (Empty LiftRose)))))\n\
+    fn inputRose (input : ProcessInput) : LiftRose = match input { \
+      MkProcessInput arguments _environment _cwd |-> match arguments { \
+        Nil |-> LiftLeaf ; \
+        Cons _ rest |-> match rest { \
+          Nil |-> LiftLeaf ; \
+          Cons _ _ |-> LiftNode (Join LiftRose \
+            (One LiftRose LiftLeaf) \
+            (Fork LiftRose (\\b. match b { \
+              False |-> Empty LiftRose ; True |-> One LiftRose LiftLeaf \
+            }))) \
+        } \
+      } \
+    }\n\
+    fn sizeExit (n : Nat) : ExitCode = match n { \
+      Zero |-> Success ; Suc _ |-> Failure 7 \
+    }\n\
+    fn main (input : ProcessInput) (_caps : ProgramCaps APartial) \
+      : HostIO APartial ExitCode = \
+      host_exit APartial (sizeExit (liftSize (inputRose input)))";
 
 fn decl_symbol(package: &str, name: &str) -> StableSymbol {
     StableSymbol::declaration(package, &[], name)
@@ -413,8 +424,28 @@ fn c2_source_mixed_branch_walk_gates_one_to_three() {
          identity -- the selected-argument branch survives to Runtime IR as itself"
     );
 
-    // ---- GATE 4 is the STOP. It is documented in this file's header and is
-    // deliberately NOT asserted here: the measurement is blocked on pre-existing
-    // RT-CLOSURE-BOUNDARY-LANE debt, and asserting a blocked measurement would
-    // pin the blockage as the expectation.
+    // ---- GATE 4a is the STOP. It is documented in this file's header and is
+    // deliberately NOT asserted here: the plan-bearing preparation refuses at
+    // total compiler-derived slot-seed consumption. Asserting that refusal as
+    // expected behaviour would pin the blockage rather than the intended
+    // relation.
+}
+
+/// Transition sentinel for the ordered gate-4a relation. This is a positive
+/// control, not an assertion that the present refusal is expected behaviour.
+/// Retire the ignore only when preparation consumes every compiler-derived C2
+/// slot seed exactly once and returns the immutable planned Runtime program.
+#[test]
+#[ignore = "gate 4a stops at checked_computational_ih_slot_unconsumed"]
+fn c2_gate_4a_preparation_consumes_every_compiler_derived_slot() {
+    let preparation = prepare_native_program_sources(
+        "r3_c2_mixed_native_pkg",
+        vec![CompilerSource::new("src/main.ken", C2_MIXED_SOURCE)],
+    )
+    .expect("input-dependent C2 reaches an immutable pre-object preparation");
+
+    assert!(
+        preparation.executable_closure().len() > 1,
+        "the input-dependent C2 witness must not fold to [main]"
+    );
 }
