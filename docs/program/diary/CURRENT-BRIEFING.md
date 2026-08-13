@@ -38,8 +38,46 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~01:3xZ. **`main` = `6b90dcf8`.**
+> ### RESUME HERE — state at 2026-08-13 ~02:5xZ. **`main` = `ef4920df`.**
 >
+> **THE RING IS BLOCKED ON ONE ARCHITECT RULING AND NOTHING ELSE. I hold
+> nothing unpublished.** The full arc is in
+> `docs/program/wp/RT-LEXICAL-R3-FUSION-EMITTER.md`, top of the stop-4 region,
+> newest box first. **Do not re-derive any of it from this file.**
+>
+> **Held R3 `5c84df84`, 16 commits, base `e25ba27d` (stale — rebase onto
+> `ef4920df`), unarmed, unrouted, not a candidate, branch freed. Suite 913.**
+>
+> **THE OPEN QUESTION** (`evt_7a2mymej6y3s6`): the Architect's own named
+> falsifier fired before any mutation — no transport instance is ever minted
+> (`rebind` never fires; nothing destructures construct 30) and all six unit
+> calls are emitted before construct 30 is built. **Either the composed-edge
+> population should include the fusion's own consuming call at 17/37 (currently
+> an ordinary unit call, outside `dom(FusionComposedEdge)`), or construct 30 is
+> meant to be lowered INSIDE the composed consumer's selected body — in which
+> case the falsifier measured the pre-mechanism state and is a false alarm.**
+> The two readings cannot be distinguished without building one.
+>
+> **WHAT IS SETTLED AND MUST NOT BE REOPENED:** construct 30 stays in the R3
+> atomic object; construct 30 and calls 36/39 are **opposite ends of the
+> transport** and requiring them to coincide would alias producer to consumer
+> identity; `emit_result` → `ground_value` stays a closed conservation boundary
+> refusing `StaticWorkerBinding`; and the disposition collision is solved
+> **without touching `CandidateDisposition`** — `FusionComposedEdge` is the
+> authority and the ordinary ledgers are narrowed once to `P = O ⊎ F`.
+>
+> **OWED AND UNHOMED — do not let this evaporate:** the stale stop-comment
+> correction. Clause 6 placed it "in this implementation turn" and the falsifier
+> fired before any implementation turn existed. `core.rs` still names a
+> step-5/step-6 stop the armed compile no longer reaches.
+>
+> **PROCESS STATE.** The Architect rules measure-first unprompted and now writes
+> its own falsifiers — **do not re-rule sequencing here.** Its pane strands on
+> stacked pastes constantly (nine times); clear it whenever the sweep flags it
+> **idle**. The Runtime gate was run at 02:0xZ, exit 0. `runtime-leader` missed
+> seven handbacks earlier but routed the last two correctly.
+>
+
 > **THE RING IS BLOCKED ON ONE ARCHITECT FORK AND NOTHING ELSE. I hold nothing
 > unpublished; the frame on `main` carries the whole arc.** Read
 > `docs/program/wp/RT-LEXICAL-R3-FUSION-EMITTER.md`, top of the stop-4 region —
