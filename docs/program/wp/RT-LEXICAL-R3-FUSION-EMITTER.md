@@ -951,12 +951,49 @@ nothing you inherit from `#6d`.**
 > the fixture. "The front end will not admit this witness" remains an acceptable
 > result to report.
 
+> ### TWO FINDINGS ARE OWED ON THE NEXT R3 INCREMENT — Steward, 2026-08-13,
+> ### carrying Architect `evt_tjdg2n3nk47b` (gate 4a, approved on cast).
+> ### **Findings 1 and 2 are OWED work, not observations. 3 and 4 are watch
+> ### items with no action.**
+>
+> **1. A TAUTOLOGICAL ASSERT SITS WHERE THE READ/CONSUME OBLIGATION IS SUPPOSED
+> TO BE DISCHARGED — and this is the FOURTH instance of the lens below.** In
+> `gate_4a_preparation_and_full_build_are_one_transaction`,
+> `std::ptr::eq(preparation.runtime_program(), preparation.runtime_program.as_ref())`
+> compares one borrow of one box **against itself** — the accessor *is*
+> `&self.runtime_program`, so it cannot fail under any implementation, including
+> a wrong one. Its message claims the accessor "must borrow the consumed boxed
+> program." **The obligation is real and is genuinely discharged four lines
+> later** by `program_identity` against `output.runtime_program`; this assert
+> adds nothing, and **when the `#[ignore]` retires it will read as covering the
+> read/consume fork while proving nothing.** Delete it, or make it compare
+> **across the completion boundary**.
+>
+> **2. `GATE_4A_EQUALITY_SOURCE` claims landed provenance for a const authored
+> in the same diff.** Its doc says *"the only landed native source found to
+> retain more than `[main]`"* — but that source **is added by this commit**.
+> Say which it is: a survey result over landed fixtures, or a source written
+> here. **This node has now paid three times in one day for a sample stated in
+> the voice of a population.** Small, same shape.
+>
+> **3 and 4 — watch items, no action.** `NativeProgramPreparationV1` derives
+> `Clone`, so a transaction whose entire contract is object identity is silently
+> forkable in-crate — not reachable by an outside caller, but a footgun aimed at
+> the exact property the control measures. And `#[inline(always)]` is now
+> **load-bearing for stack safety, not performance**: removing it as a cleanup
+> silently reinstates the overflow, caught only by one `ken-cli` row. **Keep its
+> doc comment attached to the attribute** if either function is ever refactored.
+
 > ### STANDING REVIEW LENS FOR THIS NODE — WATCH FOR A GUARD WHOSE OPERAND IS
 > ### READ OFF THE OBJECT IT IS GUARDING. Steward, 2026-08-13, promoting an
 > ### Adversary recurrence (`evt_3r7vb1a5ck5jy`) above either instance.
 >
-> **Three instances now, all in the R3 ledger work, all of which passed
-> review:**
+> **FOURTH INSTANCE FOUND 2026-08-13 in gate 4a — see the box above. The lens is
+> working and the shape is not going away; read this before authoring any guard
+> at this seat.**
+>
+> **Three instances at the time this lens was written, all in the R3 ledger
+> work, all of which passed review:**
 >
 > 1. **The `D3` partition check on `f8f853b8`** — a validator whose expected
 >    side was derived from its actual side, so the law it asserted was a
