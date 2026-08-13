@@ -1,7 +1,8 @@
 //! SURF-1 D2 acceptance smoke: `const`/`fn`/`proc` are checked against
 //! declared purity and explicit value arity on the production elaboration path.
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::parser::parse_decls;
+use ken_elaborator::{ElabEnv, ElabError, Span};
 
 fn err_text<T: std::fmt::Debug>(res: Result<T, ken_elaborator::ElabError>) -> String {
     format!("{:?}", res.expect_err("expected elaboration to reject"))
@@ -109,4 +110,46 @@ fn surf1_d2_fn_and_const_cannot_declare_effect_rows() {
         bad_const.contains("use `proc`"),
         "const with a declared effect row must be rejected as should-be-proc: {bad_const}"
     );
+}
+
+// LANG-VIEW-RETIRE AC-2 + D3. Spec ruling (spec-leader, thr_1k7h31rj23gm4,
+// grounded in `31 §4` + `57 §4.1`): `view` is retired as a definition
+// keyword and its spelling is NOT reserved -- unlike `use`/`type`, it
+// becomes an ordinary free identifier. `Token::KwView` no longer exists
+// (lexer.rs); `view` lexes as plain `Ident("view")`. The non-degenerate
+// pair the spec-author's conformance note asked for: legacy `view` at a
+// declaration head must not enter any declaration production, while an
+// ordinary binding/use spelled `view` must accept and resolve normally.
+
+#[test]
+fn legacy_view_at_declaration_head_is_not_a_declaration() {
+    let err = parse_decls("view legacy (n : Int) : Int = n")
+        .expect_err("legacy `view` at declaration head must not enter a declaration production");
+    match err {
+        ElabError::ParseError { msg, span } => {
+            assert!(
+                !msg.contains("'view'"),
+                "the expected-token list must not advertise `view` as a valid declaration \
+                 keyword: {msg}"
+            );
+            assert!(
+                msg.contains("found Ident(\"view\")"),
+                "the offending token must be the ordinary identifier `view`, not a keyword: {msg}"
+            );
+            assert_eq!(span, Span::new(0, 4));
+        }
+        other => panic!("expected a ParseError rejecting the declaration head, got {other:?}"),
+    }
+}
+
+#[test]
+fn view_is_an_ordinary_free_identifier() {
+    let mut env = ElabEnv::new().expect("base env");
+
+    env.elaborate_decl("const view : Int = 5")
+        .expect("`view` must be usable as an ordinary const name");
+    assert!(env.globals.contains_key("view"), "the binding must register under its own name");
+
+    env.elaborate_decl("fn view_user (view : Int) : Int = view")
+        .expect("`view` must be usable as an ordinary parameter name and resolve in its body");
 }
