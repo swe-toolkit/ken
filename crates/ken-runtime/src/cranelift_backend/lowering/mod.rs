@@ -77,7 +77,10 @@ pub(in crate::cranelift_backend) use super::compiled::{CompiledModule, ResultDec
 #[cfg(test)]
 pub(in crate::cranelift_backend) use super::planning::{
     d2j_checked_fixture_under, D2jCause, D2J_DECLARATION,
-    StaticContinuationFusionDescriptor, StaticContinuationFusionKey,
+};
+#[cfg(any(test, feature = "r3-4b-observation"))]
+pub(in crate::cranelift_backend) use super::planning::{
+    StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
 };
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,

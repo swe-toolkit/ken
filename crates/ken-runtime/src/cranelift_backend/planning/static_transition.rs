@@ -8978,7 +8978,14 @@ pub(in crate::cranelift_backend) struct StaticContinuationFusionDescriptor {
 pub(in crate::cranelift_backend) struct StaticContinuationFusionPlan {
     keys: Vec<StaticContinuationFusionKey>,
     descriptors: Vec<StaticContinuationFusionDescriptor>,
-    #[cfg(test)]
+    // Observation-only structural footprint. This plan derives `Eq` and
+    // `PartialEq`, so feature-on and test builds include `walked` in equality;
+    // feature-off builds do not carry the field. The containing
+    // `StaticTransitionPlan` derives only `Clone`, and no production branch
+    // compares two fusion plans. The feature therefore changes this private
+    // plan's structural equality in its enabled build, but not plan decisions
+    // or emitted artifacts.
+    #[cfg(any(test, feature = "r3-4b-observation"))]
     walked_admitted_continuation_discoveries: usize,
 }
 
@@ -9051,19 +9058,19 @@ impl StaticContinuationFusionPlan {
     /// many*. The gate needs the key itself: "exactly one key" and "the
     /// production path resolved the same key the planner controls derive" are
     /// claims a count cannot carry.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r3-4b-observation"))]
     pub(in crate::cranelift_backend) fn observed_keys(&self) -> &[StaticContinuationFusionKey] {
         &self.keys
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r3-4b-observation"))]
     pub(in crate::cranelift_backend) fn observed_descriptors(
         &self,
     ) -> &[StaticContinuationFusionDescriptor] {
         &self.descriptors
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r3-4b-observation"))]
     pub(in crate::cranelift_backend) fn observed_walked_admitted_continuation_discoveries(
         &self,
     ) -> usize {
@@ -10045,7 +10052,7 @@ pub(in crate::cranelift_backend) fn build_static_continuation_fusion_plan(
     let (candidates, _walked_admitted_continuation_discoveries) =
         enumerate_live_fusion_candidates_with_input_size(plan, entry, declarations, oriented)?;
     let mut fusion = StaticContinuationFusionPlan::default();
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r3-4b-observation"))]
     {
         fusion.walked_admitted_continuation_discoveries =
             _walked_admitted_continuation_discoveries;
@@ -12522,7 +12529,7 @@ impl<'src> StaticTransitionPlan<'src> {
     /// > `D2f`'s installer is wired to the production path, so **this still reads
     /// > `0` and the gate is unchanged.** What changed is that the zero is now a
     /// > population the mover can enter.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "r3-4b-observation"))]
     pub(in crate::cranelift_backend) fn observed_fusion_definition_count(&self) -> usize {
         self.abi.fusion_descriptors.len()
     }

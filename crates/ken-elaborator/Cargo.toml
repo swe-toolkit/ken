@@ -8,6 +8,10 @@ authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+r3-4b-observation = ["ken-runtime/r3-4b-observation"]
+
 [dependencies]
 ken-host = { path = "../ken-host" }
 ken-kernel = { path = "../ken-kernel" }

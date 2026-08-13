@@ -547,14 +547,26 @@ pub(in crate::cranelift_backend) fn d2f_production_fusion_planes_take() -> Vec<u
 /// `CallIdentity` causes, while
 /// `r3_4b_input_observation_is_artifact_identical_when_disabled` pins the same
 /// tuple for unperturbed `Exact`. The latter resolves one key and descriptor;
-/// the former two resolve none. The `walked` input-population count is sound,
-/// but it does not move when a downstream relation declines, so it cannot
-/// establish whether a decline occurred or attribute one.
-#[cfg(test)]
+/// the former two resolve none. The `walked` input-population count is
+/// structurally constant across downstream declines for every witness, not
+/// merely empirically constant across those three causes: it is the admitted
+/// discovery ledger's length, counted before the per-candidate loop in which
+/// all thirteen eliminations occur. It therefore cannot establish whether a
+/// decline occurred or attribute one.
+///
+/// This constancy is specific to `walked`, not to `REACH`.
+/// `RT-4B-UNIQUENESS-GATE-REACH` observes exit 12 of 13, after eleven prior
+/// eliminations, so that later count remains sensitive to upstream declines.
+///
+/// This feature-scoped observation record and its accessor are diagnostic
+/// machinery for the governed C2 control. They are not a supported production
+/// API.
+#[cfg(any(test, feature = "r3-4b-observation"))]
+#[doc(hidden)]
 #[derive(Clone, Debug)]
-pub(in crate::cranelift_backend) struct D2fGateArrival {
+pub struct D2fGateArrival {
     /// Whether the production compile carried an oriented plan into the builder.
-    pub(in crate::cranelift_backend) oriented_present: bool,
+    pub oriented_present: bool,
     /// The keys this compile interned. Empty is lawful: an unmarked witness
     /// resolves nothing.
     pub(in crate::cranelift_backend) keys: Vec<StaticContinuationFusionKey>,
@@ -564,33 +576,67 @@ pub(in crate::cranelift_backend) struct D2fGateArrival {
     /// from the fusion plane above it. **Zero until the emitter exists**; the
     /// gate pins that zero beside a resolved plane so the later `0 -> 1` is a
     /// statement about emission.
-    pub(in crate::cranelift_backend) fusion_definitions: usize,
+    pub fusion_definitions: usize,
     /// The admitted-continuation-discovery ledger entries the production
     /// enumerator actually walked.
-    pub(in crate::cranelift_backend) walked_admitted_continuation_discoveries: usize,
+    pub walked_admitted_continuation_discoveries: usize,
     /// The oriented plan's frame-template population.
-    pub(in crate::cranelift_backend) oriented_frames: usize,
+    pub oriented_frames: usize,
     /// The oriented plan's checked recursive-call-template population.
-    pub(in crate::cranelift_backend) oriented_recursive_calls: usize,
+    pub oriented_recursive_calls: usize,
     /// The oriented plan's computational-IH-slot-template population.
-    pub(in crate::cranelift_backend) oriented_computational_ih_slots: usize,
+    pub oriented_computational_ih_slots: usize,
     /// The oriented plan's computational-IH-call-template population.
-    pub(in crate::cranelift_backend) oriented_computational_ih_calls: usize,
+    pub oriented_computational_ih_calls: usize,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "r3-4b-observation"))]
+impl D2fGateArrival {
+    /// Number of fusion keys the existing observation recorded.
+    pub fn resolved_key_count(&self) -> usize {
+        self.keys.len()
+    }
+
+    /// Number of fusion descriptors the existing observation recorded.
+    pub fn resolved_descriptor_count(&self) -> usize {
+        self.descriptors.len()
+    }
+}
+
+#[cfg(any(test, feature = "r3-4b-observation"))]
 thread_local! {
     static D2F_GATE_ARRIVALS: std::cell::RefCell<Vec<D2fGateArrival>> =
         const { std::cell::RefCell::new(Vec::new()) };
     static D2F_GATE_OBSERVATION_ENABLED: std::cell::Cell<bool> =
-        const { std::cell::Cell::new(true) };
+        const { std::cell::Cell::new(cfg!(test)) };
 }
 
-#[cfg(test)]
-fn d2f_gate_note_arrival(arrival: D2fGateArrival) {
-    if D2F_GATE_OBSERVATION_ENABLED.get() {
-        D2F_GATE_ARRIVALS.with(|cell| cell.borrow_mut().push(arrival));
+#[cfg(any(test, feature = "r3-4b-observation"))]
+#[inline(never)]
+fn d2f_gate_note_arrival(
+    fusion: &StaticContinuationFusionPlan,
+    transition: &StaticTransitionPlan<'_>,
+    oriented: Option<&crate::OrientedSubcontinuationPlanV1>,
+) {
+    if !D2F_GATE_OBSERVATION_ENABLED.get() {
+        return;
     }
+    D2F_GATE_ARRIVALS.with(|cell| {
+        cell.borrow_mut().push(D2fGateArrival {
+            oriented_present: oriented.is_some(),
+            keys: fusion.observed_keys().to_vec(),
+            descriptors: fusion.observed_descriptors().to_vec(),
+            fusion_definitions: transition.observed_fusion_definition_count(),
+            walked_admitted_continuation_discoveries: fusion
+                .observed_walked_admitted_continuation_discoveries(),
+            oriented_frames: oriented.map_or(0, |plan| plan.frames.len()),
+            oriented_recursive_calls: oriented.map_or(0, |plan| plan.recursive_calls.len()),
+            oriented_computational_ih_slots: oriented
+                .map_or(0, |plan| plan.computational_ih_slots.len()),
+            oriented_computational_ih_calls: oriented
+                .map_or(0, |plan| plan.computational_ih_calls.len()),
+        });
+    });
 }
 
 #[cfg(test)]
@@ -602,9 +648,65 @@ fn set_d2f_gate_observation_enabled(enabled: bool) {
 /// take. **An empty vector means the builder was never reached** — which is a
 /// different fact from reaching it and resolving nothing, and the gate's
 /// validator-refusal row is exactly the former.
-#[cfg(test)]
+#[cfg(any(test, feature = "r3-4b-observation"))]
 pub(in crate::cranelift_backend) fn d2f_gate_arrivals_take() -> Vec<D2fGateArrival> {
     D2F_GATE_ARRIVALS.with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
+/// Feature-scoped handle for the existing D2f observation.
+///
+/// This is doc-hidden diagnostic machinery for governed compiler controls, not
+/// a supported production API. Dropping it restores the preceding thread-local
+/// state; [`Self::finish`] additionally returns the arrivals recorded in this
+/// scope.
+#[cfg(feature = "r3-4b-observation")]
+#[doc(hidden)]
+pub struct D2fGateObservationScope {
+    previous_enabled: bool,
+    previous_arrivals: Option<Box<Vec<D2fGateArrival>>>,
+}
+
+#[cfg(feature = "r3-4b-observation")]
+impl D2fGateObservationScope {
+    fn restore(&mut self) {
+        let Some(previous_arrivals) = self.previous_arrivals.take() else {
+            return;
+        };
+        D2F_GATE_OBSERVATION_ENABLED.set(self.previous_enabled);
+        D2F_GATE_ARRIVALS.with(|cell| {
+            *cell.borrow_mut() = *previous_arrivals;
+        });
+    }
+
+    /// Close this scope and return its recorded arrivals.
+    pub fn finish(mut self) -> Vec<D2fGateArrival> {
+        let arrivals = d2f_gate_arrivals_take();
+        self.restore();
+        arrivals
+    }
+}
+
+#[cfg(feature = "r3-4b-observation")]
+impl Drop for D2fGateObservationScope {
+    fn drop(&mut self) {
+        self.restore();
+    }
+}
+
+/// Install the existing D2f observation on this thread.
+///
+/// Feature-scoped and doc-hidden: this is an unsupported diagnostic accessor,
+/// not production API. With no scope installed the feature-on recorder remains
+/// inert.
+#[cfg(feature = "r3-4b-observation")]
+#[doc(hidden)]
+pub fn d2f_gate_observation_scope() -> D2fGateObservationScope {
+    let previous_arrivals = d2f_gate_arrivals_take();
+    let previous_enabled = D2F_GATE_OBSERVATION_ENABLED.replace(true);
+    D2fGateObservationScope {
+        previous_enabled,
+        previous_arrivals: Some(Box::new(previous_arrivals)),
+    }
 }
 
 #[cfg(test)]
@@ -2213,29 +2315,12 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     d2f_note_production_fusion_plane(static_continuation_fusion_plan.len());
     // `D2f` Deliverable 0 — the gate's own observation, alongside the wiring
     // partial's size rather than replacing it.
-    #[cfg(test)]
-    d2f_gate_note_arrival(D2fGateArrival {
-        oriented_present: oriented_subcontinuation_plan.is_some(),
-        keys: static_continuation_fusion_plan.observed_keys().to_vec(),
-        descriptors: static_continuation_fusion_plan
-            .observed_descriptors()
-            .to_vec(),
-        fusion_definitions: static_transition_plan.observed_fusion_definition_count(),
-        walked_admitted_continuation_discoveries: static_continuation_fusion_plan
-            .observed_walked_admitted_continuation_discoveries(),
-        oriented_frames: oriented_subcontinuation_plan
-            .as_ref()
-            .map_or(0, |plan| plan.frames.len()),
-        oriented_recursive_calls: oriented_subcontinuation_plan
-            .as_ref()
-            .map_or(0, |plan| plan.recursive_calls.len()),
-        oriented_computational_ih_slots: oriented_subcontinuation_plan
-            .as_ref()
-            .map_or(0, |plan| plan.computational_ih_slots.len()),
-        oriented_computational_ih_calls: oriented_subcontinuation_plan
-            .as_ref()
-            .map_or(0, |plan| plan.computational_ih_calls.len()),
-    });
+    #[cfg(any(test, feature = "r3-4b-observation"))]
+    d2f_gate_note_arrival(
+        &static_continuation_fusion_plan,
+        &static_transition_plan,
+        oriented_subcontinuation_plan.as_ref(),
+    );
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — THE FIRST BEHAVIOUR-CHANGING
     // STEP. Everything above this point observed the plane; from here the plane
     // decides what the artifact contains.

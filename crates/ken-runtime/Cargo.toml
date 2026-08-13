@@ -29,7 +29,9 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 ] }
 
 [features]
+default = []
 px8-ds-test-support = []
+r3-4b-observation = []
 
 [dependencies]
 ken-host = { path = "../ken-host" }

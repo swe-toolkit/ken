@@ -73,10 +73,12 @@ use ken_elaborator::checked_core::{
     CheckedCoreMatchBranchView, CheckedCoreMatchView, StableSymbol, SymbolNamespace,
 };
 use ken_elaborator::compiler_driver::{
-    compile_ken_package_sources, prepare_native_program_sources, CompilerManifest, CompilerSource,
-    CompilerTargetKind, TargetSelector,
+    compile_ken_package_sources, compile_native_program_sources, prepare_native_program_sources,
+    CompilerManifest, CompilerSource, CompilerTargetKind, TargetSelector,
 };
 use ken_elaborator::erasure::erase_checked_core_package_for_target;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// The `C1` family extended with the W-style `Fork`. The `Join` branch's
 /// selectors and the `Fork` branch's direct `k True` application are the two
@@ -492,5 +494,130 @@ fn c2_gate_4a_preparation_consumes_every_compiler_derived_slot() {
     assert!(
         preparation.executable_closure().len() > 1,
         "the input-dependent C2 witness must not fold to [main]"
+    );
+}
+
+const R3_4B_ARTIFACT_OUTPUT: &str = "KEN_R3_4B_ARTIFACT_OUTPUT";
+const R3_4B_IDENTITY_SOURCE: &str = r#"program capabilities FS APartial
+fn unused_sibling (_input : ProcessInput) : ExitCode = Success
+fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode = host_exit APartial Success
+"#;
+
+/// Nested-compilation worker for the artifact-identity control below.
+///
+/// The ordinary test process has no output path and returns immediately. The
+/// driver runs this exact test twice from two independently compiled test
+/// binaries. In the feature-on binary it opens the existing D2f observation
+/// scope but deliberately does not inspect the rows: this increment proves
+/// only that observation leaves an emitted native object unchanged. The
+/// feature makes the C2 observation reachable to this crate, but this
+/// increment deliberately does not measure that witness or any planner result.
+#[test]
+fn r3_4b_feature_artifact_worker() {
+    let Some(output_dir) = std::env::var_os(R3_4B_ARTIFACT_OUTPUT).map(PathBuf::from) else {
+        return;
+    };
+    let compile = || {
+        compile_native_program_sources(
+            "r3_4b_feature_identity_pkg",
+            vec![CompilerSource::new(
+                "src/main.ken",
+                R3_4B_IDENTITY_SOURCE,
+            )],
+            &output_dir,
+        )
+    };
+
+    #[cfg(feature = "r3-4b-observation")]
+    let output = {
+        let observation = ken_runtime::d2f_gate_observation_scope();
+        let output = compile();
+        drop(observation);
+        output
+    };
+    #[cfg(not(feature = "r3-4b-observation"))]
+    let output = compile();
+
+    output.expect("the identity-control source emits its native object artifact");
+    assert!(
+        output_dir.join("ken-entrypoint.o").is_file(),
+        "the worker must leave the emitted native object at the packaging path"
+    );
+}
+
+fn r3_4b_compile_artifact(
+    target_dir: &Path,
+    output_dir: &Path,
+    observation_feature: bool,
+) -> Vec<u8> {
+    std::fs::create_dir_all(target_dir).expect("per-configuration Cargo target directory");
+    std::fs::create_dir_all(output_dir).expect("per-configuration native output directory");
+
+    // Use Cargo directly inside the outer `scripts/ken-cargo` invocation. The
+    // wrapper's machine-wide lock is already held; recursively taking it would
+    // deadlock. The distinct private target directories provide isolation.
+    let mut command = Command::new(env!("CARGO"));
+    command
+        .arg("test")
+        .arg("--manifest-path")
+        .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))
+        .arg("--test")
+        .arg("r3_c2_source_mixed_branch")
+        .arg("--no-default-features")
+        .arg("--target-dir")
+        .arg(target_dir)
+        .env(R3_4B_ARTIFACT_OUTPUT, output_dir);
+    if observation_feature {
+        command.arg("--features").arg("r3-4b-observation");
+    }
+    command
+        .arg("r3_4b_feature_artifact_worker")
+        .arg("--")
+        .arg("--exact")
+        .arg("--nocapture");
+
+    let output = command.output().expect("nested Cargo compilation runs");
+    assert!(
+        output.status.success(),
+        "nested {} compilation failed:\nstdout:\n{}\nstderr:\n{}",
+        if observation_feature {
+            "feature-on"
+        } else {
+            "feature-off"
+        },
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    std::fs::read(output_dir.join("ken-entrypoint.o"))
+        .expect("the nested compilation leaves the actual native object artifact")
+}
+
+/// The default-off observation feature is inert at an emitted native object.
+///
+/// These are two Cargo compilations, not two executions of one test binary.
+/// Each has its own target directory, and each worker emits the actual native
+/// object from the same fixed source into its own output directory.
+#[test]
+fn r3_4b_observation_feature_is_native_artifact_identical() {
+    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
+        "r3-4b-observation-feature-{}",
+        std::process::id()
+    ));
+    let off_target = root.join("feature-off-target");
+    let on_target = root.join("feature-on-target");
+    let off_output = root.join("feature-off-artifact");
+    let on_output = root.join("feature-on-artifact");
+
+    let off_bytes = r3_4b_compile_artifact(&off_target, &off_output, false);
+    let on_bytes = r3_4b_compile_artifact(&on_target, &on_output, true);
+
+    assert!(
+        !off_bytes.is_empty() && !on_bytes.is_empty(),
+        "the identity relation must compare two emitted objects, not empty buffers"
+    );
+    assert_eq!(
+        off_bytes, on_bytes,
+        "the feature-off and feature-on native object artifacts must be byte-identical"
     );
 }
