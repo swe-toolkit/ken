@@ -1,7 +1,7 @@
 ---
 id: LANG-COMMENT-CLASSIFIER-SHARED
 title: "The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -48,6 +48,24 @@ assertion, but nothing asserts the **lossless** layer's comment end equals the
 lexer's, and `reconstruct() == src` cannot supply it — it is byte-preserving
 under either attribution. `AC-3` is one direct offset comparison, and it stands
 independently of how the classifier is factored.
+
+## Amended mid-flight 2026-08-13: `AC-8` and `AC-9`
+
+An Adversary pass on `7baa5eb2` (`evt_1tgxxw760tswq`) found that the existing
+prefix-relation enumeration runs every collision **at EOF only** — the one
+configuration where "where does this comment end" is not being measured — and
+that two members are missing. **Measured by the Steward with a throwaway probe
+against `Lexer::lex`, not derived:** `{--}` and `{---}` are openers and reject
+as unterminated; the shortest empty doc block is `{----}`; and `{-} 1 -}`
+accepts as `[Eof]`, silently consuming the `1`.
+
+**The Adversary's own headline witness was refuted by that probe** and the
+frame records why: `{-}` followed by a later `--}` **errors**, because the
+`{--` partially matches the `{-` check and increments depth. The fail-open
+witness needs a plain `-}`. Routing the reported fixture unchecked would have
+had the implementer assert silent consumption and watch it error.
+
+New rows go in a **new** test function so `AC-2` stays clean.
 
 ## One severable rider, folded rather than given a node
 
