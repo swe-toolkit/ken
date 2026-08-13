@@ -5718,12 +5718,64 @@ impl<'a> Lowering<'a> {
                 let mut induction_hypotheses = Vec::with_capacity(case.recursive_positions.len());
                 let ih_slots =
                     self.computational_ih_slots_for_case(case, eliminator.checked_frame_id)?;
-                // The hypothesis prefix runs in REVERSE declaration order. Three
-                // sibling sites do the same reversal (5496, 7094, 13708), and
-                // `CheckedCaseBinderLayout::for_case` in the planner is the
-                // intended single owner of this order -- it is not adopted here
-                // yet, so a change to the order is still a five-site change.
+                // ---- `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — THE ORDER
+                // ---- AUTHORITY IS ADOPTED HERE. This site CHECKS the layout
+                // ---- rather than merely agreeing with it.
+                //
+                // The hypothesis prefix runs in REVERSE declaration order, and
+                // `CheckedCaseBinderLayout::for_case` is the one place that order
+                // is spelled. Production reversed it at **five** sites, each with
+                // its own `.rev()`, and the type's own doc named four of them
+                // (`4939`, `5496`, `7094`, `13708`) as un-adopted. **This is the
+                // first adoption**, so a change to the order is now a four-site
+                // change, and this seat is no longer one of them: the loop below
+                // still walks `.rev()` to *drive* the construction, but every slot
+                // it fills is checked against the layout's own answer, so a
+                // divergence refuses here instead of shipping a permuted run.
+                //
+                // ⛔ Not a second derivation of the order. The layout is derived
+                // from the case's own checked declaration and nothing else -- not
+                // from this env, not from a lowered shape -- which is what makes
+                // the comparison a cross-check between two authorities rather than
+                // this site agreeing with itself.
+                //
+                // ⛔ Refusing rather than reordering. A permuted run is a wrong
+                // program, not a repairable one: `D6a` measured that a single
+                // shifted slot surfaces as an out-of-range `Var` at the *tail*,
+                // nowhere near the position that moved.
+                //
+                // **MEASURED, not assumed to run.** Both comparisons here were
+                // inverted as a positive control and **76** `ken-runtime` tests
+                // went red on this diagnostic, on ordinary witnesses -- so the
+                // adoption is exercised across the whole composed-eliminator
+                // population and not only on the armed `D2f` roots. **CLAIMED:**
+                // the run this site assembles agrees with the layout. **THE GAP:**
+                // agreement is checked for the slots the layout ranges over -- the
+                // hypothesis prefix and the constructor arguments -- and the frame
+                // environment appended after it is outside that range, where
+                // `role_at` answers `FrameEnvironment` for any index and so states
+                // nothing to disagree with.
+                let binder_layout = CheckedCaseBinderLayout::for_case(case)?;
                 for position in case.recursive_positions.iter().rev().copied() {
+                    // The slot this iteration is about to fill, read before the
+                    // push so the check names the position it actually occupies.
+                    let slot = induction_hypotheses.len();
+                    match binder_layout.role_at(slot) {
+                        CheckedCaseBinderRole::InductionHypothesis { recursive_position }
+                            if recursive_position as usize == position => {}
+                        other => {
+                            return Err(unsupported(
+                                "ComputationalMatch",
+                                format!(
+                                    "this case's induction-hypothesis prefix is assembling \
+                                     recursive source position {position} at binder slot {slot}, \
+                                     where the checked case binder layout says {other:?} belongs; \
+                                     the prefix order and its single authority disagree, and a \
+                                     run assembled either way would shift every later binder"
+                                ),
+                            ));
+                        }
+                    }
                     // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE
                     // IS HERE, and the claim cannot be made yet.
                     //
@@ -5746,88 +5798,163 @@ impl<'a> Lowering<'a> {
                         .iter()
                         .position(|candidate| *candidate == position)
                         .and_then(|index| ih_slots[index]);
-                    // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE ARMED
-                    // ---- COMPILE STOPS HERE, and it is a MECHANISM BOUNDARY.
+                    // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE TWO-MEMBER
+                    // ---- WORKER LAW AT THIS SEAT. Architect `evt_5yhm9c78dm27s`.
                     //
-                    // MEASURED on both armed roots once the eliminator-role axis
-                    // landed: `args[position]` at the ruled recursive position is
-                    // the producer's compiler-only STATIC WORKER field (origin 29
-                    // on `Exact`, 25 on `ReHomed`), so `specialized_at` below
-                    // refuses -- a worker binding has no value representation.
+                    // What was MEASURED before the rule, kept because it is the
+                    // population this arm exists for: on both armed roots, once
+                    // the eliminator-role axis landed, `args[position]` at the
+                    // ruled recursive position is the producer's compiler-only
+                    // STATIC WORKER field (origin 29 on `Exact`, 25 on
+                    // `ReHomed`). The old unconditional `specialized_at` refused
+                    // it -- a worker binding has no value representation -- and
+                    // that refusal was a missing disposition, not a defect in the
+                    // field.
                     //
-                    // ⇒ **This seat has no ruled disposition for a recursive
-                    // position whose field transports a worker, and its sibling
-                    // does.** `continuation_case_binder_run` in `units.rs` gives
-                    // that position the compiler-only
-                    // `SelectedRecursiveArgument` member -- a SECOND
-                    // `StaticWorkerBinding` beside the IH, needing no envelope
-                    // operand and no ABI slot. The composed eliminator here
-                    // instead demands an ordinary specialized value.
+                    // ⇒ THE RULE: at the ruled recursive position emit **two
+                    // distinct compiler-only `StaticWorkerBinding` members over
+                    // the same joined worker** -- the induction hypothesis here in
+                    // the reversed recursive prefix, and the original
+                    // static-worker argument in segment 2's source-order
+                    // constructor-field run. This mirrors the sibling
+                    // `continuation_case_binder_run` in `units.rs`, whose
+                    // `InductionHypothesis` / `SelectedRecursiveArgument` pair is
+                    // the same two members under the same law.
                     //
                     // ⛔ **Do not "fix" this by skipping the position.** `D6a`
                     // records that this loop once did exactly that: the IH then
                     // stood in for the argument as well as the hypothesis and
-                    // every later binder shifted down one slot. The cheap-looking
-                    // option is the one already measured as a defect.
+                    // every later binder shifted down one slot. The skip option is
+                    // REFUTED, not merely dispreferred.
                     //
-                    // ---- RULED, AND GROUNDED BEFORE IMPLEMENTATION.
-                    // ---- Architect `evt_5yhm9c78dm27s`: two distinct
-                    // ---- compiler-only `StaticWorkerBinding` members over the
-                    // ---- same joined worker -- the IH in the reversed
-                    // ---- recursive prefix, and the original static-worker
-                    // ---- argument in source-order constructor fields.
+                    // ---- WHERE SEGMENT 2 COMES FROM, MEASURED not assumed.
                     //
-                    // ⭐ **The segment-2 half is NOT a new mechanism.**
-                    // `composed_recursive_argument_binding` already builds
-                    // exactly that binding from a `ComposedCallTarget` --
-                    // reading `selector()`, `worker()` and `call_identity()` to
-                    // build AND to authorize it -- and it already has one
-                    // production consumer, the deferred-constructor path. The
-                    // composed eliminator here is a SECOND consumer of it, which
-                    // is the same shape this node has now relearned five times:
-                    // the machinery exists at one caller and another route
-                    // reaches the same seat without it.
+                    // The grounding commit read `composed_recursive_argument_
+                    // binding` as this seat's segment-2 authority. That is right
+                    // about the DEFERRED-CONSTRUCTOR path (`core.rs:6458`, its
+                    // sole caller) and **wrong about this one**, and the
+                    // difference is what the field already is:
                     //
-                    // ⛔ So the work is wiring this seat into that builder plus
-                    // the IH member and the `CheckedCaseBinderLayout` ordering
-                    // -- **not** authoring a second composed-binding authority.
-                    // Building one here would be the drift the existing builder's
-                    // single ownership exists to prevent.
+                    // | seat | `args[position]` | segment-2 authority |
+                    // |---|---|---|
+                    // | deferred constructor | a lowered `Lowered::Closure` | `composed_recursive_argument_binding` converts it |
+                    // | HERE | already a `ConstructorField::StaticWorker` | `constructor_field_bindings` rebinds it |
                     //
-                    // ⛔ **Do not restore the `D6a` skip shape**, above.
-                    let induction_hypothesis = self.make_computational_recursor(
-                        // ⭐ `AC-C4` clause 1 — the SPECIALIZED caller wraps
-                        // explicitly, so the phase is stated at the call site
-                        // rather than inferred by the callee.
-                        LoweringOperand::Specialized(
-                            args[position]
-                                .specialized_at(
-                                    "a computational recursor's selected recursive argument",
-                                )?
-                                .clone(),
-                        ),
-                        eliminator.cases.to_vec(),
-                        eliminator.default.clone(),
-                        eliminator.env.to_vec(),
-                        eliminator.static_origin,
-                        eliminator.provenance,
-                        eliminator.checked_frame_id,
-                        slot_template_id,
-                        producer_origin,
-                        position,
-                        RecursorLayerRole::SelectsOccurrence {
-                            origin: producer_origin,
-                        },
-                        activation,
-                        cursor,
-                        splice_caller,
-                        None,
-                        None,
-                    )?;
-                    #[cfg(test)]
-                    px8j_record_recursor_carrier(Px8jProducerPath::Composed, &induction_hypothesis);
-                    induction_hypotheses
-                        .push(LoweringEnvironmentBinding::Value(induction_hypothesis));
+                    // ⇒ **Segment 2 at this seat is already correct and needs no
+                    // edit.** `extend_constructor_fields` below routes every field
+                    // through `constructor_field_bindings`, whose
+                    // `ConstructorField::StaticWorker` arm already emits
+                    // `LoweringEnvironmentBinding::StaticWorker` at the field's own
+                    // source position and mints its transport there. Wiring
+                    // `composed_recursive_argument_binding` in here would hand a
+                    // `ConstructorField` to a builder that requires a lowered
+                    // closure, and would be a SECOND segment-2 authority over one
+                    // position -- exactly the drift its single ownership prevents.
+                    // So the whole missing half is the IH member below.
+                    //
+                    // ---- THE TWO FACETS OF THE IH MEMBER, each decided rather
+                    // ---- than defaulted.
+                    //
+                    // **Route `RawWorker`.** `GeneratedContext` is reachable by an
+                    // induction hypothesis **iff** the planner issued a context for
+                    // this `(specialization, worker body)` pair AND the unit
+                    // resolved it -- and it is the unit's own retarget outcome that
+                    // decides the second half (`units.rs`, `retargeted_worker_body`).
+                    // This seat is the source-machine composed descent inside the
+                    // producer's body: it holds no continuation-specialization unit
+                    // and performs no retarget, so there is no resolved context for
+                    // this binding to name. That is the documented route-degenerate
+                    // case and it is lawful. ⛔ An issued context this seat did not
+                    // resolve is not one it may name, so nothing here re-asks the
+                    // planner for one.
+                    //
+                    // **Discharge `DirectSpecializationCall`**, stated positively.
+                    // `ComposedSourceContinuation` is `D8i`'s facet for the
+                    // *selected recursive argument*; the hypothesis answers for no
+                    // composed causal obligation.
+                    //
+                    // **Transport `None`, by construction.** The member is built
+                    // through `construct_static_worker_binding`, which is the sole
+                    // binding constructor and issues no transport. The single
+                    // transport for this field is minted once, in segment 2's
+                    // rebind. Two members over one worker with **one** transport
+                    // between them is what keeps the conservation ledger balanced:
+                    // a consumption of the hypothesis discharges nothing.
+                    //
+                    // ---- WHAT THIS WIRING MEASURED, and where the armed compile
+                    // ---- stops next.
+                    //
+                    // The run assembled below is the ruled one, verified on both
+                    // armed roots by instrumenting it and every exact-`Var` call:
+                    //
+                    // ```text
+                    // env[0] = Worker(body=34, transport=None)      <- this member
+                    // env[1] = Worker(body=34, transport=Some(0))   <- segment 2
+                    // the ONLY exact-Var call in the case body: Var(0)
+                    // ```
+                    //
+                    // ⇒ The armed compile clears this stop and now ends at the
+                    // static-worker field ledger's close, because the body reaches
+                    // its producer through the hypothesis and segment 2's transport
+                    // is never consumed. **That collision between `D6a`'s bind-all
+                    // law and the conservation ledger is stated in full beside the
+                    // close itself**, in `mod.rs`, which is where the next reader
+                    // meets the refusal. It is a mechanism question and is routed,
+                    // not taken here.
+                    let binder = match &args[position] {
+                        // ⛔ EXHAUSTIVE with no wildcard: a future third field kind
+                        // must be a compile error at this binder, forcing a
+                        // decision about what it means at a recursive position,
+                        // rather than silently taking the ordinary arm.
+                        ConstructorField::StaticWorker { binding, .. } => {
+                            // The SAME joined worker segment 2 will bind: its
+                            // closure occurrence, body, declared arity and ordered
+                            // captures, taken from the field's own binding and not
+                            // re-derived from anything this frame lowered.
+                            let hypothesis = self.construct_static_worker_binding(
+                                binding.closure_origin,
+                                binding.body_origin,
+                                binding.declared_arity,
+                                binding.captures.len(),
+                                binding.captures.clone(),
+                                StaticWorkerCallRoute::RawWorker,
+                                ContinuationDischarge::DirectSpecializationCall,
+                            )?;
+                            LoweringEnvironmentBinding::StaticWorker(hypothesis)
+                        }
+                        ConstructorField::Specialized(value) => {
+                            let induction_hypothesis = self.make_computational_recursor(
+                                // ⭐ `AC-C4` clause 1 — the SPECIALIZED caller
+                                // wraps explicitly, so the phase is stated at the
+                                // call site rather than inferred by the callee.
+                                LoweringOperand::Specialized(value.clone()),
+                                eliminator.cases.to_vec(),
+                                eliminator.default.clone(),
+                                eliminator.env.to_vec(),
+                                eliminator.static_origin,
+                                eliminator.provenance,
+                                eliminator.checked_frame_id,
+                                slot_template_id,
+                                producer_origin,
+                                position,
+                                RecursorLayerRole::SelectsOccurrence {
+                                    origin: producer_origin,
+                                },
+                                activation,
+                                cursor,
+                                splice_caller,
+                                None,
+                                None,
+                            )?;
+                            #[cfg(test)]
+                            px8j_record_recursor_carrier(
+                                Px8jProducerPath::Composed,
+                                &induction_hypothesis,
+                            );
+                            LoweringEnvironmentBinding::Value(induction_hypothesis)
+                        }
+                    };
+                    induction_hypotheses.push(binder);
                 }
                 #[cfg(test)]
                 d2e_record_binder_assembly(case, &induction_hypotheses);
@@ -5838,6 +5965,49 @@ impl<'a> Lowering<'a> {
                     eliminated_origin: eliminator.static_origin,
                 });
                 self.extend_constructor_fields(&mut case_env, &args)?;
+                // ---- `D2e` — SEGMENT 2 CHECKED AGAINST THE SAME AUTHORITY.
+                //
+                // The prefix check above is per-slot and covers segment 1 only.
+                // This closes the run: every constructor argument must sit at the
+                // slot the layout gives it, and the run must be exactly as long as
+                // the layout says before the frame environment is appended.
+                //
+                // ⛔ **The length check is not redundant with the walk.** The walk
+                // ranges over `argument_binders`; a run that is too LONG passes it
+                // slot by slot and still displaces the frame environment, which is
+                // the `D6a` symptom -- an out-of-range `Var` at the tail, nowhere
+                // near the surplus. Both directions are refused.
+                if case_env.len() != binder_layout.binder_count() {
+                    return Err(unsupported(
+                        "ComputationalMatch",
+                        format!(
+                            "this case assembled a {}-member binder run before its frame \
+                             environment, where the checked case binder layout says {} members \
+                             belong; a run of the wrong length shifts every enclosing binder \
+                             rather than failing at the member that moved",
+                            case_env.len(),
+                            binder_layout.binder_count()
+                        ),
+                    ));
+                }
+                for field_position in 0..case.argument_binders {
+                    let slot = case.recursive_positions.len() + field_position;
+                    match binder_layout.role_at(slot) {
+                        CheckedCaseBinderRole::ConstructorChild {
+                            field_position: named,
+                        } if named as usize == field_position => {}
+                        other => {
+                            return Err(unsupported(
+                                "ComputationalMatch",
+                                format!(
+                                    "this case bound constructor source position \
+                                     {field_position} at binder slot {slot}, where the checked \
+                                     case binder layout says {other:?} belongs"
+                                ),
+                            ));
+                        }
+                    }
+                }
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Computational(eliminator),
