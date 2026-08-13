@@ -1,13 +1,13 @@
 ---
 id: LANG-FOREIGN-NAME-CONTROL-CHARS
 title: "Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet"
-status: active
+status: merged
 owner: language
 size: XS
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2128
 origin: Architect finding at evt_4fqzrhc1x0xvk while approving LANG-SURFACE-LITERAL-ESCAPES, recorded in dec_35jvztfp40v9f, explicitly non-blocking and explicitly needing an owner. Routed by the Steward 2026-08-13, who measured the parse sites and corrected the placement.
 ---
 
