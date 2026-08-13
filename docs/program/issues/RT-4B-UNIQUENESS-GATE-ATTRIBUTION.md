@@ -5,11 +5,36 @@ status: draft
 owner: runtime
 size: S
 gate: none
-depends_on: [RT-4B-ENUMERATION-INPUT-SIZE]
+depends_on: [RT-4B-UNIQUENESS-GATE-REACH]
 blocks: []
 github: null
 origin: Architect evt_7011z8x4x2j3d naming the one-function attribution start and explicitly NOT authorizing it, on the stated condition that the size increment return a non-empty population. It did -- `(4, 2, 0, 2, 1)` at RT-4B-ENUMERATION-INPUT-SIZE. Steward taking the scope question to the Architect 2026-08-13. DRAFT until that scope call lands.
 ---
+
+> **SPLIT 2026-08-13 (Architect `evt_5gck3qg72xe37`). THIS NODE IS NOW THE
+> CONDITIONAL HALF ONLY, AND IT IS NOT LAWFUL YET.**
+>
+> The reach half — counting whether exit 12 is reached at all — moved to
+> **`RT-4B-UNIQUENESS-GATE-REACH`**, which is `ready` now. It is a call-site
+> counter, changes no signature and no control flow, and is therefore **pure
+> recording inside the 4b observation gate already authorized**. It needed no
+> exception.
+>
+> **What remains here is attribution: which arm of
+> `fusion_unique_static_body_triple` fired.** That requires widening the
+> function's return type, which is a builder change outside the observation
+> gate, and it is the one-function exception the Architect named.
+>
+> ⇒ **This node becomes lawful the moment reach is measured POSITIVE, and not
+> otherwise. If reach is zero, CLOSE this node rather than kicking it** — a
+> widened return type observing a branch no candidate enters is the "working
+> instrument nothing reaches" artifact, built deliberately.
+>
+> **The reasoning is the Architect's own, applied to himself:** *"I placed five
+> rows inside a lifecycle without counting whether they produced anything for
+> it... Count the population before you build the thing that classifies it."*
+> That is the `D2k-1b` failure from earlier the same day, and this split is what
+> keeps it from repeating one level up.
 
 ## Where the arc actually stands
 
@@ -48,7 +73,7 @@ informative of the fourteen.
   this runs, so a candidate that disappears here disappeared at the uniqueness
   gate specifically."*
 
-## THE SIZING RISK, AND IT IS THE REASON THIS IS `draft`
+## THE SIZING RISK — NOW DISCHARGED BY THE SPLIT, kept for the reasoning
 
 **Instrumenting one gate is only decisive if the four candidates die at that
 gate. Nothing measured says they do.**
