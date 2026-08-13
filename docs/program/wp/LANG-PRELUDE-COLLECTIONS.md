@@ -128,6 +128,45 @@ infinitude idiom rather than a combinator, and it has its own AC4.
 - **AC-6 — no new red in CI.** Targeted locally: `-p ken-elaborator`. Never
   `--workspace` on the box.
 
+- **AC-7 — a one-character rider in `error.rs`, added mid-flight 2026-08-13.**
+  Adversary finding at `evt_7bt65xjjfsgr0`, verified by the Steward at
+  `424ab5da`. `error.rs:256-260` formats a bare `char` with `Display`:
+
+  ```rust
+  ElabError::NonAsciiIdentifierCharacter { character, span } => write!(
+      f,
+      "non-ASCII identifier character '{}' at {}-{}: identifiers are ASCII-only",
+      character, span.start, span.end,
+  ),
+  ```
+
+  **Change `'{}'` to `{:?}`.** The correct precedent is seven lines below in the
+  same `match`: `ForeignNameControlCharacter` (`:264-271`) already uses `{:?}`
+  on its `character`, for exactly this reason.
+
+  **Why it matters more than a formatting nit.** This variant's population is
+  precisely the invisible characters — it fires on any non-ASCII character in an
+  identifier, which includes C1 controls, `Cf` format characters (U+200B,
+  U+FEFF, ZWJ) and bidi overrides (U+202E). So a zero-width character yields
+  `non-ASCII identifier character '' at 12-13`, with nothing between the quotes
+  and no way for the author to know what to delete; and U+202E is emitted raw
+  into the message, **reordering the rest of the terminal line including the
+  span numbers.** ⇒ The diagnostic most likely to be triggered by an invisible
+  character is the one that prints it raw.
+
+  Verified: this is the **only** site in `error.rs` that prints a bare `char`
+  with `{}`. Every other `'{}'` in a `Display` arm formats a `String`, where it
+  is correct.
+
+  **This does not wait on the `Cf` threat-model question** that has
+  `LANG-FOREIGN-NAME-FORMAT-CHARS` held. That question is about deceiving a
+  reader of *source*; this is the compiler's own *output*, where a bidi override
+  reorders the message whatever the source policy turns out to be. Different
+  artifact, decidable now.
+
+  Severable: if it costs more than the one character plus a test, say so and
+  drop it rather than growing the node.
+
 ## Not this node
 
 - **`sort`.** Excluded above on the trusted-base argument, which is an operator
@@ -139,11 +178,22 @@ infinitude idiom rather than a combinator, and it has its own AC4.
   implicit/explicit binder structure. The L3a text is the pinned shape.
 - Making `Bool` into anything it is not already. The measurement is that it is
   already matchable; this node consumes that, it does not extend it.
+- **Anything in `error.rs` beyond `AC-7`'s single format specifier.** Not the
+  `Cc` control-character check, not `Cf`, not the identifier rule that raises
+  `NonAsciiIdentifierCharacter`, and not any other variant's wording. The rider
+  changes how one existing character is rendered and nothing about when the
+  error fires or what it covers.
 
 ## Contention
 
-`crates/ken-elaborator/src/prelude.rs` and
-`crates/ken-elaborator/tests/l3a_acceptance.rs`, both Language-owned. Runtime is
-in `crates/ken-runtime`; Verify's lane is `src/prover.rs`. No other ring holds
-either file. `prelude.rs` is loaded by every elaborator test, so a break here is
-broad — which is why AC-4 pins the existing suite rather than sampling it.
+`crates/ken-elaborator/src/prelude.rs`,
+`crates/ken-elaborator/tests/l3a_acceptance.rs`, and — from the `AC-7` rider
+added mid-flight — `crates/ken-elaborator/src/error.rs`. All three are
+Language-owned. Runtime is in `crates/ken-runtime`; Verify's lane is
+`src/prover.rs`. No other ring holds any of them. `prelude.rs` is loaded by
+every elaborator test, so a break there is broad — which is why AC-4 pins the
+existing suite rather than sampling it.
+
+**`error.rs` is in scope for `AC-7`'s one-character change only.** Nothing else
+in that file is this node's, and the `Cf`/`Cc` checks themselves remain out —
+see "Not this node".
