@@ -391,6 +391,157 @@ nothing you inherit from `#6d`.**
 > sufficient and the resolution half is not owed. **Neither has happened; do not
 > read the comment as either one.**
 >
+> ### THE PARTITION IS TERNARY. `P = O ⊎ I ⊎ R`. THE BINARY `P = O ⊎ F` IS
+> ### WITHDRAWN. Steward, 2026-08-13, folding Architect `evt_6bm54j10w1n88`
+> ### into operative scope. **THIS SUPERSEDES THE BOX BELOW ON THE PARTITION
+> ### AND ON `dom(FusionComposedEdge)`.**
+>
+> **A bounded probe run BEFORE the ruling eliminated a branch and converted the
+> fork into a fact.** Third time the measure-first discipline has paid on this
+> seam, and the first time a candidate reading died before an Architect turn was
+> spent on it.
+>
+> **`Outer` is not a missed local call — it IS the fusion-owned realization.**
+> Measured identically on both roots, no mutation: the `Outer` target's
+> continuation origin, selected body and worker body **exactly equal** the
+> `FusionRegionClaim`'s continuation origin, selected body, and producer/redirect
+> body (`Exact` 10 / 19 / 37; `ReHomed` 6 / 15 / 33). Construct 39/35 is **not
+> skipped**: it has no armed predecessor and is lowered nowhere because its
+> selected body is **already lowered once under Fusion ownership**. A second
+> `compose_continuation_locally` for it would duplicate that realization.
+>
+> #### The lawful population
+>
+> ```text
+> P = O ⊎ I ⊎ R          T = O_t ⊎ I_t ⊎ R_t
+> ```
+>
+> - **`O`** — ordinary identities, byte-identical direct-call path.
+> - **`I`** — the one producer-argument/`Inner` identity per body-owning fusion,
+>   realized by `compose_continuation_locally`.
+>   `Exact` 36 → `CSId(0)` body 31; `ReHomed` 32 → `CSId(0)` body 27.
+> - **`R`** — the one consumer-binding/`Outer` identity per body-owning fusion,
+>   realized by the **already-existing** fusion-owned body and region claim, with
+>   **no call and no second selected-body lowering**.
+>   `Exact` 39 → `CSId(1)` body 19 / fusion body 37; `ReHomed` 35 → `CSId(1)`
+>   body 15 / fusion body 33.
+>
+> **`FusionComposedEdge` and `FusionCompositionLedger` now contain `I` ONLY.**
+> Their closeout requires exactly one consumed `Inner` per fusion — not Inner
+> plus Outer. **`R` must never enter that ledger and must never reach the shared
+> call funnel.**
+>
+> #### `R` gets its own relation, and selection is never coincidence
+>
+> Add a sibling planner relation named for **realization, not a call** — e.g.
+> `FusionOwnedOuterRealization` — carrying the exact fusion id, `Outer`
+> `ContinuationCallIdentity`, target, emission owner, checked consumer
+> continuation origin, selected case body, and producer body.
+>
+> **Selection authority is the existing checked consumer binding plus the exact
+> call-target bijection. The triple equality is a CLOSURE CHECK AFTER SELECTION,
+> never an origin/body coincidence selector.** Closure: outer target continuation
+> origin = claim continuation origin; outer selected case body =
+> claim `selected_case_body`; outer worker body = claim `producer_body` =
+> redirect callee; outer emission owner = claim consumer owner; and the producer
+> body is actually `FusionOwned` for that same fusion. **Zero, ambiguity,
+> duplicate identity/target, cross-fusion reuse, disagreement in any coordinate,
+> or overlap among `O`/`I`/`R` refuses before mutation.**
+>
+> **Still no `CandidateDisposition` variant.** `O` stays on the ordinary ledger;
+> `I` closes on `FusionCompositionLedger`; `R` closes on the
+> `FusionRegionClaim`/fusion-owned-body lifetime, **augmented** with exact
+> planned-versus-realized `R` identity and target equality so a "never a call"
+> identity is still affine-accounted. Declaration and definition omissions close
+> **separately** against `I_t` and `R_t` (or a reason-tagged exact union) so one
+> class cannot satisfy the other's omission.
+>
+> #### THE SPLICE CAPABILITY IS RETIRED FROM THIS MECHANISM, NOT RE-SEATED
+>
+> **It is not waiting for a better seat.** It was minted for a dynamic
+> invocation segment this mechanism does not build: issued on the `Outer`/fused
+> frame 10/6, `checked_invocation_source` is `None` and depth is zero, the only
+> local composition is `Inner` under frame 25/21, and no
+> `make_computational_recursor` occurs after the `Inner` result. **No dynamic
+> segment exists that could lawfully present or consume it.**
+>
+> **Do NOT "consume" it at fusion close to green the assertion, and do NOT move
+> it to the `Inner` call seat. Either manufactures a receipt for an event that
+> did not occur.** Remove issuance from `lower_fused_producer_through_suffix`
+> and remove the outstanding-capability closeout for this path.
+>
+> **Audit its closure BEFORE editing.** If `SpliceCompositionCapabilityId`,
+> `SegmentComposition::Composed` and `composed_frame_templates` have no live
+> producer or consumer after the correction, **retire that whole representation,
+> validator branch and controls atomically** rather than leaving dormant
+> authority. If a separate live non-R3 producer exists, preserve it and prove by
+> **exact call-site census** that R3 no longer enters it. **The census is a hard
+> precondition, not a request to retain dead machinery.**
+>
+> > **STEWARD SCOPE RULING — the retirement is IN SCOPE for R3 and is not a
+> > widening.** Removing now-dead authority shrinks the trusted surface, which is
+> > the direction `docs/PRINCIPLES.md` requires (small auditable TCB,
+> > subsume-don't-proliferate). Leaving a dormant representation with no producer
+> > is the worse outcome and is how the stale stop-comment happened. **Do not
+> > shrink the mechanism to avoid this**; if the census says a non-R3 producer is
+> > live, preserving it and proving R3 no longer enters it is equally in scope.
+>
+> #### Implementation order
+>
+> 1. preflight `O`/`I`/`R` and both target partitions, one `I` and one `R` per
+>    body-owning fusion;
+> 2. omit `I_t` from standalone declaration/definition — its selected body is
+>    lowered locally;
+> 3. omit `R_t` — its selected body is emitted exactly once as the fusion-owned
+>    body;
+> 4. realize `I` once at `compose_continuation_locally`, hand its phase-bearing
+>    result to the existing `Outer` eliminator;
+> 5. realize `R` once at fusion-owned-body definition/claim closeout; **emit no
+>    `Outer` call and perform no second local selected-body lowering**;
+> 6. close `I`, `R`, `O` on their separate ledgers, then close their pairwise
+>    disjoint union against `P` and `T`.
+>
+> The existing `FusionRegionClaim` **remains** the authority for producer
+> construct 30/26, field 29/25, consuming call 17/13, callee 16/12, producer body
+> 37/33, and the redirect. The new `R` relation records *which planned
+> continuation identity was realized by that owned body*; **it does not move or
+> duplicate the claim.**
+>
+> #### Revised falsifiers — both armed roots, in order
+>
+> ```text
+> exactly one I local composition
+>   -> selected body 31/27
+>   -> claim producer construct 30/26, field 29/25
+>   -> the existing Outer eliminator inside the R fusion-owned realization
+>   -> exactly one rebind / transport mint
+>   -> exactly one claim-authorized consuming call 17/13
+>   -> checked producer body 37/33
+>   -> closure-free answer
+> ```
+>
+> And simultaneously: exactly one `R` identity closes through fusion ownership;
+> **zero** `Outer` `compose_continuation_locally` entries; **zero** direct calls
+> for `I` or `R`; **zero** splice capabilities issued or outstanding on this R3
+> path; no specialized template reaches a result slot or `ground_value`; no
+> worker enters an ABI operand run; `O` stays byte-identical direct.
+> **Any failure is a stop, not authority to widen by body/origin coincidence.**
+>
+> #### The same-body debt WIDENS with the corrected partition
+>
+> Retain the `I`-versus-`O` same-body control **and add or identify an
+> `R`-versus-`O` same-body control proving that FUSION OWNERSHIP — not body
+> equality — selects `R`.** All previously owed selector nets, corrected-seam
+> controls, the inner-slot witness, the self-edge discriminator, route
+> exclusions, the stale-stop red control, and the atomic unarmed/unrouted
+> boundary remain.
+>
+> **`11177a3c` landed on `main` by operator direction and that does not alter
+> this disposition.** It is the committed partial basis; the correction follows
+> on current `main`. **Merge timing is the Steward's and work quality is the
+> Architect's — the incompleteness of a work package is immaterial to whether the
+> code is on `main`.**
+
 > ### THE FORK IS CLOSED — READING TWO. RUNTIME IS RELEASED. Steward,
 > ### 2026-08-13, recording Architect `evt_6kn9ckdnbf0ph` (durable
 > ### `39ff9d8f`). **THE BOX BELOW IS RESOLVED; READ IT AS HISTORY.**

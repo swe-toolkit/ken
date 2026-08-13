@@ -38,21 +38,43 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~04:2xZ. **`main` = `18403ead`.**
+> ### RESUME HERE — state at 2026-08-13 ~04:1xZ. R3 partial LANDING as PR #2053.
 >
-> **R3 IS ON ITS FINAL MECHANISM UNIT. Gate run (exit 0, all three Runtime
-> seats compact-verified at `18403ead`), fresh unit released at
-> `evt_10fensp5rpey7`.** Held tip
-> `59b3c10fdd68c9885fe4af8ec6098dde3ea5d65f`, branch
-> `wp/RT-LEXICAL-R3-FUSION-EMITTER`, **20 commits** from `6d5a2d84`, verified
-> intact after the gate. Suite baseline **915** (913 + 2 new controls).
+> > ## STANDING OPERATOR RULE, 2026-08-13 — MERGE TIMING IS MINE
+> >
+> > *"Architect's domain covers the quality of the work done, not the timing of
+> > when it hits main. You own git, and my instructions to you are not to have
+> > long-running branches... we should recut at a seam with green CI and merge
+> > that to main, whether or not it comprises a complete work package... the
+> > incompleteness of a work package is immaterial to whether the code is in
+> > main."*
+> >
+> > **A ring's "non-candidate" and an Architect "atomic object" ruling are NOT
+> > merge prohibitions.** I read them as one and held a branch to 25 commits over
+> > six hours and three rebases, on an object that was **inert on `main`**.
+> > Policy amended at both ends of
+> > `agent/playbooks/federation/steward/merge-policy.md`. **Never ask the
+> > Architect whether something may merge — ask whether the work is right.**
 >
-> **The unit is ONE inseparable mechanism** — local selected-body lowering,
-> sibling fusion-local affine closeout, same-body composed/ordinary
-> discriminator, plus the post-implementation ordered-chain falsifier. **Do not
-> let it be cut smaller**; the ledger has no consumer until the lowering exists.
+> **THE PARTITION IS NOW TERNARY: `P = O ⊎ I ⊎ R`. The binary `P = O ⊎ F` IS
+> WITHDRAWN** (Architect `evt_6bm54j10w1n88`, folded into the frame's newest
+> box). `Outer` leaves `dom(FusionComposedEdge)` — it **is** the fusion-owned
+> realization, not a missed local call. The splice capability is **retired from
+> this mechanism, not re-seated**; I ruled its retirement in scope because
+> removing dead authority shrinks the TCB. **Read the frame's newest box, never
+> this line.**
 >
-> **Accepted last turn and NOT reopened:** exact `P = O ⊎ F` and
+> **A bounded probe run BEFORE the ruling eliminated a branch** — third time
+> measure-first has paid on this seam.
+>
+> **Landed:** `11177a3c` (25 commits) via PR #2053 as the committed partial
+> basis. The correction follows on current `main`.
+>
+> **HISTORY BELOW THIS LINE — the binary partition it calls settled is the thing
+> that was just withdrawn.** Prior state: gate run exit 0, unit released at
+> `evt_10fensp5rpey7`, suite 915 → **916**.
+>
+> **Superseded, kept only to date the change:** exact `P = O ⊎ F` and
 > `T = O_t ⊎ F_t` validated as disjointness plus coverage (never counts); the
 > fusion-scoped join `edge.fusion == claim.fusion` checked from both sides; `O`
 > threaded through resolution, declaration and both ledger opens by **narrowing

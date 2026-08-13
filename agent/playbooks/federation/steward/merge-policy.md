@@ -12,6 +12,49 @@ Steward task procedure. Read at the point of use. Governing playbook:
 
 Ask both questions at every release and every review vote.
 
+## THE STEWARD OWNS MERGE TIMING. THE ARCHITECT OWNS WORK QUALITY.
+
+Operator, 2026-08-13, verbatim: *"Architect's domain covers the quality of the
+work done, not the timing of when it hits main. You own git, and my
+instructions to you are not to have long-running branches. There is some nuance
+around recuts, but in general, we should recut at a seam with green CI and merge
+that to main, whether or not it comprises a complete work package. Keep in mind
+that the entire project is incomplete, and the incompleteness of a work package
+is immaterial to whether the code is in main."*
+
+**This outranks everything below it in this file.** Where the sections below
+make *ring acceptance* the bar, this makes **a seam with green CI** the bar.
+
+> **The default is: recut at a seam with green CI and merge. Completeness of the
+> work package is IMMATERIAL. The whole project is incomplete.**
+
+**The failure this exists to stop, measured 2026-08-13.** A ring declared its
+object *"non-candidate, unrouted, no partial to QA"*, and the Architect had
+ruled the node an **atomic object**. The Steward read both as a merge
+prohibition and held. Neither is one:
+
+| the input | what it actually governs | what it does NOT govern |
+|---|---|---|
+| ring says "non-candidate" | whether the unit is a complete deliverable ready for review | whether the tree may sit on `main` |
+| Architect rules "atomic object" | what the **node** must contain before it **closes** | where intermediate commits live |
+| QA has not reviewed it | whether the WP is **done** | whether inert code may land |
+
+⇒ **"Not accepted" and "not fit for `main`" are different properties, and only
+the first is the ring's to declare.** The cost of conflating them was a
+25-commit branch across six hours and three rebases onto moving bases — three
+chances to lose work, for no benefit, on an object that was **inert on `main`**
+(its gate flag false and its population empty, so it could not execute).
+
+**Do not ask the Architect whether something may merge.** Ask it whether the
+work is right. Timing is not its call and offering it the question invites an
+answer that reads as authoritative and is out of its lane.
+
+**The nuance the operator left open is recuts, not holds.** Finding the seam is
+judgment — see *Prefer a cut that is a straight ancestor* below, and
+*Semantic atomicity is the one genuine bar*, which survives because it is about
+a cut that would put `main` in a **self-inconsistent** state, never about a WP
+being unfinished.
+
 ## A team's accepted base belongs on `main`
 
 Operator, 2026-08-06: *"if a team is working from a committed, accepted base,
@@ -57,6 +100,14 @@ deliverable because its siblings are unfinished. The unit of merge is
 The bar is *accepted*, not *finished-looking*: reviewed and cleared on its own
 terms. Its deliverables must be complete — landing a deliverable's first half
 is not partial-WP merging, it is shipping a fragment.
+
+> **AMENDED 2026-08-13 — read the top section first; this paragraph is the one
+> that misled.** The two sentences above describe the bar for calling work
+> **accepted**. They are **not** a gate on merging, and reading them as one is
+> what produced the 25-commit branch. **A seam with green CI merges whether or
+> not anything has been "accepted" and whether or not a deliverable is whole.**
+> "Shipping a fragment" is a real caution about *claiming a deliverable is
+> delivered* — it is not a reason to keep a green tree off `main`.
 
 ## "Reviewed" and "releasable" are different properties
 
