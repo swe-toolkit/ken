@@ -1,7 +1,7 @@
 ---
 id: V3-KRIPKE-DECOMPOSITION
 title: "The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing"
-status: draft
+status: ready
 owner: verify
 size: M
 gate: none
@@ -42,10 +42,44 @@ origin: Steward measurement 2026-08-13 -- attempt_fo (prover.rs:332) calls attem
 > | unblock `Sec1`'s by-proof half | **this node.** One hole in the corpus, and a hard requirement for `AC-R3c`. |
 >
 > **Neither is derivable from the roadmap, and one of them grows the TCB. Both
-> are operator calls under the Steward playbook §3**, so this node holds at
-> `draft` with its frame written and shovel-ready rather than being released on
-> a Steward guess. Nothing is blocked behind the answer — Verify has capacity
-> and the other lanes are working.
+> are operator calls under the Steward playbook §3**, so the node was held at
+> `draft` with its frame written and shovel-ready rather than released on a
+> Steward guess.
+>
+> ### RELEASED 2026-08-13 ANYWAY, AND THE REASON IS NOT THAT THE FORK CLOSED
+>
+> **The fork above is still open and this node does not touch it.** What changed
+> is that the fork was noticed to be a comparison with **one side unpriced**.
+>
+> | option | its cost, as the operator would have to weigh it |
+> |---|---|
+> | the D fragment | **priced** — two irreducible trusted-base postulates per registrant, `check.rs:1253`/`:1302`/`:1308`, times twenty closed atoms |
+> | the Kripke embedding | **unpriced** — nobody has said what it requires or how long it takes |
+>
+> **This node is the price of the second row.** Its deliverable is a
+> decomposition report: the pieces, their real dependencies, their lane
+> assignment, and a cut into one-hour increments. That output is an **input to
+> the operator's decision, not a consequence of it** — it is worth the same
+> whichever way the fork goes, and it is worth most before the fork is answered.
+>
+> **The pre-stated test above still fired, and I am not pretending otherwise.**
+> It read: *"if FO is the tail, this node is mis-prioritized and the Steward
+> re-sequences rather than releasing it."* FO is the tail — one hole in
+> twenty-two. What the test assumed is that **corpus share is the ranking
+> criterion**, and `SEC1-R3-MINIMAL-ROUTE` then established that `AC-R3c`
+> requires the embedding regardless of its corpus share. A criterion that a
+> later measurement showed to be insufficient does not get to decide the
+> question on its own.
+>
+> ⇒ **Releasing a report is sequencing, which is the Steward's under §3.
+> Choosing which fragment gets built is priority, which is not.** Verify was
+> idle with both its nodes held behind an unanswered fork, and §1 makes an idle
+> team the Steward's backlog.
+>
+> **THIS AUTHORIZES NO BUILD.** The banned scope in the frame is unchanged and
+> is the operative constraint: not the translation, not the `World` sort, not
+> the adequacy lemma. A returned decomposition is a price tag. **Nobody should
+> read it, or this node's `ready` status, as a decision that V3 proceeds.**
 
 ## Why this is `draft` and what unblocks it
 

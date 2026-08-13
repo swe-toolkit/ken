@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-13 21:35:22Z — from 244 issue file(s) in `docs/program/issues/`.
+2026-08-13 21:41:42Z — from 244 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -277,7 +277,7 @@ the committed file matches the generator's output.
 | `STR-NFC-CONSTRUCTION` | NFC-at-construction is normative and unimplemented: all three `EvalVal::Str` ingresses store the raw string, so `char_length`/`byte_length`/`s2l`/`==` observe unnormalized values and the interp carrier disagrees with the runtime carrier | merged | language | L | none | https://github.com/swe-toolkit/ken/pull/1109 |
 | `SURF-IDENT-TR39` | The lexer's confusable-resistance is satisfied VACUOUSLY by an ASCII-only identifier rule — spec 31 §2's blessed Unicode letters are unimplemented, and the test that looks like the TR39 gate cannot see the difference | merged | ergo | S–M | none | — |
 | `SURF-SPACE-CELLS` | The `space` block surface — cells and `becomes` — is unbuilt, while its entire desugaring target (the `State` effect: Get/Put/run_state) is built and live | merged | language | M–L | none | https://github.com/swe-toolkit/ken/pull/1152 |
-| `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | draft | verify | M | none | — |
+| `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | ready | verify | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
 | `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | merged | verify | S | none | 2120 |
 | `V4-RESIDUAL` | The Kripke countermodel is an inert shell: it is never related to `φ` at all — no interpretation of the formula, no recursive forcing evaluator — and V3's prose `description` is stuffed into `FormRef`, a slot meant for a structural subformula reference | merged | verify | L | G2-G3 | 1117 |
@@ -300,6 +300,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-TEST-SCRATCH-RAII` — Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
+- `V3-KRIPKE-DECOMPOSITION` — The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing
 
 ## Blockers
 
