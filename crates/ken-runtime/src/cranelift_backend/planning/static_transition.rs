@@ -2691,6 +2691,11 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// its own unique identity, so this map is exactly "which edges compose" and
     /// nothing has to scan an incoming population to find out.
     fusion_composed_calls: BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
+    /// **`D3` — `R`.** The fusion-owned outer realizations, keyed by the exact
+    /// planned identity each owned body realized. Disjoint from
+    /// `fusion_composed_calls` by a live preflight refusal, not by construction:
+    /// the two maps are built by two selectors and could name one identity.
+    fusion_outer_realizations: BTreeMap<ContinuationCallIdentity, FusionOwnedOuterRealization>,
     /// Whether body ownership has been installed. **Not derivable from the map's
     /// emptiness:** a plan with no fused regions installs an empty map, and a
     /// second install against it must still refuse.
@@ -7881,6 +7886,55 @@ pub(in crate::cranelift_backend) struct FusionComposedEdge {
     layer: FusionCompositionLayer,
 }
 
+/// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — `R`: the ONE consumer-binding
+/// identity per body-owning fusion, realized by the fusion-owned body itself.**
+///
+/// Architect `evt_6bm54j10w1n88`. Named for a REALIZATION, not a call, because
+/// that is what it is: `R` emits no call, enters no call funnel, and lowers no
+/// second selected body. The fusion-owned body already emits that body exactly
+/// once, and this record says *which planned continuation identity that body
+/// realized* -- it neither moves nor duplicates the `FusionRegionClaim`, which
+/// remains the authority for the producer construct, field, consuming call,
+/// callee, producer body and redirect.
+///
+/// **Selection is the checked consumer binding plus the exact call-target
+/// bijection -- the same authority `I` is selected by. The coordinate equalities
+/// below are a CLOSURE CHECK APPLIED AFTER SELECTION, never a selector.**
+/// Selecting on origin or body coincidence is the aliasing this node has
+/// refused throughout: two unrelated identities that happened to agree would be
+/// admitted, and the one that mattered would be admitted for the wrong reason.
+#[derive(Clone, Debug)]
+pub(in crate::cranelift_backend) struct FusionOwnedOuterRealization {
+    fusion: StaticContinuationFusionId,
+    target: ContinuationSpecializationId,
+    emission_owner: ContinuationEmissionOwner,
+    consumer_continuation_origin: StaticOriginId,
+    selected_case_body: StaticOriginId,
+    producer_body: StaticOriginId,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl FusionOwnedOuterRealization {
+    pub(in crate::cranelift_backend) fn fusion(&self) -> StaticContinuationFusionId {
+        self.fusion
+    }
+    pub(in crate::cranelift_backend) fn target(&self) -> ContinuationSpecializationId {
+        self.target
+    }
+    pub(in crate::cranelift_backend) fn emission_owner(&self) -> ContinuationEmissionOwner {
+        self.emission_owner
+    }
+    pub(in crate::cranelift_backend) fn consumer_continuation_origin(&self) -> StaticOriginId {
+        self.consumer_continuation_origin
+    }
+    pub(in crate::cranelift_backend) fn selected_case_body(&self) -> StaticOriginId {
+        self.selected_case_body
+    }
+    pub(in crate::cranelift_backend) fn producer_body(&self) -> StaticOriginId {
+        self.producer_body
+    }
+}
+
 /// Which ruled checked binding selected a composed edge.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) enum FusionCompositionLayer {
@@ -11103,6 +11157,7 @@ impl<'src> Planner<'src> {
                 // validated claims, which cannot exist before the plan does.
                 fusion_owned_bodies: BTreeMap::new(),
                 fusion_composed_calls: BTreeMap::new(),
+                fusion_outer_realizations: BTreeMap::new(),
                 fusion_bodies_installed: false,
             },
             store_interner: BTreeMap::new(),
@@ -14095,6 +14150,10 @@ impl<'src> StaticTransitionPlan<'src> {
         // distinct way the join can be wrong rather than collapsing them into
         // one "could not resolve".
         let mut composed: BTreeMap<ContinuationCallIdentity, FusionComposedEdge> = BTreeMap::new();
+        let mut outer_realizations: BTreeMap<
+            ContinuationCallIdentity,
+            FusionOwnedOuterRealization,
+        > = BTreeMap::new();
         let specializations = self.continuation_units()?;
         let specialization_calls = self.continuation_calls()?;
         for view in self.continuation_fusions()? {
@@ -14180,135 +14239,281 @@ impl<'src> StaticTransitionPlan<'src> {
                          specialization than the edge it was read from",
                     ));
                 }
-                if composed
-                    .insert(
-                        identity,
-                        FusionComposedEdge {
-                            fusion,
-                            target: unit.id(),
-                            emission_owner: call.emission_owner(),
-                            consumer_continuation_origin: frame,
-                            producer_construct_origin: call.producer_construct_origin(),
-                            layer,
-                        },
-                    )
-                    .is_some()
-                {
-                    return Err(planner_error(
-                        "one exact continuation call identity is composed twice, so which fused \
-                         region owns the edge is undetermined",
-                    ));
+                // ---- `D3` — THE TERNARY ROUTE. `evt_6bm54j10w1n88`.
+                //
+                // Both layers are SELECTED identically, by the checked binding
+                // and the exact call-target bijection above. What differs is
+                // what realizes them: `Inner` is composed locally at its call
+                // edge, and `Outer` is already realized by the fusion-owned body
+                // and must never reach a call seat at all.
+                match layer {
+                    FusionCompositionLayer::Inner => {
+                        if composed
+                            .insert(
+                                identity,
+                                FusionComposedEdge {
+                                    fusion,
+                                    target: unit.id(),
+                                    emission_owner: call.emission_owner(),
+                                    consumer_continuation_origin: frame,
+                                    producer_construct_origin: call.producer_construct_origin(),
+                                    layer,
+                                },
+                            )
+                            .is_some()
+                        {
+                            return Err(planner_error(
+                                "one exact continuation call identity is composed twice, so which \
+                                 fused region owns the edge is undetermined",
+                            ));
+                        }
+                    }
+                    FusionCompositionLayer::Outer => {
+                        // ---- THE CLOSURE TRIPLE, APPLIED AFTER SELECTION.
+                        //
+                        // Every equality below is checked against the region
+                        // claim's own recorded coordinates. None of them chose
+                        // this identity -- the checked consumer binding and the
+                        // call-target bijection did that, above -- so a
+                        // disagreement here is a real refusal rather than a
+                        // filter that quietly admitted the wrong edge.
+                        let claim = ledger.claim(fusion).ok_or_else(|| {
+                            planner_error(
+                                "a body-owning static continuation fusion has no region claim to \
+                                 close its outer realization against, so nothing says which body \
+                                 realized the outer identity",
+                            )
+                        })?;
+                        if unit.continuation_origin() != claim.continuation_origin() {
+                            return Err(planner_error(
+                                "a fusion-owned outer realization names a continuation origin the \
+                                 region claim does not, so the body that would realize it \
+                                 eliminates a different frame",
+                            ));
+                        }
+                        let selected_case_body = self.semantic.child_origin(
+                            unit.continuation_origin(),
+                            1 + unit.producer_alternative() as usize,
+                        )?;
+                        if selected_case_body != claim.selected_case_body() {
+                            return Err(planner_error(
+                                "a fusion-owned outer realization's selected case body is not the \
+                                 one the region claim records, so the owned body emits a different \
+                                 body than the identity names",
+                            ));
+                        }
+                        if unit.worker_body_origin() != claim.producer_body()
+                            || unit.worker_body_origin() != claim.redirect().callee_origin()
+                        {
+                            return Err(planner_error(
+                                "a fusion-owned outer realization's worker body disagrees with the \
+                                 region claim's producer body or its redirect callee, so the \
+                                 identity is not the one that body realizes",
+                            ));
+                        }
+                        if call.emission_owner()
+                            != ContinuationEmissionOwner::Predeclared(claim.consumer_owner())
+                        {
+                            return Err(planner_error(
+                                "a fusion-owned outer realization is emitted by an owner other \
+                                 than the region claim's consumer, so it would be realized in a \
+                                 function that does not hold the fused region",
+                            ));
+                        }
+                        // The producer body is actually FUSION-OWNED, and by
+                        // THIS fusion. Read from the scratch map this call is
+                        // building, which is the population about to be
+                        // installed -- not from the already-installed one, which
+                        // would answer for a previous compile.
+                        match scratch.get(&claim.producer_body()) {
+                            Some(owned_body) if owned_body.fusion == fusion => {}
+                            Some(_) => {
+                                return Err(planner_error(
+                                    "a fusion-owned outer realization's producer body is owned by \
+                                     a different fusion, so two regions would each claim to \
+                                     realize it",
+                                ));
+                            }
+                            None => {
+                                return Err(planner_error(
+                                    "a fusion-owned outer realization names a producer body no \
+                                     fusion owns, so nothing emits the body the identity is \
+                                     supposed to be realized by",
+                                ));
+                            }
+                        }
+                        if outer_realizations
+                            .insert(
+                                identity,
+                                FusionOwnedOuterRealization {
+                                    fusion,
+                                    target: unit.id(),
+                                    emission_owner: call.emission_owner(),
+                                    consumer_continuation_origin: frame,
+                                    selected_case_body,
+                                    producer_body: claim.producer_body(),
+                                },
+                            )
+                            .is_some()
+                        {
+                            return Err(planner_error(
+                                "one exact continuation call identity is realized as a \
+                                 fusion-owned outer twice, so which region realized it is \
+                                 undetermined",
+                            ));
+                        }
+                    }
                 }
             }
         }
 
-        // ---- `D3` — THE FUSION-SCOPED JOIN, and it is validated as ONE
-        // ---- structure rather than by origin coincidence. Ruled
-        // ---- `evt_6kn9ckdnbf0ph` §2.
+        // ---- `D3` — THE FUSION-SCOPED JOIN, validated as ONE structure rather
+        // ---- than by origin coincidence. `evt_6kn9ckdnbf0ph` §2, carried to the
+        // ---- ternary population by `evt_6bm54j10w1n88`.
         //
-        // The two objects carry the two halves of the mechanism and neither is
-        // widened to hold the other's: `FusionComposedEdge` says WHICH exact
-        // continuation edge is locally composed, and `FusionRegionClaim` says
-        // WHICH checked call consumes the worker produced inside that
-        // composition. **The ordinary consuming call is deliberately absent
-        // from `dom(FusionComposedEdge)`** — it has no `ContinuationCall
-        // Identity` and is not a specialization target, and inventing a union
-        // edge for it would erase exactly that distinction.
+        // Each object carries one part and none is widened to hold another's:
+        // `FusionComposedEdge` says which exact edge is locally composed (`I`),
+        // `FusionOwnedOuterRealization` says which planned identity the owned
+        // body already realized (`R`), and `FusionRegionClaim` says which checked
+        // call consumes the worker produced inside the composition. The ordinary
+        // consuming call is deliberately in none of them -- it has no
+        // `ContinuationCallIdentity` and is not a specialization target.
         //
-        // So the only join asserted is `edge.fusion == claim.fusion`, exactly
-        // once per layer, both directions.
-        let mut layers_by_fusion: BTreeMap<
-            StaticContinuationFusionId,
-            BTreeSet<FusionCompositionLayer>,
-        > = BTreeMap::new();
-        for edge in composed.values() {
-            if !owned.contains(&edge.fusion) {
+        // So the only join asserted is `fusion == claim.fusion`, exactly once per
+        // layer, from both sides.
+        for fusion in composed
+            .values()
+            .map(|edge| edge.fusion)
+            .chain(outer_realizations.values().map(|realization| realization.fusion))
+        {
+            if !owned.contains(&fusion) {
                 return Err(planner_error(
-                    "a composed continuation edge names a fusion that owns no producer body, so \
-                     the claim half of the composition join does not exist",
-                ));
-            }
-            if !layers_by_fusion.entry(edge.fusion).or_default().insert(edge.layer) {
-                return Err(planner_error(
-                    "one static continuation fusion minted two composed edges at the same \
-                     composition layer, so its outer and inner selections are not distinct",
+                    "a fusion-local realization names a fusion that owns no producer body, so the                      claim half of the composition join does not exist",
                 ));
             }
         }
-        for fusion in owned.iter().copied() {
-            let layers = layers_by_fusion.remove(&fusion).unwrap_or_default();
-            if layers
-                != BTreeSet::from([FusionCompositionLayer::Outer, FusionCompositionLayer::Inner])
-            {
-                return Err(planner_error(
-                    "a body-owning static continuation fusion does not carry exactly one outer and \
-                     one inner composed edge, so the two ruled composition layers are not both \
-                     realized",
-                ));
+        for (name, population) in [
+            ("inner", composed.values().map(|edge| edge.fusion).collect::<Vec<_>>()),
+            (
+                "outer",
+                outer_realizations.values().map(|r| r.fusion).collect::<Vec<_>>(),
+            ),
+        ] {
+            let mut seen = BTreeSet::new();
+            for fusion in &population {
+                if !seen.insert(*fusion) {
+                    return Err(planner_error(format!(
+                        "one static continuation fusion has two {name} realizations, so its two                          ruled selections are not distinct"
+                    )));
+                }
+            }
+            for fusion in owned.iter() {
+                if !seen.contains(fusion) {
+                    return Err(planner_error(format!(
+                        "a body-owning static continuation fusion has no {name} realization, so                          only one of its two ruled layers is realized and the other's edge is                          left expecting a call that was omitted"
+                    )));
+                }
             }
         }
 
-        // ---- `D3` — THE EXACT PARTITIONS `P = O ⊎ F` AND `T = O_t ⊎ F_t`.
+        // ---- `D3` — THE EXACT TERNARY PARTITIONS `P = O ⊎ I ⊎ R` AND
+        // ---- `T = O_t ⊎ I_t ⊎ R_t`. `evt_6bm54j10w1n88`.
         //
-        // Asserted as SET relations, never as counts: two populations of the
-        // same size can be the wrong two, and every downstream narrowing reads
-        // `O`/`O_t` rather than re-deriving them.
+        // ⚠ **The binary form this replaces was VACUOUS, and the repair is not
+        // the ternary rewrite alone.** It defined `residual = planned \ fused`
+        // four lines above and then asserted `residual ∩ fused = ∅` and
+        // `residual ∪ fused = planned`. Set difference makes the first true by
+        // construction, and the second is exactly `fused ⊆ planned`, already
+        // refused above -- so **neither `Err` was reachable**, and nothing read
+        // `residual` afterwards, so nothing checked that the blessed population
+        // was the consumed one. Found by the adversary, not by this seat.
+        //
+        // Two things fix it, and both are needed:
+        //
+        // 1. **`O` is obtained from the CONSUMERS' OWN FUNCTION**, not
+        //    re-derived here. `ordinary_identities_of` is the single derivation
+        //    `ordinary_continuation_call_identities` also calls, so "validated"
+        //    and "consumed" cannot drift -- not because a check compares them,
+        //    but because there is one derivation to disagree with.
+        // 2. **`I ∩ R = ∅` is now LIVE.** Under the binary form there was one
+        //    fused map and its disjointness from its own complement was
+        //    algebra. `I` and `R` are built by two selectors over two layers and
+        //    can name one identity; this is the refusal that catches it.
+        //
+        // **Stated honestly: the COVERAGE half remains implied** by the two
+        // subset refusals above plus the definition of `O`. It is asserted
+        // because it is the law, and because the subset refusals are what it
+        // depends on -- if either is ever relaxed, this becomes the check that
+        // still names the property.
         let planned_identities = self.continuation_call_identities()?;
-        let fused_identities = composed.keys().cloned().collect::<BTreeSet<_>>();
-        if !fused_identities.is_subset(&planned_identities) {
+        let inner_identities = composed.keys().cloned().collect::<BTreeSet<_>>();
+        let outer_identities = outer_realizations.keys().cloned().collect::<BTreeSet<_>>();
+        for (name, population) in [("inner", &inner_identities), ("outer", &outer_identities)] {
+            if !population.is_subset(&planned_identities) {
+                return Err(planner_error(format!(
+                    "an {name} fusion-local identity is not in the exact planned call population,                      so that class is not a subset of the population it partitions"
+                )));
+            }
+        }
+        if !inner_identities.is_disjoint(&outer_identities) {
             return Err(planner_error(
-                "a composed continuation identity is not in the exact planned call population, so \
-                 the fusion-local domain is not a subset of the population it partitions",
+                "a continuation call identity is both locally composed and realized by a                  fusion-owned body, so one planned edge would be realized twice by two different                  mechanisms",
             ));
         }
-        let fused_targets = composed.values().map(|edge| edge.target).collect::<BTreeSet<_>>();
+        let ordinary_identities =
+            Self::ordinary_identities_of(&planned_identities, &composed, &outer_realizations);
+        if ordinary_identities
+            .union(&inner_identities)
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .union(&outer_identities)
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            != planned_identities
+        {
+            return Err(planner_error(
+                "the ordinary, locally composed and fusion-owned identity populations are not a                  partition of the exact planned population",
+            ));
+        }
+
         let planned_targets = specializations.iter().map(|unit| unit.id()).collect::<BTreeSet<_>>();
-        if !fused_targets.is_subset(&planned_targets) {
+        let inner_targets = composed.values().map(|edge| edge.target).collect::<BTreeSet<_>>();
+        let outer_targets = outer_realizations
+            .values()
+            .map(|realization| realization.target)
+            .collect::<BTreeSet<_>>();
+        for (name, population) in [("inner", &inner_targets), ("outer", &outer_targets)] {
+            if !population.is_subset(&planned_targets) {
+                return Err(planner_error(format!(
+                    "an {name} fusion-local target is outside the planned unit population, so                      that class's target range is not a subset of the population it partitions"
+                )));
+            }
+        }
+        if !inner_targets.is_disjoint(&outer_targets) {
             return Err(planner_error(
-                "a composed continuation edge names a specialization target outside the planned \
-                 unit population, so the fusion-local target range is not a subset of the \
-                 population it partitions",
+                "a continuation specialization target is both a local composition target and a                  fusion-owned realization target, so one unit's selected body would be emitted                  twice",
             ));
         }
-        // The residual halves, and the partition law restated in the direction
-        // a reader checks: disjointness plus coverage, each named separately
-        // because they fail for different reasons.
-        let residual_identities = planned_identities
-            .difference(&fused_identities)
+        let ordinary_targets =
+            Self::ordinary_targets_of(&planned_targets, &composed, &outer_realizations);
+        if ordinary_targets
+            .union(&inner_targets)
             .cloned()
-            .collect::<BTreeSet<_>>();
-        let residual_targets = planned_targets
-            .difference(&fused_targets)
+            .collect::<BTreeSet<_>>()
+            .union(&outer_targets)
             .cloned()
-            .collect::<BTreeSet<_>>();
-        if !residual_identities.is_disjoint(&fused_identities)
-            || residual_identities
-                .union(&fused_identities)
-                .cloned()
-                .collect::<BTreeSet<_>>()
-                != planned_identities
+            .collect::<BTreeSet<_>>()
+            != planned_targets
         {
             return Err(planner_error(
-                "the ordinary and fusion-local continuation identity populations are not a \
-                 partition of the exact planned population",
-            ));
-        }
-        if !residual_targets.is_disjoint(&fused_targets)
-            || residual_targets
-                .union(&fused_targets)
-                .cloned()
-                .collect::<BTreeSet<_>>()
-                != planned_targets
-        {
-            return Err(planner_error(
-                "the ordinary and fusion-local continuation target populations are not a partition \
-                 of the planned specialization population",
+                "the ordinary, locally composed and fusion-owned target populations are not a                  partition of the planned specialization population",
             ));
         }
 
         ledger.check_body_owned(&owned)?;
         self.fusion_owned_bodies = scratch;
         self.fusion_composed_calls = composed;
+        self.fusion_outer_realizations = outer_realizations;
         self.fusion_bodies_installed = true;
         ledger.commit_body_owned(owned);
         Ok(())
@@ -14355,9 +14560,50 @@ impl<'src> StaticTransitionPlan<'src> {
     pub(in crate::cranelift_backend) fn ordinary_continuation_call_identities(
         &self,
     ) -> Result<BTreeSet<ContinuationCallIdentity>, CraneliftBackendError> {
-        let mut identities = self.continuation_call_identities()?;
-        identities.retain(|identity| !self.fusion_composed_calls.contains_key(identity));
-        Ok(identities)
+        Ok(Self::ordinary_identities_of(
+            &self.continuation_call_identities()?,
+            &self.fusion_composed_calls,
+            &self.fusion_outer_realizations,
+        ))
+    }
+
+    /// **`D3` — the ONE derivation of `O`, over populations supplied by the
+    /// caller.**
+    ///
+    /// ⚠ **This exists so that "validated" and "consumed" cannot be two
+    /// derivations.** Preflight calls it on the CANDIDATE `I` and `R` before
+    /// either is installed, and the accessor above calls it on the installed
+    /// ones. The partition law therefore ranges over exactly the function every
+    /// consumer reads, rather than over a residual the validator computed for
+    /// itself and nothing afterwards used -- which is what made the binary form
+    /// vacuous.
+    fn ordinary_identities_of(
+        planned: &BTreeSet<ContinuationCallIdentity>,
+        inner: &BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
+        outer: &BTreeMap<ContinuationCallIdentity, FusionOwnedOuterRealization>,
+    ) -> BTreeSet<ContinuationCallIdentity> {
+        planned
+            .iter()
+            .filter(|identity| {
+                !inner.contains_key(*identity) && !outer.contains_key(*identity)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// The target-side twin of [`Self::ordinary_identities_of`], and it exists
+    /// for the same reason.
+    fn ordinary_targets_of(
+        planned: &BTreeSet<ContinuationSpecializationId>,
+        inner: &BTreeMap<ContinuationCallIdentity, FusionComposedEdge>,
+        outer: &BTreeMap<ContinuationCallIdentity, FusionOwnedOuterRealization>,
+    ) -> BTreeSet<ContinuationSpecializationId> {
+        let fused = inner
+            .values()
+            .map(|edge| edge.target)
+            .chain(outer.values().map(|realization| realization.target))
+            .collect::<BTreeSet<_>>();
+        planned.difference(&fused).copied().collect()
     }
 
     /// **`D3` — the ORDINARY residual targets `O_t = T \ F_t`.**
@@ -14368,17 +14614,23 @@ impl<'src> StaticTransitionPlan<'src> {
     pub(in crate::cranelift_backend) fn ordinary_continuation_targets(
         &self,
     ) -> Result<BTreeSet<ContinuationSpecializationId>, CraneliftBackendError> {
-        let fused = self
-            .fusion_composed_calls
-            .values()
-            .map(|edge| edge.target)
-            .collect::<BTreeSet<_>>();
-        Ok(self
+        let planned = self
             .continuation_units()?
             .iter()
             .map(|unit| unit.id())
-            .filter(|id| !fused.contains(id))
-            .collect())
+            .collect::<BTreeSet<_>>();
+        Ok(Self::ordinary_targets_of(
+            &planned,
+            &self.fusion_composed_calls,
+            &self.fusion_outer_realizations,
+        ))
+    }
+
+    /// **`D3` — `R`, the fusion-owned outer realizations.**
+    pub(in crate::cranelift_backend) fn fusion_outer_realizations(
+        &self,
+    ) -> &BTreeMap<ContinuationCallIdentity, FusionOwnedOuterRealization> {
+        &self.fusion_outer_realizations
     }
 
     /// **`D5a` checkpoint 1 — the units that receive a declared and defined
@@ -19238,10 +19490,21 @@ mod tests {
             plan.install_fusion_owned_bodies(&mut claims)
                 .expect("ownership installs");
 
+            // `evt_6bm54j10w1n88` — the two ruled selections are still made,
+            // but they land in DIFFERENT relations: `Inner` in the composed-edge
+            // map, `Outer` in the fusion-owned realization map.
             let edges = plan.fusion_composed_edges();
+            let outer = plan.fusion_outer_realizations();
             let mut layers = edges
                 .values()
                 .map(|edge| (edge.layer(), edge.target(), edge.emission_owner()))
+                .chain(outer.values().map(|realization| {
+                    (
+                        FusionCompositionLayer::Outer,
+                        realization.target(),
+                        realization.emission_owner(),
+                    )
+                }))
                 .collect::<Vec<_>>();
             layers.sort_by_key(|(layer, _, _)| match layer {
                 FusionCompositionLayer::Outer => 0,
@@ -19250,9 +19513,10 @@ mod tests {
             let distinct_targets = edges
                 .values()
                 .map(|edge| edge.target())
+                .chain(outer.values().map(|realization| realization.target()))
                 .collect::<BTreeSet<_>>()
                 .len();
-            rows.push((cause, edges.len(), distinct_targets, layers));
+            rows.push((cause, edges.len(), outer.len(), distinct_targets, layers));
         }
 
         assert_eq!(
@@ -19260,7 +19524,8 @@ mod tests {
             vec![
                 (
                     D2jCause::Exact,
-                    2,
+                    1,
+                    1,
                     2,
                     vec![
                         (
@@ -19277,7 +19542,8 @@ mod tests {
                 ),
                 (
                     D2jCause::ReHomed,
-                    2,
+                    1,
+                    1,
                     2,
                     vec![
                         (
@@ -19347,11 +19613,27 @@ mod tests {
             let ordinary = plan
                 .ordinary_continuation_call_identities()
                 .expect("ordinary identities");
-            let fused = plan
+            // `evt_6bm54j10w1n88` — the fused half is now TWO classes, and
+            // this control ranges over their union because the partition law
+            // does. ⛔ Their mutual disjointness is asserted separately below:
+            // folding them together first and then testing the union against
+            // `planned` would hide an identity that is in both, which is the one
+            // failure the binary form could not have.
+            let inner = plan
                 .fusion_composed_edges()
                 .keys()
                 .cloned()
                 .collect::<BTreeSet<_>>();
+            let outer = plan
+                .fusion_outer_realizations()
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            assert!(
+                inner.is_disjoint(&outer),
+                "{cause:?}: an identity is both locally composed and fusion-owned"
+            );
+            let fused = inner.union(&outer).cloned().collect::<BTreeSet<_>>();
             let planned_targets = plan
                 .continuation_units()
                 .expect("units")
@@ -19361,10 +19643,23 @@ mod tests {
             let ordinary_targets = plan
                 .ordinary_continuation_targets()
                 .expect("ordinary targets");
-            let fused_targets = plan
+            let inner_targets = plan
                 .fusion_composed_edges()
                 .values()
                 .map(|edge| edge.target())
+                .collect::<BTreeSet<_>>();
+            let outer_targets = plan
+                .fusion_outer_realizations()
+                .values()
+                .map(|realization| realization.target())
+                .collect::<BTreeSet<_>>();
+            assert!(
+                inner_targets.is_disjoint(&outer_targets),
+                "{cause:?}: a target is both a local composition and a fusion-owned realization"
+            );
+            let fused_targets = inner_targets
+                .union(&outer_targets)
+                .cloned()
                 .collect::<BTreeSet<_>>();
 
             // The partition, asserted as SETS in both directions rather than as
@@ -19429,10 +19724,11 @@ mod tests {
                     2,
                     0,
                     2,
-                    vec![vec![
-                        FusionCompositionLayer::Outer,
-                        FusionCompositionLayer::Inner
-                    ]],
+                    // `evt_6bm54j10w1n88` — the composed-edge map now holds
+                    // the Inner layer ONLY. The Outer layer did not disappear;
+                    // it moved to `fusion_outer_realizations`, where the control
+                    // above asserts exactly one per fusion.
+                    vec![vec![FusionCompositionLayer::Inner]],
                 ),
                 (
                     D2jCause::ReHomed,
@@ -19442,10 +19738,11 @@ mod tests {
                     2,
                     0,
                     2,
-                    vec![vec![
-                        FusionCompositionLayer::Outer,
-                        FusionCompositionLayer::Inner
-                    ]],
+                    // `evt_6bm54j10w1n88` — the composed-edge map now holds
+                    // the Inner layer ONLY. The Outer layer did not disappear;
+                    // it moved to `fusion_outer_realizations`, where the control
+                    // above asserts exactly one per fusion.
+                    vec![vec![FusionCompositionLayer::Inner]],
                 ),
             ],
             "both witnesses are WHOLLY fused: every planned identity and every target is \

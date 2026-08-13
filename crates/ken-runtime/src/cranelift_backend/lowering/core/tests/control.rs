@@ -33362,6 +33362,11 @@ fn d3_the_fusion_local_composition_ledger_is_affine_and_total() {
         let fused_targets = planned
             .values()
             .map(|edge| edge.target())
+            .chain(
+                plan.fusion_outer_realizations()
+                    .values()
+                    .map(|realization| realization.target()),
+            )
             .collect::<BTreeSet<_>>();
         assert!(
             !planned.is_empty(),
@@ -33450,6 +33455,11 @@ fn d3_the_fusion_local_composition_ledger_is_affine_and_total() {
         for target in &fused_targets {
             ledger.record_definition_omitted(*target);
         }
+        for (identity, realization) in plan.fusion_outer_realizations() {
+            ledger
+                .record_outer_realized(identity, realization.fusion(), realization.target())
+                .expect("the R realization is accepted");
+        }
         let error = ledger
             .close(&BTreeSet::new())
             .expect_err("an unrealized composition must be refused at close");
@@ -33464,6 +33474,11 @@ fn d3_the_fusion_local_composition_ledger_is_affine_and_total() {
             ledger
                 .consume(identity, edge.emission_owner(), identity.target())
                 .expect("consumes");
+        }
+        for (identity, realization) in plan.fusion_outer_realizations() {
+            ledger
+                .record_outer_realized(identity, realization.fusion(), realization.target())
+                .expect("the R realization is accepted");
         }
         let error = ledger
             .close(&BTreeSet::new())
@@ -33481,11 +33496,48 @@ fn d3_the_fusion_local_composition_ledger_is_affine_and_total() {
                 .consume(identity, edge.emission_owner(), identity.target())
                 .expect("consumes");
         }
+        for (identity, realization) in plan.fusion_outer_realizations() {
+            ledger
+                .record_outer_realized(identity, realization.fusion(), realization.target())
+                .expect("the R realization is accepted");
+        }
         for target in &fused_targets {
             ledger.record_definition_omitted(*target);
         }
         ledger
             .close(&ordinary)
             .expect("the total, affine, disjoint closeout succeeds");
+
+        // ---- `R` is refused when its owned body never realized it, and when a
+        // second body claims the same identity. Neither is a consumption.
+        let mut ledger = open();
+        for (identity, edge) in &planned {
+            ledger
+                .consume(identity, edge.emission_owner(), identity.target())
+                .expect("consumes");
+        }
+        for target in &fused_targets {
+            ledger.record_definition_omitted(*target);
+        }
+        let error = ledger
+            .close(&ordinary)
+            .expect_err("a planned R with no emitted owned body must be refused");
+        assert!(
+            format!("{error:?}").contains("never realized by an emitted owned body"),
+            "{cause:?}: {error:?}"
+        );
+        for (identity, realization) in plan.fusion_outer_realizations() {
+            let mut ledger = open();
+            ledger
+                .record_outer_realized(identity, realization.fusion(), realization.target())
+                .expect("the first realization is accepted");
+            let error = ledger
+                .record_outer_realized(identity, realization.fusion(), realization.target())
+                .expect_err("a second realization of one outer identity must be refused");
+            assert!(
+                format!("{error:?}").contains("realized twice"),
+                "{cause:?}: {error:?}"
+            );
+        }
     }
 }
