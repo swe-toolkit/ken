@@ -135,6 +135,29 @@ origin: "verify-implementer authorized hard-stop on SEC1-IFC AC-R3 (2026-07-27),
 > generalize to**. It would change no observable behavior and produce a green
 > WP over nothing. ⛔ Not work.
 
+## RE-DERIVED 2026-08-13 — the escalation named the wrong component
+
+**The 2026-07-27 escalation said this needs an SMT backend. That named the one
+component the program has already deferred by policy, and left the binding one
+unidentified.** `prover.rs:317-318` defers **four** things — kernel whnf, a
+decision procedure, solver-backed arithmetic search, and `Decidable` constructor
+extraction — and `03-program-of-work.md:182` defers only the third, deliberately,
+until the catalog can measure throughput. **That deferral is intact and is not
+what blocks Sec1 unless a measurement says so.**
+
+**`SEC1-R3-MINIMAL-ROUTE` (`ready`) takes that measurement.** It also re-derives
+the "vacuous widening" recording below, which is grounded on
+`declare_deceq_certificate` having one caller — **true of that registry, and
+blind to a second one**: `decimal_char.rs:262-264` registers `Char` via
+`numeric_env.set_eq_entry`, and `eq_float`/`eq_float32` exist with the right
+shape. Whether bridging them is a registration or TCB growth turns on ADR 0013,
+which records that the kernel does not execute `PrimReduction::Op` and that the
+universal `DecEq Int` laws are irreducibly trusted.
+
+**This node stays `draft`.** Nothing below is withdrawn; the block is real. What
+changed is that the component naming it was wrong, and the correction is
+measurable rather than another ruling.
+
 ## What happened
 
 `SEC1-IFC` (PR #1094) delivered `AC-R1` (`[Sec1-dual]`) and `AC-R2`

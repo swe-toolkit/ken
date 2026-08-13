@@ -1,13 +1,13 @@
 ---
 id: RT-4B-WALKED-CONSTANCY
 title: "Two assertions landed in one candidate compose into a result neither states -- the five input populations read `(4, 2, 0, 2, 1)` identically whether fusion forms or is perturbed so it cannot, so `walked` discriminates input size and nothing downstream of it; the observation's own doc calls this a gap in attribution, which is a weaker claim than what was measured, and the next reader of a non-zero walked count is one node away"
-status: active
+status: merged
 owner: runtime
 size: XS
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2116
 origin: Adversary finding evt_1a275gwshe00p on 2a1d87a2 (PR #2109), triaged confirmed by the Steward 2026-08-13 after independently reading both assertions at control.rs:3565-3566 and control.rs:3733. The Adversary ranked two repairs; the Steward took the first.
 ---
 

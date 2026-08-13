@@ -51,6 +51,28 @@ feature is.
 <name>`. Never `--workspace`** (operator hard rule; `agent/COORDINATION.md §12`).
 Workspace-green means green in CI.
 
+## D3 — two clauses on the constancy comment, carried from the #2116 review
+
+**Non-blocking follow-ups the Architect raised at `evt_71xaa1x7k0jsr`**, not
+held against that candidate. You are editing `lowering/core.rs` anyway.
+
+**First: the constancy is STRUCTURAL, not empirical.**
+`walked_admitted_continuation_discoveries` is `.len()` of the admitted-discovery
+ledger, taken **before** the per-candidate loop, and **all thirteen eliminations
+happen inside that loop.** So no decline can move it **for any witness**, not
+merely the three causes measured. Stated as measured-on-three-causes it leaves a
+reader wondering whether a fourth cause behaves differently; stated
+structurally, the question is closed permanently. One clause: *and it cannot
+move, because it is counted before the loop in which every elimination occurs.*
+
+**Second, and it protects a queued node: this is true of `walked` and NOT of
+reach.** `walked` is taken before *all* eliminations. The count
+`RT-4B-UNIQUENESS-GATE-REACH` would take is at exit 12 of 13, **after eleven of
+them** — so it is genuinely sensitive to upstream declines and keeps its
+discriminating value. **A reader who generalises the constancy to "input
+counting tells us nothing" would kill a node that is still sound**, and this
+file is exactly where that reader is standing.
+
 ## Acceptance criteria
 
 The first five are the Architect's stated review conditions, written as ACs
@@ -79,6 +101,10 @@ because **an envelope part that stays prose is one the build cannot fail.**
 - **AC-7 — the report states what this does NOT establish.** It makes a C2
   measurement possible. It says nothing about whether the planner fuses for C2,
   nothing about any enumerator exit, and it does not re-point the reach node.
+- **AC-9 — both D3 clauses land, and the second one names `REACH` explicitly.**
+  A clause that says only "other counts may differ" has not protected the node
+  it exists to protect. **Name the exit-12 position and the eleven exits ahead
+  of it**, so the distinction survives a reader who has not opened that frame.
 - **AC-8 — audit the structural traits before widening any `cfg`.** Moving a
   field from `#[cfg(test)]` to `#[cfg(any(test, feature = ...))]` changes which
   builds carry it, and a field on a type deriving `PartialEq`/`Eq`/`Hash`/`Ord`
