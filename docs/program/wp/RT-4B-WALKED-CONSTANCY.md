@@ -1,12 +1,12 @@
-# RT-4B-WALKED-CONSTANCY — record the measured constancy of `walked`, and bound the one comment that already depends on the weaker reading
+# RT-4B-WALKED-CONSTANCY — record the measured constancy of `walked`, and put three neighbouring facts where their readers are
 
 **Owner: runtime. Size: XS. Gate: none.**
-**COMMENT-ONLY. No code, no test, no assertion changes. Three comment sites.**
+**COMMENT-ONLY. No code, no test, no assertion changes. FOUR comment sites.**
 
-**Amended 2026-08-13 after the first kick and before any source read**, adding
-D3 and AC-6 from a second Adversary finding. **The guardrails below were swept
-for the addition** — fixed inputs, banned scope, hard stops and contention all
-carry it.
+**Amended twice on 2026-08-13**, adding D3/AC-6 and then D4/AC-7 from two
+Adversary findings. **No further amendment is coming.** The guardrails were
+swept both times — fixed inputs, banned scope, hard stops and contention all
+carry the additions.
 
 **Base: re-derive `origin/main` at cut time.** Fixed inputs measured at
 `2a1d87a2`.
@@ -20,6 +20,7 @@ carry it.
 | the paragraph that understates the result | same file, `:3656` — the `THE GAP:` paragraph |
 | the struct doc and its field | `lowering/core.rs:528-542` (doc), `:558-560` (`walked_admitted_continuation_discoveries`) |
 | the A/B whose comment D3 corrects, and its two branches | `planning/static_transition.rs:18998-19010` |
+| the uncommented early return D4 documents | `planning/static_transition.rs:10053-10054` |
 | the type whose derived equality diverges | `planning/static_transition.rs:8977` — `StaticContinuationFusionPlan` derives `Clone, Debug, Default, Eq, PartialEq`, and `walked` is `#[cfg(test)]` |
 
 ## D1 — re-derive the constancy at cut time, then write it
@@ -64,6 +65,26 @@ says such a difference is attributable to the carrier.**
 Add one clause: *the mutated plane is synthetic and carries no enumerator input
 count; compare only what the tuple below returns.*
 
+## D4 — put the early-return fact where its reader is
+
+**Added 2026-08-13. This is the last amendment to this frame.** `2a1d87a2`'s
+**commit message** explains why the early return at
+`planning/static_transition.rs:10053-10054` is safe: it returns `fusion` where
+it previously returned `default()`, and those are the same value.
+
+**The source carries no comment at all**, and a commit message cannot be
+corrected — only superseded — and no reader of the function will see one unless
+they go looking. So the fact sits in an artifact its reader never opens.
+
+**The commit message's qualifier is also narrower than the truth.** It says the
+two are the same value *in a non-test build*. The early return fires when
+`oriented` is `None`, and `enumerate_live_fusion_candidates_with_input_size`
+returns `(Vec::new(), 0)` on that same `None` — so `walked` is `0` there and
+`fusion == default()` **in every build, test included.**
+
+Write one sentence at the early return saying that, without the qualifier.
+**You are in this file for D3 already; this is the marginal cost of a sentence.**
+
 ## Acceptance criteria
 
 - **AC-1 — the statement names all three causes and both assertion sites**, so
@@ -89,6 +110,10 @@ count; compare only what the tuple below returns.*
   carrier. The whole point is that a `walked` difference between those two
   branches is attributable to `::default()` and not to the operand under test.
   **A clause that says only "be careful comparing planes" has not said it.**
+- **AC-7 — the D4 sentence carries NO build qualifier.** `fusion == default()`
+  at that return in every build. **Repeating the commit message's "in a non-test
+  build" would import the error rather than fix it** — a qualifier narrower than
+  the truth invites a reader to hunt the divergence it implies.
 
 ## Pre-stated licensing — read BEFORE reporting
 
@@ -96,6 +121,7 @@ count; compare only what the tuple below returns.*
 |---|---|
 | the constancy, in the doc | **Nothing about the planner, and nothing about 4b's status.** It bounds how any future `walked` read may be used. It does not settle whether the planner fuses for any witness — the unperturbed rows already show it fusing — and it does not close or reopen any 4b node. |
 | the D3 clause | **Nothing.** It is preventive: there is no witness today. It does not assert a defect in the field, the derive, or the A/B. |
+| the D4 sentence | **Nothing.** It relocates a fact from a commit message into the source, and drops a qualifier that was narrower than the truth. |
 
 > **This node cannot conclude that the observation was a mistake.** It records
 > what the number does and does not discriminate. If your report reads as "4b's
