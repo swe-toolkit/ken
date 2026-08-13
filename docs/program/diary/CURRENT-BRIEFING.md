@@ -131,9 +131,24 @@
 > QA-approved, Language stood down with the operator); `wp/CAT-CAPEX`
 > `31d1efcb` (2 commits, 1 `crates/` file); `wp/LIB-LINEAR-CAUSAL-OBLIGATION-
 > CALCULUS` and `wp/catalog-style-guide` (doc-only).
-> **`50da348a` on the never-merge list is a SUPERSEDED SHA, not a verdict on
-> Language's work — and that list carries NO recorded rationale**, which is
-> itself worth fixing before it is trusted again.
+> **THE NEVER-MERGE LIST IS A PUBLISH-TARGET BAN, NOT A CONTENT BAN — rationale
+> reconstructed and evidenced 2026-08-13.** It had carried none, so it was being
+> read as "this code may never reach `main`", which would have held
+> `8e9baa18` forever. **The decisive counter-example is `d5c7df82`: it is on the
+> list, and its WP `LANG-SURFACE-RECORD-DECL` ALREADY MERGED** (see the
+> merge-base commit `57688110`, "M7: LANG-SURFACE-RECORD-DECL merged"). **A list
+> entry whose own branch landed cannot be a content prohibition.** Every entry
+> is a superseded or mid-branch attempt: `e4531318`/`9d942c4b`/`6676251a`/
+> `ce5323ca` are four passes at one `D2f` "Deliverable 0" gate (three share an
+> identical message — they are retries), `ea95a223` is `D2f` `D5`, `bd5961f8` is
+> the emitter chain superseded by the un-wired `877fd731`, and `50da348a` is
+> `LANG-SURFACE-RECORD-LITERAL`'s FIRST commit — "add named record expressions"
+> **without** the stack bound that `766c9f07` adds immediately after it.
+>
+> ⇒ **Publishing any of these SHAs AS A TARGET would land a known-defective
+> intermediate. Publishing a later tip that CONTAINS one is a different act and
+> is not prohibited.** `8e9baa18` is such a tip and is clear to publish; it is
+> exactly the "recut at a green seam" case the operator's rule describes.
 >
 > > ## STANDING OPERATOR RULE, 2026-08-13 — MERGE TIMING IS MINE
 > >
