@@ -5718,12 +5718,64 @@ impl<'a> Lowering<'a> {
                 let mut induction_hypotheses = Vec::with_capacity(case.recursive_positions.len());
                 let ih_slots =
                     self.computational_ih_slots_for_case(case, eliminator.checked_frame_id)?;
-                // The hypothesis prefix runs in REVERSE declaration order. Three
-                // sibling sites do the same reversal (5496, 7094, 13708), and
-                // `CheckedCaseBinderLayout::for_case` in the planner is the
-                // intended single owner of this order -- it is not adopted here
-                // yet, so a change to the order is still a five-site change.
+                // ---- `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — THE ORDER
+                // ---- AUTHORITY IS ADOPTED HERE. This site CHECKS the layout
+                // ---- rather than merely agreeing with it.
+                //
+                // The hypothesis prefix runs in REVERSE declaration order, and
+                // `CheckedCaseBinderLayout::for_case` is the one place that order
+                // is spelled. Production reversed it at **five** sites, each with
+                // its own `.rev()`, and the type's own doc named four of them
+                // (`4939`, `5496`, `7094`, `13708`) as un-adopted. **This is the
+                // first adoption**, so a change to the order is now a four-site
+                // change, and this seat is no longer one of them: the loop below
+                // still walks `.rev()` to *drive* the construction, but every slot
+                // it fills is checked against the layout's own answer, so a
+                // divergence refuses here instead of shipping a permuted run.
+                //
+                // ⛔ Not a second derivation of the order. The layout is derived
+                // from the case's own checked declaration and nothing else -- not
+                // from this env, not from a lowered shape -- which is what makes
+                // the comparison a cross-check between two authorities rather than
+                // this site agreeing with itself.
+                //
+                // ⛔ Refusing rather than reordering. A permuted run is a wrong
+                // program, not a repairable one: `D6a` measured that a single
+                // shifted slot surfaces as an out-of-range `Var` at the *tail*,
+                // nowhere near the position that moved.
+                //
+                // **MEASURED, not assumed to run.** Both comparisons here were
+                // inverted as a positive control and **76** `ken-runtime` tests
+                // went red on this diagnostic, on ordinary witnesses -- so the
+                // adoption is exercised across the whole composed-eliminator
+                // population and not only on the armed `D2f` roots. **CLAIMED:**
+                // the run this site assembles agrees with the layout. **THE GAP:**
+                // agreement is checked for the slots the layout ranges over -- the
+                // hypothesis prefix and the constructor arguments -- and the frame
+                // environment appended after it is outside that range, where
+                // `role_at` answers `FrameEnvironment` for any index and so states
+                // nothing to disagree with.
+                let binder_layout = CheckedCaseBinderLayout::for_case(case)?;
                 for position in case.recursive_positions.iter().rev().copied() {
+                    // The slot this iteration is about to fill, read before the
+                    // push so the check names the position it actually occupies.
+                    let slot = induction_hypotheses.len();
+                    match binder_layout.role_at(slot) {
+                        CheckedCaseBinderRole::InductionHypothesis { recursive_position }
+                            if recursive_position as usize == position => {}
+                        other => {
+                            return Err(unsupported(
+                                "ComputationalMatch",
+                                format!(
+                                    "this case's induction-hypothesis prefix is assembling \
+                                     recursive source position {position} at binder slot {slot}, \
+                                     where the checked case binder layout says {other:?} belongs; \
+                                     the prefix order and its single authority disagree, and a \
+                                     run assembled either way would shift every later binder"
+                                ),
+                            ));
+                        }
+                    }
                     // `RT-CONTSPEC-ACTIVATE` `D3` — THE PRODUCER OCCURRENCE
                     // IS HERE, and the claim cannot be made yet.
                     //
@@ -5913,6 +5965,49 @@ impl<'a> Lowering<'a> {
                     eliminated_origin: eliminator.static_origin,
                 });
                 self.extend_constructor_fields(&mut case_env, &args)?;
+                // ---- `D2e` — SEGMENT 2 CHECKED AGAINST THE SAME AUTHORITY.
+                //
+                // The prefix check above is per-slot and covers segment 1 only.
+                // This closes the run: every constructor argument must sit at the
+                // slot the layout gives it, and the run must be exactly as long as
+                // the layout says before the frame environment is appended.
+                //
+                // ⛔ **The length check is not redundant with the walk.** The walk
+                // ranges over `argument_binders`; a run that is too LONG passes it
+                // slot by slot and still displaces the frame environment, which is
+                // the `D6a` symptom -- an out-of-range `Var` at the tail, nowhere
+                // near the surplus. Both directions are refused.
+                if case_env.len() != binder_layout.binder_count() {
+                    return Err(unsupported(
+                        "ComputationalMatch",
+                        format!(
+                            "this case assembled a {}-member binder run before its frame \
+                             environment, where the checked case binder layout says {} members \
+                             belong; a run of the wrong length shifts every enclosing binder \
+                             rather than failing at the member that moved",
+                            case_env.len(),
+                            binder_layout.binder_count()
+                        ),
+                    ));
+                }
+                for field_position in 0..case.argument_binders {
+                    let slot = case.recursive_positions.len() + field_position;
+                    match binder_layout.role_at(slot) {
+                        CheckedCaseBinderRole::ConstructorChild {
+                            field_position: named,
+                        } if named as usize == field_position => {}
+                        other => {
+                            return Err(unsupported(
+                                "ComputationalMatch",
+                                format!(
+                                    "this case bound constructor source position \
+                                     {field_position} at binder slot {slot}, where the checked \
+                                     case binder layout says {other:?} belongs"
+                                ),
+                            ));
+                        }
+                    }
+                }
                 let frame_env = match self.materialize_eliminator_frame_env(
                     builder,
                     EliminatorFrame::Computational(eliminator),

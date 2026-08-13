@@ -89,6 +89,12 @@ pub(in crate::cranelift_backend) use super::planning::{
     AbiCaptureProvenance, AbiCarrier, AbiFrameHeader, AbiOwnership, AbiProcessParameter,
     AbiRootIngress, AbiSlot, AbiSlotKind, AbiStorageOwner, AbiUnitDefinition,
     expected_capture_slot,
+    // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2e` — the checked binder layout, now
+    // reaching PRODUCTION rather than only lowering's test targets: the composed
+    // eliminator checks its assembled run against it. ⛔ Ungated here and in
+    // `planning.rs`, because a `cfg(test)` re-export of an item production reads
+    // is an unresolved import the test profile cannot see.
+    CheckedCaseBinderLayout, CheckedCaseBinderRole,
     CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,
     DeclarationCallTargetClass,
     ContinuationContextId, ContinuationEmissionOwner,
