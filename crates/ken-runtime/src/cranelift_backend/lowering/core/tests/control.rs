@@ -2797,31 +2797,48 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
 /// be true"*, because the prose it replaces claimed a step-5/step-6 stop that
 /// had already been overtaken with nothing going red.
 ///
-/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile: lowering
-/// runs to completion — every unit call is emitted, both composed edges among
-/// them — and the compile stops at the ROOT RESULT, in `emit_result` ->
-/// `ground_value` -> `into_specialized_at`, on the fusion key's own producer
-/// construct whose worker field has no value representation.
-/// **CLAIMED:** that, and not the mixed-frame or IH-marker refusal, is where the
-/// armed compile currently stops.
-/// **THE GAP, and it is the whole point of the row:** this pins the
-/// **pre-mechanism** order. It is *expected* to go red when local composition
-/// lands, and going red is the signal to restate the comment — not a
-/// regression. It says nothing about whether the mechanism is right; per
-/// `evt_6kn9ckdnbf0ph` the worker is a compiler-local intermediate between two
-/// lowering steps, so its absence from any ABI operand run is the design, not a
-/// defect.
+/// **MEASURED**, armed on an isolated `Exact` and `ReHomed` compile, at the
+/// residual-narrowing increment: the compile stops at
+/// `ContinuationSpecialization: the claimed continuation target was not
+/// declared into this function`.
+/// **CLAIMED:** that is where the armed compile currently stops, and it is the
+/// **fail-closed intermediate** the half-landed replacement is expected to sit
+/// at.
+///
+/// **WHY IT MOVED, and it moved BACKWARDS on purpose.** `evt_6kn9ckdnbf0ph` §3
+/// replaces *only the direct-call realization* of a fusion-local identity, and
+/// that replacement has two halves. The first half has landed: `O = P \ F` now
+/// feeds resolution, declaration and both ledger opens, so a fusion-local
+/// identity no longer has a declared target — **the direct path is closed for
+/// `F`.** The second half, local selected-body lowering, is not built yet, so
+/// nothing opens the local path and the identity meets this refusal instead.
+///
+/// ⇒ **The intermediate is a refusal, never a silent wrong answer**, which is
+/// the only reason it is acceptable to land the halves separately. Production
+/// is unarmed, so no production compile reaches it at all.
+///
+/// **THE PREVIOUS MEASURED STOP**, superseded by this one and recorded so the
+/// movement is auditable rather than rewritten: the root-result escape in
+/// `emit_result` -> `ground_value` -> `into_specialized_at`, on the fusion
+/// key's own producer construct. Per `evt_6kn9ckdnbf0ph` that order was the
+/// *pre-mechanism* one and never a refutation — the worker is a compiler-local
+/// intermediate between two lowering steps, so its absence from any ABI operand
+/// run is the design, not a defect.
 ///
 /// **Promise class: transition sentinel.** It is named for the boundary rather
 /// than for a count, and the event that retires it is the local selected-body
-/// composition landing for `dom(FusionComposedEdge)`.
+/// composition landing for `dom(FusionComposedEdge)` — at which point the stop
+/// moves again, this row reds again, and the comment beside the installer is
+/// restated again. **Each red is the mechanism reporting progress**, and the
+/// instruction is always to restate the measured stop, never to relax the
+/// assertion.
 ///
 /// ⛔ Production stays unarmed. `D2F_EMITTER_ARMED` is `false`; the arm here is
 /// the `cfg(test)` RAII `D2fEmitterTestArm`, which disarms on drop so a
 /// panicking assertion cannot leak an armed gate into the next test on this
 /// thread.
 #[test]
-fn d2f_armed_terminal_stop_is_the_root_result_worker_escape() {
+fn d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves() {
     use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
     use crate::cranelift_backend::planning::{d2j_checked_fixture_under, D2jCause};
 
@@ -2862,8 +2879,8 @@ fn d2f_armed_terminal_stop_is_the_root_result_worker_escape() {
         let reached = matches!(
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
-                if *construct == "StaticWorkerBinding"
-                    && reason.contains("escaping to a ground value")
+                if *construct == "ContinuationSpecialization"
+                    && reason.contains("was not declared into this function")
         );
         rows.push((cause, reached));
     }
@@ -2871,8 +2888,9 @@ fn d2f_armed_terminal_stop_is_the_root_result_worker_escape() {
     assert_eq!(
         rows,
         vec![(D2jCause::Exact, true), (D2jCause::ReHomed, true)],
-        "the armed compile must run through lowering and stop at the ROOT RESULT worker escape; \
-         if this row is red because the stop MOVED, the comment beside the D2f installer in \
+        "the armed compile must stop at the fail-closed intermediate: a fusion-local identity \
+         whose direct path is closed by the residual narrowing and whose local path is not open \
+         yet. If this row is red because the stop MOVED, the comment beside the D2f installer in \
          core.rs is now stale and must be restated to the new measured stop rather than this \
          assertion being relaxed"
     );

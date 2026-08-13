@@ -1027,20 +1027,14 @@ pub(in crate::cranelift_backend) fn resolve_continuation_targets(
     bundle: &UnitBundle,
 ) -> Result<BTreeMap<ContinuationCallIdentity, FuncId>, CraneliftBackendError> {
     let mut resolved = BTreeMap::new();
-    for call in plan.continuation_calls()? {
-        let identity = plan
-            .continuation_call_binding_for(
-                call.producer_construct_origin(),
-                call.continuation_origin(),
-                call.producer_alternative(),
-                call.recursive_position(),
-            )?
-            .ok_or_else(|| {
-                backend_module(
-                    "a projected causal call has no binding under its own four-field selector"
-                        .to_string(),
-                )
-            })?;
+    // **`D3` — the ORDINARY residual domain `O`, from the one plan-authoritative
+    // accessor.** A fusion-local identity omits its target resolution entirely
+    // (Architect `evt_48rwarx25pj2p` §3), so it must not be looked up here: its
+    // target has no forward-declared `Function` to resolve to, and asking would
+    // raise the never-declared refusal below for an identity that is *lawfully*
+    // absent. Narrowing the INPUT is what keeps that refusal meaningful for the
+    // ordinary population instead of weakening it to tolerate an absence.
+    for identity in plan.ordinary_continuation_call_identities()? {
         let target = bundle.continuation(identity.target()).ok_or_else(|| {
             backend_module(
                 "a projected causal identity names a continuation specialization that was never \
@@ -4156,24 +4150,11 @@ impl ContinuationCandidateLedger {
         // The SAME projection the claim ledger's `planned` is read from, so the
         // candidate population cannot drift from the population whose
         // obligations `D2` will derive out of it.
-        let candidates = plan
-            .continuation_calls()?
-            .iter()
-            .map(|call| {
-                plan.continuation_call_binding_for(
-                    call.producer_construct_origin(),
-                    call.continuation_origin(),
-                    call.producer_alternative(),
-                    call.recursive_position(),
-                )?
-                .ok_or_else(|| {
-                    backend_module(
-                        "a planned continuation call has no binding at its own four coordinates,                          so the candidate population cannot be built from the projection that                          produced it"
-                            .to_string(),
-                    )
-                })
-            })
-            .collect::<Result<BTreeSet<_>, _>>()?;
+        // **`D3` — `O`, not `P`.** A fusion-local identity is settled in the
+        // sibling composition ledger, never here, so admitting it as a candidate
+        // would make totality-at-close demand a `CandidateDisposition` it must
+        // not have. `evt_6kn9ckdnbf0ph` §2 forbids giving it one.
+        let candidates = plan.ordinary_continuation_call_identities()?;
         // **`D3` — the candidate population AS THE LIVE PLAN PROJECTED IT.**
         //
         // Recorded here rather than rebuilt in a test, and the difference is
@@ -4300,24 +4281,11 @@ impl ContinuationClaimLedger {
         // is recorded because `close()` asserts the four sets equal and a set
         // that is *implied* by another is not the same evidence as one that was
         // read independently -- the load-bearing pairs are declared and emitted.
-        let planned = plan
-            .continuation_calls()?
-            .iter()
-            .map(|call| {
-                plan.continuation_call_binding_for(
-                    call.producer_construct_origin(),
-                    call.continuation_origin(),
-                    call.producer_alternative(),
-                    call.recursive_position(),
-                )?
-                .ok_or_else(|| {
-                    backend_module(
-                        "a projected causal call has no binding under its own four-field selector"
-                            .to_string(),
-                    )
-                })
-            })
-            .collect::<Result<BTreeSet<_>, CraneliftBackendError>>()?;
+        // **`D3` — `O`.** `close()` asserts `resolved = declared = planned` over
+        // this set, and all three narrow together: a fusion-local identity is
+        // absent from every one of them, so each law stays literally true over
+        // its own complete domain rather than being widened to accept a gap.
+        let planned = plan.ordinary_continuation_call_identities()?;
         Ok(Self {
             resolved,
             claims,

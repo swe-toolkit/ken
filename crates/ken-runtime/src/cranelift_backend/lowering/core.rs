@@ -2259,36 +2259,43 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // compile:** every one of the six unit calls is emitted, both composed edges
     // among them, and the compile then stops at the ROOT RESULT.
     //
-    // **THE CURRENT MEASURED TERMINAL STOP**, and it is pinned by
-    // `d2f_armed_terminal_stop_is_the_root_result_worker_escape` rather than
+    // **THE CURRENT MEASURED TERMINAL STOP**, pinned by
+    // `d2f_armed_terminal_stop_is_pinned_and_reds_when_it_moves` rather than
     // asserted here:
     //
     // ```text
-    // compile_expr_into_object_module
-    //   -> compile_expr_into_module_with_root_projection
-    //   -> emit_result -> ground_value -> into_specialized_at
-    //   => Unsupported(StaticWorkerBinding,
-    //      "a constructor field escaping to a ground value ...")
+    // Unsupported(ContinuationSpecialization,
+    //   "the claimed continuation target was not declared into this function")
     // ```
     //
-    // The escaping value is the fusion key's OWN producer: construct 30, field
-    // 29 on `Exact` (26 / 25 on `ReHomed`), the only worker field built in the
-    // compile, built AFTER every call and never rebound or consumed.
+    // **This is the FAIL-CLOSED INTERMEDIATE of a half-landed replacement, and
+    // it moved BACKWARDS on purpose.** `evt_6kn9ckdnbf0ph` §3 replaces *only the
+    // direct-call realization* of a fusion-local identity, in two halves. The
+    // first has landed: `O = P \ F` feeds resolution, declaration and both
+    // ledger opens, so an identity in `F` has no declared target and **the
+    // direct path is closed for it**. The second — local selected-body lowering
+    // — is not built, so nothing opens the local path and the identity meets
+    // this refusal. A refusal, never a silent wrong answer, which is the only
+    // reason the halves may land separately.
     //
-    // ⛔ **That is the pre-mechanism order and it is NOT a refutation.**
-    // Architect `evt_6kn9ckdnbf0ph`: the held object carries the planner half
-    // only, so the direct calls and the later route-C build are exactly the
-    // expected sequence. The worker is a compiler-local intermediate BETWEEN two
-    // lowering steps of the composition, never an operand of either ordinary
-    // call ABI — so it not appearing in a declared operand run says nothing
-    // about the mechanism. An earlier falsifier that required it to appear there
-    // is **withdrawn**; it tested the very ABI crossing local composition
-    // removes.
+    // **THE PREVIOUS MEASURED STOP**, superseded and recorded so the movement is
+    // auditable: the root-result escape in `emit_result` -> `ground_value` ->
+    // `into_specialized_at`, on the fusion key's OWN producer — construct 30,
+    // field 29 on `Exact` (26 / 25 on `ReHomed`), the only worker field in the
+    // compile, built after every call and never rebound.
+    //
+    // ⛔ **That order was the pre-mechanism one and was NOT a refutation.**
+    // Architect `evt_6kn9ckdnbf0ph`: the worker is a compiler-local intermediate
+    // BETWEEN two lowering steps of the composition, never an operand of either
+    // ordinary call ABI — so it not appearing in a declared operand run says
+    // nothing about the mechanism. An earlier falsifier that required it to
+    // appear there is **withdrawn**; it tested the very ABI crossing local
+    // composition removes.
     //
     // ⇒ **What retires this paragraph is the local lowering**, at which point
-    // the stop moves and the control above goes red on its own. That is the
-    // whole difference from the prose this replaces, which claimed a step-5 /
-    // step-6 stop that had silently stopped being true.
+    // the stop moves again and the control reds again. That is the whole
+    // difference from the prose this replaces, which claimed a step-5 / step-6
+    // stop that had silently stopped being true with nothing to catch it.
     //
     // ---- DURABLE. A RULING, NOT A MEASUREMENT. `D1`/`D2` DO NOT TOUCH IT, AND
     // ---- THE RETIREMENT INSTRUCTION BELOW EXCLUDES IT BY NAME.
