@@ -89,6 +89,15 @@ pub use lowering::with_px8ds_retired_flat_order;
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{with_match_recursor_census, MatchRecursorCensusRow};
 
+// `RT-4B-OBSERVATION-FEATURE-GATE`: the existing D2f observer, reachable by
+// governed cross-crate controls only when its isolated default-off feature is
+// enabled. These items are doc-hidden and explicitly unsupported as production
+// API at their declarations.
+#[cfg(feature = "r3-4b-observation")]
+pub use lowering::core::{
+    d2f_gate_observation_scope, D2fGateArrival, D2fGateObservationScope,
+};
+
 // `RT-MATCH-RECURSOR-CONSUMERS` 4a.1: the child-process transport of that same
 // recorder, and the one item in this pair that is deliberately NOT gated.
 //

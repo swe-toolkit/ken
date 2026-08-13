@@ -32,7 +32,7 @@ pub(in crate::cranelift_backend) use static_transition::{
 };
 /// `D2f` Deliverable 0 — the resolved plane's observation types, so a control
 /// downstream of a production compile can state which key resolved.
-#[cfg(test)]
+#[cfg(any(test, feature = "r3-4b-observation"))]
 pub(in crate::cranelift_backend) use static_transition::{
     StaticContinuationFusionDescriptor, StaticContinuationFusionKey, StaticContinuationFusionPlan,
 };
