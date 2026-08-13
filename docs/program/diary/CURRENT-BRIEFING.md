@@ -38,8 +38,50 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~00:1xZ. **`main` = `7877a28d`.**
+> ### RESUME HERE — state at 2026-08-13 ~01:3xZ. **`main` = `6b90dcf8`.**
 >
+> **THE RING IS BLOCKED ON ONE ARCHITECT FORK AND NOTHING ELSE. I hold nothing
+> unpublished; the frame on `main` carries the whole arc.** Read
+> `docs/program/wp/RT-LEXICAL-R3-FUSION-EMITTER.md`, top of the stop-4 region —
+> newest box first. Do not re-derive any of it from this file.
+>
+> **Held R3 `430660fd`, 14 commits, base `5b912876` (now stale — rebase onto
+> `6b90dcf8`), unarmed, unrouted, not a candidate.**
+>
+> **THE FORK:** either the ruled incoming-call **partition guard is
+> structurally unreachable** defence-in-depth — recorded like
+> `FusionClaimRefusal::SelfRedirection`, one doc sentence and **no** control —
+> or **the partition must key on something other than incoming-call
+> multiplicity.** Mechanism, the Architect's alone. **(a) is not the cheap
+> answer:** it replaces two tests with a claim that then has to be true.
+>
+> **THE ROUTE-C MECHANISM IS RULED** (`evt_1t3f4e8100rb5`): planner-authored,
+> **call-edge-local continuation composition**, authorized by **one opaque exact
+> `ContinuationCallIdentity`** — never target/body/origin/owner coincidence. The
+> derivation **closes with no new source fact**: the two composed edges are named
+> by the fusion key's two `CheckedIhBinding`s, a relation already in the file
+> from the opposite direction.
+>
+> **WHY THE FIXTURES-FIRST UNIT STOPPED, and it is a result rather than a
+> failure.** `intern_specialization` keys on the **whole**
+> `ContinuationSpecializationKey` ⇒ distinct call identities imply **distinct
+> targets**, so the residual-direct-caller population exists in-tree **only**
+> under `ContinuationInternMutation` — an injected planner defect. Ten
+> configurations measured. **My sequencing ruling is not refuted by this:** a
+> singleton domain still makes the guard vacuously green; what changed is that
+> the fixture cannot supply the population either, and the bounded escape hatch
+> surfaced that **before** a mechanism was built on the guard.
+>
+> **SIX PREMISES REFUTED ON THIS SEAM, classification untouched by all six.** The
+> Architect now rules measure-first unprompted — **do not re-rule sequencing
+> here**; raise it only if a mechanism is prescribed with an unmeasured premise.
+>
+> **`runtime-leader` has missed SEVEN handbacks.** Its tick samples the
+> implementer mid-work and concludes "no action owed". **Compare its last-turn
+> time to the latest handback, never its own conclusion.** Rouse under 1000
+> chars or it pastes and needs two Enters.
+>
+
 > **THE ARCHITECT RULED AND WITHDREW ITS OWN PRIOR RULING**
 > (`evt_27qhdnnmv4h4z`, durable `fd62eb5d`): `FusionForward` and
 > continuation-specialization subsumption are **withdrawn** — the earlier
