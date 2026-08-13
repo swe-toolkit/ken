@@ -380,11 +380,28 @@ constraint any answer must satisfy, not the answer), and whether V3 proceeds at
 all.
 
 **Note for the operator's open fork.** The same mechanism sits on both sides of
-it. Widening decidable equality **deliberately** spends two irreducible
-postulates per registrant; the V3 lane can spend the same currency
-**accidentally**, by admitting adequacy instead of proving it. One fork arm
-buys TCB growth knowingly and the other can leak it — and until this gate is
-written as an AC, only the first is visible.
+it, and it is the same currency rather than an analogy: entries in
+`trusted_base()` minted by `declare_postulate`. Widening decidable equality
+spends two per registrant **deliberately**. An unproved adequacy could only
+enter the same way, because **admitting is the only alternative to proving.**
+
+**The two arms are not comparable on one axis, and this is the part the
+operator needs.** The D side's postulates are a real, bounded, acknowledged
+cost — someone can look at them and say yes. **An adequacy postulate is not an
+expensive version of that. `23 §7` declares that the prover adds *nothing* to
+the trusted base, so a leaked postulate is the stated architecture being
+false** — a deviation from a declared zero, with no threshold at which anyone
+was supposed to weigh it. It is **out of contract**, not merely unbudgeted.
+
+**And the missing thing is an observer, not an instrument.** A leaked adequacy
+postulate **would** be observable — it lands in `trusted_base()` like any
+other, and anyone who looked would see it. ⇒ **Until this gate is an AC, only
+the priced side is *watched*.** Say "watched", not "visible": detecting the
+leak needs no new machinery, which is exactly why this is cheap enough to be an
+AC rather than a node.
+
+Architect precisions at `evt_24bc8baspzfkp`; the reframing is the Steward's,
+kept with those two wordings.
 
 Also affirmed as a **soundness** argument rather than a scheduling preference:
 implementing the translation before the enclave fixes the theory would make the
