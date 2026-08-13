@@ -21,10 +21,16 @@
 //!
 //! ⛔ **It proves NOTHING about fusion-plan population, and NOTHING about arrival
 //! at the `R3` composed seat.** Those are strictly further down the pipeline than
-//! anything measured here, and this row does not observe them at all. The
-//! measured `ih_slots = 0, ih_invocations = 0` below is the concrete reason the
-//! stronger reading is unavailable: the classification arrives **without** either
-//! marker, so nothing here shows a fusion candidate being populated.
+//! anything measured here, and this row does not observe them at all.
+//!
+//! ⛔ **And the `ih_slots = 0, ih_invocations = 0` row below is NOT the evidence
+//! for that boundary — it is a property of this erasure ENTRY POINT.**
+//! `erase_checked_core_package_for_target` passes `native_plans = None`, and the
+//! markers are only emitted where the plan-bearing path supplies slot templates,
+//! so zero here is near-tautological. It must never be quoted as "the
+//! nested-result producer yields no marker". The plan-bearing measurement is
+//! owed, and is blocked on pre-existing `RT-CLOSURE-BOUNDARY-LANE` debt at object
+//! emission. See the note at that assertion.
 //!
 //! **This warning is not boilerplate — this node has already paid for a control
 //! whose text outran its measurement.** Four universal claims were published from
@@ -421,17 +427,38 @@ fn assert_nested_result_producer_arrives(package_name: &str, kind: CompilerTarge
          so it is the SAME match and not merely some computational match"
     );
 
-    // THE BOUNDARY, asserted rather than only described. TRANSITION SENTINEL:
-    // when checked IH slot/invocation metadata begins to populate for this
-    // family, this goes red ON PURPOSE so that C1's "arrival only" statement is
-    // re-derived. Do not just update the numbers.
+    // THE BOUNDARY — and this row states what it MEASURES, not what it would
+    // like to conclude.
+    //
+    // ⛔ **This zero is a property of THIS ERASURE ENTRY POINT, not of the
+    // source.** `erase_checked_core_package_for_target` calls
+    // `erase_checked_package_with_host_root(package, targets, None, None)` —
+    // `native_plans = None`. The IH slot marker is emitted only where
+    // `branch_slot_templates` is non-empty, which the plan-bearing path
+    // supplies. So on this path the markers are **structurally not computed**,
+    // and observing zero here is close to tautological.
+    //
+    // ⇒ **It is therefore NOT evidence that the source produces no IH slots**,
+    // and must never be quoted as "the nested-result producer yields no marker".
+    // What it does pin is that this path stays marker-free, so a future change
+    // that starts emitting markers *here* is surfaced rather than absorbed.
+    //
+    // The plan-bearing measurement is OWED and is currently blocked: the native
+    // route refuses at object emission on the pre-existing
+    // `RT-CLOSURE-BOUNDARY-LANE` debt (the same debt that keeps the `px8l` and
+    // `px7l` rows `#[ignore]`d), so `runtime_program` is unreadable through the
+    // public API for this shape. Recorded on the `C2` walk as its gate-4 stop.
+    //
+    // TRANSITION SENTINEL, named for that boundary: if this reds, this path has
+    // begun computing slot templates and C1's "arrival only" statement must be
+    // RE-DERIVED rather than restated with new numbers.
     assert_eq!(
         (census.ih_slots, census.ih_invocations),
         (0, 0),
-        "{label}: C1 measures ARRIVAL ONLY -- the classification reaches Runtime IR with no IH \
-         slot or invocation marker. If this is red, marker population has changed and C1's \
-         boundary (it proves nothing about fusion-plan population or R3 composed-seat arrival) \
-         must be RE-DERIVED, not restated with new numbers."
+        "{label}: the PLAIN erasure entry (native_plans = None) emits no IH slot or invocation \
+         marker. This is a fact about the entry point -- markers are not computed on this path -- \
+         and is NOT evidence about the source. If red, this path now computes slot templates: \
+         re-derive C1's boundary, do not restate the numbers."
     );
 }
 
