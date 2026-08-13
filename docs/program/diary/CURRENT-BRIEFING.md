@@ -38,8 +38,37 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~00:0xZ. **`main` = `07b20585`.**
+> ### RESUME HERE — state at 2026-08-13 ~00:1xZ. **`main` = `7877a28d`.**
 >
+> **THE ARCHITECT RULED AND WITHDREW ITS OWN PRIOR RULING**
+> (`evt_27qhdnnmv4h4z`, durable `fd62eb5d`): `FusionForward` and
+> continuation-specialization subsumption are **withdrawn** — the earlier
+> forward rested on a false temporal premise. The exact specialization stays
+> **executable** and its `DirectCall` result is the **data-flow predecessor**
+> the later redirect consumes. Neither the forward nor the redirect moves.
+> **Full frame amendment is in `docs/program/wp/RT-LEXICAL-R3-FUSION-EMITTER.md`
+> at the top of the stop-4 region — read that, not this line.**
+>
+> **`a3c25dae` is now NEGATIVE EVIDENCE and that is its value.** The mechanism
+> is withdrawn; **the measurements are not.** The recut removes the code, so the
+> ordering trace and the operand finding live in the frame and the thread by
+> design.
+>
+> **The `StaticWorkerBinding` refusal RETURNS and is not a regression** — with
+> the live specialization restored it is again the next honest boundary inside
+> route C. The ruling forbids grounding/transferring `StaticWorker`, adding an
+> ABI member, or guessing a routing mechanism in this recut.
+>
+> **HOLDING one doc-only commit deliberately** (`46680495`, the frame
+> amendment). The implementer is mid-recut and the ruling explicitly named
+> `7877a28d` as its rebase base; publishing now would stale a rebase in
+> progress. **Ship it at the next gap between turns.**
+>
+> **FIVE premises refuted on this seam, classification untouched by all five.**
+> The standing discipline is written into the frame: no further mechanism is
+> prescribed here without its premise measured first.
+>
+
 > **THE PROBE ANSWERED THE FORK IN ONE RUN, AND THE ANSWER IS THE ORDERING
 > BRANCH** (`evt_7ydbavjbtxx97`). At the consumer's producer-call seat the
 > redirected fusion invocation **has not emitted yet** — it emits immediately
