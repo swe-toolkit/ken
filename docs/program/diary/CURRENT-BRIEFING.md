@@ -65,9 +65,28 @@
 > ### RESUME HERE — state at 2026-08-13 ~16:1xZ. **`main` = `d1fb2763`.**
 > **I hold nothing. No publisher. BOTH RINGS ARE WORKING — do not kick either.**
 >
-> **Runtime — `D2k-1b`**, the five-expression `StaticWorkerBinding` wall
-> (`docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md`, framed cold).
-> **Gate 4b is authorized and QUEUED BEHIND IT.**
+> **Runtime — GATE 4b**, started 2026-08-13 ~16:1xZ.
+>
+> **`D2k-1b` IS PARKED AT A HARD STOP, PENDING AN ARCHITECT RULING**
+> (`evt_3547g5q20t0bc`). No candidate, no source change. Runtime measured that
+> all five governed rows **split the required operands across two Cranelift
+> `Function`s** — `define_unit_bodies` has `finish_source_constructor` and the
+> pending outer static-Match eliminator but no `StaticWorker` binding;
+> `define_continuation_bodies` has the recognized worker environment but no
+> pending outer Match suffix; `ContinuationInputProjection` supplies provenance
+> and owners, not a value or pending-consumer expression. Every join they can
+> see needs something a frame forbids.
+>
+> ⚠ **That boundary is asserted from the frame's PROHIBITIONS, not from a
+> measurement that no join exists.** I asked the Architect to separate two
+> questions the ring cannot: are the five rows genuinely unjoinable at this
+> layer, or is one of the named prohibitions the wrong constraint for *this*
+> slice rather than a standing one. **If the answer is a new relation or a
+> carrier, that is a scope call I take and frame — it is not authorized in
+> passing.**
+>
+> **I routed Runtime's measurement ATTRIBUTED TO RUNTIME and characterized no
+> mechanism myself** — see the gate-4b error below for why.
 >
 > **Language — `LANG-VIEW-RETIRE`.** D1 census and D2 purity-failure measurement
 > done; D3 (remove `KwView`, decide the post-removal spelling) in progress.
