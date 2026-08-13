@@ -1,7 +1,7 @@
 ---
 id: RT-4B-C2-REACHABILITY
 title: "Establish whether a witness driving through `ken-elaborator` can reach the `D2f` observation at all, and at what cost -- the question 4b opened with, never answered, and the reason every 4b measurement so far has been taken on in-crate D2j fixtures instead of the real C2 source; the answer decides whether the reach node re-points or 4b's honest status becomes blocked-on-cross-crate-expressibility rather than awaiting-a-count"
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,36 @@ blocks: [RT-4B-UNIQUENESS-GATE-REACH]
 github: null
 origin: Architect evt_dnmsmt5wsmmd, reshaping the Steward's intended re-pointing question one level up after evt_6hfw027f43cgg established that the (4,2,0,2,1) measurement was taken on perturbed D2j comparators rather than C2. Framed by the Steward 2026-08-13.
 ---
+
+## ANSWERED 2026-08-13 — row two: reachable, but the reaching build DIFFERS FROM PRODUCTION
+
+Runtime reported at `evt_29jjd4rrytnex`, read at `9f22d70c`. **No candidate
+exists and nothing was built** — this node reports.
+
+**The finding.** The D2f record, storage, note/take functions and sole write are
+all `#[cfg(test)]`. C2 is a `ken-elaborator` integration test whose Runtime
+dependency carries default features only, so **the observation write does not
+exist in the Runtime unit C2 links.** Moving C2 into Runtime creates the
+forbidden package cycle; an always-compiled accessor is a production API; an
+external recorder is a second observer.
+
+⇒ **Re-pointing `RT-4B-UNIQUENESS-GATE-REACH` at C2 is CONDITIONAL on an
+enabled-vs-disabled artifact-identity proof, and that proof is the increment,
+not a footnote to it.** 4b's status is **not** "awaiting a measurement" and
+**not** blocked on cross-crate expressibility — it is blocked on that proof.
+
+**Mechanisms, ranked by Runtime, Steward-concurred, envelope question with the
+Architect:**
+
+1. an isolated default-off Runtime observation feature extending the existing
+   record/storage/write, exposing a feature-gated hidden scoped accessor;
+2. the existing `px8-ds-test-support` feature — lower, it carries unrelated
+   mutation and census support;
+3. neutralize or split that support feature — largest blast radius.
+
+**The open question is not the ranking.** It is whether a default-off,
+feature-gated hidden accessor sits inside the 4b envelope's "no production API"
+constraint. That is the Architect's, and it is routed.
 
 ## What this is
 
