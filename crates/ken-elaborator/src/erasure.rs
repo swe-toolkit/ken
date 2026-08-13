@@ -3163,14 +3163,15 @@ fn lower_checked_host_computation(
     }
     if let Some((constructor, args)) = constructor_application_spine(term) {
         if constructor.symbol == spine.ret {
-            let value = args.last().ok_or_else(|| {
+            let value_index = args.len().checked_sub(1).ok_or_else(|| {
                 expression_lowering_error(root, "host_ret_arity", "Ret is missing its value")
             })?;
+            let value = args[value_index];
             // A checked HostIO return payload is still an ordinary runtime value.
             // It can contain a computational match after normalization, so keep
             // the native plan collector attached while lowering it.
             let mut value_path = path.to_vec();
-            value_path.extend([4, 0]);
+            value_path.extend([4, value_index as u64]);
             return lower_checked_host_value(
                 value,
                 declarations,

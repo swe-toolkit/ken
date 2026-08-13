@@ -428,16 +428,66 @@ fn c2_source_mixed_branch_walk_gates_one_to_three() {
 /// CLAIMED: a computational match normalized into a checked HostIO `Ret` payload
 /// retains the same slot population through plan-aware value lowering.
 ///
-/// THE GAP: successful preparation alone could be a zero-slot false green;
-/// `c2_source_mixed_branch_walk_gates_one_to_three` independently proves the
-/// same source retains the `[2, 3]` and `[1]` recursive-position runs.
+/// THE GAP: successful preparation alone could be a zero-slot false green. The
+/// decoded production plan below therefore asserts the exact three templates,
+/// their marker binding, and their path through the selected `Ret` payload.
 #[test]
 fn c2_gate_4a_preparation_consumes_every_compiler_derived_slot() {
+    let package_name = "r3_c2_mixed_native_pkg";
     let preparation = prepare_native_program_sources(
-        "r3_c2_mixed_native_pkg",
+        package_name,
         vec![CompilerSource::new("src/main.ken", C2_MIXED_SOURCE)],
     )
     .expect("input-dependent C2 reaches an immutable pre-object preparation");
+
+    let plan_key = StableSymbol::new(
+        SymbolNamespace::Metadata,
+        vec![
+            package_name.to_string(),
+            "OrientedSubcontinuationPlanV1".to_string(),
+        ],
+    )
+    .to_string();
+    let plan_bytes = preparation
+        .runtime_program()
+        .erased_core
+        .metadata
+        .checked_core
+        .metadata
+        .get(&plan_key)
+        .expect("preparation carries its oriented plan metadata");
+    let plan = ken_runtime::OrientedSubcontinuationPlanV1::decode(plan_bytes)
+        .expect("production emits a valid oriented plan");
+    let mut supplied_and_consumed = plan
+        .computational_ih_slots
+        .iter()
+        .map(|slot| {
+            (
+                slot.slot_template_id,
+                slot.checked_match_ordinal,
+                slot.recursive_position,
+                slot.method_binder_ordinal,
+            )
+        })
+        .collect::<Vec<_>>();
+    supplied_and_consumed.sort_unstable();
+    assert_eq!(
+        supplied_and_consumed,
+        vec![(0, 0, 2, 0), (1, 0, 3, 1), (2, 0, 1, 0)],
+        "successful total validation must expose the exact three compiler-derived slot templates"
+    );
+    assert!(
+        plan.computational_ih_slots
+            .iter()
+            .all(|slot| slot.runtime_marker_locations.len() == 1),
+        "every supplied slot template must bind exactly one consumed Runtime marker"
+    );
+    assert!(
+        plan.computational_ih_slots
+            .iter()
+            .all(|slot| slot.checked_occurrence_path.get(1..3) == Some(&[4, 3])),
+        "every slot occurrence must descend through Ret's measured arity-four payload at index three"
+    );
 
     assert!(
         preparation.executable_closure().len() > 1,
