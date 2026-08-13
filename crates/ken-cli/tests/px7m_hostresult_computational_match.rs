@@ -1,14 +1,6 @@
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "ken-px7m-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-px7m-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 const OK_PROGRAM: &str = r#"program capabilities FS APartial
@@ -103,14 +95,14 @@ fn assert_agreement(
     expected_operations: &[ken_runtime::HostOpV1],
 ) {
     let dir = output_dir(name);
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, &dir)
+    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path())
         .expect("dynamic HostResult producer reaches the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -137,7 +129,6 @@ fn assert_agreement(
             .collect::<Vec<_>>(),
         expected_operations
     );
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.

@@ -1,14 +1,6 @@
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "ken-px7n-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-px7n-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 const PROGRAM: &str = r#"program capabilities FS APartial
@@ -90,7 +82,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
         PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px7n-nested-computational-eliminator",
-        &dir,
+        dir.path(),
     )
     .expect("nested computational eliminators compose in the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -98,7 +90,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: arguments.iter().map(std::ffi::OsString::from).collect(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -136,7 +128,6 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
             ken_runtime::HostOpV1::ConsoleFlush,
         ]
     );
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-FRAME-MARKER-ONCE.

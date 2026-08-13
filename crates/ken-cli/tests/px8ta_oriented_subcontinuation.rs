@@ -1,16 +1,8 @@
 //! PX8-TA public checked-bracket oriented-subcontinuation controls.
 
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "ken-px8ta-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&path).unwrap();
-    path
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-px8ta-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 const NESTED_BRACKET_PROGRAM: &str = r#"program capabilities FS AFull
@@ -202,7 +194,7 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
     let dir = output_dir(&format!("depth-{depth}"));
     for index in 0..depth {
         std::fs::write(
-            dir.join(format!("held-{index}.bin")),
+            dir.path().join(format!("held-{index}.bin")),
             format!("held resource {index}"),
         )
         .unwrap();
@@ -211,7 +203,7 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
         &source,
         ken_cli::SourceFormat::Ken,
         &format!("px8ta-depth-{depth}"),
-        &dir,
+        dir.path(),
     )
     .unwrap_or_else(|error| {
         panic!("depth {depth} checked nested bracket reaches native lowering: {error:?}")
@@ -231,12 +223,11 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
     .expect("linked nested bracket emits its canonical observation");
-    let _ = std::fs::remove_dir_all(dir);
     (observation, plan.frames.len())
 }
 
@@ -362,7 +353,7 @@ fn run_px8ds_real_same_depth_path() {
             PX8DS_SIBLING_RECURSION_PROGRAM,
             ken_cli::SourceFormat::Ken,
             "px8ds-retired-flat",
-            &retired_dir,
+            retired_dir.path(),
         )
     })
     .expect_err("the retired cross-instance flat order must reproduce its false rejection");
@@ -376,14 +367,12 @@ fn run_px8ds_real_same_depth_path() {
         2,
         "the reaching discriminator must reject two same-depth IH instances: {retired}"
     );
-    let _ = std::fs::remove_dir_all(retired_dir);
-
     let exact_dir = output_dir("px8ds-exact-edges");
     let exact = ken_cli::build_native_program(
         PX8DS_SIBLING_RECURSION_PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px8ds-exact-edges",
-        &exact_dir,
+        exact_dir.path(),
     )
     .expect("exact dynamic edges compile the same checked source");
     let observation = ken_runtime::run_bound_process_effect_observation(
@@ -391,7 +380,7 @@ fn run_px8ds_real_same_depth_path() {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: exact_dir.clone(),
+            cwd: exact_dir.path().to_owned(),
             plan_hash: exact.plan_transport_hash,
         },
     )
@@ -419,7 +408,6 @@ fn run_px8ds_real_same_depth_path() {
             ken_runtime::HostOpV1::ResourceRelease,
         ]
     );
-    let _ = std::fs::remove_dir_all(exact_dir);
 }
 
 #[cfg(target_os = "linux")]

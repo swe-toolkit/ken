@@ -23,17 +23,9 @@ struct Differential {
 }
 
 #[cfg(target_os = "linux")]
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "ken-spanprov-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&path).unwrap();
-    path
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-spanprov-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 /// Compile `source` to a linked native artifact, run it, then run the identical
@@ -44,13 +36,13 @@ fn output_dir(name: &str) -> std::path::PathBuf {
 #[cfg(target_os = "linux")]
 fn differential(case: &str, source: &str) -> Differential {
     let root = output_dir(case);
-    std::fs::write(root.join("spanseed.bin"), b"AAAABBBB").unwrap();
+    std::fs::write(root.path().join("spanseed.bin"), b"AAAABBBB").unwrap();
 
     let output = ken_cli::build_native_program(
         source,
         ken_cli::SourceFormat::Ken,
         &format!("rt_span_prov_{}", case.replace('-', "_")),
-        &root,
+        root.path(),
     )
     .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -58,24 +50,23 @@ fn differential(case: &str, source: &str) -> Differential {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: root.clone(),
+            cwd: root.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
     .unwrap_or_else(|error| panic!("{case}: linked artifact runs: {error:?}"));
 
-    let mut host = ken_interp::PosixHost::new_at(&root);
+    let mut host = ken_interp::PosixHost::new_at(root.path());
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
-        root.as_os_str().as_encoded_bytes(),
+        root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
     .unwrap_or_else(|error| panic!("{case}: source runs in interpreter: {error:?}"));
 
-    std::fs::remove_dir_all(&root).unwrap();
     Differential {
         interpreted,
         native,
@@ -91,18 +82,17 @@ fn differential(case: &str, source: &str) -> Differential {
 #[cfg(target_os = "linux")]
 fn interpret_only(case: &str, source: &str) -> ken_runtime::EffectObservation {
     let root = output_dir(case);
-    std::fs::write(root.join("spanseed.bin"), b"AAAABBBB").unwrap();
-    let mut host = ken_interp::PosixHost::new_at(&root);
+    std::fs::write(root.path().join("spanseed.bin"), b"AAAABBBB").unwrap();
+    let mut host = ken_interp::PosixHost::new_at(root.path());
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
-        root.as_os_str().as_encoded_bytes(),
+        root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
     .unwrap_or_else(|error| panic!("{case}: interpreter run: {error:?}"));
-    std::fs::remove_dir_all(&root).unwrap();
     interpreted
 }
 
@@ -117,22 +107,21 @@ fn interpret_reading(
     reads: &[&str],
 ) -> (ken_runtime::EffectObservation, Vec<Vec<u8>>) {
     let root = output_dir(case);
-    std::fs::write(root.join("spanseed.bin"), b"AAAABBBB").unwrap();
-    let mut host = ken_interp::PosixHost::new_at(&root);
+    std::fs::write(root.path().join("spanseed.bin"), b"AAAABBBB").unwrap();
+    let mut host = ken_interp::PosixHost::new_at(root.path());
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
-        root.as_os_str().as_encoded_bytes(),
+        root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
     .unwrap_or_else(|error| panic!("{case}: interpreter run: {error:?}"));
     let contents = reads
         .iter()
-        .map(|name| std::fs::read(root.join(name)).unwrap_or_default())
+        .map(|name| std::fs::read(root.path().join(name)).unwrap_or_default())
         .collect();
-    std::fs::remove_dir_all(&root).unwrap();
     (interpreted, contents)
 }
 

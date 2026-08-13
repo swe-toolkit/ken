@@ -1,22 +1,14 @@
 //! PX7-F public checked-Ken linked-native discriminators.
 
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "ken-px7f-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&path).unwrap();
-    path
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-px7f-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
     let dir = output_dir(name);
-    std::fs::write(dir.join("held.bin"), b"held resource").unwrap();
-    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, &dir)
+    std::fs::write(dir.path().join("held.bin"), b"held resource").unwrap();
+    let output = ken_cli::build_native_program(source, ken_cli::SourceFormat::Ken, name, dir.path())
         .expect("PX7-F checked program reaches the native resource lane");
     let oriented = output
         .runtime_program
@@ -37,12 +29,11 @@ fn run(name: &str, source: &str) -> ken_runtime::EffectObservation {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
     .expect("linked PX7-F child emits its canonical observation");
-    let _ = std::fs::remove_dir_all(dir);
     observation
 }
 

@@ -40,17 +40,9 @@ struct Differential {
 }
 
 #[cfg(target_os = "linux")]
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "ken-rtescape-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&path).unwrap();
-    path
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-rtescape-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 /// Compile `source` to a linked native artifact, run it, then run the identical
@@ -59,13 +51,13 @@ fn output_dir(name: &str) -> std::path::PathBuf {
 #[cfg(target_os = "linux")]
 fn differential(case: &str, source: &str) -> Differential {
     let root = output_dir(case);
-    std::fs::write(root.join("held.bin"), b"held resource").unwrap();
+    std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
 
     let output = ken_cli::build_native_program(
         source,
         ken_cli::SourceFormat::Ken,
         &format!("rt_escape_{}", case.replace('-', "_")),
-        &root,
+        root.path(),
     )
     .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -73,24 +65,23 @@ fn differential(case: &str, source: &str) -> Differential {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: root.clone(),
+            cwd: root.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
     .unwrap_or_else(|error| panic!("{case}: linked artifact runs: {error:?}"));
 
-    let mut host = ken_interp::PosixHost::new_at(&root);
+    let mut host = ken_interp::PosixHost::new_at(root.path());
     let interpreted = ken_cli::run_program_effect_observation(
         source,
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
-        root.as_os_str().as_encoded_bytes(),
+        root.path().as_os_str().as_encoded_bytes(),
         &mut host,
     )
     .unwrap_or_else(|error| panic!("{case}: source runs in interpreter: {error:?}"));
 
-    std::fs::remove_dir_all(&root).unwrap();
     Differential {
         interpreted,
         native,

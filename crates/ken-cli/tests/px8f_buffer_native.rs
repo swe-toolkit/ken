@@ -215,18 +215,19 @@ fn linked_checked_write_all_observes_short_progress_and_matches_interpreter() {
 fn run_linked_checked_write_all() {
     use std::os::unix::ffi::OsStrExt as _;
 
-    let dir = std::env::temp_dir().join(format!("ken-px8f-write-all-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("input.bin"), b"abcdef").unwrap();
-    let preload = build_short_pwrite_preload(&dir);
+    let dir = tempfile::Builder::new()
+        .prefix("ken-px8f-write-all-")
+        .tempdir()
+        .unwrap();
+    std::fs::write(dir.path().join("input.bin"), b"abcdef").unwrap();
+    let preload = build_short_pwrite_preload(dir.path());
 
     eprintln!("PX8-F: compiling checked writeAll fixture");
     let output = ken_cli::build_native_program(
         WRITE_ALL,
         ken_cli::SourceFormat::Ken,
         "px8f_write_all_native",
-        &dir,
+        dir.path(),
     )
     .expect("checked writeAll reaches linked native lowering");
     eprintln!("PX8-F: running linked fixture");
@@ -235,7 +236,7 @@ fn run_linked_checked_write_all() {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: vec![("LD_PRELOAD".into(), preload.into_os_string())],
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -244,7 +245,10 @@ fn run_linked_checked_write_all() {
 
     assert_eq!(observation.exit_status, 0);
     assert_eq!(observation.terminal_error, None);
-    assert_eq!(std::fs::read(dir.join("output.bin")).unwrap(), b"abcdef");
+    assert_eq!(
+        std::fs::read(dir.path().join("output.bin")).unwrap(),
+        b"abcdef"
+    );
     let writes: Vec<_> = observation
         .effect_trace
         .iter()
@@ -291,20 +295,21 @@ fn run_linked_checked_write_all() {
     };
     assert_eq!(format!("{:?}", error.cause), "Capability(ScopeEscape)");
 
-    let mut interpreter = ken_interp::PosixHost::new_at(&dir);
+    let mut interpreter = ken_interp::PosixHost::new_at(dir.path());
     let interpreted = ken_cli::run_program_effect_observation(
         WRITE_ALL,
         ken_cli::SourceFormat::Ken,
         &[],
         &[],
-        dir.as_os_str().as_bytes(),
+        dir.path().as_os_str().as_bytes(),
         &mut interpreter,
     )
     .expect("the same checked writeAll runs in the interpreter");
     eprintln!("PX8-F: comparing observations");
     assert_eq!(interpreted.exit_status, observation.exit_status);
     assert_eq!(interpreted.terminal_error, observation.terminal_error);
-    assert_eq!(std::fs::read(dir.join("output.bin")).unwrap(), b"abcdef");
-
-    let _ = std::fs::remove_dir_all(dir);
+    assert_eq!(
+        std::fs::read(dir.path().join("output.bin")).unwrap(),
+        b"abcdef"
+    );
 }

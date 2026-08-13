@@ -3640,17 +3640,19 @@ fn run_checked_markdown(path: &Path, src: &str, index: usize) -> std::process::O
     // source bytes in a temporary literate file so every checked fence is
     // exercised through the real extractor without changing the
     // product-facing document name.
-    let probe = std::env::temp_dir().join(format!(
-        "doc-w2-checked-examples-{}-{index}.ken.md",
-        std::process::id()
-    ));
-    std::fs::write(&probe, src).unwrap_or_else(|e| panic!("write {}: {e}", probe.display()));
+    let prefix = format!("doc-w2-checked-examples-{index}-");
+    let mut probe = tempfile::Builder::new()
+        .prefix(&prefix)
+        .suffix(".ken.md")
+        .tempfile()
+        .expect("create checked-example probe");
+    std::io::Write::write_all(&mut probe, src.as_bytes())
+        .unwrap_or_else(|e| panic!("write {}: {e}", probe.path().display()));
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_ken"))
         .arg("check")
-        .arg(&probe)
+        .arg(probe.path())
         .output()
         .unwrap_or_else(|e| panic!("run ken check {}: {e}", path.display()));
-    let _ = std::fs::remove_file(&probe);
     output
 }
 
