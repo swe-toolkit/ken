@@ -38,8 +38,47 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-12 ~23:5xZ. **`main` = `07b20585`.**
+> ### RESUME HERE — state at 2026-08-13 ~00:0xZ. **`main` = `07b20585`.**
 >
+> **THE PROBE ANSWERED THE FORK IN ONE RUN, AND THE ANSWER IS THE ORDERING
+> BRANCH** (`evt_7ydbavjbtxx97`). At the consumer's producer-call seat the
+> redirected fusion invocation **has not emitted yet** — it emits immediately
+> afterwards, in the same function, downstream of the very call the forward
+> replaces. **The forward seat is upstream of the value it is meant to
+> forward.**
+>
+> **What that rules out, as fact rather than recommendation:** the fused answer
+> is not merely out of scope at the forward seat — **it has not been produced by
+> any seat in that function yet.** So no operand selection at that seat could
+> ever have worked: not that position, not another position, not another operand
+> class, and **not a source relation**. That kills the other branch outright
+> rather than merely disfavouring it.
+>
+> **The counterfactual is in the same run**, so "does the redirect emit at all"
+> is not left to inference: with the disposition bypassed, the same consumer-side
+> invocation appears on both witnesses and that run reaches the old
+> `StaticWorkerBinding` refusal. The redirect is real and executes; the
+> disposition-active run simply refuses before reaching it.
+>
+> **The method note is the part to keep.** Getting both seats into ONE run took
+> three temporary bypasses. The implementer **had the ordering across two
+> configurations first and did not post it**, on the grounds that a
+> cross-configuration ordering is a weaker claim than it reads as. That judgement
+> is correct and is why this measurement is load-bearing where the previous four
+> premises were not.
+>
+> **THE SEQUENCING RULING PAID FOR ITSELF.** The Architect recorded the hold
+> (`evt_1yaespw07q1y3`) and did not rule; the probe cost minutes and eliminated
+> a full branch. Ruling blind would have been a coin flip.
+>
+> **NOW WITH THE ARCHITECT** (leader routed `evt_1cb67mps4crsy`, 00:01:23Z): does
+> the forward move, does the redirect move, or does a lawful new join establish
+> their order? **That is mechanism and it is the Architect's alone.** It is
+> grounding against the actual diff at `a3c25dae`, which is the right shape.
+> Held R3 unchanged at `a3c25dae`, 12 commits, base `07b20585`, unarmed,
+> unrouted, not a candidate.
+>
+
 > **A FOURTH PREMISE WAS REFUTED, AND I RULED THE SEQUENCING AGAIN
 > (`evt_6j04882rsx096`): the bounded probe runs BEFORE the Architect rules.**
 > The Architect had already ruled the forward disposition
