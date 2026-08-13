@@ -38,7 +38,29 @@
 > **Re-arm the watchdog on every resume** — it is process-local and dies with
 > every MCP restart. Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~02:5xZ. **`main` = `ef4920df`.**
+> ### RESUME HERE — state at 2026-08-13 ~03:3xZ. **`main` = `4ca4fb58`.**
+>
+> **THE FRONTIER SURVEY WAS RUN AND THE ANSWER IS: THERE IS NO FRAMABLE WORK.
+> Do not re-derive this.** Every idle ring is idle for a measured reason, not
+> for want of a frame. Measured at `4ca4fb58`:
+>
+> | ring | why idle | is it my debt? |
+> |---|---|---|
+> | Runtime | R3 blocked on the Architect's in-flight ruling; one ring, one WP | no |
+> | Kernel | `KERNEL-NESTED-IND` `AC-K12` is Runtime-blocked; `KERNEL-SUBST-OUTER-INDEX-SCOPE` waits on the operator TCB call `evt_561jx5e0ffy40` | no |
+> | Foundation | `DS-9` `D3`+ blocked for unbounded Json folds by `KERNEL-RECURSIVE-RESULT-SURFACE` (Architect `evt_6ysrp62e4zayg`), i.e. chained behind Kernel | no |
+> | Verify | **queue exhausted** — every Verify node is `merged` except `SEC1-IFC-R3`, and its Z3-free widening is recorded in-node as **vacuous, do not frame** | no |
+> | Language | with the operator, `evt_5vwmmrr2w7ces` | no |
+> | Ergo / doc | no released work under the two-lane cap | no |
+>
+> ⇒ **The free lane can only be filled by an operator answer**, and the three
+> pending ones are already forwarded. **Do not re-raise them individually and
+> do not manufacture a node to fill the seat.**
+>
+> **§4e is satisfied:** R3's successor `RT-RECURSOR-TRANSPORT` is `ready` with a
+> full 34 KB frame (deliverables `D0`-`D3`, `AC-1`-`AC-8`, banned scope, hard
+> stops, base, contention, sizing). `RT-DESCENT-RETIRE` behind it is likewise
+> `ready`. Re-anchor the transport frame's base at release; R3 will move `main`.
 >
 > **THE RING IS BLOCKED ON ONE ARCHITECT RULING AND NOTHING ELSE. I hold
 > nothing unpublished.** The full arc is in
@@ -77,6 +99,12 @@
 > **idle**. The Runtime gate was run at 02:0xZ, exit 0. `runtime-leader` missed
 > seven handbacks earlier but routed the last two correctly.
 >
+
+> ### SUPERSEDED WINDOW — everything from here to "The detail behind the above"
+>
+> **Its held SHA `430660fd` (14 commits) is STALE. The live one is `5c84df84`
+> (16 commits), stated in the block above.** Kept only because its fork prose
+> records how route C was reached; take no SHA and no lane state from it.
 
 > **THE RING IS BLOCKED ON ONE ARCHITECT FORK AND NOTHING ELSE. I hold nothing
 > unpublished; the frame on `main` carries the whole arc.** Read
