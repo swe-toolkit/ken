@@ -4543,7 +4543,7 @@ fn class_field_declared_row(keyword: DefKeyword, field_name: &str) -> crate::eff
         DefKeyword::Proc => {
             crate::effects::RowType::singleton(format!("proc class field `{}`", field_name))
         }
-        DefKeyword::Const | DefKeyword::Fn | DefKeyword::View => crate::effects::RowType::empty(),
+        DefKeyword::Const | DefKeyword::Fn => crate::effects::RowType::empty(),
     }
 }
 
@@ -4591,7 +4591,7 @@ fn check_class_field_marker(
                 field_name
             ),
         }),
-        DefKeyword::View | DefKeyword::Const | DefKeyword::Fn | DefKeyword::Proc => Ok(()),
+        DefKeyword::Const | DefKeyword::Fn | DefKeyword::Proc => Ok(()),
     }
 }
 
@@ -4856,9 +4856,6 @@ pub fn check_surface_purity(
         } => (*keyword, *is_space_op, visits, constraints.as_slice()),
         _ => return Ok(()),
     };
-    if keyword == DefKeyword::View {
-        return Ok(());
-    }
 
     let declared = surface_declared_row_type(rdecl)?.unwrap_or_else(crate::effects::RowType::empty);
     let bound_dict_classes = collect_bound_dictionary_params(rdecl.ty.as_ref(), class_env);
@@ -4941,7 +4938,6 @@ pub fn check_surface_purity(
                 });
             }
         }
-        DefKeyword::View => {}
     }
 
     if !matches!(keyword, DefKeyword::Proc) && visits.is_some() {

@@ -104,8 +104,6 @@ pub struct EffectRowSyntax {
 /// Definition keyword for SURF-1 purity checking (`36 §1.6`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DefKeyword {
-    /// Legacy spelling kept until the D3/D4 corpus migration.
-    View,
     Const,
     Fn,
     Proc,
