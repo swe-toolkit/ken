@@ -54,6 +54,36 @@ origin: "verify-implementer authorized hard-stop on SEC1-IFC AC-R3 (2026-07-27),
 > machinery (`24 §1`) the landed `Countermodel` type genuinely supplies versus a
 > description string. ⛔ **Until that measurement exists, this stays `draft`** —
 > and it is a *measurement*, not another ruling.
+
+> ### THE MEASUREMENTS EXIST. Steward, 2026-08-14. The node is still `draft`,
+> ### for a different and now fully-priced reason.
+>
+> **Three predecessors have merged since the paragraph above was written:**
+> `SEC1-R3-MINIMAL-ROUTE` (#2124), `V3-VERDICT-CENSUS` (#2120), and
+> `V3-KRIPKE-DECOMPOSITION` (report at `docs/program/v3-kripke-decomposition.md`,
+> +144, empty `crates/` diff). **Nobody owes a measurement here.** Read that
+> sentence as discharged; the work it asked for was done and landed.
+>
+> **What they found, and why it does not release this node.**
+> `SEC1-R3-MINIMAL-ROUTE` established that `AC-R3c`'s specified automated route
+> needs the **Kripke embedding plus a checked-certificate path**. The
+> decomposition then priced that embedding and the answer is **not a number**:
+>
+> > *"There is no honest one-hour prover-side first increment on the current
+> > inputs... its size is not merely 'more than one hour'; it is presently
+> > **unsizeable**. Guessing an hour count would convert missing contracts and a
+> > feasibility risk into an effort estimate."*
+>
+> **The smallest releasable property is an end-to-end route-(a) vertical slice**
+> that crosses Spec, kernel-facing proof, and prover lanes; **its two
+> kernel-facing theorems cannot be assigned to Verify at all**, and its exact
+> semantics and reflective languages are unspecified.
+>
+> ⇒ **`AC-R3c` is not build-blocked on a missing measurement, and it is not
+> Verify-shaped.** It is blocked on Spec closure plus Architect-owned
+> kernel-facing work, and on the operator's V3 fork — which is now the one
+> genuinely open input. **Do not re-derive this as framing debt and do not frame
+> a Verify slice against it.** The `Not this node` list below stands unchanged.
 >
 > ⚠ **`SPEC-PROGRESS.md` cannot answer this** (47/48 rows `DRAFT`, `REVISED`
 > never used). Measure the code.
