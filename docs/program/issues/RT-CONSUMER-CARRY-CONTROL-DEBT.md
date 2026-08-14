@@ -239,3 +239,36 @@ is a mechanism finding well outside this node.
 - **Not [[RT-CONTKEY-REFUSAL-PROFILE-SPLIT]].** That node owns the unnamed-cause
   `Option` returns in this file. **Sequence the two; they share
   `static_transition.rs` and must not run concurrently.**
+
+## The carried `.map(Source)` item CLOSES as measured — 2026-08-14
+
+**Both framings of this item were wrong, including the one this node carried
+forward, and the read that settles it has now been taken.** Recorded from the
+Adversary's hunt on `afdabc502` (`evt_pg42y72y6hrx`), re-checked against the
+tree. **Do not re-file this shape.**
+
+The item read *"the `.map(Source)` primary branch is unexercised and sits one
+level off from the fallback"*, and was later restated as *"can the two inputs
+ever disagree?"* with that read named as unrun.
+
+Measured at `initial_continuation_discoveries`, the primary and the fallback
+are **not alternatives for one value**:
+
+| branch | fires when | supplies |
+|---|---|---|
+| `.map(Source)` | there **is** a parent (depth >= 2) | the parent's seeds |
+| `.or_else(...)` | there is **no** parent (depth 1) | this level's seeds |
+
+The walk seeds every root as `(origin, None, None)`, so at the outermost match
+`consuming_occurrences` is `None`, the `.or_else` fires, and `required` is
+`Source(candidates.clone())` — the same `candidates` that becomes the pushed key
+seeds. At every deeper level `required` is the **parent's** while the key seeds
+are **this level's**.
+
+⇒ **Both branches are exercised, by different depths, and they cannot disagree
+because they never co-occur.** The "one level off" observation is not a defect:
+**that offset is the lag this node exists to carry.**
+
+⇒ This also independently confirms the depth-1 shared-seed provenance that
+`RT-CONTKEY-ROUTE-CLOSURE-PROBE`'s `D6` clause asserts — measured at both sites
+rather than inferred from one.
