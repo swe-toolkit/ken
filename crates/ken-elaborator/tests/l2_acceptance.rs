@@ -431,6 +431,74 @@ fn non_dependent_arity_one_constructor_witness_derives_its_own_arity() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// `LANG-REACHABILITY-SUBSUMING-ARMS` AC-1/AC-2: `ReachabilityError` now
+// carries `subsuming: SubsumingArms`, the earlier arm(s) whose union already
+// covers the dead arm's pattern, as DATA (a list of spans) rather than only
+// folded into rendered prose. A single subsuming arm degenerates "which
+// arms" the same way a zero-arity constructor degenerated "name vs applied
+// pattern" on the exhaustiveness side, so the discriminating case here needs
+// at least two -- a wildcard sub-pattern shadowed at three distinct leaves
+// (one per `T3` constructor), each already won by a different earlier arm.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn redundant_wildcard_arm_shadowed_at_three_leaves_names_every_subsuming_arm() {
+    let mut env = mk_env();
+    elab_ok(&mut env, "data T3 = A | B | C");
+    elab_ok(&mut env, "data Wrap = MkWrap T3");
+
+    let src = "let bad : Int = match MkWrap A { \
+               MkWrap A |-> 0 ; MkWrap B |-> 1 ; MkWrap C |-> 2 ; MkWrap y |-> 3 }";
+    let result = elab(&mut env, src);
+
+    match &result {
+        Err(e @ ElabError::ReachabilityError { span, subsuming }) => {
+            // AC-1: at least two distinct earlier subsuming arms.
+            assert!(
+                subsuming.0.len() >= 2,
+                "AC-1: expected at least two subsuming arms, got {}: {:?}",
+                subsuming.0.len(),
+                subsuming.0
+            );
+
+            // AC-2: read the arms as DATA, not rendered text -- each
+            // subsuming span slices back to one of the three earlier,
+            // distinct arm sources.
+            let texts: Vec<&str> = subsuming.0.iter().map(|s| &src[s.start..s.end]).collect();
+            for expected in ["MkWrap A |-> 0", "MkWrap B |-> 1", "MkWrap C |-> 2"] {
+                assert!(
+                    texts.iter().any(|t| *t == expected),
+                    "AC-2: expected a subsuming span covering '{expected}', got {texts:?}"
+                );
+            }
+            assert_eq!(
+                texts.len(),
+                3,
+                "the wildcard arm is shadowed at all three leaves (A, B, C), so it \
+                 should name all three earlier arms, got {texts:?}"
+            );
+
+            // The reported span is the dead wildcard arm itself.
+            assert_eq!(
+                &src[span.start..span.end],
+                "MkWrap y |-> 3",
+                "the reported span should be the dead wildcard arm itself"
+            );
+
+            // Report the diagnostic verbatim, per the frame.
+            let rendered = e.to_string();
+            println!("rendered diagnostic: {rendered}");
+            assert!(
+                rendered.starts_with("redundant match arm at"),
+                "unexpected diagnostic: {rendered}"
+            );
+        }
+        Ok(_) => panic!("wildcard arm shadowed at every leaf should have been flagged"),
+        Err(other) => panic!("expected ReachabilityError, got: {other}"),
+    }
+}
+
 #[test]
 fn nested_ctor_pattern_shadowed_by_earlier_flat_arm_is_reachability_error() {
     let mut env = mk_env();

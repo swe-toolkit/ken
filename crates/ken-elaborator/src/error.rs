@@ -56,6 +56,31 @@ impl fmt::Display for MissingPatternWitness {
     }
 }
 
+/// The earlier arms (`34 §4.2`) whose union already covers a redundant arm's
+/// pattern -- the reachability-side analogue of `MissingPatternWitness`:
+/// named as data (each subsuming arm's own span) so a consumer can read
+/// which arms without parsing rendered prose. Ergonomics only -- `34 §4.2`
+/// mandates that redundancy be detected, not that the diagnostic name the
+/// subsuming arms; this type exists to make the existing diagnostic more
+/// useful, not to satisfy a spec obligation. Ordered by discovery during the
+/// matrix walk (`39 §2.6`); usually one span, more than one only when a
+/// wildcard/variable sub-pattern is shadowed at more than one leaf by
+/// distinct winning arms.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubsumingArms(pub Vec<Span>);
+
+impl fmt::Display for SubsumingArms {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, span) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}-{}", span.start, span.end)?;
+        }
+        Ok(())
+    }
+}
+
 /// A V0 elaboration error (`39 §5.6`): parse, name-resolution, or type error.
 #[derive(Debug, Clone)]
 pub enum ElabError {
@@ -210,8 +235,11 @@ pub enum ElabError {
         span: Span,
     },
     /// A redundant match arm (`34 §4.2`): its pattern is entirely subsumed by
-    /// the union of the earlier arms.
-    ReachabilityError { span: Span },
+    /// the union of the earlier arms named in `subsuming`.
+    ReachabilityError {
+        span: Span,
+        subsuming: SubsumingArms,
+    },
     /// An instance declared outside the module of its class AND its head-type
     /// (`33 §5.3`, `39 §6.1`). The orphan check is a syntactic, per-module
     /// predicate that keeps canonicity per-module-decidable.
@@ -544,11 +572,11 @@ impl fmt::Display for ElabError {
                     span.start, span.end, missing
                 )
             }
-            ElabError::ReachabilityError { span } => {
+            ElabError::ReachabilityError { span, subsuming } => {
                 write!(
                     f,
-                    "redundant match arm at {}-{}: pattern already covered by the earlier arms",
-                    span.start, span.end
+                    "redundant match arm at {}-{}: pattern already covered by the earlier arm(s) at {}",
+                    span.start, span.end, subsuming
                 )
             }
             ElabError::OrphanInstance { class, head_type, span } => write!(
