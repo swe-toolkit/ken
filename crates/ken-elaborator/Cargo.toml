@@ -27,4 +27,5 @@ unicode-normalization = "0.1"
 
 [dev-dependencies]
 ken-interp = { path = "../ken-interp" }
+ken-runtime = { path = "../ken-runtime", features = ["dasm-c2-observation"] }
 tempfile = "3"

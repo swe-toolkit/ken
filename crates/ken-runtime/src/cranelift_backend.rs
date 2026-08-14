@@ -98,6 +98,15 @@ pub use lowering::core::{
     d2f_gate_observation_scope, D2fGateArrival, D2fGateObservationScope,
 };
 
+// `RT-DYNAMIC-ARM-SCALAR-MERGE` `c2`: the real D5 package control's isolated,
+// default-off view of general scalar-merge decisions. The declarations are
+// doc-hidden and explicitly unsupported as production API.
+#[cfg(feature = "dasm-c2-observation")]
+pub use lowering::{
+    dasm_c2_scalar_merge_observation_scope, DasmC2ScalarMergeObservation,
+    DasmC2ScalarMergeObservationScope,
+};
+
 // `RT-MATCH-RECURSOR-CONSUMERS` 4a.1: the child-process transport of that same
 // recorder, and the one item in this pair that is deliberately NOT gated.
 //

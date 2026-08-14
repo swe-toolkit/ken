@@ -15959,6 +15959,95 @@ enum ScalarMergeKind {
     ExitCode,
     RecursiveBackedge,
 }
+
+/// One general scalar-merge decision observed by the governed
+/// `RT-DYNAMIC-ARM-SCALAR-MERGE` control.
+///
+/// Feature-scoped and doc-hidden: this is diagnostic machinery for the real D5
+/// package path, not a supported production API. `operand_kind` is read from
+/// the exhaustive [`lowered_value_kind`] classification at the merge seat;
+/// `constructor` preserves exact identity when that operand is still a
+/// constructor.
+#[cfg(any(test, feature = "dasm-c2-observation"))]
+#[doc(hidden)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DasmC2ScalarMergeObservation {
+    pub construct: &'static str,
+    pub operand_kind: &'static str,
+    pub constructor: Option<String>,
+    pub admitted: bool,
+}
+
+#[cfg(any(test, feature = "dasm-c2-observation"))]
+thread_local! {
+    static DASM_C2_SCALAR_MERGE_OBSERVATIONS:
+        std::cell::RefCell<Vec<DasmC2ScalarMergeObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+#[cfg(any(test, feature = "dasm-c2-observation"))]
+fn dasm_c2_record_scalar_merge(observation: DasmC2ScalarMergeObservation) {
+    if DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED.get() {
+        DASM_C2_SCALAR_MERGE_OBSERVATIONS.with(|cell| cell.borrow_mut().push(observation));
+    }
+}
+
+#[cfg(any(test, feature = "dasm-c2-observation"))]
+fn dasm_c2_take_scalar_merge_observations() -> Vec<DasmC2ScalarMergeObservation> {
+    DASM_C2_SCALAR_MERGE_OBSERVATIONS
+        .with(|cell| std::mem::take(&mut *cell.borrow_mut()))
+}
+
+/// Feature-scoped handle for the D5 scalar-merge observation.
+#[cfg(feature = "dasm-c2-observation")]
+#[doc(hidden)]
+pub struct DasmC2ScalarMergeObservationScope {
+    previous_enabled: bool,
+    previous_observations: Option<Box<Vec<DasmC2ScalarMergeObservation>>>,
+}
+
+#[cfg(feature = "dasm-c2-observation")]
+impl DasmC2ScalarMergeObservationScope {
+    fn restore(&mut self) {
+        let Some(previous_observations) = self.previous_observations.take() else {
+            return;
+        };
+        DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED.set(self.previous_enabled);
+        DASM_C2_SCALAR_MERGE_OBSERVATIONS.with(|cell| {
+            *cell.borrow_mut() = *previous_observations;
+        });
+    }
+
+    /// Close this scope and return its recorded merge decisions.
+    pub fn finish(mut self) -> Vec<DasmC2ScalarMergeObservation> {
+        let observations = dasm_c2_take_scalar_merge_observations();
+        self.restore();
+        observations
+    }
+}
+
+#[cfg(feature = "dasm-c2-observation")]
+impl Drop for DasmC2ScalarMergeObservationScope {
+    fn drop(&mut self) {
+        self.restore();
+    }
+}
+
+/// Observe general scalar-merge decisions on this thread until the returned
+/// scope is finished or dropped.
+#[cfg(feature = "dasm-c2-observation")]
+#[doc(hidden)]
+pub fn dasm_c2_scalar_merge_observation_scope() -> DasmC2ScalarMergeObservationScope {
+    let previous_observations = dasm_c2_take_scalar_merge_observations();
+    let previous_enabled = DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED.replace(true);
+    DasmC2ScalarMergeObservationScope {
+        previous_enabled,
+        previous_observations: Some(Box::new(previous_observations)),
+    }
+}
+
 /// Proof token for the legacy closed-expression merge sites. It can only be
 /// minted when source evaluation has no live continuation. Checked source joins
 /// use their explicit `SourceJoinTarget.required_kind` instead.
@@ -17676,7 +17765,14 @@ impl<'a> Lowering<'a> {
             lowered
         };
         let zero_tag = builder.ins().iconst(types::I64, 0);
-        match lowered {
+        #[cfg(any(test, feature = "dasm-c2-observation"))]
+        let observed_operand_kind = lowered_value_kind(&lowered);
+        #[cfg(any(test, feature = "dasm-c2-observation"))]
+        let observed_constructor = match &lowered {
+            Lowered::Constructor { constructor, .. } => Some(constructor.clone()),
+            _ => None,
+        };
+        let result = match lowered {
             Lowered::RecursiveBackedge => Ok((
                 NativeScalarPairV1 {
                     tag: zero_tag,
@@ -17740,7 +17836,15 @@ impl<'a> Lowering<'a> {
                 construct,
                 "dynamic arms must produce scalar Int or Bool values",
             )),
-        }
+        };
+        #[cfg(any(test, feature = "dasm-c2-observation"))]
+        dasm_c2_record_scalar_merge(DasmC2ScalarMergeObservation {
+            construct,
+            operand_kind: observed_operand_kind,
+            constructor: observed_constructor,
+            admitted: result.is_ok(),
+        });
+        result
     }
 
     fn restore_root_terminal_authority(
