@@ -4261,6 +4261,86 @@ fn r3_fused_capture_projection_refuses_before_emission() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- both governed fused selectors must
+/// reach the production target-authority validator before call emission.
+///
+/// **MEASURED:** the existing armed Exact and ReHomed full-pipeline compiles
+/// each reach `fusion_target_carries_claim_authority`, then complete with one
+/// claim consumption and one fused invocation.
+///
+/// **CLAIMED:** the validator is wired into every currently governed real R
+/// selector. Bypassing its call must make this control red even though both
+/// compiles otherwise still succeed.
+///
+/// **THE GAP:** the sole writer currently derives the map key and both checked
+/// fields from the same claim. This control proves validator reachability, not
+/// wrong-target refusal; the source-site future-divergence comment names the
+/// type and writer changes that would make that separate relation expressible.
+///
+/// **Promise class: durable invariant.** Every real R selector must retain the
+/// target-authority validation independently of how many selectors or claims
+/// an intended extension adds.
+#[test]
+fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
+    use crate::cranelift_backend::lowering::core::{
+        observe_d2f_target_authority_validation, D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(cause: D2jCause, symbol: &str) -> (usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, validations) = observe_d2f_target_authority_validation(|| {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-target-authority-validation",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        assert!(error.is_none(), "{cause:?}: {error:?}");
+        (
+            validations,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    for (cause, symbol) in [
+        (D2jCause::Exact, "ken_r3_target_authority_exact"),
+        (D2jCause::ReHomed, "ken_r3_target_authority_rehomed"),
+    ] {
+        let (validations, consumptions, invocations) = compile(cause, symbol);
+        assert!(
+            validations > 0,
+            "{cause:?}: the real fused selector bypassed target-authority validation"
+        );
+        assert_eq!(
+            (consumptions, invocations),
+            (1, 1),
+            "{cause:?}: validator reach is meaningful only on an accepted affine call"
+        );
+    }
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.

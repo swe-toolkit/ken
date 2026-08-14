@@ -476,6 +476,38 @@ fn fusion_capture_projection_is_exact(
         .eq(projected.iter().map(|(authority, _)| authority))
 }
 
+#[cfg(test)]
+thread_local! {
+    static D2F_TARGET_AUTHORITY_VALIDATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Observe whether one real compile reaches the fused target-authority
+/// validator. The count is reachability only: the current sole writer derives
+/// every compared field from the same claim, so no wrong-target relation is
+/// manufactured for this control.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn observe_d2f_target_authority_validation<R>(
+    run: impl FnOnce() -> R,
+) -> (R, usize) {
+    D2F_TARGET_AUTHORITY_VALIDATIONS.with(|cell| cell.set(0));
+    let result = run();
+    let validations = D2F_TARGET_AUTHORITY_VALIDATIONS.with(std::cell::Cell::get);
+    (result, validations)
+}
+
+fn fusion_target_carries_claim_authority(
+    target: &super::units::DeclaredUnitCall,
+    claim: &FusionRegionClaim,
+    seat: StaticOriginId,
+) -> bool {
+    #[cfg(test)]
+    D2F_TARGET_AUTHORITY_VALIDATIONS.with(|cell| {
+        cell.set(cell.get().saturating_add(1));
+    });
+    target.origin == claim.redirect().callee_origin() && target.call_site_origin == seat
+}
+
 /// **`RT-PRODUCER-MATCH-PORT` `D2` — a HANDOFF counter, and named so.**
 ///
 /// Incremented once the composed ordinary frame has been checked for the three
@@ -13702,7 +13734,14 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 ),
             )
         })?;
-        if target.origin != claim.redirect().callee_origin() || target.call_site_origin != seat {
+        // This is a future-divergence guard, not an independently variable
+        // relation today: `redirect_fused_producer_invocations` constructs the
+        // map key, `DeclaredUnitCall::origin`, and `call_site_origin` from this
+        // same claim. A wrong-target mutation becomes expressible, and owes a
+        // refusal control, if `DeclaredUnitCall` gains independently supplied
+        // target/lookup authority, that constructor gains a claim-independent
+        // path, or another writer or map merge can populate a claim seat.
+        if !fusion_target_carries_claim_authority(&target, claim, seat) {
             return Err(unsupported(
                 "StaticContinuationFusion",
                 "the target declared at the claim-issued seat does not carry the claim's own \
