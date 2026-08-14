@@ -1,7 +1,7 @@
 ---
 id: DS-9
 title: "lawful JSON codec — the data-structures tier's acceptance test: a Json value type, encode/decode, and the proved round-trip law, assembled entirely from the landed Core/Data sections"
-status: active
+status: draft
 owner: foundation
 size: L
 gate: none
@@ -10,6 +10,25 @@ blocks: []
 github: null
 origin: Phase 3 of the catalog data-structures enrichment program (docs/program/wp/catalog-data-structures-program.md), under the catalog campaign charter (docs/program/06-catalog-campaign.md), which homes catalog authoring in Foundation. Steward-filed; Steward owns the frame and AC/control placement. Carrier design fork ruled by the Architect as dec_3n1pp559pxrrw and transcribed into frame §3. The node is now draft because it is BLOCKED on KERNEL-NESTED-IND — see the banner.
 ---
+
+> ## STATUS CORRECTED `active` -> `draft` 2026-08-14. `draft` here means
+> ## BLOCKED-WITH-WORK-LANDED, not unstarted.
+>
+> This node's own `origin` line has said *"the node is now draft because it is
+> BLOCKED on KERNEL-NESTED-IND"* since it was filed, while the `status` field
+> said `active`. **The status field is the one a tracker scan reads**, so DS-9
+> presented as a node a ring was working while all three Foundation seats sat
+> idle — correctly stood down, per the leader's own statement.
+>
+> `D3a` is merged and the frame is written; nothing here is unstarted. The
+> schema has no `blocked` value, so `draft` carries it, and this banner is what
+> keeps `draft` from reading as "never begun."
+>
+> **The block is two levels deep:** `KERNEL-NESTED-IND` is itself waiting on
+> `RT-DYNAMIC-ARM-SCALAR-MERGE` and `RT-NESTED-IH-NATIVE-REALIZATION`, both
+> Runtime-owned, and Runtime is a single ring currently on
+> `RT-LEXICAL-R3-FUSION-EMITTER`. Flipping this back to `active` requires that
+> chain to clear, not a Foundation decision.
 
 > ## `D3a` MERGED 2026-08-10 — and DO NOT DELETE THE DECODER PARAGRAPH IT ADDED
 >
