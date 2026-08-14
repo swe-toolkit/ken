@@ -2010,6 +2010,7 @@ fn check_match_dependent(
         .inductive(d_id)
         .ok_or_else(|| ElabError::Internal(format!("inductive {:?} not found", d_id)))?
         .clone();
+    ensure_arm_ctors_belong_to_family(cx, arms, &ind, d_id)?;
     if equation.is_some()
         && (ind.indices.len() != 0 || ind.constructors.iter().any(|ctor| !ctor.args.is_empty()))
     {
@@ -3248,11 +3249,16 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
 /// user-triggerable case. `ctor_name`'s own fallback for an id absent from
 /// `cx.globals` is real -- `cx.globals` is deliberately pruned for some
 /// constructors while their kernel declaration survives, e.g. `PrivateFsOpen`
-/// after `prelude.rs`'s private-op pruning -- but it is never reached FROM
-/// THIS CALL: the `.expect()` below asserts the stronger, kernel-side belief
-/// first, so the two lookups never disagree about what "id does not resolve"
-/// means for a caller of this function (`LANG-WITNESS-DIAGNOSTIC-STRICTNESS`
-/// H1).
+/// after `prelude.rs`'s private-op pruning -- and it IS reached from this
+/// call for exactly that population: an id the kernel still resolves but
+/// `cx.globals` has pruned degrades to `ctor_name`'s fallback spelling here,
+/// which the `H1` control below measures directly. What never reaches this
+/// call is the OTHER direction -- an id `cx.globals` would still resolve but
+/// the kernel cannot -- because the `.expect()` below panics first on any id
+/// the kernel does not resolve, and every call site's id is constructed from
+/// the kernel's own enumeration, so that direction is unconstructible by
+/// this function's own callers rather than independently measured
+/// (`LANG-WITNESS-DIAGNOSTIC-STRICTNESS` H1).
 fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId) -> MissingPatternWitness {
     let (ind, ordinal) = cx.env.constructor(id).expect(
         "the constructor id passed here always names a constructor of an \
@@ -8483,6 +8489,7 @@ fn infer_match(
         .inductive(d_id)
         .ok_or_else(|| ElabError::Internal(format!("inductive {:?} not found", d_id)))?
         .clone();
+    ensure_arm_ctors_belong_to_family(cx, arms, &ind, d_id)?;
     let m = ind.params.len();
 
     // 4. Every arm must open with a constructor pattern (no top-level
@@ -8599,6 +8606,61 @@ fn ensure_pattern_constructors_resolve(
         }
     }
     Ok(())
+}
+
+/// `LANG-FOREIGN-CTOR-ARM-REJECT`: every arm's top-level constructor pattern
+/// must name a constructor of the scrutinee's own inductive family `ind`.
+/// `ensure_pattern_constructors_resolve` only proves the name resolves to
+/// SOME declared constructor; this proves it resolves to one of THIS type's.
+/// Checked once, before match compilation begins, so a foreign constructor
+/// (a real constructor of a *different* family) is rejected as the mismatch
+/// it is instead of reaching the reachability sweep, where it would silently
+/// read as `NoInhabitants` -- a true statement about inhabitants that says
+/// nothing about the mismatch actually present. Scoped to the arm's own head
+/// pattern only, never nested sub-patterns (the checked path this feeds
+/// permits only flat `Var`/`Wild` sub-patterns; the general path's nested
+/// sub-patterns each have their own, different, per-position expected type
+/// and are out of this node's one-shape scope).
+fn ensure_arm_ctors_belong_to_family(
+    cx: &ElabCtx,
+    arms: &[RMatchArm],
+    ind: &InductiveDecl,
+    d_id: GlobalId,
+) -> Result<(), ElabError> {
+    for arm in arms {
+        if let RPatKind::Ctor(name, _) = &arm.pat.kind {
+            let ctor_id = *cx.globals.get(name).expect(
+                "ensure_pattern_constructors_resolve already validated every top-level \
+                 arm pattern name resolves in cx.globals before this function runs",
+            );
+            if !ind.constructors.iter().any(|c| c.id == ctor_id) {
+                return Err(ElabError::TypeMismatch {
+                    span: arm.pat.span.clone(),
+                    reason: format!(
+                        "constructor '{}' is not a constructor of type '{}'",
+                        name,
+                        type_name(cx, d_id)
+                    ),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The elaborator's own surface name for an inductive family's `GlobalId`,
+/// resolved the same way `ctor_name` resolves a constructor's: the kernel
+/// records no name for a `Decl::Inductive` any more than it does for a
+/// `ConstructorDecl` (names live only in `cx.globals`), so this is the same
+/// inverse scan with the same render-something-over-panic fallback
+/// (`prelude.rs`'s `combinator_actual_delta` precedent: "a diagnostic that
+/// can fail to render is worse than the bare id it replaces").
+fn type_name(cx: &ElabCtx, id: GlobalId) -> String {
+    cx.globals
+        .iter()
+        .find(|(_, &candidate)| candidate == id)
+        .map(|(name, _)| name.clone())
+        .unwrap_or_else(|| format!("<type_{:?}>", id))
 }
 
 /// Shift a term's free variables DOWN by `k`, stopping with `None` if any
