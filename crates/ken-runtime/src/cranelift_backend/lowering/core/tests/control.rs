@@ -5763,12 +5763,46 @@ fn contkey_wrong_own_occurrence_seed_is_rejected() {
         }
     });
     let rendered = format!("{error:?}");
-    eprintln!("contkey wrong-own-occurrence refusal: {rendered}");
+    eprintln!("contkey body_origin mutation refusal: {rendered}");
     assert!(
         rendered.contains(
-            "a continuation specialization's consuming occurrence is not the exact outer selected case body derived from its eliminator"
+            "a continuation specialization's consuming occurrence has a mismatched body_origin: it is not the exact outer selected case body derived from its eliminator"
         ),
-        "the mutation must fail at the consuming-occurrence relation check: {rendered}",
+        "the body_origin mutation must produce its field-specific consuming-occurrence refusal: {rendered}",
+    );
+    assert!(
+        !rendered.contains("mismatched eliminator_origin"),
+        "the body_origin refusal must not report the other relation field: {rendered}",
+    );
+}
+
+/// `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` AC-1/AC-3: replacing only the
+/// selected relation's outer eliminator with the real inner match is rejected
+/// by the position-zero guard, with a field-specific control message.
+#[test]
+fn contkey_wrong_inner_match_eliminator_seed_is_rejected() {
+    use crate::cranelift_backend::planning::with_continuation_consuming_eliminator_seed_mutated;
+
+    let expression =
+        host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let declarations = BTreeMap::new();
+    let error = with_continuation_consuming_eliminator_seed_mutated(|| {
+        match plan_static_transition_graph(&expression, &declarations) {
+            Ok(_) => panic!("the inner match must not pass as the outer consuming eliminator"),
+            Err(error) => error,
+        }
+    });
+    let rendered = format!("{error:?}");
+    eprintln!("contkey eliminator_origin mutation refusal: {rendered}");
+    assert!(
+        rendered.contains(
+            "a continuation specialization's consuming occurrence has a mismatched eliminator_origin: it does not select the continuation as its position-zero child"
+        ),
+        "the eliminator_origin mutation must produce its field-specific consuming-occurrence refusal: {rendered}",
+    );
+    assert!(
+        !rendered.contains("mismatched body_origin"),
+        "the eliminator_origin refusal must not report the other relation field: {rendered}",
     );
 }
 

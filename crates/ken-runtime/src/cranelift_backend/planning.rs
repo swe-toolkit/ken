@@ -113,6 +113,7 @@ pub(super) use static_transition::{
 #[cfg(test)]
 pub(super) use static_transition::{
     set_composed_call_target_defect, set_continuation_descent_owner_duplication, set_envelope_defect, EnvelopeDefect,
+    with_continuation_consuming_eliminator_seed_mutated,
     with_continuation_consuming_occurrence_seed_mutated, ComposedCallTargetDefect,
 };
 
