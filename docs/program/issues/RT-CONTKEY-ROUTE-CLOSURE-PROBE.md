@@ -154,7 +154,34 @@ route**. Name it; do not take it.
 
 **`D5` — revert every probe byte and verify byte-identity**, in the `D2k-0`
 manner. The tree this node leaves behind is `main` plus, at most, a control
-that is assertable **without** the reverted repair.
+that is assertable **without** the reverted repair, plus `D6`.
+
+**`D6` — one clause in `control.rs`'s "Promise class" paragraph. This is the
+node's only authored change and it is deliberately exempt from the
+no-candidate rule**, because that rule is about the route repair, not about a
+comment.
+
+**Two reviewers found this independently on the same merge**, which is why it
+rides here rather than waiting: the Architect in his approval of `f467a686`
+(*"count it as a boundary-convention pin, not as a cross-compile equality
+alongside depth 2 and 3"*), and an Adversary hunt on the landed squash
+`b6b86916`. **Neither amended the approval and that merge stands.**
+
+The paragraph lists three assertions together under *"none uses fixture origin
+literals"*. That is true of all three and is not the distinction that matters:
+
+| assertion | provenance | what it can red on |
+|---|---|---|
+| depth-2/3 `required` vs sibling `unit_consumer` | **different compiles** | a genuinely independent record |
+| depth-1 `required` vs its own `unit_consumer` | **same compile, one shared seed** — `Source(candidates)` versus the interned key, two resolvers over the same `candidates` | **resolver disagreement only; it cannot red on a defect in the seed they share** |
+
+⇒ **Say that the depth-1 equality is same-compile and shares a seed, so it pins
+resolver agreement rather than the seed.** That is the distinction the same doc
+already draws for the child-push pair, applied one row up. **A reader taking
+that paragraph at face value counts three equally load-bearing controls.**
+
+**Do not weaken or remove the depth-1 assertion.** It is `AC-1` of the node
+that just merged, and it discriminates a real change to the outermost fallback.
 
 ## Acceptance criteria
 

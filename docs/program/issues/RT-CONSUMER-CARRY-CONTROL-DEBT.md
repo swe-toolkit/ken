@@ -1,7 +1,7 @@
 ---
 id: RT-CONSUMER-CARRY-CONTROL-DEBT
 title: "five carries on the consumer-descent-carry merge: two new planner refusals are unreachable in production because the interned target is not an independent authority, two of four equality assertions are vacuous, the lag law is NOT uniform and its depth-1 boundary is asserted nowhere, the primary Source branch is unexercised and sits one level off from the fallback, and the D8a twin clones where the real descent advances"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none

@@ -1,7 +1,7 @@
 ---
 id: LANG-REACHABILITY-SUBSUMING-ARMS
 title: "`ReachabilityError` carries only a span, so a redundant-arm diagnostic cannot say WHICH earlier arms subsume the dead arm -- the mirror of the gap `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` closed on the exhaustiveness side, except `34 §4.2` does NOT mandate it, so this is ergonomics and must not be filed or read as a conformance obligation"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
