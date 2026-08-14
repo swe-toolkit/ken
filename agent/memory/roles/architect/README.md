@@ -8,3 +8,4 @@ required PR reviewer.
 |---|---|
 | [architect-gate-can-be-skipped-review-on-main](architect-gate-can-be-skipped-review-on-main.md) | The Architect's required-reviewer gate can be silently skipped |
 | [architect-verify-leader-actor-ids](architect-verify-leader-actor-ids.md) | Verify a leader's actor_id from .moot/actors.json before mentioning them |
+| [read-the-candidate-shas-ci-history-before-voting](read-the-candidate-shas-ci-history-before-voting.md) | A blind instrument is not a green one — an inert control is a STOP, not a pass; read the candidate SHA's existing check runs before casting a merge vote |

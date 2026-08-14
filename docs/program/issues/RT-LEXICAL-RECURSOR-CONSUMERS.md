@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-MATCH-RECURSOR-CONSUMERS]
+depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER]
 blocks: [RT-RECURSOR-TRANSPORT]
 github: null
 origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT hard stop 4, narrowed to rows 1-5 by the re-rule evt_3r4j14fv1jtj2 on the nine-expression census evt_16cmej481q7ns. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -178,6 +178,33 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > > **The committed test asserts the edge and refusal per expression and reds if
 > > a repair moves any of them.** That is what makes this durable rather than a
 > > one-time reading — **a red there is information, not a test to update.**
+
+## `active` here means WAITING ON R3, not in progress. Edge declared 2026-08-14
+
+runtime-leader at `evt_5rvv28pt58zge`, answering a Steward sequencing question:
+
+> *"`RT-LEXICAL-RECURSOR-CONSUMERS` has no independently startable repair
+> slice. Its `D2k` seed-route work is stopped: the five seed witnesses cannot
+> carry the checked-fusion repair, route work is explicitly stopped, and its
+> remaining semantic-effect/route obligations were transferred to R3. It
+> remains active only because the R3-owned fusion disposition is incomplete."*
+
+⇒ **`depends_on` now names `RT-LEXICAL-R3-FUSION-EMITTER`**, and R3's `blocks`
+names this node. **The relationship existed only in this body's prose**, so
+`gen-progress.sh` — which reads `depends_on` — showed an `active` node with no
+blocker while it was in fact waiting on another node's disposition.
+
+**It failed in the direction that hides a stall.** A reader of the tracker, the
+operator included, saw an `active` Runtime node and would conclude the ring was
+progressing on it. This is the same defect class `RT-NESTED-IH-NATIVE-REALIZATION`
+recorded for `KERNEL-NESTED-IND`: an edge real in prose and absent from the
+field the generator reads. Two instances now, in the same lane, found the same
+way — by asking a leader whether a node was startable rather than by reading its
+status.
+
+**Do not read this edge as a graph tidy.** It is the transferred-obligation
+relationship: work that was this node's is now R3's, so this node cannot finish
+before R3 disposes of it.
 
 ## What it is
 

@@ -9,6 +9,9 @@ role's own mechanics (not shared reasoning) belongs in `roles/<role>` instead.
 
 | Lesson | One-line |
 |---|---|
+| [a-hazard-closed-incidentally-is-closed-by-a-knob-someone-is-told-to-turn](a-hazard-closed-incidentally-is-closed-by-a-knob-someone-is-told-to-turn.md) | When a hazard turns out closed, ask BY WHAT and whether that thing exists for this purpose — a closure resting on an unrelated mechanism has a documented raise procedure as its reopening; fact and trigger have different readers, so different homes |
+| [a-report-on-where-to-add-something-is-silent-about-what-exists](a-report-on-where-to-add-something-is-silent-about-what-exists.md) | A handback naming where a seam would go is silent about what already sits there — read the site before ruling; ask "missing, or merely unreachable?" |
+| [a-ruling-constraint-that-never-becomes-an-ac-cannot-be-failed](a-ruling-constraint-that-never-becomes-an-ac-cannot-be-failed.md) | An envelope part left as prose instead of an AC is one the build cannot fail — and it is usually the HARD part; check which rows carry a number before reasoning from it |
 | [abstraction-visibility-feature-soundness-gate](abstraction-visibility-feature-soundness-gate.md) | Soundness-gating a namespacing/visibility/abstraction build |
 | [assembly-is-a-semantic-reconcile-gate-not-a-merge](assembly-is-a-semantic-reconcile-gate-not-a-merge.md) | When two lanes author in parallel from one frame, both can be internally coherent and still contradict each other, because the frame DEFERRED a choice and each lane resolved it — assembly must reconcile spelling currency AND decision-state currency in coupled docs one hop away, which a frame-limited repair leaves standing |
 | [attribute-a-suite-arm-reject-before-calling-it-a-gap](attribute-a-suite-arm-reject-before-calling-it-a-gap.md) | Attribute a suite-arm reject before calling it a gap |
@@ -21,6 +24,7 @@ role's own mechanics (not shared reasoning) belongs in `roles/<role>` instead.
 | [conformance-assert-at-locked-granularity](conformance-assert-at-locked-granularity.md) | A conformance case must assert at the spec's locked granularity |
 | [conformance-reconcile-inherits-spec-metatheory-bugs](conformance-reconcile-inherits-spec-metatheory-bugs.md) | Content-reconciling a conformance case inherits the spec's metatheory bugs |
 | [contract-spec-defer-spelling-not-concept](contract-spec-defer-spelling-not-concept.md) | Defer the spelling, not the concept, in a wire/serialization spec |
+| [count-the-population-before-you-place-it-inside-a-mechanism](count-the-population-before-you-place-it-inside-a-mechanism.md) | Reading a mechanism tells you what happens to what ARRIVES — only a count tells you whether anything arrives; count the population before naming a successor |
 | [differential-verify-which-mechanism-is-the-net](differential-verify-which-mechanism-is-the-net.md) | Differential-verify which mechanism is the actual soundness net |
 | [disclaimed-framing-still-binds-your-own-companion-artifact](disclaimed-framing-still-binds-your-own-companion-artifact.md) | Disclaiming a framing doesn't protect your own companion artifact |
 | [discriminating-axis-vacuous-until-capability-lands](discriminating-axis-vacuous-until-capability-lands.md) | A discriminating axis can be design-real yet build-vacuous |

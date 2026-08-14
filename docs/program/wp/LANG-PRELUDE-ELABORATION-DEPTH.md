@@ -163,11 +163,36 @@ enumeration are the same kind of instrument.
   explicitly did not ask for it to change. Changing a control while widening
   the claim it backs forfeits the control.
 
+## Carried addendum: one comment line, unrelated to D1-D5
+
+**This is not a deliverable and it gates no AC.** It is a one-line repair
+riding this node's turn because it is too small to be a node of its own, and it
+is listed separately so its diff is attributable rather than folded into a
+measurement.
+
+`LANG-TRIVIA-KIND-MAPPING-PIN` (`193d8944`) pins all four `CommentKind` arms,
+but the `Line` arm is discharged by a fixture in **another file** —
+`crates/ken-elaborator/tests/kenfmt_b1_lossless.rs:59` — whose discriminating
+property is its **configuration**: same line after a declaration, with a
+following declaration. Moving it onto its own line, dropping the following
+`const b`, or rewriting it for an unrelated formatter reason silently falsifies
+the other file's four-arm claim, and **nothing reds.** Architect at
+`evt_7p1aw2pq52hmm`.
+
+**Add one comment at that fixture** recording that its
+same-line-after-with-a-following-declaration shape is load-bearing for
+`LANG-TRIVIA-KIND-MAPPING-PIN`'s `Line` arm, and that a `Line`/`DocLine`
+transposition is what it catches there. **Change no assertion and no fixture
+text** — the shape is correct as it stands; only the reason it must stay that
+shape is missing. If writing it truthfully requires touching the fixture
+itself, stop and say so rather than adjusting it.
+
 ## Contention
 
 `crates/ken-elaborator/src/elab.rs` (D4's one comment), whatever measurement
 harness D1 needs, and — from `D5` — `crates/ken-elaborator/tests/lang_prelude_collections.rs`
-for its `AC-5` doc sentence and the added enumeration.
+for its `AC-5` doc sentence and the added enumeration. The carried addendum
+touches `crates/ken-elaborator/tests/kenfmt_b1_lossless.rs`, comment only.
 
 **`crates/ken-elaborator/src/prelude.rs` is touched only transiently**, by `D2`
 and by `AC-6`, and **must be restored before landing** in both cases. `D2`'s
