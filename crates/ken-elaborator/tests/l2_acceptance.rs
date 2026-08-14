@@ -390,6 +390,47 @@ fn nested_ctor_pattern_missing_case_is_exhaustiveness_error() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// `LANG-WITNESS-ARITY-DERIVED` D2: `missing_pattern_witness` now derives its
+// arity from the constructor `id` alone (`crates/ken-kernel/src/env.rs`'s
+// `constructor(id) -> Option<(&InductiveDecl, usize)>`) instead of taking a
+// caller-supplied `arity: usize` that could disagree with the name. This is
+// the single control the node calls for: an arity >= 1 constructor's witness
+// must render exactly its own declared arity's worth of wildcards. `Succ`
+// (arity 1) also reaches `infer_match`'s general non-dependent path -- the
+// same emission site previously witnessed only at arity 0 (`Zero`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn non_dependent_arity_one_constructor_witness_derives_its_own_arity() {
+    let mut env = mk_env();
+    setup_natl(&mut env);
+
+    let result = elab(&mut env, "let bad : Int = match Zero { Zero |-> 0 }");
+
+    match result {
+        Err(ElabError::ExhaustivenessError { missing, .. }) => {
+            assert_eq!(
+                missing.constructor, "Succ",
+                "derived witness should name 'Succ', got '{}'",
+                missing.constructor
+            );
+            assert_eq!(
+                missing.arity, 1,
+                "'Succ' is declared with exactly one argument (NatL); the \
+                 derived arity must equal that declaration"
+            );
+            assert_eq!(
+                missing.to_string(),
+                "Succ _",
+                "an arity-1 witness renders exactly one trailing wildcard"
+            );
+        }
+        Ok(_) => panic!("non-exhaustive match accepted (should have been rejected)"),
+        Err(other) => panic!("expected ExhaustivenessError naming 'Succ', got: {}", other),
+    }
+}
+
 #[test]
 fn nested_ctor_pattern_shadowed_by_earlier_flat_arm_is_reachability_error() {
     let mut env = mk_env();

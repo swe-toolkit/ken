@@ -1583,7 +1583,7 @@ fn check_match_with_lift(
                 matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(host_ctor.id))
             })
             .ok_or_else(|| ElabError::ExhaustivenessError {
-                missing: missing_pattern_witness(cx, host_ctor.id, host_ctor.args.len()),
+                missing: missing_pattern_witness(cx, host_ctor.id),
                 span: span.clone(),
             })?;
         arm_used[arm_index] = true;
@@ -2132,7 +2132,7 @@ fn check_match_dependent(
                 ));
             }
             let arm_idx = arm_idx.ok_or_else(|| ElabError::ExhaustivenessError {
-                missing: missing_pattern_witness(cx, ctor.id, n),
+                missing: missing_pattern_witness(cx, ctor.id),
                 span: span.clone(),
             })?;
             methods[k] = Some(check_structured_constructor_method(
@@ -2311,7 +2311,7 @@ fn check_match_dependent(
             }
         } else {
             let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
-            let missing = missing_pattern_witness(cx, ctor.id, n);
+            let missing = missing_pattern_witness(cx, ctor.id);
             synthesize_omitted_index_method(cx, &premise_domains, &expected_here, missing, span)?
         };
         for _ in 0..n {
@@ -3217,12 +3217,17 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
         .unwrap_or_else(|| format!("<ctor_{:?}>", id))
 }
 
-/// The `34 §4.1` unmatched-pattern witness for an omitted constructor:
-/// its name plus the arity needed to render the applied wildcard pattern.
-fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId, arity: usize) -> MissingPatternWitness {
+/// The `34 §4.1` unmatched-pattern witness for an omitted constructor: its
+/// name and the arity of its own declaration, both derived from `id` so the
+/// two cannot disagree -- there is no caller-suppliable arity to mismatch.
+fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId) -> MissingPatternWitness {
+    let (ind, ordinal) = cx.env.constructor(id).expect(
+        "the constructor id passed here always names a constructor of an \
+         already-admitted inductive resolved from this same env",
+    );
     MissingPatternWitness {
         constructor: ctor_name(cx, id),
-        arity,
+        arity: ind.constructors[ordinal].args.len(),
     }
 }
 
@@ -8318,7 +8323,7 @@ fn build_ctor_buckets(
         let n_args0 = c0.args.len();
         if bucket.is_empty() {
             return Err(ElabError::ExhaustivenessError {
-                missing: missing_pattern_witness(cx, c0.id, n_args0),
+                missing: missing_pattern_witness(cx, c0.id),
                 span: top_span.clone(),
             });
         }
