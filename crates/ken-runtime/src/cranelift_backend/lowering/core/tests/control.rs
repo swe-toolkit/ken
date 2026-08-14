@@ -5694,6 +5694,84 @@ fn d2k_1a_the_five_static_workers_are_recognized_at_their_construct_owners() {
     );
 }
 
+/// `RT-CONTKEY-CONSUMING-OCCURRENCE` AC-1/AC-3/AC-4: the planner-carried
+/// relation agrees with an ordinal-selected body read from the outer
+/// eliminator, has a non-empty population on both governed rows, and leaves
+/// the continuation's own owner relation exact.
+#[test]
+fn contkey_rows_four_and_five_carry_the_exact_outer_consuming_occurrence() {
+    fn observe(label: &str, expression: &RuntimeExpr) -> usize {
+        let declarations = BTreeMap::new();
+        let plan = plan_static_transition_graph(expression, &declarations)
+            .expect("the governed continuation row plans");
+        let units = plan.continuation_units().expect("continuation units");
+        let mut count = 0;
+        for unit in &units {
+            let Some(carried) = unit.consuming_occurrence() else {
+                continue;
+            };
+            let direct = plan
+                .rederive_continuation_consuming_occurrence(unit)
+                .expect("the outer selected case body re-derives");
+            eprintln!(
+                "{label}: carried={carried:?} direct={direct:?} consumer_owner={:?}",
+                unit.consumer_owner(),
+            );
+            assert_eq!(
+                direct,
+                Some(carried),
+                "{label}: the carried occurrence must equal the directly selected outer body",
+            );
+            assert!(
+                plan.continuation_consumer_owner_is_exact(unit)
+                    .expect("consumer-owner authority is readable"),
+                "{label}: consumer_owner must still name the continuation occurrence's owner",
+            );
+            count += 1;
+        }
+        assert_eq!(
+            count, 1,
+            "{label}: exactly one specialization edge must carry the outer consuming relation",
+        );
+        count
+    }
+
+    let row4 = host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let row5 = host_result_closure_match(px8j_equal_payload_hole_placement(
+        Px8jSelectedScopePlacement::AfterReturnHole,
+    ));
+    assert_eq!(
+        observe("row4-depth-1", &row4) + observe("row5-after-hole", &row5),
+        2
+    );
+}
+
+/// AC-2: replacing the forward-selected outer case body with the
+/// continuation's own occurrence is rejected by the independent direct-body
+/// derivation before the plan can escape.
+#[test]
+fn contkey_wrong_own_occurrence_seed_is_rejected() {
+    use crate::cranelift_backend::planning::with_continuation_consuming_occurrence_seed_mutated;
+
+    let expression =
+        host_result_closure_match(px8j_scope_chain_observation_result(1, 0));
+    let declarations = BTreeMap::new();
+    let error = with_continuation_consuming_occurrence_seed_mutated(|| {
+        match plan_static_transition_graph(&expression, &declarations) {
+            Ok(_) => panic!("the continuation's own occurrence must not pass as its consumer"),
+            Err(error) => error,
+        }
+    });
+    let rendered = format!("{error:?}");
+    eprintln!("contkey wrong-own-occurrence refusal: {rendered}");
+    assert!(
+        rendered.contains(
+            "a continuation specialization's consuming occurrence is not the exact outer selected case body derived from its eliminator"
+        ),
+        "the mutation must fail at the consuming-occurrence relation check: {rendered}",
+    );
+}
+
 /// **The `D2k-0` control's redness, made executable rather than inherited.**
 ///
 /// `D2k-0` claims it reds when a repair moves any of the five off the

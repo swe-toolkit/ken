@@ -1612,6 +1612,29 @@ struct ContinuationWorkerProvenance {
     captures: Vec<ContinuationWorkerCaptureProvenance>,
 }
 
+/// The exact outer occurrence that consumes one continuation result.
+///
+/// The body is the selected outer case body. The eliminator is retained beside
+/// it because the body alone does not identify the path through which the
+/// result was consumed. Both coordinates are minted by the forward outer-match
+/// walk; neither is recovered from an owner or by searching backwards from the
+/// continuation.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct ContinuationConsumingOccurrence {
+    body_origin: StaticOriginId,
+    eliminator_origin: StaticOriginId,
+}
+
+impl ContinuationConsumingOccurrence {
+    pub(in crate::cranelift_backend) fn body_origin(self) -> StaticOriginId {
+        self.body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn eliminator_origin(self) -> StaticOriginId {
+        self.eliminator_origin
+    }
+}
+
 /// The complete immutable identity of one continuation specialization.
 ///
 /// The ordered projection vector is owned directly. There is no parallel
@@ -1631,7 +1654,21 @@ struct ContinuationSpecializationKey {
     producer_result_origin: StaticOriginId,
     producer_construct_origin: StaticOriginId,
     producer_alternative: u32,
+    /// The owner of the continuation occurrence itself.
+    ///
+    /// This is provenance only for the consumer half; it does not name the
+    /// outer case that consumes the continuation's answer. Widening it is
+    /// closed: [`exact_continuation_source_environment`] validates that the
+    /// continuation occurrence has this exact owner and fails closed on an
+    /// inequality.
     consumer_owner: PredeclaredFunctionId,
+    /// The exact outer selected case body and eliminator that consume this
+    /// specialization's result.
+    ///
+    /// This confers occurrence-level consuming authority. `None` means the
+    /// forward outer-match walk did not establish one exact consuming case; it
+    /// never falls back to `consumer_owner` or a reverse lookup.
+    consuming_occurrence: Option<ContinuationConsumingOccurrence>,
     continuation_origin: StaticOriginId,
     recursive_position: u32,
     /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — THE CLOSED PROJECTION.**
@@ -1727,6 +1764,11 @@ impl<'plan> ContinuationUnitView<'plan> {
     }
     pub(in crate::cranelift_backend) fn consumer_owner(&self) -> PredeclaredFunctionId {
         self.key.consumer_owner
+    }
+    pub(in crate::cranelift_backend) fn consuming_occurrence(
+        &self,
+    ) -> Option<ContinuationConsumingOccurrence> {
+        self.key.consuming_occurrence
     }
     pub(in crate::cranelift_backend) fn producer_construct_origin(&self) -> StaticOriginId {
         self.key.producer_construct_origin
@@ -8023,8 +8065,11 @@ fn intern_specialization(
 /// selected worker bodies and admits further discoveries that no seed scan can
 /// name.
 ///
-/// All THREE identity fields are carried. `enclosing_specialization` is the
-/// immediate emission context, and it **cannot be reconstructed downstream** --
+/// All three admitted identity fields are carried. The outer consuming
+/// occurrence is separate traversal authority: it continues to the
+/// specialization key but is not projected into this identity ledger.
+/// `enclosing_specialization` is the immediate emission context, and it
+/// **cannot be reconstructed downstream** --
 /// a worker body's raw occurrence owner does not name the specialization that
 /// selected and invoked it, which is the conflation `D5a` removed. Projecting it
 /// away would collapse two genuinely distinct admitted discoveries into one
@@ -8040,6 +8085,23 @@ pub(in crate::cranelift_backend) struct AdmittedContinuationDiscovery {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ContinuationConsumingOccurrenceSeed {
+    alternative: u32,
+    occurrence: ContinuationConsumingOccurrence,
+}
+
+/// Forward outer-match facts carried with a continuation discovery.
+///
+/// Every candidate was written while the eliminator and its ordinal-selected
+/// case body were both in hand. Selection waits until the inner specialization
+/// alternative is known, but no later step searches for a parent or indexes a
+/// relation by continuation origin.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ContinuationConsumingOccurrenceSeeds {
+    candidates: Vec<ContinuationConsumingOccurrenceSeed>,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct ContinuationDiscovery {
     continuation_origin: StaticOriginId,
     result_root: StaticOriginId,
@@ -8058,6 +8120,10 @@ struct ContinuationDiscovery {
     /// `None` at a top-level `ComputationalMatch` root: there is no enclosing
     /// generated context, so the emission owner is the raw occurrence owner.
     enclosing_specialization: Option<ContinuationSpecializationId>,
+    /// Forward-seeded outer consuming-case candidates, carried across the
+    /// fixed-point descent. `None` means no direct outer computational
+    /// eliminator selected this continuation as its scrutinee.
+    consuming_occurrences: Option<ContinuationConsumingOccurrenceSeeds>,
 }
 
 #[cfg(test)]
@@ -8076,6 +8142,26 @@ thread_local! {
     static SUPPRESS_BINDER_BODY_RESOLUTION: Cell<bool> = const { Cell::new(false) };
     static MUTATE_PRIMARY_FUSION_KEY_DERIVATION: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
+    static MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Run a control with only the forward consuming-body seed replaced by the
+/// continuation's own occurrence.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_continuation_consuming_occurrence_seed_mutated<T>(
+    run: impl FnOnce() -> T,
+) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous =
+        MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(|cell| cell.replace(true));
+    let _restore = Restore(previous);
+    run()
 }
 
 /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8l2` — the ordinary-envelope population
@@ -10601,6 +10687,229 @@ fn admitted_continuation_discoveries(
     Ok(admitted)
 }
 
+/// Read a computational match's scrutinee from its forward child authority.
+fn forward_match_scrutinee(
+    plan: &StaticTransitionPlan<'_>,
+    match_origin: StaticOriginId,
+) -> Result<StaticOriginId, CraneliftBackendError> {
+    let mut position_zero = occurrence_authority(plan, match_origin)?
+        .children
+        .iter()
+        .filter(|child| child.position == 0);
+    let Some(scrutinee) = position_zero.next() else {
+        return Err(planner_error(
+            "a computational match has no position-zero occurrence authority",
+        ));
+    };
+    if position_zero.next().is_some() {
+        return Err(planner_error(
+            "a computational match has two position-zero occurrence authorities",
+        ));
+    }
+    Ok(scrutinee.origin)
+}
+
+/// Seed every initial discovery by walking source children forward from the
+/// root and declarations.
+///
+/// When a computational match's scrutinee is itself a computational match, the
+/// outer occurrence is still in hand. That is the only moment this function
+/// records the outer eliminator and each ordinal-selected case body. The seed
+/// then travels on the discovery; there is no continuation-keyed table, parent
+/// map, or later occurrence scan.
+fn initial_continuation_discoveries(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<Vec<ContinuationDiscovery>, CraneliftBackendError> {
+    let mut roots = plan
+        .declaration_occurrences
+        .values()
+        .copied()
+        .map(|origin| (origin, None))
+        .collect::<Vec<_>>();
+    if let Some(root) = plan.root_occurrence {
+        roots.push((root, None));
+    }
+
+    let mut walked = BTreeSet::new();
+    let mut pending = Vec::new();
+    while let Some((origin, consuming_occurrences)) = roots.pop() {
+        if !walked.insert(origin) {
+            return Err(planner_error(
+                "the forward continuation seed walk reached one source occurrence twice",
+            ));
+        }
+        let expr = plan.planned_occurrence_expr(origin)?;
+        let children = plan.semantic.child_origins(origin)?.to_vec();
+        if let RuntimeExpr::ComputationalMatch { cases, .. } = expr {
+            let scrutinee = forward_match_scrutinee(plan, origin)?;
+            if children.first().copied() != Some(scrutinee) {
+                return Err(planner_error(
+                    "a computational match's semantic scrutinee disagrees with its position-zero \
+                     occurrence authority",
+                ));
+            }
+            pending.push(ContinuationDiscovery {
+                continuation_origin: origin,
+                result_root: scrutinee,
+                enclosing_specialization: None,
+                consuming_occurrences,
+            });
+
+            let mut candidates = Vec::with_capacity(cases.len());
+            for alternative in 0..cases.len() {
+                let body_origin = plan.semantic.child_origin(origin, 1 + alternative)?;
+                #[cfg(test)]
+                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(Cell::get) {
+                    // The exact wrong relation from AC-2: the continuation's
+                    // own occurrence in place of the outer selected case body.
+                    scrutinee
+                } else {
+                    body_origin
+                };
+                candidates.push(ContinuationConsumingOccurrenceSeed {
+                    alternative: u32::try_from(alternative).map_err(|_| {
+                        planner_capacity_error("outer consuming alternative exhausted")
+                    })?,
+                    occurrence: ContinuationConsumingOccurrence {
+                        body_origin,
+                        eliminator_origin: origin,
+                    },
+                });
+            }
+
+            // Only the direct position-zero child receives this outer
+            // relation. Every case body is walked independently with no
+            // inherited parent relation.
+            roots.push((
+                scrutinee,
+                Some(ContinuationConsumingOccurrenceSeeds { candidates }),
+            ));
+            for child in children.into_iter().skip(1) {
+                roots.push((child, None));
+            }
+        } else {
+            roots.extend(children.into_iter().map(|child| (child, None)));
+        }
+    }
+
+    pending.sort();
+    Ok(pending)
+}
+
+fn continuation_result_constructor_identities(
+    plan: &StaticTransitionPlan<'_>,
+    result_root: StaticOriginId,
+) -> Result<Vec<ConstructorIdentity>, CraneliftBackendError> {
+    let mut identities = Vec::new();
+    for origin in continuation_result_origins(plan, result_root)? {
+        if !matches!(
+            plan.planned_occurrence_expr(origin)?,
+            RuntimeExpr::Construct { .. }
+        ) {
+            continue;
+        }
+        let identity = plan.constructor_symbol_identity(origin)?;
+        if !identities.contains(&identity) {
+            identities.push(identity);
+        }
+    }
+    Ok(identities)
+}
+
+/// Select the one forward-seeded outer case consumed by this inner
+/// specialization alternative.
+fn consuming_occurrence_from_seed(
+    plan: &StaticTransitionPlan<'_>,
+    discovery: &ContinuationDiscovery,
+    alternative: usize,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    let Some(seeds) = &discovery.consuming_occurrences else {
+        return Ok(None);
+    };
+    let selected_case_body = plan
+        .semantic
+        .child_origin(discovery.continuation_origin, 1 + alternative)?;
+    let produced = continuation_result_constructor_identities(plan, selected_case_body)?;
+    let mut matching = Vec::new();
+    for candidate in &seeds.candidates {
+        let identity = plan.case_constructor_identity(
+            candidate.occurrence.eliminator_origin,
+            candidate.alternative as usize,
+        )?;
+        if produced.contains(&identity) && !matching.contains(&candidate.occurrence) {
+            matching.push(candidate.occurrence);
+        }
+    }
+    Ok(match matching.as_slice() {
+        [only] => Some(*only),
+        _ => None,
+    })
+}
+
+/// Re-derive a claimed consuming occurrence without reading the forward seed.
+///
+/// The claim supplies only the outer eliminator coordinate. Its position-zero
+/// child must be this continuation, and the selected outer body is read again
+/// by ordinal from that eliminator after matching the inner selected body's
+/// result constructor. This is the independent half of the relation check.
+fn rederive_consuming_occurrence(
+    plan: &StaticTransitionPlan<'_>,
+    key: &ContinuationSpecializationKey,
+    claimed: ContinuationConsumingOccurrence,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    if forward_match_scrutinee(plan, claimed.eliminator_origin)? != key.continuation_origin {
+        return Ok(None);
+    }
+    let selected_case_body = plan.semantic.child_origin(
+        key.continuation_origin,
+        1 + key.producer_alternative as usize,
+    )?;
+    let produced = continuation_result_constructor_identities(plan, selected_case_body)?;
+    let RuntimeExpr::ComputationalMatch { cases, .. } =
+        plan.planned_occurrence_expr(claimed.eliminator_origin)?
+    else {
+        return Ok(None);
+    };
+    let mut matching = Vec::new();
+    for alternative in 0..cases.len() {
+        let identity =
+            plan.case_constructor_identity(claimed.eliminator_origin, alternative)?;
+        if produced.contains(&identity) {
+            let occurrence = ContinuationConsumingOccurrence {
+                body_origin: plan
+                    .semantic
+                    .child_origin(claimed.eliminator_origin, 1 + alternative)?,
+                eliminator_origin: claimed.eliminator_origin,
+            };
+            if !matching.contains(&occurrence) {
+                matching.push(occurrence);
+            }
+        }
+    }
+    Ok(match matching.as_slice() {
+        [only] => Some(*only),
+        _ => None,
+    })
+}
+
+fn validate_continuation_consuming_occurrences(
+    plan: &StaticTransitionPlan<'_>,
+    units: &[PlannedContinuationSpecialization],
+) -> Result<(), CraneliftBackendError> {
+    for unit in units {
+        let Some(claimed) = unit.key.consuming_occurrence else {
+            continue;
+        };
+        if rederive_consuming_occurrence(plan, &unit.key, claimed)? != Some(claimed) {
+            return Err(planner_error(
+                "a continuation specialization's consuming occurrence is not the exact outer \
+                 selected case body derived from its eliminator",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn build_continuation_specialization_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<
@@ -10613,19 +10922,7 @@ fn build_continuation_specialization_plan(
     CraneliftBackendError,
 > {
     let mut admitted: Vec<AdmittedContinuationDiscovery> = Vec::new();
-    let mut pending = Vec::new();
-    for occurrence in plan.source_occurrences.iter().flatten() {
-        if matches!(occurrence.expr, RuntimeExpr::ComputationalMatch { .. }) {
-            pending.push(ContinuationDiscovery {
-                continuation_origin: occurrence.static_origin,
-                result_root: plan.semantic.child_origin(occurrence.static_origin, 0)?,
-                // A top-level computational frame has no enclosing generated
-                // context; its producers emit from their raw occurrence owner.
-                enclosing_specialization: None,
-            });
-        }
-    }
-    pending.sort();
+    let mut pending = initial_continuation_discoveries(plan)?;
     let computational_count = pending.len();
     let bound = plan
         .source_occurrences
@@ -10655,12 +10952,12 @@ fn build_continuation_specialization_plan(
         if WEAKEN_CONTINUATION_DECREASING_MEASURE.with(Cell::get) {
             // Compile-preserving AC-5 mutation: the active item is returned to
             // the frontier without entering the finite seen set.
-            pending.push(discovery);
-        } else if !visited.insert(discovery) {
+            pending.push(discovery.clone());
+        } else if !visited.insert(discovery.clone()) {
             continue;
         }
         #[cfg(not(test))]
-        if !visited.insert(discovery) {
+        if !visited.insert(discovery.clone()) {
             continue;
         }
         // The ledger entry, written only where the production fixed point has
@@ -10854,6 +11151,11 @@ fn build_continuation_specialization_plan(
                             planner_capacity_error("continuation alternative exhausted")
                         })?,
                         consumer_owner: producer_environment.consumer_owner,
+                        consuming_occurrence: consuming_occurrence_from_seed(
+                            plan,
+                            &discovery,
+                            alternative,
+                        )?,
                         continuation_origin: discovery.continuation_origin,
                         recursive_position: u32::try_from(position).map_err(|_| {
                             planner_capacity_error("continuation recursive position exhausted")
@@ -10918,6 +11220,7 @@ fn build_continuation_specialization_plan(
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
                                 enclosing_specialization: Some(target),
+                                consuming_occurrences: discovery.consuming_occurrences.clone(),
                             });
                         }
                         // `D8a` — the same descent, as though it were top level.
@@ -10928,6 +11231,7 @@ fn build_continuation_specialization_plan(
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
                                 enclosing_specialization: None,
+                                consuming_occurrences: discovery.consuming_occurrences.clone(),
                             });
                         }
                     }
@@ -10936,6 +11240,7 @@ fn build_continuation_specialization_plan(
         }
     }
     let calls = calls.into_iter().collect::<Vec<_>>();
+    validate_continuation_consuming_occurrences(plan, &units)?;
     validate_continuation_specialization_closure(&interned, &units, &calls)?;
     let contexts = intern_generated_contexts(&units, &calls)?;
     Ok((units, calls, contexts, admitted))
@@ -15102,6 +15407,30 @@ impl<'src> StaticTransitionPlan<'src> {
     // Read-only and unmintable. Every fact below is already validated planner
     // or ABI material, re-checked here and failing closed; nothing is derived
     // from source syntax and no id, owner, descriptor or call is invented.
+
+    /// Test-side independent read of the consuming occurrence recorded on one
+    /// unit. Production validation uses the same derivation before returning a
+    /// plan; exposing it here lets the row controls print both authorities.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn rederive_continuation_consuming_occurrence(
+        &self,
+        unit: &ContinuationUnitView<'_>,
+    ) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+        let Some(claimed) = unit.key.consuming_occurrence else {
+            return Ok(None);
+        };
+        rederive_consuming_occurrence(self, unit.key, claimed)
+    }
+
+    /// Test-side check of the unchanged `consumer_owner` validator relation.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn continuation_consumer_owner_is_exact(
+        &self,
+        unit: &ContinuationUnitView<'_>,
+    ) -> Result<bool, CraneliftBackendError> {
+        Ok(occurrence_authority(self, unit.continuation_origin())?.owner
+            == unit.consumer_owner())
+    }
 
     /// Every already-validated continuation specialization, with its exact
     /// identity, its immutable planner key facts, and its validated ABI

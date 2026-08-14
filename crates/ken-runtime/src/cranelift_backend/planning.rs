@@ -77,7 +77,7 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
 pub(super) use static_transition::{
     ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
-    ContinuationContextView, ContinuationEmissionOwner,
+    ContinuationConsumingOccurrence, ContinuationContextView, ContinuationEmissionOwner,
     ContinuationInputView,
     ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches
@@ -113,7 +113,7 @@ pub(super) use static_transition::{
 #[cfg(test)]
 pub(super) use static_transition::{
     set_composed_call_target_defect, set_continuation_descent_owner_duplication, set_envelope_defect, EnvelopeDefect,
-    ComposedCallTargetDefect,
+    with_continuation_consuming_occurrence_seed_mutated, ComposedCallTargetDefect,
 };
 
 // `D3b` stage-2 controls. ⛔ `#[cfg(test)]` on the RE-EXPORT as well as on the
