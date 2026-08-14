@@ -484,6 +484,41 @@ fn non_dependent_arity_one_constructor_witness_derives_its_own_arity() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// `LANG-WITNESS-DIAGNOSTIC-STRICTNESS` AC-2 -- H3 disposition control.
+// `ind.constructors.get(ordinal)` in `missing_pattern_witness` (`elab.rs`) is
+// asserted to always resolve because `ordinal` is populated by
+// `GlobalEnv::add_decl` from the exact same `.enumerate()` that indexes it.
+// Exercise the LAST constructor of a three-constructor family (ordinal 2 of
+// 2), the position most likely to expose an off-by-one if that invariant were
+// ever violated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn non_first_ordinal_constructor_witness_indexes_correctly() {
+    let mut env = mk_env();
+    elab_ok(&mut env, "data T3 = A | B Bool | C Bool Bool");
+
+    let result = elab(&mut env, "let bad : Int = match A { A |-> 0 ; B x |-> 1 }");
+
+    match result {
+        Err(ElabError::ExhaustivenessError { missing, .. }) => {
+            assert_eq!(
+                missing.constructor, "C",
+                "derived witness should name 'C', got '{}'",
+                missing.constructor
+            );
+            assert_eq!(
+                missing.arity, 2,
+                "'C' is the LAST constructor (ordinal 2 of 2); its arity must \
+                 still be read correctly at this position"
+            );
+        }
+        Ok(_) => panic!("non-exhaustive match accepted (should have been rejected)"),
+        Err(other) => panic!("expected ExhaustivenessError naming 'C', got: {}", other),
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // `LANG-REACHABILITY-SUBSUMING-ARMS` AC-1/AC-2 -- control 2 (matrix path,
 // >=2 winners): `ReachabilityError` carries `cause: ArmDeadCause`, total by
 // construction (`ArmDeadCause::Subsumed { first, rest }` /

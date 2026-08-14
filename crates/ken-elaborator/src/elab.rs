@@ -3240,14 +3240,36 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
 /// The `34 §4.1` unmatched-pattern witness for an omitted constructor: its
 /// name and the arity of its own declaration, both derived from `id` so the
 /// two cannot disagree -- there is no caller-suppliable arity to mismatch.
+///
+/// `id` is asserted to resolve in the kernel's own constructor index: every
+/// call site derives it from the kernel's own enumeration of the scrutinee's
+/// inductive family, never from a caller-supplied or surface-resolved value,
+/// so a miss here is an elaborator-internal invariant violation, not a
+/// user-triggerable case. `ctor_name`'s own fallback for an id absent from
+/// `cx.globals` is real -- `cx.globals` is deliberately pruned for some
+/// constructors while their kernel declaration survives, e.g. `PrivateFsOpen`
+/// after `prelude.rs`'s private-op pruning -- but it is never reached FROM
+/// THIS CALL: the `.expect()` below asserts the stronger, kernel-side belief
+/// first, so the two lookups never disagree about what "id does not resolve"
+/// means for a caller of this function (`LANG-WITNESS-DIAGNOSTIC-STRICTNESS`
+/// H1).
 fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId) -> MissingPatternWitness {
     let (ind, ordinal) = cx.env.constructor(id).expect(
         "the constructor id passed here always names a constructor of an \
          already-admitted inductive resolved from this same env",
     );
+    let ctor = ind.constructors.get(ordinal).expect(
+        "ordinal is populated by GlobalEnv::add_decl from the exact same \
+         ind.constructors.iter().enumerate() that ctor_index later returns \
+         it from, and Decl::Inductive is never mutated in place after \
+         insertion -- only replaced wholesale via remove_last, which purges \
+         ctor_index for the same family atomically -- so ordinal is always a \
+         valid index into ind.constructors for any pair GlobalEnv::constructor \
+         returns (H3)",
+    );
     MissingPatternWitness {
         constructor: ctor_name(cx, id),
-        arity: ind.constructors[ordinal].args.len(),
+        arity: ctor.args.len(),
     }
 }
 
@@ -9019,5 +9041,55 @@ mod nested_lift_association_tests {
                 span,
             }) if span == *recursive.span()
         ));
+    }
+}
+
+/// `LANG-WITNESS-DIAGNOSTIC-STRICTNESS` H1 control. Requires white-box access
+/// to `ElabCtx`/`cx.globals` to reproduce the asymmetric-prune shape
+/// `prelude.rs` exercises for real (`PrivateFsOpen` et al.), so it lives here
+/// rather than in the `tests/l2_acceptance.rs` integration suite, which can
+/// only drive `missing_pattern_witness` indirectly through source elaboration.
+#[cfg(test)]
+mod missing_pattern_witness_diagnostic_strictness_tests {
+    use super::{missing_pattern_witness, ElabCtx};
+    use crate::ElabEnv;
+
+    #[test]
+    fn globals_pruned_kernel_resolvable_id_degrades_instead_of_panicking() {
+        // H1: `cx.globals` is deliberately pruned for some constructors while
+        // their kernel declaration survives (the same discipline `prelude.rs`
+        // applies to `PrivateFsOpen` et al.) -- reproduced locally so this
+        // control does not depend on prelude wiring. The id still resolves
+        // via `cx.env.constructor` (the kernel's own `ctor_index`), so
+        // `missing_pattern_witness`'s `.expect()` must not fire; only
+        // `ctor_name`'s independent fallback degrades the rendered name.
+        let mut elab = ElabEnv::new().expect("fresh env");
+        elab.elaborate_decl("data T2 = A | B")
+            .expect("local data decl elaborates");
+        let b_id = elab.globals["B"];
+        elab.globals.remove("B");
+
+        let cx = ElabCtx::new(
+            &mut elab.env,
+            &elab.globals,
+            &mut elab.num_values,
+            &elab.numeric_env,
+            "missing-pattern-witness-globals-prune",
+        );
+        let witness = missing_pattern_witness(&cx, b_id);
+
+        assert_eq!(
+            witness.constructor,
+            format!("<ctor_{:?}>", b_id),
+            "a constructor id present in the kernel's ctor_index but absent \
+             from cx.globals must degrade to ctor_name's own fallback \
+             spelling, never panic"
+        );
+        assert_eq!(
+            witness.arity, 0,
+            "B's declared arity is still correctly derived from the kernel \
+             lookup even though the name lookup missed -- the two lookups \
+             are independent, not coupled"
+        );
     }
 }
