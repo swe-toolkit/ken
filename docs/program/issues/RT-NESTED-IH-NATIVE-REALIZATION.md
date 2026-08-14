@@ -123,6 +123,66 @@ progress rather than failure:**
    machinery is **untested** by a fixture whose body is a constant.
 2. **The `StructuralNat` relocation**, flagged separately by the Architect.
 
+### The wall D2 actually reached was a THIRD boundary, and it is CORRECT
+
+**Measured 2026-08-14 by runtime-implementer (`evt_6cd51j51pqvvk`); ruled by the
+Architect at `evt_46hx0g4gyj0r`. Folded here by the Steward because it was a
+thread-only ruling, and the prohibition below is the part that gets lost.**
+
+The two traps above are **predictions and neither fired.** The bounded `Match`
+repair applies the selected one-parameter `LexicalClosure` through its retained
+`StaticBody`, and the emitted body then reaches the source-machine ordinary
+`Match` selector carrying
+`LoweringOperand::Specialized(Lowered::ComputationalRecursorClosure { .. })`,
+where the existing catch-all reports `Match: scrutinee is not a constructor
+value`. It is neither `RecursiveBackedge` nor `StructuralNat`.
+
+**The ruling: that wall is correct and it is NOT `D2`'s stop.** Both hold at
+once. `core.rs:17716-17719` requires `Specialized(Lowered::Constructor { .. })`;
+a `ComputationalRecursorClosure` is a **suspended recursor activation**, not a
+constructor value, and no widening could lawfully make it one — accepting it
+would mean matching on an undriven computation. **Do not add a selector arm for
+this variant and do not touch the fail-closed catch-all.**
+
+⇒ **What is wrong is what ARRIVED at the wall**: an unrealized capsule handed to
+a selector that requires a realized value. **Realizing it is what this node is
+named for** — a wall saying *"this IH was never realized"* is the node's
+subject, not its boundary.
+
+**Two landed claims that would have made the wall lawful were checked, and
+neither reaches it.** Recorded so they are not re-cited as a boundary:
+
+| claim | its actual scope | why it does not reach |
+|---|---|---|
+| `mod.rs:11784` — `ComputationalRecursorClosure => FailClosedForbidden`, *"not a transferable value"* | **transfer across a unit boundary** | says nothing about consuming the capsule **in place**, which the tree already does lawfully; read at its widest it would forbid `core.rs:10521`, which is landed and green |
+| `control.rs:8544` — AC-6, *"out of the covered population ... declares no body carrier"* | **re-lowering from a source body** | driving a capsule to a value does not re-lower it from a source term; the pin fires only if the variant acquires a body-carrying field |
+
+**The next bounded step, and it is a measurement rather than an
+authorization.** Determine whether the matched-field application can route its
+result through the **existing** in-place checked-IH realization at
+`core.rs:10521` (`mint_checked_computational_ih_instance` →
+`OrientedSubcontinuationPlanV1` / `computational_ih_call`) **before** ordinary-
+`Match` selection. Three further in-place sites treat the variant as a callee
+(`core.rs:4031`, `:4271`, `:18294`). **The Architect read this route, did not
+run it, and explicitly declined to assert it is reachable from the seam.** If
+the seam has no activation, no oriented plan, or no call template, **that
+absence is the real `D2` stop and is the finding worth reporting.**
+
+**FORBIDDEN, and this one is a trap one step away from the obvious fix: do not
+reach into `.residual`.** `mod.rs:3327-3331` is explicit that the admission walk
+rejects the capsule *before* inspecting or emitting its residual, and that *"a
+carried residual must not become a way to reach the carrier through a capsule
+that is otherwise refused."* Unwrapping `residual` to obtain something matchable
+is **the exact evasion that ordering ruling exists to prevent**, and it is the
+most available-looking repair at this wall.
+
+**The bounded `Match` repair stands and must not be reverted.** The original
+`Closure` refusal disappearing — with `ground_value`, scalar-merge admission,
+the `D1` declaration sentinel, and the interpreter `Nat` 3 result all unchanged,
+and scalar-merge arrivals still zero — is the `D1` ruling confirmed by
+construction. **The refusal ADVANCED rather than recurring, which is the
+evidence the increment worked.**
+
 **`Forbidden` is unchanged and still binds** — the ruling authorizes repairing
 the `Match` path, **not** a seventh admitted merge shape.
 
