@@ -45,6 +45,40 @@ The elapsed-timer alternative `([0-9]+m [0-9]+s` is the one that generalizes —
 both harnesses print a running timer while a turn is live, and neither prints
 one at an idle prompt.
 
+## The repair that replaced this grep had the SAME bug, from the other side
+
+**Measured 2026-08-14, and this is the part to read if you are short of time.**
+After the miss above, the Steward stopped grepping `esc to interrupt` and
+adopted a **composer-content** heuristic instead: *"genuine idle = a placeholder
+prompt (`> Run /review on my current changes`)."* It went into the watchdog as
+settled guidance.
+
+**It is false in exactly the case that matters.** A Codex seat waiting on a
+**background terminal** renders the placeholder prompt while genuinely working:
+
+```
+• Waiting for background terminal (25m 07s • esc to interrupt) · 1 background terminal running
+  └ scripts/ken-cargo test -p ken-runtime --lib
+
+› Run /review on my current changes
+```
+
+`runtime-implementer` was 25 minutes into a `-p ken-runtime --lib` run and the
+composer said idle. **Two heuristics, opposite keys, same failure direction:**
+both report false idle on a seat mid-build, and both invite the nudge that
+interrupts it.
+
+⇒ **The composer is never a liveness signal, in either direction.** Codex
+restores its placeholder the moment the composer is empty, which includes every
+moment the seat is busy but not typing. What actually moved between the two
+states was the **timer line above it**, which is what the fix in this file
+already said to match — and which the composer heuristic quietly stopped
+consulting.
+
+**Read the whole footer (`tail -14`), not one line.** A seat is working if
+*anything* in the last few lines carries a running timer or a
+`background terminal running` clause, whatever the composer shows.
+
 ## Why the direction matters
 
 **False idle invites action; false busy invites waiting.** This detector fails
