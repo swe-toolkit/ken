@@ -1,7 +1,7 @@
 ---
 id: LANG-WITNESS-DIAGNOSTIC-STRICTNESS
 title: "missing_pattern_witness's two lookups read DIFFERENT tables and the strict one runs first, so ctor_name's fallback is dead code on this path -- two incompatible beliefs about one id with the stricter winning by line order -- and ind.constructors[ordinal] is a second, unmessaged panic source on the same data, all on a function that runs only while the elaborator is already reporting an error"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
@@ -147,3 +147,54 @@ than an overrun.
   payload at `elab.rs:1737`/`:2427`/`:8446`. This is the **exhaustiveness** path.
   Same file, different sites. **Sequence this after it**, not concurrently.
 - **Not a general `ElabError` panic audit.** Four call sites, one function.
+
+## Carried rider — the doc sentence contradicts its own control. Owed, not optional.
+
+**Filed by the Steward 2026-08-14 from the Adversary's hunt on the landed
+squash `b46792436` (`evt_6e6mgrhwxnhaq`), re-checked against the tree. This is a
+CONFIRMED defect on `main`, not a false alarm.** It is recorded here, on the
+node whose merge introduced it, so the shape is not re-surfaced by anyone.
+
+The new doc comment on `missing_pattern_witness` says the `ctor_name` fallback
+
+> *"is never reached **from this call**: the `.expect()` below asserts the
+> stronger, kernel-side belief first"*
+
+**The `H1` control it cites thirty lines below constructs exactly that case** —
+`data T2 = A | B`, then `elab.globals.remove("B")` — and asserts the witness
+degrades to `<ctor_{id}>` rather than panicking. **It passes.** So the fallback
+*is* reached from this call, in precisely the pruned-but-kernel-alive
+population the sentence describes one clause earlier.
+
+⇒ **The doc and its own control contradict each other, and the control is
+right.** The correct scope is *"never reached for an id the KERNEL cannot
+resolve"* — those panic first. For an id the kernel resolves and `globals` has
+pruned, the fallback is reached, is correct, and is the entire point of `H1`.
+
+**Why the false sentence survived review:** it treats *"does not resolve"* as
+one event when it is **two predicates over two independently populated maps**.
+
+| state | outcome |
+|---|---|
+| kernel miss | `expect` fires — the fallback never runs, and never would have helped |
+| **globals miss, kernel hit** | **fallback runs, arity still correct** — the population that actually exists in this tree |
+
+The case where the fallback would matter is the second, and there it is live.
+The framing inverted which population mattered and the doc inherited it
+verbatim. **The Adversary traced the false sentence to its own earlier report
+(`evt_1fybxqm29839b`) and corrected it — the census that refutes it was in the
+same message as the sentence.** The Architect had independently flagged this as
+a non-blocking prose should-fix and approved the object anyway; it is unfixed
+on `main`.
+
+**Second clause owed, same site.** `H1` exercises *globals-pruned, kernel-alive*
+only. The opposite direction — *globals-alive, kernel-missing* — is the one
+that panics and is unconstructible, because every call site derives `id` from
+the kernel's own enumeration. That split is correct, but *"the two lookups are
+genuinely independent"* reads as a claim about **both** directions, so one
+clause should say the reachable direction is measured and the other is argued.
+
+**Disposition: doc-only, both clauses, at the next Language touch of
+`elab.rs`.** Not folded into [[LANG-FOREIGN-CTOR-ARM-REJECT]] — that node
+explicitly disclaims the witness path, and overriding its scope line to carry a
+comment fix would cost more than it saves.
