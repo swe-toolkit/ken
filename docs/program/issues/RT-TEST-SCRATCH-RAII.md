@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 depends_on: []
-blocks: []
+blocks: [RT-SCRATCH-LIFETIME-REMAINING-CRATES]
 github: null
 origin: Steward measurement 2026-08-11, taken while diagnosing the seventh recurrence of the volume filling. The recurrence history and the reclaim ordering are the Steward's operational record; the generator identification and the 40-site count are measured at current main and stated below.
 ---
@@ -58,9 +58,16 @@ fixed/reused locations and the feature-off/on artifact identity fixture. The
 one preservation exception is based on that Cargo-owned location, whose
 contents are reclaimable by `cargo clean`, not on the fixture's evidentiary
 value. The identity fixture removes both trees on success and on any failure
-before its byte-identity assertions. Only a failing identity assertion keeps
-the trees, and that path prints the preserved directory before resuming the
-panic.
+before its byte-identity assertions, and that path prints the preserved
+directory before resuming the panic.
+
+**Corrected 2026-08-14.** This paragraph used to end *"Only a failing identity
+assertion keeps the trees."* **Two** assertions sit inside the preservation
+scope, and the first is a **precondition** — that neither artifact came back
+empty. Its failure is not an identity failure; it means the identity relation
+was never validly evaluated. The trees are preserved on that path too, which is
+the useful behaviour: they are what shows why an artifact came back empty. The
+code is right and the sentence was too narrow, so the sentence changed.
 
 **Not every site leaks, and the distinction is the scope.** Sites that join a
 **fixed** name — `ken-fs-flip-e2e`, `ken-cli-i1-entrypoint-abi`,
@@ -68,6 +75,36 @@ panic.
 to the mass. The leaking sites are exactly those that interpolate a timestamp
 or pid. **Sort the 40 by that axis before estimating; the second group is the
 node.**
+
+> ### THAT SCOPE IS TWO DIRECTORIES, AND THE DEFECT IS NOT. Recorded 2026-08-14.
+>
+> **Both stated counts are exact and the classification of all 40 is correct** —
+> an independent recount at the pre-merge base agreed on the 40 and on the 14,
+> and found the unclassified population within the declared scope to be
+> genuinely zero. **Nothing below disputes what landed.**
+>
+> But the scope is `crates/ken-runtime/src/` and `crates/ken-cli/tests/`, and
+> unguarded sites of exactly this shape remain in `ken-interp`, `ken-host` and
+> `ken-verify`. The strongest of them, `ken-interp/src/eval.rs`'s
+> `rt_parity_root`, matches this node's own defect statement clause for clause
+> and generates `ken-rt-parity-*` — **the second producer of a prefix
+> `scripts/ken-cargo`'s reaper already names.**
+>
+> ⇒ **This is the ONE-AXIS-OF-TWO correction a second time, under a different
+> axis.** That one was about environment-variable **spelling**, and `AC-3`
+> requires both spellings reported separately. Nothing in it ranges over
+> **path**. A census that declares its scope and then reports zero unclassified
+> is stating a true fact about a set it chose; a reader takes it as a fact about
+> the hazard, and the hazard here is the repo volume, which is not confined to
+> two directories.
+>
+> **The mechanism is the boundary, not availability:** `tempfile` was added to
+> `ken-elaborator`, `ken-cli` and `ken-runtime` only. **The fix's reach and the
+> census's scope stop at the same line**, which is why neither shows the other's
+> edge.
+>
+> Successor: **`RT-SCRATCH-LIFETIME-REMAINING-CRATES`**, which defines its
+> population by the hazard property rather than by a directory list.
 
 ### The four fixed-name sites, both axes. Recorded 2026-08-14, post-merge
 
@@ -94,11 +131,17 @@ unnamed there, is `ken-effect-composition-e2e`.
   discriminating property is **how the path is acquired**, not how it is used:
   a site can be the only writer and still write through a path someone else
   created first.
-- **Usage: NOT ESTABLISHED.** Nobody has looked. No site excludes a second
-  concurrent test-binary process and each writes non-atomically to fixed child
-  names. The Steward asserted single-writer-and-idempotent here from site shape
-  and Runtime's read refused it under the bar the Steward had just set; the
-  refusal is the entry, not the assertion.
+- **Usage: enumerated 2026-08-14, and the residual is closed.** This entry read
+  *"NOT ESTABLISHED — nobody has looked"*: the Steward had asserted
+  single-writer-and-idempotent from site shape, and Runtime's read refused it
+  under the bar the Steward had just set. Someone has now looked, per binary
+  rather than per site: `cli_i1_entrypoint_abi.rs` uses 10 distinct fixture
+  child names across its 10 tests, `fs_read_file_lines_flip_e2e.rs` 2 distinct
+  across 2, and the other two binaries each run a single test writing one child
+  (`rosetta.rs` sequentially, one child per slug). **No two tests in any of the
+  four binaries write the same child path**, so the intra-binary route is closed
+  by enumeration rather than by inference. The refusal was still the correct
+  entry — it is what got the axis measured instead of assumed.
 
 **Reachability: measured closed on both routes.** `scripts/ken-cargo` defaults
 `KEN_BUILD_SLOTS` to 1 (`:15`) and takes the single-`flock` path (`:88-96`), so

@@ -206,6 +206,38 @@ row here as well, making this file self-contained — would have duplicated
 coverage that already exists, which is a worse trade than a documented
 cross-file reference.
 
+> ### THE FOUR-ARM CLAIM IS FALSE FOR ONE PAIR, AND IT WAS NEVER ACHIEVABLE
+> ### FROM WHERE THE FILE SITS. Recorded 2026-08-14.
+>
+> **Measured by running the mutation, not argued.** Transposing
+> `CommentKind::DocLine` and `CommentKind::DocBlock` in the `From` impl leaves
+> **169 tests green across eleven targets**, this pin file included at 2/2. The
+> two `d1` rows both assert `Leading` with the same home because both flow
+> through the same `is_doc_comment()` branch, so their conjunction establishes
+> **class membership, not the arm.**
+>
+> Four arms admit six transpositions. This node's evidence covered the two
+> **cross-class** ones. Of the two within-class ones, `DocLine`/`DocBlock` is
+> free, and `Line`/`Block` reds only via a stale `TriviaKind::LineComment`
+> filter in `kenfmt_b1_lossless.rs` whose assertion message names attachment
+> totality — an **incidental** pin, and one that a correct repair to a live
+> defect in that same helper deletes.
+>
+> **The cause is not carelessness, and this is the part worth keeping.**
+> `CommentKind` is `pub(crate)`. This file is an **integration test** and cannot
+> name it, so it could only pin the map *through behaviour* — and behaviour sees
+> the map through two two-way predicates, which collapse four arms onto two
+> images. **The claim was unachievable from this file, not merely unproven.**
+> Adding more rows here cannot fix it.
+>
+> ⇒ Successor **`LANG-COMMENT-POPULATION-PARITY`** moves the arm-level pin
+> in-crate, where all four arms are nameable, and narrows this file's header to
+> what an integration test can establish. **The residual above is retired by it
+> too** — once the `Line` arm is pinned in-crate, it no longer depends on
+> `kenfmt_b1_lossless.rs`'s fixture configuration at all, so the addendum
+> carried on `LANG-PRELUDE-ELABORATION-DEPTH` documents a coupling that node
+> dissolves. Whichever lands second reconciles.
+
 ## Not this node
 
 - Changing the `From` impl, the classifier, or any comment semantics. This
