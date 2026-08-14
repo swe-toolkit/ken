@@ -53,10 +53,11 @@ answer; which entry, how many frames, and why this program reaches it is.
 
 ## D2 — fix by reducing footprint
 
-**`RUST_MIN_STACK` and any stack-limit raise are refused.** The gate-4a arc
-next door repaired a stack regression by boxing a large value and forcing
-inlining to remove a live frame, with the limit explicitly refused. Same
-standard.
+**Masking this newly failing base-versus-candidate test by changing its stack
+is refused (act 1).** The gate-4a arc next door repaired the measured regression
+by boxing a large value and forcing inlining to remove a live frame. For the
+other two acts and the mechanism-specific rules, see
+`agent/playbooks/tools/stated-stacks.md`.
 
 **`766c9f07` is preserved evidence, not a starting point.** It is a 143-line
 `parser.rs` rework titled *bound record parser stack use*, and at `8e9baa18` —
@@ -84,9 +85,10 @@ coverage. If you fix it, report the depth actually reached; **do not tune
   why the defect survived review.
 - **AC-2 — the localization from D1 is stated as a mechanism**, with the site
   and the per-level cost. An AC-1 pass without D1 is a fix nobody can review.
-- **AC-3 — no stack limit is raised anywhere**, and no test is moved, skipped,
-  or `#[ignore]`d to obtain the pass. If a row must be ignored, that is a hard
-  stop, not a step.
+- **AC-3 — the newly failing base-versus-candidate test is not masked by a stack
+  change (act 1)**, and no test is moved, skipped, or `#[ignore]`d to obtain the
+  pass. If a row must be ignored, that is a hard stop, not a step. The remaining
+  stack acts are governed by `agent/playbooks/tools/stated-stacks.md`.
 - **AC-4 — a control that fails without the fix.** Whatever you land, show it
   red on the unfixed tree and green on the fixed one. **The existing witness
   qualifies** — you do not need a new one.
@@ -97,7 +99,8 @@ coverage. If you fix it, report the depth actually reached; **do not tune
 
 ## Banned scope
 
-- Raising or configuring any stack limit.
+- Masking the newly failing base-versus-candidate test by changing its stack
+  (act 1); see `agent/playbooks/tools/stated-stacks.md` for the other acts.
 - Tuning `NESTED_MATCH_DEPTH`.
 - Ignoring, skipping, relocating or weakening `mrc_4a_cross_crate_census`. It
   is `RT-MATCH-RECURSOR-CONSUMERS` `AC-1`'s evidence and belongs to Runtime.

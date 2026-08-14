@@ -73,9 +73,10 @@ which stands.
 
 ## Not this node
 
-- **Raising a stack limit.** `RUST_MIN_STACK` and friends are refused. The
-  gate-4a arc next door repaired a stack regression by reducing footprint, and
-  that is the standard here.
+- **Masking the newly failing base-versus-candidate test by changing its stack
+  (act 1).** The gate-4a arc next door repaired this measured regression by
+  reducing footprint. For the other two acts and the mechanism-specific rules,
+  see `agent/playbooks/tools/stated-stacks.md`.
 - **Tuning `NESTED_MATCH_DEPTH`.** The constant is not what is broken.
 - **Building a new synthetic depth fixture.** The honest witness already exists
   in CI.
