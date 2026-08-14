@@ -1,7 +1,7 @@
 ---
 id: RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED
 title: "consuming_occurrence carries two fields and only one of them is checked -- eliminator_origin is copied into the re-derivation before the comparison, so AC-1's assert is x == x on that field, and AC-2's mutation perturbs only the field that was already independent, leaving step 1 never fired"
-status: active
+status: merged
 owner: runtime
 size: XS
 gate: none
