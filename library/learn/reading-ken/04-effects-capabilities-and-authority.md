@@ -81,9 +81,9 @@ trusted host/runner management complement that Ken code cannot call.
   declares; a definition with no effect row and no capability parameter is,
   by its type, inert
   ([§1](../../../spec/60-security/62-authority.md#1-no-ambient-authority)).
-- **A capability (`Cap E`) is an unforgeable authority token.** It is part
-  of a function's type, so the signature *is* the authority manifest; the
-  default authority of any function is none
+- **A source-facing filesystem capability (`Cap a`) is an unforgeable
+  authority token.** It is part of a function's type, so the signature *is*
+  the authority manifest; the default authority of any function is none
   ([§2](../../../spec/60-security/62-authority.md#2-capabilities-are-static-visible-and-least)).
 - **Attenuation derives a strictly weaker capability, never a stronger
   one — and it is not something Ken code calls.** A trusted runner/host
@@ -93,14 +93,13 @@ trusted host/runner management complement that Ken code cannot call.
   ([§3](../../../spec/60-security/62-authority.md#3-attenuation--hand-a-child-a-strictly-weaker-token-the-headline)).
   Ken code never invokes `attenuate` — the name is deliberately absent
   from the Ken environment ([§3.2](../../../spec/60-security/62-authority.md#32-no-amplification--assert-the-absence-and-net-the-orientation))
-  — it instead **receives** an
-  already-attenuated capability as an ordinary parameter, refined by that
-  same bound, through an existing privileged route
+  — it instead **receives** a host-supplied capability through an existing
+  privileged route
   ([§2.2](../../../spec/60-security/62-authority.md#22-unforgeability-the-abstraction-boundary)):
-  a child helper's signature can require exactly
-  `{ c' : Cap_FS | authority c' ⊑ authority c ⊓ only_dir "/tmp" }`, and
-  the caller supplies a capability already narrowed that way — the
-  narrowing itself happened outside Ken, not by a Ken-callable operation.
+  the current filesystem surface takes exact authority-indexed tokens such as
+  `Cap AFull` and `Cap APartial`. It cannot yet state a lower-bounded
+  capability parameter or emit a use-site sufficiency obligation; that is the
+  committed `AUTH-BOUNDED-SINK` target, not current Ken source.
 - **No amplifying or attenuating operation is bound in Ken at all.**
   `attenuate`, `revoke`, `strengthen`, and any public `Cap` constructor or
   producer are simply **unbound names** — calling any of them from Ken
@@ -116,9 +115,11 @@ trusted host/runner management complement that Ken code cannot call.
   tests in
   [`cat_capex_authority.rs`](../../../crates/ken-elaborator/tests/cat_capex_authority.rs)
   check the fragment and its missing-capability boundary. §7's worked spec
-  example shows the complementary half: a `sandbox` function receives an
-  already-narrowed `/tmp`-scoped capability as a plain parameter and passes
-  it on, while `attenuate c (full_authority)` is rejected as `UnboundName`
+  examples separate the current and target forms: `use_child` receives an
+  exact `Cap APartial` and calls the current filesystem surface, while
+  `sandbox` is metatheoretic `AUTH-BOUNDED-SINK` notation because bounded
+  authority quantification is not in v1. The management name `attenuate`
+  remains rejected as `UnboundName`
   ([§7](../../../spec/60-security/62-authority.md#7-worked-examples)).
 
 The catalog now instantiates authority-as-signature as checked code. Its
