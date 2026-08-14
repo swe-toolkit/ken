@@ -178,6 +178,17 @@ for belonging in this file rather than in `agent/memory/`.
   key. Look up a participant id **at post time**, never from memory.
 - **`steward/work` is stale immediately after every publish** — reset onto the
   squashed `main` before writing anything new.
+- **`gh pr view N --json state,mergeCommit,statusCheckRollup` before any restart.
+  `MERGED` means never restart** — a squash-merged PR's head SHA reads as
+  unlanded forever, so ancestry will tell you it never happened.
+- **`pgrep` errs in BOTH directions — print the lines, never test a boolean.**
+  An unanchored `pgrep -f 'scripted-pr-automerge.sh'` matches your own waiter
+  shell and reports a publisher that already exited. Anchor it:
+  `pgrep -af '^bash scripts/scripted-pr-automerge.sh'`.
+- **Pre-publish CI history is `gh api .../commits/<sha>/check-runs`, and a
+  `422` means the SHA was never pushed — that is clean, not an error.**
+- **`gh` is not authenticated in a plain shell here.** Mint first:
+  `export GH_TOKEN="$(.devcontainer/mint-gh-token.sh)"`.
 - **A `--doc-only` merge can redden `main` and is structurally unable to notice.**
   After one, **enumerate consumers of the touched paths** — attestation ledger,
   measured-token censuses, source-text oracles. This is how `95bc855c` broke three

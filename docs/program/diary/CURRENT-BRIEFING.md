@@ -62,142 +62,86 @@
 >
 > Builds allowed, targeted only, never `--workspace`.
 
-> ### RESUME HERE — state at 2026-08-13 ~18:3xZ. **`main` = after PR #2114.**
-> **BOTH RINGS WORKING — do not kick either. Publish queue is EMPTY.**
->
-> **Runtime — `RT-4B-WALKED-CONSTANCY`**, anchor `evt_7s6enk2syyct1`
-> (re-kick; the first kick `evt_3haj2jas0n876` fired before the frame was on
-> `main` and Runtime correctly refused it). Comment-only, XS, **four sites**.
-> **Amended twice — D3/AC-6 and D4/AC-7 — and the frame now says no further
-> amendment is coming. Hold to that.**
-> **Language — `LANG-SURFACE-LITERAL-ESCAPES`**, anchor `evt_32763was18rw6`.
-> The leader had been stalled awaiting clarification on the duplicate
-> `LANG-RECORD-STACK-OVERFLOW` kickoff; cleared. **Next ready is
-> `LANG-SURFACE-BLOCK-COMMENTS` and the leader takes it without returning to
-> the Steward.**
->
-> ### 4b IS UNBLOCKED AND ITS NEXT INCREMENT IS FRAMED
->
-> **`RT-4B-C2-REACHABILITY` is `closed`, answered with the second licensing
-> row: reachable, BUT THE REACHING BUILD DIFFERS FROM PRODUCTION.** The D2f
-> record, storage, note/take and sole write are all `#[cfg(test)]`, and C2 is a
-> `ken-elaborator` integration test whose Runtime dependency carries default
-> features only. The answer is recorded in the node, not only in the thread.
->
-> **The Architect ruled (`evt_4a1pf1jfmdemd`): a default-off feature is INSIDE
-> the 4b envelope** — one of the two mechanisms his original 4b ruling named.
-> **4b is not blocked on the envelope, not awaiting a count, and not blocked on
-> cross-crate gate expressibility.**
->
-> **`RT-4B-OBSERVATION-FEATURE-GATE` (`ready`, M) is Runtime's next node.** Its
-> five review conditions are ACs. **The one that bites: identity must be proven
-> across TWO COMPILATIONS, not a runtime toggle inside one.** A feature is a
-> compile-time property; the landed switch proves the *recording* inert, not the
-> *feature*. Cargo unifies features across a build graph, so the two cannot
-> coexist in one compilation — and the two builds must not share a
-> `CARGO_TARGET_DIR` or the comparison reads one artifact against itself.
->
-> `RT-4B-UNIQUENESS-GATE-REACH` stays `draft` until that identity proof lands,
-> then re-points at C2. `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` stays `draft`
-> behind it. **Do not cut either.**
->
-> ### OPEN TO THE OPERATOR — VERIFY IS IDLE AND FRAMING CANNOT FIX IT
->
-> **`SEC1-IFC-R3` is Verify's only open node**, and it needs an SMT/Z3 backend
-> that **is not a dependency of this workspace at all**. `AC-R3b`/`AC-R3c`
-> cannot be discharged without building the prover backend, which the node's own
-> scope bans — **the frame is unsatisfiable as written.** The Z3-free widening
-> is recorded vacuous: `declare_deceq_certificate` has exactly one caller,
-> registering `Int`, so there is no second type to generalize to.
->
-> **Escalated 2026-07-27, unanswered as of 2026-08-13.** Re-raise it; do not
-> re-derive it as framing debt.
 
-> ### R3 GATE 4b — WHY C2 HAS NEVER BEEN MEASURED. READ THIS BEFORE ANY 4b WORK.
+> ### RESUME HERE — state at 2026-08-14 ~08:1xZ. **`main` = `f34ab271`.**
+> **BOTH BUILD TEAMS WORKING — do not re-kick either. Publish queue EMPTY,
+> `steward/work` aligned to `main`, tree clean, no publisher running.**
 >
-> **The reachability half of this block is now ANSWERED — see the block above.
-> What follows is why the measurement was never taken, and it is still live.**
+> **Runtime — `RT-NESTED-IH-NATIVE-REALIZATION` `D2`**, anchor
+> `evt_x8tt2t821x4g`. Ungated; the Architect's Closure ruling is on the node.
+> Implementer confirmed pickup. **Carry verbatim, it is the part that gets
+> lost:** *"The applied form is admitted; the `D1` applied form is
+> unmeasured."* Captures / `case_env` are a third unmeasured axis. Two
+> stop-short traps: a `StaticBody` edge inside a recursive fn where
+> `Lowered::RecursiveBackedge` has its own escape rule
+> (`mod.rs:21278-21281`), and the `StructuralNat` relocation. **No seventh
+> admitted merge shape.** Successor, already `ready`:
+> `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` (`S`, resized from `XS`).
 >
-> **A previous version of this block said the observation route was exhausted
-> and that "there was nothing to fuse" was dead. BOTH WERE WRONG and are
-> withdrawn** (Architect `evt_6hfw027f43cgg`, verified by the Steward against
-> the diff).
+> **Language — `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT`**, anchor
+> `evt_24mzrhg10c9b5`. `D0` ships **DISCHARGED** — the marker never printed
+> (`evt_44qzssyvaay0b`), so the overflow is inside `register_prelude` and
+> `elaborate_file` is never reached. **`D1` targets that function's
+> ~450-declaration frame, NOT the guard.** `AC-3` forbids `RUST_MIN_STACK`,
+> any stack raise, and `stack_size` for `px4b`. Successor, already `ready`:
+> `LANG-GADT-SEQUENCE-TRACKER-GAP` (`S`), the leader's call on order.
 >
-> `(4, 2, 0, 2, 1)` is asserted on `arrived_empty` in
-> `d2f_0_the_applied_root_production_path_gate`, which iterates exactly
-> `[D2jCause::ExactSuffix, D2jCause::CallIdentity]` — **deliberate perturbations
-> authored so fusion does NOT form**, under the test's own comment
-> `// AC-6a phase B: arrived once, resolved nothing`.
+> ### THE FROZEN CANDIDATE — do not move or re-author it
 >
-> ⇒ **Four candidates entered and nothing survived BECAUSE THE FIXTURE WAS
-> PERTURBED TO MAKE NOTHING SURVIVE.** It is a negative control reporting its
-> designed outcome.
+> **`98e6ac51` on `wp/LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` is correct and
+> unmergeable-for-now**, which is not the same as wrong. It is the **trigger**
+> of a zero-margin stack path, not its cause. After the footprint node lands it
+> is **re-voted unchanged** on a fresh Decision; the Architect casts that vote.
+> PR #2178 was closed (it read `MERGEABLE` with a withdrawn approval on a SHA
+> measured to abort). Branch and SHA stay on origin.
 >
-> **The same assertion shows the three unperturbed rows each resolve exactly one
-> key and one descriptor. THIS PLANNER FUSES.** The artifact-identity control
-> drives `d2j_checked_fixture_under(D2jCause::Exact)` — **not `C2_MIXED_SOURCE`.**
+> ### NO FRAMING DEBT ANYWHERE — swept 2026-08-14, do not re-derive it
 >
-> **`C2`'s walked count is UNMEASURED.** `RT-4B-UNIQUENESS-GATE-REACH` and
-> `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` are **both `draft`; do not cut either.**
-> Pointed as written, reach would count the same comparators.
+> Every idle team is grounded-blocked, and the blocks chain into the work in
+> flight. Re-deriving this costs an hour and returns the same answer:
 >
-> **And a `walked` count would not have settled it anyway.** Measured on the
-> two landed assertions: `(walked, frames, recursive, slots, calls)` is
-> `(4, 2, 0, 2, 1)` for `ExactSuffix` and `CallIdentity` (0 keys) **and for
-> `Exact` (1 key)** — the perturbation moves the outcome and leaves all five
-> numbers unchanged. `walked` is the enumerator's INPUT size, so **no claim
-> about candidate formation can be supported by it, on any cause.**
-> `RT-4B-WALKED-CONSTANCY` is landing that sentence into the observation's own
-> doc.
+> | team | why idle | grounded in |
+> |---|---|---|
+> | Kernel | `KERNEL-NESTED-IND` blocked at `AC-K12` | Runtime `D2`, in flight |
+> | Foundation | `DS-9` `depends_on: [KERNEL-NESTED-IND]` | same chain, transitively |
+> | Verify | `SEC1-IFC-R3` needs an SMT/Z3 backend absent from the workspace | operator V3 fork |
+> | Doc | program complete — 29 merged, 4 closed, zero open | nothing to frame |
+> | Ergo | all three nodes merged or closed | nothing to frame |
 >
-> **THE ACTUAL BLOCKER, unchanged since 4b opened: cross-crate gate
-> expressibility.** The observation is `#[cfg(test)]` inside `ken-runtime`; C2
-> drives through `ken-elaborator`, which links a build where those calls do not
-> exist. **The reach frame asked for a C2 run its own fixed inputs made
-> impossible.** Re-pointing at C2 is a scope question, not an edit.
+> **`SEC1-IFC-R3` says in terms: do not frame a Verify slice against it.** Its
+> `AC-R3c` is blocked on Spec closure plus Architect-owned kernel-facing work,
+> and the smallest releasable property is not Verify-shaped.
 >
-> **THE FRAME DEFECT WORTH CARRYING:** the C2 requirement lived in D2 prose and
-> **was never carried into an AC**. Five ACs constrained everything except
-> *which witness*, so an in-crate implementation satisfied all of them while
-> answering a different question. **A deliverable stated in prose and not in an
-> AC is one the frame cannot check.** QA hedged correctly — *"on these rows"* —
-> and the Steward dropped the qualifier when restating it. **The hedge was the
-> finding.**
+> ### OWED BY OTHERS — waiting, acting on neither
 >
-> ### TWO ERRORS TODAY, BOTH THE SAME SHAPE: A CLAIM WIDER THAN ITS INSTRUMENT
+> **Operator: the decidable-equality TCB call**, re-asked with corrected scope
+> at `evt_30gckze0jryj4`. Each new primitive registrant admits **two** trusted-
+> base entries (`declare_deceq_certificate` calls `declare_postulate` twice,
+> `check.rs:1302`/`:1308`). It gates Verify's whole backlog and Language's only
+> two drafts (`LANG-DECEQ-CHAR-LAWFUL-INSTANCES`,
+> `LANG-FOREIGN-NAME-FORMAT-CHARS`, both `gate: operator`). Nothing is stalled
+> on it today.
 >
-> **1. I kicked Language onto already-merged work.** `LANG-RECORD-STACK-OVERFLOW`
-> merged as #2098 at `b4d38b8a` and still read `status: ready`. ⇒ **A node's
-> `status:` is a claim ABOUT a node; only the tree is evidence about the code.**
-> Every claim the kick derived from that frame went stale with it. **Corpus-wide
-> sweep done and clean — do not redo it.**
+> **Architect: `TEST-NATIVE-STACK-PROVISIONING-STANDARD`** (`gate: architect`,
+> now on `main`). Disposition 3 recommended, carrying the Architect's own two
+> amendments: gate provisioning on **evidence not motive** (no open measured
+> regression on that test), and **define "derived"** as measured peak times a
+> stated headroom factor, both numbers written down.
 >
-> **2. `RT-CONTSRC-FRAME-FINALIZE` is CLOSED, premise refuted by one probe.**
-> Stage 2 already runs and is correctly sequenced
-> (`finalize_continuation_availability_plan:1292`, called `:12174`); the five
-> governed rows carry **zero** projections and **zero** requirements. The
-> Architect withdrew his successor on the same measurement. **`D2k-1b` is
-> UNPARKED and was never blocked on it** — its real walls are `NativeJoinPlanV1`
-> / `StaticWorkerBinding`. The picture had been built from three code sites and
-> their doc comments, one of which is TRUE and simply never applied to those
-> rows.
+> ### PUBLISH DISCIPLINE — it cost two failed gates on 2026-08-14
 >
-> ### PUBLISHER RULES
+> **After EVERY publish lands: `git reset --hard origin/main`.** Commits are
+> **squash**-merged, so a branch carrying an already-landed commit does not
+> merge cleanly, and a two-way diff against `main` shows files landed since the
+> base as **DELETIONS** — this nearly reverted PR #2179. Rebuild by:
+> `reset --hard origin/main`, then `git checkout <old-tip> -- <explicit doc
+> paths>`, then **grep the status for `crates/` before committing.** The
+> publisher takes `--target <SHA>`, never `HEAD`.
 >
-> `gh pr view N --json state,mergeCommit,statusCheckRollup`. **MERGED ⇒ never
-> restart.** `pgrep` errs BOTH ways — print the lines, never a boolean.
-> Pre-publish CI history: `gh api .../commits/<sha>/check-runs`, **422 = never
-> pushed = clean.** `gh` is not authed in a plain shell — mint via
-> `.devcontainer/mint-gh-token.sh` with `dangerouslyDisableSandbox`.
+> ### LANDED 2026-08-14
 >
-> **MERGE NOTIFICATIONS name the LANDED SQUASH or `merge-base...tip`, never a
-> bare tip SHA** (Adversary; now playbook M8). `git show <tip>` showed 2 files
-> when the change was 10, and git returns no error.
->
-> ### LANDED 2026-08-13
->
-> #2091 gate 4a · #2093 two language frames · #2094 the Sonnet 5 reseat · #2095
-> checkpoint · #2096 the C2 slot-consumption repair · #2097 the briefing flush ·
-> #2098 record literals + dispatch-frame repair · #2099 the gate-4b ruling fold ·
-> **#2103 `LANG-VIEW-RETIRE`** · **#2104 the KwView spec erratum** · **#2105 the
-> RT-CONTSRC closure + 4b size frame**. **#2088 and #2092 closed.**
+> **#2179** `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` (squash `79fddb0d`, 2/2
+> blob-verified, `crates/`, Adversary notified) · **#2181** doc batch (squash
+> `aa7fa99a`, 9/9) · **#2183** Adversary triage fold (squash `f34ab271`, 1/1).
+> **#2178 closed** (withdrawn approval) · **#2180, #2182 closed** (superseded
+> by base drift).
