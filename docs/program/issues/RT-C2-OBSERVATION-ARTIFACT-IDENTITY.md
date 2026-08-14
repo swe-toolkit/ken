@@ -1,7 +1,7 @@
 ---
 id: RT-C2-OBSERVATION-ARTIFACT-IDENTITY
 title: "The always-on `dasm-c2-observation` feature has no artifact-identity control, and the always-on choice is what makes the off-configuration unreachable from the crate the controls live in -- the sibling's nested-cargo A/B needs a carrier feature before it can be reused"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -245,6 +245,46 @@ it inferred.
 
 **`AC-6` — no-regression, in CI.** `COORDINATION §12` — the venue is CI, never
 a local `--workspace` run.
+
+## Completion record
+
+**Merged as squash `79fddb0d` (PR #2179), exact candidate
+`d2584baf440b0a187f3d18d81ac5c174b5f5a2c0` from
+`wp/RT-C2-OBSERVATION-ARTIFACT-IDENTITY-cli`.** Decision `dec_3bjbha9s3rgtr`,
+resolved APPROVED by the Architect (verdict `evt_50h83hackbgen`); QA exact
+approval `evt_7r707r05escbk`. Two paths, `+207/-0`. M6 blob identity verified
+2/2 against `origin/main` after `fetch --prune`.
+
+**Increment 1 refuted the carrier route** and returned no residue; increment 2
+delivered the `ken-cli` route. Both increments are recorded above.
+
+**What the Architect measured that the frame could not front-load:** the off
+side resolves `ken-runtime` with `default` + `px8-ds-test-support` and
+`dasm-c2-observation` **absent**; the on side adds exactly
+`dasm-c2-observation`. The pair differs in **exactly one feature**, with
+`px8-ds-test-support` constant across both. Non-degenerate, and measured on the
+resolved feature graph rather than read off the manifests.
+
+**Delivered stronger than framed.** The frame asked for the anti-vacuity
+configuration self-check; the ring also added `!rows.is_empty()` on the enabled
+arm, proving the observer received rows during the very compilation whose
+artifact is compared. Without it the on side could be vacuously identical. The
+`AC-1` mutation moved only the on artifact (23584 vs 23672, first difference at
+byte 40).
+
+**Both clauses of the Architect's original `c2` finding are now closed.** `c3`
+discharged the recording clause; this node discharged the identity clause with a
+probe rather than a reading.
+
+**One carry, filed rather than carried:**
+[[RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH]] -- the self-check reads
+`ken-cli`'s feature while the deciding property is `ken-runtime`'s. Out of scope
+here because `AC-5` made `crates/ken-runtime/` a forbidden path.
+
+**Carry NOT actioned:** CI cost, two nested cold Cargo builds per suite run. The
+recorded lever if it becomes a drag is `#[ignore]` plus an explicit job, **never**
+removing the separate target directories, which are the mechanism rather than
+hygiene.
 
 ## Sizing
 
