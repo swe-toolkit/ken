@@ -1,7 +1,7 @@
 ---
 id: LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD
 title: "34 §4.1 requires naming the unmatched PATTERN WITNESS, and ExhaustivenessError's payload is a single String documented as a constructor NAME -- so no change at any emission site can discharge the obligation, and it reads as satisfied today only because every landed omission test uses a zero-arity constructor where name and most-general pattern coincide"
-status: active
+status: merged
 owner: language
 size: M
 gate: none

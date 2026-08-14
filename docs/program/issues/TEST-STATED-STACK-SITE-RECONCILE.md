@@ -1,7 +1,7 @@
 ---
 id: TEST-STATED-STACK-SITE-RECONCILE
 title: "Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,18 +11,21 @@ github: null
 origin: "Split out of TEST-NATIVE-STACK-PROVISIONING-STANDARD by the Steward when the Architect's census (evt_4rz7hp11f33wj, measured at origin/main 10101777) refuted that node's population claim -- 15 sites in 14 files across 4 crates carrying 3 constants, against an asserted 6 sites in 5 files in 1 crate. Filed rather than carried, because a carry with no home is what evaporates."
 ---
 
-> # `draft` BECAUSE ITS DEPENDENCY HAS NOT LANDED — NOT BECAUSE THE FRAME IS
-> # OWED. The frame below is complete and shovel-ready.
+> # UNBLOCKED AND `ready` 2026-08-14. THE DEPENDENCY LANDED.
 >
-> **The one thing between this and `ready` is
-> [[TEST-NATIVE-STACK-PROVISIONING-STANDARD]] merging**, at which point the
-> Steward flips it. `check-issue-schema.sh --strict` fails a `ready` node whose
-> dependency is still `ready`, and it is right to: there would be nothing in the
-> tree to reconcile these sites *to*. Runtime lost a turn to exactly this shape
-> on 2026-08-13, pulling a node whose own dependency had not landed and finding
-> its premise false at `D1`.
+> **[[TEST-NATIVE-STACK-PROVISIONING-STANDARD]] merged as PR #2216**, exact
+> `695eff8b`, so the standard these sites are reconciled *to* is now in the tree
+> at `agent/playbooks/tools/stated-stacks.md`. The Steward flipped this node
+> from `draft` to `ready` in the same turn.
 >
-> **Do not read `draft` as "unframed" and do not re-frame it.**
+> **This node was `draft` because nothing had landed behind it, never because
+> the frame was owed** — the frame below has been complete and shovel-ready
+> since it was filed. Runtime lost a turn on 2026-08-13 to the opposite shape,
+> pulling a node whose own dependency had not landed and finding its premise
+> false at `D1`.
+>
+> **The venue text is the fixed input now, not this node's summary of it.** Read
+> `agent/playbooks/tools/stated-stacks.md` and classify against that.
 >
 > # IT IS ALSO NOT RUNTIME'S NEXT NODE WHEN IT DOES FLIP.
 >

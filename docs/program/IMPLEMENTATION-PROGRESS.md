@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 15:34:53Z — from 273 issue file(s) in `docs/program/issues/`.
+2026-08-14 15:39:19Z — from 273 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -121,7 +121,7 @@ the committed file matches the generator's output.
 | `LANG-COMMENT-CLASSIFIER-SHARED` | The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either | merged | language | S | none | — |
 | `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | merged | language | S | none | — |
 | `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` | `37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row | draft | language | unsized | operator | — |
-| `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` | 34 §4.1 requires naming the unmatched PATTERN WITNESS, and ExhaustivenessError's payload is a single String documented as a constructor NAME -- so no change at any emission site can discharge the obligation, and it reads as satisfied today only because every landed omission test uses a zero-arity constructor where name and most-general pattern coincide | active | language | M | none | — |
+| `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` | 34 §4.1 requires naming the unmatched PATTERN WITNESS, and ExhaustivenessError's payload is a single String documented as a constructor NAME -- so no change at any emission site can discharge the obligation, and it reads as satisfied today only because every landed omission test uses a zero-arity constructor where name and most-general pattern coincide | merged | language | M | none | — |
 | `LANG-FOREIGN-NAME-CONTROL-CHARS` | Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet | merged | language | XS | none | 2128 |
 | `LANG-FOREIGN-NAME-FORMAT-CHARS` | Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FEFF -- are a visual-spoofing vector at the same `foreign`-name trust boundary the Cc control-character check just closed, and they are a DIFFERENT vector: not truncation but two distinct declarations rendering identically to the reviewer doing the check | draft | language | XS | operator | — |
 | `LANG-GADT-SEQUENCE-TRACKER-GAP` | `34 §8` names four `SURF-gadt-*` build WPs and all four have frames in `docs/program/wp/` -- none has a tracker node, so `gen-progress.sh` shows the whole dependent-constructor area as absent, while the code has in fact moved past every one of the four frames' stated baselines | merged | language | S | none | — |
@@ -304,8 +304,8 @@ the committed file matches the generator's output.
 | `SURF-gadt-elaboration` | Tracker node for the landed dependent-constructor elaboration slice (`34 §8`): points at `docs/program/wp/SURF-gadt-elaboration.md`, filed retroactively for the same tracker-generation reason as its parser/AST predecessor | merged | language | M | none | — |
 | `SURF-gadt-field-sugar` | Tracker node for the landed dependent-constructor field-sugar slice (`34 §8`): points at `docs/program/wp/SURF-gadt-field-sugar.md`; the frame's own D0 audit bounded the slice to declaration-only labels, which is why AC3's unknown/missing/extra-field checks have no corresponding test -- there is no named-argument constructor expression or pattern syntax to check them against | merged | language | S | none | — |
 | `SURF-gadt-parser-ast` | Tracker node for the landed dependent-constructor parser/AST slice (`34 §8`): points at `docs/program/wp/SURF-gadt-parser-ast.md`, filed retroactively because `gen-progress.sh` generates the tracker from `docs/program/issues/` and this slice landed with a frame but no issue node | merged | language | S | none | — |
-| `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split | active | doc | S | none | — |
-| `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | draft | runtime | M | none | — |
+| `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split | merged | doc | S | none | — |
+| `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | ready | runtime | M | none | — |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
 | `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | merged | verify | S | none | 2120 |
@@ -317,6 +317,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `LANG-MATCH-DIAGNOSTIC-PROSE` — The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-C2-DRIVER-STAGE-ATTRIBUTION` — The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors
@@ -330,6 +331,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
+- `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 
 ## Blockers
 
@@ -352,7 +354,6 @@ is itself not yet `merged`/`closed`:
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
-- `LANG-MATCH-DIAGNOSTIC-PROSE` blocked by `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` (status: active)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)
@@ -372,7 +373,6 @@ is itself not yet `merged`/`closed`:
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `TEST-STATED-STACK-SITE-RECONCILE` blocked by `TEST-NATIVE-STACK-PROVISIONING-STANDARD` (status: active)
 
 ## Gate progress
 
