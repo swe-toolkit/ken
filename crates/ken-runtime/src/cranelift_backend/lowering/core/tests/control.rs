@@ -2699,6 +2699,24 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
     );
 }
 
+/// The governed `R3` terminal-stop selector population.
+///
+/// **MEASURED:** armed `Exact` and `ReHomed` reach the fused-selector controls
+/// below, while `ProducerArity` refuses earlier at its widened producer
+/// construct. **CLAIMED:** every terminal-stop control in this file ranges over
+/// this same population. **THE GAP:** this const keeps the nine controls in
+/// lockstep; it does not prove that a future cause reaches the terminal stop,
+/// so the target-authority control separately executes `ProducerArity` and
+/// pins its current earlier refusal.
+const R3_TERMINAL_STOP_POPULATION: [(crate::cranelift_backend::planning::D2jCause, &'static str);
+    2] = [
+    (crate::cranelift_backend::planning::D2jCause::Exact, "exact"),
+    (
+        crate::cranelift_backend::planning::D2jCause::ReHomed,
+        "rehomed",
+    ),
+];
+
 /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` **Deliverable 0 — the applied-root
 /// production-path gate.** Architect `evt_6907h4rv5kq1a` and `evt_4trsqtkxtghjx`.
 ///
@@ -3106,7 +3124,7 @@ fn r3_fused_parameter_projection_refuses_before_claim_consumption() {
     }
 
     let mut rows = Vec::new();
-    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
         for (mutation, suffix) in [
             (FusionClaimParameterMutation::Exact, "exact"),
             (FusionClaimParameterMutation::MoveFirstToCallee, "moved"),
@@ -3268,7 +3286,7 @@ fn r3_fused_worker_body_refuses_before_claim_consumption() {
     }
 
     let mut rows = Vec::new();
-    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
         for (mutation, suffix) in [
             (D2fWorkerBodyMutation::Exact, "exact"),
             (D2fWorkerBodyMutation::UseConsumingCallOrigin, "wrong-body"),
@@ -3402,7 +3420,7 @@ fn r3_fused_wrong_consuming_call_refuses_before_claim_consumption() {
     }
 
     let mut rows = Vec::new();
-    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
         for (mutation, suffix) in [
             (D2fConsumingCallMutation::Exact, "exact"),
             (
@@ -3561,7 +3579,7 @@ fn r3_fused_nonempty_producer_captures_refuse_before_emission() {
     );
 
     let mut rows = Vec::new();
-    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
         for (mutation, suffix) in [
             (FusionProducerCaptureMutation::Exact, "exact"),
             (
@@ -3696,7 +3714,7 @@ fn r3_fused_late_call_build_refusal_keeps_claim_outstanding() {
     }
 
     let mut rows = Vec::new();
-    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
         for (mutation, suffix) in [
             (D2fCallBuildMutation::Exact, "exact"),
             (
@@ -3849,7 +3867,7 @@ fn r3_fused_post_field_direct_call_reintroduction_refuses_before_emission() {
     }
 
     let mut rows = Vec::new();
-    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
         for (mutation, suffix) in [
             (D2fPostFieldDirectCallMutation::Exact, "exact"),
             (
@@ -4002,7 +4020,7 @@ fn r3_fused_outer_selector_refuses_an_escaped_selected_claim() {
     }
 
     let mut rows = Vec::new();
-    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
         for (mutation, suffix) in [
             (D2fOuterClaimStateMutation::Exact, "exact"),
             (
@@ -4159,43 +4177,39 @@ fn r3_fused_capture_projection_refuses_before_emission() {
     }
 
     let mut rows = Vec::new();
-    for (mutation, suffix) in [
-        (D2fCaptureProjectionMutation::Exact, "exact"),
-        (D2fCaptureProjectionMutation::DropLast, "dropped"),
-        (D2fCaptureProjectionMutation::DuplicateFirst, "duplicated"),
-        (D2fCaptureProjectionMutation::SwapFirstTwo, "swapped"),
-        (
-            D2fCaptureProjectionMutation::UseSecondSourceForFirst,
-            "source-derived",
-        ),
-    ] {
-        let symbol = format!("ken_r3_capture_projection_exact_{suffix}");
-        let (error, applications, populations, consumptions, invocations) =
-            compile(D2jCause::Exact, mutation, &symbol);
-        rows.push((
-            D2jCause::Exact,
-            mutation,
-            classify(&error),
-            applications,
-            populations,
-            consumptions,
-            invocations,
-        ));
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
+        // Exact owns the non-empty two-capture projection and therefore the
+        // four lawful mutations. ReHomed is the zero-capture comparator, so
+        // only its exact arm has a subject.
+        let mutations = if cause == D2jCause::Exact {
+            vec![
+                (D2fCaptureProjectionMutation::Exact, "exact"),
+                (D2fCaptureProjectionMutation::DropLast, "dropped"),
+                (D2fCaptureProjectionMutation::DuplicateFirst, "duplicated"),
+                (D2fCaptureProjectionMutation::SwapFirstTwo, "swapped"),
+                (
+                    D2fCaptureProjectionMutation::UseSecondSourceForFirst,
+                    "source-derived",
+                ),
+            ]
+        } else {
+            vec![(D2fCaptureProjectionMutation::Exact, "exact")]
+        };
+        for (mutation, suffix) in mutations {
+            let symbol = format!("ken_r3_capture_projection_{prefix}_{suffix}");
+            let (error, applications, populations, consumptions, invocations) =
+                compile(cause, mutation, &symbol);
+            rows.push((
+                cause,
+                mutation,
+                classify(&error),
+                applications,
+                populations,
+                consumptions,
+                invocations,
+            ));
+        }
     }
-    let (error, applications, populations, consumptions, invocations) = compile(
-        D2jCause::ReHomed,
-        D2fCaptureProjectionMutation::Exact,
-        "ken_r3_capture_projection_rehomed_exact",
-    );
-    rows.push((
-        D2jCause::ReHomed,
-        D2fCaptureProjectionMutation::Exact,
-        classify(&error),
-        applications,
-        populations,
-        consumptions,
-        invocations,
-    ));
 
     assert_eq!(
         rows,
@@ -4266,7 +4280,9 @@ fn r3_fused_capture_projection_refuses_before_emission() {
 ///
 /// **MEASURED:** the existing armed Exact and ReHomed full-pipeline compiles
 /// each reach `fusion_target_carries_claim_authority`, then complete with one
-/// claim consumption and one fused invocation.
+/// claim consumption and one fused invocation. Armed `ProducerArity` refuses
+/// earlier at its widened producer construct, with no validator reach,
+/// consumption, or invocation.
 ///
 /// **CLAIMED:** the validator is wired into the complete currently governed
 /// terminal-stop population. That population is defined by reaching this
@@ -4293,7 +4309,10 @@ fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
         reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
     };
 
-    fn compile(cause: D2jCause, symbol: &str) -> (usize, usize, usize) {
+    fn compile(
+        cause: D2jCause,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize, usize) {
         reset_r3_fusion_claim_consumptions();
         crate::cranelift_backend::lowering::reset_r3_fused_invocations();
         let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
@@ -4319,19 +4338,18 @@ fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
             )
             .err()
         });
-        assert!(error.is_none(), "{cause:?}: {error:?}");
         (
+            error,
             validations,
             r3_fusion_claim_consumptions().len(),
             crate::cranelift_backend::lowering::r3_fused_invocations().len(),
         )
     }
 
-    for (cause, symbol) in [
-        (D2jCause::Exact, "ken_r3_target_authority_exact"),
-        (D2jCause::ReHomed, "ken_r3_target_authority_rehomed"),
-    ] {
-        let (validations, consumptions, invocations) = compile(cause, symbol);
+    for (cause, prefix) in R3_TERMINAL_STOP_POPULATION {
+        let symbol = format!("ken_r3_target_authority_{prefix}");
+        let (error, validations, consumptions, invocations) = compile(cause, &symbol);
+        assert!(error.is_none(), "{cause:?}: {error:?}");
         assert!(
             validations > 0,
             "{cause:?}: the real fused selector bypassed target-authority validation"
@@ -4342,6 +4360,29 @@ fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
             "{cause:?}: validator reach is meaningful only on an accepted affine call"
         );
     }
+
+    let (error, validations, consumptions, invocations) = compile(
+        D2jCause::ProducerArity,
+        "ken_r3_target_authority_producer_arity",
+    );
+    assert!(
+        matches!(
+            &error,
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "ComputationalMatch" && reason.contains(
+                "case ctor:fixture::D2gOut::Node expects 1 constructor arguments but value has 2"
+            )
+        ),
+        "ProducerArity must retain its own earlier widened-producer refusal: {error:?}"
+    );
+    assert_eq!(
+        (validations, consumptions, invocations),
+        (0, 0, 0),
+        "ProducerArity is outside the terminal-stop population only while its earlier refusal \
+         prevents validator reach and both affine events"
+    );
 }
 
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
