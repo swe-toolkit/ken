@@ -5774,9 +5774,11 @@ fn contkey_rows_four_and_five_carry_the_exact_outer_consuming_occurrence() {
 /// constructional and is not an independent control.
 ///
 /// Promise class: durable invariant. The depth-2/depth-3 equalities compare
-/// independently produced planner records. The depth-1 equality states the
-/// boundary convention directly. None uses fixture origin literals. The cross-
-/// compile comparisons instead rely on the generator's wrapper-invariance:
+/// independently produced planner records. The depth-1 equality is
+/// same-compile and both resolvers share one source seed, so it pins resolver
+/// agreement rather than correctness of that seed. None uses fixture origin
+/// literals. The cross-compile comparisons instead rely on the generator's
+/// wrapper-invariance:
 /// adding a wrapper preserves the inner level's origins from the sibling
 /// compile. Renumbering inside the generator can therefore false-red this
 /// control without a carry defect.
