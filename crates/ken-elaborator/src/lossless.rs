@@ -93,7 +93,7 @@ impl TriviaKind {
     /// keeps `attach_comments`/`validate_attachment_totality` from silently
     /// losing block comments the way an unwidened `LineComment`-only filter
     /// would (LANG-SURFACE-BLOCK-COMMENTS D3).
-    pub fn is_comment(self) -> bool {
+    fn is_comment(self) -> bool {
         !matches!(self, TriviaKind::Whitespace)
     }
 }

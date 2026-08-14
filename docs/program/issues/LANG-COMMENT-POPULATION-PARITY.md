@@ -125,23 +125,26 @@ reds it at `left: 2 right: 0`. A fixture containing a `LineComment` would have
 passed under both filters. The population claim beside it was checked
 independently: grepping `catalog/` for `{-` and leading `---` returns zero files.
 
-## Residual: `D3`'s export has no recorded justification
+## Residual (DISCHARGED): `D3`'s export had no recorded justification
 
-> ### OWNED BY A NODE AS OF 2026-08-14, AND THE DISPOSITION IS RETIREMENT,
-> ### NOT DOCUMENTATION. See [[LANG-LOSSLESS-COUNT-ASSERTION-RETIRE]].
+> ### DISCHARGED BY `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` D1/D2, BY
+> ### RETIREMENT, NOT DOCUMENTATION. See [[LANG-LOSSLESS-COUNT-ASSERTION-RETIRE]].
 >
-> **The repair below — "one clause on the method" — is superseded.** An
-> Adversary hunt on this node's own squash (`evt_6n7y2mzn83grn`) measured the
-> other end of the same fact: **the assertion that `pub` exists to serve cannot
-> fire.** `attach_comments` and `validate_attachment_totality` are the two sides
-> `parse_lossless` reconciles at `src/lossless.rs:235` with a `?`, so the
-> helper's third copy of the filter compares two sets production has already
-> agreed on. Narrowing `attach_comments` reds at
-> `kenfmt_b1_lossless.rs:10`, never reaching `:27`.
+> **The repair below — "one clause on the method" — was superseded, not
+> applied.** An Adversary hunt on this node's own squash (`evt_6n7y2mzn83grn`)
+> measured the other end of the same fact: **the assertion that `pub` existed
+> to serve could not fire.** `attach_comments` and `validate_attachment_totality`
+> are the two sides `parse_lossless` reconciles at `src/lossless.rs:235` with a
+> `?`, so the helper's third copy of the filter compared two sets production had
+> already agreed on. Narrowing `attach_comments` reddened at
+> `kenfmt_b1_lossless.rs:10`, never reaching the count assertion.
 >
-> ⇒ **The export and the assertion are one item.** Documenting the export would
-> have written a justification for a line that states a theorem. The node above
-> drops the assertion and reverts the `pub`, which closes both.
+> ⇒ **The export and the assertion were one item.** Documenting the export
+> would have written a justification for a line that stated a theorem.
+> `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` D1 deleted the count comparison and D2
+> reverted `is_comment` to private, closing both. No replacement control was
+> added; `D4`'s fixture (`block_and_doc_comments_are_counted_for_attachment`)
+> is what guards the population now.
 
 Architect finding, non-blocking, at `evt_73bmxjfmkv7bq`, on the approved
 candidate. **Not a defect in what landed** and not a reason to reopen the node.
