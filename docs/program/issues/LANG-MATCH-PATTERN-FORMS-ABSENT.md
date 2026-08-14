@@ -36,13 +36,69 @@ pub enum PatKind {             // :167
 |---|---|---|
 | constructor `C p̄` | `§3.1` bullet 1 | `PatKind::Ctor` |
 | variable binder | `§3.1` bullet 2 | `PatKind::Var` |
-| wildcard `_` | `§3.1` bullet 2 | `PatKind::Wild` |
+| wildcard `_` | `§3.1` bullet 2 | `PatKind::Wild` — **but see the correction below: refused at TOP LEVEL** |
 | **literals** | `§3.1` bullet 3, compiles to a decidable-equality chain (`35`, `39 §2.7`) | **absent** |
 | **tuple / pair patterns** | `§3.1` bullet 4, projects the negative `Σ` | **absent** |
 | **record patterns** | `§3.1` bullet 4, matched by projection (`14 §4`) | **absent** |
 | **as-patterns `p as x`** | `§3.1` bullet 5 | **absent** |
 | **or-patterns `p \| q`** | `§3.1` bullet 5, identical binder sets (`32 §4`) | **absent** |
 | **guards `if g`** | `§3` line 251 and `§3.3` line 472, elaborate to a conditional inside the `cₖ` method | **absent** (`MatchArm` has no field) |
+
+## CORRECTION: THIS NODE'S OWN CENSUS IS WRONG ABOUT WILDCARD AND VARIABLE
+
+**Added 2026-08-14 by the Steward, from Adversary hunt `evt_2wjy0z31c1518` on
+`123c7738`, re-verified against the tree before filing.**
+
+**The table above measured `ast.rs` and inferred about the elaborator.** Both
+`PatKind::Wild` and `PatKind::Var` exist as AST kinds, and the census counted
+them present on that basis. **They are refused at TOP LEVEL**, `elab.rs:8472`:
+
+```
+non-constructor pattern in match (wildcard/var not yet supported at top level;
+use constructor patterns)
+```
+
+⇒ **A trailing `_ |-> 9` after exhaustive constructor arms does not elaborate
+today.** The contingency is specifically *top level*: a variable **under** a
+constructor (`MkWrap y`) is `RPatKind::Ctor`, routes to the matrix path, and
+behaves correctly. So two of the three forms this node calls present are
+present in the AST and absent from the surface.
+
+**This is the same error shape as the one corrected in [[SPEC-AUTH-EX]] the
+same day** -- measuring one layer and inferring about the layer above it.
+Whoever works a slice here should re-measure at the elaborator, not the AST.
+
+### The consequence, which is a DIAGNOSTIC TRUTH dependency and not a feature gap
+
+[[LANG-REACHABILITY-SUBSUMING-ARMS]] landed `ArmDeadCause::NoInhabitants`,
+whose single-column classifier is
+`match subsumed_by[i] { Some(claimant) => Subsumed{…}, None => NoInhabitants }`.
+`subsumed_by` is only ever populated for an arm whose pattern is
+`RPatKind::Ctor` resolving to the claiming id, **so `None` covers every arm
+that is not such a pattern.**
+
+**The Adversary predicted a dead top-level bare wildcard as a third cause where
+`NoInhabitants` would be plainly FALSE -- the type has inhabitants and the arm
+is dead only because earlier arms cover them -- and measured that it is refused
+upstream instead.** ⇒ **`NoInhabitants` is never false today, and it is honest
+only BECAUSE top-level wildcard and variable do not elaborate.**
+
+⇒ **The moment a slice here accepts top-level `_`, the most ordinary redundant
+program there is -- a trailing wildcard after exhaustive arms -- lands in that
+catch-all and is told it has no inhabitants.** That is a false diagnostic, not
+merely the wrong question, and it is a strictly worse failure than the one that
+merge repaired.
+
+**Two obligations attach to whichever slice lands top-level wildcard/variable,
+and they are cheap only if taken together:**
+
+1. **`ArmDeadCause` needs a third cause** for "dead because earlier arms cover
+   it, with no single claiming constructor". **Do not widen `Subsumed` to carry
+   an empty winner set** -- that is precisely the shape
+   `LANG-REACHABILITY-SUBSUMING-ARMS` was cut to make unrepresentable, and
+   re-admitting it would undo that node.
+2. **A clause on `NoInhabitants` naming this dependency**, so the next author
+   sees the obligation rather than discovering it through a wrong diagnostic.
 
 ## Why this is a gap and not a staged deferral
 
