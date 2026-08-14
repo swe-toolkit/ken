@@ -1,7 +1,7 @@
 ---
 id: RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY
 title: "Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
@@ -19,7 +19,8 @@ origin: "Architect mechanism ruling evt_57atrppgx2exe (2026-08-14) on RT-DEPTH2-
 > question *"which banned surface does this residual demand?"* has no answer,
 > because the residual does not demand one.
 >
-> **`ready` as of 2026-08-14.** [[RT-DEPTH2-VAR-PARENT-DERIVATION]] is
+> **Released to Runtime 2026-08-14 at base `701390fd0`**, kick
+> `evt_wky8pjdee97f`. [[RT-DEPTH2-VAR-PARENT-DERIVATION]] is
 > **`closed`, not `merged`** — it was answered candidate-free, so nothing landed
 > and none was owed. Do not read that as abandoned work: its measurement is the
 > premise of this node, and it is restated below rather than left behind a link.

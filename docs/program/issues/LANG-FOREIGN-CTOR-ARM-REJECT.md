@@ -1,7 +1,7 @@
 ---
 id: LANG-FOREIGN-CTOR-ARM-REJECT
 title: "a match arm naming a constructor of a DIFFERENT inductive family reaches match compilation instead of being rejected as a constructor/type mismatch, so a Nat match with a List.Nil arm is diagnosed by whatever the coverage machinery happens to conclude about it rather than by the mismatch that is actually present"
-status: ready
+status: active
 owner: language
 size: S
 gate: none

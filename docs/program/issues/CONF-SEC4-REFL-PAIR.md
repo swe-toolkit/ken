@@ -1,7 +1,7 @@
 ---
 id: CONF-SEC4-REFL-PAIR
 title: "Sec4's C1/C2 refl pair is stale against ADR-0013: the suite half of the repair landed with SEC4-TCB, the seed half did not"
-status: ready
+status: active
 owner: spec-enclave
 size: S
 gate: none
