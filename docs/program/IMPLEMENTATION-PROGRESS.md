@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 18:28:00Z — from 283 issue file(s) in `docs/program/issues/`.
+2026-08-14 18:33:32Z — from 283 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -329,7 +329,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `LANG-CONVOY-ENCLOSING-FIELD` — spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed
 - `LANG-REACHABILITY-SUBSUMING-ARMS` — `ReachabilityError` carries only a span, so a redundant-arm diagnostic cannot say WHICH earlier arms subsume the dead arm -- the mirror of the gap `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` closed on the exhaustiveness side, except `34 §4.2` does NOT mandate it, so this is ergonomics and must not be filed or read as a conformance obligation
-- `LANG-WITNESS-DIAGNOSTIC-STRICTNESS` — missing_pattern_witness's two lookups read DIFFERENT tables and the strict one runs first, so ctor_name's fallback is dead code on this path -- two incompatible beliefs about one id with the stricter winning by line order -- and ind.constructors[ordinal] is a second, unmessaged panic source on the same data, all on a function that runs only while the elaborator is already reporting an error
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-C2-DRIVER-STAGE-ATTRIBUTION` — The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors
@@ -369,6 +368,8 @@ is itself not yet `merged`/`closed`:
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
+- `LANG-MATCH-PATTERN-FORMS-ABSENT` blocked by `SPEC-MATCH-PATTERN-PINS` (status: ready)
+- `LANG-WITNESS-DIAGNOSTIC-STRICTNESS` blocked by `LANG-REACHABILITY-SUBSUMING-ARMS` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
 - `PX10` blocked by `ABI-M1` (status: draft)

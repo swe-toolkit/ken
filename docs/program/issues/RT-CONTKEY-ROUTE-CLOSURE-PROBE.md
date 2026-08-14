@@ -11,6 +11,24 @@ github: null
 origin: "Architect evt_56dvtaft7ep38, verbatim in substance: 'That supplying the relation CLOSES the route is NOT established. The original stop reported a further refusal at the next Closure/static-worker boundary and a second recognition retained in the standalone definition. (c) supplies a missing input; whether the route then closes is a separate measurement.' He then instructed: 'Frame the successor as carry the consumer to the level that needs it and let the route question be its own increment.' RT-CONTKEY-CONSUMER-DESCENT-CARRY was that successor and merged at b0f9c2ff with no closure AC. This node is the increment the instruction reserved. Steward-filed per COORDINATION §2; not released to Runtime until RT-CONSUMER-CARRY-CONTROL-DEBT lands, because the two share static_transition.rs."
 ---
 
+> ## THE `depends_on` EDGE ON `RT-CONSUMER-CARRY-CONTROL-DEBT` IS CONTENTION,
+> ## NOT PREMISE. The schema check warns on it; the warning is answered here.
+>
+> **This node's premise is `b0f9c2ff`, which is MERGED.** Everything the probe
+> needs — the carry, its advance at the descent push, the two `#[cfg(test)]`
+> reads — is on `main` now. Nothing about the measurement waits on the control
+> debt.
+>
+> **The edge exists because the two nodes share
+> `crates/ken-runtime/src/cranelift_backend/planning/static_transition.rs` and
+> Runtime runs one node at a time.** It is a release-order fact, and it is in
+> the field `gen-progress.sh` reads rather than in prose because this lane has
+> twice produced *"an edge real in prose and absent from the field the
+> generator reads"* — a failure that hides a stall.
+>
+> ⇒ **`ready` here means the frame is shovel-ready and the release is
+> sequenced** (`ken-steward §4e`), not that a team may pull it today.
+
 ## What this is
 
 **A measured-and-reverted probe. It authors no candidate and lands no repair.**

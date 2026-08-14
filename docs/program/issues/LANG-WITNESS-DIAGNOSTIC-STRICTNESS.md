@@ -5,11 +5,25 @@ status: ready
 owner: language
 size: S
 gate: none
-depends_on: []
+depends_on: [LANG-REACHABILITY-SUBSUMING-ARMS]
 blocks: []
 github: null
 origin: "Architect non-blocking carry on the LANG-WITNESS-ARITY-DERIVED merge (dec_2hprs9v6a3ds8, exact e6db3456): the new expect has an error-policy asymmetry with ctor_name and no silent arity fallback is authorized. Sharpened by the Adversary hunt evt_1fybxqm29839b on the same SHA, which measured the mechanism -- the two lookups consult different maps that are pruned independently by design -- and added the unmessaged slice index as a sibling. Steward-filed per COORDINATION §2 because a carry recorded only in an approval verdict and a PR body evaporates; the same failure forced RT-CONTKEY-REFUSAL-PROFILE-SPLIT and LANG-REACHABILITY-SUBSUMING-ARMS to be filed the same day."
 ---
+
+> ## THE `depends_on` EDGE IS CONTENTION, NOT PREMISE. Added 2026-08-14.
+>
+> **This node's premise is `e6db3456`, which is MERGED.** Nothing it measures
+> waits on [[LANG-REACHABILITY-SUBSUMING-ARMS]].
+>
+> The edge exists because both nodes edit
+> `crates/ken-elaborator/src/elab.rs` and Language runs one node at a time.
+> **It moved out of the "Not this node" prose and into the frontmatter because
+> `gen-progress.sh` reads `depends_on` and cannot see prose** — this lane has
+> twice produced an edge that was real in prose and absent from the generator's
+> field, and both times it hid a stall.
+>
+> ⇒ **`ready` here means shovel-ready and sequenced**, not pullable today.
 
 ## What this is
 

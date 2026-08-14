@@ -5,7 +5,7 @@ status: draft
 owner: language
 size: unsized
 gate: none
-depends_on: []
+depends_on: [SPEC-MATCH-PATTERN-PINS]
 blocks: []
 github: null
 origin: "Steward sweep 2026-08-14 at main 6da108b6, reached from the Adversary hunt evt_4d10j8tmjsbhj -- which measured, as a side observation on a diagnostic-prose node, that 34 §4.2's two reachability caveats are BOTH unreachable because MatchArm has no guard field and PatKind has no literal kind. That is a symptom; this node is the cause. The census below is the Steward's, measured after the hunt. Filed draft and unsized because the CUT is the deliverable and it is not yet made. Steward-filed per COORDINATION §2. AMENDED 2026-08-14 on the spec-enclave disposition evt_12qrtnp7237dn, which ruled 34 §3 an impl-ready present-tense obligation whose six absent forms are implementation debt rather than an aspirational menu, gave a prerequisite-ordered cut, and CORRECTED the Steward's caveat claim -- see the box below."
