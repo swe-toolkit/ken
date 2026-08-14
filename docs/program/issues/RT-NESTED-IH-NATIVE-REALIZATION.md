@@ -11,6 +11,44 @@ github: null
 origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statement of c2's AC-K12 relationship, evt_77pege8j5cv14, requested at evt_6pmftb5fpxrkm. Discharges the second Steward condition on the c1/c2 cut (evt_6z7wf6dw94cym), which required c2 to state that relationship before assignment.
 ---
 
+> ## D2 MERGED 2026-08-14 as squash `f7ec9f59`. THE NODE STAYS `active`.
+>
+> **Candidate `20c12c64`** (PR #2187, CI green; Decision `dec_3e9rjnmt9e9z6`
+> resolved APPROVED by the Architect, read from the object; QA
+> `evt_4bfp301wwz00m`). Declared base `f34ab271`; one commit, two crate paths,
+> `+148/-29`; **2/2 blob verified identical after landing.**
+>
+> **What landed:** the static-constructor `Match` repair — the selected
+> one-parameter `LexicalClosure` is **applied** through its retained
+> `StaticBody` rather than lowered as a value. `ground_value`, scalar-merge
+> admission, and the fail-closed catch-all are unchanged.
+>
+> **`D2` is TERMINAL at a measured stop** (Architect `evt_3my27jtzxmhh3`). The
+> checked-IH realization route at `core.rs:10521` was **measured unreachable**:
+> `mint_checked_computational_ih_instance` (`mod.rs:16892-16894`) `.take()`s
+> `pending_computational_ih_call` **first** and returns `Ok(None)`. The
+> activation is live (`ContinuationActivationId(0)`, live at its resume cursor);
+> **the authority was never minted** — plan, call template, slot, and parent are
+> all absent. **That is a planner capability, not a missing line.**
+>
+> **The `D1` sentinel changed CLASS, it was not restated.** `D1`'s assertion —
+> *"native lowering declines a real package-backed `Closure` predecessor before
+> scalar merge"* — was **falsified by construction** and is **retired
+> explicitly**; a **separately named** control now asserts the new stop. Do not
+> read the retirement as a regression: the refusal **advanced**, which is the
+> evidence the increment worked.
+>
+> **Successor scope is minting checked realization authority for this seam.**
+> Open question the Steward has NOT presumed an answer to: whether that is the
+> same mechanism as [[RT-TERMINAL-ALL-ELIM-AUTHORITY]], whose authority is the
+> **terminal-`All` five-fact elimination** relation rather than checked-IH
+> **realization** authority. That is an Architect question.
+>
+> **Still bound, and the first is the one closest to hand:** `.residual` is not
+> inspected or unwrapped (`mod.rs:3327-3331`); no ordinary-`Match` selector arm
+> for the capsule and no catch-all change; no unchecked plan minted to get past
+> the chain.
+
 ## D1 MERGED 2026-08-14 as an ACCEPTED PARTIAL. The node stays `active`, and what remains is GATED, not merely unstarted.
 
 **Candidate `ed854c859b0daa58a0664e38ad1526659c8ce0a9`, landed as squash

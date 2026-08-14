@@ -1,7 +1,7 @@
 ---
 id: LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT
 title: "`ken-cli` native production runs `px4b_native_production` at effectively zero stack margin -- base passes with a few hundred bytes to spare, so any candidate adding a few hundred bytes aborts it, and `98e6ac51` is the trigger that exposed this rather than its cause"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
