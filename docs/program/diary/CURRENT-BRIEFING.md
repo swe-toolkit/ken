@@ -61,11 +61,8 @@ of them is framing debt -- measured, not assumed.
 | language | `LANG-WITNESS-ARITY-DERIVED` (S), implementer mid-turn | `LANG-REACHABILITY-SUBSUMING-ARMS` (M) |
 | doc | none -- stood down | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` merged, retros in |
 
-**Verify a seat by its PANE, not its convo status.** `language-implementer` read
-"idle, awaiting next WP" at 17:16 while 22 minutes into a targeted
-`ken-cargo test -p ken-elaborator`. **A status is only as fresh as the seat's
-last post**, and reading one as state is how an idle-looking seat gets re-kicked
-mid-turn.
+**Verify a seat by its PANE, not its convo status** -- `language-implementer`
+read "idle" at 17:16 while 22 minutes into a targeted `-p ken-elaborator` run.
 
 ### THE D2k ROUTE WAS RECOVERED BY ASKING, NOT BY FRAMING
 
@@ -97,99 +94,102 @@ chain, the operator's standing priority.
 
 ### SWEEP THE SPEC CHAPTER, NOT THE TRACKER -- FOUR NODES SO FAR
 
-**Grep the spec chapter for "tracked follow-on", "is a follow-on", "deferred to
-a later", "not delivered here". A tracker audit cannot see an obligation that
-was never entered into it.** Four real nodes now, plus one false positive
-cleared -- and it refuted an escalation I was about to send ("Language has no
-ungated work") before it went out.
+**Grep the chapter for "tracked follow-on", "is a follow-on", "deferred to a
+later", "not delivered here". A tracker audit cannot see an obligation never
+entered into it.** Four nodes, one false positive cleared, and it refuted an
+escalation I was about to send ("Language has no ungated work").
 
-**`LANG-MATCH-PATTERN-FORMS-ABSENT` is the fourth and the largest.** `34 §3`
-lists nine pattern forms normatively; `PatKind` is exactly `Wild | Var | Ctor`
-(`ast.rs:167`) and `MatchArm` has no guard field (`ast.rs:86`). **Literals,
-tuple/pair patterns, record patterns, as-patterns, or-patterns and guards are
-all absent**, in a chapter marked *impl-ready (L2). Normative and
-high-priority*, with **no deferral statement for any of them** and no tracker
-row. `draft` and unsized because **the deliverable is the CUT**, which is not
-made: literals are gated on the open DecEq TCB question, guards change the
-exhaustiveness contract rather than only the grammar, and or-patterns add a
-binder well-formedness rule. **It was reached from the Adversary's hunt, which
-measured the symptom while reviewing something else.**
+**`LANG-MATCH-PATTERN-FORMS-ABSENT` is the largest.** `34 §3` lists nine pattern
+forms; `PatKind` is `Wild | Var | Ctor` (`ast.rs:167`) and `MatchArm` has no
+guard field (`ast.rs:86`). **Literals, tuple/pair, record, as-, or-patterns and
+guards are all absent** from a chapter marked *impl-ready (L2). Normative and
+high-priority*, with **no deferral statement for any** and no tracker row.
+Reached from the Adversary's hunt, which measured the symptom while reviewing
+something else.
 
 ### "BACKLOG CLEAR" AND "BACKLOG GATED" ARE DIFFERENT FACTS
 
-`LANG-REACHABILITY-SUBSUMING-ARMS` was `draft` behind a flip condition reading
-*"when Language's conformance-grounded backlog is clear."* **It is not clear --
-it is GATED**, and every conformance-grounded alternative waits on someone else:
-the convoy discriminator on an Architect ruling, the pattern-forms census on a
-cut, and two nodes on operator answers.
+`LANG-REACHABILITY-SUBSUMING-ARMS` sat `draft` behind *"when Language's
+conformance-grounded backlog is clear."* **It is not clear -- it is GATED**, and
+every alternative waits on someone else. ⇒ **Releasing it is SEQUENCING (mine),
+not a priority call between `ready` WPs (the operator's).** Nothing
+conformance-grounded is displaced because none of it can be started. **The node
+is not reclassified** -- still ergonomics; `§4.2` mandates only detection.
 
-⇒ **Releasing it is SEQUENCING, which is mine (`ken-steward §3`), not a priority
-call between `ready` WPs, which is the operator's.** Nothing conformance-grounded
-is displaced because nothing conformance-grounded can be started. **The node is
-not reclassified** -- still ergonomics, and `§4.2` still mandates only detection.
+### TWO QUESTIONS ROUTED, BOTH ANSWERED WITHIN THE HOUR
 
 ### TWO QUESTIONS ROUTED, NEITHER BLOCKING -- DO NOT RE-ASK
 
 Both gate the node **after** next, not the one in flight.
 
-**spec-leader, `evt_26sk9m51rd5nk`** -- what does `34 §3` oblige of the six
-absent pattern forms, and what of it is genuinely stageable? Gates
-`LANG-MATCH-PATTERN-FORMS-ABSENT`, which is the node after next. **Raised as
-"what does the chapter oblige", never as "which node should this be"**, which
-presumes the answer.
+**Each was routed with the cheap no-ruling-needed increment offered alongside
+it, and each came back refusing my framing and supplying a better one.**
+
+**spec-leader `evt_12qrtnp7237dn` on `34 §3`: the six absent pattern forms are
+implementation debt, not an aspirational menu** -- stageable only as explicit
+tracked slices, with **every remainder fail-closed until its slice lands.** Cut
+order and per-slice pins are in `LANG-MATCH-PATTERN-FORMS-ABSENT`. **The next
+material is SPEC pins, not a Language frame** -- as-association, tuple
+comma/grouping, record `field_pat`, or-join, literal comparator table -- so the
+umbrella node stays `draft` and the next node in that chain is enclave-owned.
+
+**It also corrected me.** I wrote that adding either guards or literals makes
+**both** `§4.2` caveats live at once. **Each form activates its own caveat**;
+what holds of either slice is that **both the coverage and reachability
+obligations become live within it.** And **literals are blocked on more than the
+open TCB question** -- `DecEq Char` alone is insufficient, because
+`Float`/`Float32` and `Decimal` separate runtime value equality from lawful
+proof `DecEq`, and numeric literals need expected-type checking. Corrected in
+both affected nodes.
 
 ### THE CONVOY QUESTION IS ANSWERED, AND THE ANSWER WAS "NEITHER"
 
-**Architect `evt_1rk8wyak0z7sr` refused both options I offered** and named a
-third whose carrier already exists. `LANG-CONVOY-ENCLOSING-FIELD` is now
-`ready`, `S`, **narrowed to the discriminating fixture alone.**
+**Architect `evt_1rk8wyak0z7sr` refused both options I offered.**
+`LANG-CONVOY-ENCLOSING-FIELD` is now `ready`, `S`, **narrowed to the
+discriminating fixture alone; it implements no remedy.** Entry-depth is
+insufficient (the inner match's entry depth **already includes** the enclosing
+match's fields); a threaded floor works but is coarse, trading a wrong index for
+a possible new incompleteness. **The third candidate needs no new provenance:**
+`cx.var_refinements` is keyed by `bottom_pos == abs_pos`, absolute and stable
+across nesting, so enclosing and inner refinements **collide on one key** -- and
+capability 2 inserts without consulting it. **He bounded his own reading: he has
+NOT established that the overwrite causes the `zip` failure**, and declined to
+price a remedy from a mechanism found by reading. The node's third outcome is
+*both hypotheses are wrong*, which he named himself. **Detail is in the node.**
 
-- **Entry-depth is insufficient:** when the inner match is entered, the
-  enclosing match's fields are **already in `cx.ctx`**, so its entry depth
-  includes them. The needed quantity is the depth at the **enclosing** match's
-  entry, threaded down -- which nothing carries.
-- **A threaded floor would work but is coarse** -- it excludes `let`s and every
-  other binder between the two matches, **trading a wrong index for a possible
-  new incompleteness**, the same failure class.
-- **The third candidate:** `cx.var_refinements` is keyed by `bottom_pos`, which
-  equals `abs_pos` -- **absolute and stable across nesting depth** -- so an
-  enclosing and an inner refinement for one binder **land on the same key**, and
-  capability 2 (`:3000`-`:3027`) **inserts without consulting it**. The
-  per-entry discriminator already exists.
-
-**He explicitly bounded his own reading: he has NOT established that the
-overwrite produces the `zip` failure**, and declined to price a remedy from a
-mechanism found by reading -- *"I did that in this arc already and it cost a
-turn."* So the node measures three things and **implements no remedy**, with the
-third outcome being *both hypotheses are wrong*, which he named himself and
-called legitimate.
-
-> **THE TRANSFERABLE MOVE: when routing a design question, offer the cheap
-> increment that needs no ruling alongside it.** I added *"a failing two-vector
-> `zip` fixture is the cheapest thing that makes this concrete and does not
-> require the ruling"* as a fallback; he adopted it in terms. **A blocked node
-> became a released one in one exchange.**
-
-Cleared false positive, recorded so nobody re-investigates:
-`33-declarations.md:751` defers the `export`/re-export build to "the named
-Language follow-on", but **that build has substantially landed** -- `modules.rs`
-carries the export tables and abstract export, `error.rs:612` the re-export
-collision error.
-
-### STILL OWED BY THE OPERATOR -- BOTH ALREADY RAISED, NEITHER BLOCKING
+### STILL OWED BY THE OPERATOR -- THREE, AND ONE OF THEM BLOCKS AN IDLE RING
 
 Do **not** re-raise these without new information; re-posting a standing
 question is the servicing loop `§10-a` exists to stop.
 
-1. **`LANG-FOREIGN-NAME-FORMAT-CHARS`** -- *whose reading is the threat model?*
+1. **THE V3 FORK, `evt_h6pbx30amprj`, raised 2026-08-14** -- and it is the one
+   that **parks Verify**. Both sides are now priced: the **D fragment** costs two
+   irreducible trusted-base postulates per registrant (`check.rs:1253`, `:1302`,
+   `:1308`) across twenty closed atoms and **can start today**; the **Kripke
+   embedding** is one hole of twenty-two but a hard `AC-R3c` requirement, and the
+   merged decomposition report (`docs/program/v3-kripke-decomposition.md`) found
+   it **presently unsizeable** -- no honest prover-side first increment exists,
+   and its two kernel-facing theorems cannot be assigned to Verify at all.
+   ⇒ **The question is not "which is worth more" but "TCB cost, or a parked
+   team".** Both are the operator's.
+   **This item had fallen off this list** while the fork sat priced since
+   2026-08-14 02:51 and Verify sat idle. That is the failure to not repeat.
+2. **`LANG-FOREIGN-NAME-FORMAT-CHARS`** -- *whose reading is the threat model?*
    If Ken source is read by agents consuming bytes, a bidi override deceives
    nobody; if by humans in a terminal, it may. `gate: operator`, and its body has
    said since 2026-08-13 that **neither disposition may be built** until it is
    answered.
-2. **The decidable-equality TCB question** (`evt_30gckze0jryj4`) -- is widening
-   decidable equality worth two irreducible postulates per registrant? It gates
-   `LANG-DECEQ-CHAR-LAWFUL-INSTANCES`, which cannot be scoped or sized until it
-   is answered.
+3. **The decidable-equality TCB question** (`evt_30gckze0jryj4`) -- **this is the
+   D-fragment side of item 1**, asked separately and earlier. Answering item 1
+   answers this. It gates `LANG-DECEQ-CHAR-LAWFUL-INSTANCES`.
+
+**Idle rings, and why each is idle -- so nobody re-measures this.** Kernel:
+`KERNEL-NESTED-IND` waits on `RT-NESTED-IH-NATIVE-REALIZATION`, whose successor
+`RT-CHECKED-IH-REALIZATION-AUTHORITY` is `ready` but **queued behind the
+RecursiveDescent chain in Runtime's single-implementer ring** -- a resource
+constraint under a priority the operator already set, **not framing debt and not
+a question to re-ask**. Verify: item 1. Foundation: `DS-9` is `draft` behind
+`KERNEL-NESTED-IND`, and the ring is stood down by me.
 
 ### ADVERSARY -- THREE HUNTS TRIAGED, NONE REPLIED TO
 
