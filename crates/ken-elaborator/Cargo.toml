@@ -27,3 +27,4 @@ unicode-normalization = "0.1"
 
 [dev-dependencies]
 ken-interp = { path = "../ken-interp" }
+tempfile = "3"

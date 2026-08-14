@@ -619,24 +619,34 @@ fn r3_4b_compile_artifact(
 /// object from the same fixed source into its own output directory.
 #[test]
 fn r3_4b_observation_feature_is_native_artifact_identical() {
-    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
-        "r3-4b-observation-feature-{}",
-        std::process::id()
-    ));
-    let off_target = root.join("feature-off-target");
-    let on_target = root.join("feature-on-target");
-    let off_output = root.join("feature-off-artifact");
-    let on_output = root.join("feature-on-artifact");
+    let root = tempfile::Builder::new()
+        .prefix("r3-4b-observation-feature-")
+        .tempdir_in(env!("CARGO_TARGET_TMPDIR"))
+        .expect("create Cargo-owned feature-identity scratch");
+    let off_target = root.path().join("feature-off-target");
+    let on_target = root.path().join("feature-on-target");
+    let off_output = root.path().join("feature-off-artifact");
+    let on_output = root.path().join("feature-on-artifact");
 
     let off_bytes = r3_4b_compile_artifact(&off_target, &off_output, false);
     let on_bytes = r3_4b_compile_artifact(&on_target, &on_output, true);
 
-    assert!(
-        !off_bytes.is_empty() && !on_bytes.is_empty(),
-        "the identity relation must compare two emitted objects, not empty buffers"
-    );
-    assert_eq!(
-        off_bytes, on_bytes,
-        "the feature-off and feature-on native object artifacts must be byte-identical"
-    );
+    let identity = std::panic::catch_unwind(|| {
+        assert!(
+            !off_bytes.is_empty() && !on_bytes.is_empty(),
+            "the identity relation must compare two emitted objects, not empty buffers"
+        );
+        assert_eq!(
+            off_bytes, on_bytes,
+            "the feature-off and feature-on native object artifacts must be byte-identical"
+        );
+    });
+    if let Err(failure) = identity {
+        let preserved = root.keep();
+        eprintln!(
+            "feature-identity artifacts preserved at {}",
+            preserved.display()
+        );
+        std::panic::resume_unwind(failure);
+    }
 }
