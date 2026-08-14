@@ -11,6 +11,44 @@ github: null
 origin: "Measured by the Steward 2026-07-27 at origin/main e700b861 while discharging the CAT-CAPEX ordering question; not routed by any ring. Re-measured and FRAMED by the Steward 2026-08-14 at main a12f37b7, at which point both recorded holds were discharged -- SPEC-IDENT-BLESSED merged, and CAT-CAPEX (the exemplar this node's own scope note said should land first) merged. The re-measurement found a fourth stale axis the original census missed and corrected the size of the other three."
 ---
 
+> # RESCOPED 2026-08-14 AFTER `D0` HARD-STOPPED. READ THIS FIRST.
+>
+> **`D0` fired stop condition 3 before any edit, which is the frame working.
+> Two of the three reasons were defects in this frame, and both are fixed
+> below.** Steward ruling `evt_4atyx2jgvmtae`, on spec-leader's stop
+> `evt_43kamkngvr1qa`.
+>
+> **The four-respellable / two-unexpressible partition in this file is FALSE.**
+> It measured the FS axis and generalised to the chapter. **`send` and
+> `Cap_Net` appear nowhere in `catalog/` and nowhere in `38-ffi-io.md` -- they
+> exist only inside `62` itself.** So `exfil` is a **third** unexpressible
+> example, and **`:337` (`view send (c : Cap_Net) …`, `§6`) is a fifth
+> unexpressible site this frame never enumerated.**
+>
+> ⇒ **The Net capability surface did not land in any form**, and the chapter's
+> `§3.1` use-site bound `a ⊑ authority c` needs a quantification `38 §1.3.1`
+> says v1 does not provide. **`62` is written in the present tense about a
+> capability surface that only partly exists.**
+>
+> **A partial respell would make the chapter MORE internally inconsistent** --
+> some examples current, some retired, and no marker telling a reader which.
+>
+> **The rescope:**
+>
+> 1. **`D0`'s census IS this node's durable deliverable.** Land the per-example
+>    table across the four axes, plus every unexpressible site paired with the
+>    normative sentence that refutes it: `:173`, `:337`, `sandbox`, the `AC3`
+>    pair, `exfil`.
+> 2. **`D1`-`D4` are HELD, not cancelled.**
+> 3. **ONE question routes to the Architect** on the enclave's own edge, need
+>    surfaced and vehicle left open: *what is `62`'s standing relative to the
+>    landed surface?* **Not five questions, and no bundled mechanism** -- a
+>    bundled mechanism anchors the owner and its rejection then reads as "the
+>    need cannot be met".
+>
+> **Do not let the `AC3` pair quietly disappear while this is held.** `62 §3.2`
+> names it as the net holding the order relation's orientation.
+
 > ## BOTH RECORDED HOLDS ARE DISCHARGED. This node was `draft` for a reason
 > ## that expired, and the expiry is why it is being released now.
 >
@@ -213,10 +251,18 @@ rather than closed it.**
 
 ## Acceptance criteria
 
-**`AC-1` -- no occurrence of a retired name survives in the chapter.**
-`write_at`, `readFile`, and `Cap_FS` are absent, and every `view` that was a
-definition keyword is gone. **State the post-change counts**, so the claim is
-checkable rather than asserted.
+**`AC-1` -- no RETIRED name survives in the chapter.** `write_at`, `Cap_FS`,
+and every `view` used as a definition keyword are absent. **`readFile` and
+`writeFile` are CURRENT and must REMAIN**, including the existing correct
+occurrences at `:236` and `:386`. **State the post-change counts**, so the
+claim is checkable rather than asserted.
+
+> **Corrected 2026-08-14 after `D0` hard-stopped.** This AC previously listed
+> `readFile` among the names required to be absent, contradicting the same
+> frame's own axis table and `38 §1.3.1`. **The analysis was fixed and the
+> enforcement was not** -- an AC states a rule in outcome language, so a
+> vocabulary sweep of the prose does not reach it. Found by spec-leader at
+> `evt_43kamkngvr1qa`.
 
 **`AC-2` -- every respelled example is valid against the landed surface**, in
 arity, in authority index, and in **result type shape**. The `FS`-indexed
