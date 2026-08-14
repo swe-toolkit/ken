@@ -63,34 +63,34 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~11:2xZ. **`main` = `6c574cdd`.**
-> **A PUBLISHER IS IN FLIGHT: PR #2196**, `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH`
-> exact `ce2a7d37`, 822s pre-poll, log `publish14.log`. **`pgrep -af '^bash
-> scripts/scripted-pr-automerge.sh'` before relaunching anything** — it survives
-> compaction. **Do not `git fetch` while it holds the window.**
+> ### RESUME HERE — state at 2026-08-14 ~12:0xZ. **`main` = `54f7c84a`.**
+> **RUNTIME IS WORKING the operator's priority node. LANGUAGE IS IDLE and is
+> the next §1 obligation. Publish queue empty, no publisher, tree clean.**
 >
-> **Eleven PRs landed today, all M6 blob-verified.** Most recent: `#2189`
-> `294fceac` `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` · `#2190` `d8de7023` tracker
-> sync · `#2191` `7543ddcc` ABI-order fold · `#2192` `3f04953b` coldness fold ·
-> `#2193` `fea9cd96` releases · `#2194` `5edd3de3` successor frame · `#2195`
-> `6c574cdd` `LANG-REFINED-FALLBACK-COLDNESS-CLAIM`. M8/M9 sent for every code
-> merge.
+> **Fifteen PRs landed today, all M6 blob-verified.** Most recent: `#2195`
+> `6c574cdd` `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` · `#2196` `1200edf0`
+> `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` · `#2197` `998c3c83` closeouts +
+> the operator ruling · `#2198` `54f7c84a` the release. **M8/M9 sent for every
+> code merge.**
 >
 > **`#2189` cost one publisher abort on a FALSE RED, and the lesson is
 > positional.** The SHA was unchanged by design, so GitHub still carried the
-> **pre-repair** check-runs from `06:57`/`07:08`. **A failing check on an
-> unchanged SHA may be history — discriminate by `started_at`.** The publisher
-> does not. A direct `gh pr merge` was correctly refused by branch protection;
-> `--admin` is not the Steward's to use.
+> **pre-repair** check-runs. **A failing check on an unchanged SHA may be
+> history — discriminate by `started_at`.** The publisher does not. A direct
+> `gh pr merge` was correctly refused by branch protection; **`--admin` is not
+> the Steward's to use.**
 >
-> ### UNPUBLISHED LOCAL WORK — publish when #2196 clears
+> ### LANGUAGE IS IDLE — §1 says this is the only work until it is kicked
 >
-> **This commit** (node flip to `merged` + tracker) and
-> **`LANG-POW10-CASCADE-LITERAL-CLAUSE`** (`ready`, `XS`, untracked until it
-> lands). The latter is an Architect scope hand-off from `evt_5jmye3pdj3ra7`.
-> **Read its "why this is not a second COLDNESS-CLAIM" section before sizing
-> it** — `decimal_char.rs:60-62` is over-broad in the same way, but its
-> conclusion rests on a **different and TRUE** property (no
+> **Gate and compact the ring BEFORE kicking.** Three `ready` nodes:
+> `LANG-GADT-SEQUENCE-TRACKER-GAP` (`S`, the leader's stated next),
+> `LANG-STACK-ARC-EVIDENCE-USABILITY` (`S`), and
+> `LANG-POW10-CASCADE-LITERAL-CLAUSE` (`XS`) — **the last needs no release of
+> its own and should ride the next `ken-elaborator` candidate.**
+>
+> **Read `LANG-POW10`'s "why this is not a second COLDNESS-CLAIM" section
+> before sizing it.** `decimal_char.rs:60-62` is over-broad in the same way, but
+> its conclusion rests on a **different and TRUE** property (no
 > `saturating_*`/`.min(_)`/`clamp` in the generated cascade). **A wording repair
 > on a sound argument, not a second false justification.**
 >
@@ -119,23 +119,25 @@
 > second on "six seats idle beats one lane's depth." **A priority call between
 > `ready` WPs is the operator's under §3.** Do not re-derive it.
 >
-> ### OWED AFTER #2196 LANDS, IN ORDER
+> ### RUNTIME IS WORKING IT — anchor `evt_gzh1p738kfa1`
 >
-> 1. **M6** blob 2/2 from **declared** base `5edd3de3` —
->    `crates/ken-runtime/src/cranelift_backend.rs`,
->    `crates/ken-cli/tests/dasm_c2_observation_artifact_identity.rs`. **The
->    declared base is NOT `main` and that is by design** (`6c574cdd` landed
->    while it queued); `merge-tree` against live `main` already gave exactly
->    those two paths, both `M` — no false delete.
-> 2. **M7** flip `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` to `merged`,
->    `gen-progress.sh`. **M8** Adversary `agt_37vnwmcdxhw00` naming the landed
->    squash. **M9** runtime-leader `agt_37reqrd72cg00`.
-> 3. **Gate + compact the Runtime ring, THEN release
->    `RT-CHECKED-IH-REALIZATION-AUTHORITY`** (`ready`, `M`, no deps). **Never
->    publish inside a gate window** — the reset is a snapshot and pins seats to
->    a stale `main`.
-> 4. **Language next: `LANG-GADT-SEQUENCE-TRACKER-GAP`** (`ready`, `S`). The
->    leader has the order; gate before kicking.
+> Ring gated and compacted at `998c3c83`, all three seats verified
+> individually; implementer confirmed pickup. **Do not re-kick.**
+>
+> **The work is `D2k`, INSIDE this node** — Architect `evt_5wvk3e8k1bjqn`,
+> **no new node.** Six expressions at two walls: rows 1/4 plus row 5's
+> after-hole at the `StaticWorkerBinding` wall, row 3 at the singular-
+> specialization wall. Runtime's own estimate to `#6d` closure was *"closer to
+> a week"* ⇒ **expect increments and accepted partials, not one candidate.**
+>
+> **I made `D2k-0`'s redness claim a thing to TEST, not a premise.** The node
+> records it as unverified by anyone. If it does not red as stated, **that is
+> a finding worth more than the increment.**
+>
+> **Still ruled and relitigated often:** `10369776` is held evidence only, not
+> a candidate or repair base. **Zero new `#[ignore]`** — my earlier quarantine
+> ruling at `evt_7vhjcstd37a50` is withdrawn and was not revived. The old-green
+> semantic controls are not disposable.
 >
 > ### M3 CITED-SOURCE HIT — routed, and the direction is the point
 >
