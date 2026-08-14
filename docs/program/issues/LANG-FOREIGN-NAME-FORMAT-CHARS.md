@@ -4,7 +4,7 @@ title: "Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FE
 status: draft
 owner: language
 size: XS
-gate: none
+gate: operator
 depends_on: []
 blocks: []
 github: null
@@ -123,6 +123,13 @@ smaller-surface version of the defect the `Cc` node avoided.**
 > Adversary, which explicitly declined to rule on it; the Steward agrees it is
 > not its call. **Until it is answered, do not build either disposition** — and
 > do not read this open node as an implied obligation to build one.
+
+**`gate:` corrected `none` → `operator`, 2026-08-14.** The body has said since
+2026-08-13 that neither disposition may be built until the operator answers, and
+the frontmatter said the node was ungated. **That is the exact misreading this
+node's own opening paragraph warns about** — an open node whose metadata implies
+it is startable reads as available work, and `gate:` is the field a reader
+filters on rather than the prose. The gate is not new; only its recording is.
 
 ## Not this node
 

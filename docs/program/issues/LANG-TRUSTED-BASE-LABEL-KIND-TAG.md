@@ -45,6 +45,24 @@ it protects, replacing a doc-comment measurement that nothing enforced.
 indistinguishable**, so a substitution *among those three* is still invisible to
 `AC-6`. The candidate's own doc comment says so, which is the correct handling.
 
+**Measured unexploitable, 2026-08-14, Adversary `evt_6e1n4b6xq347y` answering a
+direct challenge.** The three entries are **generated, not hand-listed**:
+`conversions.rs:307-361` loops over `abi_scalar_specs()`, and each iteration
+builds `{snake}_to_int`, `int_to_{snake}_raw` and `{snake}_int_retract` from one
+`spec.snake`. Only the middle one is unregistered (`globals.remove` at `:360`).
+⇒ **Each unregistered entry is coupled to two named siblings from the same
+iteration and the same string, so a substitution among the three cannot occur
+without changing two entries `AC-6` compares exactly. The shape is not
+independently expressible in this generator.**
+
+**And a stronger check already guards that exact population, one layer down.**
+`conversions.rs:303/364-374` brackets the loop with a `BTreeSet` of
+`trusted_base()` before and after and compares the delta against the ids the
+block created. **It is id-keyed rather than label-keyed and returns
+`Err(ElabError::Internal)` from `ElabEnv::new()`, so it runs in production on
+every elaboration** — it has none of `AC-6`'s blindness and covers precisely
+these entries.
+
 This is a **narrower residue of the same shape**, not a miss: the node was cut
 to close the two-namespace collapse, and it did. **No node is owed and none is
 authorized** — filing one would be creating work from an aesthetic preference
