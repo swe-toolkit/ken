@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 05:32:04Z — from 253 issue file(s) in `docs/program/issues/`.
+2026-08-14 05:46:54Z — from 254 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -129,6 +129,7 @@ the committed file matches the generator's output.
 | `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` | `assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it | merged | language | XS | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
 | `LANG-PRELUDE-COLLECTIONS` | `37 §9` requires the List combinators delivered in the prelude and they are declared inside a test file instead -- `prelude.rs` supplies `data List` and no operation over it, so a program that imports the prelude has a list type and no way to map over it; and `filter` was deferred on the ground that `Bool` is an opaque non-matchable primitive, which is no longer true, with the promised follow-on never filed | merged | language | S-M | none | 2144 |
+| `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` | `AC-6`'s doc says a live differential is impossible because `ElabEnv::new()` has no 'before' env -- true of an ENV-level bracket and false of a BLOCK-level one, which is the established idiom four sites away in the same crate, so the instrument the comment says does not exist is writable, id-keyed, and fails in production | ready | language | S | none | — |
 | `LANG-PRELUDE-ELABORATION-DEPTH` | Elaboration has an unstated stack requirement that exceeds Rust's 2 MiB spawned-thread default: every compilation elaborates the whole prelude, `elab.rs:997` measures ~115 KiB of headroom out of 2 MiB, and thirteen sites across four crates independently bumped their thread to 256 MiB without any stated rule -- so the rest of `37 §9` is a queue of prelude additions spending a margin nobody measures and no site states | merged | language | S | none | — |
 | `LANG-RECORD-STACK-OVERFLOW` | The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token | merged | language | M | none | — |
 | `LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC` | The selector's non-universe classifier arm reports the elaborator's own refusal as KernelRejected and fabricates a Type(?0) expectation that Omega would equally satisfy | merged | language | S | none | — |
@@ -297,6 +298,7 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
+- `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` — `AC-6`'s doc says a live differential is impossible because `ElabEnv::new()` has no 'before' env -- true of an ENV-level bracket and false of a BLOCK-level one, which is the established idiom four sites away in the same crate, so the instrument the comment says does not exist is writable, id-keyed, and fails in production
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` — The always-on `dasm-c2-observation` feature has no artifact-identity control, and the always-on choice is what makes the off-configuration unreachable from the crate the controls live in -- the sibling's nested-cargo A/B needs a carrier feature before it can be reused
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
