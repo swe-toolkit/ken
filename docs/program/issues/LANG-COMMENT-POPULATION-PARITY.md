@@ -1,7 +1,7 @@
 ---
 id: LANG-COMMENT-POPULATION-PARITY
 title: "The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
@@ -80,6 +80,90 @@ free and `Line`/`Block` is caught only incidentally.
 **No change to `attach_comments`, to the `From` impl, or to any placement
 rule.** Both are correct; the Adversary checked and so did the Steward. This
 node changes what the tests count and what the pin file claims.
+
+## Merged 2026-08-14
+
+**Candidate `0580a7449c9d2011681fd7e7a89e13636076848b`, landed as squash
+`be8535b9`** (PR #2158, CI green; Decision `dec_72wd6gwaqmg4n`, Architect,
+read `resolved` from the object). Merge-base `bc62216a`, derived independently
+and matching the declared value; three commits, four paths, `+80/-31`; **4/4
+blobs verified identical after landing.** Both SHAs are recorded because a
+squash rewrites the candidate, so it is never an ancestor of `main` — ask
+content, not ancestry.
+
+**`AC-6a` verified on the landed tree.** The `LOAD-BEARING SHAPE` block is gone
+from `kenfmt_b1_lossless.rs`, and neither phrase the AC forbids survives
+anywhere in it: no prohibition on changing the fixture's configuration, no
+claim that the pin file cannot re-derive an arm. That AC existed because a
+warning outlives its cause silently, and the surviving clause was aimed at
+exactly the author `D4` invites into that file.
+
+### The sequencing is the part worth reusing
+
+`cdee99a6` lands the in-crate four-arm pin **first**, `a9c209bc` widens the
+filter and corrects the `D5` claim, and `0580a744` only then retires the
+superseded text. **There is no intermediate commit where the `Line` arm is
+unpinned** — the replacement is fully in place before the thing it replaces is
+removed. The natural order is to delete the stale comment while already editing
+that file, and that order is the one that leaves a window.
+
+### What the Architect retracted, and why it generalises
+
+They had required the `LOAD-BEARING SHAPE` note two reviews earlier, and praised
+it for saying *"nothing reds."* Their own reading of the miss: **the right
+question was not *"how do we protect this fragile coupling?"* but *"why does the
+coupling exist?"*** Nobody, reviewer included, asked why the pin had to be an
+*integration* test — and once asked, an in-crate `#[cfg(test)]` module beside the
+`From` impl names all four arms and the coupling dissolves. `D5`'s new header
+carries the distinction forward: the old claim was **unachievable**, not merely
+unproven, so a future author reading *"this file doesn't pin the arms"* does not
+go rediscover the wall.
+
+**`D4` is a discriminating pair, not a coverage bump** — the fixture carries one
+block and one doc-line comment and **no** `Line`, so restoring the old filter
+reds it at `left: 2 right: 0`. A fixture containing a `LineComment` would have
+passed under both filters. The population claim beside it was checked
+independently: grepping `catalog/` for `{-` and leading `---` returns zero files.
+
+## Residual: `D3`'s export has no recorded justification
+
+Architect finding, non-blocking, at `evt_73bmxjfmkv7bq`, on the approved
+candidate. **Not a defect in what landed** and not a reason to reopen the node.
+
+**`D2` states a rule and `D3` takes the other branch, one file apart.** `D2`'s
+own comment says *"in-crate because `CommentKind` is `pub(crate)` and no
+integration test can name it"* — when an integration test cannot reach
+something, move the test, not the boundary. `D3` meets the identical obstacle
+for `is_comment` and moves the boundary, `fn` to `pub fn`.
+
+**Censused at the approved SHA: zero production consumers outside the module.**
+
+```
+src/lossless.rs:96              pub fn is_comment(self) -> bool {
+src/lossless.rs:408                 .filter(|item| item.kind.is_comment())
+src/lossless.rs:798                 .filter(|item| item.kind.is_comment())
+tests/kenfmt_b1_lossless.rs:25      .filter(|item| item.kind.is_comment())
+```
+
+The only external caller is the integration test that needed it, and the
+method's doc comment still describes **internal** callers
+(`attach_comments`/`validate_attachment_totality`). So a reader asking *"why is
+this `pub`?"* finds an answer about `attach_comments`, and the export's only
+visible cause is a test's reach.
+
+**The asymmetry is defensible and the point is that nobody wrote it down.**
+Exporting `CommentKind` would publish a lexer internal; exporting one predicate
+on an already-public enum, in a module whose own docstring names *"formatter and
+source-tooling clients"* as its audience, is a different act. **The repair is
+one clause on the method stating the caller-facing contract** rather than the
+internal one.
+
+**Not filed as a node**, and explicitly **not** the alternative repair — moving
+`assert_round_trip`'s totality check in-crate and reverting the `pub` is a
+larger change for a smaller gain, and the Architect said as much. It rides the
+next Language candidate that enters `src/lossless.rs`.
+
+## Not this node, continued
 
 **No catalog content change.** Whether `catalog/` should contain a block
 comment — so that the corpus exercises a landed surface feature rather than
