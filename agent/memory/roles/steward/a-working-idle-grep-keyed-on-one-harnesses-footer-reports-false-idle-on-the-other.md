@@ -79,6 +79,35 @@ consulting.
 *anything* in the last few lines carries a running timer or a
 `background terminal running` clause, whatever the composer shows.
 
+## A THIRD false-idle source: the seat you just woke has not spun up yet
+
+**Measured 2026-08-14.** The Steward posted a mention to rouse the Architect,
+captured its pane **seconds later**, saw a bare `❯` prompt with no timer, and
+concluded *"the mention did not wake it — Claude Code seats need a tmux nudge."*
+It then sent one.
+
+**The seat was already working.** A capture moments later showed
+`Whirring… (4m 17s · thinking with high effort)`, two shell commands run, and
+the mention itself echoed in the pane as
+`← convo-channel: @you mentioned by steward`. The nudge landed as a **queued
+message** behind the live turn.
+
+⇒ **A pane read taken immediately after you post is not a measurement of
+whether the post landed.** There is a spin-up gap, and during it a genuinely
+woken seat is indistinguishable from one that never received anything.
+
+**This instance was harmless — a redundant queued message that restated the
+task. The same inference is not harmless when the recovery is bigger.** The
+prescribed recoveries for a seat that "did not wake" include `moot compact` and
+a handoff-gate reset, and both land destructively on a seat that was fine. The
+`Cf` of this file's opening lesson applies unchanged: **false idle invites
+action, and the action is what does the damage.**
+
+**The rule this file already stated covers it — apply it to wake-checks too.**
+*"A second read a few seconds later distinguishes them for free."* Do that
+before escalating from mention to nudge, not only before escalating from quiet
+to compact.
+
 ## Why the direction matters
 
 **False idle invites action; false busy invites waiting.** This detector fails
