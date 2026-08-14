@@ -781,6 +781,28 @@ surface their own gaps.
   > Recorded because a Forbidden list is read on its own, far from the
   > deliverable that carves it out.
 
+## `c2-pre` MERGED 2026-08-14 — the node stays `active`, `c2` proper is owed
+
+**Candidate `3e8de4b87962442b77283dcacfce2c81d6d98cfa`, landed as squash
+`57bf1721`** (PR #2163, CI green; Decision `dec_nram6n8jkpgn`, Architect, read
+`resolved` from the object). Merge-base `be8535b9`, derived independently and
+matching the declared value; one commit, six paths, `+341/-6`; **6/6 blobs
+verified identical after landing.** Both SHAs recorded — a squash rewrites the
+candidate, so it is never an ancestor of `main`.
+
+**Status deliberately unchanged.** `c2-pre` is the prose-and-observation slice.
+`c2` — the semantic admission that clears the real `D5` scalar-merge refusal —
+has not landed, so nothing downstream is unblocked yet. In particular
+**[[RT-NESTED-IH-NATIVE-REALIZATION]] does NOT flip on this merge**; its
+condition is `c2` merging, and reading `c2-pre` as satisfying it would arm a
+frame against an admission surface that does not exist.
+
+**Stale-base check, recorded because the answer was "do nothing":** `main` moved
+five doc-only commits under this candidate. The intersection of the candidate's
+changed paths with `main`'s was **empty**, so the staleness was immaterial and no
+rebase was taken — the branch was frozen under an open PR and a rebase would have
+re-pointed it at a SHA no reviewer approved.
+
 ## Residuals from `c2-pre`'s approval — two, both non-blocking
 
 Architect findings at `evt_3yk7f4p6k7y64`, on candidate `3e8de4b8`. **Neither is
