@@ -489,9 +489,11 @@ fn redundant_wildcard_arm_shadowed_at_three_leaves_names_every_subsuming_arm() {
             // Report the diagnostic verbatim, per the frame.
             let rendered = e.to_string();
             println!("rendered diagnostic: {rendered}");
-            assert!(
-                rendered.starts_with("redundant match arm at"),
-                "unexpected diagnostic: {rendered}"
+            assert_eq!(
+                rendered,
+                "redundant match arm at 84-98: pattern already covered by the earlier \
+                 arm(s) at 33-47, 50-64, 67-81",
+                "the rendered diagnostic must include each structured subsuming span"
             );
         }
         Ok(_) => panic!("wildcard arm shadowed at every leaf should have been flagged"),
