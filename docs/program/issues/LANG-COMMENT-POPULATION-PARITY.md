@@ -127,6 +127,22 @@ independently: grepping `catalog/` for `{-` and leading `---` returns zero files
 
 ## Residual: `D3`'s export has no recorded justification
 
+> ### OWNED BY A NODE AS OF 2026-08-14, AND THE DISPOSITION IS RETIREMENT,
+> ### NOT DOCUMENTATION. See [[LANG-LOSSLESS-COUNT-ASSERTION-RETIRE]].
+>
+> **The repair below — "one clause on the method" — is superseded.** An
+> Adversary hunt on this node's own squash (`evt_6n7y2mzn83grn`) measured the
+> other end of the same fact: **the assertion that `pub` exists to serve cannot
+> fire.** `attach_comments` and `validate_attachment_totality` are the two sides
+> `parse_lossless` reconciles at `src/lossless.rs:235` with a `?`, so the
+> helper's third copy of the filter compares two sets production has already
+> agreed on. Narrowing `attach_comments` reds at
+> `kenfmt_b1_lossless.rs:10`, never reaching `:27`.
+>
+> ⇒ **The export and the assertion are one item.** Documenting the export would
+> have written a justification for a line that states a theorem. The node above
+> drops the assertion and reverts the `pub`, which closes both.
+
 Architect finding, non-blocking, at `evt_73bmxjfmkv7bq`, on the approved
 candidate. **Not a defect in what landed** and not a reason to reopen the node.
 
