@@ -40,6 +40,24 @@ pass and the `c2` result-match region is byte-identical.
 
 **No `AC-K12` claim is made and none is owed here** (`AC-7`).
 
+**Claim scope, and it bounds what `D1` bought.** *"Declined by a predecessor"*
+is measured. *"A native path exists"* is **not measured past the `Closure`
+arm** — the instrument sees only the **first** refusal, so a second, later
+decline is invisible until the first is repaired, and `D2`/`D3` would discover
+any further ones **one at a time**. Adversary `evt_2j0h3vgn6gtqv`. Stated
+because `AC-6`'s own distinction is that *"never reached"* is two facts, and the
+residual half should be written rather than left to the reading.
+
+**Residual, non-blocking, rides the next candidate entering this file.**
+`assert_nested_full_pipeline_nat` is called at `nc14_data_match_lowering.rs`
+`:316`, `:559` and `:581`, and **only `:316` records that the helper carries an
+`AC-6` transition sentinel.** The other two declare a durable-invariant promise
+about the interpreter pipeline. **When the boundary moves, all three red, and
+two will read as a regression in a fold discriminator.** The helper's
+`Ok(artifact)` arm carries the right instruction and will be found; the call
+sites' own prose will still say the test is about something else. One sentence
+at each of `:559` and `:581`.
+
 ### What remains, stated as of 2026-08-14 — READ THE GATE BEFORE PLANNING D2
 
 **`D2`-`D5` are owed. `D2` and `D3` are NOT startable**, and prose that reads
