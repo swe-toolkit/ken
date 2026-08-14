@@ -203,17 +203,82 @@ fn assert_nested_full_pipeline_nat(
     target_name: &str,
     source: &str,
     expected: usize,
+    expected_native_declarations: &[&str],
 ) {
-    let program = nested_checked_runtime_program_for_source(package_name, target_name, source);
+    let mut program = nested_checked_runtime_program_for_source(package_name, target_name, source);
     let target = decl_symbol(package_name, target_name);
+    let target_symbol = target.to_string();
+    // MEASURED: the exact RuntimeProgram declaration set supplied to native
+    // emission. CLAIMED: the selected target is in that population. THE GAP:
+    // this does not show that native lowering defined it; the AC-6 transition
+    // sentinel below records the predecessor refusal that currently prevents
+    // an object artifact from existing.
+    let native_declarations = program
+        .declarations
+        .iter()
+        .map(|declaration| declaration.symbol.clone())
+        .collect::<BTreeSet<_>>();
+    let expected_native_declarations = expected_native_declarations
+        .iter()
+        .map(|name| decl_symbol(package_name, name).to_string())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        native_declarations, expected_native_declarations,
+        "the declaration set supplied to native emission changed"
+    );
     assert!(
-        program
-            .declarations
-            .iter()
-            .any(|declaration| declaration.symbol == target.to_string()),
-        "checked runtime program contains the selected {target_name} declaration"
+        native_declarations.contains(&target_symbol),
+        "the declaration set supplied to native emission must contain the selected \
+         {target_name} declaration; emitted input: {native_declarations:?}"
     );
     assert_eq!(interpreter_nat_for_source(source, target_name), expected);
+
+    let target_body = lowered_body(&program, &target);
+    let example = ken_runtime::RuntimeExample {
+        name: format!("{package_name}-{target_name}-native-emission"),
+        checked_core_shape: "nested-inductive recursive Nat result".to_string(),
+        ir: target_body,
+        observation: RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
+            constructor: StableSymbol::constructor(
+                &decl_symbol(package_name, "Nat"),
+                if expected == 0 { "Zero" } else { "Suc" },
+            )
+            .to_string(),
+            args: Vec::new(),
+        }),
+    };
+    program.examples = vec![example.clone()];
+    let runtime = runtime_ir_report_for_example(&program, &example, "D1 emission probe");
+    let scalar_merge_scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
+    let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
+        &program,
+        &runtime,
+        &ken_runtime::NativeSeedEnvironment::empty(),
+        format!("ken_nested_ih_{target_name}"),
+    );
+    let scalar_merge_arrivals = scalar_merge_scope.finish();
+    assert!(
+        scalar_merge_arrivals.is_empty(),
+        "the nested-IH native-emission attempt was expected to decline before the existing \
+         scalar-merge in-edge, but recorded {scalar_merge_arrivals:#?}"
+    );
+    match native {
+        Err(ken_runtime::CraneliftBackendError::Unsupported(refusal)) => {
+            assert_eq!(refusal.construct, "Closure");
+            assert_eq!(
+                refusal.reason,
+                "closures are callable but not observable ground values in native lowering"
+            );
+        }
+        Ok(artifact) => panic!(
+            "nested-IH D1 unexpectedly emitted `{}`; replace this AC-6 transition sentinel \
+             with the four separate realization observations",
+            artifact.entry_symbol
+        ),
+        Err(other) => panic!(
+            "nested-IH D1 reached a different native-emission boundary: {other}"
+        ),
+    }
 }
 
 #[test]
@@ -245,12 +310,15 @@ fn user_data_two_payload_binders_preserve_de_bruijn_order() {
 fn nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_three() {
     // Promise class: durable invariant. The surface selector consumes both
     // recursive Join results through elaboration, final kernel checking,
-    // checked-artifact erasure, and interpreter evaluation.
+    // checked-artifact erasure, and interpreter evaluation. The helper's
+    // native-emission assertion is an AC-6 transition sentinel for the current
+    // predecessor refusal, not a native-realization claim.
     assert_nested_full_pipeline_nat(
         "nested_inductive_pkg",
         "liftSizeResult",
         NESTED_LIFT_NAT_THREE_SOURCE,
         3,
+        &["liftAdd", "liftSize", "liftSizeResult"],
     );
 }
 
@@ -260,6 +328,26 @@ fn scalar_merge_observations_for_program(
     entry_symbol: &str,
 ) -> Vec<ken_runtime::DasmC2ScalarMergeObservation> {
     program.examples = vec![example.clone()];
+    let runtime = runtime_ir_report_for_example(
+        program,
+        &example,
+        "RT-DYNAMIC-ARM-SCALAR-MERGE c2 control",
+    );
+    let scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
+    let _later_native_result = ken_runtime::emit_runtime_ir_object_with_cranelift(
+        program,
+        &runtime,
+        &ken_runtime::NativeSeedEnvironment::empty(),
+        entry_symbol,
+    );
+    scope.finish()
+}
+
+fn runtime_ir_report_for_example(
+    program: &RuntimeProgram,
+    example: &ken_runtime::RuntimeExample,
+    evidence_source: &str,
+) -> ken_runtime::RuntimeIrRunReport {
     let artifact = ken_runtime::RuntimeArtifactIdentity {
         package_identity: program.package_identity.clone(),
         core_semantic_hash: program.core_semantic_hash,
@@ -269,7 +357,7 @@ fn scalar_merge_observations_for_program(
     let unavailable = |reason: &str| ken_runtime::RuntimeIrEvidenceFact::Unavailable {
         reason: reason.to_string(),
     };
-    let runtime = ken_runtime::RuntimeIrRunReport {
+    ken_runtime::RuntimeIrRunReport {
         evaluator: ken_runtime::RuntimeIrEvaluator::DirectRuntimeIrEvaluatorV1,
         target: target.clone(),
         artifact: artifact.clone(),
@@ -277,7 +365,7 @@ fn scalar_merge_observations_for_program(
             artifact,
             target: target.clone(),
             observation: example.observation.clone(),
-            evidence_source: "RT-DYNAMIC-ARM-SCALAR-MERGE c2 control".to_string(),
+            evidence_source: evidence_source.to_string(),
         },
         evidence: ken_runtime::RuntimeIrRunEvidence {
             package_identity: program.package_identity.clone(),
@@ -291,21 +379,13 @@ fn scalar_merge_observations_for_program(
         trust: ken_runtime::RuntimeIrTrustReport {
             tier: ken_runtime::RuntimeIrTrustTier::RuntimeIrObservation,
             evaluator: unavailable("the control supplies a comparison input"),
-            interpreter_oracle: unavailable("outside c2"),
-            native_backend: unavailable("measured by the c2 seat observer"),
-            object_artifact: unavailable("outside c2"),
-            linker: unavailable("outside c2"),
-            source_level_proof: unavailable("outside c2"),
+            interpreter_oracle: unavailable("reported separately by the caller"),
+            native_backend: unavailable("measured by the native-emission attempt"),
+            object_artifact: unavailable("measured by the native-emission attempt"),
+            linker: unavailable("outside this emission-only control"),
+            source_level_proof: unavailable("outside this runtime control"),
         },
-    };
-    let scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
-    let _later_native_result = ken_runtime::emit_runtime_ir_object_with_cranelift(
-        program,
-        &runtime,
-        &ken_runtime::NativeSeedEnvironment::empty(),
-        entry_symbol,
-    );
-    scope.finish()
+    }
 }
 
 #[test]
@@ -481,6 +561,7 @@ fn nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three() {
         "liftSizeDeepResult",
         NESTED_LIFT_NAT_THREE_SOURCE,
         3,
+        &["liftAdd", "liftSize", "liftSizeDeepResult"],
     );
 }
 
@@ -502,6 +583,7 @@ fn nested_recursive_bag_dropped_join_fold_reaches_nat_one() {
         "liftSizeResult",
         &source,
         1,
+        &["liftSize", "liftSizeResult"],
     );
 }
 
