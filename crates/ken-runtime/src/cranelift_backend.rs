@@ -101,6 +101,14 @@ pub use lowering::core::{
 // `RT-DYNAMIC-ARM-SCALAR-MERGE` `c2`: the real D5 package control's isolated,
 // default-off view of general scalar-merge decisions. The declarations are
 // doc-hidden and explicitly unsupported as production API.
+/// Whether this `ken-runtime` build includes the D5 observation entry point.
+///
+/// This fact stays available in both configurations so cross-crate controls
+/// can detect dependency feature unification without widening the gated
+/// observation facade.
+#[doc(hidden)]
+pub const DASM_C2_OBSERVATION_COMPILED: bool = cfg!(feature = "dasm-c2-observation");
+
 #[cfg(feature = "dasm-c2-observation")]
 pub use lowering::{
     dasm_c2_scalar_merge_observation_scope, DasmC2ScalarMergeObservation,
