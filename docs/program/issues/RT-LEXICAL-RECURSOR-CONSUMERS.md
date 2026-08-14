@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER, RT-CONTKEY-CONSUMING-OCCURRENCE]
+depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER, RT-CONTKEY-CONSUMING-OCCURRENCE, RT-CONTKEY-CONSUMER-DESCENT-CARRY]
 blocks: [RT-RECURSOR-TRANSPORT]
 github: null
 origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT hard stop 4, narrowed to rows 1-5 by the re-rule evt_3r4j14fv1jtj2 on the nine-expression census evt_16cmej481q7ns. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
