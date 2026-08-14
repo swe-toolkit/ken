@@ -8127,6 +8127,13 @@ struct ContinuationDiscovery {
 }
 
 #[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ContinuationConsumingOccurrenceSeedMutation {
+    BodyOrigin,
+    EliminatorOrigin,
+}
+
+#[cfg(test)]
 thread_local! {
     static WEAKEN_CONTINUATION_DECREASING_MEASURE: Cell<bool> = const { Cell::new(false) };
     static SUPPRESS_POST_SPECIALIZATION_DESCENT: Cell<bool> = const { Cell::new(false) };
@@ -8142,7 +8149,25 @@ thread_local! {
     static SUPPRESS_BINDER_BODY_RESOLUTION: Cell<bool> = const { Cell::new(false) };
     static MUTATE_PRIMARY_FUSION_KEY_DERIVATION: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
-    static MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED: Cell<bool> = const { Cell::new(false) };
+    static MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED: Cell<Option<ContinuationConsumingOccurrenceSeedMutation>> = const { Cell::new(None) };
+}
+
+#[cfg(test)]
+fn with_continuation_consuming_occurrence_seed_mutation<T>(
+    mutation: ContinuationConsumingOccurrenceSeedMutation,
+    run: impl FnOnce() -> T,
+) -> T {
+    struct Restore(Option<ContinuationConsumingOccurrenceSeedMutation>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED
+        .with(|cell| cell.replace(Some(mutation)));
+    let _restore = Restore(previous);
+    run()
 }
 
 /// Run a control with only the forward consuming-body seed replaced by the
@@ -8151,17 +8176,22 @@ thread_local! {
 pub(in crate::cranelift_backend) fn with_continuation_consuming_occurrence_seed_mutated<T>(
     run: impl FnOnce() -> T,
 ) -> T {
-    struct Restore(bool);
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(|cell| cell.set(self.0));
-        }
-    }
+    with_continuation_consuming_occurrence_seed_mutation(
+        ContinuationConsumingOccurrenceSeedMutation::BodyOrigin,
+        run,
+    )
+}
 
-    let previous =
-        MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(|cell| cell.replace(true));
-    let _restore = Restore(previous);
-    run()
+/// Run a control with only the forward consuming-eliminator seed replaced by
+/// the continuation's own match occurrence.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_continuation_consuming_eliminator_seed_mutated<T>(
+    run: impl FnOnce() -> T,
+) -> T {
+    with_continuation_consuming_occurrence_seed_mutation(
+        ContinuationConsumingOccurrenceSeedMutation::EliminatorOrigin,
+        run,
+    )
 }
 
 /// **`RT-CONTSRC-PRODUCER-LOCAL` `D8l2` — the ordinary-envelope population
@@ -10759,7 +10789,10 @@ fn initial_continuation_discoveries(
             for alternative in 0..cases.len() {
                 let body_origin = plan.semantic.child_origin(origin, 1 + alternative)?;
                 #[cfg(test)]
-                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(Cell::get) {
+                let body_origin = if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED
+                    .with(Cell::get)
+                    == Some(ContinuationConsumingOccurrenceSeedMutation::BodyOrigin)
+                {
                     // The exact wrong relation from AC-2: the continuation's
                     // own occurrence in place of the outer selected case body.
                     scrutinee
@@ -10840,6 +10873,22 @@ fn consuming_occurrence_from_seed(
             matching.push(candidate.occurrence);
         }
     }
+    #[cfg(test)]
+    if MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED.with(Cell::get)
+        == Some(ContinuationConsumingOccurrenceSeedMutation::EliminatorOrigin)
+    {
+        let selected = match matching.as_slice() {
+            [only] => Some(*only),
+            _ => None,
+        };
+        return Ok(selected.map(|occurrence| ContinuationConsumingOccurrence {
+            body_origin: occurrence.body_origin,
+            // Selection has already closed against the real outer match.
+            // Replacing only its coordinate with the real inner match keeps
+            // the body and selection axes fixed and fires step 1's guard.
+            eliminator_origin: discovery.continuation_origin,
+        }));
+    }
     Ok(match matching.as_slice() {
         [only] => Some(*only),
         _ => None,
@@ -10852,6 +10901,11 @@ fn consuming_occurrence_from_seed(
 /// child must be this continuation, and the selected outer body is read again
 /// by ordinal from that eliminator after matching the inner selected body's
 /// result constructor. This is the independent half of the relation check.
+///
+/// At this base, the position-zero relation is injective by construction:
+/// `plan_expr` plans every source child separately, and every visit mints a
+/// fresh append-only node identity through `push_node`. A second match therefore
+/// cannot reuse this continuation occurrence as its own position-zero child.
 fn rederive_consuming_occurrence(
     plan: &StaticTransitionPlan<'_>,
     key: &ContinuationSpecializationKey,
@@ -10901,6 +10955,22 @@ fn validate_continuation_consuming_occurrences(
             continue;
         };
         if rederive_consuming_occurrence(plan, &unit.key, claimed)? != Some(claimed) {
+            #[cfg(test)]
+            {
+                let reason = if forward_match_scrutinee(plan, claimed.eliminator_origin)?
+                    != unit.key.continuation_origin
+                {
+                    "a continuation specialization's consuming occurrence has a mismatched \
+                     eliminator_origin: it does not select the continuation as its position-zero \
+                     child"
+                } else {
+                    "a continuation specialization's consuming occurrence has a mismatched \
+                     body_origin: it is not the exact outer selected case body derived from its \
+                     eliminator"
+                };
+                return Err(planner_error(reason));
+            }
+            #[cfg(not(test))]
             return Err(planner_error(
                 "a continuation specialization's consuming occurrence is not the exact outer \
                  selected case body derived from its eliminator",
