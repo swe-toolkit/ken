@@ -927,6 +927,49 @@ in any `cfg` configuration. After filtering `cfg`-gated lines the entire
 non-`cfg` delta is a re-indentation plus `admitted: result.is_ok()`.
 **Production is untouched.**
 
+### The node closed on a two-clause finding having discharged ONE clause. The other is carried to [[RT-C2-OBSERVATION-ARTIFACT-IDENTITY]].
+
+**Adversary `evt_7cyndqwye5sfr`, confirmed by the Steward against `6b3b5b40`.
+The defect is in the `c3` frame, which is the Steward's.**
+
+The Architect's `c2-pre` finding had a heading and a remedy sentence:
+
+> **heading:** *"The gating is asymmetric with its sibling, in the direction
+> that makes an identity control MORE necessary, and it is the one without
+> one."* The opt-in sibling carries two identity controls; the always-on one
+> carries none, and *"both configurations compile"* is a different property
+> from artifact identity.
+>
+> **remedy sentence:** *"what is missing is that the trade is unrecorded."*
+
+**`D-c3-2` offered two options and neither required an identity control, and
+`AC-c3-4` checked only that the direction was written down.** The ring chose
+always-on — the branch the heading says makes the control *more* necessary —
+and the node closed.
+
+**Measured, not inferred.** `dasm_c2` appears in five files under `crates/`;
+the only test-side one **uses** the observation. Nothing compares a feature-off
+artifact to a feature-on one. The sibling's control is
+`r3_c2_source_mixed_branch.rs:621`,
+`r3_4b_observation_feature_is_native_artifact_identical`, which compiles one Ken
+source twice into separate target directories and asserts the emitted native
+objects are byte-identical.
+
+**The mechanism, which is the part worth carrying past this node.** The
+deliverable was written from the finding's **remedy sentence** rather than from
+its **heading**. That sentence characterizes the *decision* half of a two-part
+finding, and it is quotable, so it became the deliverable. The *evidence* half
+had no remedy sentence of its own, so nothing derived a deliverable from it.
+⇒ **A finding whose two clauses are joined by "and" gets discharged on
+whichever clause its author phrased as an ask.**
+
+**Why this does not reopen the node.** The code is landed and correct; the
+Architect grounded the disabled path's freeness by reading (`lowered_value_kind`
+is pure, one arm per variant, no `_ =>`). What is absent is the **probe** that
+would measure it. That is a successor's work, not a retraction of this one, and
+the successor is filed rather than left as *"rides the next candidate"* — that
+premise expires, and it expired on a Language node this same day.
+
 ### Residual carried out of the node, non-blocking: the enable flag is read twice
 
 Architect observation on `dec_77sd73v2kqewh`, explicitly **not** a merge
@@ -935,14 +978,29 @@ condition. `ENABLED` was previously read once, inside
 before the match, to decide whether to compute. Both must be true to record.
 
 ⇒ **That introduces an invariant the previous shape did not need: the flag must
-not flip between the two reads.** If it were disabled at entry and enabled by
-record time, the old code would have recorded and the new code drops the
-observation.
+not go `true` → `false` between the two reads.** It would then have computed and
+declined to record, dropping an observation the pre-`c3` code would have kept.
 
-**Why it is a residual and not a defect.** It is not believed reachable — the
-scope is RAII around whole lowering calls and nesting only ever restores to
-`true` — and the direction is **fail-closed**: every external control asserts a
-positive count, so a dropped observation reds rather than silently passing.
+**State the condition in one direction, not as "must not flip."** Adversary
+refinement at `evt_7cyndqwye5sfr`. `false` → `true` records nothing, which is
+exactly the pre-`c3` behaviour, so it is harmless. **A residual that overstates
+its own condition is harder to discharge than one that states it exactly** — the
+one-directional form halves what a future reader has to rule out.
+
+**Why it is a residual and not a defect.** Reaching the harmful direction
+requires a `DasmC2ScalarMergeObservationScope` to **drop during** the
+`match lowered`. Scopes are RAII around whole compile calls, created by test
+harnesses; nothing inside lowering constructs or drops one. **"Not believed
+reachable" is a claim about scope lifetime, not about threading.** And the
+direction is **fail-closed**, verified at the controls rather than argued:
+`nc14_data_match_lowering.rs:467` indexes `psuc_arrivals[0]`, which panics on an
+empty vector, and `:462`/`:404` are `assert_eq!` on counts. A dropped record is
+loud.
+
+**Not attributable to `c3`:** both reads are of the same thread-local, so
+lowering on a thread other than the scope's creator would record nothing — but
+the recorder's guard was already that same thread-local before `c3`. The
+property is unchanged by this slice.
 
 **What is owed, if anything, is one clause at the new read** stating that the
 flag is assumed stable across the merge, so the next person adding a scope
