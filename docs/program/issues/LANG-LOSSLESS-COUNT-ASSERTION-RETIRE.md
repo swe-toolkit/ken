@@ -1,7 +1,7 @@
 ---
 id: LANG-LOSSLESS-COUNT-ASSERTION-RETIRE
 title: "`assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it"
-status: active
+status: merged
 owner: language
 size: XS
 gate: none
@@ -10,6 +10,53 @@ blocks: []
 github: null
 origin: "Adversary hunt evt_6n7y2mzn83grn on the landed squash be8535b9, plus the Architect's non-blocking finding at evt_73bmxjfmkv7bq carried as a residual on LANG-COMMENT-POPULATION-PARITY. Triaged by the Steward 2026-08-14 as ONE node because the two findings are the same fact from opposite ends. Every load-bearing fact below re-verified by the Steward against main c4725c7c before filing."
 ---
+
+## MERGED 2026-08-14
+
+**Candidate `a6c388bd1f85646e05eef09fd93efb2af66f6884`, landed as squash
+`6148a4bb`** (PR #2170, CI green; Decision `dec_24dkgqt67t23c`, Architect, read
+`resolved` from the object). Merge-base `246019b9` derived independently and
+matching the declared value; one commit, three paths, `+18/-26`; **3/3 blobs
+verified identical after landing.** Both SHAs recorded — a squash rewrites the
+candidate, so it is never an ancestor of `main`.
+
+**`AC-1` was exercised twice, independently.** The implementer and QA each
+narrowed the production filter at `src/lossless.rs:408` and each reported `D4`
+reddening at `kenfmt_b1_lossless.rs:10:33` with `comment attachment is not
+total: 2 comments, 0 unique homes, 0 attachments`, then restored
+byte-identically. That was the whole safety argument for the retirement and it
+is measured, not asserted.
+
+**Stale base, recorded because the answer was "do nothing":** `main` moved four
+doc-only commits under this candidate during review. The changed-path
+intersection was empty and `git merge-tree` clean, so no rebase was taken — a
+rebase would have re-pointed the branch at a SHA no reviewer approved.
+
+### The Architect strengthened the reason, and it generalizes past this node
+
+The frame argued the assertion could not fire because production reconciles the
+same two sets first. **The sharper reason is that the assertion derived its own
+expected value from the predicate under test**, so it was invariant under every
+change to that predicate. `validate_attachment_totality` has the identical
+defect one layer down — `attach_comments` is a straight
+`.filter().map().collect()` with one attachment per surviving item, so the
+validator compares a set against itself-mapped.
+
+⇒ **An assertion whose expected value is computed from the thing it is testing
+is a theorem, not a check.** Recorded as a fleet memory lesson by the Architect.
+
+### The Steward's own error, corrected in the same candidate's wake
+
+The frame's design call asserted that `D4`'s fixture *"is what guards the
+population now."* **That is false.** It holds for a narrowing of
+`attach_comments`'s filter and fails for a narrowing of `is_comment` itself,
+which moves both sides together and leaves `D4` green. The correction, with the
+three call sites that actually guard the population, is on
+[[LANG-COMMENT-POPULATION-PARITY]] where the sentence landed.
+
+**This does not reopen the node.** Nothing in `D1`-`D3` depended on that
+sentence being true — the retirement is justified by production subsuming the
+assertion, which the Architect verified independently.
 
 ## What this is
 

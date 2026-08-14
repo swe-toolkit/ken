@@ -143,8 +143,40 @@ independently: grepping `catalog/` for `{-` and leading `---` returns zero files
 > would have written a justification for a line that stated a theorem.
 > `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` D1 deleted the count comparison and D2
 > reverted `is_comment` to private, closing both. No replacement control was
-> added; `D4`'s fixture (`block_and_doc_comments_are_counted_for_attachment`)
-> is what guards the population now.
+> added.
+>
+> **CORRECTED 2026-08-14 — the sentence that stood here named the wrong guard,
+> and it was the Steward's.** It read: *"`D4`'s fixture
+> (`block_and_doc_comments_are_counted_for_attachment`) is what guards the
+> population now."* **False, and false in the direction that gets a control
+> deleted.** Architect measurement at `evt_tt31sfem2vnw`.
+>
+> **Two different mutations, and only one of them is caught.**
+>
+> | mutation | caught? | by what |
+> |---|---|---|
+> | narrow **`attach_comments`'s filter** at `:408` | yes | production — the two sides now disagree, and `D4` reds at `kenfmt_b1_lossless.rs:10` |
+> | narrow **`is_comment` itself** | **no** | nothing here. Both `:408` and `:798` move together, so `validate_attachment_totality` compares a set against itself-mapped and is **invariant** under it. `D4`'s fixture then yields zero comments, zero attachments, a byte-exact round-trip and an unchanged AST — **green** |
+>
+> **The real guards against the second are three `must have an attachment`
+> panics, in two files no frame in this arc mentioned:**
+>
+> ```
+> crates/ken-elaborator/tests/lang_surface_block_comments.rs:121   (ac3, both --- and {-- --})
+> crates/ken-elaborator/tests/lang_trivia_kind_mapping_pin.rs:59   (d1)
+> crates/ken-elaborator/tests/lang_trivia_kind_mapping_pin.rs:100  (d2, ordinary {- note -})
+> ```
+>
+> ⇒ **`D4` guards the coupling between `attach_comments`'s filter and its own
+> output. Those three guard the population.** Do not treat them as
+> interchangeable: an author tidying either of those two files would have read
+> the old sentence, believed `D4` covered them, and deleted the only controls
+> that do.
+>
+> **The generalizable form, from the same measurement:** an assertion whose
+> expected value is computed from the thing it is testing is a theorem, not a
+> check — and here that defect occurred at **two layers at once**, in the
+> retired test and in the production validator underneath it.
 
 Architect finding, non-blocking, at `evt_73bmxjfmkv7bq`, on the approved
 candidate. **Not a defect in what landed** and not a reason to reopen the node.
