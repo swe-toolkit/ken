@@ -63,15 +63,15 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~12:0xZ. **`main` = `54f7c84a`.**
-> **RUNTIME IS WORKING the operator's priority node. LANGUAGE IS IDLE and is
-> the next §1 obligation. Publish queue empty, no publisher, tree clean.**
+> ### RESUME HERE — state at 2026-08-14 ~12:2xZ. **`main` = `99869bb7`.**
+> **BOTH BUILD TEAMS ARE WORKING. Publish queue empty, no publisher, tree
+> clean. No framing debt: each working team has a `ready` successor.**
 >
-> **Fifteen PRs landed today, all M6 blob-verified.** Most recent: `#2195`
+> **Seventeen PRs landed today, all M6 blob-verified.** Most recent: `#2195`
 > `6c574cdd` `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` · `#2196` `1200edf0`
 > `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` · `#2197` `998c3c83` closeouts +
-> the operator ruling · `#2198` `54f7c84a` the release. **M8/M9 sent for every
-> code merge.**
+> the operator ruling · `#2198` `54f7c84a` the Runtime release · `#2199`
+> `99869bb7` the briefing rewrite. **M8/M9 sent for every code merge.**
 >
 > **`#2189` cost one publisher abort on a FALSE RED, and the lesson is
 > positional.** The SHA was unchanged by design, so GitHub still carried the
@@ -80,13 +80,20 @@
 > `gh pr merge` was correctly refused by branch protection; **`--admin` is not
 > the Steward's to use.**
 >
-> ### LANGUAGE IS IDLE — §1 says this is the only work until it is kicked
+> ### LANGUAGE IS WORKING TWO NODES AS ONE CANDIDATE — do not re-kick
 >
-> **Gate and compact the ring BEFORE kicking.** Three `ready` nodes:
-> `LANG-GADT-SEQUENCE-TRACKER-GAP` (`S`, the leader's stated next),
-> `LANG-STACK-ARC-EVIDENCE-USABILITY` (`S`), and
-> `LANG-POW10-CASCADE-LITERAL-CLAUSE` (`XS`) — **the last needs no release of
-> its own and should ride the next `ken-elaborator` candidate.**
+> `LANG-STACK-ARC-EVIDENCE-USABILITY` (`S`) **carrying**
+> `LANG-POW10-CASCADE-LITERAL-CLAUSE` (`XS`). Both touch `crates/ken-elaborator`
+> and land as **one** candidate; `POW10`'s own Sizing section says it should
+> ride rather than spend a ring turn. **They are independent repairs sharing a
+> build, not one deliverable** — if either stalls, land the other.
+>
+> **I overrode the leader's stated next, deliberately and on the record.** The
+> leader named `LANG-GADT-SEQUENCE-TRACKER-GAP`; its `AC-4` puts `crates/` out
+> of scope, so it produces **no product change**, and an idle ring gets the
+> product node first. That node is now sequenced second **on sequencing, not
+> merit** — its own text says so, and its stale "Language has no other `ready`
+> node" premise is corrected in place.
 >
 > **Read `LANG-POW10`'s "why this is not a second COLDNESS-CLAIM" section
 > before sizing it.** `decimal_char.rs:60-62` is over-broad in the same way, but
