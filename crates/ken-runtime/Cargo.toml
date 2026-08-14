@@ -44,3 +44,4 @@ cranelift-object = "0.113.1"
 unicode-normalization = "0.1"
 
 [dev-dependencies]
+tempfile = "3"

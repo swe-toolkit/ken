@@ -3067,7 +3067,6 @@ fn required_unavailable_claims() -> BTreeSet<NativeExecutionUnavailableClaim> {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
-    use std::path::PathBuf;
 
     use crate::{
         evaluate_runtime_ir_example, executable_artifact_contract_for_runtime_report,
@@ -3299,16 +3298,25 @@ mod tests {
         })
     }
 
-    fn temp_output_dir(name: &str) -> PathBuf {
-        let mut dir = std::env::temp_dir();
-        dir.push(format!(
-            "ken-runtime-{name}-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("clock is after epoch")
-                .as_nanos()
-        ));
-        dir
+    struct TempOutputDir(tempfile::TempDir);
+
+    impl std::ops::Deref for TempOutputDir {
+        type Target = std::path::Path;
+
+        fn deref(&self) -> &Self::Target {
+            self.0.path()
+        }
+    }
+
+    impl AsRef<std::path::Path> for TempOutputDir {
+        fn as_ref(&self) -> &std::path::Path {
+            self.0.path()
+        }
+    }
+
+    fn temp_output_dir(name: &str) -> TempOutputDir {
+        let prefix = format!("ken-runtime-{name}-");
+        TempOutputDir(tempfile::Builder::new().prefix(&prefix).tempdir().unwrap())
     }
 
     fn native_platform_target_name() -> String {

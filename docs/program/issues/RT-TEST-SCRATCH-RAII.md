@@ -8,7 +8,7 @@ gate: none
 depends_on: []
 blocks: []
 github: null
-origin: Steward measurement 2026-08-11, taken while diagnosing the seventh recurrence of the volume filling. The recurrence history and the reclaim ordering are the Steward's operational record; the generator identification and the 42-site count are measured at current main and stated below.
+origin: Steward measurement 2026-08-11, taken while diagnosing the seventh recurrence of the volume filling. The recurrence history and the reclaim ordering are the Steward's operational record; the generator identification and the 40-site count are measured at current main and stated below.
 ---
 
 ## The defect
@@ -28,7 +28,7 @@ success, not on failure, not at process exit. Each run of each fixture leaks
 one directory permanently, and the nanosecond suffix guarantees a fresh one
 every time rather than reuse.
 
-Measured at `origin/main`: **42 `std::env::temp_dir()` call sites** across
+Measured at `origin/main`: **40 `std::env::temp_dir()` call sites** across
 `crates/ken-runtime/src/` and `crates/ken-cli/tests/`, and **`tempfile` is not
 a dependency** of either crate.
 
@@ -46,11 +46,27 @@ a dependency** of either crate.
 > that one fixture, because its own `AC-6` re-arms the leak by construction —
 > **this node owns the class.**
 
+## Implemented lifetime policy
+
+The implementation census classified the 40 `std::env::temp_dir()` sites as
+four fixed-name sites, eighteen sites with an existing drop guard, and eighteen
+timestamp/PID sites migrated to `tempfile`. Every migrated system-temporary
+site cleans unconditionally on success and unwind. None may preserve evidence.
+
+The separate `CARGO_TARGET_TMPDIR` census found fourteen sites: thirteen
+fixed/reused locations and the feature-off/on artifact identity fixture. The
+one preservation exception is based on that Cargo-owned location, whose
+contents are reclaimable by `cargo clean`, not on the fixture's evidentiary
+value. The identity fixture removes both trees on success and on any failure
+before its byte-identity assertions. Only a failing identity assertion keeps
+the trees, and that path prints the preserved directory before resuming the
+panic.
+
 **Not every site leaks, and the distinction is the scope.** Sites that join a
 **fixed** name — `ken-fs-flip-e2e`, `ken-cli-i1-entrypoint-abi`,
 `ken-rosetta-runner` — reuse one directory across runs and contribute nothing
 to the mass. The leaking sites are exactly those that interpolate a timestamp
-or pid. **Sort the 42 by that axis before estimating; the second group is the
+or pid. **Sort the 40 by that axis before estimating; the second group is the
 node.**
 
 ## Why this is a delivery problem and not housekeeping

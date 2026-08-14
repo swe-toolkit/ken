@@ -1,14 +1,6 @@
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "ken-px7l-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-px7l-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 const PROGRAM: &str = r#"program capabilities FS APartial
@@ -161,7 +153,7 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
         PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px7l-recursive-bind",
-        &dir,
+        dir.path(),
     )
     .expect("generic checked HostIO bind reaches the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -169,7 +161,7 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -201,7 +193,6 @@ fn delayed_capturing_generic_bind_agrees_across_real_executors() {
             ken_runtime::HostOpV1::ConsoleFlush,
         ]
     );
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
@@ -226,7 +217,7 @@ fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
         CONSUMED_RUNTIME_RESPONSE,
         ken_cli::SourceFormat::Ken,
         "px7l-consumed-runtime-response",
-        &dir,
+        dir.path(),
     )
     .expect("runtime-selected Result response reaches the linked artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -234,7 +225,7 @@ fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: Vec::new(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -265,7 +256,6 @@ fn runtime_selected_non_unit_response_is_consumed_across_real_executors() {
             ken_runtime::HostOpV1::ConsoleWrite,
         ]
     );
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -275,7 +265,7 @@ fn static_direct_vis_retains_the_existing_lowering_path() {
         STATIC_DIRECT_VIS,
         ken_cli::SourceFormat::Ken,
         "px7l-static-direct-vis",
-        &dir,
+        dir.path(),
     )
     .expect("static direct Vis remains supported");
     let main = output
@@ -296,5 +286,4 @@ fn static_direct_vis_retains_the_existing_lowering_path() {
         .expect("static artifact runs");
     assert_eq!(ran.status.code(), Some(0));
     assert_eq!(ran.stdout, b"static\n");
-    let _ = std::fs::remove_dir_all(dir);
 }

@@ -1,14 +1,6 @@
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "ken-px8l-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-px8l-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 fn declaration_refs(
@@ -131,7 +123,7 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
         PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px8l-recursive-declaration",
-        &dir,
+        dir.path(),
     )
     .expect("admitted recursive declaration compiles through the finite closure");
     assert_eq!(
@@ -159,7 +151,7 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: arguments.iter().map(std::ffi::OsString::from).collect(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -185,7 +177,6 @@ fn assert_agreement(arguments: &[&str], expected_exit: i32) {
     assert_eq!(native, interpreted);
     assert_eq!(native.exit_status, expected_exit);
     assert!(native.effect_trace.is_empty());
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-CLOSURE-BOUNDARY-LANE.
@@ -238,7 +229,7 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         source,
         ken_cli::SourceFormat::Ken,
         "px8l-nondecreasing-cycle",
-        &dir,
+        dir.path(),
     )
     .expect_err("the kernel SCT gate must reject a non-decreasing recursive cycle");
     assert!(
@@ -252,5 +243,4 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         ),
         "non-decreasing recursion must retain the typed kernel boundary: {error:?}"
     );
-    let _ = std::fs::remove_dir_all(dir);
 }

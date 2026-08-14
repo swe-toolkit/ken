@@ -56,17 +56,31 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
   host_exit APartial (Failure (process_discriminator input))
 "#;
 
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "ken-px4b-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&path).unwrap();
-    path
+struct ScratchDir(tempfile::TempDir);
+
+impl ScratchDir {
+    fn clone(&self) -> std::path::PathBuf {
+        self.0.path().to_owned()
+    }
+}
+
+impl std::ops::Deref for ScratchDir {
+    type Target = std::path::Path;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.path()
+    }
+}
+
+impl AsRef<std::path::Path> for ScratchDir {
+    fn as_ref(&self) -> &std::path::Path {
+        self.0.path()
+    }
+}
+
+fn output_dir(name: &str) -> ScratchDir {
+    let prefix = format!("ken-px4b-{name}-");
+    ScratchDir(tempfile::Builder::new().prefix(&prefix).tempdir().unwrap())
 }
 
 #[cfg(target_os = "linux")]
@@ -101,7 +115,6 @@ fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     assert!(observation.stderr.is_empty());
     assert!(observation.filesystem_delta.is_empty());
     assert!(observation.effect_trace.is_empty());
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -191,7 +204,6 @@ fn real_source_builds_one_identity_bound_linked_process_artifact() {
         .output()
         .expect("linked process artifact runs with fresh process data");
     assert_eq!(ran.status.code(), Some(0), "stderr: {:?}", ran.stderr);
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[cfg(target_os = "linux")]
@@ -251,8 +263,6 @@ fn public_source_observes_raw_argv_environment_cwd_bytes_in_field_order() {
     );
     assert_ne!(first.status.code(), second.status.code());
     assert!(observation_path.is_file());
-    let _ = std::fs::remove_dir_all(observation_dir);
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -269,7 +279,6 @@ fn authority_mismatch_fails_before_any_artifact_is_written() {
         )
     ));
     assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -287,7 +296,6 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         .expect("linked host-effect artifact runs");
     assert_eq!(ran.status.code(), Some(0), "stderr: {:?}", ran.stderr);
     assert_eq!(ran.stdout, b"px5\n");
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -384,7 +392,6 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     for changed in mutations {
         assert_ne!(changed, interpreted);
     }
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -413,7 +420,6 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         .output()
         .expect("response-dependent artifact runs");
     assert_eq!(ran.status.code(), Some(23), "stderr: {:?}", ran.stderr);
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[cfg(target_os = "linux")]
@@ -496,7 +502,6 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
     for forbidden in ["SIGPIPE", "SIG_IGN", "sigaction", "signal("] {
         assert!(!starter_source.contains(forbidden));
     }
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
@@ -601,7 +606,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             },
         }]
     );
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
@@ -707,7 +711,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
         assert_ne!(interpreted, native_drift, "native seed drift must fail");
     }
 
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
@@ -772,7 +775,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         .expect("FS denial artifact runs");
     assert_eq!(ran.status.code(), Some(44), "stderr: {:?}", ran.stderr);
     assert!(!dir.parent().unwrap().join("escape").exists());
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -795,7 +797,6 @@ fn native_build_subcommand_reaches_the_same_public_producer() {
         .output()
         .expect("CLI artifact runs");
     assert_eq!(ran.status.code(), Some(0), "stderr: {:?}", ran.stderr);
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 /// Compile `snippet` as a standalone crate against a built `ken_runtime`
@@ -818,7 +819,7 @@ fn compile_probe_against_ken_runtime(
         .arg("-L")
         .arg(format!("dependency={}", deps.display()))
         .arg("--out-dir")
-        .arg(&dir)
+        .arg(&*dir)
         .arg(&source)
         .output()
         .expect("rustc runs");

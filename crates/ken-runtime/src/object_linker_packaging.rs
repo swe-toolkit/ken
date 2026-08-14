@@ -2313,7 +2313,6 @@ fn packaging_error(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     use crate::{
         evaluate_runtime_ir_example, executable_artifact_contract_for_runtime_report,
@@ -2457,16 +2456,25 @@ mod tests {
         .expect("platform support materializes")
     }
 
-    fn temp_output_dir(name: &str) -> PathBuf {
-        let mut dir = std::env::temp_dir();
-        dir.push(format!(
-            "ken-runtime-{name}-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("clock is after epoch")
-                .as_nanos()
-        ));
-        dir
+    struct TempOutputDir(tempfile::TempDir);
+
+    impl std::ops::Deref for TempOutputDir {
+        type Target = std::path::Path;
+
+        fn deref(&self) -> &Self::Target {
+            self.0.path()
+        }
+    }
+
+    impl AsRef<std::path::Path> for TempOutputDir {
+        fn as_ref(&self) -> &std::path::Path {
+            self.0.path()
+        }
+    }
+
+    fn temp_output_dir(name: &str) -> TempOutputDir {
+        let prefix = format!("ken-runtime-{name}-");
+        TempOutputDir(tempfile::Builder::new().prefix(&prefix).tempdir().unwrap())
     }
 
     #[cfg(target_os = "linux")]
@@ -2952,7 +2960,6 @@ mod tests {
         assert_eq!(wrong_argument.status.code(), Some(1));
         assert_eq!(wrong_key.status.code(), Some(1));
 
-        fs::remove_dir_all(output_dir).expect("process fixture is removed");
     }
 
     #[cfg(target_os = "linux")]
@@ -2966,7 +2973,6 @@ mod tests {
                 .env_clear()
                 .output()
                 .expect("process terminal fixture runs");
-            fs::remove_dir_all(output_dir).expect("terminal fixture is removed");
             output
         };
         let success = || RuntimeExpr::Construct {
@@ -3063,7 +3069,6 @@ mod tests {
                 .env_clear()
                 .output()
                 .expect("PX8-TR checked post-effect fixture runs");
-            fs::remove_dir_all(output_dir).expect("PX8-TR fixture is removed");
             (output, provenance)
         };
 
@@ -3248,7 +3253,6 @@ mod tests {
                 .expect("terminal fixture runs");
             let trace = ken_host::decode_linked_effect_trace(&fs::read(&trace_path).unwrap())
                 .expect("terminal trace decodes");
-            fs::remove_dir_all(output_dir).expect("terminal fixture is removed");
             (output, trace)
         };
         let success = RuntimeExpr::Construct {
@@ -3621,7 +3625,6 @@ mod tests {
             ))
         ));
         assert_eq!(fs::read(cwd.join("held.bin")).unwrap(), b"held-resource");
-        fs::remove_dir_all(output_dir).unwrap();
     }
 
     #[test]

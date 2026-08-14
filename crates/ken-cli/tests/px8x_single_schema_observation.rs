@@ -1,16 +1,10 @@
 //! PX8-X sole observation schema through the real linked artifact.
 
-fn output_dir() -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "ken-px8x-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&path).unwrap();
-    path
+fn output_dir() -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix("ken-px8x-")
+        .tempdir()
+        .unwrap()
 }
 
 const RESOURCE_PROGRAM: &str = r#"program capabilities FS AFull
@@ -64,12 +58,12 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsReadFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
 fn linked_route_exposes_real_ordered_bindings_and_filters_reserved_input() {
     let dir = output_dir();
-    std::fs::write(dir.join("held.bin"), b"held").unwrap();
+    std::fs::write(dir.path().join("held.bin"), b"held").unwrap();
     let output = ken_cli::build_native_program(
         RESOURCE_PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px8x-single-schema-observation",
-        &dir,
+        dir.path(),
     )
     .expect("checked resource program reaches the linked artifact");
     let options = ken_runtime::NativeEffectRunOptionsV1 {
@@ -78,7 +72,7 @@ fn linked_route_exposes_real_ordered_bindings_and_filters_reserved_input() {
             "KEN_HOST_OBSERVATION_PATH".into(),
             "caller-controlled".into(),
         )],
-        cwd: dir.clone(),
+        cwd: dir.path().to_owned(),
         plan_hash: output.plan_transport_hash,
     };
     let observation = ken_runtime::run_bound_process_effect_observation(&output.artifact, &options)
@@ -107,6 +101,4 @@ fn linked_route_exposes_real_ordered_bindings_and_filters_reserved_input() {
     assert_eq!(acquired[0].0, ken_runtime::ResourceBindingRole::Target);
     assert_eq!(released[0].0, ken_runtime::ResourceBindingRole::Target);
     assert_eq!(acquired[0].1, released[0].1);
-
-    let _ = std::fs::remove_dir_all(dir);
 }

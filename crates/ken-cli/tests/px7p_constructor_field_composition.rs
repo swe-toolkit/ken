@@ -1,14 +1,6 @@
-fn output_dir(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "ken-px7p-{name}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn output_dir(name: &str) -> tempfile::TempDir {
+    let prefix = format!("ken-px7p-{name}-");
+    tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
 const PROGRAM: &str = r#"program capabilities FS APartial
@@ -169,7 +161,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
         PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px7p-constructor-field-composition",
-        &dir,
+        dir.path(),
     )
     .expect("constructor field composes through its selected consumer");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -177,7 +169,7 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: arguments.iter().map(std::ffi::OsString::from).collect(),
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -215,7 +207,6 @@ fn assert_case(arguments: &[&str], expected_stdout: &[u8], expected_exit: i32) {
             ken_runtime::HostOpV1::ConsoleFlush,
         ]
     );
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -235,10 +226,9 @@ fn ignored_field_twin_remains_green() {
         IGNORED_PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px7p-ignored-field-opposite",
-        &dir,
+        dir.path(),
     )
     .expect("the byte-near ignored-field opposite remains on ordinary lowering");
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 // Ignored pending RT-CARRIER-BYTESPAN-OBSERVE.
@@ -265,7 +255,7 @@ fn dynamic_carrier_producer_payload_reaches_linked_process_exit() {
         DYNAMIC_CARRIER_PROGRAM,
         ken_cli::SourceFormat::Ken,
         "px7p-dynamic-carrier-producer",
-        &dir,
+        dir.path(),
     )
     .expect("the generic dynamic carrier preserves its producer continuation");
     let long_component = std::ffi::OsString::from("a".repeat(300));
@@ -274,7 +264,7 @@ fn dynamic_carrier_producer_payload_reaches_linked_process_exit() {
         &ken_runtime::NativeEffectRunOptionsV1 {
             arguments: vec![long_component],
             environment: Vec::new(),
-            cwd: dir.clone(),
+            cwd: dir.path().to_owned(),
             plan_hash: output.plan_transport_hash,
         },
     )
@@ -298,5 +288,4 @@ fn dynamic_carrier_producer_payload_reaches_linked_process_exit() {
         ken_runtime::CanonicalRequestV1::ConsoleWrite { bytes, .. }
             if bytes == b"other-36"
     ));
-    let _ = std::fs::remove_dir_all(dir);
 }
