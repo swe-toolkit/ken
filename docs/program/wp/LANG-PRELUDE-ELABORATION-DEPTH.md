@@ -75,6 +75,60 @@ measurement adds nothing.
   number. **Not** an external contract document, and not a published API
   guarantee — Ken has no embedders and this is for the fourteenth site's author.
 
+## D5, added 2026-08-14: the other currency a prelude addition is paid in
+
+Adversary finding at `evt_60pwz0y927h6g`, **confirmed by a Steward read it named
+as unrun** — and the read came back the way that makes it live rather than
+nominal.
+
+`LANG-PRELUDE-COLLECTIONS`'s `AC-5` asserts **per name** that `map`/`fold`/`zip`/
+`filter` are each absent from `trusted_base()`. Its doc comment claims something
+wider: *"the trusted base does not grow."* **Those are different claims, and an
+entry added under a name other than the four satisfies every assertion.**
+
+**That is not hypothetical.** `prover.rs:493-501`:
+
+```rust
+fn emit_unknown_hole(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
+    let hole_id = declare_postulate(env, "prover unknown goal".to_string(), ...)
+```
+
+⇒ **an undischarged obligation registers a `trusted_base()` entry named
+`"prover unknown goal"`, not the name of the declaration that raised it.**
+`bytes.rs` does the same under `"BytesRoundTripLaw"`. The paths that do use the
+declared name are the recursive/mutual pre-admissions (`elab.rs:6752`, `:6846`,
+`:7103`) and the `Axiom` sugar (`:1045`). **The environment holds both kinds and
+a per-name check sees only one.**
+
+**The four landed definitions add nothing in fact** — structural recursions
+raising no obligation, so `AC-5` passes truthfully. The defect is the sentence a
+later reader inherits, and **the population it will be read against is exactly
+the obligation-bearing one**: `sort` is excluded for this precise reason, and
+`Array`, `DecEq`/`Ord` and the laws are all still owed.
+
+- **D5a — narrow the inherited claim.** Change that doc comment to say what the
+  test establishes: *these four are transparent definitions, not postulates.*
+  One sentence, same cost, and true.
+- **D5b — assert the full `trusted_base()` enumeration from a bare
+  `ElabEnv::new()`**, every entry by name. **Not a count and not a differential.**
+  The original doc rejected a frozen *size* because a coincidental `+1/-1`
+  elsewhere could mask a real regression — **a full enumeration has no such
+  masking**, which is the whole difference between a count and an absolute
+  matrix. A live differential is separately impossible here: post-landing the
+  four are registered inside `ElabEnv::new()` itself, so there is no "before"
+  environment to capture.
+  **Its maintenance cost is the feature.** A prelude addition that changes the
+  trusted base should be forced to say so explicitly, which is the property this
+  program wants on the exact path `sort` and the lawful instances are queued on.
+  **If the enumeration is large enough that a literal list is unreadable, say so
+  with the count and stop** — that is a finding about the shape of the trusted
+  base, not a reason to fall back to the per-name check.
+
+**Why it lands here rather than as its own node.** This node already owns *what
+does a prelude addition cost, and what watches it.* Stack depth and trusted-base
+entries are that question in two currencies, and `D3`'s watch and `D5b`'s
+enumeration are the same kind of instrument.
+
 ## Acceptance criteria
 
 - **AC-1 — D1 is a measurement, not an inference.** State the method and the
@@ -97,15 +151,28 @@ measurement adds nothing.
   deliverable to fold in.
 - **AC-5 — no new red in CI.** Targeted locally: `-p ken-elaborator`, `-p
   ken-cli`. Never `--workspace` on the box.
+- **AC-6 — `D5b`'s enumeration reddens on a real addition, demonstrated.**
+  Temporarily add one obligation-raising declaration to the prelude — `sort` is
+  the natural witness, since its `is_sorted ∧ Perm` obligation is the exact
+  mechanism — and show the enumeration failing with the new entry named in the
+  diff. Restore before landing. **A membership assertion that has never been
+  seen to fail is indistinguishable from one asserting the empty condition**,
+  and this one exists precisely to catch an entry nobody predicted the name of.
+- **AC-7 — `D5a` and `D5b` do not amend `AC-5`'s existing per-name assertions.**
+  Adding is fine; the per-name check is the right shape and the Adversary
+  explicitly did not ask for it to change. Changing a control while widening
+  the claim it backs forfeits the control.
 
 ## Contention
 
-`crates/ken-elaborator/src/elab.rs` (D4's one comment) and whatever measurement
-harness D1 needs. **`crates/ken-elaborator/src/prelude.rs` is touched only
-transiently by D2** — the four declarations are added one at a time to take
-readings and **the file must be restored before landing**; D2's deliverable is
-four numbers, not a prelude change. `LANG-PRELUDE-COLLECTIONS` owns the real
-prelude edit and must land first.
+`crates/ken-elaborator/src/elab.rs` (D4's one comment), whatever measurement
+harness D1 needs, and — from `D5` — `crates/ken-elaborator/tests/lang_prelude_collections.rs`
+for its `AC-5` doc sentence and the added enumeration.
+
+**`crates/ken-elaborator/src/prelude.rs` is touched only transiently**, by `D2`
+and by `AC-6`, and **must be restored before landing** in both cases. `D2`'s
+deliverable is five numbers and `AC-6`'s is a demonstrated red; neither is a
+prelude change. `LANG-PRELUDE-COLLECTIONS` landed at `60b78c95`.
 
 Language owns all of it. Runtime is in `crates/ken-runtime`; Verify's lane is
 `src/prover.rs`.
