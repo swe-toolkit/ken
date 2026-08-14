@@ -63,37 +63,48 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~08:1xZ. **`main` = `f34ab271`.**
-> **BOTH BUILD TEAMS WORKING — do not re-kick either. Publish queue EMPTY,
-> `steward/work` aligned to `main`, tree clean, no publisher running.**
+> ### RESUME HERE — state at 2026-08-14 ~10:0xZ. **`main` = `294fceac`.**
+> **BOTH BUILD TEAMS ARE IDLE and both have a `ready` successor. Publish queue
+> empty, no publisher running. §1 says the only work is release the next WP.**
 >
-> **Runtime — `RT-NESTED-IH-NATIVE-REALIZATION` `D2`**, anchor
-> `evt_x8tt2t821x4g`. Ungated; the Architect's Closure ruling is on the node.
-> Implementer confirmed pickup. **Carry verbatim, it is the part that gets
-> lost:** *"The applied form is admitted; the `D1` applied form is
-> unmeasured."* Captures / `case_env` are a third unmeasured axis. Two
-> stop-short traps: a `StaticBody` edge inside a recursive fn where
-> `Lowered::RecursiveBackedge` has its own escape rule
-> (`mod.rs:21278-21281`), and the `StructuralNat` relocation. **No seventh
-> admitted merge shape.** Successor, already `ready`:
-> `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` (`S`, resized from `XS`).
+> **Six PRs landed today, all M6 blob-verified:** `#2184` `cae1c36f` briefing
+> flush · `#2185` `842f2d5f` ruling fold · `#2186` `51b3a75c`
+> `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` · `#2187` `f7ec9f59`
+> `RT-NESTED-IH-NATIVE-REALIZATION` `D2` (node **stays `active`**, `D3`-`D5`
+> remain) · `#2188` `c035c8a4` doc bundle · `#2189` `294fceac`
+> `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA`. M8/M9 sent for every code merge.
 >
-> **Language — `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT`**, anchor
-> `evt_24mzrhg10c9b5`. `D0` ships **DISCHARGED** — the marker never printed
-> (`evt_44qzssyvaay0b`), so the overflow is inside `register_prelude` and
-> `elaborate_file` is never reached. **`D1` targets that function's
-> ~450-declaration frame, NOT the guard.** `AC-3` forbids `RUST_MIN_STACK`,
-> any stack raise, and `stack_size` for `px4b`. Successor, already `ready`:
-> `LANG-GADT-SEQUENCE-TRACKER-GAP` (`S`), the leader's call on order.
+> **THE FROZEN CANDIDATE IS LANDED — that whole block is retired.** `98e6ac51`
+> re-voted unchanged and merged as `294fceac`; `wp/…-BLOCK-DELTA` is deleted at
+> origin. Do not go looking for it.
 >
-> ### THE FROZEN CANDIDATE — do not move or re-author it
+> **`#2189` cost one publisher abort on a FALSE RED, and the lesson is
+> positional.** The SHA was unchanged by design, so GitHub still carried the
+> **pre-repair** check-runs from `06:57`/`07:08`. **A failing check on an
+> unchanged SHA may be history — discriminate by `started_at`.** The publisher
+> does not. A direct `gh pr merge` was correctly refused by branch protection;
+> `--admin` is not the Steward's to use. Relaunching the sanctioned publisher
+> after the condition changed was what worked.
 >
-> **`98e6ac51` on `wp/LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` is correct and
-> unmergeable-for-now**, which is not the same as wrong. It is the **trigger**
-> of a zero-margin stack path, not its cause. After the footprint node lands it
-> is **re-voted unchanged** on a fresh Decision; the Architect casts that vote.
-> PR #2178 was closed (it read `MERGEABLE` with a withdrawn approval on a SHA
-> measured to abort). Branch and SHA stay on origin.
+> ### OWED BY ME, IN ORDER — both are §1 releases
+>
+> 1. **Release `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH`** (`ready`, `S`) to
+>    Runtime. The leader asked at `evt_250nev2zanqef` and reported the ring
+>    idle and wanting compaction. `D3` (make the **disabled** arm probe) may
+>    close the exposure more directly than `D1`'s constant — the node says to
+>    price them separately rather than landing both.
+> 2. **Triage Adversary hunt `evt_54sb0z31q5qhn`** on `f7ec9f59`, still unread
+>    in full. Headline: it **transposed the ABI order** — the exact silent
+>    failure mode I asked it to hunt — and **nothing in the tree reds,
+>    structurally**. Record the disposition **in the node**, never as a reply
+>    (`COORDINATION §10⁻a` is report-only).
+> 3. **Language's next**, leader's call on order: `LANG-GADT-SEQUENCE-TRACKER-GAP`
+>    (`ready`, `S`) or `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` (`ready`, `S`).
+> 4. **Ask the Architect** whether the `D2` successor (checked-IH
+>    *realization* authority) is the same mechanism as
+>    `RT-TERMINAL-ALL-ELIM-AUTHORITY` (terminal-`All` five-fact *elimination*
+>    relation, blocked on `KERNEL-NESTED-IND`). **A mechanism question, not a
+>    cut** — do not presume the fold.
 >
 > ### NO FRAMING DEBT ANYWHERE — swept 2026-08-14, do not re-derive it
 >
@@ -138,7 +149,7 @@
 > paths>`, then **grep the status for `crates/` before committing.** The
 > publisher takes `--target <SHA>`, never `HEAD`.
 >
-> ### LANDED 2026-08-14
+> ### LANDED 2026-08-14, EARLIER — the later six are in the live block above
 >
 > **#2179** `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` (squash `79fddb0d`, 2/2
 > blob-verified, `crates/`, Adversary notified) · **#2181** doc batch (squash
