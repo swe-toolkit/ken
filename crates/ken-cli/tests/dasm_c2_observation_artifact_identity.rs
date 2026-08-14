@@ -41,6 +41,9 @@ fn run_with_big_stack<F: FnOnce() + Send + 'static>(f: F) {
 
 #[test]
 fn dasm_c2_artifact_identity_worker() {
+    // An ordinary targeted test leaves the artifact output unset and
+    // intentionally returns green after measuring nothing; only the outer
+    // driver supplies the path and reads the emitted object back.
     let Some(output_dir) = std::env::var_os(ARTIFACT_OUTPUT).map(PathBuf::from) else {
         return;
     };
@@ -50,7 +53,16 @@ fn dasm_c2_artifact_identity_worker() {
 fn dasm_c2_artifact_identity_worker_impl(output_dir: &Path) {
     let expected = std::env::var(EXPECTED_CONFIGURATION)
         .expect("the outer driver states the requested observation configuration");
-    let actual = if cfg!(feature = "dasm-c2-observation") {
+    let local_observation_compiled = cfg!(feature = "dasm-c2-observation");
+    // Read Runtime's own compiled fact rather than treating this crate's cfg as
+    // authority: dependency feature unification can enable Runtime without
+    // defining the forwarding feature in this crate.
+    assert_eq!(
+        ken_runtime::DASM_C2_OBSERVATION_COMPILED,
+        local_observation_compiled,
+        "ken-runtime and ken-cli disagree on the D5 observation configuration"
+    );
+    let actual = if local_observation_compiled {
         "enabled"
     } else {
         "disabled"
