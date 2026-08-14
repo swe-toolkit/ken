@@ -116,6 +116,33 @@ nc14_data_match_lowering` with no feature flag.
 
 ## Acceptance criteria
 
+**`AC-0` — the control is TWO `-p`-SCOPED BUILDS, not an assertion inside the
+workspace test run. This row decides whether `D2` measures anything.**
+
+**Architect constraint, `evt_6cm8tg834zseb`, and it is the reason this node is
+not one afternoon's work.** `ken-runtime` is both a normal dependency
+(`ken-elaborator/Cargo.toml:18`) and a dev-dependency (`:30`). **Cargo unifies
+features across a build graph**, so in CI's `--workspace` run any crate enabling
+`ken-runtime/dasm-c2-observation` turns it on for the whole graph — and the
+carrier being off in `ken-elaborator` will not produce a feature-free artifact.
+
+⇒ **An identity assertion written to run inside the ordinary workspace test run
+is vacuous by construction: it compares two artifacts unification has already
+made identical.** It passes, and it passes for the wrong reason, which is the
+exact failure this node exists to close.
+
+**So the AC is about the INVOCATION, not the property.** Two `-p`-scoped builds
+— `--no-default-features` versus default — **each with its own
+`CARGO_TARGET_DIR`**, compared as artifacts. **If the control is expressible only
+as "assert X in a test", it is the wrong control.** Report the two command lines.
+
+**One thing the Architect measured that makes the carrier route clean:**
+`ken-elaborator` has **`default = []`** at `6b3b5b40`. So adding a default-on
+carrier changes `--no-default-features` for this crate from a no-op into
+*exactly and only* "observation off" — nothing else is caught in the blast, and
+the off-configuration is a clean counterpart rather than a bundle of unrelated
+changes.
+
 **`AC-1` — `D2` is exercised against a real difference, not merely green.**
 Perturb the observation path so it *does* affect emission (for example, leave a
 computation outside the `ENABLED` guard), confirm `D2` **reds** naming the two
@@ -133,9 +160,9 @@ does **not** settle timing or allocation. State that boundary rather than
 letting a green `D2` read as the stronger claim.
 
 **`AC-4` — separate target directories, and say where they went.** An
-artifact-level A/B that shares a `cargo` target directory measures nothing.
-**This box has filled seven times** — report the paths used and that they were
-cleaned up.
+artifact-level A/B that shares a `cargo` target directory measures nothing —
+this is `AC-0`'s second half and it is the half that silently no-ops. **This box
+has filled seven times** — report the paths used and that they were cleaned up.
 
 **`AC-5` — no production change.** `crates/ken-runtime/src/` is untouched apart
 from any perturbation made and restored under `AC-1`. The six admitted merge
@@ -150,6 +177,10 @@ a local `--workspace` run.
 is a releasable increment; if the carrier route in input 3 turns out not to
 work, **reporting that with the measurement is a good outcome** and the fallback
 route is the next turn's, not this one's.
+
+**`AC-0` is where this node is most likely to go wrong, and it will look
+green while doing it.** If you find yourself writing `assert!` inside a test that
+CI's workspace run executes, stop — that is the vacuous shape, not the control.
 
 ## Not this node
 
