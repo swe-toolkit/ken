@@ -1,14 +1,14 @@
 ---
 id: LANG-CONVOY-ENCLOSING-FIELD
 title: "spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed"
-status: draft
+status: ready
 owner: language
-size: unsized
+size: S
 gate: none
 depends_on: []
 blocks: []
 github: null
-origin: "Steward sweep 2026-08-14 at main 96c95586, grepping spec/30-surface/ for deferral phrasing rather than auditing the tracker for gaps. This is the third obligation found that way -- the first two were spec 37's `filter` (produced LANG-PRELUDE-COLLECTIONS) and its `DecEq Char` transport (produced LANG-DECEQ-CHAR-LAWFUL-INSTANCES). Filed `draft` and unsized because the remedy is a design call, not because the gap is uncertain."
+origin: "Steward sweep 2026-08-14 at main 96c95586, grepping spec/30-surface/ for deferral phrasing rather than auditing the tracker for gaps. This is the third obligation found that way -- the first two were spec 37's `filter` (produced LANG-PRELUDE-COLLECTIONS) and its `DecEq Char` transport (produced LANG-DECEQ-CHAR-LAWFUL-INSTANCES). Filed `draft` and unsized because the remedy is a design call, not because the gap is uncertain. FLIPPED ready and narrowed to the discriminating fixture ALONE on the Architect ruling evt_1rk8wyak0z7sr (2026-08-14, grounded at main c932e7b4), which refused both options the Steward offered, surfaced a third candidate whose carrier already exists, and authorized cutting the fixture with no ruling needed because it discriminates between remedies that prescribe different fixes."
 ---
 
 ## What this is
@@ -54,21 +54,117 @@ destructuring -- **does not exist in `cx.ctx` today.**
 substitution is "never unsound -- always kernel-proved". The failure surfaces
 as a rejected program that should typecheck, not as a bad program admitted.
 
-## Why this is `draft` and unsized
+## THE RULING: NEITHER OPTION I OFFERED. And the fixture comes first.
 
-**The gap is certain; the remedy is a design call.** Making the distinction
-requires threading provenance about context entries through
-`check_match_dependent`, and the shape of that -- a parallel provenance vector,
-a richer context entry, or a narrower `outer_scope_depth` computed from the
-match's own entry depth -- is a component-design question. Per
-`ken-steward §3` that is the Architect's, not the Steward's, and framing
-deliverables now would produce a frame the ruling may invert.
+**Architect `evt_1rk8wyak0z7sr`, grounded by reading `elab.rs` at `main`
+`c932e7b4`.** He refused both halves of the question and named a third
+candidate. **This node is now the fixture alone; the remedy is not yet ruled.**
 
-**Filing it anyway is the point.** `34 §3.2` is normative surface spec carrying
-a named gap with no tracker row; a sentence in a spec section is not
-discoverable, and the two prior instances of this exact shape each sat unfiled
-long enough that one of them had its stated blocking reason go false with
-nobody noticing.
+**The entry-depth option is insufficient, and the reason is worth carrying.**
+*"Computed from the match's own context depth at entry"* does not help, because
+**when the INNER match is entered, the enclosing match's bound fields are
+already in `cx.ctx`** -- its entry depth *includes* them. Excluding them needs
+the depth at the **enclosing** match's entry, threaded down. That is a different
+quantity and nothing currently carries it.
+
+**Depth is not disqualified, though, and the pinned test says why in its own
+words.** `firstIsSecond`'s retyped binder is described in the test as *"an
+outer, independently-bound function parameter, never destructured by the outer
+match"* -- so it sits **below** any enclosing-match floor, while the `zip`
+offender is an enclosing match's field, **above** it. A threaded floor separates
+exactly those two. **But a floor is coarse**: it excludes `let`s and every other
+binder introduced between the two matches, which are eligible today. ⇒ **It
+trades a wrong-index substitution for a possible new incompleteness -- the same
+failure class this node exists to remove.**
+
+### The third candidate, whose carrier already exists
+
+**Capability 2's selection is already content-keyed, not position-keyed.**
+`try_reindex_cast` returns `Option` and fires only when the binder's type
+actually mentions `b2`; `outer_scope_depth` merely bounds the *candidates*. ⇒
+**The defect is not that the range is wide -- it is that mentioning `b2` is true
+without entailing that this branch's equation licenses re-indexing here.**
+
+And the per-entry fact is already recorded:
+
+- `cx.var_refinements: HashMap<usize, (Term, Term, usize)>` is keyed by
+  `bottom_pos`, and `bottom_pos = cx.ctx.len() - 1 - outer_idx` where
+  `outer_idx = cx.ctx.len() - 1 - abs_pos` ⇒ **`bottom_pos == abs_pos`, an
+  absolute index from the bottom of the context, stable across nesting depth.**
+- ⇒ an enclosing match's refinement for a binder and an inner match's refinement
+  for that same binder **land on the same key**.
+- **Capability 2 (`:3000`-`:3027`) never consults `var_refinements` before
+  inserting.** It `insert`s, so the inner refinement **silently overwrites** the
+  enclosing one.
+
+**That is a per-entry discriminator needing no new provenance field:** *has an
+enclosing match already refined this entry, and may I replace or must I
+compose?*
+
+## THIS NODE IS THE FIXTURE. THE REMEDY IS NOT RULED.
+
+**The Architect was explicit about the bound on his own reading:** he
+established that `bottom_pos` is absolute and collides across nesting levels,
+that capability 2 does not check before inserting, and therefore that an inner
+match *can* overwrite. **He has NOT established that this overwrite produces the
+`zip` failure**, and declined to price a remedy from a mechanism found by
+reading -- *"I did that in this arc already and it cost a turn."*
+
+## Deliverables
+
+**`D1` -- a failing two-vector `zip` recursive-step fixture.** The smallest
+program that both destructures a sibling through its own nested match and
+re-uses a field the enclosing match bound, in the same expression. **It must
+fail today**, and the failure must be the wrong-index substitution the spec
+describes, not an unrelated rejection.
+
+**`D2` -- instrumentation that discriminates, reporting the LEVEL of each
+operand.** When the wrong index arrives, report for the binder that received it:
+
+1. its `bottom_pos`;
+2. whether `cx.var_refinements` **already held an entry at that `bottom_pos`**,
+   installed by the **enclosing** match, at the moment the **inner** match's
+   capability 2 inserted;
+3. whether that binder is **below** the enclosing match's entry depth (a genuine
+   outer binder) or **above** it (an enclosing-match field).
+
+**`D3` -- report the raw values and the verdict separately.** Not "the overwrite
+hypothesis holds" -- the three measurements, then what you read from them. A
+verdict without its operands is what cost this program a turn on the `D2k`
+probe.
+
+## Acceptance criteria
+
+**`AC-1` -- the fixture fails at this base, with the failure text quoted
+verbatim.** A fixture that passes means the gap is not where the spec says it
+is; **that is the finding** and it stops here.
+
+**`AC-2` -- all three measurements in `D2` are reported, with raw values.**
+
+**`AC-3` -- no remedy is implemented.** No floor, no provenance field, no
+compose-or-skip. **The Architect rules the remedy on this output.** A candidate
+containing a fix has exceeded the node.
+
+**`AC-4` -- instrumentation is removed before handback**, or is `#[cfg(test)]`
+and named as such. The fixture stays; the probe does not.
+
+**`AC-5` -- no-regression, in CI.** `COORDINATION §12`; build and test targeted,
+`-p ken-elaborator`. **The pinned acceptance suite below stays green** -- if the
+new fixture cannot be added without reddening it, stop and report.
+
+## What the three outcomes mean, including the one that refutes the Architect
+
+**Already-present at (2)** ⇒ the **overwrite** hypothesis; the fix is a
+per-entry compose-or-skip on a carrier that already exists -- no provenance
+field, no threading.
+
+**Absent at (2), above the floor at (3)** ⇒ the **range** hypothesis; the fix is
+the threaded floor, with the coarseness accepted and its residual stated.
+
+**Absent at (2), below the floor at (3)** ⇒ **both hypotheses are wrong and the
+ruling reopens on new evidence.** The Architect named this outcome himself and
+called it legitimate. **It must be sayable** -- report it plainly and stop; do
+not reach for a third mechanism.
 
 ## What is already pinned, and must not be broken
 
@@ -80,18 +176,24 @@ genuinely ill-typed program stays kernel-rejected. **Whatever shape the remedy
 takes, those stay green** -- the single-level case is the behaviour the wider
 one must generalize, not replace.
 
-## Flip condition
+## Sizing
 
-**Flip to `ready` and frame it when the discriminator's shape is ruled.** The
-question to route, in one sentence: *does the elaborator's local context need
-per-entry provenance distinguishing an enclosing match's bound fields from
-genuine outer binders, or can `outer_scope_depth` be computed from the match's
-own context depth at entry instead?* The second is far cheaper if it is
-sufficient, and whether it is sufficient is exactly the ruling.
+**`S`.** One fixture and three measurements. **If the fixture cannot be made to
+fail, that is the hard stop and it is a good outcome** -- it means the spec's
+stated gap is not reachable from the surface as it stands, which is a bigger
+finding than the remedy would have been.
 
-**A failing two-vector `zip` fixture is the cheapest thing that would make this
-concrete** and does not require the ruling -- if a later sweep wants one
-increment of progress here before the design call, that is it.
+## The flip condition is DISCHARGED -- recorded so it is not re-asked
+
+It read: *"flip when the discriminator's shape is ruled"*, and offered the
+provenance-versus-entry-depth fork. **The ruling refused the fork.** The
+sentence *"a failing two-vector `zip` fixture is the cheapest thing that would
+make this concrete, and does not require the ruling"* was written as a fallback
+and turned out to be the answer -- the Architect adopted it in terms.
+
+**The transferable form: when you route a design question, offer the cheap
+increment that needs no ruling alongside it.** Here it converted a blocked node
+into a released one in a single exchange.
 
 ## The pattern this instance confirms
 

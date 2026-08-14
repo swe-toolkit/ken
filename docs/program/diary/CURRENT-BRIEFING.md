@@ -34,88 +34,141 @@
 > reds when it grows. If you are adding a block and the file is over budget,
 > flush first.
 
-> ### REWRITTEN 2026-07-26 ~19:4xZ — 2866 lines → this. Read the bound.
+> ### PRE-2026-07-26 CONTENT IS AT BLOB `c26ee67f`
 >
-> The prior content (~2700 lines of windows stacked back to 2026-07-21) is at blob
-> **`c26ee67f29d42690f461d43fe15e21c2202a31df`** — `git show c26ee67f`. Nothing was
-> lost; it was archived to git with this pointer.
->
-> **HONEST BOUND ON THE AUDIT: I did not read all 2866 lines.** I read every
-> heading, the blocks claiming to be authoritative, and then **scanned** the
-> remainder for sole-source markers, decision ids, held items, and preserved refs.
-> ⇒ **That is a scan, not an exhaustive audit**, and its surface was my own idea of
-> what "load-bearing" looks like. A reader who needs something from before
-> 2026-07-26 should assume it is in `c26ee67f`, not that it was considered.
->
-> **What the scan found is why the rewrite was worth doing: two blocks that
-> advertised themselves as authoritative were WRONG** (see *Corrections*), and a
-> hand-maintained list of 6 preserved refs when origin held **26**.
+> ~2700 lines of windows back to 2026-07-21, archived here on 2026-07-26 --
+> `git show c26ee67f`. **The rewrite audit was a SCAN, not exhaustive**: headings,
+> authoritative-looking blocks, then a sweep for sole-source markers, decision
+> ids, held items and preserved refs. A reader needing something from before that
+> date should assume it is in the blob, not that it was considered. (The scan is
+> what found two self-declared-authoritative blocks that were wrong, and a
+> hand-maintained list of 6 preserved refs when origin held 26.)
 
 ## LIVE
 
-**`main` = `15c21269`.** Landed through **PR #2224**. Tree clean, nothing
-unpublished, no publisher running. **Eleven PRs merged 2026-08-14** (#2214-#2224);
-three of them code: `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD`,
+**`main` = `c932e7b4`.** Landed through **PR #2226**. Tree clean, nothing
+unpublished, no publisher running. **Thirteen PRs merged 2026-08-14**
+(#2214-#2226); three of them code: `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD`,
 `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED`, `LANG-MATCH-DIAGNOSTIC-PROSE`.
 
-**NOTHING IS UNFRAMED.** The D2k successor is framed and released; both build
-rings have a node. Kernel, Verify and Foundation are idle and none of them is
-framing debt -- measured, not assumed.
+**NOTHING IS OWED AND NOTHING IS UNFRAMED. Both rings are working and each has
+a `ready` successor behind it.** Kernel, Verify and Foundation are idle and none
+of them is framing debt -- measured, not assumed.
 
-| ring | node | state |
+| ring | in flight | successor, `ready` and framed |
 |---|---|---|
-| runtime | `RT-CONTKEY-CONSUMER-DESCENT-CARRY` (S) | `ready`, released 2026-08-14 |
-| language | `LANG-WITNESS-ARITY-DERIVED` (S) | assigned on `eb3806de`, implementer mid-turn |
+| runtime | `RT-CONTKEY-CONSUMER-DESCENT-CARRY` (S), implementer engaged from `6da108b6` | `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` (S) |
+| language | `LANG-WITNESS-ARITY-DERIVED` (S), implementer mid-turn | `LANG-REACHABILITY-SUBSUMING-ARMS` (M) |
 | doc | none -- stood down | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` merged, retros in |
+
+**Verify a seat by its PANE, not its convo status.** `language-implementer` read
+"idle, awaiting next WP" at 17:16 while 22 minutes into a targeted
+`ken-cargo test -p ken-elaborator`. **A status is only as fresh as the seat's
+last post**, and reading one as state is how an idle-looking seat gets re-kicked
+mid-turn.
 
 ### THE D2k ROUTE WAS RECOVERED BY ASKING, NOT BY FRAMING
 
-**Runtime's bounded probe returned "No", which by the Architect's own fork
-selected route (b). The No was his own off-by-one.** The raw pairs showed
-depth 3's requirement `(26,21)` **is** depth 2's derived pair -- so "not equal"
-held, but "the consumer is outside both carriers", the stated warrant for (b),
-did not. Ruled at `evt_56dvtaft7ep38`: **`required(N)` = the consumer
-established at level `N-1`; route (c) survives.**
-
-**Two things made it recoverable, and both are worth keeping.** Runtime reported
-**raw values** rather than a bare verdict. And the fork's **No branch carried its
-warrant in writing**, so the data could refute the branch rather than only
-select it.
+**Runtime's probe returned "No", which by the Architect's own fork selected
+route (b). The No was his off-by-one.** The raw pairs showed depth 3's
+requirement `(26,21)` **is** depth 2's derived pair -- "not equal" held, but
+"the consumer is outside both carriers", the stated warrant for (b), did not.
+Ruled `evt_56dvtaft7ep38`: **`required(N)` = the consumer established at level
+`N-1`; route (c) survives.** Two things made it recoverable: Runtime reported
+**raw values**, and the fork's No branch **carried its warrant in writing**.
 
 **Both rulings are transcribed in
-`docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md`, with a hard-stop header
-above the superseded probe spec. Read them there.**
+`docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md`, above a hard-stop header
+marking the superseded probe spec. Read them there, not here.**
 
 **The one constraint that must not slip, ruled twice:** that supplying the
 relation **closes** the route is **not established** -- the original stop named a
 further `Closure`/static-worker refusal and a retained standalone recognition.
-**An AC assuming closure assumes what nobody measured.** The frame has no such
-AC, deliberately, and says so.
+**An AC assuming closure assumes what nobody measured.** The frame has none,
+deliberately. If Runtime hands back "the refusal is gone", that is a welcome
+observation and **not** an acceptance criterion.
 
-### RUNTIME SEQUENCING -- THE ORDER IS NOT ARBITRARY
+**Sequencing:** `RT-CONTKEY-CONSUMER-DESCENT-CARRY` runs **before**
+`RT-CONTKEY-REFUSAL-PROFILE-SPLIT` -- same file, and the split's new refusal
+variant *"must be named for what it OBSERVES, since if the successor lands the
+absence stops being structural."* `TEST-STATED-STACK-SITE-RECONCILE` and
+`RT-C2-DRIVER-STAGE-ATTRIBUTION` sequence **after** the `RecursiveDescent`
+chain, the operator's standing priority.
 
-`RT-CONTKEY-CONSUMER-DESCENT-CARRY` runs **before**
-`RT-CONTKEY-REFUSAL-PROFILE-SPLIT`. They share `static_transition.rs` and must
-not run concurrently. The Architect ruled the split's new refusal variant *"must
-be named for what it OBSERVES, since if the successor lands the absence stops
-being structural"* -- **this is that successor**, so landing it first lets the
-split name reality rather than a prediction.
-
-`TEST-STATED-STACK-SITE-RECONCILE` (`ready`) and `RT-C2-DRIVER-STAGE-ATTRIBUTION`
-sequence **after** the `RecursiveDescent` chain, the operator's standing
-priority. Neither is Runtime's next node.
-
-### FOUND BY GREPPING THE SPEC FOR DEFERRAL PHRASING -- KEEP DOING THIS
+### SWEEP THE SPEC CHAPTER, NOT THE TRACKER -- FOUR NODES SO FAR
 
 **Grep the spec chapter for "tracked follow-on", "is a follow-on", "deferred to
 a later", "not delivered here". A tracker audit cannot see an obligation that
-was never entered into it.** Three real nodes so far (spec 37's `filter`, its
-`DecEq Char` transport, the convoy gap) and one false positive cleared.
+was never entered into it.** Four real nodes now, plus one false positive
+cleared -- and it refuted an escalation I was about to send ("Language has no
+ungated work") before it went out.
 
-**It also refuted an escalation I was about to send** -- "Language has no ungated
-work" -- before it went out. Language now has `LANG-WITNESS-ARITY-DERIVED`
-(`ready`, kicked) and `LANG-CONVOY-ENCLOSING-FIELD` (`draft`, unsized, waiting on
-an Architect call about the discriminator's shape).
+**`LANG-MATCH-PATTERN-FORMS-ABSENT` is the fourth and the largest.** `34 §3`
+lists nine pattern forms normatively; `PatKind` is exactly `Wild | Var | Ctor`
+(`ast.rs:167`) and `MatchArm` has no guard field (`ast.rs:86`). **Literals,
+tuple/pair patterns, record patterns, as-patterns, or-patterns and guards are
+all absent**, in a chapter marked *impl-ready (L2). Normative and
+high-priority*, with **no deferral statement for any of them** and no tracker
+row. `draft` and unsized because **the deliverable is the CUT**, which is not
+made: literals are gated on the open DecEq TCB question, guards change the
+exhaustiveness contract rather than only the grammar, and or-patterns add a
+binder well-formedness rule. **It was reached from the Adversary's hunt, which
+measured the symptom while reviewing something else.**
+
+### "BACKLOG CLEAR" AND "BACKLOG GATED" ARE DIFFERENT FACTS
+
+`LANG-REACHABILITY-SUBSUMING-ARMS` was `draft` behind a flip condition reading
+*"when Language's conformance-grounded backlog is clear."* **It is not clear --
+it is GATED**, and every conformance-grounded alternative waits on someone else:
+the convoy discriminator on an Architect ruling, the pattern-forms census on a
+cut, and two nodes on operator answers.
+
+⇒ **Releasing it is SEQUENCING, which is mine (`ken-steward §3`), not a priority
+call between `ready` WPs, which is the operator's.** Nothing conformance-grounded
+is displaced because nothing conformance-grounded can be started. **The node is
+not reclassified** -- still ergonomics, and `§4.2` still mandates only detection.
+
+### TWO QUESTIONS ROUTED, NEITHER BLOCKING -- DO NOT RE-ASK
+
+Both gate the node **after** next, not the one in flight.
+
+**spec-leader, `evt_26sk9m51rd5nk`** -- what does `34 §3` oblige of the six
+absent pattern forms, and what of it is genuinely stageable? Gates
+`LANG-MATCH-PATTERN-FORMS-ABSENT`, which is the node after next. **Raised as
+"what does the chapter oblige", never as "which node should this be"**, which
+presumes the answer.
+
+### THE CONVOY QUESTION IS ANSWERED, AND THE ANSWER WAS "NEITHER"
+
+**Architect `evt_1rk8wyak0z7sr` refused both options I offered** and named a
+third whose carrier already exists. `LANG-CONVOY-ENCLOSING-FIELD` is now
+`ready`, `S`, **narrowed to the discriminating fixture alone.**
+
+- **Entry-depth is insufficient:** when the inner match is entered, the
+  enclosing match's fields are **already in `cx.ctx`**, so its entry depth
+  includes them. The needed quantity is the depth at the **enclosing** match's
+  entry, threaded down -- which nothing carries.
+- **A threaded floor would work but is coarse** -- it excludes `let`s and every
+  other binder between the two matches, **trading a wrong index for a possible
+  new incompleteness**, the same failure class.
+- **The third candidate:** `cx.var_refinements` is keyed by `bottom_pos`, which
+  equals `abs_pos` -- **absolute and stable across nesting depth** -- so an
+  enclosing and an inner refinement for one binder **land on the same key**, and
+  capability 2 (`:3000`-`:3027`) **inserts without consulting it**. The
+  per-entry discriminator already exists.
+
+**He explicitly bounded his own reading: he has NOT established that the
+overwrite produces the `zip` failure**, and declined to price a remedy from a
+mechanism found by reading -- *"I did that in this arc already and it cost a
+turn."* So the node measures three things and **implements no remedy**, with the
+third outcome being *both hypotheses are wrong*, which he named himself and
+called legitimate.
+
+> **THE TRANSFERABLE MOVE: when routing a design question, offer the cheap
+> increment that needs no ruling alongside it.** I added *"a failing two-vector
+> `zip` fixture is the cheapest thing that makes this concrete and does not
+> require the ruling"* as a fallback; he adopted it in terms. **A blocked node
+> became a released one in one exchange.**
 
 Cleared false positive, recorded so nobody re-investigates:
 `33-declarations.md:751` defers the `export`/re-export build to "the named
@@ -155,9 +208,14 @@ being re-surfaced permanently; a message stops it once.
   than queued behind it. **The amendment exposed an `AC-3` that banned the only
   clean discharge of its own new `D3`**; rewritten, with a new `AC-6` pinning
   accept/reject incidence so the loosening is safe.
-- `evt_4d10j8tmjsbhj` (on `c2f285ee`) -- everything verified, nothing to fix. Its
-  own finding is the useful part: the node was an **as-built correction**, not a
-  citation repoint.
+- `evt_4d10j8tmjsbhj` (on `c2f285ee`) -- everything verified, nothing to fix, and
+  **its side observation was worth more than a defect would have been.** It
+  measured, by enumerating AST variants rather than by a grep that found nothing,
+  that `34 §4.2`'s two reachability caveats are **both** vacuous. That is the
+  symptom whose cause is `LANG-MATCH-PATTERN-FORMS-ABSENT`. The contingency --
+  **adding guards or literal patterns makes both caveats live at once against an
+  `arm_used` with no `§3.3` exception** -- is recorded in **both** affected
+  nodes, where the person who adds those features will actually be working.
 
 ### MY WP CUT WAS ACCEPTED OVER THE ARCHITECT'S
 
@@ -176,14 +234,20 @@ mine -- I grouped it by which node noticed it; you grouped it by defect class."*
 
 ### RULES EARNED 2026-08-14
 
+Each is stated in full in its own section above; this is the index.
+
 1. **Read the Decision object at publish time**, never from an earlier
    `list_decisions` dump.
 2. **Do release step 10 in the same turn as any kickoff.**
-3. **A publisher that looks stalled may be in its initial `sleep`.** Check
-   `pgrep -aP <pid>` for a `sleep N` child **before** diagnosing CI. Measured at
-   865s and 1004s.
-4. **Merge order: docs candidates collide only on the generated tracker, and my
-   own M7 is the collider -- not a code candidate.** Order the merges; do not
-   hold them.
-5. **A fork's No branch must carry its warrant in writing.** That is what let the
-   D2k probe's data refute the branch instead of merely selecting it.
+3. **A publisher that looks stalled may be in its initial `sleep`** -- `pgrep -aP
+   <pid>` for a `sleep N` child before diagnosing CI. Measured at 865s and 1004s.
+4. **Merge order: my own M7 is the tracker collider, not a code candidate.**
+   Order the merges; do not hold them.
+5. **A fork's No branch must carry its warrant in writing**, or data can only
+   select the branch, never refute it.
+6. **Read a seat's PANE before ruling on its state.** A convo status is only as
+   fresh as the seat's last post.
+7. **Offer the cheap no-ruling-needed increment alongside any design question
+   you route.**
+8. **"Backlog clear" and "backlog gated" are different facts**, and only the
+   first makes a release a priority call rather than a sequencing one.
