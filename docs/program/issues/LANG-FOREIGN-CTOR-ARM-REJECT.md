@@ -136,5 +136,10 @@ not an overrun.
   concurrently** — same file.
 - **Not [[LANG-WITNESS-DIAGNOSTIC-STRICTNESS]]**, which is the exhaustiveness
   witness path. Three Language nodes now share `elab.rs`; they run in a line.
+  **That node carries a doc-only rider owed at the next Language touch of
+  `elab.rs`** (its `missing_pattern_witness` comment contradicts the `H1`
+  control it cites). **It is not this node's work** — the disclaimer above
+  stands — but if you are opening `elab.rs` anyway, read it there first so the
+  two edits do not collide.
 - **Not a general type-mismatch audit of pattern position.** One shape: an arm
   naming a constructor of a different inductive family.
