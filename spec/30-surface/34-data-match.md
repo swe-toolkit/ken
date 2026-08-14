@@ -265,16 +265,73 @@ patterns. Specifically:
   `cₖ` method, with `p̄` matched against `cₖ`'s fields in the residual matrix.
 - **Variable / wildcard** patterns bind (or discard) the scrutinee in a method
   that does not split further; a column of all-variables needs no eliminator.
-- **Literal** patterns (`35`) compile to a decidable-equality test on the
-  primitive (a guard-like `if` chain, `39 §2.7`); a literal column is **not**
-  closed (the primitive type is not an enumerable `data`), so a literal `match`
-  is exhaustive **only** with a final variable/wildcard arm (`§4.2`).
+- **Literal** patterns are checked against the scrutinee type (`31 §3`, `35
+  §4`) and compile to the selected value-comparator test below (a guard-like
+  `if` chain, `39 §2` item 7); a literal column is **not** closed, so a literal
+  `match` is exhaustive **only** with a final variable/wildcard arm (`§4.1`).
+  The lexical Boolean literals `true` and `false` are the exception in pattern
+  position: before comparator selection, they elaborate as the ordinary `Bool`
+  constructor patterns from `14 §3`. They therefore contribute constructor
+  coverage: `true` and `false` together exhaust `Bool`, and a following
+  variable/wildcard arm is unreachable (`§4.2`).
 - **Tuple / record** patterns project the (negative) `Σ`/record components (`13
   §3`, `33 §2`) and match componentwise — no `elim_D` (records are negative,
   matched by projection, `14 §4`).
-- **As-patterns** `p as x` bind `x` to the whole scrutinee in `p`'s scope;
-  **or-patterns** `p | q` duplicate the residual arm under both (requiring
-  identical binder sets, `32 §4`).
+- **As-patterns** `p as x` bind `x` to the whole value matched by `p`, at the
+  original scrutinee type. Their match set, coverage, and reachability are
+  exactly those of `p`. The alias must not duplicate a name bound within `p`.
+- **Or-patterns** `p | q` duplicate the residual arm under both alternatives.
+  Each alternative binds every name exactly once, and all alternatives have
+  the same binder-name set. Corresponding bindings must have definitionally
+  equal types in the common context before the branch. The first alternative's
+  left-to-right binder order is the canonical branch order; later alternatives
+  map their bindings into those slots by name. The source arm is reachable if
+  at least one alternative has a non-empty residual, and its coverage is the
+  union of the alternatives' coverage. Checking the binder types in the common
+  pre-branch context is deliberately conservative: it may reject a dependent
+  or-pattern whose binder types would coincide only after distinct
+  alternative-specific refinements. Such a pattern must use separate arms
+  unless a later rule supplies a sound refined-context join.
+
+#### Literal-pattern comparator selection
+
+A literal pattern always has the scrutinee's type as its expected type. Numeric
+defaulting therefore does not choose a match comparator: the literal is first
+checked at that expected type by `35 §4`, and comparator selection uses the
+resulting carrier. A literal form that the expected carrier does not admit is a
+type error.
+
+The comparator is a **value-level branch-selection operation**. It returns a
+`Bool`; it neither constructs an `Equal` proof nor adds an equality hypothesis
+to the branch. A lawful `DecEq` certificate may license a comparator, but is not
+required when the type's normative value semantics already fixes a total
+comparison. This distinction is necessary for IEEE floating point and
+non-canonical `Decimal`, whose value comparators are deliberately not lawful
+`DecEq` operations.
+
+| Literal after expected-type checking | Match comparator | Equality authority and boundary |
+|---|---|---|
+| numeric at `Int` | `eq_int` | Exact integer value equality and the registered `Int` equality certificate (`18a §5.4`). |
+| numeric at `Int8`/`Int16`/`Int32`/`Int64` or `UInt8`/`UInt16`/`UInt32`/`UInt64` | exact fixed-width integer value equality | The mathematical fixed-width value fixed by `35 §2.2`; comparison is exact and does not perform arithmetic, wrap, widen, or narrow. |
+| numeric at `Float` | `eq_float` | IEEE-754 binary64 `==`, including NaN unequal to every value and `+0.0` equal to `-0.0` (`35 §2.4`, `18a §5.4`); explicitly not proof equality. |
+| numeric at `Float32` | `eq_float32` | IEEE-754 binary32 `==` with the same boundary (`35 §2.4`, `18a §5.4`); explicitly not proof equality. |
+| numeric at `Decimal` | `decimalEq` | Exact base-10 value equality by exponent alignment (`18a §5.6.1(4)`), not definitional equality of the non-canonical pair carrier and therefore not `DecEq Decimal`. Literal-pattern use additionally requires a total `Bool` result; while `18a §5.6.1(2)` permits the unbounded-alignment case to remain stuck, `Decimal` literal patterns reject rather than emit a non-selecting match. |
+| string, ordinary or raw | codepoint-wise `String` `eq` | Equality of the canonical `String` value (`37 §2.1`, `§2.5`); value-level comparison, independent of whether the lawful `DecEq String` instance has landed. |
+| character | `eqChar` | Unicode-scalar/codepoint equality, derived through the `Int` projection (`18a §5.9.1(3)`); value-level comparison, independent of the separately staged lawful instance. |
+| byte string or bracketed hexadecimal bytes | byte-sequence content equality | Equality of the immutable, length-determined byte sequence (`38 §1.1`); representation and equality acceleration are unobservable. This row assigns no new surface operation name. |
+
+The absence of a law-carrying `DecEq` instance does not by itself block a row
+licensed by normative value equality: literal matching consumes only the
+comparator's `Bool`. It blocks a row only when that certificate is the row's
+named equality authority. In particular, the separately staged `DecEq Char`
+and `DecEq String` instances do not replace or weaken the value comparators
+named above.
+
+A numeric literal at a user-defined carrier remains outside this table while
+the `35 §4.2` user-type literal mechanism is staged. Any literal/carrier pair
+without a row or without the row's total comparator rejects at elaboration; the
+elaborator never guesses a comparator from spelling, representation, or an
+unrelated `Eq` proof.
 
 **Nested recursive fields.** When a constructor field contains recursive values
 through a declared strictly-positive parameter path, its method type includes
@@ -470,9 +527,9 @@ a refinement of the type) is what AC6 pins — the surface origin of `22 §3`'s
 path-sensitive `Γ`.
 
 **Guards do not refine and do not cover.** A guarded arm `Cₖ p̄ if g => e`
-elaborates to a conditional *inside* the `cₖ` method (`39 §2.7`); because the
+elaborates to a conditional *inside* the `cₖ` method (`39 §2` item 7); because the
 guard `g` may fail, the arm does **not** by itself discharge the `cₖ`
-constructor for exhaustiveness (`§4.2`). Guards are an arm-selection refinement,
+constructor for exhaustiveness (`§4.1`). Guards are an arm-selection refinement,
 not a coverage contribution.
 
 ### 3.4 Transport by a propositional equality — the `J` former

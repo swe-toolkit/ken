@@ -100,6 +100,93 @@ prototype's stubbed sums and missing exhaustiveness.
   guard may fail) — asserted so a checker that wrongly counts a guarded arm as
   covering is caught (it would mis-flag the unguarded `Red` as redundant).
 
+## surface/data-match/as-or-association-composes
+- spec: `spec/30-surface/32-grammar.md §4`,
+  `spec/30-surface/34-data-match.md §3.1`
+- given: the four shapes `C p as x`, `p as x | q`, `p | q as x`, and
+  `(p | q) as x`, plus a whole-disjunction alias whose inner alternatives
+  already bind `x`
+- expect: the current implementation **rejects** every unimplemented `as` or
+  `|` form fail-closed. [deferred — as/or-pattern surface slices] Once the
+  corresponding slices land, the four shapes parse respectively as `(C p) as
+  x`, `(p as x) | q`, `p | (q as x)`, and `(p | q) as x`; parsing does not
+  waive the or-pattern binder-join check, and the last negative rejects because
+  the whole-value alias duplicates an inner binding.
+- why: this is the P1/P4 composition boundary. A parser may produce the pinned
+  tree before semantic validation, but it must neither reinterpret `as` to make
+  an invalid or-pattern valid nor silently shadow a name bound inside `p`.
+
+## surface/data-match/tuple-grouping-and-right-nesting
+- spec: `spec/30-surface/32-grammar.md §4`,
+  `spec/30-surface/34-data-match.md §3.1`
+- given: `(p)`, `(p, q)`, and `(p, q, r)` against values of the corresponding
+  grouped, pair, and three-component tuple shapes
+- expect: tuple-pattern forms remain fail-closed while their surface slice is
+  absent. [deferred — tuple-pattern surface slice] `(p)` is only grouping,
+  `(p, q)` matches a pair, and `(p, q, r)` matches the right-nested value
+  `(p, (q, r))`; zero- and one-tuples are never inferred from parentheses.
+- why: comma presence, not parentheses alone, selects the tuple form, and the
+  arity-three case distinguishes the specified right nesting from a flat or
+  left-nested implementation.
+
+## surface/data-match/open-record-pattern-selection
+- spec: `spec/30-surface/32-grammar.md §4`,
+  `spec/30-surface/34-data-match.md §3.1`,
+  `spec/30-surface/33-declarations.md §2`
+- given: a dependent record whose later field type mentions an earlier field;
+  patterns spelling `later = p, earlier = q` in reverse source order, a punned
+  field, an omitted field, and duplicate and unknown field-label negatives
+- expect: record-pattern forms remain fail-closed while their surface slice is
+  absent. [deferred — record-pattern surface slice] Explicit and punned fields
+  select named projections; omission means an implicit wildcard; checking uses
+  declaration order even when source order differs; duplicate and unknown
+  labels reject rather than becoming positional or extension fields.
+- why: the reversed dependent case distinguishes declaration-order checking
+  from textual order, while the two negatives prevent an open record pattern
+  from becoming an unchecked field bag.
+
+## surface/data-match/or-pattern-binder-environment
+- spec: `spec/30-surface/32-grammar.md §4`,
+  `spec/30-surface/34-data-match.md §3.1`, `§4.2`
+- given: alternatives that bind the same names in different textual orders;
+  siblings with a missing name, a duplicate name within one alternative, or a
+  corresponding binder whose type is not definitionally equal in the common
+  pre-branch context; and an arm for which only one alternative has a non-empty
+  residual
+- expect: or-pattern forms remain fail-closed while their surface slice is
+  absent. [deferred — or-pattern surface slice] The positive uses the first
+  alternative's left-to-right order as the branch environment and maps later
+  bindings by name. Each negative rejects, including types that coincide only
+  after alternative-specific refinements; that dependent case uses separate
+  arms absent a later sound join rule. Coverage is the alternatives' union, and
+  the source arm is reachable when at least one alternative remains.
+- why: equal binder counts are insufficient: the branch body needs one stable,
+  well-typed environment, and reachability is existential over the duplicated
+  residuals rather than requiring every alternative to remain reachable.
+
+## surface/data-match/literal-value-comparator-selection
+- spec: `spec/30-surface/31-lexical.md §3`,
+  `spec/30-surface/34-data-match.md §3.1`, `§4.1`,
+  `spec/30-surface/35-numbers.md §4`
+- given: literals checked at expected `Int`, each fixed-width integer family,
+  `Float`, `Float32`, `Decimal`, `String`, `Char`, and `Bytes`, paired with a
+  wildcard fallback; include `Float` NaN and signed-zero controls, equal
+  non-canonical Decimal values, and a Decimal alignment outside the total
+  comparator boundary
+- expect: comparator-backed literal-pattern forms remain fail-closed while
+  their surface slice is absent. [deferred — literal-pattern surface slice]
+  Each supported carrier uses exactly the value comparator in `34 §3.1`'s
+  table to select an arm; no comparator result constructs `Equal` or adds an
+  equality hypothesis. NaN selects the fallback, `+0.0` and `-0.0` compare
+  equal, and a Decimal case for which `decimalEq` may be stuck rejects at
+  elaboration instead of compiling a silently non-selecting match. Any
+  non-Boolean literal/carrier pair absent from the table also rejects.
+- why: this distinguishes runtime branch selection from proof-producing
+  equality and catches default-driven or representation-driven comparator
+  guesses; the fallback also pins that a comparator-backed literal column never
+  closes coverage. Boolean tokens are constructor patterns, not members of this
+  comparator fixture (`34 §3.1`).
+
 ## surface/data-match/indexed-impossible-pair (AC5) (soundness) — TR5a + TR5b
 - spec: `spec/30-surface/34-data-match.md §2`, `§4.3`
 - given: `data Vec a : Nat → Type { VNil : Vec a 0 ; VCons : {n} → a → Vec a n →
