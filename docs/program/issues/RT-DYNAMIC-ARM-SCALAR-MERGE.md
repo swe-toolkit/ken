@@ -950,6 +950,15 @@ unrecorded choice is not, which was the Architect's actual finding — *"the
 trade may be the better half and what is missing is that the trade is
 unrecorded."*
 
+**Chosen direction: retain the always-on `ken-elaborator` dev-dependency.** The
+external observation scope is feature-gated, and the two D5 seat controls in
+`nc14_data_match_lowering.rs` must compile and execute in the default targeted
+test invocation. Making the dependency opt-in would require a second default-on
+feature carrier merely to preserve that coverage, adding indirection without
+reducing the feature set compiled by default tests. The observation therefore
+stays always-on for `ken-elaborator` tests, while `D-c3-1` makes its disabled
+runtime path free.
+
 ### Acceptance
 
 | AC | criterion | control |

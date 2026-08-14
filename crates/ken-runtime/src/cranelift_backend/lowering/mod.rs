@@ -17766,11 +17766,15 @@ impl<'a> Lowering<'a> {
         };
         let zero_tag = builder.ins().iconst(types::I64, 0);
         #[cfg(any(test, feature = "dasm-c2-observation"))]
-        let observed_operand_kind = lowered_value_kind(&lowered);
-        #[cfg(any(test, feature = "dasm-c2-observation"))]
-        let observed_constructor = match &lowered {
-            Lowered::Constructor { constructor, .. } => Some(constructor.clone()),
-            _ => None,
+        let observation = if DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED.get() {
+            let observed_operand_kind = lowered_value_kind(&lowered);
+            let observed_constructor = match &lowered {
+                Lowered::Constructor { constructor, .. } => Some(constructor.clone()),
+                _ => None,
+            };
+            Some((observed_operand_kind, observed_constructor))
+        } else {
+            None
         };
         let result = match lowered {
             Lowered::RecursiveBackedge => Ok((
@@ -17838,12 +17842,14 @@ impl<'a> Lowering<'a> {
             )),
         };
         #[cfg(any(test, feature = "dasm-c2-observation"))]
-        dasm_c2_record_scalar_merge(DasmC2ScalarMergeObservation {
-            construct,
-            operand_kind: observed_operand_kind,
-            constructor: observed_constructor,
-            admitted: result.is_ok(),
-        });
+        if let Some((observed_operand_kind, observed_constructor)) = observation {
+            dasm_c2_record_scalar_merge(DasmC2ScalarMergeObservation {
+                construct,
+                operand_kind: observed_operand_kind,
+                constructor: observed_constructor,
+                admitted: result.is_ok(),
+            });
+        }
         result
     }
 
