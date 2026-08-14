@@ -16,6 +16,15 @@
 > multi-space and cross-space realization remains deferred to `40-runtime`
 > (`../30-surface/36 §4`).
 >
+> **Surface standing.** The security requirements in this chapter remain
+> committed. Present-tense operation claims, however, extend only to the
+> authority-indexed filesystem surface landed by `38 §1.3.1`. The bounded
+> use-site authority predicate, a distinguishing pair of live authority sinks,
+> and an authority-indexed network surface are committed targets that the
+> current source language does not yet instantiate. Sections 7, 8, and H name
+> those gaps and their exit conditions; example metanotation does not make them
+> current Ken.
+>
 > **No new kernel rule.** No-ambient is the L5 **capability-passing
 > translation** (`36 §2.5`: a `perform_E` is ordinary Π/λ over the `Cap E`
 > value); attenuation rides the **landed refinement types**
@@ -59,14 +68,17 @@ nicer **missing-capability** diagnostic (`36 §7.3` error class 2). The
 no-ambient guarantee is therefore **kernel-backed at its core** (the `perform`'s
 denotation needs the `Cap E` value; the value is a real Π binding, not an erased
 index) — the elaborator supplies only the source-located diagnostic, not the
-soundness. A no-cap/no-row `view` denotes to `ITree 𝟘 ⟦B⟧ ≅ ⟦B⟧` (`36 §2.4`): no
-`Vis` node is constructible, so it is provably effect-free.
+soundness. A no-cap/no-row `view` denotes to `ITree 𝟘 ⟦B⟧ ≅ ⟦B⟧`
+(`36 §2.4`): no `Vis` node is constructible, so it is provably effect-free.
 
 ## 2. Capabilities are static, visible, and least
 
 A **capability** is an unforgeable authority token a computation must hold to
-perform the corresponding effect (`Cap_FS`, `Cap_Net`, `Cap_declassify[ℓ→ℓ']`,
-…). Per `36 §2.5`/`§3`:
+perform the corresponding effect. Capability types are authority-indexed as
+`Cap a`; the landed source-facing instance is the filesystem family in
+`38 §1.3.1`. Declassification has its separate label-edge index (`61 §4`). No
+corresponding authority-indexed network family is yet admitted. Per
+`36 §2.5`/`§3`:
 
 - **Static + visible.** A capability is part of a function's type (a `CapParam`
   in its `EffectSig`), so a function's signature *is* its authority manifest:
@@ -79,13 +91,15 @@ perform the corresponding effect (`Cap_FS`, `Cap_Net`, `Cap_declassify[ℓ→ℓ
 
 ### 2.1 The authority lattice (`Authority`)
 
-A capability carries an **authority** — the *scope* of what it permits (a set of
-paths for `Cap_FS`, a set of hosts for `Cap_Net`, a clearance edge for
-`Cap_declassify`, optionally a quota or a validity window). Authorities form a
+A capability carries an **authority** — the *scope* of what it permits (for
+example, filesystem paths, network hosts, a declassification edge, a quota, or
+a validity window). The current source surface realizes the filesystem case as
+`Cap a`; the other names used here remain semantic families, not source forms.
+Authorities form a
 **bounded lattice** `Authority` — the *same machinery* as the IFC label lattice
 (`61 §2.1`), an **ordinary Ken value, not a kernel primitive**: a record of a
-carrier plus `⊑`/`⊔`/`⊓`/`⊥`/`⊤` plus the lattice laws as `Ω`-valued obligations
-(`../10-kernel/16 §1`), discharged once per instance.
+carrier plus `⊑`/`⊔`/`⊓`/`⊥`/`⊤` plus the lattice laws as `Ω`-valued
+obligations (`../10-kernel/16 §1`), discharged once per instance.
 
 ```
 authority : Cap E → Authority         -- the scope a capability confers; ⊑-comparable
@@ -159,25 +173,29 @@ from Sec1's flow rules (which are *trusted*: IFC labels are erased, conformance
 the sole net, `61 §H`/§9 N1). **The exception: the declassify capability**
 `Cap_declassify[ℓ→ℓ']` (`61 §4`): its authority **is an IFC label edge**, and
 IFC labels are **erased before the kernel** (`61 §3`/§9 N1), so *its* monotone
-bound (`ℓ' ⊑ ℓ`) is **trusted-by-typing** — exactly the landed elaborator check
-`DeclassifyCap.is_valid` (`ifc.rs`), **not** a kernel obligation. The rule:
+bound (`ℓ' ⊑ ℓ`) is **trusted-by-typing** — exactly the landed
+elaborator check `DeclassifyCap.is_valid` (`ifc.rs`), **not** a kernel
+obligation. The rule:
 **real-value authority → kernel-backed obligation; label-mediated authority
 (declassify) → trusted-by-typing**, mirroring `61 §H`. Filing a label-mediated
 guarantee as kernel-certified over-claims (the `61 §9 N1` erasure boundary);
 the safe, accurate split is the one above.
 
-**The use-site dual is also a refinement obligation.** A world-action that needs
-*at least* authority `a` declares its capability parameter **refined**:
+**Committed use-site dual; not a current source form.** A world-action that
+needs *at least* authority `a` would declare its capability parameter refined:
 
-```
-view write_at (c : { c : Cap_FS | a ⊑ authority c }) (p : Path) … visits [FS]
+```text
+required capability: { c : Cap(E) | a ⊑ authority(c) }
 ```
 
-so **calling** it with a capability `c''` emits the obligation `a ⊑ authority
-c''` — kernel-re-checked. A capability is **sufficient** for an op iff its
-authority is `⊒` the demand. Both the trusted *production* of a weaker cap and
-its *consumption* at a sufficiency-demanding sink ride the same
-refinement-obligation machinery; only the latter is directly Ken-callable.
+This relation is retained as target metanotation, not as present Ken. Current
+source-facing filesystem sinks instead require an exact
+`Cap AFull` (`38 §1.3.1`); they do not quantify a lower bound and do not emit
+`a ⊑ authority c` at a call. Once bounded authority quantification and a real
+sufficiency-demanding sink are admitted, calling such a sink with `c''` must
+emit the kernel-re-checked obligation `a ⊑ authority c''`. A capability is then
+sufficient exactly when its authority is `⊒` the demand. This is the pinned
+encoding for the committed use-site dual, not a claim that v1 instantiates it.
 
 ### 3.2 No amplification — assert the absence, and net the orientation
 
@@ -211,10 +229,37 @@ authorities (`authority c ⊓ w ⊏ authority c`):
   weakened cap passing a strong sink — privilege escalation). The pair flips
   green↔red on exactly the orientation bug; a single accept case cannot.
 
-So the headline soundness property is **kernel-backed in its bound yet
-conformance-netted in its orientation** — both nets required, for *different*
-reasons than Sec1 (there the rule is erased; here the bound is degenerate at the
-meet).
+This same-cap/two-sink formulation is a **metatheoretic distinguishing
+requirement**, not a pair of current Ken operations. It must not be respelled as
+two `writeFile` calls: that source-facing gate accepts exactly `Cap AFull`, so
+both arms would reject at the capability type before comparing demands.
+
+The orientation nevertheless has an executing runtime net. The real FS read
+driver calls the production authority gate with demand `APartial`. Two
+READ-bearing witnesses drive that gate over the same existing
+`three-lines.txt`: `fs_driver_build_capability_acceptance.rs`'s
+`r1_sufficient_cap_reads_fixture` supplies `APartial`, while
+`fs_driver_build_acceptance.rs`'s `positive_read_returns_exact_fixture_bytes`
+supplies `AFull`; both accept. Reversing the check from
+`required ⊑ available` to `available ⊑ required` preserves the equal
+`APartial` arm but wrongly rejects the `AFull` arm (`AFull ⋢ APartial`). Thus
+the headline bound remains kernel-backed where its authority is kernel-visible
+and its orientation is **trusted but conformance-netted** by an executing sink
+pair; the block in §7 remains the canonical metatheoretic explanation of the
+hazard.
+
+That pair does **not** live-net rejection by the FS read gate: both controls
+accept under the correct order. The existing
+`fs_driver_build_capability_acceptance.rs::r2_insufficient_cap_denied_before_read`
+control supplies `ANone`, whose scope has no `READ` right, so the production
+gate rejects at `RightNotHeld` before comparing authority. The only executing
+`AuthorityInsufficient` assertion is the write control
+`i5_scoped_capability.rs::coarse_authority_is_a_named_real_dispatch_backstop`;
+it does not exercise the read demand. FS-read authority enforcement is
+therefore **trusted but not currently conformance-netted**
+(`AUTH-FS-READ-ENFORCEMENT`). The gap exits when an executing read control
+passes the rights gate with authority below `APartial`, rejects specifically
+for insufficient authority, and records no backend read.
 
 ## 4. Revocation — transitive, fail-closed, and bounded at runtime
 
@@ -327,76 +372,140 @@ every-use audit point is a static site. The *runtime emission* of records
 
 ## 6. Relationship to effects and flow — authority + flow compose
 
-Authority and flow compose: a capability **gates an effect** (you may write to
-`Net` only with `Cap_Net`), and the sink that capability opens **carries a
-clearance label** (`61 §3`, you may write only data `⊑` that clearance). So a
-single typed arrow expresses both *may this code act* (capability, this chapter)
-and *may this data flow here* (label, `61`):
+Authority and flow must compose: a capability **gates an effect**, and the sink
+that capability opens **carries a clearance label** (`61 §3`, data may flow
+only `⊑` that clearance). The landed operation-level instance is the
+authority-indexed filesystem surface in `38 §1.3.1`. The following network
+arrow states the committed composition rule but is deferred target
+metanotation: current Ken has neither an authority-indexed network capability
+nor `send`.
 
-```
-view send (c : Cap_Net) (s : Socket κ) (msg : Bytes @ ℓ) : Unit  visits [Net]
-  -- well-formed iff  c present (authority)  AND  ℓ ⊔ pc ⊑ κ  (flow, 61 §3.1 L-SINK)
+```text
+send(capability for Net authority a, socket at κ, message at ℓ)
+  is admitted only if the capability is present and ℓ ⊔ pc ⊑ κ
 ```
 
-**Both** concessions are required and they are **independent**: dropping the
-capability is a missing-capability error (§1); dropping the flow check is an
-`IFC-FLOW` error (`61 §3.1`). A `Secret` datum to a `Cap_Net` sink at `Public`
-clearance is rejected **even with** `Cap_Net` held — authority does not buy
-clearance, and clearance does not buy authority. Pure-by-default +
-least-authority + upward-only-flow together make "an AI-written helper leaks a
-secret to the network" require **three** explicit, visible, audited concessions
-— each a place a reviewer or policy can say no.
+When that surface exists, **both** concessions are required and independent:
+dropping the capability is a missing-capability error (§1); dropping the flow
+check is an `IFC-FLOW` error (`61 §3.1`). Authority does not buy clearance, and
+clearance does not buy authority. The security requirement is committed now;
+the network operation-level instance is the named `AUTH-NET-SURFACE` gap.
 
 ## 7. Worked examples
 
-```
--- No ambient authority: a no-cap/no-row view is inert by its type.
-view classify (x : Record) : Tag = …          -- cannot touch FS/Net/anything (§1)
+### 7.1 Surface census
+
+This is the durable D0 census for the examples below and the two normative
+sites that share their assumptions. It separates four independent axes:
+definition keyword, authority index or quantification, operation, and
+effect-indexed result shape. A target spelling in this table is not an
+authorization to present it as current Ken.
+
+Three classes govern the non-current rows:
+
+- `AUTH-NET-SURFACE`: no authority-indexed network capability, operation, or
+  result surface is admitted. It exits when a Net surface lands with the
+  authority-indexed capability/operation/result association already used by
+  the filesystem surface in `38 §1.3.1`.
+- `AUTH-BOUNDED-SINK`: v1 has no bounded authority quantification and no live
+  sink that emits `a ⊑ authority c`. It exits when both the quantification and
+  a real sink obligation are admitted.
+- `AUTH-AC3-ORIENTATION`: §7's same-cap/two-sink spelling is unavailable until
+  a live operation admits those two non-degenerate demands. Its soundness
+  purpose is already covered: the executing FS read pair accepts both
+  `APartial` and `AFull` under the correct order, while a reversed `⊑` rejects
+  only the `AFull` arm, so the orientation ledger remains conformance-netted.
+
+| Site or example | Definition keyword | Authority index or quantification | Operation | Effect-indexed result | Standing |
+|---|---|---|---|---|---|
+| §3.1 target signature (issue anchor `:173`) | `proc` target | bounded `{c : Cap a \| demand ⊑ authority c}` unavailable | sufficiency-demanding FS sink unavailable | must use the sink's `FS a (Result …)` association | `AUTH-BOUNDED-SINK`; design-committed, not instantiated |
+| §6 network arrow (issue anchor `:337`) | `proc` target | authority-indexed Net cap unavailable | `send` unavailable | no Net result association is admitted | `AUTH-NET-SURFACE`; deferred `(oracle)` |
+| no-ambient family: `classify`, `save`, `save_bad` | `fn` for pure classify; `proc` for both saves | none for classify; `Cap AFull` for save; save_bad omits it | none for classify; source-facing `writeFile` for both saves | pure `Tag`; both saves use `FS AFull (Result FileError Unit)` | current positive and deliberate no-cap negative below |
+| `sandbox` | `proc` target | lower-bounded child quantification unavailable | real lower-bound sink unavailable | would follow the admitted FS sink association | `AUTH-BOUNDED-SINK`; metatheoretic target |
+| AC3 order-dual pair | no standalone definition | same attenuated cap under two demands unavailable | two real sinks unavailable | accept/reject observations, not a source result annotation | `AUTH-AC3-ORIENTATION`; metatheoretic form, orientation net live |
+| three management negatives | no definition | held capability only | names remain deliberately unbound | none | current negative contract |
+| `use_child` | `proc` | `Cap APartial` | current `readFile APartial c_child path` | `FS APartial (Result FileError Bytes)` | current source spelling below |
+| `exfil` | `proc` target | authority-indexed Net cap unavailable | `send` unavailable | no Net result association is admitted | `AUTH-NET-SURFACE`; deferred `(oracle)` |
+
+The current filesystem shapes below follow the checked exemplar at
+`catalog/packages/Capability/Filesystem/Authority.ken.md`, while staying at
+the source-facing `readFile`/`writeFile` tier fixed by `38 §1.3.1`.
+
+```ken
+-- No ambient authority: a no-cap/no-row fn is inert by its type.
+fn classify (x : Record) : Tag = …
 
 -- A world-action REQUIRES the capability + the declared effect.
-view save (c : Cap_FS) (p : Path) (d : Bytes) : Unit  visits [FS]
-  = write_at c p d
-view save_bad (p : Path) (d : Bytes) : Unit   visits [FS]
-  = write_at ??? p d                            -- REJECTED: missing Cap_FS (§1)
+proc save
+      (c : Cap AFull) (p : Bytes) (policy : CreatePolicy) (d : Bytes)
+    : FS AFull (Result FileError Unit)
+    visits [FS] =
+  writeFile c p policy d
 
--- An attenuated child is supplied through an existing privileged route; Ken
--- receives it but cannot invoke the raw action that created it.
-view sandbox
-    (c : Cap_FS)
-    (c_tmp : { c' : Cap_FS | authority c' ⊑ authority c ⊓ only_dir "/tmp" })
-    : Unit  visits [FS]
-  = helper c_tmp                                -- helper gets exactly /tmp
+proc save_bad
+      (p : Bytes) (policy : CreatePolicy) (d : Bytes)
+    : FS AFull (Result FileError Unit)
+    visits [FS] =
+  writeFile missing_capability p policy d
+  -- REJECTED: missing_capability is unbound; no FS capability is ambient.
+```
 
--- THE order-dual pair (AC3): the SAME attenuated cap, two sinks, verdict FLIPS.
-write_at c_tmp (path "/tmp/a") d   -- ACCEPTS: weak sink, authority "/tmp" suffices
-write_at c_tmp (path "/etc/passwd") d
-       -- REJECTED: a "/etc"-demanding sink needs authority ⊒ "/etc"; c_tmp has "/tmp" ⊏ that.
-       --   Under a BACKWARDS ⊑ this would WRONGLY accept (escalation) — the net.
+The `sandbox` example is a metatheoretic `AUTH-BOUNDED-SINK` target, not Ken
+source. A trusted host starts with `c : Cap(A_parent)` and supplies
+`c_tmp : Cap(A_tmp)` such that
+`A_tmp ⊑ A_parent ⊓ authority-for("/tmp")`; the child can reach exactly the
+delegated `/tmp` scope. Ken cannot yet state the required lower-bounded
+capability parameter because `38 §1.3.1` expressly leaves bounded authority
+quantification out of v1. This preserves the host-side reading settled for the
+chapter without fabricating a source spelling.
 
+The AC3 order-dual pair is likewise **metatheoretic**, never a respelled read or
+write program:
+
+```text
+same attenuated c_tmp at sink demanding /tmp       -> ACCEPTS
+same attenuated c_tmp at sink demanding parent     -> REJECTS
+```
+
+The second verdict must flip to acceptance if `⊑` is implemented backwards;
+that is the non-degenerate orientation discriminator. Landed `writeFile` takes
+exactly `Cap AFull`, so spelling these as two writes would reject both at the
+capability type before either demand and would destroy the discriminator.
+
+The negative management examples remain current name-resolution claims:
+
+```ken
 -- No public production or management action: all three names are absent.
-attenuate c (full_authority)   -- REJECTED: UnboundName (I-4)
-revoke c                       -- REJECTED: UnboundName (§4)
-strengthen c …                 -- REJECTED: UnboundName (§3.2)
+attenuate c AFull   -- REJECTED: UnboundName (I-4)
+revoke c            -- REJECTED: UnboundName (§4)
+strengthen c AFull  -- REJECTED: UnboundName (§3.2)
+```
 
--- Revocation is observed through an existing capability-consuming operation.
+Revocation is observed through the current source-facing filesystem API:
+
+```ken
 -- If the trusted host revoked c_child or an ancestor before admission, the
 -- call returns MkFileError ReadFile path Revoked and performs no backend read.
-view use_child (c_child : Cap_FS) (path : Bytes)
-    : Result FileError Bytes  visits [FS]
-  = readFile APartial c_child path
-
--- Authority + flow compose (AC6): BOTH concessions, independent.
-view exfil (c : Cap_Net) (s : Socket Public) (secret : Bytes @ Secret) : Unit  visits [Net]
-  = send c s secret    -- REJECTED: has Cap_Net, but Secret ⋢ Public (61 L-SINK).
-                       --   Authority present, FLOW denied — dropping EITHER concession rejects.
+proc use_child (c_child : Cap APartial) (path : Bytes)
+    : FS APartial (Result FileError Bytes)
+    visits [FS] =
+  readFile APartial c_child path
 ```
+
+Finally, `exfil` is a deferred `(oracle)` `AUTH-NET-SURFACE` example, not Ken
+source. It requires an authority-indexed Net capability and a Net sink at
+`Public`; sending `Bytes @ Secret` must be rejected by `61`'s `L-SINK` even
+when the capability is present. Omitting either the capability concession or
+the flow concession must reject independently. This retains AC6 without
+inventing the absent Net operation or result surface.
 
 A CISO reads these and sees no-ambient confinement, least authority,
 non-amplifiable delegation, and audited boundaries in the typed surface, plus
 transitive, fail-visible revocation at the runtime boundary. The static controls
-("this generated component cannot reach the network / the disk beyond X") are
-enforced by construction; §4 names the separate runtime-trusted guarantee
-without presenting it as a kernel theorem.
+over the landed filesystem surface are enforced by construction. The bounded
+sink and Net controls remain committed requirements with the explicit gaps
+above; §4 names the separate runtime-trusted guarantee without presenting it as
+a kernel theorem.
 
 ## H. Honest limits — kernel-backed vs trusted vs deferred
 
@@ -411,25 +520,29 @@ excepted — it is over erased labels, §3.1) (ADR 0004 Decision 3, ADR 0001).
 |---|---|---|
 | No ambient authority — a `perform_E` needs `Cap E` in scope | **kernel-backed** | the cap is a real Π parameter (`36 §2.5`); a world-action with no matching cap denotes to an unbound reference the kernel rejects (§1). The elaborator adds only the source-located **missing-capability** diagnostic |
 | Least by default — a function holds exactly the caps it is passed | **kernel-backed** | same mechanism — using an un-passed capability is an unbound reference; default authority is `∅` |
-| Attenuation **monotone bound** `authority c' ⊑ authority c ⊓ w` (real-value authority) | **kernel-backed (refinement obligation) — but direction-degenerate** | a `34 §5`/`21 §2` obligation, kernel-re-checked (§3.1) — *stronger* than Sec1's erased flow rules. **Yet** the meet-witness discharges both `⊑` orientations by refl, so the **orientation** is netted by the non-degenerate conformance pair, not the kernel (§3.2) |
+| Attenuation **monotone bound** `authority c' ⊑ authority c ⊓ w` (real-value authority) | **kernel-backed (refinement obligation) — but direction-degenerate** | a `34 §5`/`21 §2` obligation, kernel-re-checked (§3.1) — *stronger* than Sec1's erased flow rules. **Yet** the meet-witness discharges both `⊑` orientations by refl, so the orientation remains trusted. The production FS read gate's executing `APartial`/`AFull` accept pair becomes accept/reject under a reversed check and conformance-nets that orientation (§3.2) |
+| FS-read dynamic authority enforcement `APartial ⊑ authority c` | **trusted; not currently conformance-netted** | the production gate performs this Rust check, but its two live orientation witnesses both accept. The existing `ANone` read control rejects earlier at `RightNotHeld`, and the live `AuthorityInsufficient` control exercises write rather than read. `AUTH-FS-READ-ENFORCEMENT` exits when a rights-admissible insufficient-authority read rejects before backend access (§3.2) |
 | Attenuation bound of the **declassify** cap `ℓ' ⊑ ℓ` | **trusted-by-typing** | its authority is an **IFC label edge** and labels are erased before the kernel (`61 §3`/§9 N1), so the bound is the landed elaborator check `DeclassifyCap.is_valid`, **not** a kernel obligation — exactly Sec1's erased-label posture (§3.1) |
-| Use-site **sufficiency** `a ⊑ authority c` | **kernel-backed (refinement obligation)** | a sink refines its cap parameter `{c | a ⊑ authority c}`; each call emits the obligation (§3.1) |
+| Use-site **sufficiency** `a ⊑ authority c` | **design-committed; not instantiated** | the pinned target refines a sink's cap parameter `{c | a ⊑ authority c}`, but current sinks take exact `Cap AFull`; v1 has no bounded authority quantification and no landed call emits this obligation (`AUTH-BOUNDED-SINK`, §3.1) |
 | **No amplification / source attenuation** | **trusted by enumerated absence** | no `strengthen`/`amplify`/`attenuate`/`revoke` or public `Cap` constructor/producer exists — there is nothing to call; conformance asserts the positive wrappers plus this complete absence (§3.2, §4), which the kernel cannot witness |
 | **Unforgeability** of `Cap E` | **abstraction-boundary** | `Cap E` is opaque; minting and raw management are confined to trusted handler/runner/runtime machinery. The kernel rejects a user-side construction (no constructor in scope); I-4 separately nets the absence of every producer/management name (§2.2) |
 | Revocation **lineage + bounded OS-operation behavior** | **runtime-trusted contract; mechanism deferred** | raw management is not Ken-callable; descendant closure, admission linearization, the two distinct `Revoked` projections, and settlement are normative for the current implicit root space (§4) |
 | Revocation **mechanism + general space realization** | **deferred → `40-runtime` / `OQ-Space`** | representation and isolation argument are ADR-owned; no general multi-space, cross-space, transport, or distributed claim (§4.3) |
 | Audit points **statically known** | **kernel-backed** | the boundary set = the `Vis` nodes the type declares; an un-audited declared effect is impossible (`36 §1.4`, §5) |
 | Audit-record **emission** (log, tamper-evidence) | **deferred → runtime / `Ward`** | the static surface is fixed; runtime serialization is `(oracle)`-tagged (§5) |
-| Authority + flow **compose** | **kernel-backed (authority) ∧ trusted-by-typing (flow)** | dropping the cap is kernel-caught (§1); dropping the flow check is the Sec1 erased-label rule (`61 §H`); both required (§6) |
+| Authority + flow **compose** | **committed; Net operation instance deferred** | capability and flow concessions remain independent requirements. The operation-level capability surface currently lands only for FS (`38 §1.3.1`); the Net form must follow that authority-indexed capability/operation/result association (`AUTH-NET-SURFACE`, §6) |
 | The **policy** (which paths/hosts/edges an authority lattice has) | **assumed** | a wrong policy ⇒ a wrong guarantee — the `64 §4.1` spec≠intent analog; the policy (`65`) is the human-reviewed boundary, exactly as for IFC (`61 §H`) |
 
 **The Sec2 vs Sec1 contrast (worth stating, the design payoff).** Sec1's IFC
 labels are **erased** before the kernel, so its flow rules are *trusted* and the
 conformance corpus is the **sole** net (`61 §9 N1`). Sec2's capabilities are
-**real values**, so the attenuation *bound* and use-site *sufficiency* over
-**kernel-visible** authority are **kernel-backed** obligations — a strictly
-smaller trusted surface. What remains trusted is **narrower and named**: the
-*orientation* of `⊑` (degenerate at meet → conformance pair), the **absence**
+**real values**, so an instantiated attenuation *bound* over kernel-visible
+authority is a kernel-backed obligation. The use-site sufficiency encoding is
+committed but not yet instantiated, and therefore supplies no current
+kernel-backed guarantee. What remains trusted or deferred is **narrower and
+named**: the *orientation* of `⊑` (degenerate at meet, conformance-netted by the
+executing FS read pair),
+the **absence**
 of amplification, **unforgeability** (abstraction boundary), the **declassify**
 cap's bound (over erased labels → trusted-by-typing, the one Sec1-style
 exception, §3.1), §4's runtime-trusted revocation contract and deferred
@@ -456,6 +569,12 @@ mechanism, and runtime audit emission (`40-runtime`/`Ward`).
   argument for §4's bounded contract, general space realization, and runtime
   audit-record **emission** (§5) — `40-runtime`/`Ward`, riding the contracts this
   chapter pins.
+- **Deferred (`AUTH-NET-SURFACE`, `(oracle)`):** the authority-indexed Net
+  capability, operation, and result surface. It must follow the landed FS
+  association in `38 §1.3.1`; the gap exits when that Net surface exists.
+- **Deferred (`AUTH-BOUNDED-SINK`, `(oracle)`):** the pinned use-site predicate
+  `a ⊑ authority c`. The gap exits when bounded authority quantification exists
+  and a real sink uses it to emit the obligation.
 
 ## 9. What Team Verify must deliver here (Sec2)
 
@@ -506,9 +625,13 @@ Every level is the **predicative `max`** of its parts (`12 §2`), non-cumulative
 Π/Σ/inductive/refinement, adding **no new level rule**.
 
 Conformance: `../../conformance/security/capabilities/` — AC1–AC6 with
-**discriminating** cases (COORDINATION §7; every negative case **flips** on the
-bug it targets). **AC3 is the order-dual distinguishing pair** (weaker-accepts /
-stronger-rejects on the **same** cap shape, **non-degenerate** authorities, real
-`Cap` values through the real `authority`-`⊑` check — never a synthetic flag),
-plus the cross-case sweep (the no-ambient class agrees; every authority bound is
-kernel-backed; the orientation is netted by the pair).
+**discriminating** cases (COORDINATION §7; every live negative case flips on
+the bug it targets). AC3 retains the metatheoretic order-dual requirement:
+weaker-accepts / stronger-rejects on the same cap shape at non-degenerate live
+sinks, never a synthetic flag. That illustrative form remains metatheoretic.
+The production FS read gate supplies the live net. The independent executing
+witnesses named in §3.2 accept `APartial` and `AFull` for the same read and
+existing path; a reversed `⊑` preserves the equal `APartial` arm but rejects
+the `AFull` arm. No executing read control currently reaches the distinct
+insufficient-authority rejection after passing the rights gate;
+`AUTH-FS-READ-ENFORCEMENT` names that conformance gap and its exit in §3.2.
