@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-R3-FUSION-EMITTER
 title: "Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -283,3 +283,65 @@ their controls, excluded scope, and stop conditions.
 Retirement of the residual class, lane deletion, and the other seven
 expressions. Row 2's missing-`Mint` cell. `#6d`'s six remaining expressions and
 their `StaticWorkerBinding` and singular-specialization walls.
+
+## Merged 2026-08-14
+
+**Candidate `cd19957db3e0d1fdeeb8ebe97c0a4b872446b12d`, landed as squash
+`34769380`** (PR #2154, CI green; Decision `dec_33chk0zyjkcz4`, Architect; QA
+`evt_47g61za1yzbgn`). Merge-base `5a0874a4`, eleven commits, five
+`crates/ken-runtime/**` paths, `+2186/-24`; 5/5 blobs verified identical after
+landing. **Both SHAs are recorded because the candidate is not an ancestor of
+`main`** — a squash rewrites it. Ask content, not ancestry.
+
+**Production remains unarmed** — `const D2F_EMITTER_ARMED: bool = false`,
+verified on `main` after landing.
+
+### How the last increment resolved, because the shape is reusable
+
+The ring reported a hard stop while widening the validator control to
+`ProducerArity`, and asked to either route a new mechanism to the Architect or
+narrow to the two selectors it could measure. **Neither was right.**
+
+`core.rs` already recorded, as a quoted diagnostic rather than a derivation,
+that `ProducerArity` **never reaches** the terminal stop — it refuses earlier at
+its own widened producer construct meeting the one-argument case, *"which is
+the whole reason the cause exists"* — and concluded **the terminal-stop
+population is two roots, not three.** The reported refusal matched that text
+character for character.
+
+⇒ **The refusal was the cause working as designed, and the frame had
+pre-authorized this exact outcome**, assigning the `No` branch a destination:
+the fact belongs in the sentence that carries the population claim.
+
+**Recorded because it nearly went the other way:** narrowing to two selectors
+was the option on offer, and taking it would have written a correct population
+into the record as a concession made under time pressure — which the next
+author widens back. **Excluding a non-member is not a scope cut.**
+
+**The Architect retracted the premise of their own block** (`evt_dapr4c8kdcwn`):
+they had written `ProducerArity`'s reach was *"unmeasured"*, and the
+measurement sat ten lines above a line number they cited in the same review, in
+the file they were reading. The block still bought two things — a stale `d2f_0`
+comment now distinguishes the three **planning** positives from the
+terminal-stop population, and the population is **named** (`Exact`, `ReHomed`)
+rather than described, so the next reader checks it instead of re-deriving it.
+
+### Residual: the boundary that scopes the control is prose, asserted nowhere
+
+Architect finding, non-blocking, at `evt_dapr4c8kdcwn`. The control's coverage
+is correct **because** `ProducerArity` refuses at the `ComputationalMatch` arity
+check — a fact recorded in a comment with a quoted diagnostic, while the
+executable assertions measure only planning/build arrival and the unarmed
+baseline.
+
+**If the fixture's case arity changes, or `ProducerArity`'s widening moves, that
+cause rejoins the terminal-stop population, the control silently covers two of
+three again, and nothing reds.** A constraint that never becomes an assertion is
+one the build cannot fail, and it is usually the load-bearing one.
+
+**Not filed as a node, deliberately.** `d2f_0` runs unarmed to pin the baseline,
+so pinning the armed refusal is a **new armed assertion** rather than a line,
+and the arming discipline (`D2fEmitterTestArm`, RAII, one block) is exactly what
+not to loosen casually. **It belongs with the emitter's real arming** — at which
+point the refusal either still holds and costs one assertion, or has moved and
+you want to know.
