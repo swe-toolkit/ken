@@ -23,6 +23,22 @@ origin: "Architect ruling evt_3zjhbbr7k3ky6 (2026-08-14) on the RT-LEXICAL-RECUR
 > `AC-6`: rows 4 and 5 **still refuse** at `StaticWorkerBinding` with their prior
 > conservation sentence -- no route repair rode along.
 >
+> **`AC-1` AND `AC-3` ARE WEAKER THAN THEY READ. Adversary `evt_7b75nbgqbw04z`,
+> triaged CONFIRMED; follow-up is [[RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED]].**
+> `consuming_occurrence` has two fields and only `body_origin` is re-derived --
+> `eliminator_origin` is **copied from the input** into every candidate before
+> the comparison, so `AC-1`'s assert is `x == x` on that field. `AC-2`'s mutation
+> perturbs `body_origin` only, so the measured refusal is the scan rejecting a
+> wrong body and **step 1 has never been fired**. Nothing is known to be wrong;
+> there is simply no evidence that half is right.
+>
+> **`AC-3`'s "population of two" is one on the axes that matter.** Both rows
+> carry `eliminator_origin: StaticOriginId(5)` and
+> `consumer_owner: PredeclaredFunctionId(0)`; only `body_origin` differs. They
+> are **one eliminator with two bodies**, not two samples -- so a control passing
+> for the wrong reason on `eliminator_origin` passes identically on both. Do not
+> cite that count as two independent samples.
+>
 > Architect Decision `dec_7ta70j8a2dqk3`, QA `evt_4v9xz45y4443z`.
 > `scripts/ken-cargo test -p ken-runtime --lib`: 928 passed, 0 failed.
 >
