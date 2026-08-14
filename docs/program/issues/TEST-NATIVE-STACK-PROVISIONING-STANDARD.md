@@ -36,11 +36,32 @@ that aborted.
 
 ## The apparent conflict, and why it is not one
 
-`LANG-RECORD-STACK-OVERFLOW` (merged) says, at `:76-78`:
+**There are TWO occurrences, in two artifacts, and they are different kinds of
+thing.** The Steward's first pass cited only the first; the second was located
+by the Architect at `evt_5ftfpmd6yaxge`, and `D1` must amend both or it amends
+half the problem.
+
+**Occurrence A — `docs/program/issues/LANG-RECORD-STACK-OVERFLOW.md:76-78`, a
+`## Not this node` bullet:**
 
 > **Raising a stack limit.** `RUST_MIN_STACK` and friends are refused. The
 > gate-4a arc next door repaired a stack regression by reducing footprint, and
 > that is the standard here.
+
+**Occurrence B — `docs/program/wp/LANG-RECORD-STACK-OVERFLOW.md:56-60`, under
+the heading `## D2 -- fix by reducing footprint`:**
+
+> **`RUST_MIN_STACK` and any stack-limit raise are refused.** The gate-4a arc
+> next door repaired a stack regression by boxing a large value and forcing
+> inlining to remove a live frame, with the limit explicitly refused. Same
+> standard.
+
+**One is a scope exclusion; the other is a work instruction to that node's
+implementer. Neither is a ratified codebase standard.** Occurrence B is the
+more forceful wording and is the easier of the two to mistake for one, because
+it sits under a deliverable heading rather than beside `Tuning
+NESTED_MATCH_DEPTH`. **Reading either in isolation, at its widest, yields
+"refused, fleet-wide" -- which is how this arrived.**
 
 **Read as a fleet standard, the five landed files are debt.** That reading is
 what makes this look like a contradiction to resolve.
@@ -96,19 +117,44 @@ Three dispositions, and the node must pick one:
 3. **Yes but bounded** -- provisioning is permitted only where a named,
    recorded reason exists, and the size is not a copied constant.
 
-**Disposition 3 is the Steward's recommendation and the reviewer should attack
-it.** The tell that the current state is unconsidered is that all six sites
-carry the **identical** `256 * 1024 * 1024`, which is the signature of a value
-copied from a neighbour rather than derived from a measured depth. A standard
-that permits provisioning without requiring a reason reproduces that.
+**Disposition 3 is the Steward's recommendation.** The tell that the current
+state is unconsidered is that all six sites carry the **identical**
+`256 * 1024 * 1024`, which is the signature of a value copied from a neighbour
+rather than derived from a measured depth. A standard that permits provisioning
+without requiring a reason reproduces that.
+
+### Two amendments to disposition 3, from the Architect (`evt_5ftfpmd6yaxge`)
+
+**Both are adopted into the recommendation, because both are better than what
+the Steward wrote.** The original form asks authors to classify their own
+intent, and intent is exactly what nobody self-reports accurately under
+schedule pressure.
+
+**Amendment 1 — gate on evidence, not on motive. A test may be provisioned only
+when there is NO OPEN MEASURED REGRESSION on it.** If a base-versus-candidate
+A/B shows that test newly failing, provisioning masks a regression **regardless
+of the reason recorded**, because it functions as the repair whatever the author
+intended.
+
+⇒ This is objective, checkable by a reviewer, and it makes the standard
+**structurally incapable** of being used to unblock a candidate. It reaches what
+`AC-3` fences around one file, but as a rule that generalizes.
+
+**Amendment 2 — define "derived", or it degrades into the copied constant with
+a comment above it.** *"Native production is deep"* written next to
+`256 * 1024 * 1024` satisfies "recorded reason" and changes nothing. **Derived
+means: the measured peak for the deepest program in that file, times a stated
+headroom factor, with BOTH numbers written down.**
 
 ## Deliverables
 
-**`D1` — the ruling, recorded where it binds.** Amend
-`LANG-RECORD-STACK-OVERFLOW:76-78` so the sentence states which act it forbids,
+**`D1` — the ruling, recorded where it binds. BOTH occurrences.** Amend
+`issues/LANG-RECORD-STACK-OVERFLOW.md:76-78` **and**
+`wp/LANG-RECORD-STACK-OVERFLOW.md:56-60` so each states which act it forbids,
 and put the standing standard somewhere a future candidate will actually read
-it -- a `Not this node` bullet in a merged node is not that place. Name the
-chosen venue.
+it -- a `Not this node` bullet and a per-node deliverable instruction are
+neither of them that place. Name the chosen venue. **Amending only one leaves
+the wider-reading copy in the tree**, which is the whole defect.
 
 **`D2` — the five sites reconciled to the ruling.** Under disposition 1 or 3,
 each site gains the one-line reason the ruling requires. Under 2, each is filed
@@ -130,6 +176,12 @@ Steward read it as a scope bullet.
 **`AC-2` — the mechanism distinction is stated.** `RUST_MIN_STACK` versus a
 per-test `stack_size`: same ruling or different, said explicitly rather than
 left to "and friends."
+
+**`AC-2b` — under disposition 3, the two amendments are IN the ruling's text.**
+The no-open-regression gate must be stated as a **checkable condition**, not as
+guidance, and "derived" must carry its arithmetic (measured peak, headroom
+factor, both written). **A ruling that says "with a recorded reason" and stops
+has not discharged this** -- that is the form the amendments exist to prevent.
 
 **`AC-3` — no candidate is unblocked by this node.** `crates/ken-cli/tests/px4b_native_production.rs`
 is **not** modified here. If the ruling permits provisioning, that edit is a
