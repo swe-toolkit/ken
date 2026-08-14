@@ -155,3 +155,23 @@ a paraphrase.
 
 Row 5's after-hole residual. It is separate by ruling, and its remedy question
 is open on its own terms.
+
+## Settling this needs an INSTRUMENTED RUN, not a read — and this node owns it
+
+Recorded 2026-08-14 from the Adversary's hunt on `afdabc502`
+(`evt_pg42y72y6hrx`), which independently reached the same conclusion about the
+boundary-class comparison and named it as unhunted rather than implying
+coverage.
+
+**The comparison at the head of this node is prose against prose** — the
+`D2k-1c` stop record against the refusal now firing — which is exactly why the
+Architect marked it `needs confirmation` rather than ruling on it. **Settling it
+requires instrumenting the residual path; no amount of further reading closes
+it.** That is `D1`'s measurement and it belongs to Runtime here.
+
+**It is therefore not an open invitation elsewhere.** The Adversary offered to
+instrument it as its next pass; that would duplicate `D1` and risk two
+differently-specified measurements of one question, which is the failure this
+node is built to avoid. **The measurement is specified here, at a named level,
+with the three branches pre-committed — that specification is the deliverable's
+value, and a second unspecified run would not have it.**
