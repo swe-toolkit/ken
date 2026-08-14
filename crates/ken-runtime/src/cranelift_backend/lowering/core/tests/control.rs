@@ -4261,25 +4261,28 @@ fn r3_fused_capture_projection_refuses_before_emission() {
     );
 }
 
-/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- both governed fused selectors must
-/// reach the production target-authority validator before call emission.
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- both terminal-stop fused selectors
+/// must reach the production target-authority validator before call emission.
 ///
 /// **MEASURED:** the existing armed Exact and ReHomed full-pipeline compiles
 /// each reach `fusion_target_carries_claim_authority`, then complete with one
 /// claim consumption and one fused invocation.
 ///
-/// **CLAIMED:** the validator is wired into every currently governed real R
-/// selector. Bypassing its call must make this control red even though both
-/// compiles otherwise still succeed.
+/// **CLAIMED:** the validator is wired into the complete currently governed
+/// terminal-stop population. That population is defined by reaching this
+/// validator and the later terminal stop: `Exact` and `ReHomed`. `ProducerArity`
+/// refuses earlier, as recorded beside `D2F_EMITTER_ARMED` in `core.rs`, and is
+/// not a member. Bypassing the validator call must make this control red even
+/// though both compiles otherwise still succeed.
 ///
 /// **THE GAP:** the sole writer currently derives the map key and both checked
 /// fields from the same claim. This control proves validator reachability, not
 /// wrong-target refusal; the source-site future-divergence comment names the
 /// type and writer changes that would make that separate relation expressible.
 ///
-/// **Promise class: durable invariant.** Every real R selector must retain the
-/// target-authority validation independently of how many selectors or claims
-/// an intended extension adds.
+/// **Promise class: durable invariant.** Every selector in the reachable
+/// terminal-stop population must retain the target-authority validation
+/// independently of how many selectors or claims an intended extension adds.
 #[test]
 fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
     use crate::cranelift_backend::lowering::core::{
@@ -4754,16 +4757,15 @@ fn d2f_0_the_applied_root_production_path_gate() {
         );
     };
 
-    // ---- the three positives, each on its own root.
+    // ---- the three planning positives, each on its own root.
     //
     // `D2k` `AC-1a` extends this gate to the THIRD positive. `ProducerArity` is
-    // a documented positive, not a refusal: `static_transition.rs`'s `D2jCause`
-    // doc says "Five are refusal causes ... and `ProducerArity` is a positive
-    // widening that makes the argument row's inventory non-degenerate", and its
-    // variant doc gives the reason -- the exact witness's producer construct has
-    // ONE child, so "the argument is the child at the recursive position" cannot
-    // discriminate position on a single-element inventory. A `ProducerArity`
-    // that refused would defeat its reason for existing.
+    // a positive for this builder/planner population: it reaches the builder and
+    // resolves its own key and descriptor. It is not a successful-lowering or
+    // terminal-stop positive. Armed lowering refuses earlier at its widened
+    // producer construct; the authoritative population and refusal account is
+    // beside `D2F_EMITTER_ARMED` in `core.rs`. The executable assertions below
+    // measure only planning/build arrival and the unarmed baseline.
     let (exact_arrivals, exact_error) = compile_cause(D2jCause::Exact, "ken_d2f_gate_exact");
     let (rehomed_arrivals, rehomed_error) = compile_cause(D2jCause::ReHomed, "ken_d2f_gate_rehomed");
     let (arity_arrivals, arity_error) =
