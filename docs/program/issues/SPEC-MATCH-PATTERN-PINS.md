@@ -1,7 +1,7 @@
 ---
 id: SPEC-MATCH-PATTERN-PINS
 title: "the five spelling pins 34 §3's absent pattern forms need before any of them can be cut as a slice -- as-association/precedence, tuple comma-versus-grouping, record field_pat form, the or-pattern binder join, and the literal-kind-to-value-comparator table -- none of which exists today, so a Language slice built now is a slice that gets rebuilt"
-status: ready
+status: merged
 owner: spec-enclave
 size: M
 gate: none
