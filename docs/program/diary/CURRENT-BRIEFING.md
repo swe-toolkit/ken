@@ -63,42 +63,65 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~11:0xZ. **`main` = `3f04953b`.**
-> **RUNTIME IS WORKING. Language gated and kicked. Publish queue empty, no
-> publisher running.**
+> ### RESUME HERE — state at 2026-08-14 ~11:2xZ. **`main` = `6c574cdd`.**
+> **A PUBLISHER IS IN FLIGHT: PR #2196**, `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH`
+> exact `ce2a7d37`, 822s pre-poll, log `publish14.log`. **`pgrep -af '^bash
+> scripts/scripted-pr-automerge.sh'` before relaunching anything** — it survives
+> compaction. **Do not `git fetch` while it holds the window.**
 >
-> **Nine PRs landed today, all M6 blob-verified:** `#2184` `cae1c36f` briefing
-> flush · `#2185` `842f2d5f` ruling fold · `#2186` `51b3a75c`
-> `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` · `#2187` `f7ec9f59`
-> `RT-NESTED-IH-NATIVE-REALIZATION` `D2` (node **stays `active`**) · `#2188`
-> `c035c8a4` doc bundle · `#2189` `294fceac`
-> `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` · `#2190` `d8de7023` tracker sync ·
-> `#2191` `7543ddcc` ABI-order fold · `#2192` `3f04953b` coldness-claim fold.
-> M8/M9 sent for every code merge.
->
-> **THE FROZEN CANDIDATE IS LANDED — that whole block is retired.** `98e6ac51`
-> re-voted unchanged and merged as `294fceac`; `wp/…-BLOCK-DELTA` is deleted at
-> origin. Do not go looking for it.
+> **Eleven PRs landed today, all M6 blob-verified.** Most recent: `#2189`
+> `294fceac` `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` · `#2190` `d8de7023` tracker
+> sync · `#2191` `7543ddcc` ABI-order fold · `#2192` `3f04953b` coldness fold ·
+> `#2193` `fea9cd96` releases · `#2194` `5edd3de3` successor frame · `#2195`
+> `6c574cdd` `LANG-REFINED-FALLBACK-COLDNESS-CLAIM`. M8/M9 sent for every code
+> merge.
 >
 > **`#2189` cost one publisher abort on a FALSE RED, and the lesson is
 > positional.** The SHA was unchanged by design, so GitHub still carried the
 > **pre-repair** check-runs from `06:57`/`07:08`. **A failing check on an
 > unchanged SHA may be history — discriminate by `started_at`.** The publisher
 > does not. A direct `gh pr merge` was correctly refused by branch protection;
-> `--admin` is not the Steward's to use. Relaunching the sanctioned publisher
-> after the condition changed was what worked.
+> `--admin` is not the Steward's to use.
 >
-> ### IN FLIGHT
+> ### UNPUBLISHED LOCAL WORK — publish when #2196 clears
 >
-> **Runtime — `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH`**, anchor
-> `evt_7t1ncby6yaexe`, ring gated and compacted at `7543ddcc`. Implementer
-> confirmed pickup and is taking **`D3` first** — the silent-arm control —
-> which is the sequencing call the node left open and the right one: the
-> exposure is **one arm, not one crate**. If `D3` alone closes the silent
-> direction, `D1` is priced separately rather than landed because it was listed.
+> **This commit** (node flip to `merged` + tracker) and
+> **`LANG-POW10-CASCADE-LITERAL-CLAUSE`** (`ready`, `XS`, untracked until it
+> lands). The latter is an Architect scope hand-off from `evt_5jmye3pdj3ra7`.
+> **Read its "why this is not a second COLDNESS-CLAIM" section before sizing
+> it** — `decimal_char.rs:60-62` is over-broad in the same way, but its
+> conclusion rests on a **different and TRUE** property (no
+> `saturating_*`/`.min(_)`/`clamp` in the generated cascade). **A wording repair
+> on a sound argument, not a second false justification.**
 >
-> **Language — gated and compacted at `3f04953b`**, kicked on
-> `LANG-REFINED-FALLBACK-COLDNESS-CLAIM`.
+> ### OWED AFTER #2196 LANDS, IN ORDER
+>
+> 1. **M6** blob 2/2 from **declared** base `5edd3de3` —
+>    `crates/ken-runtime/src/cranelift_backend.rs`,
+>    `crates/ken-cli/tests/dasm_c2_observation_artifact_identity.rs`. **The
+>    declared base is NOT `main` and that is by design** (`6c574cdd` landed
+>    while it queued); `merge-tree` against live `main` already gave exactly
+>    those two paths, both `M` — no false delete.
+> 2. **M7** flip `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` to `merged`,
+>    `gen-progress.sh`. **M8** Adversary `agt_37vnwmcdxhw00` naming the landed
+>    squash. **M9** runtime-leader `agt_37reqrd72cg00`.
+> 3. **Gate + compact the Runtime ring, THEN release
+>    `RT-CHECKED-IH-REALIZATION-AUTHORITY`** (`ready`, `M`, no deps). **Never
+>    publish inside a gate window** — the reset is a snapshot and pins seats to
+>    a stale `main`.
+> 4. **Language next: `LANG-GADT-SEQUENCE-TRACKER-GAP`** (`ready`, `S`). The
+>    leader has the order; gate before kicking.
+>
+> ### M3 CITED-SOURCE HIT — routed, and the direction is the point
+>
+> `crates/ken-runtime/src/cranelift_backend.rs` is attested at
+> `SOURCE-ATTESTATIONS:60`. **The attestation was ALREADY stale on `main`
+> before this candidate** — attested `d317ad9c`, `main` was `419df20b`. The
+> candidate moves it a second time; it did not originate the drift. Routed to
+> the Librarian at `evt_6yhr7qe9tee82` with that distinction, because
+> re-attesting against the post-merge blob would **silently absorb whatever
+> earlier change went unrecorded.** Currency is generated at release points,
+> not enforced per merge — nothing is gated on it.
 >
 > ### BOTH ADVERSARY HUNTS ARE TRIAGED AND FOLDED — do not re-read them
 >

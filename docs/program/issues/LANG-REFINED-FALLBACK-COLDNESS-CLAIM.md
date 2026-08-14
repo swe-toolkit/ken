@@ -1,13 +1,13 @@
 ---
 id: LANG-REFINED-FALLBACK-COLDNESS-CLAIM
 title: "The doc comment justifying LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT's -3120 saving says the pow10 cascade's arms are all bare literals, which the generator refutes -- only the True arms are, every False arm is the next nested match, and the innermost is an application; the conclusion survives, the recorded reason does not, and it misleads in both directions"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2195
 origin: "Adversary hunt evt_28m4mz6wy8fgn on squash 51b3a75c, triaged by the Steward. Findings 1-3 accepted; Finding 1 re-verified against origin/main before filing (decimal_char.rs:62-75 generator read directly, elab.rs:1868 comment read directly). Filed as a node rather than carried because the defect is a false sentence sitting on main in the artifact written to carry the justification."
 ---
 
