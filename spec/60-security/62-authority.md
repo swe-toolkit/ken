@@ -248,6 +248,19 @@ and its orientation is **trusted but conformance-netted** by an executing sink
 pair; the block in §7 remains the canonical metatheoretic explanation of the
 hazard.
 
+That pair does **not** live-net rejection by the FS read gate: both controls
+accept under the correct order. The existing
+`fs_driver_build_capability_acceptance.rs::r2_insufficient_cap_denied_before_read`
+control supplies `ANone`, whose scope has no `READ` right, so the production
+gate rejects at `RightNotHeld` before comparing authority. The only executing
+`AuthorityInsufficient` assertion is the write control
+`i5_scoped_capability.rs::coarse_authority_is_a_named_real_dispatch_backstop`;
+it does not exercise the read demand. FS-read authority enforcement is
+therefore **trusted but not currently conformance-netted**
+(`AUTH-FS-READ-ENFORCEMENT`). The gap exits when an executing read control
+passes the rights gate with authority below `APartial`, rejects specifically
+for insufficient authority, and records no backend read.
+
 ## 4. Revocation — transitive, fail-closed, and bounded at runtime
 
 Authority is **revocable**: a delegated capability can be withdrawn, and
@@ -508,6 +521,7 @@ excepted — it is over erased labels, §3.1) (ADR 0004 Decision 3, ADR 0001).
 | No ambient authority — a `perform_E` needs `Cap E` in scope | **kernel-backed** | the cap is a real Π parameter (`36 §2.5`); a world-action with no matching cap denotes to an unbound reference the kernel rejects (§1). The elaborator adds only the source-located **missing-capability** diagnostic |
 | Least by default — a function holds exactly the caps it is passed | **kernel-backed** | same mechanism — using an un-passed capability is an unbound reference; default authority is `∅` |
 | Attenuation **monotone bound** `authority c' ⊑ authority c ⊓ w` (real-value authority) | **kernel-backed (refinement obligation) — but direction-degenerate** | a `34 §5`/`21 §2` obligation, kernel-re-checked (§3.1) — *stronger* than Sec1's erased flow rules. **Yet** the meet-witness discharges both `⊑` orientations by refl, so the orientation remains trusted. The production FS read gate's executing `APartial`/`AFull` accept pair becomes accept/reject under a reversed check and conformance-nets that orientation (§3.2) |
+| FS-read dynamic authority enforcement `APartial ⊑ authority c` | **trusted; not currently conformance-netted** | the production gate performs this Rust check, but its two live orientation witnesses both accept. The existing `ANone` read control rejects earlier at `RightNotHeld`, and the live `AuthorityInsufficient` control exercises write rather than read. `AUTH-FS-READ-ENFORCEMENT` exits when a rights-admissible insufficient-authority read rejects before backend access (§3.2) |
 | Attenuation bound of the **declassify** cap `ℓ' ⊑ ℓ` | **trusted-by-typing** | its authority is an **IFC label edge** and labels are erased before the kernel (`61 §3`/§9 N1), so the bound is the landed elaborator check `DeclassifyCap.is_valid`, **not** a kernel obligation — exactly Sec1's erased-label posture (§3.1) |
 | Use-site **sufficiency** `a ⊑ authority c` | **design-committed; not instantiated** | the pinned target refines a sink's cap parameter `{c | a ⊑ authority c}`, but current sinks take exact `Cap AFull`; v1 has no bounded authority quantification and no landed call emits this obligation (`AUTH-BOUNDED-SINK`, §3.1) |
 | **No amplification / source attenuation** | **trusted by enumerated absence** | no `strengthen`/`amplify`/`attenuate`/`revoke` or public `Cap` constructor/producer exists — there is nothing to call; conformance asserts the positive wrappers plus this complete absence (§3.2, §4), which the kernel cannot witness |
@@ -618,4 +632,6 @@ sinks, never a synthetic flag. That illustrative form remains metatheoretic.
 The production FS read gate supplies the live net. The independent executing
 witnesses named in §3.2 accept `APartial` and `AFull` for the same read and
 existing path; a reversed `⊑` preserves the equal `APartial` arm but rejects
-the `AFull` arm.
+the `AFull` arm. No executing read control currently reaches the distinct
+insufficient-authority rejection after passing the rights gate;
+`AUTH-FS-READ-ENFORCEMENT` names that conformance gap and its exit in §3.2.
