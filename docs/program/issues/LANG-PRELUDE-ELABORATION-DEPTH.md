@@ -232,3 +232,42 @@ assert_eq!(by_global_name.len(), env.globals.len(),
 (one line, inside a function an open node already touches); it rides the next
 Language candidate that enters this file. `LANG-COMMENT-POPULATION-PARITY` does
 not touch it, so this is carried rather than assigned.
+
+### Residual: `trusted_base_labels` flattens two namespaces into one untagged list
+
+Adversary hunt `evt_31dc9xfdp2ny`, Finding 3, triaged by the Steward
+2026-08-14. **Re-verified against the landed code before filing**, at
+`crates/ken-elaborator/tests/lang_prelude_collections.rs:205-211`.
+
+The `match decl` has two arms feeding one `Vec<String>`, and they draw from
+**different namespaces**:
+
+- `Decl::Opaque { name, .. } => name.clone()` — the **kernel declaration**
+  name, taken from the audit surface.
+- `_ => by_global_name.get(&id.0)` — the **surface** name from `env.globals`,
+  falling back to `"<unregistered>"`.
+
+**Nothing in the emitted label records which arm produced it.** So a
+trusted-base entry that changes **kind** while keeping its spelling renders
+identically, and the enumeration this node landed as `AC-6` — 107 entries, by
+name — cannot see the change. **That is not a cosmetic distinction:** an
+opaque is an axiom, a primitive is a thing with a reduction, and they are not
+the same trust claim. A postulate becoming a primitive under the same name is
+exactly the movement an enumeration of the trusted base exists to catch, and
+this one is blind to it.
+
+**The repair is to tag the label with the decl's kind** — `Opaque(Bytes)`,
+`Primitive(add_int)` — so the namespace each name came from is on the face of
+the label. **It also fixes `<unregistered>` for free**, which the finding
+scoped itself out of: `decl` is in hand on both arms, so the three
+deliberately-dropped `conversions.rs` entries can carry their kind even when
+no surface name resolves. The `AC-6` expected-list in this file updates with
+it; that is the same edit, not a second one.
+
+**Not filed as a node**, same reasoning as the injectivity residual above and
+the same route: it rides the next Language candidate that enters this file.
+**These two now travel together** — both are inside `trusted_base_labels`,
+both are one-function edits, and whichever candidate takes one should take
+both rather than leaving a second pass on the same twenty lines.
+`LANG-COMMENT-POPULATION-PARITY` does not touch this file, so this is carried
+rather than assigned.
