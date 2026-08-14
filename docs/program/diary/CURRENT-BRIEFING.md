@@ -63,114 +63,108 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~14:3xZ. **`main` = `a998d3f6`.**
-> **BOTH BUILD TEAMS ARE WORKING.** Recent: `#2206` `3ea9bef4` · `#2207`
-> `018abf96` · `#2208` `10101777` · **`#2209` `a998d3f6` Runtime
-> `RT-CONTKEY-CONSUMING-OCCURRENCE`, M6 tree `1ac31455` verified.**
+> ### RESUME HERE — state at 2026-08-14 ~15:0xZ. **`main` = `6c2a7a7b`.**
+> **BOTH BUILD TEAMS ARE WORKING. Nothing held, tree clean, no publisher.**
+> Landed since the last block: `#2209` `a998d3f6` Runtime `RT-CONTKEY` (M6 tree
+> `1ac31455`) · `#2210` Language GADT audit (tree `8ed1d238`) · `#2211` Steward
+> M7 + rulings · `#2212` Language's next node.
 >
-> ### I AM HOLDING THREE UNPUBLISHED COMMITS ON PURPOSE. PUBLISH ORDER MATTERS.
+> ### RUNTIME: `D2k-1c` — anchor `evt_296nwf42qd2ft`, thread `thr_5ngmcb9tnhym`
 >
-> **`b14b2c1e` + `5a077459` (+ this briefing) are held until Language's
-> `4b8f6777` lands.** Both regenerate `docs/program/IMPLEMENTATION-PROGRESS.md`,
-> which is the one path Language's candidate also writes. **Publishing first
-> forces a third rebase on them.** The moment `4b8f6777` merges: rebase onto the
-> new `main`, re-run `gen-progress.sh`, publish. **Do not publish them before.**
+> Gated + compact-verified at `a998d3f6`, leader confirmed `Working`. The
+> relation it waited for exists: `ContinuationSpecializationKey` carries
+> `consuming_occurrence` beside an unchanged `consumer_owner`.
 >
-> ### THE COLLISION CLASS, because it will recur and "rebase faster" cannot win
+> **THE GRADING INVERTED.** `RT-CONTKEY`'s `AC-6` required rows 4/5 to **still
+> refuse**; `D2k-1c` requires them to **consume**. The kick says so explicitly.
 >
-> `IMPLEMENTATION-PROGRESS.md` is generated from `docs/program/issues/`, and
-> **every** commit that adds or flips a node rewrites it — the `Last generated`
-> line and file count change on every regeneration. CI runs
-> `gen-progress.sh --check`, so a candidate **cannot drop it**. ⇒ Two docs
-> candidates in flight **always** conflict on exactly that path and nothing else.
-> It fired twice in forty minutes.
+> **Row 1: measurement requested, not a fix.** It was blocked by this relation
+> *and* by an earlier `NativeJoinPlanV1` refusal. The relation now exists ⇒ if
+> row 1 still blocks, `NativeJoinPlanV1` is the **sole** blocker — a different
+> shape from what was reported. Report only.
 >
-> **A code candidate is NOT the collider — my `M7` is.** Runtime's `16eb2618`
-> was `crates/`-only and merged with no effect on Language. Order the merges, do
-> not hold them.
+> ### THE ADVERSARY FOUND A REAL HOLE IN THE MERGE I JUST PUBLISHED
 >
-> **Registered fix (Architect `evt_2kf7xke2q2nvc`), my lane to choose:** a custom
-> merge driver on that path re-running `gen-progress.sh` — correct by
-> construction. **`merge=union` DOES NOT WORK** and is the obvious wrong reach:
-> it doubles the timestamp/count and reds `--check`. Third option: stop
-> committing the file, generate in CI — loses in-tree readability. **Not filed
-> as a node yet. That is the one piece of framing debt I know about.**
+> `evt_7b75nbgqbw04z`, triaged CONFIRMED → **[[RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED]]**
+> (`ready`, `XS`, runtime). `consuming_occurrence` has two fields;
+> **`eliminator_origin` is copied from the input into the re-derivation before
+> the comparison, so `AC-1` asserts `x == x` on it**, and `AC-2`'s mutation
+> perturbs `body_origin` only — **step 1 has never been fired.** Nothing is known
+> wrong; there is no evidence that half is right. `AC-3`'s "population of two" is
+> **one** on the copied axis: one eliminator, two bodies.
 >
-> ### RUNTIME: `D2k-1c` RELEASED — anchor `evt_296nwf42qd2ft`, thread `thr_5ngmcb9tnhym`
+> ⇒ **`eliminator_origin` is exactly the field with no red between that merge and
+> `D2k-1c`, which is consuming it now.** Sequenced after `D2k-1c`, or as fill-in.
+> Recorded in the merged node; **not replied to the Adversary (`§10⁻a`).**
 >
-> Ring gated and compact-verified at `a998d3f6`; leader confirmed `Working`.
-> **`RT-CONTKEY-CONSUMING-OCCURRENCE` merged**, so the absent relation that
-> stopped all five expressions now exists: `ContinuationSpecializationKey`
-> carries `consuming_occurrence` beside an unchanged `consumer_owner`, naming the
-> exact outer selected case body **and** its eliminator. Landed control: row 4
-> body `16`, row 5 body `12`, both eliminator `5`.
+> ### LANGUAGE: `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` — anchor `evt_4mwvc7gg2bzrt`
 >
-> **THE GRADING INVERTED AND THE KICK SAYS SO.** `RT-CONTKEY`'s `AC-6` required
-> rows 4/5 to **still refuse**. `D2k-1c` requires them to **consume**. A carried
-> habit from the last turn fails this one.
+> Gated at `6c2a7a7b`. **`language-leader` COMPACTED this time** — the twice-refused
+> `/compact` cleared once it left the WP boundary. Implementer was mid-compaction
+> at 75% when I posted (gate allows "compacting"); **verify it finished.**
 >
-> **Row 1's status genuinely changed and I asked for a measurement, not a fix.**
-> It was blocked by this relation *and* by an earlier `NativeJoinPlanV1` refusal.
-> The relation now exists ⇒ if row 1 still blocks, `NativeJoinPlanV1` is the
-> **sole** remaining blocker, which is a different shape from what was reported.
-> Report only; not a deliverable.
+> **All four `SURF-gadt-*` nodes came back `merged`**, so the audit supplied no
+> next work — its `D3` residual is the node instead. `34 §4.1` needs the applied
+> **pattern witness**; `ExhaustivenessError { missing: String }` is documented as
+> a constructor **name**, so no emission-site change reaches it. **It reads as
+> satisfied because every omission test uses a zero-arity constructor, where name
+> and most-general pattern coincide.** `AC-1` is the criterion: a test that FAILS
+> against the old payload.
 >
-> ### LANGUAGE: IDLE, BLOCKED ON ONE `resolve_decision`
+> ### MY TWO ERRORS TODAY, both stated publicly, both with a durable rule
 >
-> `LANG-GADT-SEQUENCE-TRACKER-GAP` tip **`4b8f6777`**, twice-rebased, content
-> approved. `dec_28s60t6n2w5y5` still reads `resolved_at 13:15:24` cast on
-> `07da235f` — **it names a SHA that will not land.** The Architect refused to let
-> me publish a tip no resolution names (`evt_2kf7xke2q2nvc`) and gave four
-> standing carry conditions instead. **I verified 1, 2 and 4 myself against
-> `a998d3f6`; condition 3 (`gen-progress --check`) I did NOT reproduce and said
-> so — CI is the gate for it.** Nudged at `evt_gshxxc9wkyrh`.
+> 1. **I asserted a Decision's current state from a cached read.** Nudged the
+>    Architect that `dec_28s60t6n2w5y5` still named `07da235f`; he had re-resolved
+>    on `4b8f6777` eighteen seconds earlier. **I re-measured the git side against
+>    the new `main` and inherited the Decision side from a dump.** ⇒ **Read the
+>    Decision at publish time, never from a dump taken earlier in the turn.**
+> 2. **Release step 10 missed** on the GADT kickoff — node sat `ready` 45 min.
 >
-> **The leader claimed the old resolution carries to byte-identical content. It
-> does not, and I read the object rather than the claim.**
+> ### THE COLLISION CLASS — resolved procedurally, fix not yet filed
 >
-> `language-leader`'s seat is **still not compacted** — `/compact` refused twice.
-> Retry at the next WP boundary.
+> `IMPLEMENTATION-PROGRESS.md` is generated from `docs/program/issues/`; **every**
+> node add/flip rewrites it and CI runs `gen-progress.sh --check`, so a candidate
+> **cannot drop it**. Two docs candidates in flight always conflict there and
+> nowhere else. **A code candidate is NOT the collider — my `M7` is.** The working
+> procedure: **order the merges, do not hold them**, and resolve any rebase
+> conflict by re-running the generator, never by hand.
 >
-> ### TEST-NATIVE-STACK-PROVISIONING-STANDARD — RULED, RECUT, HELD IN `b14b2c1e`
->
-> Architect `evt_4rz7hp11f33wj`. Disposition 3, **re-grounded on STATEDNESS** —
-> the property is that a stack is *stated*, not that it is large. Three acts,
-> only "masking a regression" forbidden, and its test is objective (no open
-> measured regression), so the standard **cannot unblock a candidate**.
->
-> **The census refuted the node's own decisive evidence:** 15 sites / 14 files /
-> 4 crates / 3 constants, against an asserted 6 / 5 / 1. **The Architect withdrew
-> his own Amendment 2** — its arithmetic had **one sign**, so it would have marked
-> the repo's best stack site non-compliant. Enumerate the acts, not the sites.
->
-> **Venue decided (§3): `agent/playbooks/tools/stated-stacks.md`**, skill-linked,
-> one line each from `build/implementer.md` and `build/qa.md`. `pin-a-property`
-> is the precedent. `COORDINATION §12` rejected — it owns laptop resource
-> discipline, so filing it there is a category error. Owner moved to **`doc`**.
-> Site pass split to `TEST-STATED-STACK-SITE-RECONCILE`, **`draft` deliberately**
-> (its dep has not landed; `--strict` is right to fail that).
+> **Registered fix (Architect `evt_2kf7xke2q2nvc`), my lane:** a custom merge
+> driver on that path re-running `gen-progress.sh`. **`merge=union` DOES NOT
+> WORK** — doubles the timestamp/count and reds `--check`. **Still unfiled. This
+> is the one piece of framing debt I know about.**
 >
 > ### KERNEL AND VERIFY ARE IDLE, NEITHER IS FRAMING DEBT
 >
 > **Kernel** — `KERNEL-NESTED-IND` blocked at `AC-K12` on
 > `RT-NESTED-IH-NATIVE-REALIZATION`, parked behind the operator's RecursiveDescent
-> ruling. Kernel has no other node; **the ruling idles that ring** — a consequence
-> for the operator, not to re-derive. **Verify** — `SEC1-IFC-R3` forbids framing a
-> Verify slice against it; blocked on Spec closure, Architect kernel-facing
-> theorems, and the operator's V3 fork. Both hard stops already routed.
+> ruling; Kernel has no other node, so **the ruling idles that ring.**
+> **Verify** — `SEC1-IFC-R3` forbids framing a slice against it; blocked on Spec
+> closure, Architect theorems, and the operator's V3 fork. Both routed.
 >
 > ### THE OPERATOR PRIORITY RULING STILL GOVERNS RUNTIME
 >
 > *"that is the priority for the runtime team. prioritize that work over other
 > runtime work."* Chain: `D2k-1c` → rest of `RT-LEXICAL-RECURSOR-CONSUMERS` →
 > `RT-RECURSOR-TRANSPORT` (`draft`, every other dep merged) → `RT-DESCENT-RETIRE`.
-> `RT-CHECKED-IH-REALIZATION-AUTHORITY` stays `ready` and held.
-> **My contrary sequencing call was surfaced and overruled — do not re-derive it.**
+> `RT-CHECKED-IH-REALIZATION-AUTHORITY` stays `ready` and held. **My contrary
+> sequencing call was overruled — do not re-derive it.**
 >
-> **Runtime fill-in if `D2k-1c` stops early:** `RT-C2-DRIVER-STAGE-ATTRIBUTION`
-> (`ready`, `XS`) — as fill-in, **not** a passenger on the candidate.
+> **Runtime fill-in order if `D2k-1c` stops early:**
+> `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` first, then
+> `RT-C2-DRIVER-STAGE-ATTRIBUTION`. **Fill-in, never passengers on a candidate.**
 >
-> **Still ruled:** `10369776` is held evidence only. **Zero new `#[ignore]`.**
+> ### TEST-NATIVE-STACK-PROVISIONING-STANDARD — RULED AND LANDED in `#2211`
+>
+> `evt_4rz7hp11f33wj`. Property is **STATEDNESS**; three acts, only "masking a
+> regression" forbidden, its test objective, so the standard **cannot unblock a
+> candidate**. Census refuted the node's own evidence (15 sites/14 files/4
+> crates/3 constants vs an asserted 6/5/1). **The Architect withdrew his own
+> Amendment 2** — its arithmetic had **one sign**. Venue (§3):
+> `agent/playbooks/tools/stated-stacks.md`, `pin-a-property` shape. Owner `doc`.
+> Site pass = `TEST-STATED-STACK-SITE-RECONCILE`, **`draft` deliberately.**
+>
+> **Nothing is released to the doc ring yet — that node is `ready` and unkicked.**
 > ### M3 CITED-SOURCE HIT — routed, and the direction is the point
 >
 > `crates/ken-runtime/src/cranelift_backend.rs` is attested at
