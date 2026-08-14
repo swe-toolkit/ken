@@ -1,7 +1,7 @@
 ---
 id: LANG-POW10-CASCADE-LITERAL-CLAUSE
 title: "The pow10 generator's own doc comment says every branch is a concrete literal, which its own recursion refutes in the same way the elab.rs copy did -- but its conclusion rests on a DIFFERENT and TRUE property (no saturating/min/clamp anywhere in the generated cascade), so this is a wording repair on a sound argument, not a second false justification"
-status: active
+status: merged
 owner: language
 size: XS
 gate: none

@@ -1,7 +1,7 @@
 ---
 id: LANG-STACK-ARC-EVIDENCE-USABILITY
 title: "The trusted-base guard now localizes the bracket but reports a bare GlobalId, so it names no offender; and both frame-size figures this arc produced cite objdump without naming the artifact, so neither is reproducible by the next reader -- three repairs that make the arc's own evidence usable"
-status: active
+status: merged
 owner: language
 size: S
 gate: none

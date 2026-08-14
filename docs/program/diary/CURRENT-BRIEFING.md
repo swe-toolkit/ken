@@ -63,9 +63,58 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~12:2xZ. **`main` = `99869bb7`.**
-> **BOTH BUILD TEAMS ARE WORKING. Publish queue empty, no publisher, tree
-> clean. No framing debt: each working team has a `ready` successor.**
+> ### RESUME HERE — state at 2026-08-14 ~13:0xZ. **`main` = `43a01ca2`.**
+> **PUBLISH QUEUE EMPTY. Both candidates landed and closed out. Runtime is
+> working; Language is idle awaiting its next kick.**
+>
+> **`#2202` `12cefd5b`** Runtime `D2k-1a` (M6 1/1) · **`#2203` `43a01ca2`**
+> Language `LANG-STACK-ARC-EVIDENCE-USABILITY` + `LANG-POW10` (M6 3/3). M3 clean
+> on both. M8/M9 sent for `#2202`.
+>
+> ### THE FLAKE AND ITS RECOVERY — now `merge-procedure.md` M5a, read it there
+>
+> `#2202` reddened once on a runner fault (`library_documentation_gates.rs`
+> synthetic-git fixture, `git commit -m "filler 16"` → `bad tree object HEAD`;
+> shards 1/2/4 green, `main` green). **Merged unchanged on a re-triggered run at
+> the SAME SHA** — the re-run was green on identical code, which is the
+> confirmation.
+>
+> **`gh run rerun --failed` is REFUSED to the publisher identity** (`Resource
+> not accessible by integration`, no `actions:write`). **The route that works is
+> `gh pr close` + `gh pr reopen`** — `ci.yml` triggers on `pull_request`, whose
+> default types include `reopened`, so a fresh run starts on the identical SHA.
+> Never push an empty commit to kick CI: that detaches the exact-SHA verdict and
+> costs the ring a fresh Decision for a flake.
+>
+> ### NEXT: LANGUAGE IS IDLE — `LANG-GADT-SEQUENCE-TRACKER-GAP`
+>
+> `ready`, `S`, `gate: none`, `depends_on: []`. **Gate and compact the ring
+> before kicking.** Its `AC-4` puts `crates/` out of scope, so it is a tracker
+> and audit node: four `SURF-gadt-*` frames exist in `docs/program/wp/` with no
+> tracker node, and the code has moved past every frame's stated baseline.
+>
+> ### RUNTIME'S NEXT SLICE IS `D2k-1c` — ALREADY AUTHORIZED, DO NOT RE-RELEASE
+>
+> **My M9 named `D2k-1b-i`, which is WRONG — that merged as `45addeaf` on
+> 08-12.** The leader caught it. `RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md:158`:
+> *"The successor is `D2k-1c`, framed in section 5. It is a route repair.
+> Nothing in it has been done."* Architect authorization `evt_5ed8ee70cmrt`,
+> released 08-12 anchor `evt_2b1zhe78c81at`. **No new node, no new release.**
+>
+> - **`D2k-1c-0` and `1c-0b` are LANDED** at `1a16a64d` (PR #1996); its deciding
+>   read is **answered** — do not re-run it.
+> - **The head block's origin-identity table was measured on `11e4eae1`, a
+>   REJECTED object.** It records where a measurement was taken, not that the
+>   identities survived the recut. Re-derive at your own base.
+> - **`AC-1` is OPEN and unqualified.** *"Conservation holds"* and *"the five
+>   rows are green"* are different claims; only the second closes the node.
+>
+> ### OWED TO ME AND STILL UNANSWERED: `D2k-0`'s redness claim
+>
+> The kick made testing it an explicit condition rather than a premise, because
+> nobody had verified it. Runtime went straight to the increment. **Asked twice.
+> The record still cannot distinguish "confirmed by the ring that tested it"
+> from "nobody checked."**
 >
 > **Seventeen PRs landed today, all M6 blob-verified.** Most recent: `#2195`
 > `6c574cdd` `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` · `#2196` `1200edf0`
@@ -129,7 +178,32 @@
 > ### RUNTIME IS WORKING IT — anchor `evt_gzh1p738kfa1`
 >
 > Ring gated and compacted at `998c3c83`, all three seats verified
-> individually; implementer confirmed pickup. **Do not re-kick.**
+> individually; implementer confirmed pickup. **Do not re-kick.** First
+> increment `D2k-1a` handed back and approved within the hour
+> (`dec_7kjw87yqbam7a`, exact `afc97115`, one `control.rs` test path, `+92/-51`)
+> — accepted partials are landing as designed.
+>
+> ### KERNEL AND VERIFY ARE BOTH IDLE, AND NEITHER IS FRAMING DEBT
+>
+> **Checked why rather than assuming a thin frame.** Both are blocked on inputs
+> that are the operator's, and both are already routed there.
+>
+> - **Kernel** — `KERNEL-NESTED-IND` (`active`, `L`) is blocked at `AC-K12` on
+>   `RT-NESTED-IH-NATIVE-REALIZATION` (`active`, `L`, **Runtime**-owned). Runtime
+>   is not working it, because the operator's RecursiveDescent ruling put
+>   `RT-LEXICAL-RECURSOR-CONSUMERS` ahead of it. **Kernel has no other node at
+>   all.** ⇒ **The ruling idles the Kernel ring** — a consequence worth the
+>   operator knowing, not a call to re-derive.
+> - **Verify** — its only non-merged node is `SEC1-IFC-R3` (`draft`), and its own
+>   text says **do not frame a Verify slice against it**. `AC-R3c` is blocked on
+>   Spec closure plus Architect-owned kernel-facing theorems **and the operator's
+>   V3 fork**. `V3-KRIPKE-DECOMPOSITION` priced the embedding and returned
+>   *"presently unsizeable"* rather than a number. Hard stop already routed to
+>   the operator by `verify-leader`.
+>
+> **`verify-implementer` and `verify-qa` status lines still read
+> "awaiting review" on `ce11f99e`. That is STALE** — `V3-KRIPKE-DECOMPOSITION`
+> is `merged`. A seat's status line is not evidence about the tree.
 >
 > **The work is `D2k`, INSIDE this node** — Architect `evt_5wvk3e8k1bjqn`,
 > **no new node.** Six expressions at two walls: rows 1/4 plus row 5's
@@ -196,7 +270,7 @@
 > |---|---|---|
 > | Kernel | `KERNEL-NESTED-IND` blocked at `AC-K12` | Runtime `D2`, in flight |
 > | Foundation | `DS-9` `depends_on: [KERNEL-NESTED-IND]` | same chain, transitively |
-> | Verify | `SEC1-IFC-R3` needs an SMT/Z3 backend absent from the workspace | operator V3 fork |
+> | Verify | `SEC1-IFC-R3` — read the node, not this cell; the reason was re-derived 2026-08-14 | operator V3 fork |
 > | Doc | program complete — 29 merged, 4 closed, zero open | nothing to frame |
 > | Ergo | all three nodes merged or closed | nothing to frame |
 >
