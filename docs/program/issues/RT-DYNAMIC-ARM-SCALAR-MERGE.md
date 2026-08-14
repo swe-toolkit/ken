@@ -1,7 +1,7 @@
 ---
 id: RT-DYNAMIC-ARM-SCALAR-MERGE
 title: "A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -787,6 +787,10 @@ surface their own gaps.
 Do not interrupt a slice in flight for it. `D0` is measurement and does not
 contend with `D8`'s pin.
 
+> **That condition is DISCHARGED, 2026-08-14.** `RT-MATCH-RECURSOR-CONSUMERS`
+> is `merged`, and so is `RT-LEXICAL-R3-FUSION-EMITTER` (squash `34769380`).
+> No Runtime slice is in flight. **Nothing on this node waits on another node.**
+
 ### No reverse edge, and the direction is deliberate
 
 `KERNEL-NESTED-IND` `AC-K12` requires native execution, the Cranelift verifier,
@@ -796,3 +800,23 @@ implementation dependency**, and `blocks:` stays empty here — the same call
 [[RT-TERMINAL-ALL-ELIM-AUTHORITY]] records for the identical shape. Kernel's
 `D5` work lands as an accepted partial in the meantime; it does not wait on
 this node and this node does not wait on it.
+
+> #### SUPERSEDED IN ITS CONCLUSION, 2026-08-14. The distinction above is
+> #### still right; `blocks:` is **not** empty and must not be re-emptied.
+>
+> **Frontmatter reads `blocks: [KERNEL-NESTED-IND,
+> RT-NESTED-IH-NATIVE-REALIZATION]`, and that is the later deliberate call.**
+> The paragraph above and the frontmatter have contradicted each other since
+> the edge was declared, which is the one thing a reader cannot resolve from
+> inside this file.
+>
+> **Why the edge won.** This node's own 2026-08-12 banner enumerates three
+> mechanisms that hid an idle ring on this chain, and **the first is "a missing
+> `depends_on` edge."** An edge that is semantically defensible to omit is
+> still the thing a tracker reads to decide whether anyone is blocked.
+> `blocks:` is the frontier instrument, not a claim about implementation order.
+>
+> **What survives unchanged:** `AC-K12` is an acceptance condition, Kernel's
+> `D5` lands as an accepted partial without waiting, and this node does not
+> wait on Kernel. The direction is still one-way. Only the *"stays empty"*
+> clause is dead.

@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-RECURSOR-CONSUMERS
 title: "Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam"
-status: active
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -178,6 +178,44 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > > **The committed test asserts the edge and refusal per expression and reds if
 > > a repair moves any of them.** That is what makes this durable rather than a
 > > one-time reading — **a red there is information, not a test to update.**
+
+> # R3 MERGED. THE BLOCKER IS DISCHARGED AND THE STATUS IS NOW `ready`.
+> # Steward, 2026-08-14. Nothing was un-landed and nothing is re-ranked.
+>
+> **`RT-LEXICAL-R3-FUSION-EMITTER` merged as squash `34769380`.** The section
+> below says this node is `active` only because R3's fusion disposition was
+> incomplete. **That condition no longer holds**, so the word `active` would
+> now mean the one thing the section below was written to stop it meaning:
+> in progress.
+>
+> **No seat holds this node.** Deps met, unassigned ⇒ `ready`.
+>
+> **Sequenced second, deliberately.** Runtime's next assignment is
+> [[RT-DYNAMIC-ARM-SCALAR-MERGE]], kicked 2026-08-14. That node unblocks
+> `KERNEL-NESTED-IND`, and behind it three Kernel seats and Foundation's
+> `DS-9`; this node blocks `RT-RECURSOR-TRANSPORT`, which is inside Runtime's
+> own lane. **Six seats idle beats one lane's depth.** This is a Steward
+> sequencing call under `ken-steward` §3, not a judgment about this node's
+> readiness or size.
+>
+> **What Runtime still owes here, unchanged:** the `D2k-0` redness claim is
+> still unverified by anyone (see the block above), and the residual at the
+> foot of this file — five groups carrying no cardinality assertion — is
+> inherited by the next `#6d` slice frame, not by this node.
+>
+> **CARRIED IN, from R3's residual — two `#[cfg(test)]` edits in
+> `control.rs`, for whichever `#6d` slice next touches that file.** Filed
+> against [[RT-LEXICAL-R3-FUSION-EMITTER]] from Adversary hunt
+> `evt_28n873ahnq6z7`; that node has the measurements and the nine call sites.
+> In short: the two-root terminal-stop population is a hard-coded literal at
+> **nine** sites with no name, and the sentence scoping all nine is asserted
+> nowhere. **(a)** name the population once as a `const` and iterate it in the
+> nine controls — no arming needed; **(b)** add the armed `ProducerArity` row
+> to the target-authority validator control, ~6 lines, by relaxing its own
+> `assert!(error.is_none(), ...)` at `control.rs:4325` to return the error.
+> **The "it needs a new armed harness" cost that deferred this was measured
+> false** — `D2fEmitterTestArm::arm()` is already used at twelve sites in that
+> file. Carried here because a residual on a merged node is read by nobody.
 
 ## `active` here means WAITING ON R3, not in progress. Edge declared 2026-08-14
 
