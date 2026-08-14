@@ -596,19 +596,25 @@ fn redundant_wildcard_arm_shadowed_at_three_leaves_names_every_subsuming_arm() {
     }
 }
 
-// `LANG-REACHABILITY-SUBSUMING-ARMS` controls 3/4: `ArmDeadCause::
-// NoInhabitants` for a foreign/typo constructor arm -- one that resolves to
-// a REAL global constructor (so name resolution does not reject it first),
-// but not one of the scrutinee's own inductive's constructors, so no earlier
-// arm ever claims it and it wins at no leaf. Before this repair this shape
-// reached the new single-column `.expect()` and panicked (Architect finding,
-// evt_5hwsbae6kqj5w; independently reproduced by QA, evt_69dkk9q8hn3ye); the
-// matrix-path variant previously produced a representable-but-false empty
-// `Subsumed` payload. Both must now return `Err(NoInhabitants)`, never panic
-// and never claim false coverage.
+// `LANG-REACHABILITY-SUBSUMING-ARMS` controls 3/4, SUPERSEDED by
+// `LANG-FOREIGN-CTOR-ARM-REJECT`. A foreign/typo constructor arm -- one that
+// resolves to a REAL global constructor (so name resolution does not reject
+// it first), but not one of the scrutinee's own inductive's constructors --
+// used to reach reachability construction and win at no leaf. Before
+// `LANG-REACHABILITY-SUBSUMING-ARMS` this shape reached the single-column
+// `.expect()` and panicked (Architect finding, evt_5hwsbae6kqj5w;
+// independently reproduced by QA, evt_69dkk9q8hn3ye); the matrix-path
+// variant previously produced a representable-but-false empty `Subsumed`
+// payload. That node made both return a clean `Err(NoInhabitants)` instead.
+// `LANG-FOREIGN-CTOR-ARM-REJECT`'s AC-2 supersedes that outcome again: a
+// foreign-family constructor is now rejected as the constructor/type
+// mismatch it is, BEFORE match compilation, so neither path below ever
+// reaches reachability construction at all. `NoInhabitants` was true but
+// answered a question nobody asked; these controls now assert the mismatch
+// diagnostic that answers the one that matters.
 
 #[test]
-fn foreign_constructor_arm_is_no_inhabitants_not_a_panic_single_column() {
+fn foreign_constructor_arm_rejected_before_single_column_reachability() {
     let mut env = mk_env();
     elab_ok(&mut env, "data NatProbe = ZProbe | SProbe NatProbe");
     elab_ok(&mut env, "data Foreign = NProbe");
@@ -619,75 +625,76 @@ fn foreign_constructor_arm_is_no_inhabitants_not_a_panic_single_column() {
     let result = elab(&mut env, src);
 
     match &result {
-        Err(e @ ElabError::ReachabilityError { span, cause: ArmDeadCause::NoInhabitants }) => {
+        Err(e @ ElabError::TypeMismatch { span, reason }) => {
             assert_eq!(
                 &src[span.start..span.end],
-                "NProbe |-> 2",
-                "the reported span should be the foreign-constructor arm itself"
+                "NProbe",
+                "the reported span should be the foreign constructor's own pattern"
             );
-            let rendered = e.to_string();
-            println!("rendered diagnostic: {rendered}");
-            assert_eq!(
-                rendered,
-                format!(
-                    "unreachable match arm at {}-{}: no value of the scrutinee type can \
-                     match this pattern",
-                    span.start, span.end
-                ),
-                "NoInhabitants must not claim any covering arm"
+            assert!(
+                reason.contains("NProbe") && reason.contains("NatProbe"),
+                "message must name both the written constructor and the expected \
+                 type, got: {reason}"
             );
+            println!("rendered diagnostic: {e}");
         }
         Ok(_) => panic!(
             "a foreign-constructor arm (NProbe, not a NatProbe constructor) elaborated \
              successfully"
         ),
-        Err(other) => panic!(
-            "expected a clean ReachabilityError(NoInhabitants), NOT a panic; got: {other}"
-        ),
+        Err(ElabError::ReachabilityError { .. }) | Err(ElabError::ExhaustivenessError { .. }) => {
+            panic!(
+                "a foreign-family constructor arm must be rejected before reaching \
+                 coverage/reachability machinery, got: {:?}",
+                result
+            )
+        }
+        Err(other) => panic!("expected TypeMismatch naming NProbe and NatProbe, got: {other}"),
     }
 }
 
 #[test]
-fn foreign_constructor_arm_is_no_inhabitants_not_empty_subsumed_matrix() {
+fn foreign_constructor_arm_rejected_before_matrix_path_reachability() {
     let mut env = mk_env();
     elab_ok(&mut env, "data NatProbe = ZProbe | SProbe NatProbe");
     elab_ok(&mut env, "data Foreign = NProbe");
 
     // Nested sub-patterns (`SProbe ZProbe`, `SProbe (SProbe n)`) are NOT
     // flat, so this routes to `infer_match`'s general matrix path (control
-    // 4) instead of the single-column path above. `NProbe`'s row never
-    // matches either of NatProbe's own constructor ids and is not a
-    // Wild/Var row either, so it is filtered out of every bucket and never
-    // reaches a leaf -- `subsumed_by` for it stays empty.
+    // 4) instead of the single-column path above. `NProbe`'s own top-level
+    // pattern still names a constructor of a different family, so the new
+    // family-membership check catches it before `build_ctor_buckets` ever
+    // runs -- regardless of the other arms' nesting.
     let src = "let bad : Int = match ZProbe { \
                ZProbe |-> 0 ; SProbe ZProbe |-> 1 ; SProbe (SProbe n) |-> 2 ; NProbe |-> 3 }";
     let result = elab(&mut env, src);
 
     match &result {
-        Err(e @ ElabError::ReachabilityError { span, cause: ArmDeadCause::NoInhabitants }) => {
+        Err(e @ ElabError::TypeMismatch { span, reason }) => {
             assert_eq!(
                 &src[span.start..span.end],
-                "NProbe |-> 3",
-                "the reported span should be the foreign-constructor arm itself"
+                "NProbe",
+                "the reported span should be the foreign constructor's own pattern"
             );
-            let rendered = e.to_string();
-            println!("rendered diagnostic: {rendered}");
-            assert_eq!(
-                rendered,
-                format!(
-                    "unreachable match arm at {}-{}: no value of the scrutinee type can \
-                     match this pattern",
-                    span.start, span.end
-                ),
-                "NoInhabitants must not claim any covering arm, and must not be an empty \
-                 Subsumed payload"
+            assert!(
+                reason.contains("NProbe") && reason.contains("NatProbe"),
+                "message must name both the written constructor and the expected \
+                 type, got: {reason}"
             );
+            println!("rendered diagnostic: {e}");
         }
         Ok(_) => panic!(
             "a foreign-constructor arm (NProbe, not a NatProbe constructor) elaborated \
              successfully"
         ),
-        Err(other) => panic!("expected ReachabilityError(NoInhabitants), got: {other}"),
+        Err(ElabError::ReachabilityError { .. }) | Err(ElabError::ExhaustivenessError { .. }) => {
+            panic!(
+                "a foreign-family constructor arm must be rejected before reaching \
+                 coverage/reachability machinery, got: {:?}",
+                result
+            )
+        }
+        Err(other) => panic!("expected TypeMismatch naming NProbe and NatProbe, got: {other}"),
     }
 }
 
@@ -1123,4 +1130,63 @@ fn data_two_arg_ctor_match_accepted() {
         !matches!(reduced, Term::Elim { .. }),
         "Pair match should ι-reduce"
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// `LANG-FOREIGN-CTOR-ARM-REJECT` AC-1/AC-2/AC-3 -- an otherwise-complete match
+// on one inductive family, with one extra arm naming a real constructor of a
+// DIFFERENT family, must be rejected as the constructor/type mismatch it is
+// -- naming both the written constructor and the expected type -- rather
+// than reaching reachability construction and reporting the true-but-useless
+// `NoInhabitants`/`ReachabilityError`. D0 confirmed this was the emitted
+// diagnostic at this node's base before the fix.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn foreign_family_ctor_arm_rejected_naming_both_ctor_and_type() {
+    let mut env = mk_env();
+    elab_ok(&mut env, "data T4 = A | B Bool");
+    elab_ok(&mut env, "data T5 = XCtor | YCtor");
+
+    let result = elab(
+        &mut env,
+        "let bad : Int = match A { A |-> 0 ; B x |-> 1 ; XCtor |-> 2 }",
+    );
+
+    match result {
+        Err(ElabError::TypeMismatch { reason, .. }) => {
+            assert!(
+                reason.contains("XCtor"),
+                "message must name the written constructor 'XCtor', got: {}",
+                reason
+            );
+            assert!(
+                reason.contains("T4"),
+                "message must name the expected type 'T4', got: {}",
+                reason
+            );
+        }
+        Err(ElabError::ReachabilityError { .. }) | Err(ElabError::ExhaustivenessError { .. }) => {
+            panic!(
+                "a foreign-family constructor arm must be rejected as a type \
+                 mismatch, not reach coverage/reachability machinery: {:?}",
+                result
+            )
+        }
+        Ok(_) => panic!("foreign-family constructor arm was accepted (should be rejected)"),
+        Err(other) => panic!("expected TypeMismatch naming 'XCtor' and 'T4', got: {}", other),
+    }
+}
+
+#[test]
+fn well_typed_match_unaffected_by_foreign_ctor_family_check() {
+    // AC-3/AC-4 control: an ordinary well-typed match on `T4` (the same
+    // family used above) still elaborates and ι-reduces exactly as before --
+    // the new family-membership check must not perturb any in-family arm.
+    let mut env = mk_env();
+    elab_ok(&mut env, "data T4 = A | B Bool");
+
+    let id = elab_ok(&mut env, "let ok : Int = match A { A |-> 0 ; B x |-> 1 }");
+    let body = body_of(&env, id);
+    assert!(matches!(body, Term::Elim { .. }));
 }
