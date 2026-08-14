@@ -84,6 +84,13 @@ boundary.
 > There is no other gate on it — not the retirement chain, not a decision, not
 > the operator.
 
+> **`c2` IS IN FLIGHT AS OF 2026-08-14.** `RT-DYNAMIC-ARM-SCALAR-MERGE` was
+> kicked to Runtime at `main` `3ff6cd6e` (anchor `evt_52b0n0y09p379`), scoped
+> `c2-pre` then `c2`. `c1` merged long since at `7bfc8ae5`, and the retirement
+> chain named above is behind it — `RT-MATCH-RECURSOR-CONSUMERS` and
+> `RT-LEXICAL-R3-FUSION-EMITTER` are both `merged`. **The flip condition is now
+> one merge away, and it is mine to execute the moment `c2` lands.**
+
 ## What the frame must carry when written
 
 Recorded now while the reasoning is fresh, so the framing turn does not
