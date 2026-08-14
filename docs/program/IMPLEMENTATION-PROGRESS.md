@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 02:03:49Z — from 250 issue file(s) in `docs/program/issues/`.
+2026-08-14 02:10:33Z — from 250 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -119,7 +119,7 @@ the committed file matches the generator's output.
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
 | `KW-THEOREM` | rename the surface keyword `lemma` to `theorem` | merged | language | M | none | — |
 | `LANG-COMMENT-CLASSIFIER-SHARED` | The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either | merged | language | S | none | — |
-| `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | ready | language | S | none | — |
+| `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | active | language | S | none | — |
 | `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` | `37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row | draft | language | unsized | operator | — |
 | `LANG-FOREIGN-NAME-CONTROL-CHARS` | Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet | merged | language | XS | none | 2128 |
 | `LANG-FOREIGN-NAME-FORMAT-CHARS` | Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FEFF -- are a visual-spoofing vector at the same `foreign`-name trust boundary the Cc control-character check just closed, and they are a DIFFERENT vector: not truncation but two distinct declarations rendering identically to the reviewer doing the check | draft | language | XS | none | — |
@@ -294,7 +294,6 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `LANG-COMMENT-POPULATION-PARITY` — The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
