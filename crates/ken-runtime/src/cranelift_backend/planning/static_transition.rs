@@ -9580,6 +9580,99 @@ pub(in crate::cranelift_backend) struct FusionRegionClaimLedger {
     body_owned_recorded: bool,
 }
 
+/// Test-only corruption of the claim's ordered invocation-parameter
+/// projection at its production derivation site.
+///
+/// The three variants move different properties. `MoveFirstToCallee` preserves
+/// the declared arity and therefore reaches lowering's independent
+/// visited-origin comparison. `DropLast` and `AppendCallee` change the arity
+/// and must be refused by preflight before a claim is issued.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum FusionClaimParameterMutation {
+    Exact,
+    MoveFirstToCallee,
+    DropLast,
+    AppendCallee,
+}
+
+/// Test-only corruption of the producer-capture population after the fusion
+/// key has selected its real producer descriptor.
+///
+/// This moves only the selected descriptor's capture count presented to fusion
+/// admission. It does not invent a claim, source relation, capture authority,
+/// or ABI input; the production detector must refuse the new non-empty
+/// disposition before the fusion ABI is installed.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum FusionProducerCaptureMutation {
+    Exact,
+    ForceNonEmptyAfterSelection,
+}
+
+#[cfg(test)]
+thread_local! {
+    static FUSION_CLAIM_PARAMETER_MUTATION: Cell<FusionClaimParameterMutation> =
+        const { Cell::new(FusionClaimParameterMutation::Exact) };
+    static FUSION_PRODUCER_CAPTURE_MUTATION: Cell<FusionProducerCaptureMutation> =
+        const { Cell::new(FusionProducerCaptureMutation::Exact) };
+    static R3_FUSION_CLAIM_CONSUMPTIONS: std::cell::RefCell<
+        Vec<(StaticContinuationFusionId, StaticOriginId)>,
+    > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Run one production compile with the selected producer's capture population
+/// changed from empty to non-empty. The guard restores exact behaviour even if
+/// planning returns early or unwinds.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_fusion_producer_capture_mutation<R>(
+    mutation: FusionProducerCaptureMutation,
+    run: impl FnOnce() -> R,
+) -> R {
+    struct Restore(FusionProducerCaptureMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FUSION_PRODUCER_CAPTURE_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = FUSION_PRODUCER_CAPTURE_MUTATION.with(|cell| cell.replace(mutation));
+    let _restore = Restore(previous);
+    run()
+}
+
+/// Run one production compile with a single claim-parameter defect installed.
+/// The guard restores exact behaviour even if the compile unwinds.
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_fusion_claim_parameter_mutation<R>(
+    mutation: FusionClaimParameterMutation,
+    run: impl FnOnce() -> R,
+) -> R {
+    struct Restore(FusionClaimParameterMutation);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FUSION_CLAIM_PARAMETER_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+
+    let previous = FUSION_CLAIM_PARAMETER_MUTATION.with(|cell| cell.replace(mutation));
+    let _restore = Restore(previous);
+    run()
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn reset_r3_fusion_claim_consumptions() {
+    R3_FUSION_CLAIM_CONSUMPTIONS.with(|cell| cell.borrow_mut().clear());
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn r3_fusion_claim_consumptions(
+) -> Vec<(StaticContinuationFusionId, StaticOriginId)> {
+    R3_FUSION_CLAIM_CONSUMPTIONS.with(|cell| cell.borrow().clone())
+}
+
 #[cfg_attr(not(test), allow(dead_code))]
 impl FusionRegionClaimLedger {
     /// Derive one claim per installed fusion, refusing before anything is
@@ -9749,8 +9842,45 @@ impl FusionRegionClaimLedger {
             // 3. Every recorded argument origin is an actual positional child of
             //    THAT SAME call. Taken by construction from `call_children`, so
             //    there is no origin here the call does not own.
-            let invocation_parameters =
+            //
+            // Ordering is structural rather than selected. The `Call` planning
+            // arm constructs `[callee] ++ args` by extending from the source
+            // argument slice. `plan_sequence` may plan that run in reverse, but
+            // writes every occurrence back at its original `enumerate` ordinal;
+            // `SemanticSourceSeed::expression` then copies that positional slice
+            // into the child-origin arena, and `child_origins` returns the same
+            // validated slice. Therefore this `skip(1)` preserves source argument
+            // order. No map, sort, keyed lookup, or second ordering decision
+            // exists between the source walk and this projection.
+            let mut invocation_parameters =
                 call_children.iter().skip(1).copied().collect::<Vec<_>>();
+            #[cfg(test)]
+            match FUSION_CLAIM_PARAMETER_MUTATION.with(Cell::get) {
+                FusionClaimParameterMutation::Exact => {}
+                FusionClaimParameterMutation::MoveFirstToCallee => {
+                    let first = invocation_parameters.first_mut().ok_or_else(|| {
+                        planner_error(
+                            "the claim-parameter mutation requires a non-empty argument run",
+                        )
+                    })?;
+                    *first = key.consuming_callee;
+                }
+                FusionClaimParameterMutation::DropLast => {
+                    // Both governed roots are unary, so this produces the same
+                    // empty `Vec` as an absent parameter projection. The claim
+                    // representation has no presence bit: the two states are
+                    // deliberately indistinguishable and reach the same count
+                    // check below.
+                    invocation_parameters.pop().ok_or_else(|| {
+                        planner_error(
+                            "the claim-parameter mutation requires a non-empty argument run",
+                        )
+                    })?;
+                }
+                FusionClaimParameterMutation::AppendCallee => {
+                    invocation_parameters.push(key.consuming_callee);
+                }
+            }
             // 2. The ordered argument count equals the fused header's ordinary
             //    parameter count. ⛔ Against the DESCRIPTOR's own slot walk, not
             //    against the vector's length, which would compare the projection
@@ -9763,10 +9893,12 @@ impl FusionRegionClaimLedger {
             if invocation_parameters.len() != parameter_slots {
                 return Err(fusion_claim_error(FusionClaimRefusal::InputAvailability));
             }
-            // 4. The producer-capture run is EMPTY on this admitted population.
-            //    A future non-empty one is a new ABI disposition and refuses
-            //    here rather than being folded into the parameters or into
-            //    `inputs`.
+            // 4. Producer-capture emptiness was already closed at
+            //    `install_static_continuation_fusions`, against the selected
+            //    producer descriptor. The captures below are the DISTINCT
+            //    continuation-input suffix that becomes `claim.inputs()`;
+            //    reading them as producer captures would conflate the two ABI
+            //    axes the admission check exists to keep separate.
             if view.header().captures as usize != key.continuation_inputs.len() {
                 return Err(fusion_claim_error(FusionClaimRefusal::InputAvailability));
             }
@@ -9877,6 +10009,21 @@ impl FusionRegionClaimLedger {
         self.claims.get(&fusion)
     }
 
+    /// Move the exact selected claim out of the outstanding population without
+    /// recording a successful consumption.
+    ///
+    /// Test-only: this represents a claim that escaped after the outer selector
+    /// closed against it. It neither constructs a second claim nor writes the
+    /// consumed ledger, so the production outstanding check remains the sole
+    /// detector for the corrupted state.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn escape_selected_claim_for_test(
+        &mut self,
+        fusion: StaticContinuationFusionId,
+    ) -> bool {
+        self.claims.remove(&fusion).is_some()
+    }
+
     /// **Consume the claim for `fusion` at `seat`, atomically and exactly once.**
     ///
     /// The seat is checked against the claim's own [`FusionRegionClaim::seat`]
@@ -9906,6 +10053,8 @@ impl FusionRegionClaimLedger {
             .remove(&fusion)
             .expect("the claim was present at the borrow above");
         self.consumed.insert(fusion, seat);
+        #[cfg(test)]
+        R3_FUSION_CLAIM_CONSUMPTIONS.with(|cell| cell.borrow_mut().push((fusion, seat)));
         Ok(claim)
     }
 
@@ -11686,6 +11835,9 @@ impl<'src> Planner<'src> {
         for (ordinal, expression) in expressions.iter().enumerate().rev() {
             let planned = self.plan_expr(expression, ctx, next, next_kind, ordinal as u32)?;
             next = planned.entry;
+            // Fusion-claim parameter order depends on this original-ordinal
+            // write-back: reverse planning changes the execution chain, never
+            // the positional child slice that reaches the semantic arena.
             occurrences[ordinal] = Some(planned.occurrence);
             next_kind = EdgeKind::Continue;
         }
@@ -15129,6 +15281,33 @@ impl<'src> StaticTransitionPlan<'src> {
                          the operand run its redirected invocation already passes is unknown",
                     )
                 })?;
+            // `R3` -- the producer-capture run and the continuation-capture
+            // suffix are different axes. The former is read from the selected
+            // producer descriptor here; the latter comes from
+            // `key.continuation_inputs` below and becomes `claim.inputs()`.
+            //
+            // This admitted population has no producer captures. A non-empty
+            // run is a new ABI disposition: it refuses before fusion-ABI
+            // installation rather than being folded into the ordinary
+            // parameter run or the continuation-capture suffix.
+            let producer_captures = producer.header.captures;
+            #[cfg(test)]
+            let producer_captures = if FUSION_PRODUCER_CAPTURE_MUTATION.with(Cell::get)
+                == FusionProducerCaptureMutation::ForceNonEmptyAfterSelection
+            {
+                // Population-side mutation only. The real producer descriptor
+                // has already been selected; no input or authority is added.
+                producer_captures.max(1)
+            } else {
+                producer_captures
+            };
+            if producer_captures != 0 {
+                return Err(planner_error(
+                    "a static continuation fusion's producer capture run is non-empty; this ABI \
+                     disposition cannot be folded into the fused invocation's ordinary \
+                     parameters or continuation-input capture suffix",
+                ));
+            }
             projections.push(abi::PlannedStaticContinuationFusionAbi {
                 id,
                 producer_parameters: producer.header.parameters,

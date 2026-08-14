@@ -3707,6 +3707,50 @@ struct StaticWorkerEmission {
     supplied_operands: usize,
 }
 
+/// The shared static-worker seam either emits its call or, under the R3
+/// post-field control only, hands the already-validated call back to the outer
+/// seam. Production has no deferred variant.
+enum StaticWorkerCallOutcome {
+    Emitted(LoweringOperand, StaticWorkerEmission),
+    #[cfg(test)]
+    DeferredPostField(LoweringOperand),
+}
+
+impl StaticWorkerCallOutcome {
+    fn into_operand(self) -> LoweringOperand {
+        match self {
+            Self::Emitted(operand, _) => operand,
+            #[cfg(test)]
+            Self::DeferredPostField(operand) => operand,
+        }
+    }
+
+    fn into_emitted(
+        self,
+    ) -> Result<(LoweringOperand, StaticWorkerEmission), CraneliftBackendError> {
+        match self {
+            Self::Emitted(operand, emission) => Ok((operand, emission)),
+            #[cfg(test)]
+            Self::DeferredPostField(_) => Err(backend_module(
+                "a deferred post-field fused call reached a source-machine consumer"
+                    .to_string(),
+            )),
+        }
+    }
+}
+
+/// A call whose exact consuming occurrence supplied the target and operand run,
+/// deferred solely so the test mutation can attempt it at the forbidden outer
+/// post-field seam without re-deriving either input.
+#[cfg(test)]
+struct D2fDeferredPostFieldDirectCall {
+    fusion: StaticContinuationFusionId,
+    seat: StaticOriginId,
+    consuming_call: StaticOriginId,
+    target: units::DeclaredUnitCall,
+    operands: Vec<LoweringOperand>,
+}
+
 /// **`D8j` — one CLAIMED composed discharge, awaiting the finished CLIF.**
 ///
 /// ⛔ Every field is recorded at the seat from a value the seat already held.

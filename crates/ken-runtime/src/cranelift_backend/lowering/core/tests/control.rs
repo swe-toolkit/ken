@@ -3009,6 +3009,1341 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
     );
 }
 
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the fused invocation accepts only
+/// the claim's exact ordered argument-origin projection, and a refusal cannot
+/// spend the affine region claim.
+///
+/// **MEASURED:** on both armed roots, the exact projection emits one fused call
+/// and consumes one claim. Replacing its sole origin with the consuming callee
+/// reaches lowering's visited-origin comparison and refuses with neither event;
+/// dropping or appending one origin refuses in preflight, also with neither
+/// event.
+///
+/// **CLAIMED:** the planner closes projection arity before issuing a claim, and
+/// lowering independently closes the same ordered projection against the
+/// arguments it actually visited before the claim is consumed.
+///
+/// **THE GAP:** both governed roots have one explicit argument, so their only
+/// permutation is the identity. A non-identity reorder is unrepresentable on
+/// this population, and the production projection has no independent ordering
+/// choice: its index is the source-child traversal index. A synthetic
+/// multi-argument witness would measure a population production does not have.
+/// Also, shortening a unary run produces the same empty `Vec` as an absent
+/// projection; because the claim has no presence bit, that row proves an empty
+/// parameter run refuses. It does not distinguish wrong length from absence.
+/// Reorder and length-versus-presence become owed when a multi-argument fused
+/// invocation exists in the governed population; no such witness is
+/// manufactured here.
+#[test]
+fn r3_fused_parameter_projection_refuses_before_claim_consumption() {
+    use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, with_fusion_claim_parameter_mutation, D2jCause,
+        FusionClaimParameterMutation,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: FusionClaimParameterMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(
+            crate::cranelift_backend::planning::D2J_DECLARATION,
+            &declaration,
+        );
+        let error = with_fusion_claim_parameter_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-parameter-projection",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("visited argument origins") =>
+            {
+                "visited-origin refusal"
+            }
+            Some(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
+                if reason
+                    == "a static continuation fusion claim's ordered input projection is \
+                       unavailable or disagrees with the capture run its own ABI frame declares" =>
+            {
+                "preflight arity refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (FusionClaimParameterMutation::Exact, "exact"),
+            (FusionClaimParameterMutation::MoveFirstToCallee, "moved"),
+            (FusionClaimParameterMutation::DropLast, "short"),
+            (FusionClaimParameterMutation::AppendCallee, "long"),
+        ] {
+            let symbol = format!("ken_r3_projection_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::MoveFirstToCallee,
+                "visited-origin refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::DropLast,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                FusionClaimParameterMutation::AppendCallee,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::MoveFirstToCallee,
+                "visited-origin refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::DropLast,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionClaimParameterMutation::AppendCallee,
+                "preflight arity refusal",
+                0,
+                0,
+            ),
+        ],
+        "the exact projection completes and consumes once; a same-length moved origin reaches \
+         lowering's own ordered comparison, while short and long projections stop in preflight; \
+         every refusal occurs before claim consumption and before a fused invocation is recorded"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the checked worker presented at the
+/// exact consuming call must name the claim's producer body before the affine
+/// claim can be spent.
+///
+/// **MEASURED:** after the real selector chooses the claim on both armed roots,
+/// replacing the worker binding's body with that same real consuming-call
+/// occurrence reaches the worker-body closure and refuses with zero claim
+/// consumptions and zero fused invocations. The exact binding completes at one
+/// and one.
+///
+/// **CLAIMED:** a fused invocation cannot enter a worker body other than the
+/// producer body and redirect callee the region claim closed over, and refusal
+/// leaves the affine claim outstanding.
+///
+/// **THE GAP:** this pins the worker-body relation after exact call selection.
+/// It does not pin the consuming-call selector, producer captures, the
+/// post-field route, or a failure after the declared call starts building.
+///
+/// **Promise class: durable invariant.** The assertion is relational over the
+/// real selector outcome, the named refusal, and both affine events; it freezes
+/// no origin literal or population count.
+#[test]
+fn r3_fused_worker_body_refuses_before_claim_consumption() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_worker_body_mutation, D2fEmitterTestArm, D2fWorkerBodyMutation,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fWorkerBodyMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let error = with_d2f_worker_body_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-worker-body",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("checked worker body")
+                    && reason.contains("is not the claim's producer body") =>
+            {
+                "worker-body refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fWorkerBodyMutation::Exact, "exact"),
+            (D2fWorkerBodyMutation::UseConsumingCallOrigin, "wrong-body"),
+        ] {
+            let symbol = format!("ken_r3_worker_body_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fWorkerBodyMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fWorkerBodyMutation::UseConsumingCallOrigin,
+                "worker-body refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fWorkerBodyMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fWorkerBodyMutation::UseConsumingCallOrigin,
+                "worker-body refusal",
+                0,
+                0,
+            ),
+        ],
+        "the exact worker body completes and consumes once; replacing that binding's body with \
+         the selected consuming-call occurrence reaches the named closure and refuses before \
+         either affine event"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the selected Call occurrence must be
+/// the claim's exact consuming Call before its ordered ordinary parameter run
+/// can enter the fused target.
+///
+/// **MEASURED:** after the real selector chooses the claim on both armed roots,
+/// substituting a real occurrence from that call's same-compile projected
+/// argument run reaches the consuming-call closure and refuses with zero claim
+/// consumptions and zero fused invocations. Exact selection completes at one
+/// and one.
+///
+/// **CLAIMED:** the field supplies the local worker binding, the claim's exact
+/// consuming Call supplies the ordered ordinary parameter run, and the checked
+/// worker body closes independently against `claim.producer_body()`.
+///
+/// **THE GAP:** this pins the consuming-call relation after exact selection. It
+/// does not pin producer captures, premature claim consumption, or the
+/// post-field direct-call route.
+///
+/// **Promise class: durable invariant.** The alternative is selected from the
+/// exact descent's real same-compile projected run while excluding the claim's
+/// consuming call, seat, producer body, and redirect callee. No origin literal,
+/// sentinel, hand-built claim, or coincident call-site/callee identity can
+/// discharge it.
+#[test]
+fn r3_fused_wrong_consuming_call_refuses_before_claim_consumption() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_consuming_call_mutation, D2fConsumingCallMutation, D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fConsumingCallMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let error = with_d2f_consuming_call_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-consuming-call",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                if *construct == "StaticContinuationFusion"
+                    && reason.contains("selected fused consuming Call occurrence")
+                    && reason.contains("not the claim's exact consuming Call") =>
+            {
+                "consuming-call refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fConsumingCallMutation::Exact, "exact"),
+            (
+                D2fConsumingCallMutation::UseProjectedArgumentOccurrence,
+                "wrong-call",
+            ),
+        ] {
+            let symbol = format!("ken_r3_consuming_call_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fConsumingCallMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fConsumingCallMutation::UseProjectedArgumentOccurrence,
+                "consuming-call refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fConsumingCallMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fConsumingCallMutation::UseProjectedArgumentOccurrence,
+                "consuming-call refusal",
+                0,
+                0,
+            ),
+        ],
+        "exact selection completes and consumes once; a different real occurrence from the \
+         call's projected run reaches the named closure and refuses before either affine event"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- fusion admission accepts an empty
+/// producer-capture run only, independently of the checked continuation-capture
+/// suffix later exposed as `claim.inputs()`.
+///
+/// **MEASURED:** the real selected producer descriptor has zero captures on
+/// both governed roots. Exact retains its two checked continuation captures and
+/// completes at one claim consumption and one fused invocation; ReHomed retains
+/// its zero-capture comparator and also completes at one and one. Changing only
+/// the post-selection producer-capture count to non-empty reaches the named
+/// admission refusal on both roots at zero and zero.
+///
+/// **CLAIMED:** a non-empty producer-capture population is a new ABI
+/// disposition and refuses before fusion ABI installation, emission, affine
+/// claim consumption, or fused invocation. It is never folded into ordinary
+/// parameters or into the distinct `claim.inputs()` suffix.
+///
+/// **THE GAP:** this pins the producer descriptor's capture-count boundary and
+/// its separation from the real zero/two consumer suffixes. It does not define
+/// an ABI for producer captures, invent a capture input, or pin failures after
+/// the declared fused call begins building.
+///
+/// **Promise class: durable invariant.** The mutation is downstream of exact
+/// producer-descriptor selection and changes no source, claim, relation, or ABI
+/// input.
+#[test]
+fn r3_fused_nonempty_producer_captures_refuse_before_emission() {
+    use crate::cranelift_backend::lowering::core::D2fEmitterTestArm;
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, d2j_installed_plan_under,
+        r3_fusion_claim_consumptions, reset_r3_fusion_claim_consumptions,
+        with_fusion_producer_capture_mutation, D2jCause, FusionProducerCaptureMutation,
+        D2J_DECLARATION,
+    };
+
+    fn continuation_capture_count(cause: D2jCause) -> u32 {
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let plan = d2j_installed_plan_under(cause, &entry, &declarations, &oriented)
+            .expect("the governed root installs its exact fusion plan");
+        let views = plan
+            .continuation_fusions()
+            .expect("the installed fusion plane rejoins its ABI");
+        assert_eq!(views.len(), 1, "one governed root installs one fusion");
+        views[0].header().captures
+    }
+
+    fn compile(
+        cause: D2jCause,
+        mutation: FusionProducerCaptureMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let error = with_fusion_producer_capture_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-producer-captures",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason)))
+                if reason.contains("producer capture run is non-empty")
+                    && reason.contains("continuation-input capture suffix") =>
+            {
+                "producer-capture refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    assert_eq!(
+        (
+            continuation_capture_count(D2jCause::Exact),
+            continuation_capture_count(D2jCause::ReHomed),
+        ),
+        (2, 0),
+        "Exact retains its two checked continuation captures while ReHomed is the real \
+         zero-capture comparator; neither count is the producer-capture population"
+    );
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (FusionProducerCaptureMutation::Exact, "exact"),
+            (
+                FusionProducerCaptureMutation::ForceNonEmptyAfterSelection,
+                "nonempty-producer-captures",
+            ),
+        ] {
+            let symbol = format!("ken_r3_producer_captures_{prefix}_{suffix}");
+            let (error, consumptions, invocations) = compile(cause, mutation, &symbol);
+            rows.push((cause, mutation, classify(&error), consumptions, invocations));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                FusionProducerCaptureMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                FusionProducerCaptureMutation::ForceNonEmptyAfterSelection,
+                "producer-capture refusal",
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionProducerCaptureMutation::Exact,
+                "completed",
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                FusionProducerCaptureMutation::ForceNonEmptyAfterSelection,
+                "producer-capture refusal",
+                0,
+                0,
+            ),
+        ],
+        "both exact roots retain their real consumer-capture behaviour and complete once; a \
+         non-empty producer-capture population refuses before either affine event"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- a selected affine fusion claim is
+/// settled only after its declared fused call has been accepted.
+///
+/// **MEASURED:** on both governed roots, withholding the last input only after
+/// the real claim, target, ordinary parameter run and capture suffix have been
+/// checked reaches the descriptor-driven call builder exactly once. That
+/// builder refuses the real target's missing declared input with zero claim
+/// consumptions and zero fused invocations. The unchanged operand runs are
+/// accepted and then consume and invoke exactly once.
+///
+/// **CLAIMED:** a claim that is live at the fallible call-build boundary stays
+/// outstanding when that build refuses; the affine settlement occurs only
+/// after successful call emission.
+///
+/// **THE GAP:** the application counter proves this is a post-selection
+/// call-build refusal, not an earlier selector or preflight failure. The
+/// mutation changes only the real operand run handed to the real target; it
+/// creates no source relation, claim, target, settlement or call instruction.
+/// It does not prove the later post-field route remains absent.
+///
+/// **Promise class: durable invariant.** The exact error category, mutation
+/// reach count and both affine events jointly pin the ordering without freezing
+/// an origin literal or hand-building a ledger entry.
+#[test]
+fn r3_fused_late_call_build_refusal_keeps_claim_outstanding() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_call_build_mutation, D2fCallBuildMutation, D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fCallBuildMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications) = with_d2f_call_build_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-late-call-build",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            applications,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
+                if reason == "callee frame is missing a declared input" =>
+            {
+                "late call-build refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fCallBuildMutation::Exact, "exact"),
+            (
+                D2fCallBuildMutation::WithholdLastDeclaredInput,
+                "missing-last-input",
+            ),
+        ] {
+            let symbol = format!("ken_r3_late_call_build_{prefix}_{suffix}");
+            let (error, applications, consumptions, invocations) =
+                compile(cause, mutation, &symbol);
+            rows.push((
+                cause,
+                mutation,
+                classify(&error),
+                applications,
+                consumptions,
+                invocations,
+            ));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fCallBuildMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCallBuildMutation::WithholdLastDeclaredInput,
+                "late call-build refusal",
+                1,
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fCallBuildMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fCallBuildMutation::WithholdLastDeclaredInput,
+                "late call-build refusal",
+                1,
+                0,
+                0,
+            ),
+        ],
+        "both exact claims consume once only after accepted emission; both altered compiles reach \
+         the real call builder exactly once and its late refusal leaves each claim outstanding"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the fusion-owned outer realization
+/// lowers its selected body locally and never reintroduces a direct fused or R
+/// specialization call at the post-field seam.
+///
+/// **MEASURED:** on both governed roots, the real local selected-body descent
+/// reaches the claim's exact consuming call with its checked worker and ordered
+/// operand run. Deferring only that already-validated call back to the outer
+/// post-field seam reaches the named direct-call exclusion exactly once and
+/// refuses with zero claim consumptions and zero fused invocations. The exact
+/// route completes at one and one.
+///
+/// **CLAIMED:** the R post-field fork is non-calling. It may lower the selected
+/// body locally, but only the exact consuming call reached inside that body may
+/// emit and consume the fused invocation.
+///
+/// **THE GAP:** the mutation preserves the real claim, worker binding, visited
+/// argument run, capture suffix and declared target by moving the completed
+/// call preparation rather than rebuilding it. It does not prove the ordinary
+/// O direct path, which never enters the outer-realization dispatcher and is
+/// intentionally byte-identical.
+///
+/// **Promise class: durable invariant.** The assertion relates the named route
+/// exclusion to the mutation's post-closure application count and both affine
+/// events, without freezing an origin, target, arity or operand value.
+#[test]
+fn r3_fused_post_field_direct_call_reintroduction_refuses_before_emission() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_post_field_direct_call_mutation, D2fEmitterTestArm,
+        D2fPostFieldDirectCallMutation,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fPostFieldDirectCallMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications) = with_d2f_post_field_direct_call_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-post-field-direct-call",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            applications,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("reintroduced directly")
+                && reason.contains("post-field seam") =>
+            {
+                "post-field direct-call refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fPostFieldDirectCallMutation::Exact, "exact"),
+            (
+                D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall,
+                "direct-call",
+            ),
+        ] {
+            let symbol = format!("ken_r3_post_field_direct_call_{prefix}_{suffix}");
+            let (error, applications, consumptions, invocations) =
+                compile(cause, mutation, &symbol);
+            rows.push((
+                cause,
+                mutation,
+                classify(&error),
+                applications,
+                consumptions,
+                invocations,
+            ));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fPostFieldDirectCallMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall,
+                "post-field direct-call refusal",
+                1,
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fPostFieldDirectCallMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fPostFieldDirectCallMutation::ReintroduceDirectFusionCall,
+                "post-field direct-call refusal",
+                1,
+                0,
+                0,
+            ),
+        ],
+        "both exact roots consume and invoke once through the consuming Call inside the selected \
+         body; deferring that same prepared call to the forbidden post-field seam reaches the \
+         exclusion once and refuses before either affine event"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the outer realization may descend
+/// only while its exact selected region claim remains outstanding after
+/// identity and closure.
+///
+/// **MEASURED:** both governed roots select and close against their real claim.
+/// Moving that same move-only claim out of the outstanding map immediately
+/// afterward reaches the production outstanding detector once and refuses with
+/// zero successful consumptions and zero fused invocations. Exact compilation
+/// completes with one of each.
+///
+/// **CLAIMED:** opaque identity selection and closure do not license replay.
+/// The claim must remain outstanding at the boundary where the R selector
+/// enters its locally lowered body.
+///
+/// **THE GAP:** the mutation represents one lawful corrupted ledger state -- an
+/// escaped selected claim. It does not separately instantiate duplicate storage
+/// or a second attempted consumption, whose affine behavior belongs to the
+/// ledger's own controls. It proves this real R selector refuses non-outstanding
+/// state before emission, settlement or invocation.
+///
+/// **Promise class: durable invariant.** The assertion relates selected-claim
+/// state to the selector boundary and affine events without freezing a fusion,
+/// owner, body, call, projection, capture count or target coordinate.
+#[test]
+fn r3_fused_outer_selector_refuses_an_escaped_selected_claim() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_outer_claim_state_mutation, D2fEmitterTestArm,
+        D2fOuterClaimStateMutation,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fOuterClaimStateMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications) = with_d2f_outer_claim_state_mutation(mutation, || {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-outer-claim-state",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        (
+            error,
+            applications,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("selected region claim")
+                && reason.contains("no longer outstanding after closure") =>
+            {
+                "non-outstanding selected-claim refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (cause, prefix) in [(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")] {
+        for (mutation, suffix) in [
+            (D2fOuterClaimStateMutation::Exact, "exact"),
+            (
+                D2fOuterClaimStateMutation::EscapeAfterClosure,
+                "escaped",
+            ),
+        ] {
+            let symbol = format!("ken_r3_outer_claim_state_{prefix}_{suffix}");
+            let (error, applications, consumptions, invocations) =
+                compile(cause, mutation, &symbol);
+            rows.push((
+                cause,
+                mutation,
+                classify(&error),
+                applications,
+                consumptions,
+                invocations,
+            ));
+        }
+    }
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fOuterClaimStateMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fOuterClaimStateMutation::EscapeAfterClosure,
+                "non-outstanding selected-claim refusal",
+                1,
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fOuterClaimStateMutation::Exact,
+                "completed",
+                0,
+                1,
+                1,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fOuterClaimStateMutation::EscapeAfterClosure,
+                "non-outstanding selected-claim refusal",
+                1,
+                0,
+                0,
+            ),
+        ],
+        "both exact roots consume and invoke once; escaping the same selected claim after closure \
+         reaches the independent outstanding detector once and refuses before either affine event"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- the fused capture suffix must be the
+/// claim's exact ordered projection through the real entry ABI.
+///
+/// **MEASURED:** Exact reaches one two-member `claim.inputs()` projection and
+/// one two-member entry-ABI result. Dropping its last projected member,
+/// duplicating its first, swapping its two, or replacing its first with the
+/// second real entry-ABI source reaches the production integrity detector once
+/// and refuses with zero claim consumption and zero fused invocation. ReHomed
+/// reaches the same seam with a measured `(0, 0)` projection and completes
+/// with one consumption and one invocation.
+///
+/// **CLAIMED:** after opaque selection and identity closure, the call's capture
+/// suffix is exactly `claim.inputs()` in source order -- no missing, repeated,
+/// transposed or differently sourced member may reach call emission.
+///
+/// **THE GAP:** the source-derived row reuses another member of Exact's real
+/// entry-ABI projection; it creates no capture authority, claim, ABI operand or
+/// source relation. No governed claim contains a `ProducerLocal` coordinate, so
+/// this control does not manufacture one to widen the population. ReHomed is a
+/// zero-capture comparator and therefore cannot itself discriminate a suffix
+/// mutation; its measured empty projection plus successful affine pair is the
+/// control that keeps that limitation visible.
+///
+/// **Promise class: durable invariant.** The assertion relates the claim's
+/// ordered source authorities to the suffix actually presented at the fused
+/// call, without freezing owner ids, ABI positions, carriers or operand values.
+#[test]
+fn r3_fused_capture_projection_refuses_before_emission() {
+    use crate::cranelift_backend::lowering::core::{
+        with_d2f_capture_projection_mutation, D2fCaptureProjectionMutation,
+        D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(
+        cause: D2jCause,
+        mutation: D2fCaptureProjectionMutation,
+        symbol: &str,
+    ) -> (Option<CraneliftBackendError>, usize, Vec<(usize, usize)>, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, applications, populations) =
+            with_d2f_capture_projection_mutation(mutation, || {
+                let _arm = D2fEmitterTestArm::arm();
+                crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                    crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                        "ken-r3-capture-projection",
+                    )
+                    .expect("object module"),
+                    symbol,
+                    cranelift_module::Linkage::Export,
+                    &entry,
+                    &crate::NativeSeedEnvironment::empty(),
+                    declarations,
+                    None,
+                    false,
+                    None,
+                    None,
+                    Some(oriented),
+                )
+                .err()
+            });
+        (
+            error,
+            applications,
+            populations,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
+        match error {
+            None => "completed",
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+            })) if *construct == "StaticContinuationFusion"
+                && reason.contains("capture suffix")
+                && reason.contains("exact ordered input projection") =>
+            {
+                "capture-integrity refusal"
+            }
+            Some(_) => "other refusal",
+        }
+    }
+
+    let mut rows = Vec::new();
+    for (mutation, suffix) in [
+        (D2fCaptureProjectionMutation::Exact, "exact"),
+        (D2fCaptureProjectionMutation::DropLast, "dropped"),
+        (D2fCaptureProjectionMutation::DuplicateFirst, "duplicated"),
+        (D2fCaptureProjectionMutation::SwapFirstTwo, "swapped"),
+        (
+            D2fCaptureProjectionMutation::UseSecondSourceForFirst,
+            "source-derived",
+        ),
+    ] {
+        let symbol = format!("ken_r3_capture_projection_exact_{suffix}");
+        let (error, applications, populations, consumptions, invocations) =
+            compile(D2jCause::Exact, mutation, &symbol);
+        rows.push((
+            D2jCause::Exact,
+            mutation,
+            classify(&error),
+            applications,
+            populations,
+            consumptions,
+            invocations,
+        ));
+    }
+    let (error, applications, populations, consumptions, invocations) = compile(
+        D2jCause::ReHomed,
+        D2fCaptureProjectionMutation::Exact,
+        "ken_r3_capture_projection_rehomed_exact",
+    );
+    rows.push((
+        D2jCause::ReHomed,
+        D2fCaptureProjectionMutation::Exact,
+        classify(&error),
+        applications,
+        populations,
+        consumptions,
+        invocations,
+    ));
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::Exact,
+                "completed",
+                0,
+                vec![(2, 2)],
+                1,
+                1,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::DropLast,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::DuplicateFirst,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::SwapFirstTwo,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::Exact,
+                D2fCaptureProjectionMutation::UseSecondSourceForFirst,
+                "capture-integrity refusal",
+                1,
+                vec![(2, 2)],
+                0,
+                0,
+            ),
+            (
+                D2jCause::ReHomed,
+                D2fCaptureProjectionMutation::Exact,
+                "completed",
+                0,
+                vec![(0, 0)],
+                1,
+                1,
+            ),
+        ],
+        "Exact's real two-capture suffix is accepted only in claim order; every alteration \
+         reaches the independent integrity detector before either affine event, while ReHomed \
+         proves the same seam is a real zero-capture comparator"
+    );
+}
+
+/// `RT-LEXICAL-R3-FUSION-EMITTER` `D3` -- both terminal-stop fused selectors
+/// must reach the production target-authority validator before call emission.
+///
+/// **MEASURED:** the existing armed Exact and ReHomed full-pipeline compiles
+/// each reach `fusion_target_carries_claim_authority`, then complete with one
+/// claim consumption and one fused invocation.
+///
+/// **CLAIMED:** the validator is wired into the complete currently governed
+/// terminal-stop population. That population is defined by reaching this
+/// validator and the later terminal stop: `Exact` and `ReHomed`. `ProducerArity`
+/// refuses earlier, as recorded beside `D2F_EMITTER_ARMED` in `core.rs`, and is
+/// not a member. Bypassing the validator call must make this control red even
+/// though both compiles otherwise still succeed.
+///
+/// **THE GAP:** the sole writer currently derives the map key and both checked
+/// fields from the same claim. This control proves validator reachability, not
+/// wrong-target refusal; the source-site future-divergence comment names the
+/// type and writer changes that would make that separate relation expressible.
+///
+/// **Promise class: durable invariant.** Every selector in the reachable
+/// terminal-stop population must retain the target-authority validation
+/// independently of how many selectors or claims an intended extension adds.
+#[test]
+fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
+    use crate::cranelift_backend::lowering::core::{
+        observe_d2f_target_authority_validation, D2fEmitterTestArm,
+    };
+    use crate::cranelift_backend::planning::{
+        d2j_checked_fixture_under, r3_fusion_claim_consumptions,
+        reset_r3_fusion_claim_consumptions, D2jCause, D2J_DECLARATION,
+    };
+
+    fn compile(cause: D2jCause, symbol: &str) -> (usize, usize, usize) {
+        reset_r3_fusion_claim_consumptions();
+        crate::cranelift_backend::lowering::reset_r3_fused_invocations();
+        let (entry, declaration, oriented) = d2j_checked_fixture_under(cause);
+        let mut declarations = std::collections::BTreeMap::new();
+        declarations.insert(D2J_DECLARATION, &declaration);
+        let (error, validations) = observe_d2f_target_authority_validation(|| {
+            let _arm = D2fEmitterTestArm::arm();
+            crate::cranelift_backend::lowering::core::compile_expr_into_object_module(
+                crate::cranelift_backend::artifact::new_object_module_for_lowering_tests(
+                    "ken-r3-target-authority-validation",
+                )
+                .expect("object module"),
+                symbol,
+                cranelift_module::Linkage::Export,
+                &entry,
+                &crate::NativeSeedEnvironment::empty(),
+                declarations,
+                None,
+                false,
+                None,
+                None,
+                Some(oriented),
+            )
+            .err()
+        });
+        assert!(error.is_none(), "{cause:?}: {error:?}");
+        (
+            validations,
+            r3_fusion_claim_consumptions().len(),
+            crate::cranelift_backend::lowering::r3_fused_invocations().len(),
+        )
+    }
+
+    for (cause, symbol) in [
+        (D2jCause::Exact, "ken_r3_target_authority_exact"),
+        (D2jCause::ReHomed, "ken_r3_target_authority_rehomed"),
+    ] {
+        let (validations, consumptions, invocations) = compile(cause, symbol);
+        assert!(
+            validations > 0,
+            "{cause:?}: the real fused selector bypassed target-authority validation"
+        );
+        assert_eq!(
+            (consumptions, invocations),
+            (1, 1),
+            "{cause:?}: validator reach is meaningful only on an accepted affine call"
+        );
+    }
+}
+
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3` — ONE RECOGNIZED SOURCE FIELD, ONE
 /// TRANSPORT, TWO AUTHORIZED BINDER PROJECTIONS.** Architect
 /// `evt_37715knv356yp`, control 1.
@@ -3422,16 +4757,15 @@ fn d2f_0_the_applied_root_production_path_gate() {
         );
     };
 
-    // ---- the three positives, each on its own root.
+    // ---- the three planning positives, each on its own root.
     //
     // `D2k` `AC-1a` extends this gate to the THIRD positive. `ProducerArity` is
-    // a documented positive, not a refusal: `static_transition.rs`'s `D2jCause`
-    // doc says "Five are refusal causes ... and `ProducerArity` is a positive
-    // widening that makes the argument row's inventory non-degenerate", and its
-    // variant doc gives the reason -- the exact witness's producer construct has
-    // ONE child, so "the argument is the child at the recursive position" cannot
-    // discriminate position on a single-element inventory. A `ProducerArity`
-    // that refused would defeat its reason for existing.
+    // a positive for this builder/planner population: it reaches the builder and
+    // resolves its own key and descriptor. It is not a successful-lowering or
+    // terminal-stop positive. Armed lowering refuses earlier at its widened
+    // producer construct; the authoritative population and refusal account is
+    // beside `D2F_EMITTER_ARMED` in `core.rs`. The executable assertions below
+    // measure only planning/build arrival and the unarmed baseline.
     let (exact_arrivals, exact_error) = compile_cause(D2jCause::Exact, "ken_d2f_gate_exact");
     let (rehomed_arrivals, rehomed_error) = compile_cause(D2jCause::ReHomed, "ken_d2f_gate_rehomed");
     let (arity_arrivals, arity_error) =
