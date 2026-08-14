@@ -417,6 +417,15 @@ pub struct PreludeEnv {
 }
 
 /// Register the L3 prelude in `elab` (called from `ElabEnv::empty`).
+///
+/// `LANG-STACK-ARC-EVIDENCE-USABILITY` `D3`/`AC-5`: this function's own
+/// stack frame is large, and it is live beneath `register_decimal_char`'s
+/// 31-level `decimalPow10` cascade -- `ElabEnv::new` calls this before any
+/// package source elaborates, so a caller further up the same chain pays
+/// this frame and the cascade's frame together. **Read this function's own
+/// `objdump` prologue before adding a local here**, rather than trusting a
+/// number in this comment: an in-code figure would need a custodian and
+/// would go stale silently at the next unrelated edit, with nothing red.
 pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let omega0 = Term::omega(Level::Zero);
     let type0 = Term::ty(Level::Zero);
@@ -496,11 +505,27 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let combinator_expected_delta: std::collections::BTreeSet<GlobalId> =
         std::collections::BTreeSet::new();
     if combinator_actual_delta != combinator_expected_delta {
+        // LANG-STACK-ARC-EVIDENCE-USABILITY D1: name the offending
+        // declaration(s) rather than reporting a bare, unnamed `GlobalId`.
+        // `elab.globals` maps name -> id, so recovering a name for a given id
+        // is an INVERSE scan, not an index -- cheap at this size (this guard
+        // fires at most once per `ElabEnv::new()`, over a map with a few
+        // hundred entries). If no name resolves (the growing declaration
+        // never went through `elab.globals.insert`), say `<unnamed>` and
+        // still print the bare id -- a diagnostic that can fail to render is
+        // worse than the bare id it replaces.
+        let offenders: Vec<String> = combinator_actual_delta
+            .iter()
+            .map(|id| match elab.globals.iter().find(|(_, v)| *v == id) {
+                Some((name, _)) => format!("{name} ({id:?})"),
+                None => format!("<unnamed> ({id:?})"),
+            })
+            .collect();
         return Err(ElabError::Internal(format!(
             "prelude declarations bracketed between combinator_trusted_before \
              and combinator_trusted_after (LANG-PRELUDE-COMBINATOR-BLOCK-DELTA \
              D2) must contribute nothing to the trusted base: expected \
-             {combinator_expected_delta:?}, got {combinator_actual_delta:?}"
+             {combinator_expected_delta:?}, got {offenders:?}"
         )));
     }
 
