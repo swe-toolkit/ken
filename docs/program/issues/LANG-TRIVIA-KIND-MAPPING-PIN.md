@@ -1,7 +1,7 @@
 ---
 id: LANG-TRIVIA-KIND-MAPPING-PIN
 title: "`LANG-COMMENT-CLASSIFIER-SHARED` made scanner divergence unrepresentable and moved the surface one hop to `From<CommentKind> for TriviaKind`, which is now the sole place a classification becomes a behaviour -- the completeness axis is closed by the compiler but the per-arm mapping is asserted nowhere, and the one fixture that covers the block form is a configuration where the doc rule and the positional heuristic return the same answer, so a Block/DocBlock transposition compiles and reds nothing"
-status: ready
+status: merged
 owner: language
 size: XS
 gate: none
@@ -140,6 +140,71 @@ twice been about.
 - **AC-3 — `ac3` and `kenfmt_b1_lossless.rs:58-60` still pass unchanged.** No
   assertion amended in either. Adding is fine.
 - **AC-4 — no new red in CI.** Targeted locally: `-p ken-elaborator`.
+
+## Delivered 2026-08-14 as `193d8944`, and it is one row wider than framed
+
+**Candidate `193d8944797f5facc5aace55d03e3722d6a69da5`, landed as squash
+`b233ba682af172e99af33c2f539e4e10bed73506`** (PR #2148; Decision
+`dec_4ynrarenyn8hb`, Architect; QA `evt_2t2nf4myw7px6`; merge-base `60b78c95`,
+one path, `+116/-0`; blob verified identical after landing). **Both SHAs are
+recorded because the candidate is not an ancestor of `main` and never will be**
+— a squash merge rewrites it, so an ancestry test on `193d8944` reads as
+never-landed forever. Ask content, not ancestry.
+
+**The frame above pins two arms; the delivered file pins four.** The frame's
+witness covers the direction where a **doc** comment loses its doc treatment
+(`DocLine`, `DocBlock`). The Architect found the symmetric one-way error
+uncovered — an **ordinary** comment classified as doc — and it is not benign: an
+ordinary trailing `{- -}` would stop attaching positionally and start attaching
+`Leading` to the **following** declaration, moving a user's comment across a
+declaration boundary in formatter output. The Steward held the approved
+`d65aee91` to complete it rather than filing a successor, on cost: the addition
+is a mirror of a fixture already in the file, and splitting was more expensive
+than finishing.
+
+**The hold's instruction was to measure before writing, and the measurement
+changed the answer from two rows to one.** `kenfmt_b1_lossless.rs:59`'s
+`-- trailing` fixture was measured to already sit in the discriminating
+configuration — same line after `const a`, with a following `const b` — and to
+red under a `Line`/`DocLine` swap. So the ordinary-**line** direction was
+already pinned and only the ordinary-**block** row (`d2`) was owed.
+
+**`d2` is not a symmetric copy of `d1`, and the asymmetry is recorded in the
+file rather than worked around.** `Trailing` homes on the smallest enclosing
+span of the **preceding token**, which for a bare literal RHS is the value
+expression's own narrower span, not the whole `const` declaration — so `d2`
+asserts containment within `a` where `d1` asserts equality with `b`. It still
+discriminates: a `Block`/`DocBlock` transposition fires the doc rule, giving
+`Leading` homed on `b`, which fails both the containment check and the explicit
+`!= b` assertion.
+
+## Residual: the four-arm claim spans two files and only one end knows it
+
+Architect at `evt_7p1aw2pq52hmm`, **non-blocking and not a gate** — the coverage
+is real today and this protects it rather than questioning it.
+
+The delivered header carries a four-arm table, and the `Line` row of that table
+is discharged by a fixture in **another crate's test file**
+(`kenfmt_b1_lossless.rs:59`). That fixture's discriminating property is its
+**configuration**, not its content: same line after a declaration, with a
+following declaration. If someone later moves it onto its own line, drops the
+following `const b`, or rewrites it for an unrelated formatter reason, this
+file's "all four arms are pinned" silently becomes false — the claim lives in a
+header and the thing that invalidates it lives somewhere else. **Nothing reds.**
+
+**The repair is one comment line at `kenfmt_b1_lossless.rs:59`** saying that
+fixture's same-line-after-with-a-following-declaration shape is load-bearing for
+this node's `Line` arm. It is not a node: it is one line, in a file no open node
+owns, and filing a frame plus a kickoff plus a review round around it would cost
+an order of magnitude more than the coupling it documents. **It is carried as a
+named addendum on `LANG-PRELUDE-ELABORATION-DEPTH`**, Language's next node,
+where it rides an existing turn and an existing publish.
+
+**Why the coupling exists at all:** the Steward's hold instructed one row rather
+than two, on the measurement above. The alternative — authoring an ordinary-line
+row here as well, making this file self-contained — would have duplicated
+coverage that already exists, which is a worse trade than a documented
+cross-file reference.
 
 ## Not this node
 
