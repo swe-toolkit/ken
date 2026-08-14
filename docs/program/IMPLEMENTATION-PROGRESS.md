@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 13:50:54Z — from 268 issue file(s) in `docs/program/issues/`.
+2026-08-14 14:21:48Z — from 269 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -300,7 +300,8 @@ the committed file matches the generator's output.
 | `SURF-gadt-elaboration` | Tracker node for the landed dependent-constructor elaboration slice (`34 §8`): points at `docs/program/wp/SURF-gadt-elaboration.md`, filed retroactively for the same tracker-generation reason as its parser/AST predecessor | merged | language | M | none | — |
 | `SURF-gadt-field-sugar` | Tracker node for the landed dependent-constructor field-sugar slice (`34 §8`): points at `docs/program/wp/SURF-gadt-field-sugar.md`; the frame's own D0 audit bounded the slice to declaration-only labels, which is why AC3's unknown/missing/extra-field checks have no corresponding test -- there is no named-argument constructor expression or pattern syntax to check them against | merged | language | S | none | — |
 | `SURF-gadt-parser-ast` | Tracker node for the landed dependent-constructor parser/AST slice (`34 §8`): points at `docs/program/wp/SURF-gadt-parser-ast.md`, filed retroactively because `gen-progress.sh` generates the tracker from `docs/program/issues/` and this slice landed with a frame but no issue node | merged | language | S | none | — |
-| `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Five landed `ken-cli` native-production tests each provision `stack_size(256 MiB)` while `LANG-RECORD-STACK-OVERFLOW` says stack-limit raises are refused -- but that refusal is a `Not this node` bullet whose rationale is about MASKING A REGRESSION, and baseline provisioning for a legitimately deep workload is a different act that no artifact has ever distinguished | ready | language | S | architect | — |
+| `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split | ready | doc | S | none | — |
+| `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | draft | runtime | M | none | — |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
 | `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | merged | verify | S | none | 2120 |
@@ -324,7 +325,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
-- `TEST-NATIVE-STACK-PROVISIONING-STANDARD` — Five landed `ken-cli` native-production tests each provision `stack_size(256 MiB)` while `LANG-RECORD-STACK-OVERFLOW` says stack-limit raises are refused -- but that refusal is a `Not this node` bullet whose rationale is about MASKING A REGRESSION, and baseline provisioning for a legitimately deep workload is a different act that no artifact has ever distinguished
+- `TEST-NATIVE-STACK-PROVISIONING-STANDARD` — Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split
 
 ## Blockers
 
@@ -367,6 +368,7 @@ is itself not yet `merged`/`closed`:
 - `RT-LEXICAL-RECURSOR-CONSUMERS` blocked by `RT-CONTKEY-CONSUMING-OCCURRENCE` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
+- `TEST-STATED-STACK-SITE-RECONCILE` blocked by `TEST-NATIVE-STACK-PROVISIONING-STANDARD` (status: ready)
 
 ## Gate progress
 
@@ -377,7 +379,6 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
-- **architect**: `TEST-NATIVE-STACK-PROVISIONING-STANDARD` (ready)
 - **operator**: `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
 
 ## Archive & diary
