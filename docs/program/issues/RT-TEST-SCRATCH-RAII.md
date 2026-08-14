@@ -1,7 +1,7 @@
 ---
 id: RT-TEST-SCRATCH-RAII
 title: "Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -68,6 +68,54 @@ panic.
 to the mass. The leaking sites are exactly those that interpolate a timestamp
 or pid. **Sort the 40 by that axis before estimating; the second group is the
 node.**
+
+### The four fixed-name sites, both axes. Recorded 2026-08-14, post-merge
+
+Architect finding at `evt_2gcg9gxb9yxgg` and its amendment at
+`evt_6qae8sz45070n`: the four do not leak, they **collide** — a different hazard
+from the one this node repaired, and the census counted them without saying why
+a fixed name is safe.
+
+**The count was right and the list above was illustrative.** The fourth,
+unnamed there, is `ken-effect-composition-e2e`.
+
+| site | fixed name | acquisition |
+|---|---|---|
+| `ken-cli/tests/rosetta.rs:158` | `ken-rosetta-runner` | `create_dir_all` |
+| `ken-cli/tests/fs_read_file_lines_flip_e2e.rs:155` | `ken-fs-flip-e2e` | `create_dir_all` |
+| `ken-cli/tests/cli_i1_entrypoint_abi.rs:14` | `ken-cli-i1-entrypoint-abi` | `create_dir_all` |
+| `ken-cli/tests/effect_composition_state_console_e2e.rs:51` | `ken-effect-composition-e2e` | `create_dir_all` |
+
+**Two independent axes, and they disagree — which is why both are recorded:**
+
+- **Acquisition: `accept-existing`, four for four, measured.** `create_dir_all`
+  succeeds onto an existing entry, including a symlink pointing elsewhere, and
+  each site then writes beneath the accepted root with a plain `fs::write`. The
+  discriminating property is **how the path is acquired**, not how it is used:
+  a site can be the only writer and still write through a path someone else
+  created first.
+- **Usage: NOT ESTABLISHED.** Nobody has looked. No site excludes a second
+  concurrent test-binary process and each writes non-atomically to fixed child
+  names. The Steward asserted single-writer-and-idempotent here from site shape
+  and Runtime's read refused it under the bar the Steward had just set; the
+  refusal is the entry, not the assertion.
+
+**Reachability: measured closed on both routes.** `scripts/ken-cargo` defaults
+`KEN_BUILD_SLOTS` to 1 (`:15`) and takes the single-`flock` path (`:88-96`), so
+no two seats run test binaries concurrently; the lock is pinned outside `TMPDIR`
+(`:55-58`) specifically so two seats cannot resolve different locks. And
+`TMPDIR` is redirected to `/workspaces/ken/tmp` (`:30-32`) — the repo volume,
+not a shared system `/tmp` — so reaching these paths means already being inside
+it. CI overrides `KEN_TMPDIR` per runner.
+
+**What would reopen it, stated as a config change rather than an attacker:**
+raising `KEN_BUILD_SLOTS` above 1, or running these suites outside `ken-cargo`.
+That is the sentence worth having, because it names something someone may
+deliberately do.
+
+**Not a node.** No reachable route, three test fixtures, and no observed
+failure. The value is the record: the next author choosing a forty-first name
+inherits the fact instead of the reassurance.
 
 ## Why this is a delivery problem and not housekeeping
 
