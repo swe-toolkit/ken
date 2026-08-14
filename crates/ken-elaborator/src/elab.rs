@@ -998,6 +998,24 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
     // stack remained at the deepest call after that node's repair -- cleared
     // by inches, not a mile. Keep new arm bodies as a call to a separate
     // (ideally #[inline(never)]) function; don't build locals inline here.
+    //
+    // REQUIRED MINIMUM (LANG-PRELUDE-ELABORATION-DEPTH D1/D4, measured at
+    // 2ca91a3a): a caller of `ElabEnv::new` + `elaborate_file` -- what `ken
+    // check`/`ken run` actually do -- must provision at least 4 MiB of
+    // stack: more than double the measured unoptimized peak (worst observed
+    // 1,982,464 bytes, ~1.98 MiB; a margin of over 2 MiB above it) and never
+    // the 2 MiB spawned-thread figure named below as the failure
+    // configuration, because that peak was measured only on the shallowest
+    // possible input -- a bare-prelude four-line program that calls no
+    // prelude combinator, with source nesting depth held constant and never
+    // varied -- so it is a floor beneath a deeper program's real cost, not a
+    // sufficient bound on it. Optimized peak measured the same way: ~280 KiB.
+    // This is why Rust's 2 MiB spawned-thread default must not be treated as
+    // adequate -- it is `r3_c2_source_mixed_branch.rs`'s `r3_4b` worker's
+    // exact failure configuration (`#2144`), not a safe answer -- while
+    // `ken-cli`'s own 8 MiB main thread has wide headroom today (~6.1 MiB
+    // unoptimized free); that margin is this box's, not a guarantee for
+    // every future caller.
     match expr {
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
