@@ -623,6 +623,57 @@ mechanism"* only becomes true here.
 > and must stay absent. Creating it early invites migration notes for
 > migrations nobody performed.
 
+#### Known limitation: the ledger check is red between release points, and its
+#### two axes are ordered so one hides the other
+
+**Recorded 2026-08-14 so it is not re-filed.** Librarian ruling
+`evt_1v4yjsbqhhagn`, on an Adversary hunt (`evt_69dknak0ym0nd`) routed by the
+Steward. **No ledger mutation and no WP is authorized by this record.**
+
+`scripts/gen-doc-status.sh --check` exits `1` on `main` today. That is the
+check **behaving as designed**, because it is a release-readiness check and Ken
+has no release points yet. Two independent axes are red:
+
+| axis | state at `main`, 2026-08-14 |
+|---|---|
+| **population** — manifest-cited sources with no ledger row | 147 required, 135 attested, **12 missing**, 0 extra |
+| **drift** — attested rows whose blob has since moved | 135 rows, 120 current, **15 drifted**, 0 missing files |
+
+**The ruling.** Cited-but-unattested sources are **permitted between release
+points and not permitted at one**; likewise blob drift. `library/REVISION` is a
+provenance and bootstrap anchor, not a content snapshot for every row.
+`STATUS.md`'s currency wording stays true because it is **temporal** — the
+ledger binds every source that was manifest-cited **at the commit the Librarian
+last reviewed it**, and claims nothing about later manifest growth. At
+`556e5af6`, the ledger's last review commit, both axes were exactly clean:
+135 required, 135 attested, 0 missing, 0 extra, and all 15 of the
+now-drifted rows matched.
+
+**The limitation itself is the ordering.** The population gate `exit 1`s
+**before** the drift loop is entered, so a single invocation reports the
+population mismatch and never the drift. Someone who runs the check sees the
+twelve and not the fifteen. **This is a diagnostic limitation, not a defect in
+the ledger**, and it is not a reason to install rows now or to revisit whether
+the check is wired into CI — the script is manual by design and CI topology is
+the operator's.
+
+**At the next release point** the deterministic delta is the 12 new rows plus
+the 15 moved ones, and **semantic review, not generation, authorizes the fold**
+— `gen-source-attestations.sh` writes only a `.proposed` sibling for exactly
+that reason.
+
+**One correction to the Steward's routing, kept because the shape recurs.**
+The routed report stated that six of the twelve unattested paths were files the
+`RT-DYNAMIC-ARM-SCALAR-MERGE` `c2-pre` candidate touched. **The intersection is
+exactly one** — `crates/ken-runtime/src/cranelift_backend/lowering/mod.rs`. The
+other five are sibling sources of the calculus page and were untouched by
+`57bf1721`. **The Steward relayed a count without re-deriving it**, and an
+overlap between two path sets is precisely the kind of claim that reads as
+already-measured. The Librarian checked the one real edge and found no page
+edit owed: `c2-pre` adds observation-only diagnostics, and
+`library/reference/linear-causal-obligation-calculus.md` does not enumerate
+that surface.
+
 > ### Wave 6 is gated on two things Ken does not have — MEASURED
 > (Steward, 2026-08-02, at `origin/main = 5a0fd8e6`)
 >
