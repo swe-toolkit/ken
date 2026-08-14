@@ -48,7 +48,7 @@ pub(super) use static_transition::plan_static_transition_graph_with_symbols;
 #[cfg(test)]
 pub(super) use static_transition::{
     contspec_nested_fixture, governed_nested_resource_bracket, plan_static_transition_graph,
-    ScaleBPlanCensus,
+    take_continuation_required_consumer_observations, ScaleBPlanCensus,
 };
 pub(super) use static_transition::{
     planned_partiality_trap, CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass,

@@ -5705,6 +5705,12 @@ fn contkey_rows_four_and_five_carry_the_exact_outer_consuming_occurrence() {
         let plan = plan_static_transition_graph(expression, &declarations)
             .expect("the governed continuation row plans");
         let units = plan.continuation_units().expect("continuation units");
+        assert_eq!(
+            units.len(),
+            1,
+            "{label}: the discovery carry is not specialization identity and must not split the \
+             one interned unit",
+        );
         let mut count = 0;
         for unit in &units {
             let Some(carried) = unit.consuming_occurrence() else {
@@ -5743,6 +5749,120 @@ fn contkey_rows_four_and_five_carry_the_exact_outer_consuming_occurrence() {
     assert_eq!(
         observe("row4-depth-1", &row4) + observe("row5-after-hole", &row5),
         2
+    );
+}
+
+/// `RT-CONTKEY-CONSUMER-DESCENT-CARRY` AC-1 through AC-3 and D3/D5.
+///
+/// MEASURED: for the row-4 fixtures at depths 1, 2 and 3, the production
+/// planner records the required consumer on the discovery at producer use and
+/// records the target-derived consumer installed on its child push. The same
+/// compiles report the existing key's consuming occurrence and interned-unit
+/// population.
+///
+/// CLAIMED: `required(N)` is the existing consuming occurrence established at
+/// level `N-1`, while the child push advances to the occurrence established by
+/// its exact target. The discovery fact is traversal state and must not split
+/// specialization identity.
+///
+/// THE GAP: this observes the carried planner identity before any lowering
+/// consumer exists. It does not claim that a later Closure/static-worker route
+/// consumes the fact or that the governed source compiles.
+///
+/// Promise class: durable invariant. The equalities are between independently
+/// produced planner records, not fixture origin literals; source-origin
+/// renumbering therefore cannot require re-recording the test.
+#[test]
+fn contkey_row_four_discovery_carries_the_previous_levels_exact_consumer() {
+    use crate::cranelift_backend::planning::{
+        take_continuation_required_consumer_observations, ContinuationConsumingOccurrence,
+    };
+
+    #[derive(Debug)]
+    struct Observed {
+        unit_consumer: ContinuationConsumingOccurrence,
+        required: ContinuationConsumingOccurrence,
+        advanced: ContinuationConsumingOccurrence,
+        units: usize,
+    }
+
+    fn observe(depth: usize) -> Observed {
+        let _ = take_continuation_required_consumer_observations();
+        let expression = host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+        let declarations = BTreeMap::new();
+        let plan = plan_static_transition_graph(&expression, &declarations)
+            .expect("the governed row-4 continuation plans");
+        let units = plan.continuation_units().expect("continuation units");
+        let [unit] = units.as_slice() else {
+            panic!(
+                "row4-depth-{depth}: expected one interned specialization, got {}",
+                units.len(),
+            );
+        };
+        let unit_consumer = unit
+            .consuming_occurrence()
+            .expect("the existing depth-specific key relation remains populated");
+
+        let mut required = BTreeSet::new();
+        let mut advanced = BTreeSet::new();
+        let mut raw = BTreeSet::new();
+        for observation in take_continuation_required_consumer_observations() {
+            raw.insert((
+                observation.is_child_push(),
+                format!("{:?}", observation.continuation_origin()),
+                format!("{:?}", observation.result_root()),
+                format!("{:?}", observation.required().body_origin()),
+                format!("{:?}", observation.required().eliminator_origin()),
+            ));
+            if observation.is_child_push() {
+                advanced.insert(observation.required());
+            } else {
+                required.insert(observation.required());
+            }
+        }
+        eprintln!(
+            "row4-depth-{depth}: unit_consumer={unit_consumer:?} raw_required_carry={raw:?}"
+        );
+        let required = required.into_iter().collect::<Vec<_>>();
+        let [required] = required.as_slice() else {
+            panic!("row4-depth-{depth}: producer-use carry is not one exact identity");
+        };
+        let advanced = advanced.into_iter().collect::<Vec<_>>();
+        let [advanced] = advanced.as_slice() else {
+            panic!("row4-depth-{depth}: child-push carry is not one exact identity");
+        };
+        Observed {
+            unit_consumer,
+            required: *required,
+            advanced: *advanced,
+            units: units.len(),
+        }
+    }
+
+    let depth_1 = observe(1);
+    let depth_2 = observe(2);
+    let depth_3 = observe(3);
+
+    assert_eq!(
+        depth_2.required, depth_1.unit_consumer,
+        "row4-depth-2 must carry the exact consumer established at depth 1",
+    );
+    assert_eq!(
+        depth_3.required, depth_2.unit_consumer,
+        "row4-depth-3 must carry the exact consumer established at depth 2",
+    );
+    assert_eq!(
+        depth_2.advanced, depth_2.unit_consumer,
+        "the depth-2 target must advance its exact consumer onto the child",
+    );
+    assert_eq!(
+        depth_3.advanced, depth_3.unit_consumer,
+        "the depth-3 target must advance its exact consumer onto the child",
+    );
+    assert_eq!(
+        [depth_1.units, depth_2.units, depth_3.units],
+        [1, 1, 1],
+        "the discovery-only carry must leave the interned-unit population unchanged",
     );
 }
 

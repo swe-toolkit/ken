@@ -8101,6 +8101,19 @@ struct ContinuationConsumingOccurrenceSeeds {
     candidates: Vec<ContinuationConsumingOccurrenceSeed>,
 }
 
+/// The exact outer consumer a discovery's producers must use.
+///
+/// A source discovery retains the prior outer-match candidates until its
+/// specialization alternative selects one. A generated descent already has
+/// that selection in its newly interned target, so it carries the exact
+/// occurrence directly. These are two construction phases of one relation,
+/// not two lookup authorities.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum ContinuationRequiredConsumingOccurrence {
+    Source(ContinuationConsumingOccurrenceSeeds),
+    Exact(ContinuationConsumingOccurrence),
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct ContinuationDiscovery {
     continuation_origin: StaticOriginId,
@@ -8124,6 +8137,43 @@ struct ContinuationDiscovery {
     /// fixed-point descent. `None` means no direct outer computational
     /// eliminator selected this continuation as its scrutinee.
     consuming_occurrences: Option<ContinuationConsumingOccurrenceSeeds>,
+    /// `RT-CONTKEY-CONSUMER-DESCENT-CARRY` -- the consumer this discovery's
+    /// producers must use, established one level outside the discovery.
+    ///
+    /// This is traversal state, not specialization identity. It therefore
+    /// remains beside `ContinuationSpecializationKey`: widening that key would
+    /// change interning even though two walks that reach the same immutable
+    /// specialization do not become different units merely because their
+    /// outstanding outer consumer differs.
+    required_consuming_occurrence: Option<ContinuationRequiredConsumingOccurrence>,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct ContinuationRequiredConsumerObservation {
+    continuation_origin: StaticOriginId,
+    result_root: StaticOriginId,
+    required: ContinuationConsumingOccurrence,
+    child_push: bool,
+}
+
+#[cfg(test)]
+impl ContinuationRequiredConsumerObservation {
+    pub(in crate::cranelift_backend) fn continuation_origin(self) -> StaticOriginId {
+        self.continuation_origin
+    }
+
+    pub(in crate::cranelift_backend) fn result_root(self) -> StaticOriginId {
+        self.result_root
+    }
+
+    pub(in crate::cranelift_backend) fn required(self) -> ContinuationConsumingOccurrence {
+        self.required
+    }
+
+    pub(in crate::cranelift_backend) fn is_child_push(self) -> bool {
+        self.child_push
+    }
 }
 
 #[cfg(test)]
@@ -8150,6 +8200,17 @@ thread_local! {
     static MUTATE_PRIMARY_FUSION_KEY_DERIVATION: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
     static MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED: Cell<Option<ContinuationConsumingOccurrenceSeedMutation>> = const { Cell::new(None) };
+    static CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS:
+        std::cell::RefCell<Vec<ContinuationRequiredConsumerObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn take_continuation_required_consumer_observations(
+) -> Vec<ContinuationRequiredConsumerObservation> {
+    CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
+        std::mem::take(&mut *observations.borrow_mut())
+    })
 }
 
 #[cfg(test)]
@@ -10754,15 +10815,15 @@ fn initial_continuation_discoveries(
         .declaration_occurrences
         .values()
         .copied()
-        .map(|origin| (origin, None))
+        .map(|origin| (origin, None, None))
         .collect::<Vec<_>>();
     if let Some(root) = plan.root_occurrence {
-        roots.push((root, None));
+        roots.push((root, None, None));
     }
 
     let mut walked = BTreeSet::new();
     let mut pending = Vec::new();
-    while let Some((origin, consuming_occurrences)) = roots.pop() {
+    while let Some((origin, consuming_occurrences, required_consuming_occurrence)) = roots.pop() {
         if !walked.insert(origin) {
             return Err(planner_error(
                 "the forward continuation seed walk reached one source occurrence twice",
@@ -10782,7 +10843,8 @@ fn initial_continuation_discoveries(
                 continuation_origin: origin,
                 result_root: scrutinee,
                 enclosing_specialization: None,
-                consuming_occurrences,
+                consuming_occurrences: consuming_occurrences.clone(),
+                required_consuming_occurrence,
             });
 
             let mut candidates = Vec::with_capacity(cases.len());
@@ -10813,15 +10875,25 @@ fn initial_continuation_discoveries(
             // Only the direct position-zero child receives this outer
             // relation. Every case body is walked independently with no
             // inherited parent relation.
+            let required_consuming_occurrence = consuming_occurrences
+                .map(ContinuationRequiredConsumingOccurrence::Source)
+                .or_else(|| {
+                    Some(ContinuationRequiredConsumingOccurrence::Source(
+                        ContinuationConsumingOccurrenceSeeds {
+                            candidates: candidates.clone(),
+                        },
+                    ))
+                });
             roots.push((
                 scrutinee,
                 Some(ContinuationConsumingOccurrenceSeeds { candidates }),
+                required_consuming_occurrence,
             ));
             for child in children.into_iter().skip(1) {
-                roots.push((child, None));
+                roots.push((child, None, None));
             }
         } else {
-            roots.extend(children.into_iter().map(|child| (child, None)));
+            roots.extend(children.into_iter().map(|child| (child, None, None)));
         }
     }
 
@@ -10888,6 +10960,60 @@ fn consuming_occurrence_from_seed(
             // the body and selection axes fixed and fires step 1's guard.
             eliminator_origin: discovery.continuation_origin,
         }));
+    }
+    Ok(match matching.as_slice() {
+        [only] => Some(*only),
+        _ => None,
+    })
+}
+
+/// Select the outer consumer already carried for this discovery's producers.
+///
+/// Source candidates are selected through their own eliminator's forward
+/// position-zero continuation. Generated descents have already performed that
+/// selection and therefore carry an exact occurrence.
+#[cfg(test)]
+fn required_consuming_occurrence_for_alternative(
+    plan: &StaticTransitionPlan<'_>,
+    discovery: &ContinuationDiscovery,
+    alternative: usize,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    let Some(required) = &discovery.required_consuming_occurrence else {
+        return Ok(None);
+    };
+    let seeds = match required {
+        ContinuationRequiredConsumingOccurrence::Source(seeds) => seeds,
+        ContinuationRequiredConsumingOccurrence::Exact(occurrence) => {
+            return Ok(Some(*occurrence));
+        }
+    };
+    let Some(first) = seeds.candidates.first() else {
+        return Ok(None);
+    };
+    let eliminator_origin = first.occurrence.eliminator_origin;
+    if seeds
+        .candidates
+        .iter()
+        .any(|candidate| candidate.occurrence.eliminator_origin != eliminator_origin)
+    {
+        return Err(planner_error(
+            "one required-consumer source relation names two outer eliminators",
+        ));
+    }
+    let continuation_origin = forward_match_scrutinee(plan, eliminator_origin)?;
+    let selected_case_body = plan
+        .semantic
+        .child_origin(continuation_origin, 1 + alternative)?;
+    let produced = continuation_result_constructor_identities(plan, selected_case_body)?;
+    let mut matching = Vec::new();
+    for candidate in &seeds.candidates {
+        let identity = plan.case_constructor_identity(
+            candidate.occurrence.eliminator_origin,
+            candidate.alternative as usize,
+        )?;
+        if produced.contains(&identity) && !matching.contains(&candidate.occurrence) {
+            matching.push(candidate.occurrence);
+        }
     }
     Ok(match matching.as_slice() {
         [only] => Some(*only),
@@ -11212,6 +11338,27 @@ fn build_continuation_specialization_plan(
                             enclosing_inputs,
                         },
                     };
+                    #[cfg(test)]
+                    {
+                        let required_consuming_occurrence =
+                            required_consuming_occurrence_for_alternative(
+                                plan,
+                                &discovery,
+                                alternative,
+                            )?;
+                        if let Some(required) = required_consuming_occurrence {
+                            CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
+                                observations.borrow_mut().push(
+                                    ContinuationRequiredConsumerObservation {
+                                        continuation_origin: discovery.continuation_origin,
+                                        result_root: discovery.result_root,
+                                        required,
+                                        child_push: false,
+                                    },
+                                );
+                            });
+                        }
+                    }
                     let key = ContinuationSpecializationKey {
                         producer_owner: producer_environment.producer_owner,
                         emission_owner,
@@ -11286,11 +11433,43 @@ fn build_continuation_specialization_plan(
                         #[cfg(not(test))]
                         let descend = true;
                         if descend {
+                            let target_unit = units.get(target.0 as usize).ok_or_else(|| {
+                                planner_error(
+                                    "a descent target was not installed before its child",
+                                )
+                            })?;
+                            if target_unit.key.worker != worker {
+                                return Err(planner_error(
+                                    "a descent target names a different worker than the child push",
+                                ));
+                            }
+                            let required_consuming_occurrence = target_unit
+                                .key
+                                .consuming_occurrence
+                                .map(ContinuationRequiredConsumingOccurrence::Exact);
+                            #[cfg(test)]
+                            if let Some(ContinuationRequiredConsumingOccurrence::Exact(required)) =
+                                required_consuming_occurrence.as_ref()
+                            {
+                                CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(
+                                    |observations| {
+                                        observations.borrow_mut().push(
+                                            ContinuationRequiredConsumerObservation {
+                                                continuation_origin: discovery.continuation_origin,
+                                                result_root: worker.body_origin,
+                                                required: *required,
+                                                child_push: true,
+                                            },
+                                        );
+                                    },
+                                );
+                            }
                             pending.push(ContinuationDiscovery {
                                 continuation_origin: discovery.continuation_origin,
                                 result_root: worker.body_origin,
                                 enclosing_specialization: Some(target),
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
+                                required_consuming_occurrence,
                             });
                         }
                         // `D8a` — the same descent, as though it were top level.
@@ -11302,6 +11481,9 @@ fn build_continuation_specialization_plan(
                                 result_root: worker.body_origin,
                                 enclosing_specialization: None,
                                 consuming_occurrences: discovery.consuming_occurrences.clone(),
+                                required_consuming_occurrence: discovery
+                                    .required_consuming_occurrence
+                                    .clone(),
                             });
                         }
                     }
