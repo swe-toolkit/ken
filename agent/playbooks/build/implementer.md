@@ -250,6 +250,8 @@ identity**, never on position. Full gate + the permitted boundary case:
 
 ## Authoring a mechanical pin — load the `pin-a-property` skill
 
+Before changing a test stack, load **`stated-stacks`** (`../tools/stated-stacks.md`).
+
 Any acceptance criterion you discharge with a test, a source scan, or a
 structural assertion is a **pin**, and a pin that is real, committed and green
 can still be **green for the wrong reason**. Before you write one, load the

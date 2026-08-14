@@ -253,6 +253,9 @@ hard gates you apply before Approve. It is `agent/playbooks/build/qa-test-design
 
 ## Verifying a mechanical pin — load the `pin-a-property` skill
 
+Before approving a test stack, load **`stated-stacks`**
+(`../tools/stated-stacks.md`).
+
 Running a pin proves it passes. It does **not** prove it guards its claim. Load
 the **`pin-a-property`** skill (`agent/playbooks/tools/pin-a-property.md`) and
 hold each pin to it **individually**.
