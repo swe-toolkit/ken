@@ -1,7 +1,7 @@
 ---
 id: LANG-GADT-SEQUENCE-TRACKER-GAP
 title: "`34 §8` names four `SURF-gadt-*` build WPs and all four have frames in `docs/program/wp/` -- none has a tracker node, so `gen-progress.sh` shows the whole dependent-constructor area as absent, while the code has in fact moved past every one of the four frames' stated baselines"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
