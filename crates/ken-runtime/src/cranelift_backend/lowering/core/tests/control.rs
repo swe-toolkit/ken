@@ -5760,20 +5760,23 @@ fn contkey_rows_four_and_five_carry_the_exact_outer_consuming_occurrence() {
 /// compiles report the existing key's consuming occurrence and interned-unit
 /// population.
 ///
-/// CLAIMED: `required(N)` is the existing consuming occurrence established at
-/// level `N-1`, while the child push advances to the occurrence established by
-/// its exact target. The discovery fact is traversal state and must not split
-/// specialization identity.
+/// CLAIMED: at depth 1, `required` coincides with that level's consuming
+/// occurrence; from depth 2 onward, `required(N)` is the existing occurrence
+/// established at level `N-1`. The discovery fact is traversal state and must
+/// not split specialization identity.
 ///
 /// THE GAP: this observes the carried planner identity before any lowering
 /// consumer exists. It does not claim that a later Closure/static-worker route
-/// consumes the fact or that the governed source compiles.
+/// consumes the fact or that the governed source compiles. Child-push records
+/// are retained as diagnostics, but equality with the same singleton unit is
+/// constructional and is not an independent control.
 ///
-/// Promise class: durable invariant. The equalities are between independently
-/// produced planner records, not fixture origin literals; source-origin
-/// renumbering therefore cannot require re-recording the test.
+/// Promise class: durable invariant. The depth-2/depth-3 equalities compare
+/// independently produced planner records. The depth-1 equality states the
+/// boundary convention directly. None uses fixture origin literals, so source-
+/// origin renumbering cannot require re-recording the test.
 #[test]
-fn contkey_row_four_discovery_carries_the_previous_levels_exact_consumer() {
+fn contkey_row_four_discovery_carries_the_outer_boundary_then_previous_consumers() {
     use crate::cranelift_backend::planning::{
         take_continuation_required_consumer_observations, ContinuationConsumingOccurrence,
     };
@@ -5782,7 +5785,6 @@ fn contkey_row_four_discovery_carries_the_previous_levels_exact_consumer() {
     struct Observed {
         unit_consumer: ContinuationConsumingOccurrence,
         required: ContinuationConsumingOccurrence,
-        advanced: ContinuationConsumingOccurrence,
         units: usize,
     }
 
@@ -5828,13 +5830,12 @@ fn contkey_row_four_discovery_carries_the_previous_levels_exact_consumer() {
             panic!("row4-depth-{depth}: producer-use carry is not one exact identity");
         };
         let advanced = advanced.into_iter().collect::<Vec<_>>();
-        let [advanced] = advanced.as_slice() else {
+        let [_advanced] = advanced.as_slice() else {
             panic!("row4-depth-{depth}: child-push carry is not one exact identity");
         };
         Observed {
             unit_consumer,
             required: *required,
-            advanced: *advanced,
             units: units.len(),
         }
     }
@@ -5844,20 +5845,16 @@ fn contkey_row_four_discovery_carries_the_previous_levels_exact_consumer() {
     let depth_3 = observe(3);
 
     assert_eq!(
+        depth_1.required, depth_1.unit_consumer,
+        "row4-depth-1 must use its own outermost consumer before the lag begins",
+    );
+    assert_eq!(
         depth_2.required, depth_1.unit_consumer,
         "row4-depth-2 must carry the exact consumer established at depth 1",
     );
     assert_eq!(
         depth_3.required, depth_2.unit_consumer,
         "row4-depth-3 must carry the exact consumer established at depth 2",
-    );
-    assert_eq!(
-        depth_2.advanced, depth_2.unit_consumer,
-        "the depth-2 target must advance its exact consumer onto the child",
-    );
-    assert_eq!(
-        depth_3.advanced, depth_3.unit_consumer,
-        "the depth-3 target must advance its exact consumer onto the child",
     );
     assert_eq!(
         [depth_1.units, depth_2.units, depth_3.units],
