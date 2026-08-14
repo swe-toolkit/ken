@@ -1,7 +1,7 @@
 ---
 id: RT-CONTKEY-CONSUMER-DESCENT-CARRY
 title: "the consuming-occurrence relation is complete at depth 1 and absent below it because the descent clones the source seed forward unchanged; the value each level needs is the one derived at the level ABOVE it, so carry it -- seeded from the source relation at the top and advanced by target-derivation at each push, attributed to the CHILD"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,48 @@ blocks: [RT-LEXICAL-RECURSOR-CONSUMERS]
 github: null
 origin: "Architect mechanism ruling evt_6td3bs6j6g14m (route (c), the D5a precedent) plus the probe-correction ruling evt_56dvtaft7ep38, both transcribed in full into docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md. The bounded probe was run by runtime at evt_76cmre0qvsmmd and returned No; the Steward raised the raw pairs at evt_3n4e0hs0gy8xm and the Architect reversed his own route selection, the No having been produced by an off-by-one in his probe specification. Filed as a new cut rather than an increment on D2k because D2k's banned scope excludes the planning surface this changes -- the same reason RT-CONTKEY-CONSUMING-OCCURRENCE was cut out of it. Steward-filed per COORDINATION §2."
 ---
+
+> ## MERGED 2026-08-14 as PR #2233. THE LAW HELD; FIVE CARRIES DID NOT COME WITH IT.
+>
+> Exact `b0f9c2ff2bf942017a35e557c5441f5b418938e2`. Decision `dec_7yg4qzfngjwtj`
+> read from the object at publish time (`resolved`, APPROVED by the Architect on
+> the exact SHA, `resolved_at` 2026-08-14T17:54:48Z; QA `evt_7fwjd4gcqamkf`). One
+> commit over merge-base `5b989f29`, three `crates/ken-runtime` paths, `+309/-7`,
+> no `spec/` or `conformance/` paths. **All three blobs verified identical on
+> `main`.** The Architect independently confirmed **no key widening** --
+> `ContinuationSpecializationKey`'s definition is untouched, which is `D3`'s
+> question answered in the safest direction.
+>
+> **The law is right and is really controlled.** `required(N)` = the consumer
+> established at `N-1`, implemented by carrying the interned target's occurrence
+> at the descent push. The control pins it with **cross-compile equalities
+> between independently produced planner records** -- `depth_2.required ==
+> depth_1.unit_consumer`, `depth_3.required == depth_2.unit_consumer` -- rather
+> than fixture literals, and the production mutation reddened depth 2
+> (left `(26,21)`, right `(16,5)`), reproduced independently by QA.
+>
+> ### THE SCOPE STATEMENT, AND IT IS THE PART A SUCCESSOR WILL GET WRONG
+>
+> **`required_consuming_occurrence` is PRODUCTION-WRITTEN and TEST-ONLY-READ.**
+> The Architect recorded that plainly *"so nobody later over-reads it"*: it is
+> **the bounded discovery-only increment he authorized, not a defect** -- but
+> **the carry has not been validated by any production consumer, and the
+> successor that wires one must not treat this node as having done so.**
+>
+> ⇒ **NO ROW CLOSED.** This node supplied a missing input. Whether the route then
+> closes is a separate measurement, exactly as framed -- which is why this node
+> deliberately carried no closure AC. The original stop named a further
+> `Closure`/static-worker refusal **and** a retained standalone recognition, and
+> both are still ahead.
+>
+> ### FIVE NON-BLOCKING CARRIES, FILED AS [[RT-CONSUMER-CARRY-CONTROL-DEBT]]
+>
+> None amended the exact-SHA approval. **The one that can produce a wrong
+> successor: the lag is NOT uniform.** At depth 1 `required` coincides with the
+> same level's consumer and lags only from depth 2 on; the test asserts nothing
+> about that value and the field doc does not note the boundary. The other four
+> are control-inflation and unexercised-branch findings. **Read them in that
+> node** -- they are not restated here.
 
 ## What this is
 
