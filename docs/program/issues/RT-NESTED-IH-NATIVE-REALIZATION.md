@@ -60,7 +60,7 @@ at each of `:559` and `:581`.
 
 ### What remains, stated as of 2026-08-14 — READ THE GATE BEFORE PLANNING D2
 
-**`D2`-`D5` are owed. `D2` and `D3` are NOT startable**, and prose that reads
+**`D2`-`D5` are owed. `D2` was gated and is now UNGATED — see the ruling below**, and prose that reads
 otherwise would send the next turn straight into the boundary question this
 node was cut to keep out.
 
@@ -78,8 +78,58 @@ equally consistent with two situations that have different owners:
 
 **These are not distinguishable from the sentence.** Routed to the Architect as
 *"which of these is it?"* — deliberately **not** as *"may I apply the
-closure?"*, which presumes the first answer. **Until that ruling lands, `D2` is
-gated.** `Forbidden` is unchanged and still binds.
+closure?"*, which presumes the first answer.
+
+#### RULED 2026-08-14: reading 1. `D2` IS UNGATED. Recorded here because an in-thread ruling is not a durable artifact.
+
+**Architect, thread `thr_1kvgpwt7b057w`, bounds restated at
+`evt_2mvbnxfejmn6p`.** The repair is a **defect in the `Match` lowering path**
+and is in scope; it does **not** widen the `c1`/`c2` boundary.
+
+**The ruling rests on the declared type, not on what the boundary admits.**
+`liftSize : LiftRose -> Nat` is kernel-checked, **which makes the `Match` path's
+closure-valued result wrong independently of what any lowering boundary would
+accept.** That entailment is the Architect's and it does not depend on the
+in-tree evidence below.
+
+**Supporting evidence, located by the Adversary (`evt_2j0h3vgn6gtqv`) and
+verified by the Steward.** `control.rs:11541-11545` records that a closure at
+the root is refused while the **called** form
+`Call { callee: LexicalClosure }` reaches emission and mints a `StaticBody`
+edge — a passing control predating this node. ⇒ *"Any repair would widen the
+boundary"* is refuted **positively**, not merely structurally.
+
+**THE BOUND THAT TRAVELS WITH IT — carry this sentence into the repair:**
+
+> **The applied form is admitted; the `D1` applied form is unmeasured.**
+
+The supporting fixture is **degenerate on every axis the `D1` case is
+non-degenerate on**: zero `params` against `D1`'s one, zero `args` against
+`D1`'s matched field, and a constant `Bool` body against a body that must
+produce a `Nat`. **Captures are a third axis and nobody has measured it** — the
+`case_env` binding is the mechanism in question, and *"binds fields into
+`case_env`"* does not say whether those become closure captures. So the control
+establishes that `Call{callee: LexicalClosure}` **is not refused as such**, and
+nothing more. It is worth exactly the objection it kills.
+
+**Two places the repair can stop short of green, both of which read as
+progress rather than failure:**
+
+1. **`StaticBody` inside a recursive function.** *"Mints a `StaticBody` edge and
+   therefore a second function unit"* is not free — every lifted nested match
+   becomes its own unit, and in `liftSize` that unit sits **inside a recursive
+   function**, where `Lowered::RecursiveBackedge` has its own escape rule at
+   `mod.rs:21278-21281`. Whether a `StaticBody` edge composes with the backedge
+   machinery is **untested** by a fixture whose body is a constant.
+2. **The `StructuralNat` relocation**, flagged separately by the Architect.
+
+**`Forbidden` is unchanged and still binds** — the ruling authorizes repairing
+the `Match` path, **not** a seventh admitted merge shape.
+
+**Runtime's own retro reached the same first proof independently:** the first
+new proof must show the case closure **consumes the matched field** and that
+`ground_value` **remains unchanged**; only then may native definition,
+call-site replacement, and `D2`/`D3` evidence proceed.
 
 
 ## Why this node exists
