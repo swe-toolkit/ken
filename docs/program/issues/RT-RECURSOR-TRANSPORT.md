@@ -14,9 +14,17 @@ origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDes
 > # `draft`, NOT unframed — set back 2026-08-13 by the Steward
 >
 > **It was mis-flagged `ready` while two of its five `depends_on`
-> (`RT-LEXICAL-RECURSOR-CONSUMERS`, `RT-LEXICAL-R3-FUSION-EMITTER`) are still
+> (`RT-LEXICAL-RECURSOR-CONSUMERS`, `RT-LEXICAL-R3-FUSION-EMITTER`) were still
 > `active`.** The frame below already says `D3` is gated on those successors;
 > the frontmatter did not agree with the frame.
+>
+> **UPDATED 2026-08-14: one of those two has cleared.**
+> `RT-LEXICAL-R3-FUSION-EMITTER` is **`merged`**. **The single remaining
+> blocker is [[RT-LEXICAL-RECURSOR-CONSUMERS]]**, which is `active` and is the
+> operator's priority lane. The other four `depends_on` are all `merged`.
+>
+> ⇒ **The flip condition is now ONE check, not two.** Do not go looking at
+> `R3-FUSION-EMITTER`; it is done.
 >
 > **Measured, not inferred.** Runtime's `RT-DESCENT-RETIRE` `D1` census at
 > `c1b9a1e8` found 89 intact residual rows — 74 `LexicalCallArgumentRecursor`

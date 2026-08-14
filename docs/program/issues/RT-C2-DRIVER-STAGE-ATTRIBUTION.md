@@ -20,7 +20,7 @@ later reader is told. Sized `XS` deliberately.
 that touches `ken-runtime` or `ken-cli`. If none arrives before Runtime's
 current node closes, it is a single short turn.
 
-## `D1` — the driver blames the wrong stage on the path the control exists to exercise
+## `D1` — the driver blames the wrong stage on the path it exists to exercise
 
 `crates/ken-cli/tests/dasm_c2_observation_artifact_identity.rs:141-142`:
 
