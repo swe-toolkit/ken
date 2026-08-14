@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 16:53:17Z — from 277 issue file(s) in `docs/program/issues/`.
+2026-08-14 17:06:36Z — from 278 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -208,6 +208,7 @@ the committed file matches the generator's output.
 | `RT-COMPMATCH-TREE-SCRUTINEE` | ComputationalMatch refuses a tree-producing scrutinee that is not Bool or a constructor (rt_span_prov) | draft | runtime | TBD | none | — |
 | `RT-CONTINUATION-CALL-DISCHARGE` | A planned continuation call is neither directly emitted nor compositionally consumed once the Active resume path goes live — attribution, not repair | merged | runtime | S | none | — |
 | `RT-CONTINUATION-EDGE-DISPOSITION` | One planner edge carries both binding projection and a causal call obligation — split the representation so a binding candidate can be settled InlineNoCall without ever entering the call-discharge partition | merged | runtime | M | none | — |
+| `RT-CONTKEY-CONSUMER-DESCENT-CARRY` | the consuming-occurrence relation is complete at depth 1 and absent below it because the descent clones the source seed forward unchanged; the value each level needs is the one derived at the level ABOVE it, so carry it -- seeded from the source relation at the top and advanced by target-derivation at each push, attributed to the CHILD | ready | runtime | S | none | — |
 | `RT-CONTKEY-CONSUMING-OCCURRENCE` | The continuation specialization key names the owner of the continuation's own occurrence and has nowhere to name the occurrence that CONSUMES its answer; the enclosing eliminator is measurably not in hand at the interning site, so the fact must be seeded at the outer-match walk and threaded there -- a plan-construction change, not a field addition | merged | runtime | M | none | — |
 | `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` | consuming_occurrence carries two fields and only one of them is checked -- eliminator_origin is copied into the re-derivation before the comparison, so AC-1's assert is x == x on that field, and AC-2's mutation perturbs only the field that was already independent, leaving step 1 never fired | merged | runtime | XS | none | — |
 | `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` | the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured | ready | runtime | S | none | — |
@@ -330,6 +331,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
 - `RT-CENSUS-CAVEAT-GUARD` — The identifier-census caveat's staleness guard is an existence check standing in for a count check, so it cannot detect the drift it was written to catch
 - `RT-CHECKED-IH-REALIZATION-AUTHORITY` — Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing
+- `RT-CONTKEY-CONSUMER-DESCENT-CARRY` — the consuming-occurrence relation is complete at depth 1 and absent below it because the descent clones the source seed forward unchanged; the value each level needs is the one derived at the level ABOVE it, so carry it -- seeded from the source relation at the top and advanced by target-derivation at each push, attributed to the CHILD
 - `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` — the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
@@ -376,6 +378,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
+- `RT-LEXICAL-RECURSOR-CONSUMERS` blocked by `RT-CONTKEY-CONSUMER-DESCENT-CARRY` (status: ready)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 

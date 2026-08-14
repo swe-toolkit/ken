@@ -875,6 +875,16 @@ Authorized by Architect `evt_5ed8ee70cmrt`. **RELEASED to the runtime ring
 > [[RT-CONTKEY-REFUSAL-PROFILE-SPLIT]], on the Steward's WP cut, accepted by the
 > Architect at `evt_56dvtaft7ep38` -- grouped by defect class rather than by
 > which node noticed it. **No blocking dependency either way.**
+>
+> ### THE SUCCESSOR IS FRAMED. IT IS NOT AN INCREMENT ON THIS NODE.
+>
+> **[[RT-CONTKEY-CONSUMER-DESCENT-CARRY]]** (`ready`, `S`, runtime-owned),
+> framed 2026-08-14 from the two rulings above with fixed inputs measured at
+> `main` `15c21269`. It is in this node's `depends_on`. **Read it there, not
+> here** -- it carries the site table, the deliverables and the excluded scope,
+> including the one exclusion this chain has already had ruled twice: **that
+> supplying the relation closes the route is NOT established, and an AC assuming
+> closure assumes what nobody measured.**
 
 > **THE PROBE THAT SELECTS THE SUCCESSOR -- one instrumented run of the existing
 > controls, and it MAY NOT AUTHOR A CANDIDATE.** At the descent push, for **row

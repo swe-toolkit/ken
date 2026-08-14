@@ -53,139 +53,137 @@
 
 ## LIVE
 
-**`main` = `f7ed6dea`.** Landed today through **PR #2219**. Tree clean, nothing
-unpublished, no publisher running.
+**`main` = `15c21269`.** Landed through **PR #2224**. Tree clean, nothing
+unpublished, no publisher running. **Eleven PRs merged 2026-08-14** (#2214-#2224);
+three of them code: `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD`,
+`RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED`, `LANG-MATCH-DIAGNOSTIC-PROSE`.
 
-**TWO RINGS WORKING. Kernel, Verify and Foundation are idle and NONE of them
-is framing debt** — measured 2026-08-14, not assumed.
+**NOTHING IS UNFRAMED.** The D2k successor is framed and released; both build
+rings have a node. Kernel, Verify and Foundation are idle and none of them is
+framing debt -- measured, not assumed.
 
-| ring | node | anchor | state |
-|---|---|---|---|
-| runtime | `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` (XS) | `evt_28wapm370mj11` | exact `e84dc867` **with QA**, routed `evt_6b6wn8b8t33bd` |
-| language | `LANG-MATCH-DIAGNOSTIC-PROSE` (S) | `evt_4zk1wykfjspp9` | implementer mid-turn at `c4ead9b3` |
-| doc | none — stood down | — | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` merged, retros in |
+| ring | node | state |
+|---|---|---|
+| runtime | `RT-CONTKEY-CONSUMER-DESCENT-CARRY` (S) | `ready`, released 2026-08-14 |
+| language | `LANG-WITNESS-ARITY-DERIVED` (S) | assigned on `eb3806de`, implementer mid-turn |
+| doc | none -- stood down | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` merged, retros in |
 
-**Merged today:** #2214 (Steward), #2215 `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD`
-exact `626a9c8a`, #2216 `TEST-NATIVE-STACK-PROVISIONING-STANDARD` exact
-`695eff8b`, #2217 (M7 bookkeeping), #2218 (step 10 + briefing), #2219 (the two
-Language successors below).
+### THE D2k ROUTE WAS RECOVERED BY ASKING, NOT BY FRAMING
 
-### THE ONE THING NOT FRAMED, AND IT IS NOT MINE TO GUESS
+**Runtime's bounded probe returned "No", which by the Architect's own fork
+selected route (b). The No was his own off-by-one.** The raw pairs showed
+depth 3's requirement `(26,21)` **is** depth 2's derived pair -- so "not equal"
+held, but "the consumer is outside both carriers", the stated warrant for (b),
+did not. Ruled at `evt_56dvtaft7ep38`: **`required(N)` = the consumer
+established at level `N-1`; route (c) survives.**
 
-**The `D2k-1c` successor.** Runtime hit its named hard stop at the **second**
-boundary (`evt_774xvjz3n5axs`), retained no candidate. **My scope disposition is
-made and is not reopened:** the slice is not widened, and a WP that must cross
-its own banned scope to discharge its AC has been **cut wrong**, so the repair is
-a new cut.
+**Two things made it recoverable, and both are worth keeping.** Runtime reported
+**raw values** rather than a bare verdict. And the fork's **No branch carried its
+warrant in writing**, so the data could refute the branch rather than only
+select it.
 
-**Architect mechanism ruling `evt_6td3bs6j6g14m`, transcribed in full into
-`docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md` — read it there, not
-here.** Its substance: the landed relation is **right** and composes along the
-**producer** axis; `consuming_occurrence` is **SOURCE-keyed** and cannot name the
-depth-2/3 consumer **in principle**, because that identity is determined by which
-specialization realized the body. Route (c) is a **specialization-keyed** relation
-minted at the existing descent push, on the `D5a` precedent.
+**Both rulings are transcribed in
+`docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md`, with a hard-stop header
+above the superseded probe spec. Read them there.**
 
-**He declined to size it and named a PROBE that selects the successor:** at the
-descent push, for row 4 depths 2 and 3, does the required consumer identity equal
-the one derivable from `enclosing_specialization`? **The probe may not author a
-candidate.** Frame the successor from its answer, and fold in the **three-way
-`None`** split — row 1's `None` means *ambiguity, declined*; depth 2/3's `None`
-means *no relation exists* — opposite facts wearing the same value.
+**The one constraint that must not slip, ruled twice:** that supplying the
+relation **closes** the route is **not established** -- the original stop named a
+further `Closure`/static-worker refusal and a retained standalone recognition.
+**An AC assuming closure assumes what nobody measured.** The frame has no such
+AC, deliberately, and says so.
 
-### THE LANGUAGE ESCALATION IS WITHDRAWN — IT WAS FALSE
+### RUNTIME SEQUENCING -- THE ORDER IS NOT ARBITRARY
 
-**This block previously said Language had no ungated work and that I owed the
-operator an escalation. A spec sweep refuted it before I sent it.** Language now
-has a framed, ungated successor and a second obligation filed behind it.
+`RT-CONTKEY-CONSUMER-DESCENT-CARRY` runs **before**
+`RT-CONTKEY-REFUSAL-PROFILE-SPLIT`. They share `static_transition.rs` and must
+not run concurrently. The Architect ruled the split's new refusal variant *"must
+be named for what it OBSERVES, since if the successor lands the absence stops
+being structural"* -- **this is that successor**, so landing it first lets the
+split name reality rather than a prediction.
 
-- **`LANG-WITNESS-ARITY-DERIVED`** — `ready`, `S`, ungated. **Language's next
-  node.** Kick it once `LANG-MATCH-DIAGNOSTIC-PROSE` merges; flip that dep
-  `merged` first or `--strict` warns.
-- **`LANG-CONVOY-ENCLOSING-FIELD`** — `draft`, unsized. Spec `34 §3.2` names the
-  two-vector `zip` recursive step a known gap **and a follow-on**, with zero
-  tracker rows. Mechanism measured: `outer_scope_depth = cx.ctx.len() - n`
-  (`elab.rs:2204`) defines "outer" as raw context depth below the branch's own
-  fields, so an **enclosing match's bound fields are indistinguishable from
-  genuine parameters**. Completeness, not soundness — the spec says the
-  substitution is always kernel-proved. `draft` because the discriminator's
-  shape is an Architect call, with the routing question in its flip condition.
+`TEST-STATED-STACK-SITE-RECONCILE` (`ready`) and `RT-C2-DRIVER-STAGE-ATTRIBUTION`
+sequence **after** the `RecursiveDescent` chain, the operator's standing
+priority. Neither is Runtime's next node.
 
-**How both were found, and this is the transferable part: grep the spec chapter
-for DEFERRAL PHRASING, not the tracker for gaps.** "tracked follow-on", "is a
-follow-on", "deferred to a later", "not delivered here". **A tracker audit cannot
-see an obligation that was never entered into it.** That sweep has now produced
-three real nodes (spec 37's `filter`, its `DecEq Char` transport, and the convoy
-gap). It also cleared one false positive, recorded so nobody re-investigates:
+### FOUND BY GREPPING THE SPEC FOR DEFERRAL PHRASING -- KEEP DOING THIS
+
+**Grep the spec chapter for "tracked follow-on", "is a follow-on", "deferred to
+a later", "not delivered here". A tracker audit cannot see an obligation that
+was never entered into it.** Three real nodes so far (spec 37's `filter`, its
+`DecEq Char` transport, the convoy gap) and one false positive cleared.
+
+**It also refuted an escalation I was about to send** -- "Language has no ungated
+work" -- before it went out. Language now has `LANG-WITNESS-ARITY-DERIVED`
+(`ready`, kicked) and `LANG-CONVOY-ENCLOSING-FIELD` (`draft`, unsized, waiting on
+an Architect call about the discriminator's shape).
+
+Cleared false positive, recorded so nobody re-investigates:
 `33-declarations.md:751` defers the `export`/re-export build to "the named
-Language follow-on", but **that build has substantially landed** — `modules.rs`
+Language follow-on", but **that build has substantially landed** -- `modules.rs`
 carries the export tables and abstract export, `error.rs:612` the re-export
 collision error.
 
-### STILL OWED BY THE OPERATOR — BOTH ALREADY RAISED, NEITHER BLOCKING
+### STILL OWED BY THE OPERATOR -- BOTH ALREADY RAISED, NEITHER BLOCKING
 
 Do **not** re-raise these without new information; re-posting a standing
-question is the servicing loop `§10⁻a` exists to stop.
+question is the servicing loop `§10-a` exists to stop.
 
-1. **`LANG-FOREIGN-NAME-FORMAT-CHARS`** — *whose reading is the threat model?*
+1. **`LANG-FOREIGN-NAME-FORMAT-CHARS`** -- *whose reading is the threat model?*
    If Ken source is read by agents consuming bytes, a bidi override deceives
-   nobody; if by humans in a terminal or web view, it may. That answer decides
-   whether a whole-source lexical policy has a victim at all, or the node closes
-   with the reason recorded. The node is `gate: operator` and its body has said
-   since 2026-08-13 that **neither disposition may be built** until it is
+   nobody; if by humans in a terminal, it may. `gate: operator`, and its body has
+   said since 2026-08-13 that **neither disposition may be built** until it is
    answered.
-2. **The decidable-equality TCB question** (`evt_30gckze0jryj4`) — is widening
+2. **The decidable-equality TCB question** (`evt_30gckze0jryj4`) -- is widening
    decidable equality worth two irreducible postulates per registrant? It gates
    `LANG-DECEQ-CHAR-LAWFUL-INSTANCES`, which cannot be scoped or sized until it
    is answered.
 
-### ADVERSARY HUNT `evt_4zx9xp7qkf6rm` — TRIAGED, CLOSED AS A NODE, NOT REPLIED
+### ADVERSARY -- THREE HUNTS TRIAGED, NONE REPLIED TO
 
-**Its `AC-1` re-verification is accepted in full** and is the stronger half: it
-reverted `Display` to a name-only render, got exactly the old
-`missing constructor 'ConsVector'`, and observed that **only one test in the
-crate reddened** — a universal probe proving one test sees the arity property.
+`COORDINATION §10-a`: the edge is report-only. **Dispositions are recorded in the
+node, never sent back down the edge** -- a sentence in the artifact stops a shape
+being re-surfaced permanently; a message stops it once.
 
-**Its causal claim was narrowed by measurement at `96c95586`, and that changed
-the deliverable.** All four `missing_pattern_witness` sites pass the
-`.args.len()` of the **same constructor whose `id` they pass**, and `:2135` /
-`:2314` share one `n` bound at `:2097`. ⇒ **There is no live wrong-arity
-output.** What survives is the absent guard: the pairing holds by convention per
-call site rather than by construction, and three sites have no witness-inspecting
-test, so a later refactor breaks a user-visible diagnostic silently.
+- `evt_4zx9xp7qkf6rm` -- narrowed by measurement before filing. There is **no
+  live wrong-arity output**; all four sites pass the `.args.len()` of the same
+  constructor whose `id` they pass. The remedy is a **deletion** (`env.rs:495`
+  makes arity derivable from the id), not the four fixtures the hunt ranked
+  first. Filed as `LANG-WITNESS-ARITY-DERIVED`; the narrowing is recorded **in
+  the node** so the "three emitters emit wrong arities" framing is not
+  re-surfaced.
+- `evt_2e245r28s3m6n` -- folded into `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` rather
+  than queued behind it. **The amendment exposed an `AC-3` that banned the only
+  clean discharge of its own new `D3`**; rewritten, with a new `AC-6` pinning
+  accept/reject incidence so the loosening is safe.
+- `evt_4d10j8tmjsbhj` (on `c2f285ee`) -- everything verified, nothing to fix. Its
+  own finding is the useful part: the node was an **as-built correction**, not a
+  citation repoint.
 
-**The remedy is therefore a deletion, not the four fixtures the hunt ranked
-first:** `ken-kernel/src/env.rs:495` `constructor(id) -> Option<(&InductiveDecl,
-usize)>` makes the arity derivable from the id, so the parameter goes and the
-class is unrepresentable. Fixtures are the fallback if that lookup is not total
-at an emission site. **The narrowing is recorded in the node itself** so the
-"three emitters emit wrong arities" framing is not re-surfaced from the hunt
-text by a later reader.
+### MY WP CUT WAS ACCEPTED OVER THE ARCHITECT'S
+
+Row 1's `None` split moved out of the D2k successor into
+`RT-CONTKEY-REFUSAL-PROFILE-SPLIT`'s `H4`. His words: *"your cut is better than
+mine -- I grouped it by which node noticed it; you grouped it by defect class."*
+**Grouping by defect class is the rule to reuse.**
 
 ### READY AND DELIBERATELY UNRELEASED
 
-- `TEST-STATED-STACK-SITE-RECONCILE` — runtime-owned, `ready` now that the
-  standard landed. **Sequences AFTER the `RecursiveDescent` chain** (operator's
-  standing priority). Not Runtime's next node.
-- `PROG-TRACKER-MERGE-DRIVER` — `owner: steward`, mine to execute when no ring
-  needs framing. **Its `D0` exists because the recorded reason for rejecting
+- `PROG-TRACKER-MERGE-DRIVER` -- `owner: steward`, mine when no ring needs
+  framing. **Its `D0` exists because the recorded reason for rejecting
   `merge=union` is FALSE**: `gen-progress.sh --check` greps `TS_PATTERN` out of
   both sides, and that pattern covers the issue **count** as well as the
   timestamp, so a doubled header is invisible to the check.
-- `RT-C2-DRIVER-STAGE-ATTRIBUTION` — Runtime's next fill-in.
 
-### RULES EARNED TODAY
+### RULES EARNED 2026-08-14
 
 1. **Read the Decision object at publish time**, never from an earlier
-   `list_decisions` dump. I told the Architect a Decision was unresolved 18
-   seconds after he resolved it, because I refreshed the git evidence and
-   inherited the Decision evidence.
+   `list_decisions` dump.
 2. **Do release step 10 in the same turn as any kickoff.**
 3. **A publisher that looks stalled may be in its initial `sleep`.** Check
-   `pgrep -aP <pid>` for a `sleep N` child **before** diagnosing CI. `gh pr
-   checks` pending=0 with the PR still OPEN is that, not a stuck suite.
-4. **Verify a splice landed.** A failed python assert left a commit whose message
-   claimed work it had not done.
-5. **Merge order: docs candidates collide only on the generated tracker, and my
-   own M7 is the collider — not a code candidate.** Order the merges; do not hold
-   them.
+   `pgrep -aP <pid>` for a `sleep N` child **before** diagnosing CI. Measured at
+   865s and 1004s.
+4. **Merge order: docs candidates collide only on the generated tracker, and my
+   own M7 is the collider -- not a code candidate.** Order the merges; do not
+   hold them.
+5. **A fork's No branch must carry its warrant in writing.** That is what let the
+   D2k probe's data refute the branch instead of merely selecting it.
