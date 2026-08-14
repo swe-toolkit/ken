@@ -1,7 +1,7 @@
 ---
 id: RT-C2-OBSERVATION-ARTIFACT-IDENTITY
 title: "The always-on `dasm-c2-observation` feature has no artifact-identity control, and the always-on choice is what makes the off-configuration unreachable from the crate the controls live in -- the sibling's nested-cargo A/B needs a carrier feature before it can be reused"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -67,52 +67,116 @@ pinned in the dev-dependency declaration, which `--no-default-features` does not
 touch.** From `ken-elaborator`, the off-configuration is unreachable, and that
 is a direct consequence of the always-on choice `c3` correctly made.
 
-## The design call, front-loaded — add a DEFAULT-ON carrier feature
+## The design call — the DEFAULT-ON CARRIER ROUTE IS REFUTED BY MEASUREMENT
 
-**Taken by the Steward. It is a test-topology call, the same class as the calls
-the `c3` frame front-loaded; the Architect reviews it on the merge Decision.**
+**The carrier route below was the Steward's front-loaded call. Runtime built
+exactly the framed shape and measured that it does not work.** The frame
+pre-authorized this exit ("if the carrier route turns out not to work, reporting
+that with the measurement is a good outcome"), so this is the planned branch and
+not a hard stop. The refuted route is kept because the reason it fails is the
+node's central fact.
 
-**Price this route first, because it is one line and it makes input 2 directly
-reusable:** give `ken-elaborator` its own feature that forwards to the runtime
-one, put it in `default`, and drop the `features = [...]` from the dev-dependency
-line:
+**The refuted route:** give `ken-elaborator` its own feature forwarding to the
+runtime one, put it in `default`, drop the `features = [...]` from the
+dev-dependency line.
 
 ```toml
 [features]
-default = ["dasm-c2-observation"]
+default = ["dasm-c2-observation"]              # REFUTED — see below
 dasm-c2-observation = ["ken-runtime/dasm-c2-observation"]
 ```
 
-**This preserves the property `c3` was protecting and unblocks the control at
-the same time.** An ordinary `cargo test -p ken-elaborator` still has the
-feature on, so both `D5` seat controls in `nc14_data_match_lowering.rs` still
-compile and run in the default targeted run — that was the trap `c3` avoided and
-this must not re-open it. A nested `--no-default-features` run now reaches the
-off-configuration.
+**Why it cannot work, measured by runtime-implementer 2026-08-14.** The
+package-scoped `--no-default-features` build still compiled
+`dasm-c2-observation`. `ken-elaborator` dev-depends on `ken-interp`
+(`ken-elaborator/Cargo.toml:29`), and `ken-interp` depends back on
+`ken-elaborator` **with default features** (`ken-interp/Cargo.toml:18`, no
+`default-features = false`). Cargo unions feature activations, so the cycle
+re-activates `ken-elaborator/default` — and therefore the carrier — in every
+build that includes dev-dependencies, which is every `cargo test`. The
+anti-vacuity worker caught it before the artifact comparison: *"nested build did
+not compile the requested D5 observation configuration; left: true, right:
+false"*. Confirmed independently by `scripts/ken-cargo tree -p ken-elaborator
+--no-default-features -e features -i ken-runtime`.
 
-**This is the "second default-on carrier" the `c3` rationale said an opt-in
-dependency would need.** That rationale was correct about opt-in and is not
-being overturned; what it did not consider is that the carrier can be
-**default-on**, which costs one line and is not the opt-in shape it rejected.
+⇒ **The general fact, and it is the durable content of this node:
+`--no-default-features` is a NO-OP for any package that one of its own
+dev-dependencies depends back on.** Putting a feature in `default` to keep it
+always-on in the ordinary run is therefore the same knob as making its
+off-configuration unreachable. At `ken-elaborator` the two properties this node
+needs — "on in the ordinary targeted run" and "reachable off-configuration" —
+are **mutually exclusive**, and no wording of a carrier feature separates them.
 
-**If measurement shows this route does not work, say so and stop.** The
-Adversary named the fallback — drive the nested cargo from `ken-runtime` or
-`ken-cli`, which do not carry that dev-dependency — and **explicitly did not run
-it**. Report which route you took and why. Do not build both.
+**This is also why the sibling control works and looked copyable.**
+`r3-4b-observation` is **not** in `default`, so the cycle re-activating
+`default` re-activates nothing. The sibling never depended on
+`--no-default-features` doing anything; its off-configuration is the natural
+state. That difference is invisible when reading the two features side by side.
+
+**Note the in-tree comment at `ken-interp/Cargo.toml:15-17`** — *"elaborator's
+own ken-interp dependency is dev-only (tests), so this is not circular."* It is
+not circular for **linking**, and it is circular for **feature resolution**.
+Anyone re-deriving this route will read that comment and reach the refuted
+conclusion.
+
+## The new route — host the nested build in `ken-cli`, and NO carrier
+
+**Taken by the Steward, a test-topology call; the Architect reviews it on the
+merge Decision. Every fact below re-measured against `main` `ca803dfc`.**
+
+**`ken-runtime` is eliminated, not deprioritized.** The Adversary named
+"`ken-runtime` or `ken-cli`" as the fallback and did not run either.
+`ken-runtime` **cannot** host it: emitting the artifact requires elaborating a
+Ken source, and `ken-runtime` has no `ken-elaborator` dependency
+(`ken-runtime/Cargo.toml:37-45`) — the direction is `ken-elaborator →
+ken-runtime`. Do not spend a turn discovering this.
+
+**`ken-cli` can, and it has the property `ken-elaborator` lacks:**
+
+1. **No dev-dependency cycle.** `ken-cli`'s only dev-dependency is `ken-runtime`
+   with `px8-ds-test-support` (`ken-cli/Cargo.toml:25`), which does not depend
+   back on `ken-cli`. Its one reverse dependency, `ken-verify/Cargo.toml:12`, is
+   a normal dependency. So a `ken-cli` feature is honestly togglable from the
+   command line.
+2. **It can already emit the artifact.** `compile_native_program_sources` is
+   `pub` at `ken-elaborator/src/compiler_driver.rs:2524` and **`ken-cli` already
+   calls it.** The worker has the input it needs.
+3. **The carrier disappears from the design.** `ken-cli` has no `[features]`
+   section at all; add `dasm-c2-observation =
+   ["ken-runtime/dasm-c2-observation"]` and **do not put it in `default`**. Off
+   becomes the natural state and on requires `--features` — mirroring the
+   sibling exactly, which is the shape already known to work.
+
+**The decisive consequence: `ken-elaborator/Cargo.toml:30` is not touched.** The
+ordinary `scripts/ken-cargo test -p ken-elaborator` keeps its pinned dev-dep, so
+both `D5` seat controls keep running and the target stays at its measured 17/17.
+`D3`/`AC-2` are preserved by **not touching them** rather than by re-measuring
+after a change, and the "no removal of the always-on default" bar in "Not this
+node" is honoured literally rather than argued around.
 
 ## Deliverables
 
-**`D1` — the carrier.** Whichever route input 3 resolves to. Report the
-`Cargo.toml` diff.
+**`D1` — the `ken-cli` feature stanza.** A new `[features]` section carrying
+`dasm-c2-observation = ["ken-runtime/dasm-c2-observation"]` and **no `default`
+key**. Report the `Cargo.toml` diff. **`ken-elaborator/Cargo.toml` must appear
+in no diff for this node.**
 
-**`D2` — the identity control**, modelled on
-`r3_4b_observation_feature_is_native_artifact_identical`: compile one Ken source
-twice, feature-off and feature-on, into **separate target directories**, and
-assert the emitted native objects are byte-identical.
+**`D2` — the identity control, hosted in `ken-cli/tests/`**, modelled on
+`r3_4b_observation_feature_is_native_artifact_identical`
+(`ken-elaborator/tests/r3_c2_source_mixed_branch.rs:568-660`): an outer driver
+that spawns a nested `cargo test --manifest-path <ken-cli>/Cargo.toml --test
+<worker>` twice with **its own `--target-dir` each time**, adding `--features
+dasm-c2-observation` on the on-run, and a worker that emits one Ken source's
+native object into a per-configuration output dir. Assert the two objects are
+byte-identical. **Reuse the sibling's `env!("CARGO")` detail and its reason** —
+the outer `scripts/ken-cargo` already holds the machine-wide lock and taking it
+recursively deadlocks (`:576-578`).
 
-**`D3` — the `D5` seat controls still run by default.** Report both test names
-from an ordinary `scripts/ken-cargo test -p ken-elaborator --test
-nc14_data_match_lowering` with no feature flag.
+**`D3` — the `D5` seat controls are unchanged, verified not re-engineered.**
+Report both test names and the target's test count from an ordinary
+`scripts/ken-cargo test -p ken-elaborator --test nc14_data_match_lowering` with
+no feature flag. Under the new route this deliverable is a **confirmation that
+nothing moved**, since no `ken-elaborator` file is edited.
 
 ## Acceptance criteria
 
@@ -136,12 +200,20 @@ exact failure this node exists to close.
 `CARGO_TARGET_DIR`**, compared as artifacts. **If the control is expressible only
 as "assert X in a test", it is the wrong control.** Report the two command lines.
 
-**One thing the Architect measured that makes the carrier route clean:**
-`ken-elaborator` has **`default = []`** at `6b3b5b40`. So adding a default-on
-carrier changes `--no-default-features` for this crate from a no-op into
-*exactly and only* "observation off" — nothing else is caught in the blast, and
-the off-configuration is a clean counterpart rather than a bundle of unrelated
-changes.
+**~~One thing the Architect measured that makes the carrier route clean:~~** —
+**struck, false, and it was the sentence that made the refuted route look
+safe.** `ken-elaborator` does have `default = []`, but the inference drawn from
+it does not hold: adding a default-on carrier does **not** turn
+`--no-default-features` into "exactly and only observation off", because the
+`ken-interp` dev-dependency cycle re-activates `ken-elaborator/default`
+regardless of the flag. See the refutation above. The true premise was `default
+= []`; the false step was mine, in reading a suppressible default off it.
+
+**What survives, and it is what `AC-0` was really for:** the invocation must be
+two package-scoped builds with separate `CARGO_TARGET_DIR`s, and the feature must
+be toggled at a package whose feature set the command line can actually reach.
+`AC-0` is satisfiable at `ken-cli` and is **not satisfiable at
+`ken-elaborator`** by any wording. Report the two command lines.
 
 **`AC-1` — `D2` is exercised against a real difference, not merely green.**
 Perturb the observation path so it *does* affect emission (for example, leave a
@@ -166,17 +238,65 @@ has filled seven times** — report the paths used and that they were cleaned up
 
 **`AC-5` — no production change.** `crates/ken-runtime/src/` is untouched apart
 from any perturbation made and restored under `AC-1`. The six admitted merge
-shapes and the fail-closed `_ =>` are not in scope.
+shapes and the fail-closed `_ =>` are not in scope. **The `D1` feature stanza is
+not a production change because it carries no `default` key** — the ordinary
+`ken-cli` build activates nothing new. Say so with the diff rather than leaving
+it inferred.
 
 **`AC-6` — no-regression, in CI.** `COORDINATION §12` — the venue is CI, never
 a local `--workspace` run.
 
+## Completion record
+
+**Merged as squash `79fddb0d` (PR #2179), exact candidate
+`d2584baf440b0a187f3d18d81ac5c174b5f5a2c0` from
+`wp/RT-C2-OBSERVATION-ARTIFACT-IDENTITY-cli`.** Decision `dec_3bjbha9s3rgtr`,
+resolved APPROVED by the Architect (verdict `evt_50h83hackbgen`); QA exact
+approval `evt_7r707r05escbk`. Two paths, `+207/-0`. M6 blob identity verified
+2/2 against `origin/main` after `fetch --prune`.
+
+**Increment 1 refuted the carrier route** and returned no residue; increment 2
+delivered the `ken-cli` route. Both increments are recorded above.
+
+**What the Architect measured that the frame could not front-load:** the off
+side resolves `ken-runtime` with `default` + `px8-ds-test-support` and
+`dasm-c2-observation` **absent**; the on side adds exactly
+`dasm-c2-observation`. The pair differs in **exactly one feature**, with
+`px8-ds-test-support` constant across both. Non-degenerate, and measured on the
+resolved feature graph rather than read off the manifests.
+
+**Delivered stronger than framed.** The frame asked for the anti-vacuity
+configuration self-check; the ring also added `!rows.is_empty()` on the enabled
+arm, proving the observer received rows during the very compilation whose
+artifact is compared. Without it the on side could be vacuously identical. The
+`AC-1` mutation moved only the on artifact (23584 vs 23672, first difference at
+byte 40).
+
+**Both clauses of the Architect's original `c2` finding are now closed.** `c3`
+discharged the recording clause; this node discharged the identity clause with a
+probe rather than a reading.
+
+**One carry, filed rather than carried:**
+[[RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH]] -- the self-check reads
+`ken-cli`'s feature while the deciding property is `ken-runtime`'s. Out of scope
+here because `AC-5` made `crates/ken-runtime/` a forbidden path.
+
+**Carry NOT actioned:** CI cost, two nested cold Cargo builds per suite run. The
+recorded lever if it becomes a drag is `#[ignore]` plus an explicit job, **never**
+removing the separate target directories, which are the mechanism rather than
+hygiene.
+
 ## Sizing
 
 **`S`**, and the one-hour target applies. `D1` plus a failing-then-passing `D2`
-is a releasable increment; if the carrier route in input 3 turns out not to
-work, **reporting that with the measurement is a good outcome** and the fallback
-route is the next turn's, not this one's.
+is a releasable increment.
+
+**Increment 1 (2026-08-14) spent its turn refuting the carrier route** and
+returned no candidate and no source residue — the implementer restored every
+edit, attempted no fallback, and perturbed nothing. That is the outcome the frame
+asked for on that branch, and the measured impossibility is now a fixed input
+above rather than a fact to rediscover. **Increment 2 is the `ken-cli` route and
+starts from a clean tree.**
 
 **`AC-0` is where this node is most likely to go wrong, and it will look
 green while doing it.** If you find yourself writing `assert!` inside a test that
