@@ -1,7 +1,7 @@
 ---
 id: RT-DEPTH2-VAR-PARENT-DERIVATION
 title: "Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one"
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -11,18 +11,30 @@ github: null
 origin: "Architect ruling evt_4xmz4n8n49w1d (2026-08-14) on RT-CONTKEY-ROUTE-CLOSURE-PROBE stop condition 2, alongside merge approval dec_6fj6f6t4hcpa6 for exact 866fab52. He declined to rule the fork and specified this bounded derivation instead. Steward-filed (agents cannot create tracked work per COORDINATION §2)."
 ---
 
-> # THIS IS A DERIVATION, NOT A REPAIR. TAKE NO BRANCH.
+> # CLOSED 2026-08-14 — ANSWERED, CANDIDATE-FREE. `closed`, NOT `merged`.
 >
-> **Report the parent. The fork is the Architect's once he knows which branch
-> the data selects.** Three candidate branches are written out below **with the
-> warrant that would refute each** — they are there so the measurement can
-> discriminate, not so you can pick one.
+> **D1 was delivered and ruled on, and nothing landed** — the node's whole
+> deliverable was a measurement, its AC-3 required every probe reverted, and the
+> ring confirmed blob identity to `f26167e22` on all three paths before deleting
+> its branch. **No QA vote, no PR, no merge gate applies**, and `merged` would
+> assert a landing that does not exist.
 >
-> **No new surface. No repair. `S`-sized** (Architect, verbatim: *"the
-> derivation above is `S`-sized and needs no new surface"*).
+> **The result: `parent_arm = RuntimeExpr::Construct`, `parent_origin =
+> StaticOriginId(26)`, `parent_construct = ctor:fixture::PX8JScopeTree::Node`,
+> demanding arm `core.rs:7494`** (installs `SourceContinuation::ConstructArgument`
+> at `:7522`, evaluates child 0 at `:7531`), with `pending_remaining=0` and
+> `lowered_fields=0`. Handback `evt_78ddkrtvxkebp`.
 >
-> **`ready` as of 2026-08-14.** [[RT-CONTKEY-ROUTE-CLOSURE-PROBE]] merged as
-> `afdabc502` (PR #2248), which was this node's only dependency.
+> **Branch (b) selected; the fork is DISSOLVED, not decided** — Architect ruling
+> `evt_57atrppgx2exe`. Neither banned surface is established as required, and
+> **row 4 deep and row 5 are one need**. He also **withdrew his own
+> `needs confirmation` flag against himself**: the boundary did **not** change
+> class, only its enforcement point, so the "inherited premise is stale" framing
+> below is retired. Read the rest of this file as the specification that produced
+> the measurement, not as live claims.
+>
+> **The durable record is [[RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY]]**, which
+> carries the ruling and the two-trees warning. That node is the successor.
 
 ## Why this node exists: the deciding premise was inherited, not derived
 
