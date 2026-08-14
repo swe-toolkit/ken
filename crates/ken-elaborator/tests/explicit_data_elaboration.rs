@@ -427,6 +427,32 @@ fn type_possible_indexed_constructor_is_still_required() {
     );
 }
 
+/// `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` AC-1/AC-2: the omitted-constructor
+/// witness must be the applied pattern, not the bare name -- a property only
+/// a constructor with arity >= 1 can discriminate, because `EmptyVector`
+/// (arity 0, exercised above) has a witness that coincides with its name
+/// under both the old and the new payload shape. `ConsVector` (arity 3) does
+/// not: the old `String` payload could only ever report `"ConsVector"`, so
+/// this assertion is false against it and true only against the new,
+/// arity-aware payload.
+#[test]
+fn type_possible_arity_one_constructor_witness_is_the_applied_pattern() {
+    let mut env = mk_env();
+    elab_ok(&mut env, VECTOR_DECL);
+
+    let err = expect_err(
+        &mut env,
+        r#"
+        fn onlyEmptyVector (A : Type) (n : Nat) (v : Vector A n) : Nat =
+          match v { EmptyVector |-> Zero }
+        "#,
+    );
+    assert!(
+        err.contains("non-exhaustive match") && err.contains("ConsVector _ _ _"),
+        "unexpected diagnostic: {err}"
+    );
+}
+
 fn peel_app(term: &Term) -> (&Term, Vec<&Term>) {
     let mut head = term;
     let mut args = Vec::new();
