@@ -33,6 +33,17 @@ fn assert_round_trip(label: &str, source: &str) {
 
 #[test]
 fn leading_trailing_and_interstitial_comments_have_stable_unique_homes() {
+    // LOAD-BEARING SHAPE (LANG-PRELUDE-ELABORATION-DEPTH carried addendum):
+    // `-- trailing`'s line -- same line as `const a`, after it, with a
+    // following `const b` -- is the discriminating same-line-after
+    // configuration LANG-TRIVIA-KIND-MAPPING-PIN's `Line` arm depends on
+    // (its own file, `lang_trivia_kind_mapping_pin.rs`, cannot re-derive
+    // this fixture; it names this exact line as where that arm is pinned).
+    // A `Line`/`DocLine` transposition is what it catches here. Moving this
+    // comment onto its own line, dropping `const b`, or otherwise changing
+    // this shape for an unrelated formatter reason silently drops that
+    // pin, and nothing reds -- do not change this configuration without
+    // updating that file too.
     let source = "-- leading\n\
 const a : Nat = Zero -- trailing\n\
 const b : Nat = (\n\
