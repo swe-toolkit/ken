@@ -32,7 +32,7 @@ signatures (`crates/ken-elaborator/src/foreign.rs:171`), typed-hole / `ensures`
 runtime-check slots (`foreign.rs:185`), and unproved prover goals
 (`prover.rs:367`, `23 §1.3`) all route through; `upgrade_to_transparent`
 (`env.rs:349`, `Decl::Opaque` → `Decl::Transparent` on discharge); the kernel
-`check(env, ctx, t, ty)` entry (`check.rs:373`) — four parameters, no
+`check(env, ctx, t, ty)` entry (`check.rs:386`) — four parameters, no
 provenance; `crates/ken-kernel/Cargo.toml` (the kernel's dependency closure).
 
 ## Reading these cases — the Sec4-specific disciplines
@@ -96,15 +96,17 @@ the B1 "trusted-by-typing is not kernel-proved" line — a security corpus that
 mislabels a trusted-by-construction property as kernel-backed over-claims
 exactly where a CISO reads the guarantee.
 
-**Authorship-independence is a verdict-flip on proposition validity, keyed on
-the kernel verdict — never on metadata (`64 §2.1`, AC3).** The de-Bruijn
-security reading: a bug or malice in *any* generator (prover, elaborator, SMT,
-AI) can cause a failed proof or a rejected certificate — **never a false
-`proved`** (`23 §1`). The discriminating pair is the **same certificate shape**
-(a `refl`) at a **true vs false** proposition: `refl` at `Id Nat 0 0` accepts,
-`refl` at `Id Nat 0 1` rejects on conversion (`0 ≢ 1`). The net is that the
-discriminant is the kernel `check` verdict on `(t, ty)` alone; "trusted author"
-is inexpressible at the API (§C-C3), so it cannot bypass the check.
+**Authorship-independence is a verdict-flip on abstract-index convertibility,
+keyed on the kernel verdict — never on metadata (`64 §2.1`, AC3).** The
+de-Bruijn security reading: a bug or malice in *any* generator (prover,
+elaborator, SMT, AI) can cause a failed proof or a rejected certificate —
+**never a false `proved`** (`23 §1`). The discriminating pair uses the **same
+certificate shape** (`Refl x`) in one two-binder context: it accepts at
+`Equal Int x x` and rejects at `Equal Int x y`. The distinct-binder goal is
+**unprovable, not false**; its abstract operands keep the goal `Eq`-shaped so
+the pair reaches conversion. The net is that the discriminant is the kernel
+`check` verdict on `(t, ty)` alone; "trusted author" is inexpressible at the
+API (§C-C3), so it cannot bypass the check.
 
 ## A. TCB enumeration is SOUND (AC1) — empty ⟺ verified, no phantom
 
@@ -226,37 +228,47 @@ is inexpressible at the API (§C-C3), so it cannot bypass the check.
 
 ## C. Authorship-independence (AC3 ★) — the de-Bruijn security reading
 
-> The pair is **{C1, C2}** — the **same** certificate shape (a `refl`) at a
-> **false vs true** proposition, flipping on the kernel `check` verdict alone.
-> **C3** pins the structural net: `check`'s signature has no provenance channel,
-> so no "trusted author" framing can bypass the verdict.
+> The pair is **{C1, C2}** — the **same** `Refl x` certificate in one
+> two-binder context, accepted at `Equal Int x x` and rejected at
+> `Equal Int x y` by the kernel `check` verdict alone. The negative arm is
+> **unprovable, not false**. **C3** pins the structural net: `check`'s signature
+> has no provenance channel, so no "trusted author" framing can bypass the
+> verdict. C1–C3 execute in
+> `kernel_check_flips_on_abstract_index_convertibility_without_provenance`.
 
-### security/trust-model/false-proposition-certificate-rejected
+### security/trust-model/abstract-distinct-index-certificate-rejected
 - spec: `64 §2.1` (Contract AI-Indep), `23 §1` (never a false `proved`), `18 §5`
-- given: a **false**-proposition certificate — `refl` offered at type
-  `Id Nat 0 1` — submitted to the kernel `check` (`check.rs:373`),
-  **regardless of any "trusted-author" framing**
-- expect: `check` **rejects** (conversion fails, `0 ≢ 1`) — the term never
-  enters `trusted_base()` as `proved`; no provenance input can change this
-- why: (soundness ★) AC3. A generator's bug or malice yields a *rejected*
-  certificate, never a false `proved` (`23 §1`). **Flip:** case C2 (the true
-  proposition) accepts the same cert shape — the verdict flips on proposition
-  validity, on the real kernel `check`, not an elaborator proxy. **Trust level:
-  `[structural]` — the accepting/rejecting verdict is the landed kernel check.**
+- given: in a context with distinct abstract binders `x y : Int`, the
+  certificate `Refl x` is offered at `Equal Int x y` to the kernel `check`
+  (`check.rs:386`), regardless of any "trusted-author" framing
+- expect: `check` **rejects** with `BadEliminator`; the abstract goal remains
+  `Eq`-shaped and conversion cannot establish `x ≡ y`
+- why: (soundness ★) AC3. The distinct-binder goal is **unprovable, not
+  false**. A generator's bug or malice yields a rejected certificate, never a
+  false `proved` (`23 §1`). **Flip:** case C2 offers the same certificate shape
+  in the same context at `Equal Int x x` and accepts, so the real kernel
+  verdict isolates abstract-index convertibility rather than author metadata.
+  Executed by
+  `kernel_check_flips_on_abstract_index_convertibility_without_provenance`.
+  **Trust level: `[structural]` — the accepting/rejecting verdict is the landed
+  kernel check.**
 
-### security/trust-model/genuine-proof-accepted
+### security/trust-model/abstract-self-index-certificate-accepted
 - spec: `64 §2.1` (AI-Indep), `18 §4`
-- given: a genuine proof of a **true** proposition — `refl` at type
-  `Id Nat 0 0` — submitted to `check` (`check.rs:373`)
+- given: in the same two-binder context as C1, the certificate `Refl x` is
+  offered at `Equal Int x x` to `check` (`check.rs:386`)
 - expect: `check` **accepts** (`Ok(())`) — admission on the kernel's terms
-- why: (soundness) AC3, the accepting half of the pair. Same producer (`check`),
-  same cert shape as C1; the **only** difference is the proposition's truth.
+- why: (soundness) AC3, the accepting half of the pair. Same context, producer,
+  and certificate shape as C1; only the right abstract index changes from `y`
+  to `x`. Executed by
+  `kernel_check_flips_on_abstract_index_convertibility_without_provenance`.
   **Trust level: `[structural]` — landed kernel verdict, origin-independent.**
 
 ### security/trust-model/check-signature-exposes-no-provenance-channel
 - spec: `64 §2.1` (Contract AI-Indep), `18 §5`
 - given: the kernel check entry `check(env, ctx, t, ty) -> KernelResult<()>`
-  (`check.rs:373`)
+  (`check.rs:386`), as called by
+  `kernel_check_flips_on_abstract_index_convertibility_without_provenance`
 - expect: the signature takes **exactly** `(env, ctx, term, type)` — **no**
   author / provenance / trust-tier / metadata parameter; the accept/reject
   verdict is a function of `(t, ty)` and `Σ` alone
@@ -266,6 +278,29 @@ is inexpressible at the API (§C-C3), so it cannot bypass the check.
   **This is a structural fact about the check signature, NOT a kernel-proved
   theorem** — the corpus must not label it "kernel-backed." **Trust level:
   `[structural]`.**
+
+### security/trust-model/closed-equal-literal-collapses-to-top
+- spec: `64 §2.1` (Contract AI-Indep), `16 §1.4` (`Top`), ADR 0013
+- given: the closed registered-literal proposition `Equal Int 0 0`, reduced by
+  the kernel before any certificate is checked
+- expect: weak-head reduction yields `Top`; the closed operand therefore does
+  not exercise the `Refl` conversion boundary used by C1/C2
+- why: this is the honest positive arm of the superseded closed pair, kept
+  distinct from the abstract authorship-independence pair. Executed by
+  `sec4_acceptance.rs::closed_literal_equalities_bypass_refl_via_top_and_bottom`.
+  **Trust level: `[landed producer]` — registered-literal reduction.**
+
+### security/trust-model/closed-unequal-literal-collapses-to-bottom
+- spec: `64 §2.1` (Contract AI-Indep), `16 §1.4` (`Bottom`), ADR 0013
+- given: the closed registered-literal proposition `Equal Int 0 1`, with
+  `Refl 0` offered as its certificate
+- expect: weak-head reduction yields `Bottom`, and `check` rejects `Refl 0`
+  with `TypeMismatch` before the `Eq` conversion arm is reached
+- why: this is the honest negative arm of the superseded closed pair, kept
+  distinct from C1's abstract, unprovable goal. Executed by
+  `sec4_acceptance.rs::closed_literal_equalities_bypass_refl_via_top_and_bottom`.
+  **Trust level: `[landed producer]` — registered-literal reduction plus the
+  landed kernel verdict.**
 
 ## D. The trusting-trust invariant (AC4 ★) — the independent second checker
 
