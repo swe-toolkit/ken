@@ -104,13 +104,59 @@ arm-level claim. **State in that header why the split exists** (`CommentKind`
 is `pub(crate)`, so this file cannot name the arms), so the next author does
 not re-widen the claim here.
 
-**D6 — repair the two stale attachment-totality couplings.** The helper's
-assertion message and the residual recorded in
-`docs/program/issues/LANG-TRIVIA-KIND-MAPPING-PIN.md` both describe a
-`kenfmt_b1_lossless.rs` coupling that D1 and D2 dissolve. Update that node's
-residual section to record that the coupling is gone and which deliverable
-removed it. **Editing the message text is D6's, not D1's** — kept separate so
-the diff attributes.
+**D6 — repair the stale attachment-totality couplings. THERE ARE THREE, and
+the third landed after this frame was measured.** **Editing the message text is
+D6's, not D1's** — kept separate so the diff attributes.
+
+1. The helper's own assertion message in `kenfmt_b1_lossless.rs`, which names
+   attachment totality for a check that is about kind mapping.
+2. The residual section in `docs/program/issues/LANG-TRIVIA-KIND-MAPPING-PIN.md`
+   — record that the coupling is gone and which deliverable removed it.
+3. **The `LOAD-BEARING SHAPE` comment block above
+   `leading_trailing_and_interstitial_comments_have_stable_unique_homes` in
+   `kenfmt_b1_lossless.rs`.** Added by `LANG-PRELUDE-ELABORATION-DEPTH` as its
+   carried addendum, landed at `f807d7c3`.
+
+> ### AMENDED 2026-08-14, AFTER THE KICK. Item 3 and the paragraph below are
+> ### the amendment; the ring must read `D6` as three items, not two.
+>
+> **This frame enumerated two couplings because it was measured at `2ca91a3a`,
+> and both were visible there.** `f807d7c3` is that tree's child and it added
+> an eleven-line block asserting the fixture's shape is load-bearing for the
+> pin's `Line` arm. **The enumeration was complete when written and incomplete
+> against the tree it lands on.**
+>
+> **The Contention section already said "`D6` updates the comment it added."
+> That was not enough and the gap is instructive:** a reconciliation stated in
+> a section whose grammatical mood is advisory does not bind a deliverable that
+> enumerates its own members. A reader discharging `D6` works the list. **This
+> frame's own rule — a sentence that tells someone to do something is an AC —
+> applied to the Contention section and I did not apply it.**
+>
+> **Why item 3 is not bookkeeping.** Every clause of that block is false after
+> `D1`+`D2`: the `Line` arm will be pinned in-crate and will not depend on the
+> fixture; `D5` rewrites the header it cites; and `D2` reds under all six
+> transpositions where the block says *"nothing reds."* **The last clause is
+> the live hazard — *"do not change this configuration without updating that
+> file too"* survives as a prohibition on a fixture that is now free, addressed
+> to exactly the author `D4` invites into that file.** A warning outlives its
+> cause silently and reads as a live constraint.
+>
+> **And the block states an impossibility that is measured false.** It says the
+> pin file *"cannot re-derive this fixture."* An in-file `--` row appended to
+> `d2` **does** red under a `Line`/`DocLine` transposition — run, then reverted.
+> The cross-file coupling was a **scope decision, not an impossibility**, and
+> the comment states it in the strongest available form, which is the one
+> nobody re-checks. If any of that block survives `D6`, it must say *why* the
+> arm was not re-derived there — superseded by `D2` — never that it could not
+> be.
+>
+> **Do not let this collapse into the design call above.** `CommentKind` being
+> `pub(crate)` makes the **map** unassertable from an integration test, and no
+> number of behavioural rows separates a **within-class** pair. Behaviour
+> separates the four **cross-class** transpositions perfectly well. **The
+> impossibility is real for the map and false for the `Line` arm's behavioural
+> pin**; the two sit one sentence apart and the landed comment merges them.
 
 ## Acceptance criteria
 
@@ -147,6 +193,13 @@ riding the filter it replaces.
 establishes.** After D5, quote the header's claim sentence in the handback and
 name which of the two artifacts — this file or D2's module — carries the
 arm-level claim.
+
+**AC-6a — no surviving text asserts a coupling this node dissolved.** After D6,
+grep `crates/ken-elaborator/` for the three cited artifacts and report, one row
+each, what the text now says. **The specific thing that must not survive
+anywhere is a prohibition on changing a fixture's configuration, or a claim
+that the pin file cannot re-derive an arm.** Both are false after `D2`, and
+both currently read as live constraints on the file `D4` sends an author into.
 
 **AC-7 — no-regression, in CI.** Green in CI on the candidate. Do **not** run
 a local `--workspace` build; the venue is CI (`COORDINATION §12`).

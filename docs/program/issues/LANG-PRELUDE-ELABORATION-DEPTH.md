@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-ELABORATION-DEPTH
 title: "Elaboration has an unstated stack requirement that exceeds Rust's 2 MiB spawned-thread default: every compilation elaborates the whole prelude, `elab.rs:997` measures ~115 KiB of headroom out of 2 MiB, and thirteen sites across four crates independently bumped their thread to 256 MiB without any stated rule -- so the rest of `37 §9` is a queue of prelude additions spending a margin nobody measures and no site states"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
@@ -190,3 +190,45 @@ unrelated to what was reviewed.
   superseding tip, not here.
 - **Adding `Array`, `Map`/`Set`, `DecEq`/`Ord`, or the laws.** This node measures
   what they will cost; it does not deliver them.
+
+## Merged 2026-08-14
+
+**Candidate `1d5694c3a5ca369d9d4f5bd956de39ac0ab7511e`, landed as squash
+`f807d7c3`** (PR #2153, CI green; Decision `dec_6d6vdgw4qqs1m`, Architect,
+superseding `dec_39gbb9y56mng8` against the spent `843c7449`; QA
+`evt_5m3kbr6g8cmtc`). Merge-base `2ca91a3a`, two commits, three
+`crates/ken-elaborator/**` paths, `+245/-11`; 3/3 blobs verified identical
+after landing. **Both SHAs are recorded because the candidate is not an
+ancestor of `main` and never will be** — a squash rewrites it, so an ancestry
+test reads as never-landed forever. Ask content, not ancestry.
+
+**The delivered fix does the harder half, and that is the part worth keeping.**
+Raising the minimum to 4 MiB was mechanical. What makes the number correct is
+the scope qualifier sitting **inside** the requirement sentence rather than in
+a parenthetical beneath it: the peak was measured only on the shallowest
+possible input — a bare-prelude four-line program calling no prelude
+combinator, source nesting depth held constant — so it is a **floor beneath a
+deeper program's real cost, not a sufficient bound on it**. A qualifier one
+line below the claim does not travel with the claim.
+
+### Residual: `env.globals` injectivity is measured, not enforced
+
+Architect finding, non-blocking, at `evt_4bdcm6fer2570`. `trusted_base_labels`
+depends on `env.globals` being injective, and the census measured it — `452`
+globals, `452` distinct ids, zero aliased. That is true **at this tip** and the
+comment dates it honestly.
+
+**Nothing fails if a later prelude addition registers a second name for an
+existing id.** The consequence is not a wrong test but a **flaky** one: an
+intermittently-changing label whose diff will not explain itself. The closing
+line already exists in the function that depends on it —
+
+```rust
+assert_eq!(by_global_name.len(), env.globals.len(),
+    "env.globals is not injective; labels would be order-dependent");
+```
+
+— which converts a measured fact into a maintained one. **Not filed as a node**
+(one line, inside a function an open node already touches); it rides the next
+Language candidate that enters this file. `LANG-COMMENT-POPULATION-PARITY` does
+not touch it, so this is carried rather than assigned.

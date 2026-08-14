@@ -1,7 +1,7 @@
 ---
 id: LANG-COMMENT-POPULATION-PARITY
 title: "The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
