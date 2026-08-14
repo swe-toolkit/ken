@@ -63,44 +63,58 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~12:3xZ. **`main` = `8f709da0`.**
-> **BOTH BUILD TEAMS HAVE APPROVED CANDIDATES AND THE PUBLISH QUEUE HAS TWO IN
-> IT. Neither team is owed anything; both are mine to land.**
+> ### RESUME HERE — state at 2026-08-14 ~13:0xZ. **`main` = `43a01ca2`.**
+> **PUBLISH QUEUE EMPTY. Both candidates landed and closed out. Runtime is
+> working; Language is idle awaiting its next kick.**
 >
-> ### THE TWO QUEUED CANDIDATES — this is the live work
+> **`#2202` `12cefd5b`** Runtime `D2k-1a` (M6 1/1) · **`#2203` `43a01ca2`**
+> Language `LANG-STACK-ARC-EVIDENCE-USABILITY` + `LANG-POW10` (M6 3/3). M3 clean
+> on both. M8/M9 sent for `#2202`.
 >
-> **1. Runtime `#2202`, exact `afc971158082f4d262a1915a2380b872526c3c04`,
-> `dec_7kjw87yqbam7a` resolved.** M1/M2/M3 all done: one commit, one path
-> (`.../lowering/core/tests/control.rs`), `+92/-51`, nothing outside `tests/`,
-> no cited-source hits, base-drift intersection empty.
+> ### THE FLAKE AND ITS RECOVERY — now `merge-procedure.md` M5a, read it there
 >
-> **It reddened on a FLAKE and is on a re-trigger, not a first run.**
-> `library_documentation_gates.rs` synthetic-git fixture died at
-> `git commit -m "filler 16"` → `bad tree object HEAD`; shards 1/2/4 green,
-> `main` green. **Re-triggered on the SAME SHA via `gh pr close` + `gh pr
-> reopen`** (run `31798706708`) — `gh run rerun --failed` is refused to the
-> publisher identity. Procedure now in `merge-procedure.md` **M5a**.
+> `#2202` reddened once on a runner fault (`library_documentation_gates.rs`
+> synthetic-git fixture, `git commit -m "filler 16"` → `bad tree object HEAD`;
+> shards 1/2/4 green, `main` green). **Merged unchanged on a re-triggered run at
+> the SAME SHA** — the re-run was green on identical code, which is the
+> confirmation.
 >
-> ⇒ **When that run is green, relaunch:**
-> `scripts/scripted-pr-automerge.sh --target afc971158082f4d262a1915a2380b872526c3c04 ...`
-> It finds `#2202` rather than opening a second PR. **Check `gh pr checks 2202`
-> shows the FRESH result first** — the SHA carries the old reds too.
+> **`gh run rerun --failed` is REFUSED to the publisher identity** (`Resource
+> not accessible by integration`, no `actions:write`). **The route that works is
+> `gh pr close` + `gh pr reopen`** — `ci.yml` triggers on `pull_request`, whose
+> default types include `reopened`, so a fresh run starts on the identical SHA.
+> Never push an empty commit to kick CI: that detaches the exact-SHA verdict and
+> costs the ring a fresh Decision for a flake.
 >
-> **2. Language, exact `8b58010f040cfa6820339e16f9a2f243246aad53`,
-> `dec_4j8c4pcq1xs64` resolved APPROVED.** Queued second. **M2 already done and
-> matches on all four counts** against declared base `8f709da0`: one non-merge
-> commit, three `crates/ken-elaborator` paths, `+44/-4`. **`AC-4` verified
-> structurally** — non-comment added/removed lines in `elab.rs` filter to
-> **empty**, so the landed `-3120` extraction is untouched rather than merely
-> un-reverted.
+> ### NEXT: LANGUAGE IS IDLE — `LANG-GADT-SEQUENCE-TRACKER-GAP`
 >
-> ### TWO STEWARD COMMITS ARE HELD, DELIBERATELY
+> `ready`, `S`, `gate: none`, `depends_on: []`. **Gate and compact the ring
+> before kicking.** Its `AC-4` puts `crates/` out of scope, so it is a tracker
+> and audit node: four `SURF-gadt-*` frames exist in `docs/program/wp/` with no
+> tracker node, and the code has moved past every frame's stated baseline.
 >
-> `b845d694` (idle-ring measurements) and `2e26569c` (`merge-procedure` M5a) sit
-> unpublished on `steward/work`. **`COORDINATION §10⁻` rule 1: no process merge
-> while a ring holds finished, unmerged work.** Land them after both candidates
-> above. **Rebase, do not reset** — a `git reset --hard origin/main` destroys
-> them.
+> ### RUNTIME'S NEXT SLICE IS `D2k-1c` — ALREADY AUTHORIZED, DO NOT RE-RELEASE
+>
+> **My M9 named `D2k-1b-i`, which is WRONG — that merged as `45addeaf` on
+> 08-12.** The leader caught it. `RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md:158`:
+> *"The successor is `D2k-1c`, framed in section 5. It is a route repair.
+> Nothing in it has been done."* Architect authorization `evt_5ed8ee70cmrt`,
+> released 08-12 anchor `evt_2b1zhe78c81at`. **No new node, no new release.**
+>
+> - **`D2k-1c-0` and `1c-0b` are LANDED** at `1a16a64d` (PR #1996); its deciding
+>   read is **answered** — do not re-run it.
+> - **The head block's origin-identity table was measured on `11e4eae1`, a
+>   REJECTED object.** It records where a measurement was taken, not that the
+>   identities survived the recut. Re-derive at your own base.
+> - **`AC-1` is OPEN and unqualified.** *"Conservation holds"* and *"the five
+>   rows are green"* are different claims; only the second closes the node.
+>
+> ### OWED TO ME AND STILL UNANSWERED: `D2k-0`'s redness claim
+>
+> The kick made testing it an explicit condition rather than a premise, because
+> nobody had verified it. Runtime went straight to the increment. **Asked twice.
+> The record still cannot distinguish "confirmed by the ring that tested it"
+> from "nobody checked."**
 >
 > **Seventeen PRs landed today, all M6 blob-verified.** Most recent: `#2195`
 > `6c574cdd` `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` · `#2196` `1200edf0`
