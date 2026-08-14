@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-IH-NATIVE-REALIZATION
 title: "Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3"
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -107,3 +107,113 @@ re-derive it:
 - **`AC-K12` is not claimed or advanced by `c1` or `c2`.** Whatever this node
   discharges, the criterion belongs to `KERNEL-NESTED-IND` and closing it is
   Kernel's, on Runtime's delivered capability.
+
+# FRAMED AND FLIPPED `ready` — 2026-08-14, on `c2` merging as `57bf1721`
+
+**The flip condition above is met and this is the framing turn it called for.**
+`c1` merged at `7bfc8ae5`, `c2` at `57bf1721`. The `c3` closure slice on
+`RT-DYNAMIC-ARM-SCALAR-MERGE` is **not** a gate on this node — it is gating and
+placement on a diagnostic feature and touches no admission arm.
+
+## Fixed inputs, measured at `main` `d578a894`
+
+**The frame's whole point is that these are read off `c2`'s landed surface
+rather than guessed, which is what `draft` was protecting against.**
+
+**1. The existing harness ends exactly one step short of `AC-K12`.**
+`crates/ken-elaborator/tests/nc14_data_match_lowering.rs:201-217`,
+`assert_nested_full_pipeline_nat`, runs elaborate → kernel-check → erase →
+**interpreter**, and stops:
+
+```rust
+let program = nested_checked_runtime_program_for_source(package_name, target_name, source);
+// ... asserts the target declaration is present in the runtime program ...
+assert_eq!(interpreter_nat_for_source(source, target_name), expected);
+```
+
+⇒ **`program` is the erased `RuntimeProgram` already in hand, and
+`interpreter_nat_for_source` is already the differential oracle, in the same
+function.** The four stages this node owes are the continuation of that
+function, not a new pipeline. `nested_recursive_bag_rose_elaborates_checks_
+erases_and_interprets_at_nat_three` (`:245`) is the Nat-3 caller.
+
+**2. What `c2` admits, and what it deliberately still refuses.** At
+`merge_scalar_operand` the `match lowered` arm set is **unchanged by `c2`** —
+six admitted merge shapes plus the fail-closed `_ =>`. On the real `D5`
+package path the operand arrives as `StructuralNat` with no surviving
+constructor identity and is admitted; an independently-named Peano-shaped user
+`Data` reaches the same seat, stays exact `Constructor`, and is refused
+(`nc14_data_match_lowering.rs:312`, `:420`).
+
+⇒ **This node inherits a seat that admits, and must not widen it.** If native
+realization appears to need a seventh admitted shape, that is a finding and a
+question for the Architect, not a local edit — see `Forbidden`.
+
+**3. There is a reusable seat instrument, and it is feature-gated.**
+`DasmC2ScalarMergeObservation { construct, operand_kind, constructor, admitted }`
+via `dasm_c2_scalar_merge_observation_scope()`
+(`crates/ken-runtime/src/cranelift_backend/lowering/mod.rs:16040`). **Note the
+gate is `cfg(feature = "dasm-c2-observation")` alone, not `cfg(any(test, …))`**,
+so reaching it from `ken-elaborator` depends on the dev-dependency feature that
+`c3` may change. **Do not build a second instrument** — if `c3` has moved the
+gate, use the shape `c3` left.
+
+## Deliverables — four stages, and they stay four observations
+
+The node body already fixes this: *"a control that collapses any two of them
+cannot say which failed."* Each `D` below produces its own reported evidence.
+
+**`D1` — emitted definition.** The nested-IH continuation reaches native
+emission as a definition in the artifact. Report the emitted declaration set and
+show the target present in it, the way `assert_nested_full_pipeline_nat` already
+does for the runtime program.
+
+**`D2` — verifier acceptance.** The emitted artifact passes Cranelift
+verification. **Report the verifier's own verdict**, not the absence of a panic
+downstream of it.
+
+**`D3` — native execution.** The artifact executes and produces a value.
+
+**`D4` — interpreter agreement at Nat 3.** The native result equals
+`interpreter_nat_for_source(NESTED_LIFT_NAT_THREE_SOURCE, …)`, computed in the
+same run.
+
+**`D5` — the carried control is no longer ignored.** `AC-K12`'s own wording
+carries this and the node body already names it as *"the thing most likely to be
+satisfied vacuously."* **Read `KERNEL-NESTED-IND`'s `AC-K12` text for which
+control it means before writing this** — do not infer it from the name.
+
+## Acceptance criteria
+
+| AC | criterion | control |
+|---|---|---|
+| `AC-1` | `D1`-`D4` are reported as **four separate** observations | a single green end-to-end assertion does not discharge any of them. Name which stage produced each piece of evidence |
+| `AC-2` | `D4` is a **differential**, not a self-check | the oracle is `ken-interp`'s value for the same source in the same run. *"The native run produced 3"* fails this row — 3 is also what a stub returns |
+| `AC-3` | A **negative** control shows the differential would see a disagreement | perturb the native side (or the expected value) and report the differential reddening. `AC-2` passes vacuously if the two sides are never actually compared |
+| `AC-4` | `D5`'s carried control is exercised, with its failing text reported | an assertion that cannot fail is the shape this arc keeps finding; show it firing under a mutation |
+| `AC-5` | The `c2` admission surface is **unchanged** | the six admitted merge shapes and the fail-closed `_ =>` are byte-for-behaviour as `c2` left them, and the two `c2` seat controls still pass. Report both test names |
+| `AC-6` | If a stage cannot be reached, that is a **measured finding with a route**, not a silent omission | name which in-edge was instrumented and what it showed. *"Never reached"* is two different facts — declined by a predecessor, or no such path exists — and only instrumenting the route tells them apart |
+| `AC-7` | No `AC-K12` discharge claim | this node delivers a capability; closing `AC-K12` is Kernel's, on `KERNEL-NESTED-IND` |
+| `AC-8` | No-regression, in CI | `COORDINATION §12` — the venue is CI, never a local `--workspace` run |
+
+## Sizing and the hard stop
+
+**`L`, and it is the unbounded question the `c1`/`c2` cut deliberately kept
+out.** Per `steward.md §4b` the target is a releasable increment **or a genuine
+hard stop** within about an hour. **A hard stop here is a good outcome and is
+what `AC-6` is for:** if `D2` refuses, report the verifier's verdict and stop —
+do not attempt `D3` or widen the seat to get past it.
+
+**The natural first increment is `D1` plus `AC-5`**, because it extends an
+existing function and re-runs two existing controls. If `D1` alone consumes the
+turn, release it.
+
+## Forbidden
+
+- **No new admitted merge shape and no change to the `_ =>` catch-all.** If
+  native realization appears to require one, that is an Architect question. The
+  fail-closed boundary is what `c1` and `c2` were cut to establish.
+- **No second observation instrument** — see fixed input 3.
+- **No `AC-K12` claim**, and no advancing-it claim.
+- **No change to the interpreter side of the differential.** Moving the oracle
+  to make the two sides agree is the failure `AC-2` exists to catch.

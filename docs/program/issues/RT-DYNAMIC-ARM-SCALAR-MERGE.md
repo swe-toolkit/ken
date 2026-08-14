@@ -781,7 +781,50 @@ surface their own gaps.
   > Recorded because a Forbidden list is read on its own, far from the
   > deliverable that carves it out.
 
-## `c2-pre` MERGED 2026-08-14 — the node stays `active`, `c2` proper is owed
+## `c2` MERGED 2026-08-14 — and the "`c2` proper is owed" reading below is WRONG
+
+> ### CORRECTED SAME DAY, BY THE STEWARD, AGAINST THE OBJECT.
+>
+> **`57bf1721` is `c2`, not a `c2-pre` prose slice with `c2` still owed.** The
+> record below called it *"the prose-and-observation slice"* on one inference —
+> *production is untouched, therefore the semantic admission has not landed.*
+> **That inference reads a code-change requirement into an AC that never had
+> one.**
+>
+> `c2`'s acceptance is rows **4** and **5** of `Required committed
+> discrimination — all six`, and `AC-10` is explicit about its own shape:
+> *"re-run `D0`'s seat instrument: the refusal count at `_ =>` for the `D5` case
+> must go 1 → 0, **and** the arrival must be `StructuralNat`. A green `D5` test
+> alone does not discharge this."* **That is a measurement at the seat, not a
+> new admission arm.** The fold that produces `StructuralNat` landed earlier in
+> the arc; what `c2` owed was proof at the seat, discriminated from a different
+> arm admitting the `Constructor`.
+>
+> **Measured on the landed diff.** In `lowering/mod.rs` the `match lowered`
+> arms are **byte-unchanged** — the hunk renames the match's value to `result`
+> and records `admitted: result.is_ok()`. So:
+>
+> - **Row 4** — `d5_native_scalar_merge_admits_checked_structural_nat` reads
+>   `operand_kind == "StructuralNat"` and `admitted` at the seat on the real
+>   package path, and QA's mutation reddens it at `admitted: false` with
+>   `StructuralNat` count `0 != 1`. The mutation pins the **admission path**,
+>   which is exactly the failure `AC-10`'s warning names.
+> - **Row 5** — `peano_shaped_user_data_remains_an_exact_constructor` keeps the
+>   independently-named Peano shape at exact `Constructor PSuc`, refused.
+> - **Row 6's preservation half** is discharged *a fortiori*: an unchanged arm
+>   set cannot have widened the `_ =>`, which is what `AC-5` guards.
+>
+> **The corroboration was on the record before I wrote the wrong version.** The
+> Architect's approval commit is titled `architect: approve
+> RT-DYNAMIC-ARM-SCALAR-MERGE c2 3e8de4b8`, and the candidate's own commit body
+> says *"`c2-pre` **plus the `c2` admission observation**."* Three parties named
+> it `c2`; only this record said otherwise.
+>
+> ⇒ **[[RT-NESTED-IH-NATIVE-REALIZATION]] FLIPS ON THIS MERGE.** The condition
+> was `c2` merging and `c2` has merged. The node stays `active` only for the
+> `c3` closure slice authorized below, and **`c3` does not gate the successor.**
+
+## `c2` merge record (the facts below stand; only the scope claim was wrong)
 
 **Candidate `3e8de4b87962442b77283dcacfce2c81d6d98cfa`, landed as squash
 `57bf1721`** (PR #2163, CI green; Decision `dec_nram6n8jkpgn`, Architect, read
@@ -790,12 +833,17 @@ matching the declared value; one commit, six paths, `+341/-6`; **6/6 blobs
 verified identical after landing.** Both SHAs recorded — a squash rewrites the
 candidate, so it is never an ancestor of `main`.
 
-**Status deliberately unchanged.** `c2-pre` is the prose-and-observation slice.
-`c2` — the semantic admission that clears the real `D5` scalar-merge refusal —
-has not landed, so nothing downstream is unblocked yet. In particular
+~~**Status deliberately unchanged.** `c2-pre` is the prose-and-observation
+slice. `c2` — the semantic admission that clears the real `D5` scalar-merge
+refusal — has not landed, so nothing downstream is unblocked yet. In particular
 **[[RT-NESTED-IH-NATIVE-REALIZATION]] does NOT flip on this merge**; its
 condition is `c2` merging, and reading `c2-pre` as satisfying it would arm a
-frame against an admission surface that does not exist.
+frame against an admission surface that does not exist.~~
+
+**Struck — see the correction banner above.** The admission surface does exist:
+it arrives as `StructuralNat` on the real `D5` path and is now pinned at the
+seat by a mutation-discriminated control. The node stays `active` for `c3`
+only.
 
 **Stale-base check, recorded because the answer was "do nothing":** `main` moved
 five doc-only commits under this candidate. The intersection of the candidate's
@@ -853,8 +901,68 @@ only the second is what you want under an always-on feature. Moving both inside
 the enabled check makes the disabled path free and the identity claim easier to
 state.
 
-**Disposition: take them with `c2` proper if they fit, or say so and the Steward
-cuts a slice.** Do not treat either as an acceptance criterion on `c2`.
+~~**Disposition: take them with `c2` proper if they fit, or say so and the
+Steward cuts a slice.**~~ Do not treat either as an acceptance criterion on
+`c2`.
+
+## `c3` — AUTHORIZED 2026-08-14, the closure slice. Both residuals, ~10 lines.
+
+**Steward's call on runtime-leader's question `evt_54vygsecrhvr`** (fold into a
+`c2` closure slice, or cut a node). **Neither: it is a slice on this node, and
+it is authorized now — no separate node.** `c2` is done, so there is nothing
+left to fold into; and a new node for ten lines lengthens the critical path for
+a change that touches one file, one feature and one ring. Preferring the fold
+over a new node is `§4c`.
+
+**`c3` does not gate [[RT-NESTED-IH-NATIVE-REALIZATION]]**, which flips on `c2`
+and is where the critical path actually runs. If Runtime's next turn has to
+choose, the successor outranks `c3`.
+
+### The trap, and it is the whole reason this is framed rather than just assigned
+
+**The naive fix deletes rows 4 and 5 — the controls `c2` just landed.**
+
+`dasm_c2_scalar_merge_observation_scope` is gated
+`#[cfg(feature = "dasm-c2-observation")]` **alone** (`lowering/mod.rs:16040`),
+not `cfg(any(test, …))` like the recorder. An external crate can therefore only
+call it when the feature is on. `nc14_data_match_lowering.rs` is in
+**`ken-elaborator`** and drives both `D5` controls through that scope — so the
+always-on dev-dependency is **what makes those controls compile at all.**
+
+⇒ **Copying the sibling's opt-in shape and stopping there does not "make it
+symmetric"; it makes the `D5` seat controls silently absent from a default test
+run.** The Adversary's read — *"the one read that decides it is whether any
+`ken-elaborator` test needs the observation"* — has an answer, and it is **yes**.
+
+### Deliverables
+
+**`D-c3-1` — make the disabled path free.** Move `observed_operand_kind` and
+`observed_constructor` inside the `DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED`
+check so a disabled build classifies nothing and clones no constructor name.
+One `if` at the call site is sufficient: `LocalKey<Cell<bool>>::get()` is
+already used bare at `:15992`, `:16017` and `:16044`.
+
+**`D-c3-2` — resolve the asymmetry in a stated direction.** Either keep
+always-on and record why, or move to the opt-in shape **and** carry the
+`ken-elaborator` `D5` controls with it so they still run by default. **State
+which and why in one paragraph on this node.** Both are acceptable; an
+unrecorded choice is not, which was the Architect's actual finding — *"the
+trade may be the better half and what is missing is that the trade is
+unrecorded."*
+
+### Acceptance
+
+| AC | criterion | control |
+|---|---|---|
+| `AC-c3-1` | The `D5` seat controls still run in a **default** `-p ken-elaborator` invocation | name the two tests and report them passing with no feature flag on the command line. This is the row that catches the trap above |
+| `AC-c3-2` | The disabled path does no work | show both bindings inside the enabled check; a build with the feature on and no scope active classifies no operand |
+| `AC-c3-3` | The observation still discriminates | re-run QA's mutation and report it reddening at `admitted: false`, `StructuralNat` count `0 != 1` |
+| `AC-c3-4` | The direction chosen in `D-c3-2` is written down | one paragraph on this node giving the reason, not the change |
+| `AC-c3-5` | No-regression, in CI | `COORDINATION §12` — the venue is CI, not a local `--workspace` run |
+
+**Forbidden in `c3`:** any change to the `match lowered` arms, to the admitted
+merge-shape set, or to the `_ =>` catch-all. `c3` is gating and placement only.
+Touching an arm turns a ten-line cleanup into a re-review of `c2`.
 
 ## Cited-source hit, and it is the Steward's, not the ring's
 
