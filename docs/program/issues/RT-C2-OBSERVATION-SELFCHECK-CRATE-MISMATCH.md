@@ -1,13 +1,13 @@
 ---
 id: RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH
 title: "The artifact-identity control's anti-vacuity self-check reads `ken-cli`'s `dasm-c2-observation` feature while the property that decides whether the two artifacts differ is `ken-runtime`'s -- they agree today and nothing holds them together, so a future `ken-cli` dev-dependency enabling the runtime feature would make the off side ON with the assertion still reading `disabled` and no signal at all"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2196
 origin: "Architect carry (1) on the RT-C2-OBSERVATION-ARTIFACT-IDENTITY merge Decision dec_3bjbha9s3rgtr, verdict evt_50h83hackbgen. Explicitly non-blocking and explicitly named a follow-up node. Filed by the Steward at merge time rather than carried, because the immediately preceding node on this same arc lost a clause exactly this way."
 ---
 
