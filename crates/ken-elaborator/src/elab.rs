@@ -1010,6 +1010,21 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
     // prelude combinator, with source nesting depth held constant and never
     // varied -- so it is a floor beneath a deeper program's real cost, not a
     // sufficient bound on it. Optimized peak measured the same way: ~280 KiB.
+    //
+    // LANG-REFINED-FALLBACK-COLDNESS-CLAIM D2: that gap -- "only ever
+    // measured on the shallowest input" -- is now closed with one deep-source
+    // data point, not resolved by revising the figure above.
+    // LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT D3 process-level-bisected the
+    // minimum viable stack for `two_vis_nodes_resume_once_in_source_order`
+    // (a real two-node program driving `register_decimal_char`'s 31-level
+    // cascade, not the four-line bare-prelude input above) at 1,998,848
+    // bytes after that node's fix. That is a process-level MINIMUM-VIABLE-
+    // STACK figure -- the smallest allocation that still passes -- not a
+    // PEAK-USAGE one, so it is not the same quantity as the 1,982,464
+    // figure above and must not be swapped in for it. Whether the headline
+    // peak-usage figure itself needs revising still requires a peak-usage
+    // run on a deep source, which nobody has done.
+    //
     // This is why Rust's 2 MiB spawned-thread default must not be treated as
     // adequate -- it is `r3_c2_source_mixed_branch.rs`'s `r3_4b` worker's
     // exact failure configuration (`#2144`), not a safe answer -- while
@@ -1864,15 +1879,34 @@ fn check_structured_constructor_method(
 /// extraction targets, this one matters here for a *narrower* reason worth
 /// recording: `check_match_dependent` is on the `check` <-> `check_match_
 /// dependent` mutual-recursion cycle that `decimal_char.rs`'s fixed
-/// 31-level `decimalPow10` cascade drives to full depth on every compile,
-/// and every one of that cascade's arms is a bare literal that the cheap
-/// unrefined attempt always resolves -- so this fallback's own frame is
-/// declared (and paid for by its caller) on every level, but never
-/// otherwise entered on this path. Moving it out removes dead weight from
+/// 31-level `decimalPow10` cascade drives to full depth on every compile
+/// (`decimal_char.rs:62-75`), and every arm of that cascade is a bare
+/// literal or a two-way `eq_int` match that the cheap unrefined attempt
+/// always resolves -- so this fallback's own frame is declared (and paid
+/// for by its caller) on every level, but never otherwise entered on this
+/// path. Moving it out removes dead weight from
 /// the caller's always-paid frame without adding a frame that this
 /// particular recursion ever pays for. Unchanged control flow and
 /// semantics -- same `refine_branch_goal`/`simplify_branch_goal`/`check`/
 /// `Term::Cast` calls in the same order, only their host frame moved.
+///
+/// This coldness claim is about *which programs*, and it was measured on
+/// one: the `decimalPow10` cascade above. A recursion that DOES enter this
+/// fallback at every level pays the extracted frame's own call overhead at
+/// every level, on top of (not instead of) the reduced caller frame. The
+/// inversion mode for such a recursion is a SIGSEGV on the guard page, not
+/// a red test in this suite: nothing here would notice before it happened
+/// on that recursion's own deployment.
+///
+/// `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` `D4`, measured, not assumed:
+/// `objdump`'s prologue for this function gives `0x1000 + 0x48 = 4168`
+/// bytes/call -- well under the `+6472` measured on the reverted mirror
+/// extraction above. A recursion that entered this fallback at every level
+/// would pay `30232 + 4168 = 34400` bytes/call, `+1048` against the
+/// pre-extraction `33352` baseline, not the `+3352`/level a `6472`-sized
+/// frame would cost. Over 31 levels that is `+32488` bytes (~31.7 KiB), well
+/// inside the ~96 KiB this change bought, not the ~104 KiB that would
+/// exceed it.
 #[inline(never)]
 fn check_match_dependent_refined_fallback(
     cx: &mut ElabCtx,

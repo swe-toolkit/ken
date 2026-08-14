@@ -450,13 +450,21 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // trusted-base change), and `unfoldUpTo` is the no-coinduction
     // infinitude idiom rather than a combinator -- both stay test-local.
     //
-    // LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D2: bracket exactly these four
-    // declarations with the `conversions.rs:303/364` before/after delta
-    // idiom. Unlike an env-level differential (impossible: `ElabEnv::new()`
-    // has no "before" env), this is a block-level bracket, which does have
-    // one. The expected delta is stated independently -- the four
-    // combinators contribute nothing to the trusted base -- not read back
-    // from `trusted_base()` itself.
+    // LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D2: bracket the declarations
+    // between here and the matching `combinator_trusted_after` snapshot
+    // below with the `conversions.rs:303/364` before/after delta idiom.
+    // Unlike an env-level differential (impossible: `ElabEnv::new()` has no
+    // "before" env), this is a block-level bracket, which does have one.
+    // The expected delta is stated independently -- everything bracketed
+    // here contributes nothing to the trusted base -- not read back from
+    // `trusted_base()` itself.
+    //
+    // LANG-REFINED-FALLBACK-COLDNESS-CLAIM D6: the bracket's population is
+    // POSITIONAL, not nominal -- it covers whatever `elaborate_decl` calls
+    // lie between this snapshot and the matching one below, today exactly
+    // map/fold/zip/filter. Inserting a declaration between the two
+    // snapshots silently enrols it in the delta check; moving one outside
+    // them silently drops it.
     let combinator_trusted_before: std::collections::BTreeSet<GlobalId> =
         elab.env.trusted_base().into_iter().collect();
     elab.elaborate_decl(
@@ -489,9 +497,10 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         std::collections::BTreeSet::new();
     if combinator_actual_delta != combinator_expected_delta {
         return Err(ElabError::Internal(format!(
-            "prelude List combinators (map/fold/zip/filter) must contribute \
-             nothing to the trusted base: expected {combinator_expected_delta:?}, \
-             got {combinator_actual_delta:?}"
+            "prelude declarations bracketed between combinator_trusted_before \
+             and combinator_trusted_after (LANG-PRELUDE-COMBINATOR-BLOCK-DELTA \
+             D2) must contribute nothing to the trusted base: expected \
+             {combinator_expected_delta:?}, got {combinator_actual_delta:?}"
         )));
     }
 
