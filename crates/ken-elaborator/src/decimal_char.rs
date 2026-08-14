@@ -57,9 +57,13 @@ const MAX_SHIFT: u32 = 30;
 /// chain of `eq_int`-on-Bool matches, one per `k ∈ [0, MAX_SHIFT]`, each
 /// yielding the exact `10^k` literal. Beyond `MAX_SHIFT` it applies
 /// `unbounded_name` — see `register_decimal_char`'s doc comment on that
-/// marker. Because every branch here is a concrete literal (never
-/// `saturating_*`/`.min(_)`/`clamp`), the align path this feeds is exact-or
-/// -stuck, never wrong (Architect's hard-gated condition 1).
+/// marker. `LANG-POW10-CASCADE-LITERAL-CLAUSE` D1: the generated cascade
+/// contains no lossy or clamping operation (never `saturating_*`/
+/// `.min(_)`/`clamp`) at ANY level, whether an arm is a `10^k` literal (the
+/// `True` side), the next nested `eq_int` match (the `False` side at
+/// `k < MAX_SHIFT`), or the final `unbounded_name` application (the
+/// `False` side at `k = MAX_SHIFT`) — so the align path this feeds is
+/// exact-or-stuck, never wrong (Architect's hard-gated condition 1).
 fn pow10_cascade_body(max_shift: u32, unbounded_name: &str) -> String {
     fn rec(k: u32, max_shift: u32, unbounded_name: &str) -> String {
         if k > max_shift {

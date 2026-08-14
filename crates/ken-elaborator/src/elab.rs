@@ -1907,6 +1907,17 @@ fn check_structured_constructor_method(
 /// frame would cost. Over 31 levels that is `+32488` bytes (~31.7 KiB), well
 /// inside the ~96 KiB this change bought, not the ~104 KiB that would
 /// exceed it.
+///
+/// `LANG-STACK-ARC-EVIDENCE-USABILITY` `D2`: the `4168` figure above is
+/// reproducible from a named artifact, not a one-off read. Build
+/// `ken-cli`'s test binaries (`scripts/ken-cargo build -p ken-cli --tests`,
+/// default/dev profile), resolve this function's mangled symbol in the
+/// `px4b_native_production` binary
+/// (`target/debug/deps/px4b_native_production-<hash>`) with
+/// `nm <binary> | grep refined_fallback`, then read `0x1000 + 0x48` off
+/// `objdump -d --disassemble='<mangled-name>' <binary>`'s prologue -- the
+/// two `sub $imm,%rsp` immediates, excluding the `push` register-save
+/// bytes.
 #[inline(never)]
 fn check_match_dependent_refined_fallback(
     cx: &mut ElabCtx,
