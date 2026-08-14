@@ -238,6 +238,16 @@ cross-file reference.
 > carried on `LANG-PRELUDE-ELABORATION-DEPTH` documents a coupling that node
 > dissolves. Whichever lands second reconciles.
 
+**RETIRED by `LANG-COMMENT-POPULATION-PARITY` D2/D6.** The arm-level claim now
+lives in `comment_kind_mapping_tests`, a `#[cfg(test)]` module beside
+`From<CommentKind> for TriviaKind` in `crates/ken-elaborator/src/lossless.rs`,
+asserting all four arms directly (measured to red under all six
+transpositions from `{Line, DocLine, Block, DocBlock}`, each run separately
+and restored). This file's header (D5) now states class membership only and
+points there for the arm-level claim. The `kenfmt_b1_lossless.rs:59` fixture
+that discharged the `Line` arm above carries no pin obligation and is free to
+change; its `LOAD-BEARING SHAPE` comment was rewritten to say so (D6).
+
 ## Not this node
 
 - Changing the `From` impl, the classifier, or any comment semantics. This

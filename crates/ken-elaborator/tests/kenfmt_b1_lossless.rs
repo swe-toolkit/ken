@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ken_elaborator::lossless::{parse_lossless, CommentPlacement, FormattableSource, TriviaKind};
+use ken_elaborator::lossless::{parse_lossless, CommentPlacement, FormattableSource};
 
 fn assert_round_trip(label: &str, source: &str) {
     let lossless = parse_lossless(source)
@@ -22,28 +22,26 @@ fn assert_round_trip(label: &str, source: &str) {
     let comment_count = lossless
         .trivia()
         .iter()
-        .filter(|item| item.kind == TriviaKind::LineComment)
+        .filter(|item| item.kind.is_comment())
         .count();
     assert_eq!(
         lossless.comment_attachments().len(),
         comment_count,
-        "{label}: every comment must have exactly one home"
+        "{label}: every trivia item counted by is_comment() must have exactly one home"
     );
 }
 
 #[test]
 fn leading_trailing_and_interstitial_comments_have_stable_unique_homes() {
-    // LOAD-BEARING SHAPE (LANG-PRELUDE-ELABORATION-DEPTH carried addendum):
-    // `-- trailing`'s line -- same line as `const a`, after it, with a
-    // following `const b` -- is the discriminating same-line-after
-    // configuration LANG-TRIVIA-KIND-MAPPING-PIN's `Line` arm depends on
-    // (its own file, `lang_trivia_kind_mapping_pin.rs`, cannot re-derive
-    // this fixture; it names this exact line as where that arm is pinned).
-    // A `Line`/`DocLine` transposition is what it catches here. Moving this
-    // comment onto its own line, dropping `const b`, or otherwise changing
-    // this shape for an unrelated formatter reason silently drops that
-    // pin, and nothing reds -- do not change this configuration without
-    // updating that file too.
+    // Historical note (LANG-COMMENT-POPULATION-PARITY D6): `-- trailing`'s
+    // same-line-after-a-declaration-with-a-following-declaration shape was
+    // previously the sole discharge of LANG-TRIVIA-KIND-MAPPING-PIN's `Line`
+    // arm -- a cross-file coupling that was a scope decision, not an
+    // impossibility (`CommentKind` remains `pub(crate)`, so an integration
+    // test still cannot name the arms or separate a within-class pair
+    // behaviorally). Superseded by `comment_kind_mapping_tests`
+    // (`src/lossless.rs`), which pins all four arms directly and in-crate;
+    // this fixture carries no pin obligation and its shape is free to change.
     let source = "-- leading\n\
 const a : Nat = Zero -- trailing\n\
 const b : Nat = (\n\
@@ -86,6 +84,19 @@ const b : Nat = (\n\
             "each focused comment has one span-keyed AST home"
         );
     }
+}
+
+#[test]
+fn block_and_doc_comments_are_counted_for_attachment() {
+    // LANG-COMMENT-POPULATION-PARITY D4/AC-1/AC-2 -- a fixture the pre-widen
+    // `TriviaKind::LineComment`-only filter undercounted: one block comment,
+    // one doc-line comment, neither a `LineComment`. This is the population
+    // `catalog/`'s corpus walk cannot exercise, since no catalog source
+    // contains a block or doc comment.
+    assert_round_trip(
+        "block-and-doc",
+        "{- leading block -}\nconst a : Nat = Zero --- doc for b\nconst b : Nat = Zero\n",
+    );
 }
 
 #[test]

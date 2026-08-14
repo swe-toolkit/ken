@@ -53,6 +53,30 @@ impl From<CommentKind> for TriviaKind {
     }
 }
 
+/// LANG-COMMENT-POPULATION-PARITY D2 -- the arm-level pin on `From<CommentKind>
+/// for TriviaKind`, in-crate because `CommentKind` is `pub(crate)` and no
+/// integration test can name it. Each assertion is independent, so a
+/// transposition of any one pair of arms fails exactly the row naming that
+/// pair, not the module as a whole.
+#[cfg(test)]
+mod comment_kind_mapping_tests {
+    use super::*;
+
+    #[test]
+    fn from_comment_kind_maps_each_arm_directly() {
+        assert_eq!(TriviaKind::from(CommentKind::Line), TriviaKind::LineComment);
+        assert_eq!(
+            TriviaKind::from(CommentKind::DocLine),
+            TriviaKind::DocLineComment
+        );
+        assert_eq!(TriviaKind::from(CommentKind::Block), TriviaKind::BlockComment);
+        assert_eq!(
+            TriviaKind::from(CommentKind::DocBlock),
+            TriviaKind::DocBlockComment
+        );
+    }
+}
+
 impl TriviaKind {
     /// D3: only doc comments attach to the FOLLOWING declaration by rule;
     /// ordinary comments use the existing positional Leading/Trailing/
@@ -69,7 +93,7 @@ impl TriviaKind {
     /// keeps `attach_comments`/`validate_attachment_totality` from silently
     /// losing block comments the way an unwidened `LineComment`-only filter
     /// would (LANG-SURFACE-BLOCK-COMMENTS D3).
-    fn is_comment(self) -> bool {
+    pub fn is_comment(self) -> bool {
         !matches!(self, TriviaKind::Whitespace)
     }
 }

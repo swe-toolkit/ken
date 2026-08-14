@@ -11,18 +11,22 @@
 //! (`Trailing`, preceding) split, so only one mechanism can be responsible
 //! for the observed answer.
 //!
-//! All four `CommentKind` arms are pinned in that configuration, one row per
-//! arm, split across two directions and two files:
-//!   - `DocLine`  -- `d1`'s `"---"` row, this file (a doc comment must keep
-//!                   its doc treatment).
-//!   - `DocBlock` -- `d1`'s `"{--"` row, this file (same direction).
-//!   - `Line`     -- `kenfmt_b1_lossless.rs:59`'s `-- trailing` fixture (an
-//!                   ordinary comment must NOT take the doc rule). Measured
-//!                   to already be this exact same-line-after configuration
-//!                   with a following declaration (`const b`); reds under a
-//!                   `Line`<->`DocLine` swap.
-//!   - `Block`    -- `d2`, this file (same direction as `Line`, mirrored for
-//!                   the block form).
+//! This file establishes CLASS membership in that configuration, not
+//! per-arm identity: `d1` shows both doc forms (`DocLine`, `DocBlock`) take
+//! the doc rule; `d2` shows an ordinary form (`Block`) takes the positional
+//! rule. `CommentKind` is `pub(crate)` (`lexer.rs`), so an integration test
+//! in `crates/ken-elaborator/tests/` cannot name it and cannot assert the
+//! `From` impl's arms directly -- behaviour alone separates a cross-class
+//! pair (doc vs. ordinary) but not a within-class one (`DocLine`/`DocBlock`,
+//! or `Line`/`Block`).
+//!
+//! **The arm-level claim -- all four `CommentKind` variants mapped to their
+//! distinct `TriviaKind`, asserted directly, one assertion per arm -- lives
+//! in `comment_kind_mapping_tests` beside `From<CommentKind> for TriviaKind`
+//! in `src/lossless.rs`, the only place all four arms are nameable.** Do not
+//! widen this file's claim back to the arm level; it was never achievable
+//! from an integration test, not merely unproven here
+//! (LANG-COMMENT-POPULATION-PARITY D5).
 
 use ken_elaborator::lossless::{parse_lossless, CommentPlacement};
 
@@ -69,10 +73,10 @@ fn d1_same_line_after_doc_comment_attaches_leading_to_following_declaration() {
 /// discriminating configuration (comment on the same line after a
 /// declaration, with a following declaration), an ORDINARY block comment
 /// must still take the positional `Trailing` answer, homed on the
-/// PRECEDING declaration -- not the doc rule's `Leading`/following. The
-/// ordinary-**line** direction of this same mirror is already pinned at
-/// `kenfmt_b1_lossless.rs:59` (see the module doc); this is the block
-/// mirror, so all four arms are covered.
+/// PRECEDING declaration -- not the doc rule's `Leading`/following. This is
+/// the ordinary-class counterpart to `d1`'s doc-class rows -- together they
+/// establish the CLASS split behaviorally (see the module doc); the
+/// per-arm claim lives in `comment_kind_mapping_tests` in `src/lossless.rs`.
 #[test]
 fn d2_same_line_after_ordinary_block_comment_attaches_trailing_to_preceding_declaration() {
     let src = "const a : Int = 1 {- note -}\nconst b : Int = 2\n";
