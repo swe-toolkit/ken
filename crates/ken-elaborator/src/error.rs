@@ -56,29 +56,20 @@ impl fmt::Display for MissingPatternWitness {
     }
 }
 
-/// The earlier arms (`34 §4.2`) whose union already covers a redundant arm's
-/// pattern -- the reachability-side analogue of `MissingPatternWitness`:
-/// named as data (each subsuming arm's own span) so a consumer can read
-/// which arms without parsing rendered prose. Ergonomics only -- `34 §4.2`
-/// mandates that redundancy be detected, not that the diagnostic name the
-/// subsuming arms; this type exists to make the existing diagnostic more
-/// useful, not to satisfy a spec obligation. Ordered by discovery during the
-/// matrix walk (`39 §2.6`); usually one span, more than one only when a
-/// wildcard/variable sub-pattern is shadowed at more than one leaf by
-/// distinct winning arms.
+/// Why a match arm is dead (`34 §4.2`). Total by construction: every arm the
+/// reachability sweep reports carries exactly one of these, and `Subsumed`
+/// cannot name an empty winner set. Ergonomics only -- `34 §4.2` mandates
+/// that redundancy be detected, not that the diagnostic explain it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubsumingArms(pub Vec<Span>);
-
-impl fmt::Display for SubsumingArms {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, span) in self.0.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}-{}", span.start, span.end)?;
-        }
-        Ok(())
-    }
+pub enum ArmDeadCause {
+    /// Earlier arms whose union already covers this arm's pattern. `first` is
+    /// the winner discovered first in the matrix walk (`39 §2` item 6);
+    /// `rest` holds any further distinct winners, which occur only when a
+    /// wildcard/variable sub-pattern is shadowed at more than one leaf.
+    Subsumed { first: Span, rest: Vec<Span> },
+    /// The arm won at no leaf and no earlier arm claimed its pattern, so no
+    /// value of the scrutinee type can reach it.
+    NoInhabitants,
 }
 
 /// A V0 elaboration error (`39 §5.6`): parse, name-resolution, or type error.
@@ -234,12 +225,8 @@ pub enum ElabError {
         missing: MissingPatternWitness,
         span: Span,
     },
-    /// A redundant match arm (`34 §4.2`): its pattern is entirely subsumed by
-    /// the union of the earlier arms named in `subsuming`.
-    ReachabilityError {
-        span: Span,
-        subsuming: SubsumingArms,
-    },
+    /// A dead match arm (`34 §4.2`): `cause` says why (`ArmDeadCause`).
+    ReachabilityError { span: Span, cause: ArmDeadCause },
     /// An instance declared outside the module of its class AND its head-type
     /// (`33 §5.3`, `39 §6.1`). The orphan check is a syntactic, per-module
     /// predicate that keeps canonicity per-module-decidable.
@@ -572,13 +559,24 @@ impl fmt::Display for ElabError {
                     span.start, span.end, missing
                 )
             }
-            ElabError::ReachabilityError { span, subsuming } => {
-                write!(
+            ElabError::ReachabilityError { span, cause } => match cause {
+                ArmDeadCause::Subsumed { first, rest } => {
+                    write!(
+                        f,
+                        "redundant match arm at {}-{}: pattern already covered by the earlier arm(s) at {}-{}",
+                        span.start, span.end, first.start, first.end
+                    )?;
+                    for s in rest {
+                        write!(f, ", {}-{}", s.start, s.end)?;
+                    }
+                    Ok(())
+                }
+                ArmDeadCause::NoInhabitants => write!(
                     f,
-                    "redundant match arm at {}-{}: pattern already covered by the earlier arm(s) at {}",
-                    span.start, span.end, subsuming
-                )
-            }
+                    "unreachable match arm at {}-{}: no value of the scrutinee type can match this pattern",
+                    span.start, span.end
+                ),
+            },
             ElabError::OrphanInstance { class, head_type, span } => write!(
                 f,
                 "orphan instance at {}-{}: instance of '{}' for '{}' must be declared \

@@ -24,7 +24,7 @@ use ken_kernel::{
 use crate::ast::{BinOp, DefKeyword, NumLit, RecursiveResultSelector};
 use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceInfo};
 use crate::data;
-use crate::error::{ElabError, MissingPatternWitness, RecursiveResultSort, Span, SubsumingArms};
+use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
@@ -1736,13 +1736,16 @@ fn check_match_with_lift(
     }
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
-            let claimant = subsumed_by[i].expect(
-                "a dead arm at this single-column site is always subsumed by the \
-                 earlier arm that already claimed its shared top-level constructor",
-            );
+            let cause = match subsumed_by[i] {
+                Some(claimant) => ArmDeadCause::Subsumed {
+                    first: arms[claimant].span.clone(),
+                    rest: Vec::new(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
             return Err(ElabError::ReachabilityError {
                 span: arms[i].span.clone(),
-                subsuming: SubsumingArms(vec![arms[claimant].span.clone()]),
+                cause,
             });
         }
     }
@@ -2433,13 +2436,16 @@ fn check_match_dependent(
     }
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
-            let claimant = subsumed_by[i].expect(
-                "a dead arm at this single-column site is always subsumed by the \
-                 earlier arm that already claimed its shared top-level constructor",
-            );
+            let cause = match subsumed_by[i] {
+                Some(claimant) => ArmDeadCause::Subsumed {
+                    first: arms[claimant].span.clone(),
+                    rest: Vec::new(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
             return Err(ElabError::ReachabilityError {
                 span: arms[i].span.clone(),
-                subsuming: SubsumingArms(vec![arms[claimant].span.clone()]),
+                cause,
             });
         }
     }
@@ -8508,15 +8514,16 @@ fn infer_match(
     //    it was expanded into via a wildcard row) is dead code.
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
-            let subsuming = SubsumingArms(
-                subsumed_by[i]
-                    .iter()
-                    .map(|&winner| arms[winner].span.clone())
-                    .collect(),
-            );
+            let cause = match subsumed_by[i].split_first() {
+                Some((&first, rest)) => ArmDeadCause::Subsumed {
+                    first: arms[first].span.clone(),
+                    rest: rest.iter().map(|&w| arms[w].span.clone()).collect(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
             return Err(ElabError::ReachabilityError {
                 span: arms[i].span.clone(),
-                subsuming,
+                cause,
             });
         }
     }
