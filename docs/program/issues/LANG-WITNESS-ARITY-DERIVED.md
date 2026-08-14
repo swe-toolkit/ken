@@ -1,7 +1,7 @@
 ---
 id: LANG-WITNESS-ARITY-DERIVED
 title: "`missing_pattern_witness` takes the constructor's arity as a caller-supplied parameter beside the id it names, so the two can disagree in principle -- and three of the four emitters have no test that inspects the witness, meaning a future divergence reds nothing; the arity is derivable from the id alone through an existing kernel API, which retires the class instead of testing it"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
@@ -10,6 +10,35 @@ blocks: []
 github: null
 origin: "Adversary hunt evt_4zx9xp7qkf6rm on fc9408ec, triaged by the Steward at main 96c95586. The hunt independently confirmed LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD's AC-1 by reverting the property, then found that only one of four emitters has arity-positive evidence. The Steward's re-check NARROWED the finding before filing -- see the disposition section, which is the reason this node's deliverable is a derivation change rather than the four fixtures the hunt ranked first."
 ---
+
+> ## MERGED 2026-08-14 as PR #2229. ONE ARCHITECT CARRY SURVIVES THIS NODE.
+>
+> Exact `e6db3456e6464af02cb52f7a4be88f3c3f744e73`, Decision `dec_2hprs9v6a3ds8`
+> read from the object at publish time (`resolved`, APPROVED by the Architect on
+> the exact SHA, `resolved_at` 2026-08-14T17:32:35Z; QA `evt_5cc610q2hntvm`).
+> One commit over merge-base `eb3806de`, two `crates/ken-elaborator` paths,
+> `+54/-8`. **Both blobs verified identical on `main` after landing.**
+>
+> **What landed is the deletion, not the fixtures.** Removing the
+> caller-suppliable arity makes a mismatched `(constructor, arity)` pair
+> **unrepresentable at all four emitters**, rather than correct-by-convention per
+> call site. The originating hunt ranked four fixtures first; the Steward's
+> re-measurement found no live wrong-arity output and identified the deletion
+> instead.
+>
+> ### THE CARRY, WHICH IS NOT DISCHARGED BY THIS MERGE
+>
+> **Architect, non-blocking, recorded at the merge request:** the new `expect` on
+> the diagnostic path has an **error-policy asymmetry with `ctor_name`**, and
+> **no silent arity fallback is authorized.**
+>
+> It did not amend the resolved exact-SHA approval and it did not gate the merge.
+> **It is written here rather than left in a PR body because a carry recorded
+> only in an approval verdict or a PR body evaporates** -- which is why
+> [[RT-CONTKEY-REFUSAL-PROFILE-SPLIT]] and [[LANG-REACHABILITY-SUBSUMING-ARMS]]
+> both had to be filed the same day. **Whoever next touches this diagnostic path
+> owns resolving the asymmetry, and "fall back to a supplied arity" is
+> explicitly not the resolution.**
 
 ## What this is
 
