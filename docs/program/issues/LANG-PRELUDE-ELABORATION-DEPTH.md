@@ -211,6 +211,15 @@ combinator, source nesting depth held constant — so it is a **floor beneath a
 deeper program's real cost, not a sufficient bound on it**. A qualifier one
 line below the claim does not travel with the claim.
 
+> ### BOTH RESIDUALS BELOW ARE OWNED BY A NODE AS OF 2026-08-14.
+> ### See [[LANG-TRUSTED-BASE-LABEL-KIND-TAG]].
+>
+> **Their shared "not filed as a node; it rides the next Language candidate that
+> enters this file" disposition is superseded** — no such candidate exists.
+> Language's other two nodes are `draft` behind **operator** decisions, so the
+> ride-along would have waited on an answer unrelated to it. The work is
+> unchanged; only its route is. Retiring these two sections is that node's `D5`.
+
 ### Residual: `env.globals` injectivity is measured, not enforced
 
 Architect finding, non-blocking, at `evt_4bdcm6fer2570`. `trusted_base_labels`
