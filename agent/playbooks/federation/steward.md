@@ -327,16 +327,45 @@ behavior — the negative-space twin of the Librarian's as-built passes. It is
 advisory and non-blocking: it does not gate merges, and it routes every finding
 to a side thread to you, its one outbound edge. You own the triage.
 
+> ### THE TRIAGE IS DURABLE-ARTIFACT WORK. YOU DO NOT REPLY TO THE ADVERSARY.
+>
+> **`COORDINATION §10⁻a` is operator law and it outranks this section.** The
+> edge is report-only: you may notify on a code merge, you may receive reports,
+> **nothing else** — *"no reply of any kind, including a reply whose content is
+> that no reply is owed."*
+>
+> **This section used to end its dispositions with "tell the Adversary it is
+> accepted" and "drop it and say why."** Both are replies, and following them
+> breaches the law every time a hunt lands. Measured 2026-08-14: the Steward
+> posted *"I have your hunt and have not read it yet"* into the channel — a
+> courteous, useless message that is exactly the servicing loop §10⁻a exists to
+> stop.
+>
+> ⇒ **A disposition is recorded where the work lives — the node, the frame, the
+> tracker — not sent back down the edge.** "Say why" still binds; the audience
+> is the next reader of the artifact, not the Adversary. If a finding is a false
+> alarm, the sentence explaining why belongs in the node it was filed against,
+> where it stops the shape being re-surfaced by anyone, permanently. A message
+> stops it once.
+
 Every finding must carry a repro, `file:line`, and the violated invariant.
-Bounce anything that does not. Then:
+**A finding that does not is not triaged and not answered** — record the gap in
+your own notes and move on; bouncing it is a reply.
 
 - **Confirmed defect** — sequence a follow-up WP or fold into an open one; if
   severe or soundness-adjacent on unreleased work, a hold or erratum. A
   soundness-adjacent finding routes through the Architect like any design
   question.
-- **Accepted trade-off** — record it as a known limitation so it is not
-  re-filed, and tell the Adversary it is accepted.
-- **False alarm** — drop it and say why, so the same shape is not re-surfaced.
+- **Accepted trade-off** — record it as a known limitation **in the artifact it
+  concerns**, so it is not re-filed by anyone.
+- **False alarm** — record why **in that artifact**, so the same shape is not
+  re-surfaced.
+
+**Re-check the finding against the tree before you frame on it.** The reports
+are measured and have been reliable, but a hunt is grounded at a SHA and you
+frame against `main`. Both 2026-08-14 hunts held up on re-check, and the
+re-check is what turned one of them from "the claim was overstated" into "the
+claim was unachievable from that file" — which changed the deliverable.
 
 Do not let its findings become a shadow gate; merges still turn on QA, CV, and
 Architect review. It is a standing seat, not a per-task dispatch: you do not
