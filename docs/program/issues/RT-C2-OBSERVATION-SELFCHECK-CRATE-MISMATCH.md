@@ -1,7 +1,7 @@
 ---
 id: RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH
 title: "The artifact-identity control's anti-vacuity self-check reads `ken-cli`'s `dasm-c2-observation` feature while the property that decides whether the two artifacts differ is `ken-runtime`'s -- they agree today and nothing holds them together, so a future `ken-cli` dev-dependency enabling the runtime feature would make the off side ON with the assertion still reading `disabled` and no signal at all"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none

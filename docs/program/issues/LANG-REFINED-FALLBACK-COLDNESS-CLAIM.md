@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-FALLBACK-COLDNESS-CLAIM
 title: "The doc comment justifying LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT's -3120 saving says the pow10 cascade's arms are all bare literals, which the generator refutes -- only the True arms are, every False arm is the next nested match, and the innermost is an application; the conclusion survives, the recorded reason does not, and it misleads in both directions"
-status: ready
+status: active
 owner: language
 size: S
 gate: none

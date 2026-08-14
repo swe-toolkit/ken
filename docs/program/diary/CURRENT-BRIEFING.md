@@ -63,16 +63,18 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~10:0xZ. **`main` = `294fceac`.**
-> **BOTH BUILD TEAMS ARE IDLE and both have a `ready` successor. Publish queue
-> empty, no publisher running. §1 says the only work is release the next WP.**
+> ### RESUME HERE — state at 2026-08-14 ~11:0xZ. **`main` = `3f04953b`.**
+> **RUNTIME IS WORKING. Language gated and kicked. Publish queue empty, no
+> publisher running.**
 >
-> **Six PRs landed today, all M6 blob-verified:** `#2184` `cae1c36f` briefing
+> **Nine PRs landed today, all M6 blob-verified:** `#2184` `cae1c36f` briefing
 > flush · `#2185` `842f2d5f` ruling fold · `#2186` `51b3a75c`
 > `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` · `#2187` `f7ec9f59`
-> `RT-NESTED-IH-NATIVE-REALIZATION` `D2` (node **stays `active`**, `D3`-`D5`
-> remain) · `#2188` `c035c8a4` doc bundle · `#2189` `294fceac`
-> `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA`. M8/M9 sent for every code merge.
+> `RT-NESTED-IH-NATIVE-REALIZATION` `D2` (node **stays `active`**) · `#2188`
+> `c035c8a4` doc bundle · `#2189` `294fceac`
+> `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` · `#2190` `d8de7023` tracker sync ·
+> `#2191` `7543ddcc` ABI-order fold · `#2192` `3f04953b` coldness-claim fold.
+> M8/M9 sent for every code merge.
 >
 > **THE FROZEN CANDIDATE IS LANDED — that whole block is retired.** `98e6ac51`
 > re-voted unchanged and merged as `294fceac`; `wp/…-BLOCK-DELTA` is deleted at
@@ -86,25 +88,47 @@
 > `--admin` is not the Steward's to use. Relaunching the sanctioned publisher
 > after the condition changed was what worked.
 >
-> ### OWED BY ME, IN ORDER — both are §1 releases
+> ### IN FLIGHT
 >
-> 1. **Release `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH`** (`ready`, `S`) to
->    Runtime. The leader asked at `evt_250nev2zanqef` and reported the ring
->    idle and wanting compaction. `D3` (make the **disabled** arm probe) may
->    close the exposure more directly than `D1`'s constant — the node says to
->    price them separately rather than landing both.
-> 2. **Triage Adversary hunt `evt_54sb0z31q5qhn`** on `f7ec9f59`, still unread
->    in full. Headline: it **transposed the ABI order** — the exact silent
->    failure mode I asked it to hunt — and **nothing in the tree reds,
->    structurally**. Record the disposition **in the node**, never as a reply
->    (`COORDINATION §10⁻a` is report-only).
-> 3. **Language's next**, leader's call on order: `LANG-GADT-SEQUENCE-TRACKER-GAP`
->    (`ready`, `S`) or `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` (`ready`, `S`).
-> 4. **Ask the Architect** whether the `D2` successor (checked-IH
->    *realization* authority) is the same mechanism as
->    `RT-TERMINAL-ALL-ELIM-AUTHORITY` (terminal-`All` five-fact *elimination*
->    relation, blocked on `KERNEL-NESTED-IND`). **A mechanism question, not a
->    cut** — do not presume the fold.
+> **Runtime — `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH`**, anchor
+> `evt_7t1ncby6yaexe`, ring gated and compacted at `7543ddcc`. Implementer
+> confirmed pickup and is taking **`D3` first** — the silent-arm control —
+> which is the sequencing call the node left open and the right one: the
+> exposure is **one arm, not one crate**. If `D3` alone closes the silent
+> direction, `D1` is priced separately rather than landed because it was listed.
+>
+> **Language — gated and compacted at `3f04953b`**, kicked on
+> `LANG-REFINED-FALLBACK-COLDNESS-CLAIM`.
+>
+> ### BOTH ADVERSARY HUNTS ARE TRIAGED AND FOLDED — do not re-read them
+>
+> **`evt_54sb0z31q5qhn` on `f7ec9f59` → `RT-NESTED-IH-NATIVE-REALIZATION`.**
+> Accepted. Transposing the ABI order left all three suites green while the arm
+> was reached twice. **Structural, not a test gap:** `D2` is terminal, so the
+> population that exercises the ABI is exactly the population that never emits.
+> The obligation lands on the successor, which is where the stop lifts and the
+> order becomes load-bearing with nothing having ever tested it.
+>
+> **`evt_6r8qxhyn3hcb6` on `294fceac` → `LANG-REFINED-FALLBACK-COLDNESS-CLAIM`
+> as `D5`/`D6`/`AC-6`/`AC-7`.** It **cleared** the candidate (zero frame bytes,
+> measured both ways) and surfaced a term the stack arc has never stated:
+> **`register_prelude`'s own frame is ~196 KiB against the ~96 KiB total
+> margin.** Recorded, explicitly not acted on — the trend read was not run.
+>
+> ### OWED BY ME
+>
+> 1. **Runtime's next release** when the selfcheck candidate reaches review.
+>    `RT-CALL-EDGE-EXECUTABILITY-AXIS` (`ready`, `S`) is shovel-ready; three
+>    more `S` nodes behind it. **I told the leader there was no framed
+>    successor — that was wrong and is corrected at `evt_3wh8wg6gpyzc2`.**
+> 2. **Architect answer pending at `evt_1469rndt5745r`:** is checked-IH
+>    *realization* authority the same mechanism as
+>    `RT-TERMINAL-ALL-ELIM-AUTHORITY` (terminal-`All` *elimination*)? **It
+>    decides whether the nested-IH arc is parked behind `KERNEL-NESTED-IND` or
+>    framable now.** Nothing is blocked on it today.
+>
+> **Owed by others:** operator decidable-equality TCB (`evt_30gckze0jryj4`);
+> Architect on `TEST-NATIVE-STACK-PROVISIONING-STANDARD`.
 >
 > ### NO FRAMING DEBT ANYWHERE — swept 2026-08-14, do not re-derive it
 >
