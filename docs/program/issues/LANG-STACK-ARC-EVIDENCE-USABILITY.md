@@ -1,7 +1,7 @@
 ---
 id: LANG-STACK-ARC-EVIDENCE-USABILITY
 title: "The trusted-base guard now localizes the bracket but reports a bare GlobalId, so it names no offender; and both frame-size figures this arc produced cite objdump without naming the artifact, so neither is reproducible by the next reader -- three repairs that make the arc's own evidence usable"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -10,6 +10,19 @@ blocks: []
 github: null
 origin: "Adversary hunt evt_39t1v4twehspd on squash 6c574cdd, triaged by the Steward and accepted. The hunt FIRED the repaired guard rather than reading it, confirming the D5 readability claim, and the three items below are what firing it turned up. Writability of the inverse lookup re-verified against main 6c574cdd: prelude.rs:498-505 is the guard, and elab.rs carries globals as a HashMap<String, GlobalId>."
 ---
+
+> # RELEASED 2026-08-14 CARRYING [[LANG-POW10-CASCADE-LITERAL-CLAUSE]].
+>
+> **The two land as ONE `ken-elaborator` candidate, not two.** `POW10` is an
+> `XS` doc-comment repair in `decimal_char.rs` that its own node says should
+> ride the next candidate touching this crate rather than spend a ring turn
+> alone. This is that candidate.
+>
+> **They are independent repairs sharing a build, not one deliverable.** If
+> either stalls, land the other — do not hold a finished repair for its
+> passenger. Read `POW10`'s "why this is not a second
+> `LANG-REFINED-FALLBACK-COLDNESS-CLAIM`" section before sizing it; the
+> resemblance to this arc is the trap it warns about.
 
 ## What this is
 

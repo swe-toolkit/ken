@@ -129,12 +129,26 @@ outcome is to report that and stop.
 - Not the `34 §2.5` deferral, which is already filed as
   [[LANG-DECEQ-CHAR-LAWFUL-INSTANCES]] and is operator-gated.
 
-## Why this is Language's next WP
+## Why this is releasable, and why it is SECOND rather than next
 
-Language has **no `ready` node** once `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA`
-merges, and its only two drafts -- [[LANG-DECEQ-CHAR-LAWFUL-INSTANCES]] and
-[[LANG-FOREIGN-NAME-FORMAT-CHARS]] -- are both `gate: operator`. This node is
-`gate: none` and depends on nothing, so it is releasable now. It also produces
-the input needed to choose the *following* Language WP, which is currently
-unknowable: the frontier of the dependent-constructor area cannot be named until
-`D2` is done.
+**The original argument here was that Language had no other `ready` node. That
+premise is FALSE as of 2026-08-14** and is corrected rather than deleted,
+because a "why this is next" section that has quietly stopped being true is the
+thing that gets acted on. Two other `ready` Language nodes now exist:
+[[LANG-STACK-ARC-EVIDENCE-USABILITY]] and
+[[LANG-POW10-CASCADE-LITERAL-CLAUSE]].
+
+**What survives the correction is the releasability, which never depended on
+scarcity.** This node is `gate: none` with `depends_on: []`, and Language's
+only two drafts -- [[LANG-DECEQ-CHAR-LAWFUL-INSTANCES]] and
+[[LANG-FOREIGN-NAME-FORMAT-CHARS]] -- are both `gate: operator`. It is
+releasable whenever the ring is free.
+
+**Why it is sequenced second.** `AC-4` puts `crates/` out of scope, so this
+node produces no product change; the two nodes released ahead of it are both
+`ken-elaborator` repairs and ride one candidate. **Sequencing, not merit** --
+nothing here was found wanting, and the audit does not perish.
+
+It also produces the input needed to choose the Language WP after that, which
+is currently unknowable: the frontier of the dependent-constructor area cannot
+be named until `D2` is done.

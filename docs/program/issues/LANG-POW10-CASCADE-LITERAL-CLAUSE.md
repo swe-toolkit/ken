@@ -1,7 +1,7 @@
 ---
 id: LANG-POW10-CASCADE-LITERAL-CLAUSE
 title: "The pow10 generator's own doc comment says every branch is a concrete literal, which its own recursion refutes in the same way the elab.rs copy did -- but its conclusion rests on a DIFFERENT and TRUE property (no saturating/min/clamp anywhere in the generated cascade), so this is a wording repair on a sound argument, not a second false justification"
-status: ready
+status: active
 owner: language
 size: XS
 gate: none
@@ -10,6 +10,16 @@ blocks: []
 github: null
 origin: "Architect scope hand-off on the LANG-REFINED-FALLBACK-COLDNESS-CLAIM merge verdict evt_3w84rh9jdg981 / evt_5jmye3pdj3ra7, explicitly named as a scope call for the Steward rather than an Architect ruling. Filed by the Steward rather than carried, because a carry with no home is what evaporates. Re-verified against main 5edd3de3: decimal_char.rs:60-62 read directly."
 ---
+
+> # RELEASED 2026-08-14 AS A PASSENGER ON [[LANG-STACK-ARC-EVIDENCE-USABILITY]].
+>
+> **This is the "ride it with the next candidate" the Sizing section calls
+> for.** Both nodes touch `crates/ken-elaborator` and land as one candidate.
+> **It is not a deliverable of that node** — it has its own `D1` and its own
+> `AC-1`-`AC-4`, and it is reviewed on its own terms.
+>
+> **If this one grows past `XS`, that is the finding** and it comes off the
+> candidate rather than delaying it. See Sizing.
 
 ## What this is
 
