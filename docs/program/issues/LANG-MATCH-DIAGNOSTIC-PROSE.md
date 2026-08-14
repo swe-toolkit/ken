@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-DIAGNOSTIC-PROSE
 title: "The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
