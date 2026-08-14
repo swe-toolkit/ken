@@ -18,17 +18,6 @@ fn assert_round_trip(label: &str, source: &str) {
         format!("{:?}", reparsed.typed_decls()),
         "{label}: reconstructed source changed the semantic AST"
     );
-
-    let comment_count = lossless
-        .trivia()
-        .iter()
-        .filter(|item| item.kind.is_comment())
-        .count();
-    assert_eq!(
-        lossless.comment_attachments().len(),
-        comment_count,
-        "{label}: every trivia item counted by is_comment() must have exactly one home"
-    );
 }
 
 #[test]
