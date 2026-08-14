@@ -136,6 +136,28 @@ rather than optional: if the margin turns out to be wide, no watch is needed; if
 it is inches, retiring the canary without replacing it is a regression in what
 we can see.
 
+## Amended 2026-08-14: the trusted-base axis (`D5`)
+
+Adversary at `evt_60pwz0y927h6g`, **confirmed by a Steward read the finding
+named as unrun** — and it came back live rather than nominal.
+
+`LANG-PRELUDE-COLLECTIONS`'s `AC-5` asserts per name that the four combinators
+are absent from `trusted_base()`; its doc claims the wider *"the trusted base
+does not grow."* **An entry added under a different name satisfies every
+assertion**, and `prover.rs:493-501` shows the mechanism is real: an
+undischarged obligation registers under the literal name
+**`"prover unknown goal"`**, not under the declaration that raised it.
+
+The four landed definitions add nothing in fact. The defect is the sentence a
+later reader inherits, on the exact path where `sort`, `Array`, `DecEq`/`Ord`
+and the laws are queued. `D5` narrows the claim and adds a **full enumeration**
+of `trusted_base()` from a bare env — not a count, so the original doc's
+masking objection does not reach it, and its maintenance cost is the point.
+
+**It lands here rather than as its own node** because this node already owns
+what a prelude addition costs and what watches it. Stack depth and trusted-base
+entries are the same question in two currencies.
+
 ## Why this is a node and not a rider
 
 **The constraint is grounded in a measured number in the tree**, not in a
