@@ -38,11 +38,34 @@ origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statemen
 > read the retirement as a regression: the refusal **advanced**, which is the
 > evidence the increment worked.
 >
-> **Successor scope is minting checked realization authority for this seam.**
-> Open question the Steward has NOT presumed an answer to: whether that is the
-> same mechanism as [[RT-TERMINAL-ALL-ELIM-AUTHORITY]], whose authority is the
-> **terminal-`All` five-fact elimination** relation rather than checked-IH
-> **realization** authority. That is an Architect question.
+> **Successor scope is minting checked realization authority for this seam, and
+> the successor now EXISTS: [[RT-CHECKED-IH-REALIZATION-AUTHORITY]]** (`ready`,
+> `M`, `depends_on: []`).
+>
+> **THE SUCCESSOR QUESTION IS ANSWERED — do not re-litigate it.** Architect
+> ruling `evt_7mgzv23cnjm0a` (2026-08-14): checked-IH **realization** authority
+> and [[RT-TERMINAL-ALL-ELIM-AUTHORITY]]'s **terminal-`All` elimination**
+> relation are **TWO mechanisms**. Refuted on three independent grounds — the
+> producers never read each other's relation; the other node's own text forbids
+> it to build the new machinery this seam needs; and the fold would turn a
+> well-founded dependency into a **cycle**, since realization would then sit
+> behind the `KERNEL-NESTED-IND` block that this very arc is what unblocks.
+>
+> ⇒ **The realization successor carries NO `KERNEL-NESTED-IND` dependency and
+> was framable immediately. Runtime's nested-IH arc is a live critical path, not
+> a parked one.** `RT-TERMINAL-ALL-ELIM-AUTHORITY` stays `draft`, held on
+> Kernel, untouched.
+>
+> **`D3`-`D5` of THIS node are gated on that successor landing.** They are
+> outcomes — native execution, interpreter agreement at `Nat 3`, the carried
+> control no longer ignored — and each requires the authority the successor
+> mints. **The cut is capability there, outcomes here.** Do not restate the
+> capability as a sixth deliverable on this node.
+>
+> **The selector wall is untouched by both, and this is the line most likely to
+> be crossed by a change that looks like progress:** a
+> `ComputationalRecursorClosure` is a suspended activation, not a constructor
+> value. **Realize before selection; never accept at selection.**
 >
 > **Still bound, and the first is the one closest to hand:** `.residual` is not
 > inspected or unwrapped (`mod.rs:3327-3331`); no ordinary-`Match` selector arm
