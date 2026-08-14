@@ -268,7 +268,12 @@ patterns. Specifically:
 - **Literal** patterns are checked against the scrutinee type (`31 §3`, `35
   §4`) and compile to the selected value-comparator test below (a guard-like
   `if` chain, `39 §2` item 7); a literal column is **not** closed, so a literal
-  `match` is exhaustive **only** with a final variable/wildcard arm (`§4.2`).
+  `match` is exhaustive **only** with a final variable/wildcard arm (`§4.1`).
+  The lexical Boolean literals `true` and `false` are the exception in pattern
+  position: before comparator selection, they elaborate as the ordinary `Bool`
+  constructor patterns from `14 §3`. They therefore contribute constructor
+  coverage: `true` and `false` together exhaust `Bool`, and a following
+  variable/wildcard arm is unreachable (`§4.2`).
 - **Tuple / record** patterns project the (negative) `Σ`/record components (`13
   §3`, `33 §2`) and match componentwise — no `elim_D` (records are negative,
   matched by projection, `14 §4`).
@@ -282,7 +287,11 @@ patterns. Specifically:
   left-to-right binder order is the canonical branch order; later alternatives
   map their bindings into those slots by name. The source arm is reachable if
   at least one alternative has a non-empty residual, and its coverage is the
-  union of the alternatives' coverage.
+  union of the alternatives' coverage. Checking the binder types in the common
+  pre-branch context is deliberately conservative: it may reject a dependent
+  or-pattern whose binder types would coincide only after distinct
+  alternative-specific refinements. Such a pattern must use separate arms
+  unless a later rule supplies a sound refined-context join.
 
 #### Literal-pattern comparator selection
 
@@ -310,7 +319,6 @@ non-canonical `Decimal`, whose value comparators are deliberately not lawful
 | string, ordinary or raw | codepoint-wise `String` `eq` | Equality of the canonical `String` value (`37 §2.1`, `§2.5`); value-level comparison, independent of whether the lawful `DecEq String` instance has landed. |
 | character | `eqChar` | Unicode-scalar/codepoint equality, derived through the `Int` projection (`18a §5.9.1(3)`); value-level comparison, independent of the separately staged lawful instance. |
 | byte string or bracketed hexadecimal bytes | byte-sequence content equality | Equality of the immutable, length-determined byte sequence (`38 §1.1`); representation and equality acceleration are unobservable. This row assigns no new surface operation name. |
-| `true` or `false` | `Bool` constructor identity | Ordinary `Bool` constructor discrimination and its zero-delta decidable equality (`14 §3`, `51 §2.2`), not a primitive runtime comparator. |
 
 The absence of a law-carrying `DecEq` instance does not by itself block a row
 licensed by normative value equality: literal matching consumes only the
@@ -521,7 +529,7 @@ path-sensitive `Γ`.
 **Guards do not refine and do not cover.** A guarded arm `Cₖ p̄ if g => e`
 elaborates to a conditional *inside* the `cₖ` method (`39 §2` item 7); because the
 guard `g` may fail, the arm does **not** by itself discharge the `cₖ`
-constructor for exhaustiveness (`§4.2`). Guards are an arm-selection refinement,
+constructor for exhaustiveness (`§4.1`). Guards are an arm-selection refinement,
 not a coverage contribution.
 
 ### 3.4 Transport by a propositional equality — the `J` former
