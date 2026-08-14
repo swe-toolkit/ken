@@ -8110,6 +8110,12 @@ struct ContinuationConsumingOccurrenceSeeds {
 /// not two lookup authorities.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum ContinuationRequiredConsumingOccurrence {
+    /// `RT-CONSUMER-CARRY-CONTROL-DEBT` `C4` disposition: retained as the
+    /// source-side phase of the relation. The current depth fixtures take the
+    /// outermost fallback instead of exercising an inherited nested-Source
+    /// population, and this variant is resolved only by the test observer.
+    /// It is therefore not evidence of a production consumer or route; a
+    /// successor that relies on this arm owes its own reaching control.
     Source(ContinuationConsumingOccurrenceSeeds),
     Exact(ContinuationConsumingOccurrence),
 }
@@ -8138,7 +8144,10 @@ struct ContinuationDiscovery {
     /// eliminator selected this continuation as its scrutinee.
     consuming_occurrences: Option<ContinuationConsumingOccurrenceSeeds>,
     /// `RT-CONTKEY-CONSUMER-DESCENT-CARRY` -- the consumer this discovery's
-    /// producers must use, established one level outside the discovery.
+    /// producers must use. At the outermost source discovery, the fallback
+    /// installs the consumer selected by that same match. The one-level lag
+    /// begins at depth 2: a generated descent carries the consumer established
+    /// by its parent specialization.
     ///
     /// This is traversal state, not specialization identity. It therefore
     /// remains beside `ContinuationSpecializationKey`: widening that key would
@@ -11433,6 +11442,15 @@ fn build_continuation_specialization_plan(
                         #[cfg(not(test))]
                         let descend = true;
                         if descend {
+                            // `RT-CONSUMER-CARRY-CONTROL-DEBT` `C1`: these are
+                            // constructional pins, not checks against a second
+                            // authority. Production interning either returns a
+                            // full-key-equal installed unit or inserts this key
+                            // at the returned index. Test-only aliasing returns
+                            // `inserted = false`, so it cannot enter this block.
+                            // Neither refusal is reachable through the current
+                            // interner; they protect only a future writer change
+                            // that breaks that construction contract.
                             let target_unit = units.get(target.0 as usize).ok_or_else(|| {
                                 planner_error(
                                     "a descent target was not installed before its child",
@@ -11474,6 +11492,14 @@ fn build_continuation_specialization_plan(
                         }
                         // `D8a` — the same descent, as though it were top level.
                         // See `set_continuation_descent_owner_duplication`.
+                        //
+                        // `RT-CONSUMER-CARRY-CONTROL-DEBT` `C5` disposition:
+                        // leave the inherited required consumer unchanged. This
+                        // test-only twin mutates the emission-owner axis; unlike
+                        // the real descent above, it does not advance the carry.
+                        // It is not evidence for descent-carry behaviour, and
+                        // coupling that second mutation axis into this twin
+                        // would weaken its original discriminator.
                         #[cfg(test)]
                         if DUPLICATE_DESCENT_AS_TOP_LEVEL.with(Cell::get) {
                             pending.push(ContinuationDiscovery {
