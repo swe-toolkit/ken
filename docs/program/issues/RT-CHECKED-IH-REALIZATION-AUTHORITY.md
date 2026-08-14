@@ -11,6 +11,18 @@ github: null
 origin: "Architect mechanism ruling evt_7mgzv23cnjm0a (2026-08-14), answering the Steward's question at evt_1469rndt5745r. The ruling is that checked-IH REALIZATION authority and RT-TERMINAL-ALL-ELIM-AUTHORITY's terminal-All ELIMINATION relation are TWO mechanisms, so this successor carries no KERNEL-NESTED-IND dependency and is framable now. Steward-filed (agents cannot create tracked work per COORDINATION §2). Every structural fact below re-verified by the Steward against main fea9cd96 before filing."
 ---
 
+> # HELD BEHIND THE OPERATOR'S PRIORITY RULING, 2026-08-14. `ready`, NOT next.
+>
+> **Do not release this until [[RT-LEXICAL-RECURSOR-CONSUMERS]] lands.** The
+> operator ruled the `RecursiveDescent` retirement Runtime's priority — *"that
+> is the priority for the runtime team. prioritize that work over other runtime
+> work."* That node is the single unblocked node on the retirement chain.
+>
+> **This node is unchanged, unblocked, and correct** — nothing here is deferred
+> on its merits, and no dependency was added. It is `ready` and waiting on a
+> priority call, which is the operator's under `ken-steward` §3. **A reader
+> finding it idle should not diagnose framing debt.**
+
 ## What this is
 
 **The planner capability that `RT-NESTED-IH-NATIVE-REALIZATION` `D2` stopped
