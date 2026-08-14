@@ -1,13 +1,13 @@
 ---
 id: LANG-PRELUDE-COMBINATOR-BLOCK-DELTA
 title: "`AC-6`'s doc says a live differential is impossible because `ElabEnv::new()` has no 'before' env -- true of an ENV-level bracket and false of a BLOCK-level one, which is the established idiom four sites away in the same crate, so the instrument the comment says does not exist is writable, id-keyed, and fails in production"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: []
 blocks: []
-github: null
+github: 2189
 origin: "Adversary hunt evt_6e1n4b6xq347y on the landed squash 225876a4, second finding, with a compiled-and-run probe that was reverted. The refuted claim is one the Adversary itself confirmed two nodes ago, and it is in landed test doc text. Every load-bearing fact below re-measured by the Steward against main 225876a4 before filing."
 ---
 
