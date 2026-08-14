@@ -146,6 +146,54 @@ The script creates the PR, waits and polls checks for non-doc changes, and runs
 the publisher merge command. If GitHub blocks the merge it must stop and route
 that fact; it must not pretend the publisher identity can self-approve.
 
+### M5a — A RED that is not the candidate's: attribute it, then re-trigger on the SAME SHA
+
+**The publisher stops on the first red shard by design and does not distinguish
+a flake from a regression. That distinction is yours, and it is cheap.**
+
+**Attribute before you tell anyone anything.** Three reads, all fast:
+
+1. **Is the base green?** `gh run list --branch main --limit 5`. A red base is
+   not the ring's bug.
+2. **Can the candidate's paths reach the failing test?** Compare
+   `git diff --name-only <BASE>...<SHA>` against what the test actually does.
+3. **What do the sibling shards say?** Three of four green with the fourth
+   failing on scratch-directory I/O is a runner fault, not a behaviour.
+
+**Measured 2026-08-14 on `#2202`.** A one-path `ken-runtime` **test-control**
+candidate reddened `library_documentation_gates.rs`'s synthetic-git fixture with
+`git commit -m "filler 16"` → `error: bad tree object HEAD`. Shards 1, 2 and 4
+passed; `main` was green. **The sixteenth filler commit failing after fifteen
+succeeded is a write fault**, and no `ken-runtime` test edit can reach whether
+git can write a tree object in a scratch repo.
+
+> ### `gh run rerun --failed` IS REFUSED TO THE PUBLISHER IDENTITY
+>
+> `Resource not accessible by integration` — the App has no `actions:write`.
+> **Tested, not assumed** (§7a: a capability question is answered by attempting
+> it). Do not escalate for this permission before trying the route below.
+
+**The route that works, and why it is the right one:** `.github/workflows/ci.yml`
+triggers on `pull_request`, whose default types include **`reopened`**.
+
+```sh
+gh pr close <N> && sleep 5 && gh pr reopen <N>
+gh pr view <N> --json headRefOid    # MUST be unchanged -- verify, don't assume
+```
+
+⇒ **A fresh run on the identical SHA.** That is the whole point: the Architect's
+approval and the Decision bind an **exact SHA**, so republishing at a new SHA
+would detach a live verdict and cost the ring a fresh Decision **for a flake**.
+Never push an empty commit to "kick CI".
+
+**Then re-run the publisher on the same `--target <SHA>`.** It finds the existing
+PR rather than creating a second one.
+
+> **Watch the stale-check hazard on the way back in.** The SHA now carries the
+> old red check-runs *and* the new ones. Confirm `gh pr checks <N>` reports the
+> **fresh** result before relaunching — a publisher that reads history aborts on
+> a candidate that is actually green.
+
 ## M6 — Verify by blob identity, every changed path
 
 Ancestry lies after a squash; phrase greps lie on wrapped lines.
