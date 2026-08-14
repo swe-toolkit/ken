@@ -345,3 +345,76 @@ and the arming discipline (`D2fEmitterTestArm`, RAII, one block) is exactly what
 not to loosen casually. **It belongs with the emitter's real arming** — at which
 point the refusal either still holds and costs one assertion, or has moved and
 you want to know.
+
+> #### AMENDED 2026-08-14 by Adversary hunt `evt_28n873ahnq6z7`, run at
+> #### `bc62216a`. The blast radius above is wrong by 9x and the cost
+> #### argument prices an instrument that already exists.
+>
+> **The prose fact itself is CONFIRMED, measured armed.** The Adversary armed
+> via the sanctioned `D2fEmitterTestArm` RAII and compiled all three roots:
+> `Exact => None`, `ReHomed => None`, `ProducerArity => Some(Unsupported{
+> construct: "ComputationalMatch", reason: "case ctor:fixture::D2gOut::Node
+> expects 1 constructor arguments but value has 2" })` — byte-identical to the
+> string quoted at `core.rs:2936-2937`. Probe reverted, `control.rs`
+> byte-identical after. **The disposition recorded above is right; only its
+> scoping and its costing are not.**
+>
+> **1. This paragraph is not one control's completeness argument. It is the
+> population definition for the candidate's ENTIRE control set.** The literal
+> `[(D2jCause::Exact, "exact"), (D2jCause::ReHomed, "rehomed")]` is hard-coded
+> at **nine** sites in `control.rs` — `3109`, `3271`, `3405`, `3564`, `3699`,
+> `3852`, `4005`, `4117`, and the validator's own pair at `4330` — behind nine
+> `r3_fused_*` controls whose `MEASURED:` blocks all read *"on both armed
+> roots"* / *"both real selectors"*: `parameter_projection`, `worker_body`,
+> `wrong_consuming_call`, `nonempty_producer_captures`,
+> `late_call_build_refusal`, `post_field_direct_call_reintroduction`,
+> `outer_selector_escaped_claim`, `capture_projection`,
+> `target_authority_validator`. **The residual as I filed it points a reader at
+> one.** If `ProducerArity` rejoins, nine controls silently cover two of three.
+>
+> **2. The cost argument reaches the instrument I named and not this one.**
+> *"It needs a new armed assertion"* prices building an armed harness. **The
+> harness exists and is cause-parameterized:** `D2fEmitterTestArm::arm()` is
+> used at twelve sites in this same file, nine of them added by this candidate.
+> The Adversary wrote the assertion — 34 lines standalone including boilerplate,
+> one build, 36 seconds, exact refusal string, **loosening nothing**. As a third
+> row on the existing validator control it is smaller: that control's inner
+> `compile(cause, symbol)` already takes a `D2jCause`, already arms, already
+> builds through `d2j_checked_fixture_under`. The only obstacle is its own
+> `assert!(error.is_none(), ...)` at `control.rs:4325` — relax that to return
+> the error and the `ProducerArity` row is a `contains` on the arity sentence,
+> roughly six lines. *"Do not loosen the arming discipline"* rules out arming
+> production or widening the const; **it does not reach a `#[cfg(test)]` RAII
+> arm that nine of this candidate's own controls already use.**
+>
+> **3. The population has no name, so a third root costs nine edits and a pin
+> has nothing to attach to.** There is no `const` naming the terminal-stop
+> population; it is nine anonymous array literals agreeing by discipline.
+> Missing one on a future edit yields a control that silently covers a subset —
+> the same defect one layer down. **And the tree already has the right shape one
+> plane over:** `ken-r3-base` (`control.rs:34788`, `:34866`) expresses the
+> three-root population **as data**, the literal `[Exact, ReHomed,
+> ProducerArity]`, written twice, unarmed. **The degradation from data to prose
+> happened at exactly one plane boundary** — base/planning names it, the armed
+> plane narrates it.
+>
+> **Disposition — the repair, in the order it should land, and still not a
+> node.** Two pieces, both inside `control.rs`, both `#[cfg(test)]`:
+>
+> 1. **Name the population once** as a `const` and iterate it in the nine
+>    controls. **Needs no arming at all**, so it is not the repair that was
+>    costed. It does not detect `ProducerArity` rejoining; it is what makes the
+>    detection a one-line addition instead of a tenth literal.
+> 2. **Add the armed `ProducerArity` row** to the target-authority validator
+>    control, as the ~6-line third row described above.
+>
+> **Route: the next Runtime candidate that touches `control.rs`** — folded, per
+> `ken-steward` §4c, rather than lengthening the critical path with a node for
+> two `#[cfg(test)]` edits. **This is also flagged on
+> [[RT-LEXICAL-RECURSOR-CONSUMERS]]**, which owns the next `#6d` slice frame,
+> because a residual on a merged node is read by nobody by default.
+>
+> **Explicitly unswept, and named as such rather than implied clean:** the
+> Adversary scoped to lines this candidate added and did **not** sweep the
+> unchanged bulk of these five files (28k+ lines in `control.rs`), where phrases
+> of the same family are frequent.
