@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 07:03:36Z — from 255 issue file(s) in `docs/program/issues/`.
+2026-08-14 07:31:54Z — from 256 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -183,6 +183,7 @@ the committed file matches the generator's output.
 | `RT-BACKEND-SPLIT-CENSUS` | Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves | draft | runtime | M | none | — |
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
 | `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` | The always-on `dasm-c2-observation` feature has no artifact-identity control, and the always-on choice is what makes the off-configuration unreachable from the crate the controls live in -- the sibling's nested-cargo A/B needs a carrier feature before it can be reused | active | runtime | S | none | — |
+| `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` | The artifact-identity control's anti-vacuity self-check reads `ken-cli`'s `dasm-c2-observation` feature while the property that decides whether the two artifacts differ is `ken-runtime`'s -- they agree today and nothing holds them together, so a future `ken-cli` dev-dependency enabling the runtime feature would make the off side ON with the assertion still reading `disabled` and no signal at all | ready | runtime | XS | none | — |
 | `RT-CALL-EDGE-EXECUTABILITY-AXIS` | executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error | ready | runtime | S | none | — |
 | `RT-CANDIDATE-LEDGER-RESIDUALS` | Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed | ready | runtime | S | none | — |
 | `RT-CARRIED-CONTINUATION-RESUME` | A carried scrutinee reaching a continuation frame has no resume path — the carried elimination does not implement the Carried x {PendingLet, Active} arm | merged | runtime | M | none | — |
@@ -302,6 +303,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-GADT-SEQUENCE-TRACKER-GAP` — `34 §8` names four `SURF-gadt-*` build WPs and all four have frames in `docs/program/wp/` -- none has a tracker node, so `gen-progress.sh` shows the whole dependent-constructor area as absent, while the code has in fact moved past every one of the four frames' stated baselines
 - `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA` — `AC-6`'s doc says a live differential is impossible because `ElabEnv::new()` has no 'before' env -- true of an ENV-level bracket and false of a BLOCK-level one, which is the established idiom four sites away in the same crate, so the instrument the comment says does not exist is writable, id-keyed, and fails in production
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
+- `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` — The artifact-identity control's anti-vacuity self-check reads `ken-cli`'s `dasm-c2-observation` feature while the property that decides whether the two artifacts differ is `ken-runtime`'s -- they agree today and nothing holds them together, so a future `ken-cli` dev-dependency enabling the runtime feature would make the off side ON with the assertion still reading `disabled` and no signal at all
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
