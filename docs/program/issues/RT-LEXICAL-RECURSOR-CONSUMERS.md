@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-RECURSOR-CONSUMERS
 title: "Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
