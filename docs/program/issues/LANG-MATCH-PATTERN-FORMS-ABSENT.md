@@ -130,7 +130,34 @@ has not implemented, never silently accept it.
 **The umbrella node stays `draft`. It is not a six-form frame and must never
 become one.**
 
-| order | slice | prerequisite pin, which does not exist yet |
+> ## EVERY PIN IN THIS TABLE LANDED AT `34fd01c1`. The column heading used to
+> ## read "which does not exist yet" and that is now false for all six rows.
+>
+> **Measured by the Steward at `main` `a12f37b7`.** [[SPEC-MATCH-PATTERN-PINS]]
+> delivered the whole prerequisite column:
+>
+> - **as-pattern association/precedence** -- `32 §4`: constructor application
+>   binds tighter than `as`, `as` binds tighter than `|`, `as` is
+>   non-associative, and an `as`- or or-pattern used as a constructor argument
+>   must be parenthesized.
+> - **tuple grouping/comma** -- `32 §4`: `(p)` is grouping, a tuple contains at
+>   least two patterns, arity >2 right-nests, no zero- or one-tuple.
+> - **`field_pat` spelling** -- `32 §4`: label/value form, punning, omission,
+>   open-vs-closed, duplicates, unknown fields, source order. All seven.
+> - **or-pattern binder join** -- `34 §3.1`: same binder-name set, each name
+>   bound exactly once per alternative, corresponding types definitionally equal
+>   in the common pre-branch context, first alternative's order canonical. Its
+>   association with `as` is in `32 §4`.
+> - **guards** -- no pin was named and none is owed.
+> - **literals** -- `34 §3.2` carries the literal-kind-to-comparator table with
+>   an equality-authority column, and pins that a literal's expected type is the
+>   scrutinee's.
+>
+> ⇒ **Read the rows below as slice DESCRIPTIONS with their pins discharged, not
+> as blockers.** The order still stands and the umbrella still never becomes one
+> frame.
+
+| order | slice | prerequisite pin -- ALL LANDED at `34fd01c1` |
 |---|---|---|
 | 1 | **as-patterns** -- alias binds the whole matched scrutinee, no split, preserves `p`'s coverage/reachability, rejects collision with an inner binder | `p as x` association/precedence |
 | 2 | **tuple/pair patterns** -- dependent `Σ` projection typing, right-nesting for arity >2, componentwise coverage/reachability, `Proj1`/`Proj2` lowering with no pair `elim` | `(p)` is grouping; a tuple requires a comma |
@@ -146,18 +173,25 @@ expected-type checking. ⇒ **The literal slice is blocked on more than the open
 operator TCB question**, and this node's earlier statement that it was gated on
 that question alone understated it.
 
-## Flip condition -- the enclave named the next material, and it is SPEC work
+## Flip condition -- the spec half is DONE; the next node is LANGUAGE's
 
-**The disposition is explicit: the next material needed is the small spec pins
-in the table above, and THEN a first contained as-pattern slice** -- not a
-six-form frame.
+**The enclave's disposition asked for the small spec pins first and THEN a
+first contained as-pattern slice** -- not a six-form frame. **The first half of
+that instruction is discharged.**
 
-⇒ **The next node in this chain is spec-enclave-owned, not Language-owned.**
-Nothing can be released to Language until the `p as x` association/precedence
-pin exists, because a slice built against an unpinned association is a slice
-that gets rebuilt.
+⇒ **This section previously read *"the next node in this chain is
+spec-enclave-owned, not Language-owned"*, and that is no longer true.** It was
+correct when written and `34fd01c1` retired it. **Nothing spec-side stands
+between this node and its first slice.**
 
-**This node flips per slice, never as a whole, and only after its pin lands.**
+**What actually gates the as-pattern slice now is Language's own queue, which
+is a contention fact and not a premise.** Three nodes already share `elab.rs`
+and run in a line -- [[LANG-REACHABILITY-SUBSUMING-ARMS]], then
+[[LANG-WITNESS-DIAGNOSTIC-STRICTNESS]], then
+[[LANG-FOREIGN-CTOR-ARM-REJECT]]. The as-pattern slice is the fourth, and the
+Steward cuts it rather than the ring.
+
+**This node flips per slice, never as a whole.**
 
 **One thing already decided and needing no further ruling:** this node does
 **not** amend `34`. The enclave ruled the chapter's obligations real, so the
