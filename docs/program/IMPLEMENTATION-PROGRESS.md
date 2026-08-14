@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 04:35:15Z — from 252 issue file(s) in `docs/program/issues/`.
+2026-08-14 04:54:08Z — from 252 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -205,7 +205,7 @@ the committed file matches the generator's output.
 | `RT-CONTSRC-PRODUCER-LOCAL` | Producer-local continuation source coordinate — a mid-body value is a third availability class with no ABI seat, so continuation specialization cannot name its environment | merged | runtime | L | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | draft | runtime | M | none | — |
-| `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | active | runtime | M | none | — |
+| `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-ENTRY-TRAP-254` | public_source_observes_raw_argv_environment_cwd_bytes_in_field_order exits 1 with an explicit entry trap where it expects 254 — branch-introduced, and the only tip failure that is not the byte-span gap | closed | runtime | M | none | — |
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
@@ -306,6 +306,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-LEXICAL-RECURSOR-CONSUMERS` — Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam
+- `RT-NESTED-IH-NATIVE-REALIZATION` — Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 
@@ -329,7 +330,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
-- `KERNEL-NESTED-IND` blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE` (status: active)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
@@ -348,7 +348,6 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
-- `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 

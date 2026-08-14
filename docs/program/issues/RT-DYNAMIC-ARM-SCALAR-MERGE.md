@@ -1,7 +1,7 @@
 ---
 id: RT-DYNAMIC-ARM-SCALAR-MERGE
 title: "A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -904,6 +904,51 @@ state.
 ~~**Disposition: take them with `c2` proper if they fit, or say so and the
 Steward cuts a slice.**~~ Do not treat either as an acceptance criterion on
 `c2`.
+
+## NODE COMPLETE — `c3` MERGED 2026-08-14. `status: merged`.
+
+**Every slice has landed: `c1` `7bfc8ae5`, `c2` `57bf1721`, `c3` `6b3b5b40`.**
+
+`c3` candidate `e4e308d19db11403a8d5368d34424eae7db8caee`, **landed as squash
+`6b3b5b40`** (PR #2171, CI green; Decision `dec_77sd73v2kqewh`, Architect, read
+`resolved` from the object). Merge-base `246019b9` derived independently and
+matching the declared value; one commit, two paths, `+26/-11`; **2/2 blobs
+verified identical after landing.** Both SHAs recorded — a squash rewrites the
+candidate, so it is never an ancestor of `main`; ask content, not ancestry.
+
+**Runtime did not take the trap below.** They kept the always-on
+`ken-elaborator` dev-dependency and recorded the rationale, rather than copying
+the sibling's opt-in shape — which would have made the two `D5` seat controls
+silently absent from a default test run. The Architect confirmed the hoist is
+behaviour-preserving on evidence rather than assertion: `lowered_value_kind` is
+`&Lowered → &'static str`, one arm per variant with **no `_ =>`**, an ordinary
+production function with ~40 call sites, so it is pure and exposes no dead code
+in any `cfg` configuration. After filtering `cfg`-gated lines the entire
+non-`cfg` delta is a re-indentation plus `admitted: result.is_ok()`.
+**Production is untouched.**
+
+### Residual carried out of the node, non-blocking: the enable flag is read twice
+
+Architect observation on `dec_77sd73v2kqewh`, explicitly **not** a merge
+condition. `ENABLED` was previously read once, inside
+`dasm_c2_record_scalar_merge` (`mod.rs:15992`); it is now also read at `:17769`
+before the match, to decide whether to compute. Both must be true to record.
+
+⇒ **That introduces an invariant the previous shape did not need: the flag must
+not flip between the two reads.** If it were disabled at entry and enabled by
+record time, the old code would have recorded and the new code drops the
+observation.
+
+**Why it is a residual and not a defect.** It is not believed reachable — the
+scope is RAII around whole lowering calls and nesting only ever restores to
+`true` — and the direction is **fail-closed**: every external control asserts a
+positive count, so a dropped observation reds rather than silently passing.
+
+**What is owed, if anything, is one clause at the new read** stating that the
+flag is assumed stable across the merge, so the next person adding a scope
+inside a lowering path meets the assumption instead of discovering it. **It
+rides the next Runtime candidate that enters `lowering/mod.rs`; do not recut
+for it.**
 
 ## `c3` — AUTHORIZED 2026-08-14, the closure slice. Both residuals, ~10 lines.
 
