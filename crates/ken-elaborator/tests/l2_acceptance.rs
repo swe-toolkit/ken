@@ -214,9 +214,18 @@ fn ac3_missing_arm_names_blue() {
     match result {
         Err(ElabError::ExhaustivenessError { missing, .. }) => {
             assert_eq!(
-                missing, "Blue",
+                missing.constructor, "Blue",
                 "AC3: named witness should be 'Blue', got '{}'",
-                missing
+                missing.constructor
+            );
+            assert_eq!(
+                missing.arity, 0,
+                "AC3: 'Blue' is zero-arity, so its witness pattern IS its name"
+            );
+            assert_eq!(
+                missing.to_string(),
+                "Blue",
+                "AC3: a zero-arity witness renders with no trailing wildcards"
             );
         }
         Ok(_) => panic!("AC3: non-exhaustive match accepted (should have been rejected)"),

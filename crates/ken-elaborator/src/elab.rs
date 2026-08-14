@@ -24,7 +24,7 @@ use ken_kernel::{
 use crate::ast::{BinOp, DefKeyword, NumLit, RecursiveResultSelector};
 use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceInfo};
 use crate::data;
-use crate::error::{ElabError, RecursiveResultSort, Span};
+use crate::error::{ElabError, MissingPatternWitness, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
@@ -1583,7 +1583,7 @@ fn check_match_with_lift(
                 matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(host_ctor.id))
             })
             .ok_or_else(|| ElabError::ExhaustivenessError {
-                missing: ctor_name(cx, host_ctor.id),
+                missing: missing_pattern_witness(cx, host_ctor.id, host_ctor.args.len()),
                 span: span.clone(),
             })?;
         arm_used[arm_index] = true;
@@ -2132,7 +2132,7 @@ fn check_match_dependent(
                 ));
             }
             let arm_idx = arm_idx.ok_or_else(|| ElabError::ExhaustivenessError {
-                missing: ctor_name(cx, ctor.id),
+                missing: missing_pattern_witness(cx, ctor.id, n),
                 span: span.clone(),
             })?;
             methods[k] = Some(check_structured_constructor_method(
@@ -2311,8 +2311,8 @@ fn check_match_dependent(
             }
         } else {
             let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
-            let missing = ctor_name(cx, ctor.id);
-            synthesize_omitted_index_method(cx, &premise_domains, &expected_here, &missing, span)?
+            let missing = missing_pattern_witness(cx, ctor.id, n);
+            synthesize_omitted_index_method(cx, &premise_domains, &expected_here, missing, span)?
         };
         for _ in 0..n {
             cx.ctx.pop();
@@ -3182,7 +3182,7 @@ fn synthesize_omitted_index_method(
     cx: &ElabCtx,
     premise_domains: &[Term],
     expected_here: &Term,
-    missing: &str,
+    missing: MissingPatternWitness,
     span: &Span,
 ) -> Result<Term, ElabError> {
     let bottom = Term::const_(cx.env.bottom_id(), vec![]);
@@ -3197,7 +3197,7 @@ fn synthesize_omitted_index_method(
                 .then_some(i)
         })
         .ok_or_else(|| ElabError::ExhaustivenessError {
-            missing: missing.to_string(),
+            missing,
             span: span.clone(),
         })?;
     let premise_count = premise_domains.len();
@@ -3215,6 +3215,15 @@ fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
         .find(|(_, &candidate)| candidate == id)
         .map(|(name, _)| name.clone())
         .unwrap_or_else(|| format!("<ctor_{:?}>", id))
+}
+
+/// The `34 §4.1` unmatched-pattern witness for an omitted constructor:
+/// its name plus the arity needed to render the applied wildcard pattern.
+fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId, arity: usize) -> MissingPatternWitness {
+    MissingPatternWitness {
+        constructor: ctor_name(cx, id),
+        arity,
+    }
 }
 
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
@@ -8306,20 +8315,14 @@ fn build_ctor_buckets(
             }
         }
 
+        let n_args0 = c0.args.len();
         if bucket.is_empty() {
-            let name0 = cx
-                .globals
-                .iter()
-                .find(|(_, &id)| id == c0.id)
-                .map(|(n, _)| n.clone())
-                .unwrap_or_else(|| format!("<ctor_{:?}>", c0.id));
             return Err(ElabError::ExhaustivenessError {
-                missing: name0,
+                missing: missing_pattern_witness(cx, c0.id, n_args0),
                 span: top_span.clone(),
             });
         }
 
-        let n_args0 = c0.args.len();
         let field_types0: Vec<Term> = (0..n_args0)
             .map(|j| subst_outer(&c0.args[j], m0, params0, j))
             .collect();

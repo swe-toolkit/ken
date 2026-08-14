@@ -34,6 +34,28 @@ impl Span {
     }
 }
 
+/// The unmatched-pattern witness a non-exhaustive `match` names (`34 §4.1`):
+/// the constructor together with the arity needed to render it as the
+/// most-general applied pattern (`ConsVector _ _ _`), never a bare
+/// constructor name. For a zero-arity constructor (`Blue`) the applied
+/// pattern and the name coincide; for any constructor with arguments they do
+/// not, which is exactly the property a bare `String` cannot express.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MissingPatternWitness {
+    pub constructor: String,
+    pub arity: usize,
+}
+
+impl fmt::Display for MissingPatternWitness {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.constructor)?;
+        for _ in 0..self.arity {
+            write!(f, " _")?;
+        }
+        Ok(())
+    }
+}
+
 /// A V0 elaboration error (`39 §5.6`): parse, name-resolution, or type error.
 #[derive(Debug, Clone)]
 pub enum ElabError {
@@ -180,8 +202,13 @@ pub enum ElabError {
         family_level: Level,
         span: Span,
     },
-    /// A non-exhaustive match: `missing` names the first uncovered constructor (`34 §4`).
-    ExhaustivenessError { missing: String, span: Span },
+    /// A non-exhaustive match: `missing` names the unmatched pattern witness
+    /// (`34 §4.1`) -- the uncovered constructor applied to wildcard
+    /// placeholders for each of its arguments, not merely its name.
+    ExhaustivenessError {
+        missing: MissingPatternWitness,
+        span: Span,
+    },
     /// A redundant match arm (`34 §5`): the arm's constructor was already covered.
     ReachabilityError { span: Span },
     /// An instance declared outside the module of its class AND its head-type
