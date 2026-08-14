@@ -322,14 +322,39 @@ pattern ::=
   | ident                    -- variable binder (lowercase)
   | "_"                      -- wildcard
   | literal                  -- literal pattern
-  | "(" pattern ("," pattern)* ")"  -- tuple/pair
-  | "{" field_pat ("," field_pat)* "}"  -- record pattern
+  | "(" pattern ")"          -- grouping; never a one-tuple
+  | "(" pattern "," pattern ("," pattern)* ")"  -- tuple/pair, arity >= 2
+  | "{" field_pat ("," field_pat)* "}"  -- open record pattern
   | pattern "as" ident       -- as-pattern
   | pattern "|" pattern       -- or-pattern (same binders)
+field_pat ::= ident "=" pattern | ident  -- explicit or punned
 ```
 
 Pattern matching compiles to nested `elim_D` with exhaustiveness and
 reachability checking (`34`, `39`).
+
+Pattern operators have their own fixed precedence. Constructor application
+binds tighter than `as`, and `as` binds tighter than `|`. Thus `C p as x` is
+`(C p) as x`, `p as x | q` is `(p as x) | q`, and `p | q as x` is `p | (q as
+x)`. To bind the whole disjunction, write `(p | q) as x`. The `as` operator is
+non-associative: a second unparenthesized `as` is a syntax error. A `|` chain is
+parsed as one flat list of alternatives; its grouping has no semantic effect.
+An `as`- or or-pattern used as a constructor argument must be parenthesized.
+
+`(p)` is grouping and has exactly the meaning of `p`. A tuple pattern contains
+at least two patterns, so its spelling contains a comma. An n-ary tuple pattern
+right-nests in the same way as the corresponding tuple expression: `(p, q, r)`
+matches `(p, (q, r))`. There are no distinct zero- or one-tuple patterns.
+
+A record field pattern `label = p` matches `p` against the named projection. A
+punned field `label` means `label = label`: the field label selects the
+projection and the second occurrence is an ordinary variable pattern. Record
+patterns are open; an omitted field is matched by an implicit wildcard. Field
+labels are resolved against the scrutinee's record declaration, and patterns
+are checked in declaration order so dependent later-field types see the
+earlier projections. Source order is not significant. A duplicate or unknown
+field label is a surface error; it is never treated as a positional field or an
+extension field.
 
 ## 5. Specifications
 
