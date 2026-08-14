@@ -209,7 +209,8 @@ pub enum ElabError {
         missing: MissingPatternWitness,
         span: Span,
     },
-    /// A redundant match arm (`34 §5`): the arm's constructor was already covered.
+    /// A redundant match arm (`34 §4.2`): its pattern is entirely subsumed by
+    /// the union of the earlier arms.
     ReachabilityError { span: Span },
     /// An instance declared outside the module of its class AND its head-type
     /// (`33 §5.3`, `39 §6.1`). The orphan check is a syntactic, per-module
@@ -539,14 +540,14 @@ impl fmt::Display for ElabError {
             ElabError::ExhaustivenessError { missing, span } => {
                 write!(
                     f,
-                    "non-exhaustive match at {}-{}: missing constructor '{}'",
+                    "non-exhaustive match at {}-{}: unmatched pattern '{}'",
                     span.start, span.end, missing
                 )
             }
             ElabError::ReachabilityError { span } => {
                 write!(
                     f,
-                    "redundant match arm at {}-{}: constructor already covered",
+                    "redundant match arm at {}-{}: pattern already covered by the earlier arms",
                     span.start, span.end
                 )
             }

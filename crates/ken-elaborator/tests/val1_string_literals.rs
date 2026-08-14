@@ -187,13 +187,17 @@ fn print_line_prim_reduction_builds_itree() {
 
 /// Verifies mod3/mod5/classify elaborate using modular accumulator types.
 ///
-/// Workaround for two surface gaps:
-/// - GAP-nested-patterns: nested constructor patterns trigger ReachabilityError
-/// - No mutual recursion between views
+/// Originally a workaround for two surface gaps, both since closed:
+/// - nested constructor patterns tripping `ReachabilityError` -- closed, see
+///   `is_even_nested_pattern_elaborates_and_reduces` below in this file.
+/// - no mutual recursion between `fn`s -- closed, see
+///   `is_even_is_odd_mutual_group_elaborates_as_one_group` in
+///   `mutual_recursion_surface_acceptance.rs`.
 ///
-/// Solution: define a 3-element `Mod3` and 5-element `Mod5` data type as the
-/// accumulator; `mod3Step`/`mod5Step` are self-recursive on the Nat argument,
-/// passing the incremented accumulator — flat patterns only, no mutual recursion.
+/// The accumulator-type shape is kept as a working regression, not a live
+/// workaround: `mod3Step`/`mod5Step` are self-recursive on the Nat argument,
+/// passing the incremented accumulator -- flat patterns, no mutual
+/// recursion, exercising neither closed gap.
 #[test]
 fn fizzbuzz_classification_elaborates() {
     let mut env = ElabEnv::new().expect("base env");
