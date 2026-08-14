@@ -46,10 +46,17 @@
 
 ## LIVE
 
-**`main` = `c932e7b4`.** Landed through **PR #2226**. Tree clean, nothing
-unpublished, no publisher running. **Thirteen PRs merged 2026-08-14**
-(#2214-#2226); three of them code: `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD`,
-`RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED`, `LANG-MATCH-DIAGNOSTIC-PROSE`.
+**`main` = `0db668d2`.** Landed through **PR #2230**. Tree clean, nothing
+unpublished, no publisher running. **Seventeen PRs merged 2026-08-14**
+(#2214-#2230); four of them code: `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD`,
+`RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED`, `LANG-MATCH-DIAGNOSTIC-PROSE`,
+`LANG-WITNESS-ARITY-DERIVED`.
+
+**ONE LIVE CARRY, filed and NOT discharged by its merge.** The
+`LANG-WITNESS-ARITY-DERIVED` `expect` on the diagnostic path has an
+**error-policy asymmetry with `ctor_name`**, and **no silent arity fallback is
+authorized** (Architect, non-blocking). It is in the node. Whoever next touches
+that path owns it.
 
 **NOTHING IS OWED AND NOTHING IS UNFRAMED. Both rings are working and each has
 a `ready` successor behind it.** Kernel, Verify and Foundation are idle and none
@@ -57,12 +64,13 @@ of them is framing debt -- measured, not assumed.
 
 | ring | in flight | successor, `ready` and framed |
 |---|---|---|
-| runtime | `RT-CONTKEY-CONSUMER-DESCENT-CARRY` (S), implementer engaged from `6da108b6` | `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` (S) |
-| language | `LANG-WITNESS-ARITY-DERIVED` (S), implementer mid-turn | `LANG-REACHABILITY-SUBSUMING-ARMS` (M) |
+| runtime | `RT-CONTKEY-CONSUMER-DESCENT-CARRY` (S), engaged from `6da108b6` | `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` (S) |
+| language | `LANG-REACHABILITY-SUBSUMING-ARMS` (M), kicked `evt_1b5egz25x3xs6` | `LANG-CONVOY-ENCLOSING-FIELD` (S), ready, unrouted by design |
+| spec-enclave | `SPEC-MATCH-PATTERN-PINS` (M), kicked `evt_5xx5y7frrs4d7` | per-slice, after each pin lands |
 | doc | none -- stood down | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` merged, retros in |
 
-**Verify a seat by its PANE, not its convo status** -- `language-implementer`
-read "idle" at 17:16 while 22 minutes into a targeted `-p ken-elaborator` run.
+**Verify a seat by its PANE, not its status** -- `language-implementer` read
+"idle" while 22 minutes into a targeted `-p ken-elaborator` run.
 
 ### THE D2k ROUTE WAS RECOVERED BY ASKING, NOT BY FRAMING
 
@@ -99,7 +107,9 @@ later", "not delivered here". A tracker audit cannot see an obligation never
 entered into it.** Four nodes, one false positive cleared, and it refuted an
 escalation I was about to send ("Language has no ungated work").
 
-**`LANG-MATCH-PATTERN-FORMS-ABSENT` is the largest.** `34 §3` lists nine pattern
+**`LANG-MATCH-PATTERN-FORMS-ABSENT` is the largest, and its prerequisite is now
+released as `SPEC-MATCH-PATTERN-PINS`** -- the five spelling pins the enclave
+named itself. **The next node in that chain is enclave-owned, not Language's.** `34 §3` lists nine pattern
 forms; `PatKind` is `Wild | Var | Ctor` (`ast.rs:167`) and `MatchArm` has no
 guard field (`ast.rs:86`). **Literals, tuple/pair, record, as-, or-patterns and
 guards are all absent** from a chapter marked *impl-ready (L2). Normative and
@@ -116,46 +126,35 @@ not a priority call between `ready` WPs (the operator's).** Nothing
 conformance-grounded is displaced because none of it can be started. **The node
 is not reclassified** -- still ergonomics; `§4.2` mandates only detection.
 
-### TWO QUESTIONS ROUTED, BOTH ANSWERED WITHIN THE HOUR
-
-### TWO QUESTIONS ROUTED, NEITHER BLOCKING -- DO NOT RE-ASK
-
-Both gate the node **after** next, not the one in flight.
+### TWO QUESTIONS ROUTED, BOTH ANSWERED WITHIN THE HOUR, BOTH REFUSED MY FRAMING
 
 **Each was routed with the cheap no-ruling-needed increment offered alongside
-it, and each came back refusing my framing and supplying a better one.**
+it, and that is what converted each into a released node in one exchange.**
 
-**spec-leader `evt_12qrtnp7237dn` on `34 §3`: the six absent pattern forms are
-implementation debt, not an aspirational menu** -- stageable only as explicit
-tracked slices, with **every remainder fail-closed until its slice lands.** Cut
-order and per-slice pins are in `LANG-MATCH-PATTERN-FORMS-ABSENT`. **The next
-material is SPEC pins, not a Language frame** -- as-association, tuple
-comma/grouping, record `field_pat`, or-join, literal comparator table -- so the
-umbrella node stays `draft` and the next node in that chain is enclave-owned.
+**Architect `evt_1rk8wyak0z7sr` -- neither option.** `LANG-CONVOY-ENCLOSING-FIELD`
+is `ready`, `S`, **narrowed to the discriminating fixture; it implements no
+remedy.** Entry-depth fails because the inner match's entry depth **already
+includes** the enclosing match's fields; a threaded floor works but is coarse,
+trading a wrong index for a possible new incompleteness. **The third candidate
+needs no new provenance:** `cx.var_refinements` is keyed by `bottom_pos ==
+abs_pos`, absolute and stable across nesting, so enclosing and inner refinements
+**collide on one key** -- and capability 2 inserts without consulting it. **He
+bounded his own reading: he has NOT established that the overwrite causes the
+`zip` failure.** The node's third outcome is *both hypotheses are wrong*.
 
-**It also corrected me.** I wrote that adding either guards or literals makes
-**both** `§4.2` caveats live at once. **Each form activates its own caveat**;
-what holds of either slice is that **both the coverage and reachability
-obligations become live within it.** And **literals are blocked on more than the
-open TCB question** -- `DecEq Char` alone is insufficient, because
-`Float`/`Float32` and `Decimal` separate runtime value equality from lawful
-proof `DecEq`, and numeric literals need expected-type checking. Corrected in
-both affected nodes.
+**spec-leader `evt_12qrtnp7237dn` -- `34 §3`'s six absent forms are
+implementation debt**, stageable only as tracked slices with **every remainder
+fail-closed until its slice lands**. Cut order and per-slice pins are in
+`LANG-MATCH-PATTERN-FORMS-ABSENT`; the pins themselves are released as
+`SPEC-MATCH-PATTERN-PINS`.
 
-### THE CONVOY QUESTION IS ANSWERED, AND THE ANSWER WAS "NEITHER"
-
-**Architect `evt_1rk8wyak0z7sr` refused both options I offered.**
-`LANG-CONVOY-ENCLOSING-FIELD` is now `ready`, `S`, **narrowed to the
-discriminating fixture alone; it implements no remedy.** Entry-depth is
-insufficient (the inner match's entry depth **already includes** the enclosing
-match's fields); a threaded floor works but is coarse, trading a wrong index for
-a possible new incompleteness. **The third candidate needs no new provenance:**
-`cx.var_refinements` is keyed by `bottom_pos == abs_pos`, absolute and stable
-across nesting, so enclosing and inner refinements **collide on one key** -- and
-capability 2 inserts without consulting it. **He bounded his own reading: he has
-NOT established that the overwrite causes the `zip` failure**, and declined to
-price a remedy from a mechanism found by reading. The node's third outcome is
-*both hypotheses are wrong*, which he named himself. **Detail is in the node.**
+**It corrected me, and both nodes are fixed rather than annotated:** guards and
+literals each activate their **own** `§4.2` caveat -- what holds of either slice
+is that **both the coverage and reachability obligations become live within
+it**. And **literals are blocked on more than the open TCB question**: `DecEq
+Char` alone is insufficient, because `Float`/`Float32` and `Decimal` separate
+runtime value equality from lawful proof `DecEq`, and numeric literals need
+expected-type checking.
 
 ### STILL OWED BY THE OPERATOR -- THREE, AND ONE OF THEM BLOCKS AN IDLE RING
 
