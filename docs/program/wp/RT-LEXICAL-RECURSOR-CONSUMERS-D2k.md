@@ -804,6 +804,78 @@ Authorized by Architect `evt_5ed8ee70cmrt`. **RELEASED to the runtime ring
 > ARCHITECT DECLINED TO SIZE IT.** His own words: a forward walk existing
 > somewhere in the file does not establish that **this** site sits inside one.
 >
+> ## PROBE RUN 2026-08-14. IT RETURNED "No", AND THE "No" WAS THE ARCHITECT'S
+> ## OWN OFF-BY-ONE. ROUTE (c) SURVIVES. THE BLOCK BELOW IS SUPERSEDED.
+>
+> **Read this before the probe specification immediately below it. That
+> specification's comparison is one level off, and its No branch selects a
+> route on a warrant that is false.**
+>
+> **Runtime ran it faithfully and reported the raw pairs rather than only the
+> verdict (`evt_76cmre0qvsmmd`) -- which is the only reason this was
+> recoverable.** No candidate, no source diff, instrumentation removed, focused
+> predecessor control 1/1, row 1's ambiguity left unprobed and uncollapsed.
+>
+> | row 4 | derived at this push | required by the next worker-bearing boundary |
+> |---|---|---|
+> | depth 2 | `(body 26, eliminator 21)` | `(body 16, eliminator 5)` |
+> | depth 3 | `(body 36, eliminator 31)` | `(body 26, eliminator 21)` |
+>
+> **Depth 3's requirement IS depth 2's derived pair.** `(26,21)` appears in both
+> columns, one row apart. The Steward raised that at `evt_3n4e0hs0gy8xm`; the
+> Architect ruled at **`evt_56dvtaft7ep38`**, transcribed in substance here:
+>
+> **`required(N)` = the consumer established at level `N-1`.** Three levels,
+> consistent, **and the two ends come from different sources**: depth 2's
+> requirement matches the **seed** relation (the landed control's
+> `row4-depth-1`), depth 3's matches the **target-derived** one. **That
+> difference is not noise, it is the design statement** -- the carry must be
+> **seeded** from the source relation at the top and then **advanced by
+> target-derivation at each push**.
+>
+> **Why it is structural rather than a coincidence over two points: the descent
+> goes inward and the consumer is outward.** A constructor produced inside a
+> worker body is consumed by the enclosing context, so the consumer needed
+> *inside* level N is the one established *at* level `N-1`. **A carrier that
+> appears to hold "the next level's identity" is a carrier holding the correct
+> identity, read at the wrong level.**
+>
+> - The old probe asked: does `required(N) == derived-at-push(N)`? **No**, correctly.
+> - The deciding question is: does `required(N) == derived-at-push(N-1)`? **Yes**.
+>
+> ⇒ **ROUTE (c) SURVIVES WITH A ONE-LEVEL CORRECTION: derive at the push,
+> ATTRIBUTE TO THE CHILD.** The new discovery carries *"the consumer my
+> producers must use"*, set from the value derived at this push, so at depth N
+> the discovery already holds `required(N)`. **That is the `D5a` shape exactly**
+> -- same struct, same push site, same reason `enclosing_specialization` was
+> added there. **It changes no `BodyEmissionDisposition::ContinuationTemplate`
+> population and touches no continuation-source surface.**
+>
+> ⇒ **(b) IS NOT THE REMAINING HONEST CLASS. It was selected by the off-by-one**
+> -- disregard the No branch below, and disregard the runtime-leader handback's
+> closing line naming (b), which faithfully applied the fork as specified.
+>
+> ### WHAT MUST NOT RIDE IN ON THIS -- ARCHITECT, VERBATIM IN SUBSTANCE
+>
+> **That supplying the relation CLOSES the route is NOT established.** The
+> original stop reported a further refusal at the next `Closure`/static-worker
+> boundary **and** a second recognition retained in the standalone definition.
+> **(c) supplies a missing input; whether the route then closes is a separate
+> measurement.**
+>
+> ⇒ **Frame the successor as "carry the consumer to the level that needs it"
+> and let the route question be its own increment. An AC that assumes closure
+> assumes exactly what nobody has measured.**
+>
+> **Scope of the pattern: row 4 at three levels, consistent with row 5's single
+> level. NOT established for row 1**, a different class, correctly left
+> unprobed.
+>
+> **The row-1 `None` split has LEFT this node.** It is `H4` of
+> [[RT-CONTKEY-REFUSAL-PROFILE-SPLIT]], on the Steward's WP cut, accepted by the
+> Architect at `evt_56dvtaft7ep38` -- grouped by defect class rather than by
+> which node noticed it. **No blocking dependency either way.**
+
 > **THE PROBE THAT SELECTS THE SUCCESSOR -- one instrumented run of the existing
 > controls, and it MAY NOT AUTHOR A CANDIDATE.** At the descent push, for **row
 > 4 depth 2 and depth 3**, does the consumer identity the refusing boundary
