@@ -6,7 +6,7 @@ owner: runtime
 size: S
 gate: none
 depends_on: [RT-CONTKEY-CONSUMER-DESCENT-CARRY]
-blocks: []
+blocks: [RT-CONTKEY-ROUTE-CLOSURE-PROBE]
 github: null
 origin: "Five non-blocking carries the Architect recorded in the resolved Decision dec_7yg4qzfngjwtj (APPROVED on exact b0f9c2ff, resolved_at 2026-08-14T17:54:48Z), none of which amended that exact-SHA approval. Steward-filed per COORDINATION §2 because a carry recorded only in an approval verdict and a PR body evaporates -- the third time that failure was caught the same day, after RT-CONTKEY-REFUSAL-PROFILE-SPLIT and LANG-WITNESS-DIAGNOSTIC-STRICTNESS."
 ---

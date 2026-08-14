@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 18:16:27Z — from 282 issue file(s) in `docs/program/issues/`.
+2026-08-14 18:28:00Z — from 283 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -215,6 +215,7 @@ the committed file matches the generator's output.
 | `RT-CONTKEY-CONSUMING-OCCURRENCE` | The continuation specialization key names the owner of the continuation's own occurrence and has nowhere to name the occurrence that CONSUMES its answer; the enclosing eliminator is measurably not in hand at the interning site, so the fact must be seeded at the outer-match walk and threaded there -- a plan-construction change, not a field addition | merged | runtime | M | none | — |
 | `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` | consuming_occurrence carries two fields and only one of them is checked -- eliminator_origin is copied into the re-derivation before the comparison, so AC-1's assert is x == x on that field, and AC-2's mutation perturbs only the field that was already independent, leaving step 1 never fired | merged | runtime | XS | none | — |
 | `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` | the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured | ready | runtime | S | none | — |
+| `RT-CONTKEY-ROUTE-CLOSURE-PROBE` | the one question the carry merge deliberately did not answer: with required_consuming_occurrence now available at depths 2 and 3, does the D2k-1c route repair close row 4, or does it still refuse at the next boundary -- a measured-and-reverted probe that authors no candidate, because both ways forward from a residual cross a banned surface and the choice between them is the Architect's | ready | runtime | S | none | — |
 | `RT-CONTSPEC-ABI` | ContinuationSpecialization slice 2 — land the explicit unit/descriptor projection and the ABI, owner/lifetime/affinity and zero-allocation negative gates, still DORMANT | merged | runtime | M | none | — |
 | `RT-CONTSPEC-ACTIVATE` | ContinuationSpecialization seam 2 — lowering activation and exact-use consumption: direct call before the identity-erasing join, active emitted owner, affine call occurrence, JoinArm consumption, gating the 37-row lower-owned population | merged | runtime | L | none | — |
 | `RT-CONTSPEC-ASSEMBLY` | ContinuationSpecialization seam 1 — the lawful assembly: extract the accepted branch-scope helper and its feature-gated harness onto the landed slice 0-2 blobs, unactivated, and prove the prior-slice surfaces are untouched | merged | runtime | M | none | — |
@@ -384,6 +385,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
+- `RT-CONTKEY-ROUTE-CLOSURE-PROBE` blocked by `RT-CONSUMER-CARRY-CONTROL-DEBT` (status: ready)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
