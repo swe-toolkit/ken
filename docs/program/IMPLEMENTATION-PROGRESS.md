@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 02:50:50Z — from 250 issue file(s) in `docs/program/issues/`.
+2026-08-14 03:08:27Z — from 250 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -119,7 +119,7 @@ the committed file matches the generator's output.
 | `KW-ORACLE-REMOVE` | Delete the whole-tree source-text oracle: it asserts facts about repository text, which is now a prohibited test subject | merged | language | S | none | 1035 |
 | `KW-THEOREM` | rename the surface keyword `lemma` to `theorem` | merged | language | M | none | — |
 | `LANG-COMMENT-CLASSIFIER-SHARED` | The lexer and the lossless layer each carry their own copy of the block-comment classification -- the `{--`-before-`{-` ordering twice and both end-scanners twice -- so their agreement is held by a comment saying they mirror each other `exactly` and by tests, with nothing failing to compile when they diverge; and the divergence they can reach disagrees about comment KIND rather than acceptance, which the `is_ok()`-comparing net cannot see and round-trip cannot see either | merged | language | S | none | — |
-| `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | active | language | S | none | — |
+| `LANG-COMMENT-POPULATION-PARITY` | The B1 round-trip helper counts a comment population that production stopped using -- `assert_round_trip` filters `TriviaKind::LineComment` while `attach_comments` filters `is_comment()`, so the whole-`catalog/` walk is green only because no catalog source contains a block or doc comment, and the first author who writes one gets a red in a different crate accusing the attachment mechanism of losing a home | merged | language | S | none | — |
 | `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` | `37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row | draft | language | unsized | operator | — |
 | `LANG-FOREIGN-NAME-CONTROL-CHARS` | Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet | merged | language | XS | none | 2128 |
 | `LANG-FOREIGN-NAME-FORMAT-CHARS` | Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FEFF -- are a visual-spoofing vector at the same `foreign`-name trust boundary the Cc control-character check just closed, and they are a DIFFERENT vector: not truncation but two distinct declarations rendering identically to the reviewer doing the check | draft | language | XS | none | — |
