@@ -153,13 +153,18 @@ that size with the same shape on the exhaustiveness side.
 
   > **THE CONTINGENCY, WHICH IS THE PART WORTH CARRYING FORWARD.** The
   > reachability prose is accurate **because** those two surface features do not
-  > exist. **Adding either makes both caveats live at once**, and `arm_used`
-  > would then need the `§3.3` guard exception it does not have. The person who
-  > adds guards or literal patterns will be reading `§4.2`, not this file --
-  > which is why the same sentence is recorded in
-  > [[LANG-MATCH-PATTERN-FORMS-ABSENT]], where that person is actually working.
-  > **This node must not implement either feature**; it records the dependency
-  > and stops.
+  > exist. **Corrected by the spec enclave at `evt_12qrtnp7237dn`:** guards and
+  > literals each activate their **own** feature caveat -- **not** both caveats
+  > merely because either lands, which is what the Steward first wrote here.
+  > What holds of either slice is that **both the coverage and the reachability
+  > obligations become live within it**, and `arm_used` would then need the
+  > `§3.3` guard exception it does not have.
+  >
+  > The person who adds guards or literal patterns will be reading `§4.2`, not
+  > this file -- which is why the same paragraph is recorded in
+  > [[LANG-MATCH-PATTERN-FORMS-ABSENT]], where that person is actually working
+  > and where the enclave's cut order lives. **This node must not implement
+  > either feature**; it records the dependency and stops.
 - **Not an amendment to `34 §4.2`.** If the conclusion is that the spec *should*
   mandate the subsuming arms, that is a Spec-enclave question raised as one,
   never a deliverable here.

@@ -8,7 +8,7 @@ gate: none
 depends_on: []
 blocks: []
 github: null
-origin: "Steward sweep 2026-08-14 at main 6da108b6, reached from the Adversary hunt evt_4d10j8tmjsbhj -- which measured, as a side observation on a diagnostic-prose node, that 34 §4.2's two reachability caveats are BOTH unreachable because MatchArm has no guard field and PatKind has no literal kind. That is a symptom; this node is the cause. The census below is the Steward's, measured after the hunt. Filed draft and unsized because the CUT is the deliverable and it is not yet made. Steward-filed per COORDINATION §2."
+origin: "Steward sweep 2026-08-14 at main 6da108b6, reached from the Adversary hunt evt_4d10j8tmjsbhj -- which measured, as a side observation on a diagnostic-prose node, that 34 §4.2's two reachability caveats are BOTH unreachable because MatchArm has no guard field and PatKind has no literal kind. That is a symptom; this node is the cause. The census below is the Steward's, measured after the hunt. Filed draft and unsized because the CUT is the deliverable and it is not yet made. Steward-filed per COORDINATION §2. AMENDED 2026-08-14 on the spec-enclave disposition evt_12qrtnp7237dn, which ruled 34 §3 an impl-ready present-tense obligation whose six absent forms are implementation debt rather than an aspirational menu, gave a prerequisite-ordered cut, and CORRECTED the Steward's caveat claim -- see the box below."
 ---
 
 ## What this is
@@ -65,56 +65,104 @@ pub enum PatKind {             // :167
 and no node. That is the strongest grounding available for a new node** and it
 is the same shape as the three obligations the deferral sweep already produced.
 
-## THE DELIVERABLE OF THIS NODE IS THE CUT
+## THE CUT IS THE DELIVERABLE, AND THE ENCLAVE HAS NOW GIVEN IT
 
-**Six forms is not one WP and this file is not a frame.** The forms do not
-decompose evenly and at least three carry a dependency that is not theirs:
+**Six forms is not one WP and this file is not a frame.** That much was clear at
+filing; what this node could not supply was the order and the prerequisites.
+**Both are now ruled -- see the disposition table below, which supersedes the
+Steward's guesses in this section.**
 
-- **Literals depend on decidable equality**, whose widening is the open operator
-  TCB question gating [[LANG-DECEQ-CHAR-LAWFUL-INSTANCES]]. **Do not cut a
-  literal-patterns WP before that is answered.**
-- **Guards change the exhaustiveness contract**, not just the pattern grammar.
-  `§3.3` is explicit: a guarded arm does **not** discharge its constructor, so
-  `§4.2` coverage and reachability both change the day guards land.
-- **Or-patterns change binder checking** -- identical binder sets across
-  alternatives is a new well-formedness rule, not a new `PatKind` row.
+Recorded because it is the reasoning the ruling had to answer, and because two
+of the three guesses were wrong:
 
-**As-patterns and tuple/record patterns look like the two contained slices**,
-and that is a Steward reading of the spec text, not a measurement. **Whoever
-cuts this measures it first.**
+- **Literals depend on decidable equality.** ⇒ **Understated.** The enclave
+  ruled `DecEq Char` alone insufficient; `Float`/`Float32` and `Decimal`
+  distinguish runtime value equality from lawful proof `DecEq`, and numeric
+  literals need expected-type checking besides. The blocker is larger than the
+  open operator TCB question gating [[LANG-DECEQ-CHAR-LAWFUL-INSTANCES]].
+- **Guards change the exhaustiveness contract**, not just the pattern grammar --
+  `§3.3` is explicit that a guarded arm does not discharge its constructor. ⇒
+  **Stands**, and the enclave made it sharper: guards are **atomic** with their
+  conditional lowering and all `§3.3`/`§4` behaviour, and **do not depend on
+  literals.**
+- **Or-patterns change binder checking.** ⇒ **Stands**, and the rule is bigger
+  than "identical binder sets": see row 4 below.
+- **"As-patterns and tuple/record patterns look like the two contained
+  slices."** ⇒ **Half wrong.** As-patterns are the smallest first delivery, but
+  **record patterns are not to be bundled with tuples merely because both
+  project.** They are separate slices with separate pins.
 
-## What must ride along with GUARDS specifically, whenever that slice is cut
+## THE CAVEAT CLAIM, CORRECTED BY THE ENCLAVE
 
-> **`34 §4.2`'s two reachability caveats are both vacuous today, and adding
-> either guards or literal patterns makes BOTH live at once.** The reachability
-> checker is `arm_used` -- an arm that never won at any leaf -- at `elab.rs:1737`,
-> `:2427` and `:8446`. **It has no `§3.3` guard exception**, because there has
-> never been a guard.
+> **What I wrote was wrong and the correction is finer-grained.** I wrote that
+> adding **either** guards or literal patterns makes **both** of `34 §4.2`'s
+> caveats live at once. **Spec enclave, `evt_12qrtnp7237dn`: guards and literals
+> each activate their OWN feature caveat, not both caveats merely because either
+> lands.** What *is* true of either slice is that **both the coverage and the
+> reachability obligations become live within it.**
+>
+> The underlying measurement stands and is unaffected: `MatchArm` has no guard
+> field (`ast.rs:86`), `PatKind` has no literal kind (`ast.rs:167`), and the
+> reachability checker `arm_used` (`elab.rs:1737`, `:2427`, `:8446`) **has no
+> `§3.3` guard exception**, because there has never been a guard.
 >
 > ⇒ **A guards slice that adds the syntax and the elaboration but not the
-> `§4.2`/`§3.3` coverage exception ships a checker that calls correct programs
+> `§3.3` coverage exception ships a checker that calls correct programs
 > redundant.** The reachability prose landed by `LANG-MATCH-DIAGNOSTIC-PROSE` is
-> accurate **contingent on this absence** and goes stale on the same day.
+> accurate **contingent on the absence** and goes stale with its own slice.
 >
-> Measured by enumerating the AST variants, not by a grep that found nothing
-> (Adversary `evt_4d10j8tmjsbhj`; re-checked by the Steward at `6da108b6`). The
-> mirror of this paragraph is in [[LANG-REACHABILITY-SUBSUMING-ARMS]].
+> **The enclave adds one rule the cut must obey:** each **wrapper** form can
+> start over the current baseline, but **every later inner pattern form must add
+> a composition discriminator.**
+>
+> Original measurement: Adversary `evt_4d10j8tmjsbhj`, re-checked by the Steward
+> at `6da108b6`. The mirror of this paragraph is in
+> [[LANG-REACHABILITY-SUBSUMING-ARMS]].
 
-## Flip condition
+## THE ENCLAVE DISPOSITION AND ITS CUT ORDER
 
-**Flip to `ready` per slice, not as a whole.** The first slice to be cut needs
-two things this node deliberately does not decide: **which forms are one WP**,
-and **whether any of them is gated on a kernel or spec question** the way
-literals are gated on decidable equality.
+**`evt_12qrtnp7237dn`. `34 §3` is an impl-ready, present-tense obligation, and
+the six absent forms are implementation debt, not an aspirational menu.** They
+may be staged **only as explicit tracked slices**, and **every remainder stays
+fail-closed until its slice lands** -- so a partial delivery must reject what it
+has not implemented, never silently accept it.
 
-**The route is the Spec enclave, not the Architect alone** -- the question is
-what `34 §3` obliges and in what order, which is spec-shaped. **Raise it as
-"what does the chapter oblige and what is genuinely stageable", never as "which
-node should this be"**, which presumes the answer.
+**The umbrella node stays `draft`. It is not a six-form frame and must never
+become one.**
 
-**One thing that is already decided and does not need the ruling:** this node
-does **not** amend `34`. If the conclusion is that some form should be dropped
-from the surface, that is a spec-erratum question raised as one.
+| order | slice | prerequisite pin, which does not exist yet |
+|---|---|---|
+| 1 | **as-patterns** -- alias binds the whole matched scrutinee, no split, preserves `p`'s coverage/reachability, rejects collision with an inner binder | `p as x` association/precedence |
+| 2 | **tuple/pair patterns** -- dependent `Σ` projection typing, right-nesting for arity >2, componentwise coverage/reachability, `Proj1`/`Proj2` lowering with no pair `elim` | `(p)` is grouping; a tuple requires a comma |
+| 3 | **record patterns** -- **do not bundle with tuples merely because both project** | `field_pat` spelling: label/value form, punning, omission and open-vs-closed, duplicates and unknown fields, source order |
+| 4 | **or-patterns** -- owns union coverage and residual duplication | full binder-join rule and association with `as`: identical name sets, exactly one binding per alternative, corresponding types definitionally equal in the common pre-branch context, canonical branch environment |
+| 5 | **guards** -- atomic with their conditional lowering and all `§3.3`/`§4` coverage, reachability and non-refinement behaviour. **They do not depend on literals.** | none named |
+| 6 | **literals** -- **blocked** | a literal-kind-to-value-comparator table and a corrected citation, plus the relevant equality authority |
+
+**On literals, the enclave went further than this node did: `DecEq Char` alone
+is insufficient.** `Float`/`Float32` and `Decimal` distinguish runtime value
+equality from lawful proof `DecEq`, and numeric literals additionally require
+expected-type checking. ⇒ **The literal slice is blocked on more than the open
+operator TCB question**, and this node's earlier statement that it was gated on
+that question alone understated it.
+
+## Flip condition -- the enclave named the next material, and it is SPEC work
+
+**The disposition is explicit: the next material needed is the small spec pins
+in the table above, and THEN a first contained as-pattern slice** -- not a
+six-form frame.
+
+⇒ **The next node in this chain is spec-enclave-owned, not Language-owned.**
+Nothing can be released to Language until the `p as x` association/precedence
+pin exists, because a slice built against an unpinned association is a slice
+that gets rebuilt.
+
+**This node flips per slice, never as a whole, and only after its pin lands.**
+
+**One thing already decided and needing no further ruling:** this node does
+**not** amend `34`. The enclave ruled the chapter's obligations real, so the
+"drop it from the surface" branch is closed -- the six forms are debt to be
+paid, not text to be corrected.
 
 ## Not this node
 
