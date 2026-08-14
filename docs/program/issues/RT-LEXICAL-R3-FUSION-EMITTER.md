@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 depends_on: []
-blocks: [RT-RECURSOR-TRANSPORT]
+blocks: [RT-RECURSOR-TRANSPORT, RT-LEXICAL-RECURSOR-CONSUMERS]
 github: null
 origin: Steward re-cut of RT-LEXICAL-RECURSOR-CONSUMERS after its AC reconciliation returned 0 of 8 discharged across eleven merged D2f partials (runtime-leader, evt_d9n0twj6y5sp). Separability ruled by the Architect at evt_7knsqyqg72103 on a Steward question (evt_2vbhz9kgp0b44). Steward-filed (agents cannot create tracked work per COORDINATION 2).
 ---
