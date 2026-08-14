@@ -63,92 +63,66 @@
 > Builds allowed, targeted only, never `--workspace`.
 
 
-> ### RESUME HERE — state at 2026-08-14 ~13:0xZ. **`main` = `43a01ca2`.**
-> **PUBLISH QUEUE EMPTY. Both candidates landed and closed out. Runtime is
-> working; Language is idle awaiting its next kick.**
+> ### RESUME HERE — state at 2026-08-14 ~13:1xZ. **`main` = `f78b486d`.**
+> **BOTH BUILD TEAMS ARE WORKING. Publish queue empty, no publisher, tree
+> clean. Nineteen PRs landed today, all M6 blob-verified.**
 >
-> **`#2202` `12cefd5b`** Runtime `D2k-1a` (M6 1/1) · **`#2203` `43a01ca2`**
-> Language `LANG-STACK-ARC-EVIDENCE-USABILITY` + `LANG-POW10` (M6 3/3). M3 clean
-> on both. M8/M9 sent for `#2202`.
+> Most recent: `#2202` `12cefd5b` Runtime `D2k-1a` (M6 1/1) · `#2203` `43a01ca2`
+> Language `LANG-STACK-ARC` + `LANG-POW10` (M6 3/3) · `#2204` `f78b486d`
+> closeouts + `merge-procedure` M5a. M3 clean on both code merges.
 >
-> ### THE FLAKE AND ITS RECOVERY — now `merge-procedure.md` M5a, read it there
+> ### RUNTIME: `D2k-1c` HARD-STOPPED, ARCHITECT RULED, PROBE RELEASED
 >
-> `#2202` reddened once on a runner fault (`library_documentation_gates.rs`
-> synthetic-git fixture, `git commit -m "filler 16"` → `bad tree object HEAD`;
-> shards 1/2/4 green, `main` green). **Merged unchanged on a re-triggered run at
-> the SAME SHA** — the re-run was green on identical code, which is the
-> confirmation.
+> **All five expressions are stopped** — rows 4 and 5 first, then row 1 on the
+> same measurement. The Architect ruled at **`evt_3zjhbbr7k3ky6`**; I released
+> only Section 5's **probe** at **`evt_hkqp2pjrknaj`**. **No new node yet, and
+> that is deliberate** — the probe decides whether the successor is a field
+> addition or a plan-construction change, and I will not draw the boundary
+> before that fact.
 >
-> **`gh run rerun --failed` is REFUSED to the publisher identity** (`Resource
-> not accessible by integration`, no `actions:write`). **The route that works is
-> `gh pr close` + `gh pr reopen`** — `ci.yml` triggers on `pull_request`, whose
-> default types include `reopened`, so a fresh run starts on the identical SHA.
-> Never push an empty commit to kick CI: that detaches the exact-SHA verdict and
-> costs the ring a fresh Decision for a flake.
+> **The probe:** at the site interning the specialization key for rows 4/5, is
+> the **enclosing eliminator occurrence in hand**? Print the enclosing walk's
+> current occurrence beside the interned key; **do not infer it from the call
+> graph.** In hand ⇒ small field + forward write. Not in hand ⇒ its own node.
 >
-> ### NEXT: LANGUAGE IS IDLE — `LANG-GADT-SEQUENCE-TRACKER-GAP`
+> **Four things the ruling settled — do not re-derive, and frame them into the
+> successor:**
+> 1. **Widening the existing `consumer_owner` is closed STRUCTURALLY** —
+>    `exact_continuation_source_environment` validates it *equals* the coarse
+>    owner and fails closed. The all-`Fn(0)` equality is an **enforced
+>    derivation, not a coincidence.** Cheapest wrong turn available; presents as
+>    a one-line change.
+> 2. **Do not build on `ContinuationInputProjection`** — a per-input carrier
+>    cannot express a per-edge fact for an edge with **zero inputs**.
+> 3. **The carrier is the edge's own key, BESIDE `consumer_owner`**, precedent
+>    `producer_owner`/`emission_owner` in the same struct. Value must be an
+>    **occurrence coordinate, not an owner.**
+> 4. **The forbidden reverse search is NOT needed** — enter at the outer match,
+>    not the continuation. Mint the fact **forward** at the enclosing eliminator.
 >
-> `ready`, `S`, `gate: none`, `depends_on: []`. **Gate and compact the ring
-> before kicking.** Its `AC-4` puts `crates/` out of scope, so it is a tracker
-> and audit node: four `SURF-gadt-*` frames exist in `docs/program/wp/` with no
-> tracker node, and the code has moved past every frame's stated baseline.
+> **Ruled: the successor inherits NO Kernel block.** §7's exclusions stay
+> excluded; needing that surface is **a second stop, not a widening**.
 >
-> ### RUNTIME'S NEXT SLICE IS `D2k-1c` — ALREADY AUTHORIZED, DO NOT RE-RELEASE
+> **`D2k-0` IS ANSWERED — the control holds**, 1/1 at `12cefd5b`, tested rather
+> than inherited. That was the release condition and it is discharged.
 >
-> **My M9 named `D2k-1b-i`, which is WRONG — that merged as `45addeaf` on
-> 08-12.** The leader caught it. `RT-LEXICAL-RECURSOR-CONSUMERS-D2k.md:158`:
-> *"The successor is `D2k-1c`, framed in section 5. It is a route repair.
-> Nothing in it has been done."* Architect authorization `evt_5ed8ee70cmrt`,
-> released 08-12 anchor `evt_2b1zhe78c81at`. **No new node, no new release.**
+> ### LANGUAGE: working `LANG-GADT-SEQUENCE-TRACKER-GAP`, anchor `evt_6jb0p5w0zx69p`
 >
-> - **`D2k-1c-0` and `1c-0b` are LANDED** at `1a16a64d` (PR #1996); its deciding
->   read is **answered** — do not re-run it.
-> - **The head block's origin-identity table was measured on `11e4eae1`, a
->   REJECTED object.** It records where a measurement was taken, not that the
->   identities survived the recut. Re-derive at your own base.
-> - **`AC-1` is OPEN and unqualified.** *"Conservation holds"* and *"the five
->   rows are green"* are different claims; only the second closes the node.
+> Ring reset to `f78b486d`. **`language-leader` is NOT compacted** — the gate's
+> `/compact` was refused (*"disabled while a task is in progress"*) and stayed
+> refused on retry; implementer and QA are compacted and verified. Told the
+> leader rather than letting it assume a clean start. **Retry its compaction at
+> the next WP boundary.**
 >
-> ### OWED TO ME AND STILL UNANSWERED: `D2k-0`'s redness claim
+> ### KERNEL AND VERIFY ARE IDLE, NEITHER IS FRAMING DEBT
 >
-> The kick made testing it an explicit condition rather than a premise, because
-> nobody had verified it. Runtime went straight to the increment. **Asked twice.
-> The record still cannot distinguish "confirmed by the ring that tested it"
-> from "nobody checked."**
->
-> **Seventeen PRs landed today, all M6 blob-verified.** Most recent: `#2195`
-> `6c574cdd` `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` · `#2196` `1200edf0`
-> `RT-C2-OBSERVATION-SELFCHECK-CRATE-MISMATCH` · `#2197` `998c3c83` closeouts +
-> the operator ruling · `#2198` `54f7c84a` the Runtime release · `#2199`
-> `99869bb7` the briefing rewrite. **M8/M9 sent for every code merge.**
->
-> **`#2189` cost one publisher abort on a FALSE RED, and the lesson is
-> positional.** The SHA was unchanged by design, so GitHub still carried the
-> **pre-repair** check-runs. **A failing check on an unchanged SHA may be
-> history — discriminate by `started_at`.** The publisher does not. A direct
-> `gh pr merge` was correctly refused by branch protection; **`--admin` is not
-> the Steward's to use.**
->
-> ### LANGUAGE IS WORKING TWO NODES AS ONE CANDIDATE — do not re-kick
->
-> `LANG-STACK-ARC-EVIDENCE-USABILITY` (`S`) **carrying**
-> `LANG-POW10-CASCADE-LITERAL-CLAUSE` (`XS`). Both touch `crates/ken-elaborator`
-> and land as **one** candidate; `POW10`'s own Sizing section says it should
-> ride rather than spend a ring turn. **They are independent repairs sharing a
-> build, not one deliverable** — if either stalls, land the other.
->
-> **I overrode the leader's stated next, deliberately and on the record.** The
-> leader named `LANG-GADT-SEQUENCE-TRACKER-GAP`; its `AC-4` puts `crates/` out
-> of scope, so it produces **no product change**, and an idle ring gets the
-> product node first. That node is now sequenced second **on sequencing, not
-> merit** — its own text says so, and its stale "Language has no other `ready`
-> node" premise is corrected in place.
->
-> **Read `LANG-POW10`'s "why this is not a second COLDNESS-CLAIM" section
-> before sizing it.** `decimal_char.rs:60-62` is over-broad in the same way, but
-> its conclusion rests on a **different and TRUE** property (no
-> `saturating_*`/`.min(_)`/`clamp` in the generated cascade). **A wording repair
-> on a sound argument, not a second false justification.**
+> **Kernel** — `KERNEL-NESTED-IND` blocked at `AC-K12` on
+> `RT-NESTED-IH-NATIVE-REALIZATION`, Runtime-owned and parked behind the
+> operator's RecursiveDescent ruling. **Kernel has no other node.** The ruling
+> idles that ring; recorded as a consequence for the operator, not re-derived.
+> **Verify** — `SEC1-IFC-R3`'s own text forbids framing a Verify slice against
+> it; blocked on Spec closure, Architect-owned kernel-facing theorems, and the
+> operator's V3 fork. Hard stop already routed.
 >
 > ### OPERATOR PRIORITY RULING 2026-08-14 — RUNTIME'S LANE IS RE-RANKED
 >
