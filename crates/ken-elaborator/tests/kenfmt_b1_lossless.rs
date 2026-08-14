@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ken_elaborator::lossless::{parse_lossless, CommentPlacement, FormattableSource, TriviaKind};
+use ken_elaborator::lossless::{parse_lossless, CommentPlacement, FormattableSource};
 
 fn assert_round_trip(label: &str, source: &str) {
     let lossless = parse_lossless(source)
@@ -22,7 +22,7 @@ fn assert_round_trip(label: &str, source: &str) {
     let comment_count = lossless
         .trivia()
         .iter()
-        .filter(|item| item.kind == TriviaKind::LineComment)
+        .filter(|item| item.kind.is_comment())
         .count();
     assert_eq!(
         lossless.comment_attachments().len(),
@@ -86,6 +86,19 @@ const b : Nat = (\n\
             "each focused comment has one span-keyed AST home"
         );
     }
+}
+
+#[test]
+fn block_and_doc_comments_are_counted_for_attachment() {
+    // LANG-COMMENT-POPULATION-PARITY D4/AC-1/AC-2 -- a fixture the pre-widen
+    // `TriviaKind::LineComment`-only filter undercounted: one block comment,
+    // one doc-line comment, neither a `LineComment`. This is the population
+    // `catalog/`'s corpus walk cannot exercise, since no catalog source
+    // contains a block or doc comment.
+    assert_round_trip(
+        "block-and-doc",
+        "{- leading block -}\nconst a : Nat = Zero --- doc for b\nconst b : Nat = Zero\n",
+    );
 }
 
 #[test]
