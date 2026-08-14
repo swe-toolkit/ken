@@ -11,7 +11,89 @@ github: null
 origin: "Measured by the Steward 2026-07-27 at origin/main e700b861 while discharging the CAT-CAPEX ordering question; not routed by any ring. Re-measured and FRAMED by the Steward 2026-08-14 at main a12f37b7, at which point both recorded holds were discharged -- SPEC-IDENT-BLESSED merged, and CAT-CAPEX (the exemplar this node's own scope note said should land first) merged. The re-measurement found a fourth stale axis the original census missed and corrected the size of the other three."
 ---
 
-> # RESCOPED 2026-08-14 AFTER `D0` HARD-STOPPED. READ THIS FIRST.
+> # ARCHITECT RULING `evt_3eqh0vxc5v95p` -- THE HOLD IS LIFTED. READ THIS FIRST.
+>
+> **`62` already owns the mechanism. Do not build a new one.** The answer turns
+> on `§H` and `§8`, which `D0` did not cite. He read the chapter at `ed65aa40`
+> directly rather than work from the census.
+>
+> **The standing:** `62`'s *security requirements* stay committed and
+> chapter-wide; its *operation-level* claims narrow to the FS axis, the only
+> landed one; every Net-axis and bounded-quantification claim moves out of the
+> present tense into a `§H` row plus a `§8 Deferred (named, `(oracle)`-tagged)`
+> entry. **Nothing is deleted.** `§H` is already a graded status ledger and `§8`
+> already separates Committed / Decided / Deferred.
+>
+> The chapter's own charter decides it -- `§H` opens by quoting `64 §4`,
+> *"a verified language that over-claims is itself a security risk."*
+> **Present-tense Net material is an over-claim by the chapter's own standard,
+> in a security chapter, about security properties.**
+>
+> ## Record the CLASS per site. A flat unexpressible-sites table is wrong.
+>
+> **The three classes have different exit conditions**, and a flat list loses
+> them so the next attempt re-derives them. Tag each site with its class and
+> its unblocking condition.
+>
+> | class | sites | exit condition |
+> |---|---|---|
+> | **1. Net -- no landed surface at all** | `send`, `Cap_Net`, `:337`, `AC6 exfil` | a Net surface exists. The `§H` row **must name `38 §1.3.1`'s FS shape as the target**, so Net lands authority-indexed rather than re-litigated. Requirement stays committed -- precedent is `§8 OQ-Space`'s *"the security requirement is fixed regardless of runtime construct form"* |
+> | **2. the use-site bound `a ⊑ authority c`** | `:173`, `§3.1` | bounded authority quantification exists |
+> | **3. the `AC3` order-dual pair** | `§3.2`, `§7` | whichever of 1 or 2 first admits a distinguishing sink pair |
+>
+> ## `§H` IS CURRENTLY WRONG ABOUT THE LANDED SURFACE, and this is the big one
+>
+> **`§H` grades use-site sufficiency as *kernel-backed (refinement
+> obligation)*** -- *"a sink refines its cap parameter `{c | a ⊑ authority c}`;
+> each call emits the obligation."* **Landed sinks take an exact `Cap AFull`
+> and `38 §1.3.1` provides no bounded authority quantification, so NO LANDED
+> SINK EMITS THAT OBLIGATION.**
+>
+> ⇒ Re-grade that row to design-committed-but-not-instantiated, keeping the
+> encoding as the pinned target. **This is not a currency nit: it is the
+> chapter claiming a kernel-backed guarantee it does not currently have.**
+>
+> ## `AC3` -- retain as explicitly metatheoretic. DO NOT respell it.
+>
+> **This supersedes the read-path option this frame offered below; the
+> Architect ruled it out and his reason is stronger than the one I gave.**
+> `§3.2` establishes the kernel obligation is **direction-degenerate at meet**
+> -- the canonical witness discharges both orientations by `⊑-refl`, so a
+> backwards `⊑` still type-checks. **The pair is the sole net over a named
+> soundness gap**, privilege escalation via inverted attenuation.
+>
+> Under a `writeFile` respell both halves reject on capability *type* before
+> either sink comparison is reached, so **the pair goes red-red and stops
+> distinguishing the orientation at all** -- while `§H` goes on claiming it is
+> netted. **A conformance pair that is red for an unrelated reason is worse
+> than an absent one, because the ledger still reads as covered.**
+>
+> ## ONE GREP IS REQUIRED BEFORE THE CENSUS LANDS -- it changes a disposition
+>
+> `§H` says the orientation is *"netted by the non-degenerate conformance pair
+> (§3.2)"*. **Does the capabilities conformance corpus contain an EXECUTING
+> pair that distinguishes the two `⊑` orientations at a sink, given landed
+> sinks take exact `Cap AFull`?**
+>
+> - **yes** -- the row stands; mark `§7`'s block metatheoretic and move on.
+> - **no** -- `§H` is claiming a live net that does not run, and the row
+>   re-grades to *trusted / not currently netted*, as a named gap.
+>
+> **He explicitly declined to rule this blind. Do not assume either branch.**
+>
+> ## The durable principle
+>
+> **A spec chapter may be ahead of the implementation, but it must not be ahead
+> of its own honesty ledger.** Present tense is reserved for what the landed
+> surface provides; everything else is graded in `§H` and listed in `§8`.
+> **`62` is not drifting -- it is UNGRADED, and grading is a mechanism it
+> already has.**
+>
+> **`D1`-`D4` are unheld into this shape.** `AC-1`'s correction stands:
+> `readFile`/`writeFile` are current and stay, including `:236` and `:386`.
+
+> # RESCOPED 2026-08-14 AFTER `D0` HARD-STOPPED. Superseded in part by the
+> # ruling above; kept because it records why the stop was correct.
 >
 > **`D0` fired stop condition 3 before any edit, which is the frame working.
 > Two of the three reasons were defects in this frame, and both are fixed
