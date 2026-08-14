@@ -5758,7 +5758,9 @@ fn contkey_rows_four_and_five_carry_the_exact_outer_consuming_occurrence() {
 /// planner records the required consumer on the discovery at producer use and
 /// records the target-derived consumer installed on its child push. The same
 /// compiles report the existing key's consuming occurrence and interned-unit
-/// population.
+/// population. Each separately sized compile observes one outermost required-
+/// consumer level; intermediate boundaries are not observed in that compile
+/// and are inferred from the sibling compiles.
 ///
 /// CLAIMED: at depth 1, `required` coincides with that level's consuming
 /// occurrence; from depth 2 onward, `required(N)` is the existing occurrence
@@ -5773,8 +5775,11 @@ fn contkey_rows_four_and_five_carry_the_exact_outer_consuming_occurrence() {
 ///
 /// Promise class: durable invariant. The depth-2/depth-3 equalities compare
 /// independently produced planner records. The depth-1 equality states the
-/// boundary convention directly. None uses fixture origin literals, so source-
-/// origin renumbering cannot require re-recording the test.
+/// boundary convention directly. None uses fixture origin literals. The cross-
+/// compile comparisons instead rely on the generator's wrapper-invariance:
+/// adding a wrapper preserves the inner level's origins from the sibling
+/// compile. Renumbering inside the generator can therefore false-red this
+/// control without a carry defect.
 #[test]
 fn contkey_row_four_discovery_carries_the_outer_boundary_then_previous_consumers() {
     use crate::cranelift_backend::planning::{
