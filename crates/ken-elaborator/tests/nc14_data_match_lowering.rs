@@ -254,6 +254,223 @@ fn nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_thre
     );
 }
 
+fn scalar_merge_observations_for_program(
+    program: &mut RuntimeProgram,
+    example: ken_runtime::RuntimeExample,
+    entry_symbol: &str,
+) -> Vec<ken_runtime::DasmC2ScalarMergeObservation> {
+    program.examples = vec![example.clone()];
+    let artifact = ken_runtime::RuntimeArtifactIdentity {
+        package_identity: program.package_identity.clone(),
+        core_semantic_hash: program.core_semantic_hash,
+        artifact_hash: program.artifact_hash,
+    };
+    let target = ken_runtime::RuntimeIrTargetIdentity::from_example(&example);
+    let unavailable = |reason: &str| ken_runtime::RuntimeIrEvidenceFact::Unavailable {
+        reason: reason.to_string(),
+    };
+    let runtime = ken_runtime::RuntimeIrRunReport {
+        evaluator: ken_runtime::RuntimeIrEvaluator::DirectRuntimeIrEvaluatorV1,
+        target: target.clone(),
+        artifact: artifact.clone(),
+        observation: ken_runtime::RuntimeIrObservation {
+            artifact,
+            target: target.clone(),
+            observation: example.observation.clone(),
+            evidence_source: "RT-DYNAMIC-ARM-SCALAR-MERGE c2 control".to_string(),
+        },
+        evidence: ken_runtime::RuntimeIrRunEvidence {
+            package_identity: program.package_identity.clone(),
+            core_semantic_hash: program.core_semantic_hash,
+            runtime_artifact_hash: program.artifact_hash,
+            target_example: target.example.clone(),
+            checked_core_shape: target.checked_core_shape.clone(),
+            evidence_sources: BTreeMap::new(),
+            unavailable: BTreeSet::new(),
+        },
+        trust: ken_runtime::RuntimeIrTrustReport {
+            tier: ken_runtime::RuntimeIrTrustTier::RuntimeIrObservation,
+            evaluator: unavailable("the control supplies a comparison input"),
+            interpreter_oracle: unavailable("outside c2"),
+            native_backend: unavailable("measured by the c2 seat observer"),
+            object_artifact: unavailable("outside c2"),
+            linker: unavailable("outside c2"),
+            source_level_proof: unavailable("outside c2"),
+        },
+    };
+    let scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
+    let _later_native_result = ken_runtime::emit_runtime_ir_object_with_cranelift(
+        program,
+        &runtime,
+        &ken_runtime::NativeSeedEnvironment::empty(),
+        entry_symbol,
+    );
+    scope.finish()
+}
+
+#[test]
+fn d5_native_scalar_merge_admits_checked_structural_nat() {
+    // Promise class: durable invariant. The package-backed D5 source has one
+    // Nat-valued carried Match arm. Its exact checked constructor authority
+    // must fold that operand to StructuralNat before the scalar merge; later
+    // native stages are deliberately outside this assertion.
+    let package = "nested_inductive_pkg";
+    let target_name = "liftSize";
+    let source = "data Bag (a : Type) : Type where { \
+          Empty : Bag a ; One : a -> Bag a ; Join : a -> a -> Bag a \
+        }\n\
+        data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)\n\
+        fn liftAdd (x : Nat) (y : Nat) : Nat = match x { \
+          Zero |-> y ; Suc x2 |-> Suc (liftAdd x2 y) \
+        }\n\
+        fn liftSize (r : LiftRose) : Nat = match r { \
+          LiftLeaf |-> Suc Zero ; \
+          LiftNode b |-> match b { \
+            Empty |-> Suc Zero ; \
+            One x |-> Suc (liftSize x) ; \
+            Join x y |-> Suc (liftAdd (liftSize x) (liftSize y)) \
+          } \
+        }\n\
+        const liftSizeResult : Nat = liftSize \
+          (LiftNode (Join LiftRose LiftLeaf (LiftNode (Empty LiftRose))))";
+    let mut program = nested_checked_runtime_program_for_source(
+        package,
+        target_name,
+        source,
+    );
+    let rose = decl_symbol(package, "LiftRose");
+    let bag = decl_symbol(package, "Bag");
+    let leaf = RuntimeExpr::Construct {
+        constructor: StableSymbol::constructor(&rose, "LiftLeaf").to_string(),
+        args: Vec::new(),
+    };
+    let empty = RuntimeExpr::Construct {
+        constructor: StableSymbol::constructor(&bag, "Empty").to_string(),
+        args: Vec::new(),
+    };
+    let sample = RuntimeExpr::Construct {
+        constructor: StableSymbol::constructor(&rose, "LiftNode").to_string(),
+        args: vec![RuntimeExpr::Construct {
+            constructor: StableSymbol::constructor(&bag, "Join").to_string(),
+            args: vec![
+                leaf,
+                RuntimeExpr::Construct {
+                    constructor: StableSymbol::constructor(&rose, "LiftNode").to_string(),
+                    args: vec![empty],
+                },
+            ],
+        }],
+    };
+    let ir = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::DeclarationRef {
+            symbol: decl_symbol(package, target_name).to_string(),
+        }),
+        args: vec![sample],
+    };
+    program.declarations.retain(|declaration| {
+        declaration.symbol == decl_symbol(package, "liftAdd").to_string()
+            || declaration.symbol == decl_symbol(package, "liftSize").to_string()
+    });
+    let example = ken_runtime::RuntimeExample {
+        name: "dasm-c2-structural-nat".to_string(),
+        checked_core_shape: "nested-inductive-nat-three".to_string(),
+        ir,
+        observation: RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
+            constructor: format!("ctor:{package}::Nat::Suc"),
+            args: vec![],
+        }),
+    };
+    let observations = scalar_merge_observations_for_program(
+        &mut program,
+        example,
+        "ken_dasm_c2_structural_nat",
+    );
+    let d5_arrivals = observations
+        .iter()
+        .filter(|observation| {
+            observation.construct == "a carried `Match` arm"
+                && observation.operand_kind == "StructuralNat"
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        d5_arrivals.len(),
+        1,
+        "the real D5 fixture has one Nat-valued carried Match arm: {observations:#?}"
+    );
+    assert!(
+        d5_arrivals[0].admitted,
+        "the exact StructuralNat operand must be admitted at the scalar merge"
+    );
+    assert_eq!(
+        d5_arrivals[0].constructor, None,
+        "StructuralNat must not retain an unfolded constructor identity"
+    );
+    let nat_zero = StableSymbol::constructor(&decl_symbol(package, "Nat"), "Zero").to_string();
+    let nat_suc = StableSymbol::constructor(&decl_symbol(package, "Nat"), "Suc").to_string();
+    assert!(
+        observations.iter().all(|observation| {
+            observation.constructor.as_deref() != Some(nat_zero.as_str())
+                && observation.constructor.as_deref() != Some(nat_suc.as_str())
+        }),
+        "checked Nat must not reach the scalar merge as an unfolded constructor: {observations:#?}"
+    );
+}
+
+#[test]
+fn peano_shaped_user_data_remains_an_exact_constructor() {
+    // Promise class: durable invariant. Exact checked Nat identity, not a
+    // nullary-plus-unary recursive shape, is what licenses StructuralNat.
+    let package = "dasm_c2_user_data_pkg";
+    let source = "data Peanoish = PZero | PSuc Peanoish\n\
+        data Switch = Hit | Miss\n\
+        fn target (switch : Switch) : Peanoish = match switch { \
+          Hit |-> PSuc PZero ; Miss |-> PZero \
+        }";
+    let mut program = nested_checked_runtime_program_for_source(package, "target", source);
+    program.declarations.retain(|declaration| {
+        declaration.symbol == decl_symbol(package, "target").to_string()
+    });
+    let switch = decl_symbol(package, "Switch");
+    let peanoish = decl_symbol(package, "Peanoish");
+    let psuc = StableSymbol::constructor(&peanoish, "PSuc").to_string();
+    let example = ken_runtime::RuntimeExample {
+        name: "dasm-c2-user-data-boundary".to_string(),
+        checked_core_shape: "Peano-shaped user Data remains nominal".to_string(),
+        ir: RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: decl_symbol(package, "target").to_string(),
+            }),
+            args: vec![RuntimeExpr::Construct {
+                constructor: StableSymbol::constructor(&switch, "Hit").to_string(),
+                args: Vec::new(),
+            }],
+        },
+        observation: RuntimeObservation::Returned(RuntimeGroundValue::Constructor {
+            constructor: psuc.clone(),
+            args: Vec::new(),
+        }),
+    };
+    let observations = scalar_merge_observations_for_program(
+        &mut program,
+        example,
+        "ken_dasm_c2_user_data",
+    );
+    let psuc_arrivals = observations
+        .iter()
+        .filter(|observation| observation.constructor.as_deref() == Some(psuc.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        psuc_arrivals.len(),
+        1,
+        "the selected unary user constructor must reach the real merge seat once: {observations:#?}"
+    );
+    assert_eq!(psuc_arrivals[0].operand_kind, "Constructor");
+    assert!(
+        !psuc_arrivals[0].admitted,
+        "Peano shape alone must not enter the StructuralNat admission"
+    );
+}
+
 #[test]
 fn nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three() {
     // Promise class: durable invariant. Three residual Join layers separate

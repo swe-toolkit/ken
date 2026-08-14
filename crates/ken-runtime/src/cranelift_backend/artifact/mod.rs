@@ -70,10 +70,13 @@ pub(super) fn program_admission(
 
 /// Package-backed JIT compilation against an authority the caller resolved.
 ///
-/// ⛔ The authority is a **required** parameter, not an `Option`. Production
-/// callers obtain it from `program_authority`, which fails closed; the only
-/// other producer is the `#[cfg(test)]` synthetic entrypoint, which does not
-/// exist in a production build. There is no third way to reach lowering.
+/// The authority is a **required** parameter, not an `Option`. Package-backed
+/// callers obtain it from `program_admission`, which fails closed. That
+/// no-fallback property rests on the package-backed call graph, not on this
+/// parameter's non-`Option` type: `seed_only_legacy_authority` is a separate,
+/// real production producer for the seed-only lane, and the `#[cfg(test)]`
+/// synthetic entrypoint is another explicit producer. Neither is reachable
+/// from package-backed compilation.
 fn compile_program_expr(
     program: &RuntimeProgram,
     expr: &RuntimeExpr,
