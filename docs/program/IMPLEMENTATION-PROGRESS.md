@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 16:10:32Z — from 275 issue file(s) in `docs/program/issues/`.
+2026-08-14 16:20:12Z — from 276 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -209,6 +209,7 @@ the committed file matches the generator's output.
 | `RT-CONTINUATION-EDGE-DISPOSITION` | One planner edge carries both binding projection and a causal call obligation — split the representation so a binding candidate can be settled InlineNoCall without ever entering the call-discharge partition | merged | runtime | M | none | — |
 | `RT-CONTKEY-CONSUMING-OCCURRENCE` | The continuation specialization key names the owner of the continuation's own occurrence and has nowhere to name the occurrence that CONSUMES its answer; the enclosing eliminator is measurably not in hand at the interning site, so the fact must be seeded at the outer-match walk and threaded there -- a plan-construction change, not a field addition | merged | runtime | M | none | — |
 | `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` | consuming_occurrence carries two fields and only one of them is checked -- eliminator_origin is copied into the re-derivation before the comparison, so AC-1's assert is x == x on that field, and AC-2's mutation perturbs only the field that was already independent, leaving step 1 never fired | active | runtime | XS | none | — |
+| `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` | the consuming-occurrence validator's refusal is split into a `cfg(test)` classifier and a `cfg(not(test))` arm, so no test profile can compile the production refusal string -- and the deeper hazard is that under `cfg(test)` the production arm is ABSENT rather than dead, so dropping one `return` makes the validator silently accept a mismatched occurrence in exactly the profile that does the checking | ready | runtime | XS | none | — |
 | `RT-CONTSPEC-ABI` | ContinuationSpecialization slice 2 — land the explicit unit/descriptor projection and the ABI, owner/lifetime/affinity and zero-allocation negative gates, still DORMANT | merged | runtime | M | none | — |
 | `RT-CONTSPEC-ACTIVATE` | ContinuationSpecialization seam 2 — lowering activation and exact-use consumption: direct call before the identity-erasing join, active emitted owner, affine call occurrence, JoinArm consumption, gating the 37-row lower-owned population | merged | runtime | L | none | — |
 | `RT-CONTSPEC-ASSEMBLY` | ContinuationSpecialization seam 1 — the lawful assembly: extract the accepted branch-scope helper and its feature-gated harness onto the landed slice 0-2 blobs, unactivated, and prove the prior-slice surfaces are untouched | merged | runtime | M | none | — |
@@ -372,6 +373,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
+- `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` blocked by `RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED` (status: active)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
