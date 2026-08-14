@@ -1,7 +1,7 @@
 ---
 id: RT-DEPTH2-VAR-PARENT-DERIVATION
 title: "Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
