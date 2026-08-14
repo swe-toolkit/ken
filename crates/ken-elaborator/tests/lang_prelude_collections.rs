@@ -233,9 +233,14 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 }
 
 /// D5b/AC-6 -- the full `trusted_base()` enumeration from a bare env, by
-/// name, not a count and not a differential (a live differential is
-/// separately impossible here: the four combinators are registered inside
-/// `ElabEnv::new()` itself, so there is no "before" env to diff against).
+/// name, not a count. It is not itself a live differential, but precisely:
+/// an *env-level* differential over the whole trusted base is impossible,
+/// because `ElabEnv::new()` has no "before" env to diff against. A
+/// *block-level* bracket over a sub-range of registration is a different
+/// and available instrument -- `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D2`
+/// brackets exactly the four `List` combinator `elaborate_decl` calls in
+/// `prelude.rs`, following the established `conversions.rs:303/364` idiom,
+/// and asserts their contribution to the trusted base is empty.
 /// 107 entries: large enough to be a finding about the shape of the
 /// trusted base in its own right (per D5b, that finding is reported rather
 /// than a reason to fall back to the per-name check AC-5 already is) --
@@ -259,6 +264,15 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 /// orthogonal movement: an entry changing from `Opaque(x)` to
 /// `Primitive(x)` (or the reverse) under the same spelling `x`, which the
 /// untagged `Vec<String>` this enumeration replaced could not see at all.
+///
+/// `LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D3` -- this enumeration and the
+/// block delta above are not redundant, and neither retires the other: the
+/// block delta is `GlobalId`-keyed and covers only the four combinators'
+/// contribution, while this enumeration is label-keyed and covers the
+/// *whole* 107-entry trusted base, carrying census value the block delta
+/// does not (the shape-of-the-trusted-base finding two paragraphs up is a
+/// property of this list specifically). Seeing an id-keyed delta land next
+/// to this label-keyed census is not a reason to retire the census.
 #[test]
 fn d5b_trusted_base_full_enumeration_from_bare_env() {
     let env = ElabEnv::new().expect("base env");
