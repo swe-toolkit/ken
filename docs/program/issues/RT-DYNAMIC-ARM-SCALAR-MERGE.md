@@ -781,6 +781,68 @@ surface their own gaps.
   > Recorded because a Forbidden list is read on its own, far from the
   > deliverable that carves it out.
 
+## Residuals from `c2-pre`'s approval — two, both non-blocking
+
+Architect findings at `evt_3yk7f4p6k7y64`, on candidate `3e8de4b8`. **Neither is
+a defect in what landed and neither holds `c2`.** Recorded here so they are not
+re-derived, and so the second is not lost — it is a concrete small fix.
+
+**1. The gating is asymmetric with its sibling, in the direction that makes an
+identity control MORE necessary, and it is the one without one.**
+
+```toml
+r3-4b-observation = ["ken-runtime/r3-4b-observation"]   # ken-elaborator [features], opt-in
+ken-runtime = { path = "../ken-runtime", features = ["dasm-c2-observation"] }  # dev-deps, always on
+```
+
+`dasm-c2-observation` is on for **every** `ken-elaborator` test build, and by
+Cargo feature unification a `--workspace` test run — what CI does — compiles
+`ken-runtime` once with the observation in and links **every other crate's
+tests** against that copy.
+
+**The trade may be the better half and the frame does not prejudge it.** An
+opt-in control does not run in a default CI invocation at all, so
+`r3_4b_observation_feature_is_native_artifact_identical` never executes there;
+always-on means this control actually runs. **What is missing is that the trade
+is unrecorded.** The opt-in sibling carries **two** identity controls
+(`r3_c2_source_mixed_branch.rs:621`, `control.rs:5001`); the always-on one
+carries **none**, and "both configurations compile" is a different property from
+artifact identity.
+
+**2. The disabled instrumented path still does work.**
+
+```rust
+#[cfg(any(test, feature = "dasm-c2-observation"))]
+let observed_operand_kind = lowered_value_kind(&lowered);
+#[cfg(any(test, feature = "dasm-c2-observation"))]
+let observed_constructor = match &lowered {
+    Lowered::Constructor { constructor, .. } => Some(constructor.clone()),
+    _ => None,
+};
+```
+
+Both sit **outside** the `DASM_C2_SCALAR_MERGE_OBSERVATION_ENABLED.get()` guard,
+which lives inside `dasm_c2_record_scalar_merge`. With the feature on and no
+scope active — the state of every other crate's tests in a workspace run — each
+scalar merge classifies the operand and heap-allocates a constructor name that is
+discarded. **Not a correctness finding.** It is the difference between *"inert
+when disabled"* meaning **no observable effect** and meaning **no work**, and
+only the second is what you want under an always-on feature. Moving both inside
+the enabled check makes the disabled path free and the identity claim easier to
+state.
+
+**Disposition: take them with `c2` proper if they fit, or say so and the Steward
+cuts a slice.** Do not treat either as an acceptance criterion on `c2`.
+
+## Cited-source hit, and it is the Steward's, not the ring's
+
+`crates/ken-runtime/src/cranelift_backend.rs` is cited in
+`library/SOURCE-ATTESTATIONS`, found by the `M3` check on `3e8de4b8`. **It routes
+to the Librarian after the merge.** Recorded here only so the next person running
+`M3` on this lane is not surprised by it. **The ring does not touch `library/`,
+and this is not an AC** (operator ruling, 2026-07-26: the Librarian's
+responsibilities are downstream and unobserved for build teams).
+
 ## Sequencing
 
 **Runtime's next slice after the current `RT-MATCH-RECURSOR-CONSUMERS` work.**
