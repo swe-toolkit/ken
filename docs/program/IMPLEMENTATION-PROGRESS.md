@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 17:51:50Z — from 280 issue file(s) in `docs/program/issues/`.
+2026-08-14 17:54:59Z — from 281 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -159,6 +159,7 @@ the committed file matches the generator's output.
 | `LANG-TRUSTED-BASE-LABEL-KIND-TAG` | The `AC-6` trusted-base enumeration is blind to the one movement it exists to catch -- `trusted_base_labels` flattens kernel-declaration and surface names into one untagged `Vec<String>`, so a postulate becoming a primitive under the same spelling renders identically across all 107 entries, and the injectivity the fallback depends on is measured rather than enforced | merged | language | XS | none | — |
 | `LANG-VIEW-RETIRE` | Operator ruling SURF-1 retired the single definition keyword `view` and split it into `const`/`fn`/`proc`, but the landed elaborator still accepts it -- and `view` is not an alias: it takes an EARLY RETURN out of the bidirectional purity check that `33 §1` calls a hard error, so every definition still spelled `view` has never been checked for the effect discipline the spec requires | merged | language | M | none | — |
 | `LANG-WITNESS-ARITY-DERIVED` | `missing_pattern_witness` takes the constructor's arity as a caller-supplied parameter beside the id it names, so the two can disagree in principle -- and three of the four emitters have no test that inspects the witness, meaning a future divergence reds nothing; the arity is derivable from the id alone through an existing kernel API, which retires the class instead of testing it | merged | language | S | none | — |
+| `LANG-WITNESS-DIAGNOSTIC-STRICTNESS` | missing_pattern_witness's two lookups read DIFFERENT tables and the strict one runs first, so ctor_name's fallback is dead code on this path -- two incompatible beliefs about one id with the stricter winning by line order -- and ind.constructors[ordinal] is a second, unmessaged panic source on the same data, all on a function that runs only while the elaborator is already reporting an error | ready | language | S | none | — |
 | `LIB-GATE-DECOUPLE` | main is red on two library documentation-census gates: the currency gate the operator decoupled from merges still fires from inside CI, and a doc-only merge invalidated the ledger unreported | merged | verify | S | none | 1039 |
 | `LOADER-CITE-ANCHOR` | LOADER-STALE-PREMISE cites the spec by line number (:147-158) — rots silently in the one catalog file outside the currency gate | merged | doc | XS | none | — |
 | `LOADER-STALE-PREMISE` | \"no disk loader yet\" is stale in 9 places — including already-landed library/ content | merged | doc | S | none | — |
@@ -326,6 +327,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `LANG-CONVOY-ENCLOSING-FIELD` — spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed
 - `LANG-REACHABILITY-SUBSUMING-ARMS` — `ReachabilityError` carries only a span, so a redundant-arm diagnostic cannot say WHICH earlier arms subsume the dead arm -- the mirror of the gap `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` closed on the exhaustiveness side, except `34 §4.2` does NOT mandate it, so this is ergonomics and must not be filed or read as a conformance obligation
+- `LANG-WITNESS-DIAGNOSTIC-STRICTNESS` — missing_pattern_witness's two lookups read DIFFERENT tables and the strict one runs first, so ctor_name's fallback is dead code on this path -- two incompatible beliefs about one id with the stricter winning by line order -- and ind.constructors[ordinal] is a second, unmessaged panic source on the same data, all on a function that runs only while the elaborator is already reporting an error
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-C2-DRIVER-STAGE-ATTRIBUTION` — The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors

@@ -36,9 +36,25 @@ origin: "Adversary hunt evt_4zx9xp7qkf6rm on fc9408ec, triaged by the Steward at
 > **It is written here rather than left in a PR body because a carry recorded
 > only in an approval verdict or a PR body evaporates** -- which is why
 > [[RT-CONTKEY-REFUSAL-PROFILE-SPLIT]] and [[LANG-REACHABILITY-SUBSUMING-ARMS]]
-> both had to be filed the same day. **Whoever next touches this diagnostic path
-> owns resolving the asymmetry, and "fall back to a supplied arity" is
-> explicitly not the resolution.**
+> both had to be filed the same day.
+>
+> **The carry now has its own node: [[LANG-WITNESS-DIAGNOSTIC-STRICTNESS]]**
+> (`ready`, `S`), filed after the Adversary measured the mechanism at
+> `evt_1fybxqm29839b`. **It is sharper than "two error policies":** the two
+> lookups read **different tables** -- `ctor_name` reads `cx.globals`,
+> `env.constructor` reads `env.ctor_index`, and `globals` is deliberately pruned
+> in seven places while the kernel declaration remains -- and **the strict one
+> runs first, so `ctor_name`'s fallback is dead code on this path.** A second,
+> **unmessaged** panic source sits on the same data: `ind.constructors[ordinal]`
+> is a slice index, not a lookup.
+>
+> **No live crash is claimed and none was found.** What changed is the failure
+> mode, on a function that runs **only while the elaborator is already reporting
+> an error** -- so the trade is a clean "non-exhaustive match" diagnostic for a
+> potential panic, bought with an unrepresentable mismatched pair. **That trade
+> is endorsed and is this node's whole point; it is recorded so it is explicit
+> rather than implicit.** "Fall back to a supplied arity" remains excluded by
+> ruling.
 
 ## What this is
 
