@@ -723,6 +723,106 @@ this consumer is a silent accept, measured at `739cfde3`.
 Authorized by Architect `evt_5ed8ee70cmrt`. **RELEASED to the runtime ring
 2026-08-12, anchor `evt_2b1zhe78c81at`.**
 
+> # STOPPED 2026-08-14 AT THE **SECOND** BOUNDARY. NO CANDIDATE WAS RETAINED,
+> # AND THE MEASUREMENT IS THE DELIVERABLE.
+>
+> **Runtime reported the named hard stop at `evt_774xvjz3n5axs`** and reverted
+> its probes. **Steward disposition at `evt_7ykhmbw7rgrk3`: the slice is NOT
+> widened and Runtime was right not to author a candidate.**
+>
+> **THE BLOCKED BLOCK IMMEDIATELY BELOW IS DISCHARGED. Do not read it as
+> current state.** It says this node is blocked *"on a relation that does not
+> exist"*; that relation is [[RT-CONTKEY-CONSUMING-OCCURRENCE]], which was
+> framed, released, and **merged** on 2026-08-14. It is kept for its fork
+> history, not for its status.
+>
+> **What the route repair actually did, measured.** Applying the landed
+> consuming occurrence inside the standalone specialization **closes row 4
+> depth 1 and row 5's first transport**. Then:
+>
+> - **Row 4 depths 2/3 construct a SECOND worker-bearing constructor whose next
+>   outer consumer has no carried relation at all.**
+> - Moved to the real call funnel, the route reaches the carried
+>   body/eliminator on the live stack and refuses at the next boundary --
+>   `Closure` for depth 1, a further worker-bearing-constructor boundary for
+>   depths 2/3.
+> - **Row 5 separately keeps a standalone continuation definition with a second
+>   unconsumed recognition.**
+>
+> **⇒ THE CARRIED RELATION IS ONE LEVEL DEEP AND THE STRUCTURE IS RECURSIVE.**
+> It does not compose along the chain; each new worker-bearing constructor
+> would need its own. **That is a mechanism question, not a scope question**,
+> and it is routed to the Architect rather than answered here.
+>
+> **WHY THIS IS A WRONG CUT RATHER THAN AN UNFINISHED ONE.** Both ways forward
+> cross a line this node explicitly bans: one mutates the **planner-owned**
+> `BodyEmissionDisposition::ContinuationTemplate` population, the other needs
+> an exact projection through the **excluded** continuation-source surface.
+> **A WP that must cross its own banned scope to discharge its AC has been cut
+> wrong**, and the repair is a new cut. The successor is framed from the
+> Architect's answer, exactly as this node's own predecessor was framed from a
+> probe.
+>
+> **ONE FINDING THAT MAY NOT BELONG TO THIS CHAIN AT ALL.** Row 1 remains at
+> `NativeJoinPlanV1` when duplicate 12/5 claims are declined, and **its two
+> target edges distinguish it from rows 4/5**. If row 1 is a different class
+> rather than a further depth, a successor scoped to "rows 4 and 5" does not
+> cover it. Re-derive that before assuming one node closes all three.
+
+> # MECHANISM RULED 2026-08-14, `evt_6td3bs6j6g14m`. THE LANDED RELATION IS
+> # RIGHT; THE SECOND BOUNDARY IS A DIFFERENT **KIND** OF EDGE, NOT A FURTHER
+> # DEPTH.
+>
+> **Grounded by the Architect reading the planner at `dfd00ba8`, not from the
+> handback.** The descent holds `continuation_origin` **fixed** and advances
+> only `result_root`, so cloning the seeds forward is correct and the relation
+> composes perfectly **along the producer axis**. **There is no defect in the
+> carry.**
+>
+> **`consuming_occurrence` is SOURCE-keyed.** `initial_continuation_discoveries`
+> mints a seed only onto the position-zero child of an outer
+> `ComputationalMatch`, and its own comment says *"Every case body is walked
+> independently with no inherited parent relation."* It answers *"which outer
+> source eliminator scrutinizes this continuation, and which case body consumes
+> the result?"* -- **complete at depth 1.** At depth 2/3 the consumer is
+> determined by **which specialization realized the body**, a fact about
+> generated structure. **A relation minted in the source walk cannot name it in
+> principle, not by omission** -- so adding more source-minted relations reaches
+> it at no depth.
+>
+> **THE CANDIDATE ROUTE (c), AND ITS PRECEDENT IS `D5a` ONE LEVEL UP.**
+> `ContinuationDiscovery` already carries `enclosing_specialization`, added
+> because the fixed point *"re-read the raw occurrence owner and lost the
+> specialization that had selected and invoked that worker"* -- the same shape,
+> already solved once, by carrying the generated context on the descent and
+> adding `emission_owner` **beside** `producer_owner` rather than repurposing
+> it. **Route (c) is a specialization-keyed relation minted at the existing
+> descent push, where `target` is already in hand. It crosses neither excluded
+> surface nor the template population.**
+>
+> **IT IS A HYPOTHESIS WITH AN EXACT CARRIER, NOT A MEASUREMENT, AND THE
+> ARCHITECT DECLINED TO SIZE IT.** His own words: a forward walk existing
+> somewhere in the file does not establish that **this** site sits inside one.
+>
+> **THE PROBE THAT SELECTS THE SUCCESSOR -- one instrumented run of the existing
+> controls, and it MAY NOT AUTHOR A CANDIDATE.** At the descent push, for **row
+> 4 depth 2 and depth 3**, does the consumer identity the refusing boundary
+> requires equal the one derivable from `enclosing_specialization` at that push?
+> **Yes** ⇒ route (c), the `D5a` shape exactly. **No** ⇒ the consumer is outside
+> both carriers and (b)'s planner-owned population change is the honest answer.
+>
+> **ROW 1 CANNOT BE ANSWERED FROM THE PAYLOAD, AND THAT IS A PREREQUISITE
+> RATHER THAN A TIDINESS ITEM.** `consuming_occurrence_from_seed` returns `None`
+> for **three** different reasons and keeps no record of which: no outer
+> eliminator scrutinizes the continuation (structural absence); an outer
+> eliminator exists but no case consumes the produced constructor; or
+> `matching.len() >= 2`, **ambiguity, which is row 1**. ⇒ **Row 1's `None` means
+> "two candidates, declined" while depth 2/3's `None` means "no relation exists
+> at all" -- opposite facts wearing the same value**, and anyone diagnosing it
+> is sent to plan construction when the truth is that the relation was refused.
+> **Splitting it into a two- or three-variant enum belongs in the same successor
+> as whatever the probe selects.**
+
 > # BLOCKED 2026-08-14 ON A RELATION THAT DOES NOT EXIST. THE STOP FIRED AND
 > # WAS RULED CORRECT.
 >

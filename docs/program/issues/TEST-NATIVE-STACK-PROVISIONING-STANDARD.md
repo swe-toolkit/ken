@@ -1,7 +1,7 @@
 ---
 id: TEST-NATIVE-STACK-PROVISIONING-STANDARD
 title: "Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split"
-status: active
+status: merged
 owner: doc
 size: S
 gate: none

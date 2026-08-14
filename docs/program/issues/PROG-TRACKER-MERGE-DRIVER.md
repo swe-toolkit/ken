@@ -2,7 +2,7 @@
 id: PROG-TRACKER-MERGE-DRIVER
 title: "Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built"
 status: ready
-owner: foundation
+owner: steward
 size: S
 gate: none
 depends_on: []
