@@ -1,7 +1,7 @@
 ---
 id: LANG-WITNESS-DIAGNOSTIC-STRICTNESS
 title: "missing_pattern_witness's two lookups read DIFFERENT tables and the strict one runs first, so ctor_name's fallback is dead code on this path -- two incompatible beliefs about one id with the stricter winning by line order -- and ind.constructors[ordinal] is a second, unmessaged panic source on the same data, all on a function that runs only while the elaborator is already reporting an error"
-status: ready
+status: active
 owner: language
 size: S
 gate: none

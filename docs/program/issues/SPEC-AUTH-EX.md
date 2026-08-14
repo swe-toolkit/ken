@@ -1,7 +1,7 @@
 ---
 id: SPEC-AUTH-EX
 title: "62-authority section 7 is the spec's only worked example of the authority discipline and almost none of it elaborates -- four stale axes rather than the three recorded, the fourth being a RESULT TYPE that changed shape, and two examples that cannot be respelled at all because v1 lacks the quantification one needs and moved the write boundary the other turns on"
-status: ready
+status: active
 owner: spec-enclave
 size: S
 gate: none

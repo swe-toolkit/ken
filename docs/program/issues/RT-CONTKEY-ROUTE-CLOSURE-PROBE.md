@@ -1,7 +1,7 @@
 ---
 id: RT-CONTKEY-ROUTE-CLOSURE-PROBE
 title: "the one question the carry merge deliberately did not answer: with required_consuming_occurrence now available at depths 2 and 3, does the D2k-1c route repair close row 4, or does it still refuse at the next boundary -- a measured-and-reverted probe that authors no candidate, because both ways forward from a residual cross a banned surface and the choice between them is the Architect's"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
