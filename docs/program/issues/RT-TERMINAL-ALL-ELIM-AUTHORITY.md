@@ -1,7 +1,7 @@
 ---
 id: RT-TERMINAL-ALL-ELIM-AUTHORITY
 title: "Issue the typed terminal-All structured-IH elimination authority upstream in checked erasure/planning, and let only that issued relation license the source-machine Match seat to consume a ComputationalRecursorClosure"
-status: ready
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,21 @@ blocks: []
 github: null
 origin: Architect mechanism ruling evt_33v0hx3k3ygjm (2026-08-09), issued on the discharged D0 record RT-SPECIALIZED-MATCH-ATTRIBUTION exact f8250c5a, merged at f9146b91 (PR #1702, Decision dec_3b9y90ag7m91). The ruling names this successor and requires Steward framing and explicit release before Runtime edits production. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # `status` corrected to `draft` 2026-08-13 — it read `ready` while this very
+> # block said "not released"
+>
+> **The frontmatter contradicted the frame.** This node has said *"framed and
+> not released"* since it was written, and its gate has been re-measured three
+> times (`3a1ed7da`, `678acebc`, and `D5` WIP `51c482a5`) with the answer No
+> each time — yet it sat at `status: ready`, which is what puts a node on the
+> frontier for any team to pull. Only the frontmatter was wrong; every word
+> below was right.
+>
+> **Flip to `ready` by re-running the three capability rows** in the
+> `678acebc` section against whatever `main` you stand on — not by counting
+> `KERNEL-NESTED-IND` partials. That section already warns that two partials
+> landed and each moved a different piece into a lane this node does not read.
 
 > # THE BASE THIS NODE NEEDS IS NOT ON `main`. READ THE SEQUENCING SECTION FIRST.
 >

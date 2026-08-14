@@ -54,14 +54,16 @@ measurement adds nothing.
   product path: a `ken-cli` compile of a small program, in both **debug** and
   **release**. Report actual peak, not "it did not crash." Two builds because
   `elab.rs:997` states the unoptimized cost is the one that grows.
-- **D2 — shape or cumulative.** Using `LANG-PRELUDE-COLLECTIONS`'s four
-  combinators, add them to the prelude one at a time and report the peak after
-  each. **If the tipping declaration is `zip` or `filter`, the cost is
+- **D2 — shape or cumulative.** The four combinators are now **landed** in
+  `prelude.rs` (`60b78c95`), so run this subtractively: remove all four, measure,
+  then add them back **one at a time**, reporting the peak after each.
+  **If the tipping declaration is `zip` or `filter`, the cost is
   shape-dependent** (nested matches). **If it is whichever lands fourth
   regardless of which one that is, the cost is cumulative** and the rule binds
   every prelude addition, recursive or not. This is the Architect's probe at
   `evt_54y1jadrfk9eq`; it is D2 because it decides the scope of the rule, not
-  because the combinators are suspect.
+  because the combinators are suspect. **Restore `prelude.rs` before landing** —
+  D2's deliverable is five numbers, not a prelude change.
 - **D3 — contingent, and only on D1's result.** If the product-path margin is
   thin, replace the canary the `r3_4b` stack fix retires: one check that reddens
   when elaboration's peak crosses a stated fraction of the stated minimum.

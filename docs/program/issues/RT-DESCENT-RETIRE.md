@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-RETIRE
 title: "Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane"
-status: ready
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,32 @@ blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # `draft`, NOT unframed — the frame is written and the premise is not yet true
+>
+> **Set back to `draft` 2026-08-13 by the Steward. It was mis-flagged `ready`
+> while `RT-RECURSOR-TRANSPORT` — a `depends_on` and a genuine mechanism
+> dependency — was itself still `ready`.** Nothing had landed, so the node's
+> premise ("all residual classes retired") was false the whole time it sat on
+> the frontier.
+>
+> **Runtime paid for that.** `RT-DESCENT-RETIRE` `D1` was pulled and
+> hard-stopped at fresh base `c1b9a1e8`: the exhaustive unarmed enumeration
+> found **89 intact non-empty residual rows** (74 `LexicalCallArgumentRecursor`,
+> 15 `MatchScrutineeRecursor`) and production still selecting
+> `BodyEmissionAuthority::RecursiveDescent` **29 times**. Both residual variants
+> and both classifier arms remain in production. The observer was fully
+> reverted; no candidate exists; `D2`-`D7` were never entered.
+>
+> **That measurement is worth keeping.** It is a clean unarmed census at a named
+> base, and it is exactly the dead-code oracle this node's `D1` is supposed to
+> capture. When the node is genuinely released, `D1` re-runs against a base where
+> the answer should be zero — and the `c1b9a1e8` numbers above are the control
+> that makes a zero meaningful rather than vacuous.
+>
+> **Flip to `ready` when `RT-RECURSOR-TRANSPORT` is `merged`**, not before, and
+> not on a partial: this node's dependency is the mechanism, and `D1` re-run
+> must find the residual population empty.
 
 > # RETIRING ALL FIVE RESIDUAL CLASSES IS NOT THE FINISH LINE
 >

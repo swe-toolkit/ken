@@ -1,7 +1,7 @@
 ---
 id: RT-RECURSOR-TRANSPORT
 title: "Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane"
-status: ready
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,22 @@ blocks: [RT-DESCENT-RETIRE]
 github: null
 origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDescent, migrate the remaining residual classes, do not linger half-migrated. Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2). Recut 2026-08-08 per Architect ruling evt_237tbdsacqbk4.
 ---
+
+> # `draft`, NOT unframed — set back 2026-08-13 by the Steward
+>
+> **It was mis-flagged `ready` while two of its five `depends_on`
+> (`RT-LEXICAL-RECURSOR-CONSUMERS`, `RT-LEXICAL-R3-FUSION-EMITTER`) are still
+> `active`.** The frame below already says `D3` is gated on those successors;
+> the frontmatter did not agree with the frame.
+>
+> **Measured, not inferred.** Runtime's `RT-DESCENT-RETIRE` `D1` census at
+> `c1b9a1e8` found 89 intact residual rows — 74 `LexicalCallArgumentRecursor`
+> and 15 `MatchScrutineeRecursor`, which are precisely this node's two classes.
+> The transport has not happened.
+>
+> **Flip to `ready` when both `active` dependencies are `merged`.** They are
+> where Runtime actually is; this node is downstream of them, not an alternative
+> to them.
 
 > # `D0`-`D2` LANDS; `D3` IS GATED — 2026-08-08, hard stop 4
 >
