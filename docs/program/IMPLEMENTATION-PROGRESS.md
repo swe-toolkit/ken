@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 07:31:54Z — from 256 issue file(s) in `docs/program/issues/`.
+2026-08-14 07:47:35Z — from 257 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -289,6 +289,7 @@ the committed file matches the generator's output.
 | `STR-NFC-CONSTRUCTION` | NFC-at-construction is normative and unimplemented: all three `EvalVal::Str` ingresses store the raw string, so `char_length`/`byte_length`/`s2l`/`==` observe unnormalized values and the interp carrier disagrees with the runtime carrier | merged | language | L | none | https://github.com/swe-toolkit/ken/pull/1109 |
 | `SURF-IDENT-TR39` | The lexer's confusable-resistance is satisfied VACUOUSLY by an ASCII-only identifier rule — spec 31 §2's blessed Unicode letters are unimplemented, and the test that looks like the TR39 gate cannot see the difference | merged | ergo | S–M | none | — |
 | `SURF-SPACE-CELLS` | The `space` block surface — cells and `becomes` — is unbuilt, while its entire desugaring target (the `State` effect: Get/Put/run_state) is built and live | merged | language | M–L | none | https://github.com/swe-toolkit/ken/pull/1152 |
+| `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Five landed `ken-cli` native-production tests each provision `stack_size(256 MiB)` while `LANG-RECORD-STACK-OVERFLOW` says stack-limit raises are refused -- but that refusal is a `Not this node` bullet whose rationale is about MASKING A REGRESSION, and baseline provisioning for a legitimately deep workload is a different act that no artifact has ever distinguished | ready | language | S | architect | — |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
 | `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | merged | verify | S | none | 2120 |
@@ -314,6 +315,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-LEXICAL-RECURSOR-CONSUMERS` — Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
+- `TEST-NATIVE-STACK-PROVISIONING-STANDARD` — Five landed `ken-cli` native-production tests each provision `stack_size(256 MiB)` while `LANG-RECORD-STACK-OVERFLOW` says stack-limit raises are refused -- but that refusal is a `Not this node` bullet whose rationale is about MASKING A REGRESSION, and baseline provisioning for a legitimately deep workload is a different act that no artifact has ever distinguished
 
 ## Blockers
 
@@ -365,6 +367,7 @@ for every item, gated or not):
 - **G-Sec**: `SEC1-IFC-R3` (draft) `SEC1-IFC` (merged)
 - **G2-G3**: `V3-RESIDUAL` (merged) `V4-RESIDUAL` (merged)
 - **G5**: `SEC4-TCB` (merged)
+- **architect**: `TEST-NATIVE-STACK-PROVISIONING-STANDARD` (ready)
 - **operator**: `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` (draft) `LANG-FOREIGN-NAME-FORMAT-CHARS` (draft)
 
 ## Archive & diary
