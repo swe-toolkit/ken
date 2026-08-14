@@ -1,7 +1,7 @@
 ---
 id: LANG-LOSSLESS-COUNT-ASSERTION-RETIRE
 title: "`assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it"
-status: ready
+status: active
 owner: language
 size: XS
 gate: none
