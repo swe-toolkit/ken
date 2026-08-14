@@ -51,8 +51,16 @@ The frame's design call asserted that `D4`'s fixture *"is what guards the
 population now."* **That is false.** It holds for a narrowing of
 `attach_comments`'s filter and fails for a narrowing of `is_comment` itself,
 which moves both sides together and leaves `D4` green. The correction, with the
-three call sites that actually guard the population, is on
+**four** call sites that actually guard the population, is on
 [[LANG-COMMENT-POPULATION-PARITY]] where the sentence landed.
+
+**The first correction was itself short by one**, and the Adversary supplied it
+at `evt_1ezcaqqqd62ge`: three of the four are `find(...).unwrap_or_else(panic)`
+**setup lookups** asserting that an internal record exists, and the fourth —
+`lang_surface_block_comments.rs:253` — is the only one asserting the
+**consequence**, that the comment's text survives `format_ken`. Mechanism
+guards and consequence guards are not interchangeable, and a list of the first
+kind reads as complete precisely because they share a greppable shape.
 
 **This does not reopen the node.** Nothing in `D1`-`D3` depended on that
 sentence being true — the retirement is justified by production subsuming the
@@ -134,9 +142,12 @@ being deleted.** That is legitimate, and it is still not what should land.
    thing to guard is *that `parse_lossless` calls
    `validate_attachment_totality` at all* — a pin on that call, not a third
    copy of its filter in an integration test that only runs after it passes.
-3. **`D4`'s fixture is what guards the population now**, and it is a real
-   discriminating control: restoring the old filter reds it at
-   `left: 2, right: 0`.
+3. ~~**`D4`'s fixture is what guards the population now**~~ — **struck, false;
+   see "The Steward's own error" above.** `D4` is a real discriminating control
+   and restoring the old filter does red it at `left: 2, right: 0`, but what it
+   discriminates is the **coupling** between `attach_comments`'s filter and its
+   own output, not the population. The population is guarded by four sites in
+   two other files.
 
 **No replacement control is owed, and do not build one.** There is no measured
 gap here — production enforces the relation and returns `Err`. Adding a pin on
