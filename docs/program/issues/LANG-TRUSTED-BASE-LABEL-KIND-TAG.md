@@ -1,7 +1,7 @@
 ---
 id: LANG-TRUSTED-BASE-LABEL-KIND-TAG
 title: "The `AC-6` trusted-base enumeration is blind to the one movement it exists to catch -- `trusted_base_labels` flattens kernel-declaration and surface names into one untagged `Vec<String>`, so a postulate becoming a primitive under the same spelling renders identically across all 107 entries, and the injectivity the fallback depends on is measured rather than enforced"
-status: ready
+status: merged
 owner: language
 size: XS
 gate: none
@@ -10,6 +10,47 @@ blocks: []
 github: null
 origin: "Two residuals parked on LANG-PRELUDE-ELABORATION-DEPTH -- the Architect's env.globals injectivity finding (evt_4bdcm6fer2570) and the Adversary's Finding 3 (evt_31dc9xfdp2ny), both non-blocking. Cut as a node by the Steward 2026-08-14 for the reason given below. Both residuals re-verified against the landed code at main 246019b9 before filing."
 ---
+
+## MERGED 2026-08-14
+
+**Candidate `009f11fa4cd3ab55e4ecbf0b8e78955a07ed78d0`, landed as squash
+`225876a4`** (PR #2173, CI green; Decision `dec_6hz6j2j0we5kt`, Architect, read
+`resolved` from the object). Merge-base `6b3b5b40` derived independently and
+matching the declared value; one non-merge commit, two paths, `+195/-171`;
+**2/2 blobs verified identical after landing.** Both SHAs recorded — a squash
+rewrites the candidate, so it is never an ancestor of `main`; ask content, not
+ancestry.
+
+**`AC-4` was checked against the list, not its header comment.** The base's
+expected enumeration has **107** entries and the candidate's has **107** —
+retagging only, membership and count unmoved. That AC carried a stop-condition
+(*a changed count is a finding, not a list to bless*), so it was verified the
+way the AC asks rather than by reading the doc comment that states the number.
+
+**`D1` is slightly better than the frame required, and the improvement is the
+part worth reusing.** The old `_ =>` arm collapsed `Primitive`, `Transparent`
+and `Inductive` into one untagged string — that collapse *is* the defect, since
+it is what let a kind change render identically. The candidate makes `Primitive`
+explicit and turns the remaining two into a panic naming `trusted_base()`'s own
+filter contract. **The `<unregistered>` fallback sits inside `Primitive(...)`,
+so it carries a kind** rather than rendering bare; that is the arm where the
+surface-name lookup fails, and the obvious edit leaves it untagged.
+
+`D3`'s injectivity assertion is present with its exact message, ahead of the map
+it protects, replacing a doc-comment measurement that nothing enforced.
+
+### Residue, recorded rather than reopened
+
+**Three entries render as `Primitive(<unregistered>)` and remain mutually
+indistinguishable**, so a substitution *among those three* is still invisible to
+`AC-6`. The candidate's own doc comment says so, which is the correct handling.
+
+This is a **narrower residue of the same shape**, not a miss: the node was cut
+to close the two-namespace collapse, and it did. **No node is owed and none is
+authorized** — filing one would be creating work from an aesthetic preference
+for a tidier enumeration rather than from a measured gap. Recorded so the next
+reader of that enumeration does not re-derive it as new.
+
 
 ## Why this is a node now, when both residuals say it should not be
 
