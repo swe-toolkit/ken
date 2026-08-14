@@ -449,6 +449,16 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // obligation would enter the prelude as an undischarged postulate (a
     // trusted-base change), and `unfoldUpTo` is the no-coinduction
     // infinitude idiom rather than a combinator -- both stay test-local.
+    //
+    // LANG-PRELUDE-COMBINATOR-BLOCK-DELTA D2: bracket exactly these four
+    // declarations with the `conversions.rs:303/364` before/after delta
+    // idiom. Unlike an env-level differential (impossible: `ElabEnv::new()`
+    // has no "before" env), this is a block-level bracket, which does have
+    // one. The expected delta is stated independently -- the four
+    // combinators contribute nothing to the trusted base -- not read back
+    // from `trusted_base()` itself.
+    let combinator_trusted_before: std::collections::BTreeSet<GlobalId> =
+        elab.env.trusted_base().into_iter().collect();
     elab.elaborate_decl(
         "fn map (a b : Type) (f : a → b) (xs : List a) : List b = \
          match xs { Nil |-> Nil b ; Cons h t |-> Cons b (f h) (map a b f t) }",
@@ -469,6 +479,21 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
          match xs { Nil |-> Nil a ; Cons h t |-> match p h { True |-> Cons a h (filter a p t) ; False |-> filter a p t } }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude filter failed: {}", e)))?;
+    let combinator_trusted_after: std::collections::BTreeSet<GlobalId> =
+        elab.env.trusted_base().into_iter().collect();
+    let combinator_actual_delta: std::collections::BTreeSet<GlobalId> = combinator_trusted_after
+        .difference(&combinator_trusted_before)
+        .copied()
+        .collect();
+    let combinator_expected_delta: std::collections::BTreeSet<GlobalId> =
+        std::collections::BTreeSet::new();
+    if combinator_actual_delta != combinator_expected_delta {
+        return Err(ElabError::Internal(format!(
+            "prelude List combinators (map/fold/zip/filter) must contribute \
+             nothing to the trusted base: expected {combinator_expected_delta:?}, \
+             got {combinator_actual_delta:?}"
+        )));
+    }
 
     // VAL1-surface inductives — declared before `lookup` closure to avoid
     // conflicting borrows (elaborate_decl needs &mut elab).
