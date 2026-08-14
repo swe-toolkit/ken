@@ -235,14 +235,18 @@ two `writeFile` calls: that source-facing gate accepts exactly `Cap AFull`, so
 both arms would reject at the capability type before comparing demands.
 
 The orientation nevertheless has an executing runtime net. The real FS read
-driver calls the production authority gate with demand `APartial`.
-`fs_driver_build_capability_acceptance.rs` drives the same read operation and
-existing path with an `APartial` cap, which accepts, and an `ANone` cap, which
-rejects as `CapabilityDenied`. Reversing the check from `required ⊑ available`
-to `available ⊑ required` wrongly accepts the `ANone` arm. Thus the headline
-bound remains kernel-backed where its authority is kernel-visible and its
-orientation is **trusted but conformance-netted** by an executing sink pair;
-the block in §7 remains the canonical metatheoretic explanation of the hazard.
+driver calls the production authority gate with demand `APartial`. Two
+READ-bearing witnesses drive that gate over the same existing
+`three-lines.txt`: `fs_driver_build_capability_acceptance.rs`'s
+`r1_sufficient_cap_reads_fixture` supplies `APartial`, while
+`fs_driver_build_acceptance.rs`'s `positive_read_returns_exact_fixture_bytes`
+supplies `AFull`; both accept. Reversing the check from
+`required ⊑ available` to `available ⊑ required` preserves the equal
+`APartial` arm but wrongly rejects the `AFull` arm (`AFull ⋢ APartial`). Thus
+the headline bound remains kernel-backed where its authority is kernel-visible
+and its orientation is **trusted but conformance-netted** by an executing sink
+pair; the block in §7 remains the canonical metatheoretic explanation of the
+hazard.
 
 ## 4. Revocation — transitive, fail-closed, and bounded at runtime
 
@@ -395,8 +399,9 @@ Three classes govern the non-current rows:
   a real sink obligation are admitted.
 - `AUTH-AC3-ORIENTATION`: §7's same-cap/two-sink spelling is unavailable until
   a live operation admits those two non-degenerate demands. Its soundness
-  purpose is already covered: the executing FS read R1/R2 pair flips under a
-  reversed `⊑`, so the orientation ledger remains conformance-netted.
+  purpose is already covered: the executing FS read pair accepts both
+  `APartial` and `AFull` under the correct order, while a reversed `⊑` rejects
+  only the `AFull` arm, so the orientation ledger remains conformance-netted.
 
 | Site or example | Definition keyword | Authority index or quantification | Operation | Effect-indexed result | Standing |
 |---|---|---|---|---|---|
@@ -502,7 +507,7 @@ excepted — it is over erased labels, §3.1) (ADR 0004 Decision 3, ADR 0001).
 |---|---|---|
 | No ambient authority — a `perform_E` needs `Cap E` in scope | **kernel-backed** | the cap is a real Π parameter (`36 §2.5`); a world-action with no matching cap denotes to an unbound reference the kernel rejects (§1). The elaborator adds only the source-located **missing-capability** diagnostic |
 | Least by default — a function holds exactly the caps it is passed | **kernel-backed** | same mechanism — using an un-passed capability is an unbound reference; default authority is `∅` |
-| Attenuation **monotone bound** `authority c' ⊑ authority c ⊓ w` (real-value authority) | **kernel-backed (refinement obligation) — but direction-degenerate** | a `34 §5`/`21 §2` obligation, kernel-re-checked (§3.1) — *stronger* than Sec1's erased flow rules. **Yet** the meet-witness discharges both `⊑` orientations by refl, so the orientation remains trusted. The production FS read gate's executing `APartial`-accepts / `ANone`-rejects pair flips under a reversed check and conformance-nets that orientation (§3.2) |
+| Attenuation **monotone bound** `authority c' ⊑ authority c ⊓ w` (real-value authority) | **kernel-backed (refinement obligation) — but direction-degenerate** | a `34 §5`/`21 §2` obligation, kernel-re-checked (§3.1) — *stronger* than Sec1's erased flow rules. **Yet** the meet-witness discharges both `⊑` orientations by refl, so the orientation remains trusted. The production FS read gate's executing `APartial`/`AFull` accept pair becomes accept/reject under a reversed check and conformance-nets that orientation (§3.2) |
 | Attenuation bound of the **declassify** cap `ℓ' ⊑ ℓ` | **trusted-by-typing** | its authority is an **IFC label edge** and labels are erased before the kernel (`61 §3`/§9 N1), so the bound is the landed elaborator check `DeclassifyCap.is_valid`, **not** a kernel obligation — exactly Sec1's erased-label posture (§3.1) |
 | Use-site **sufficiency** `a ⊑ authority c` | **design-committed; not instantiated** | the pinned target refines a sink's cap parameter `{c | a ⊑ authority c}`, but current sinks take exact `Cap AFull`; v1 has no bounded authority quantification and no landed call emits this obligation (`AUTH-BOUNDED-SINK`, §3.1) |
 | **No amplification / source attenuation** | **trusted by enumerated absence** | no `strengthen`/`amplify`/`attenuate`/`revoke` or public `Cap` constructor/producer exists — there is nothing to call; conformance asserts the positive wrappers plus this complete absence (§3.2, §4), which the kernel cannot witness |
@@ -610,6 +615,7 @@ Conformance: `../../conformance/security/capabilities/` — AC1–AC6 with
 the bug it targets). AC3 retains the metatheoretic order-dual requirement:
 weaker-accepts / stronger-rejects on the same cap shape at non-degenerate live
 sinks, never a synthetic flag. That illustrative form remains metatheoretic.
-The production FS read gate supplies the live net: its executing R1/R2 pair
-accepts `APartial` and rejects `ANone` for the same read operation and existing
-path, and the reject arm flips under a reversed `⊑`.
+The production FS read gate supplies the live net. The independent executing
+witnesses named in §3.2 accept `APartial` and `AFull` for the same read and
+existing path; a reversed `⊑` preserves the equal `APartial` arm but rejects
+the `AFull` arm.
