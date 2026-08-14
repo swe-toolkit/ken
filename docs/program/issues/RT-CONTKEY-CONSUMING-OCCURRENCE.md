@@ -1,7 +1,7 @@
 ---
 id: RT-CONTKEY-CONSUMING-OCCURRENCE
 title: "The continuation specialization key names the owner of the continuation's own occurrence and has nowhere to name the occurrence that CONSUMES its answer; the enclosing eliminator is measurably not in hand at the interning site, so the fact must be seeded at the outer-match walk and threaded there -- a plan-construction change, not a field addition"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
