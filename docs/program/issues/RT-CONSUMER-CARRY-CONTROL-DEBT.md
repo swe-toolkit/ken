@@ -11,6 +11,17 @@ github: null
 origin: "Five non-blocking carries the Architect recorded in the resolved Decision dec_7yg4qzfngjwtj (APPROVED on exact b0f9c2ff, resolved_at 2026-08-14T17:54:48Z), none of which amended that exact-SHA approval. Steward-filed per COORDINATION §2 because a carry recorded only in an approval verdict and a PR body evaporates -- the third time that failure was caught the same day, after RT-CONTKEY-REFUSAL-PROFILE-SPLIT and LANG-WITNESS-DIAGNOSTIC-STRICTNESS."
 ---
 
+> # AMENDED AFTER RELEASE, 2026-08-14. TWO ITEMS ADDED: `C6` AND `C7`.
+>
+> **The ring was kicked at `evt_7v1250teswa9h` against the five-carry version.**
+> An Adversary hunt on the same merge (`evt_76f8grx4y7rtt`) landed afterwards,
+> was verified against the tree, and adds two items **it explicitly ranked as
+> belonging here rather than as their own node.**
+>
+> **Neither invalidates work already done.** `C6` reads onto `C3` and sharpens
+> what the existing controls establish; `C7` is a comment clause. **`AC-1` is
+> unchanged and still leads.**
+
 ## What this is
 
 **The merge is correct and is not reopened.** The Architect verified the law
@@ -42,6 +53,81 @@ lag law is wrong at exactly that one level**, and nothing reds.
 **Remedy:** `assert_eq!(depth_1.required, depth_1.unit_consumer)`, so the
 boundary convention is a **stated law** rather than an incidental value. Correct
 the field doc to say where the lag begins.
+
+## `C6` -- THE LAW IS A CLAIM OVER ALL `N`, AND EACH COMPILE OBSERVES ONE `N`
+
+**Adversary hunt `evt_76f8grx4y7rtt` on `b0f9c2ff`, verified against the tree
+before filing. It reads directly onto `C3` and belongs beside it.**
+
+**The good half first, because it is the half the Steward asked to have
+attacked and it survived.** The cross-compile equalities are real:
+`depth_2.required` is `(16,5)` **from a different program's compile**, matching
+`depth_1.unit_consumer` exactly, and the same 3→2. There is no shared
+derivation within a run, and a wrong carry produces the target's own value --
+which is exactly what the production mutation showed. **That construction is
+not weaker than it reads.**
+
+**The raw stream the control already prints, and which nobody had quoted.**
+Format `(is_child_push, continuation_origin, result_root, required.body,
+required.eliminator)`:
+
+```
+depth-1  unit=(16,5)   (false, 21, 31, 16, 5)   (true, 21, 29, 16, 5)
+depth-2  unit=(26,21)  (false, 31, 41, 16, 5)   (true, 31, 39, 26, 21)
+depth-3  unit=(36,31)  (false, 41, 51, 26, 21)  (true, 41, 49, 36, 31)
+```
+
+**Two observations per compile at every depth -- one producer-use, one
+child-push. NOT one per level.** The doc claims *"`required(N)` is the existing
+consuming occurrence established at level `N-1`"*, which quantifies over `N`.
+**The stream contains one `N` per compile.** The depth-3 program's inner
+boundary is never observed *in the depth-3 compile*; it is inferred from the
+separate depth-2 compile.
+
+**The control's own structure proves this is not a misreading.** `required` is
+collected into a `BTreeSet` (`control.rs:5806`) and destructured as
+`[required]` (`:5827`). **If a depth-3 compile emitted producer-use carries at
+two levels with correct -- therefore different -- values, the set would hold
+two and the destructure would fail.** ⇒ **The test passing is itself the
+evidence that only one level is observed.**
+
+⇒ **"Correct at every level" is established as "correct at the OUTERMOST level
+of three separately-sized programs."** For this uniformly generated chain that
+is a good proxy -- numbering advances by exactly 10 per level and each depth's
+`unit.eliminator_origin` is the previous depth's `continuation_origin`. **For
+any non-uniform nesting it would be silent.**
+
+**`C3` says the depth-1 boundary is un-ASSERTED. This says the intermediate
+boundaries are un-OBSERVED.** They are different gaps in the same law and a
+delivery that closes one is not evidence about the other.
+
+## `C7` -- a doc clause is false in the direction that invites the WRONG repair
+
+`control.rs:5774`:
+
+> *"The equalities are between independently produced planner records, not
+> fixture origin literals; **source-origin renumbering therefore cannot require
+> re-recording the test**."*
+
+**The first clause is true and it is the control's real strength. The
+conclusion does not follow.** The equalities hold because the depth-2 program's
+*inner* level is numbered identically to the whole depth-1 program -- the
+uniform `+10` offset visible in `C6`'s stream. **That is a property of
+`px8j_scope_chain_observation_result`'s numbering, not of the test.**
+
+⇒ **The test is robust to renumbering it does not contain, and NOT robust to
+renumbering in the generator.** If wrapping ever numbered the wrapper's nodes
+before the inner ones, depth-2's inner level would stop being `(16,5)` and
+**the control would red with a correct carry.**
+
+**That is the safe direction -- a false red, not a false green.** It is filed
+anyway because of where it sends the next author: reading *"renumbering cannot
+require re-recording"*, they look for a defect in the carry rather than in the
+generator, and **the cheapest way out of that confusion is to hardcode the
+values, which destroys the very property the sentence was written to praise.**
+
+**One clause naming the generator's wrapper-invariance as the premise fixes
+it.** This is a comment change; no control moves.
 
 ## `C1` -- the "already-interned target" is not an independent authority
 
@@ -117,6 +203,19 @@ Either is fine; leaving them uncounted is not.
 **`AC-4` -- `C4` and `C5` are dispositioned in writing**, which may be "left as
 is, for this reason". They are the two least urgent and an explicit deferral
 closes them.
+
+**`AC-6a` -- `C6` is dispositioned in writing, beside `C3`'s remedy.** Say, in
+the doc that states the law, that it is observed **once per compile at the
+outermost level** and that the intermediate boundaries are inferred from the
+sibling compiles. **Extending the observation to every level is NOT required
+here** -- it may not even be constructible without changing what the control
+compiles. What is required is that the next reader cannot mistake three
+outermost observations for a per-level verification.
+
+**`AC-6b` -- `C7`'s clause is corrected.** The sentence must name the
+generator's wrapper-invariance as its premise. **Do not resolve it by deleting
+the claim** -- the independent-records property is real and worth stating; it
+is the unsupported conclusion that goes.
 
 **`AC-5` -- the merged law still holds and its controls stay green** on the same
 derivation. This node changes controls and documentation, **never the carry**.
