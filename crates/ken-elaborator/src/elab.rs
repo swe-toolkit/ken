@@ -1001,15 +1001,21 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
     //
     // REQUIRED MINIMUM (LANG-PRELUDE-ELABORATION-DEPTH D1/D4, measured at
     // 2ca91a3a): a caller of `ElabEnv::new` + `elaborate_file` -- what `ken
-    // check`/`ken run` actually do -- must provide at least 2 MiB of stack.
-    // Measured product-path peak (kernel-observed growth of the calling
-    // thread's stack VMA around that exact call, on a bare-prelude four-line
-    // program that calls no prelude combinator): ~1.98 MiB unoptimized,
-    // ~280 KiB optimized. This is why a spawned worker on Rust's 2 MiB
-    // spawned-thread default is the failure mode (`r3_c2_source_mixed_
-    // branch.rs`'s `r3_4b` worker, `#2144`) while `ken-cli`'s own 8 MiB main
-    // thread has wide headroom (~6.1 MiB unoptimized) -- the requirement is
-    // real regardless of which caller happens to have margin today.
+    // check`/`ken run` actually do -- must provision at least 4 MiB of
+    // stack: more than double the measured unoptimized peak (worst observed
+    // 1,982,464 bytes, ~1.98 MiB; a margin of over 2 MiB above it) and never
+    // the 2 MiB spawned-thread figure named below as the failure
+    // configuration, because that peak was measured only on the shallowest
+    // possible input -- a bare-prelude four-line program that calls no
+    // prelude combinator, with source nesting depth held constant and never
+    // varied -- so it is a floor beneath a deeper program's real cost, not a
+    // sufficient bound on it. Optimized peak measured the same way: ~280 KiB.
+    // This is why Rust's 2 MiB spawned-thread default must not be treated as
+    // adequate -- it is `r3_c2_source_mixed_branch.rs`'s `r3_4b` worker's
+    // exact failure configuration (`#2144`), not a safe answer -- while
+    // `ken-cli`'s own 8 MiB main thread has wide headroom today (~6.1 MiB
+    // unoptimized free); that margin is this box's, not a guarantee for
+    // every future caller.
     match expr {
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {

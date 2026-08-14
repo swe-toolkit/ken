@@ -169,12 +169,24 @@ fn ac5_new_combinators_add_zero_trusted_base_entries() {
 /// is what `prover.rs`'s "prover unknown goal" and `bytes.rs`'s
 /// "BytesRoundTripLaw" both show can diverge from the declaration that
 /// raised the obligation); failing that, the elaborator's public surface
-/// name for it (`Primitive` carries no kernel-level name of its own); and
-/// failing that, the literal `"<unregistered>"` -- some entries are
-/// deliberately removed from the public name map after use
+/// name for it; and failing that, the literal `"<unregistered>"` -- some
+/// entries are deliberately removed from the public name map after use
 /// (`conversions.rs`'s unchecked ABI-scalar narrowing primitives, "not a
 /// public API"), so they have no name at all, by design rather than by
-/// omission, and must still be visible in the enumeration.
+/// omission, and must still be visible in the enumeration. The `match`'s
+/// `_ =>` arm structurally absorbs `Primitive`, `Transparent`, and
+/// `Inductive` alike (only `Opaque` carries a kernel-level name); in
+/// practice only `Primitive` ever reaches it, since `trusted_base()`'s own
+/// filter (`env.rs`) admits only `Opaque` and non-literal `Primitive`
+/// declarations, but the fallback is not `Primitive`-specific.
+///
+/// `by_global_name`'s `HashMap<u32, &String>` is built by `.collect()`ing
+/// `env.globals` (`HashMap<String, GlobalId>`), which would be
+/// order-dependent -- and this fallback flaky -- if any `GlobalId` had two
+/// names. Checked directly: `env.globals.len()` and its distinct-id count
+/// are both 452 (measured at this WP's tip), and zero `trusted_base()` ids
+/// are aliased -- `env.globals` is injective, so this is a deterministic
+/// lookup, not a per-process coin flip.
 fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
     use ken_kernel::Decl;
     let by_global_name: std::collections::HashMap<u32, &String> =
@@ -217,7 +229,13 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 /// retract postulate are built (`conversions.rs` ~L359, "unchecked
 /// narrowing is not a public API") -- present in the trusted base with no
 /// public name, which is the exact shape this enumeration exists to make
-/// visible rather than let a per-name check silently miss.
+/// visible rather than let a per-name check silently miss. That visibility
+/// has a real edge: three collided entries make the *count* of unnamed
+/// members visible (three, not two or four), but the `Vec<String>` cannot
+/// distinguish one unnamed entry being replaced by a different unnamed one
+/// -- both render as the same `"<unregistered>"` string, so a substitution
+/// among the three is invisible here even though growth or shrinkage of
+/// the unnamed population is not.
 #[test]
 fn d5b_trusted_base_full_enumeration_from_bare_env() {
     let env = ElabEnv::new().expect("base env");
