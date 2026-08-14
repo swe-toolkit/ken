@@ -1,7 +1,7 @@
 ---
 id: RT-CONTKEY-CONSUMING-OCCURRENCE
 title: "The continuation specialization key names the owner of the continuation's own occurrence and has nowhere to name the occurrence that CONSUMES its answer; the enclosing eliminator is measurably not in hand at the interning site, so the fact must be seeded at the outer-match walk and threaded there -- a plan-construction change, not a field addition"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,7 +11,41 @@ github: null
 origin: "Architect ruling evt_3zjhbbr7k3ky6 (2026-08-14) on the RT-LEXICAL-RECURSOR-CONSUMERS D2k frame section 8 hard stop, which fixed the amendment shape and made sizing turn on one probe; the Steward released only that probe (evt_hkqp2pjrknaj) and filed no node until it answered. Runtime measured it at origin/main 0644ab95 (evt_3tkyp322dh4c7, leader confirmation evt_1f4yp49cx23m4): NOT in hand. Steward-filed per COORDINATION §2."
 ---
 
-> # THIS NODE SUPPLIES A RELATION. IT DOES NOT REPAIR A ROUTE.
+> # MERGED 2026-08-14 at `a998d3f6` (PR #2209), exact `16eb2618`.
+>
+> **Every AC discharged, and the two that existed to catch a wrong answer both
+> produced real measurements rather than assertions.** `AC-1`: rows 4 and 5
+> carry body `16`/`12` with eliminator `5`, each agreeing with an independent
+> direct derivation. `AC-2`: the wrong-own-occurrence seed mutation refuses
+> verbatim with *"a continuation specialization's consuming occurrence is not
+> the exact outer selected case body derived from its eliminator"*. `AC-3`:
+> population is one carrying edge per governed plan, two in the two-row control.
+> `AC-6`: rows 4 and 5 **still refuse** at `StaticWorkerBinding` with their prior
+> conservation sentence -- no route repair rode along.
+>
+> **`AC-1` AND `AC-3` ARE WEAKER THAN THEY READ. Adversary `evt_7b75nbgqbw04z`,
+> triaged CONFIRMED; follow-up is [[RT-CONTKEY-ELIMINATOR-ORIGIN-UNFIRED]].**
+> `consuming_occurrence` has two fields and only `body_origin` is re-derived --
+> `eliminator_origin` is **copied from the input** into every candidate before
+> the comparison, so `AC-1`'s assert is `x == x` on that field. `AC-2`'s mutation
+> perturbs `body_origin` only, so the measured refusal is the scan rejecting a
+> wrong body and **step 1 has never been fired**. Nothing is known to be wrong;
+> there is simply no evidence that half is right.
+>
+> **`AC-3`'s "population of two" is one on the axes that matter.** Both rows
+> carry `eliminator_origin: StaticOriginId(5)` and
+> `consumer_owner: PredeclaredFunctionId(0)`; only `body_origin` differs. They
+> are **one eliminator with two bodies**, not two samples -- so a control passing
+> for the wrong reason on `eliminator_origin` passes identically on both. Do not
+> cite that count as two independent samples.
+>
+> Architect Decision `dec_7ta70j8a2dqk3`, QA `evt_4v9xz45y4443z`.
+> `scripts/ken-cargo test -p ken-runtime --lib`: 928 passed, 0 failed.
+>
+> **[[RT-LEXICAL-RECURSOR-CONSUMERS]] `D2k-1c` IS NOW UNBLOCKED** -- the relation
+> it was waiting for exists.
+
+> # THIS NODE SUPPLIED A RELATION. IT DID NOT REPAIR A ROUTE.
 >
 > The route repair is `D2k-1c` in [[RT-LEXICAL-RECURSOR-CONSUMERS]], which is
 > `active`, already framed in section 5 of its frame, and blocked on exactly the
