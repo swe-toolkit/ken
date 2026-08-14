@@ -17751,6 +17751,74 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 });
                 let case_env = self.bound_constructor_fields(&args, env)?;
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                if self.body_emission_authority == BodyEmissionAuthority::FunctionizedUnits {
+                    if let RuntimeExpr::LexicalClosure {
+                        captures,
+                        params,
+                        body: closure_body,
+                    } = body.expr
+                    {
+                        if params.len() != args.len() {
+                            return Err(unsupported(
+                                "Match",
+                                format!(
+                                    "selected case closure expects {} parameters but the matched \
+                                     constructor supplies {} fields",
+                                    params.len(),
+                                    args.len()
+                                ),
+                            ));
+                        }
+
+                        // The applied form is admitted; the D1 applied form is
+                        // unmeasured. The case binder check above and this
+                        // parameter check establish one exact run: every matched
+                        // field becomes one closure parameter, in source order,
+                        // before the capture suffix is appended.
+                        let mut inputs = args
+                            .iter()
+                            .map(|field| {
+                                let field = field
+                                    .specialized_at("a static Match case closure parameter")?
+                                    .clone();
+                                self.carry_call_input(
+                                    builder,
+                                    body.static_origin,
+                                    LoweringOperand::Specialized(field),
+                                )
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        inputs.extend(
+                            captures
+                                .iter()
+                                .enumerate()
+                                .map(|(position, capture)| {
+                                    let capture = self.child_occurrence(
+                                        body.static_origin,
+                                        1 + position,
+                                        capture,
+                                    )?;
+                                    let lowered = self.lower_expr(builder, capture, &case_env)?;
+                                    self.carry_call_input(
+                                        builder,
+                                        capture.static_origin,
+                                        lowered,
+                                    )
+                                })
+                                .collect::<Result<Vec<_>, _>>()?,
+                        );
+                        let closure_body = self
+                            .child_occurrence(body.static_origin, 0, closure_body)?
+                            .static_origin;
+                        return self.call_declared_unit(
+                            builder,
+                            closure_body,
+                            &inputs,
+                            #[cfg(test)]
+                            None,
+                        );
+                    }
+                }
                 self.lower_expr(builder, body, &case_env)
             }
             RuntimeExpr::ComputationalMatch {

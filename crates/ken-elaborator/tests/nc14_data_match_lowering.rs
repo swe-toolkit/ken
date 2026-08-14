@@ -198,41 +198,91 @@ fn nested_checked_runtime_program_for_source(
         .expect("recursive checked artifact erases")
 }
 
-fn assert_nested_full_pipeline_nat(
+fn assert_nested_checked_pipeline_nat(
     package_name: &str,
     target_name: &str,
     source: &str,
     expected: usize,
-    expected_native_declarations: &[&str],
-) {
-    let mut program = nested_checked_runtime_program_for_source(package_name, target_name, source);
+    expected_declarations: &[&str],
+) -> RuntimeProgram {
+    let program = nested_checked_runtime_program_for_source(package_name, target_name, source);
     let target = decl_symbol(package_name, target_name);
     let target_symbol = target.to_string();
-    // MEASURED: the exact RuntimeProgram declaration set supplied to native
-    // emission. CLAIMED: the selected target is in that population. THE GAP:
-    // this does not show that native lowering defined it; the AC-6 transition
-    // sentinel below records the predecessor refusal that currently prevents
-    // an object artifact from existing.
-    let native_declarations = program
+    // MEASURED: the exact RuntimeProgram declaration set produced by checked
+    // erasure. CLAIMED: the selected target is in that population. THE GAP:
+    // this durable checked/interpreter invariant does not claim native
+    // realization; the D2 transition stop has its own control below.
+    let declarations = program
         .declarations
         .iter()
         .map(|declaration| declaration.symbol.clone())
         .collect::<BTreeSet<_>>();
-    let expected_native_declarations = expected_native_declarations
+    let expected_declarations = expected_declarations
         .iter()
         .map(|name| decl_symbol(package_name, name).to_string())
         .collect::<BTreeSet<_>>();
     assert_eq!(
-        native_declarations, expected_native_declarations,
-        "the declaration set supplied to native emission changed"
+        declarations, expected_declarations,
+        "the checked-erasure declaration set changed"
     );
     assert!(
-        native_declarations.contains(&target_symbol),
-        "the declaration set supplied to native emission must contain the selected \
-         {target_name} declaration; emitted input: {native_declarations:?}"
+        declarations.contains(&target_symbol),
+        "the erased declaration set must contain the selected \
+         {target_name} declaration; erased input: {declarations:?}"
     );
     assert_eq!(interpreter_nat_for_source(source, target_name), expected);
 
+    program
+}
+
+#[test]
+fn nested_recursive_match_applies_case_field_then_stops_without_checked_ih_authority() {
+    // The D1 transition sentinel is retired deliberately: D2's settled Match
+    // repair removes the predecessor Closure refusal. This separately named
+    // transition control owns the later boundary and must be retired when the
+    // successor planning-capability node supplies checked-IH authority.
+    //
+    // MEASURED: the real erased program has no oriented-plan metadata; after
+    // the selected case closure consumes its field, native lowering reaches
+    // ordinary Match selection and reports its exact unrealized-capsule
+    // refusal, with zero scalar-merge arrivals.
+    //
+    // CLAIMED: D2 advances the predecessor refusal to the truthful stop where
+    // checked-IH plan and call-template authority have not been minted.
+    //
+    // THE GAP: this control does not license minting that authority or define
+    // its representation. The successor planning-capability node owns the
+    // pending call, exact template, slot, parent, and segment authority.
+    let package_name = "nested_inductive_native_stop_pkg";
+    let target_name = "liftSizeResult";
+    let expected = 3;
+    let mut program = assert_nested_checked_pipeline_nat(
+        package_name,
+        target_name,
+        NESTED_LIFT_NAT_THREE_SOURCE,
+        expected,
+        &["liftAdd", "liftSize", "liftSizeResult"],
+    );
+
+    let oriented_plan_symbol = StableSymbol::new(
+        SymbolNamespace::Metadata,
+        vec![
+            package_name.to_string(),
+            "OrientedSubcontinuationPlanV1".to_string(),
+        ],
+    )
+    .to_string();
+    assert!(
+        !program
+            .erased_core
+            .metadata
+            .checked_core
+            .metadata
+            .contains_key(&oriented_plan_symbol),
+        "the D2 transition fixture must not carry successor-owned checked-IH plan authority"
+    );
+
+    let target = decl_symbol(package_name, target_name);
     let target_body = lowered_body(&program, &target);
     let example = ken_runtime::RuntimeExample {
         name: format!("{package_name}-{target_name}-native-emission"),
@@ -248,13 +298,13 @@ fn assert_nested_full_pipeline_nat(
         }),
     };
     program.examples = vec![example.clone()];
-    let runtime = runtime_ir_report_for_example(&program, &example, "D1 emission probe");
+    let runtime = runtime_ir_report_for_example(&program, &example, "D2 authority stop");
     let scalar_merge_scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
     let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &runtime,
         &ken_runtime::NativeSeedEnvironment::empty(),
-        format!("ken_nested_ih_{target_name}"),
+        "ken_nested_ih_authority_stop",
     );
     let scalar_merge_arrivals = scalar_merge_scope.finish();
     assert!(
@@ -264,19 +314,19 @@ fn assert_nested_full_pipeline_nat(
     );
     match native {
         Err(ken_runtime::CraneliftBackendError::Unsupported(refusal)) => {
-            assert_eq!(refusal.construct, "Closure");
+            assert_eq!(refusal.construct, "Match");
             assert_eq!(
                 refusal.reason,
-                "closures are callable but not observable ground values in native lowering"
+                "scrutinee is not a constructor value"
             );
         }
         Ok(artifact) => panic!(
-            "nested-IH D1 unexpectedly emitted `{}`; replace this AC-6 transition sentinel \
-             with the four separate realization observations",
+            "nested-IH D2 unexpectedly emitted `{}` without successor-owned checked-IH \
+             planning authority",
             artifact.entry_symbol
         ),
         Err(other) => panic!(
-            "nested-IH D1 reached a different native-emission boundary: {other}"
+            "nested-IH D2 reached a different native-emission boundary: {other}"
         ),
     }
 }
@@ -310,10 +360,9 @@ fn user_data_two_payload_binders_preserve_de_bruijn_order() {
 fn nested_recursive_bag_rose_elaborates_checks_erases_and_interprets_at_nat_three() {
     // Promise class: durable invariant. The surface selector consumes both
     // recursive Join results through elaboration, final kernel checking,
-    // checked-artifact erasure, and interpreter evaluation. The helper's
-    // native-emission assertion is an AC-6 transition sentinel for the current
-    // predecessor refusal, not a native-realization claim.
-    assert_nested_full_pipeline_nat(
+    // checked-artifact erasure, and interpreter evaluation. Native realization
+    // is intentionally outside this durable assertion.
+    assert_nested_checked_pipeline_nat(
         "nested_inductive_pkg",
         "liftSizeResult",
         NESTED_LIFT_NAT_THREE_SOURCE,
@@ -556,7 +605,8 @@ fn nested_recursive_bag_join_residual_folds_all_leaves_at_nat_three() {
     // Promise class: durable invariant. Three residual Join layers separate
     // the outer node from both leaves, so a finite unroll or depth snapshot
     // cannot obtain the expected result without consuming the generated fold.
-    assert_nested_full_pipeline_nat(
+    // Native realization is intentionally outside this durable assertion.
+    assert_nested_checked_pipeline_nat(
         "nested_inductive_deep_pkg",
         "liftSizeDeepResult",
         NESTED_LIFT_NAT_THREE_SOURCE,
@@ -578,7 +628,8 @@ fn nested_recursive_bag_dropped_join_fold_reaches_nat_one() {
         1,
     );
     assert_ne!(source, NESTED_LIFT_NAT_THREE_SOURCE);
-    assert_nested_full_pipeline_nat(
+    // Native realization is intentionally outside this durable assertion.
+    assert_nested_checked_pipeline_nat(
         "nested_inductive_dropped_fold_pkg",
         "liftSizeResult",
         &source,
