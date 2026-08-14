@@ -163,34 +163,44 @@ fn ac5_new_combinators_add_zero_trusted_base_entries() {
     }
 }
 
-/// Every `trusted_base()` entry's best-available name: an `Opaque`
+/// Every `trusted_base()` entry's label, tagged with its `ken_kernel::Decl`
+/// kind (LANG-TRUSTED-BASE-LABEL-KIND-TAG D1): `Opaque(name)` for an opaque
 /// declaration's own kernel-recorded `name` (`ken_kernel::Decl::Opaque`'s
 /// audit label -- what `declare_postulate` was actually called with, which
 /// is what `prover.rs`'s "prover unknown goal" and `bytes.rs`'s
 /// "BytesRoundTripLaw" both show can diverge from the declaration that
-/// raised the obligation); failing that, the elaborator's public surface
-/// name for it; and failing that, the literal `"<unregistered>"` -- some
-/// entries are deliberately removed from the public name map after use
-/// (`conversions.rs`'s unchecked ABI-scalar narrowing primitives, "not a
-/// public API"), so they have no name at all, by design rather than by
-/// omission, and must still be visible in the enumeration. The `match`'s
-/// `_ =>` arm structurally absorbs `Primitive`, `Transparent`, and
-/// `Inductive` alike (only `Opaque` carries a kernel-level name); in
-/// practice only `Primitive` ever reaches it, since `trusted_base()`'s own
+/// raised the obligation), or `Primitive(name)` for a primitive, where
+/// `name` is the elaborator's public surface name if one resolves and the
+/// literal `"<unregistered>"` otherwise -- some entries are deliberately
+/// removed from the public name map after use (`conversions.rs`'s unchecked
+/// ABI-scalar narrowing primitives, "not a public API"), so they have no
+/// surface name at all, by design rather than by omission, and must still
+/// be visible in the enumeration (D2). Tagging by kind is what makes a
+/// postulate quietly becoming a primitive under the same spelling visible:
+/// before this WP, `Opaque(add_int)` and a same-spelled `Primitive(add_int)`
+/// rendered identically as the untagged `"add_int"`. `trusted_base()`'s own
 /// filter (`env.rs`) admits only `Opaque` and non-literal `Primitive`
-/// declarations, but the fallback is not `Primitive`-specific.
+/// declarations, so `Transparent`/`Inductive` are enumerated declarations
+/// that can never actually reach this `match`; the arm panics rather than
+/// silently mislabeling them, so a regression in that filter reds here
+/// instead of producing a wrong tag.
 ///
 /// `by_global_name`'s `HashMap<u32, &String>` is built by `.collect()`ing
 /// `env.globals` (`HashMap<String, GlobalId>`), which would be
-/// order-dependent -- and this fallback flaky -- if any `GlobalId` had two
-/// names. Checked directly: `env.globals.len()` and its distinct-id count
-/// are both 452 (measured at this WP's tip), and zero `trusted_base()` ids
-/// are aliased -- `env.globals` is injective, so this is a deterministic
-/// lookup, not a per-process coin flip.
+/// order-dependent -- and the surface-name lookup flaky -- if any `GlobalId`
+/// had two names. `D3` enforces this directly rather than only measuring it:
+/// the `assert_eq!` below fails the moment `env.globals` ever admits a
+/// second name for one id, instead of leaving it a doc-comment claim that
+/// could go stale silently.
 fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
     use ken_kernel::Decl;
     let by_global_name: std::collections::HashMap<u32, &String> =
         env.globals.iter().map(|(name, id)| (id.0, name)).collect();
+    assert_eq!(
+        by_global_name.len(),
+        env.globals.len(),
+        "env.globals is not injective; labels would be order-dependent"
+    );
     let mut labels: Vec<String> = env
         .env
         .trusted_base()
@@ -202,12 +212,19 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
                 .iter()
                 .find(|d| d.id() == *id)
                 .expect("every trusted_base id must resolve to a declaration");
-            match decl {
-                Decl::Opaque { name, .. } => name.clone(),
-                _ => by_global_name
+            let surface_name = || {
+                by_global_name
                     .get(&id.0)
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| "<unregistered>".to_string()),
+                    .unwrap_or_else(|| "<unregistered>".to_string())
+            };
+            match decl {
+                Decl::Opaque { name, .. } => format!("Opaque({name})"),
+                Decl::Primitive { .. } => format!("Primitive({})", surface_name()),
+                Decl::Transparent { .. } | Decl::Inductive(_) => panic!(
+                    "trusted_base() yielded a {decl:?} entry; its own filter admits \
+                     only Opaque and non-literal Primitive declarations"
+                ),
             }
         })
         .collect();
@@ -223,131 +240,137 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 /// trusted base in its own right (per D5b, that finding is reported rather
 /// than a reason to fall back to the per-name check AC-5 already is) --
 /// nearly all of it is the numeric-tower floor (`numbers.rs`/
-/// `conversions.rs`), not user-authored postulates. Three entries are
-/// `"<unregistered>"`: `conversions.rs`'s `int_to_{usize,isize,cint}_raw`,
-/// each deliberately dropped from `env.globals` after its safe wrapper and
-/// retract postulate are built (`conversions.rs` ~L359, "unchecked
-/// narrowing is not a public API") -- present in the trusted base with no
-/// public name, which is the exact shape this enumeration exists to make
-/// visible rather than let a per-name check silently miss. That visibility
-/// has a real edge: three collided entries make the *count* of unnamed
-/// members visible (three, not two or four), but the `Vec<String>` cannot
-/// distinguish one unnamed entry being replaced by a different unnamed one
-/// -- both render as the same `"<unregistered>"` string, so a substitution
-/// among the three is invisible here even though growth or shrinkage of
-/// the unnamed population is not.
+/// `conversions.rs`), not user-authored postulates. `LANG-TRUSTED-BASE-
+/// LABEL-KIND-TAG D1`/`D4` retagged every entry with its `Decl` kind without
+/// changing membership: the count stays 107. Three entries are
+/// `"Primitive(<unregistered>)"`: `conversions.rs`'s
+/// `int_to_{usize,isize,cint}_raw`, each deliberately dropped from
+/// `env.globals` after its safe wrapper and retract postulate are built
+/// (`conversions.rs` ~L359, "unchecked narrowing is not a public API") --
+/// present in the trusted base with no public surface name, which is the
+/// exact shape this enumeration exists to make visible rather than let a
+/// per-name check silently miss. That visibility has a real edge: three
+/// collided entries make the *count* of unnamed members visible (three, not
+/// two or four), but the tagged label cannot distinguish one unnamed entry
+/// being replaced by a different unnamed one -- both render as the same
+/// `"Primitive(<unregistered>)"` string, so a substitution among the three
+/// is invisible here even though growth or shrinkage of the unnamed
+/// population is not. What the kind tag newly makes visible is the
+/// orthogonal movement: an entry changing from `Opaque(x)` to
+/// `Primitive(x)` (or the reverse) under the same spelling `x`, which the
+/// untagged `Vec<String>` this enumeration replaced could not see at all.
 #[test]
 fn d5b_trusted_base_full_enumeration_from_bare_env() {
     let env = ElabEnv::new().expect("base env");
     let labels = trusted_base_labels(&env);
     let mut expected: Vec<&str> = vec![
-        "<unregistered>",
-        "<unregistered>",
-        "<unregistered>",
-        "Bytes",
-        "BytesRoundTripLaw",
-        "CInt",
-        "Cap",
-        "Float",
-        "Float32",
-        "ISize",
-        "Int",
-        "Int16",
-        "Int32",
-        "Int64",
-        "Int8",
-        "NoOvfAddInt16",
-        "NoOvfAddInt32",
-        "NoOvfAddInt64",
-        "NoOvfAddInt8",
-        "NoOvfAddUInt16",
-        "NoOvfAddUInt32",
-        "NoOvfAddUInt64",
-        "NoOvfAddUInt8",
-        "RecordNil",
-        "Resource",
-        "String",
-        "UInt16",
-        "UInt32",
-        "UInt64",
-        "UInt8",
-        "USize",
-        "add_float",
-        "add_float32",
-        "add_int",
-        "add_int16",
-        "add_int32",
-        "add_int64",
-        "add_int8",
-        "add_uint16",
-        "add_uint32",
-        "add_uint64",
-        "add_uint8",
-        "and_bool",
-        "byte_length",
-        "bytes_at",
-        "bytes_concat",
-        "bytes_decode",
-        "bytes_encode",
-        "bytes_length",
-        "bytes_list_roundtrip",
-        "bytes_slice",
-        "bytes_to_list",
-        "char_length",
-        "cint_int_retract",
-        "cint_to_int",
-        "decidable equality complete",
-        "decidable equality sound",
-        "decimalPow10Unbounded",
-        "div_float",
-        "eq_float",
-        "eq_float32",
-        "eq_int",
-        "int16_to_int",
-        "int32_to_int",
-        "int64_to_int",
-        "int8_to_int",
-        "int_to_int16_raw",
-        "int_to_int32_raw",
-        "int_to_int64_raw",
-        "int_to_int8_raw",
-        "int_to_uint16_raw",
-        "int_to_uint32_raw",
-        "int_to_uint64_raw",
-        "int_to_uint8_raw",
-        "isize_int_retract",
-        "isize_to_int",
-        "leq_int",
-        "list_bytes_roundtrip",
-        "list_char_to_string",
-        "list_to_bytes",
-        "mul_float",
-        "mul_int",
-        "neg_int16",
-        "neg_int32",
-        "neg_int64",
-        "neg_int8",
-        "not_bool",
-        "or_bool",
-        "record_nil_val",
-        "string_to_list_char",
-        "sub_float",
-        "sub_int",
-        "uint16_to_int",
-        "uint32_to_int",
-        "uint64_to_int",
-        "uint8_int_retract",
-        "uint8_to_int",
-        "usize_int_retract",
-        "usize_to_int",
-        "wrapping_add_int16",
-        "wrapping_add_int32",
-        "wrapping_add_int64",
-        "wrapping_add_int8",
-        "wrapping_add_uint16",
-        "wrapping_add_uint32",
-        "wrapping_add_uint64",
-        "wrapping_add_uint8",
+        "Opaque(BytesRoundTripLaw)",
+        "Opaque(NoOvfAddInt16)",
+        "Opaque(NoOvfAddInt32)",
+        "Opaque(NoOvfAddInt64)",
+        "Opaque(NoOvfAddInt8)",
+        "Opaque(NoOvfAddUInt16)",
+        "Opaque(NoOvfAddUInt32)",
+        "Opaque(NoOvfAddUInt64)",
+        "Opaque(NoOvfAddUInt8)",
+        "Opaque(RecordNil)",
+        "Opaque(bytes_list_roundtrip)",
+        "Opaque(cint_int_retract)",
+        "Opaque(decidable equality complete)",
+        "Opaque(decidable equality sound)",
+        "Opaque(decimalPow10Unbounded)",
+        "Opaque(isize_int_retract)",
+        "Opaque(list_bytes_roundtrip)",
+        "Opaque(record_nil_val)",
+        "Opaque(uint8_int_retract)",
+        "Opaque(usize_int_retract)",
+        "Primitive(<unregistered>)",
+        "Primitive(<unregistered>)",
+        "Primitive(<unregistered>)",
+        "Primitive(Bytes)",
+        "Primitive(CInt)",
+        "Primitive(Cap)",
+        "Primitive(Float)",
+        "Primitive(Float32)",
+        "Primitive(ISize)",
+        "Primitive(Int)",
+        "Primitive(Int16)",
+        "Primitive(Int32)",
+        "Primitive(Int64)",
+        "Primitive(Int8)",
+        "Primitive(Resource)",
+        "Primitive(String)",
+        "Primitive(UInt16)",
+        "Primitive(UInt32)",
+        "Primitive(UInt64)",
+        "Primitive(UInt8)",
+        "Primitive(USize)",
+        "Primitive(add_float)",
+        "Primitive(add_float32)",
+        "Primitive(add_int)",
+        "Primitive(add_int16)",
+        "Primitive(add_int32)",
+        "Primitive(add_int64)",
+        "Primitive(add_int8)",
+        "Primitive(add_uint16)",
+        "Primitive(add_uint32)",
+        "Primitive(add_uint64)",
+        "Primitive(add_uint8)",
+        "Primitive(and_bool)",
+        "Primitive(byte_length)",
+        "Primitive(bytes_at)",
+        "Primitive(bytes_concat)",
+        "Primitive(bytes_decode)",
+        "Primitive(bytes_encode)",
+        "Primitive(bytes_length)",
+        "Primitive(bytes_slice)",
+        "Primitive(bytes_to_list)",
+        "Primitive(char_length)",
+        "Primitive(cint_to_int)",
+        "Primitive(div_float)",
+        "Primitive(eq_float)",
+        "Primitive(eq_float32)",
+        "Primitive(eq_int)",
+        "Primitive(int16_to_int)",
+        "Primitive(int32_to_int)",
+        "Primitive(int64_to_int)",
+        "Primitive(int8_to_int)",
+        "Primitive(int_to_int16_raw)",
+        "Primitive(int_to_int32_raw)",
+        "Primitive(int_to_int64_raw)",
+        "Primitive(int_to_int8_raw)",
+        "Primitive(int_to_uint16_raw)",
+        "Primitive(int_to_uint32_raw)",
+        "Primitive(int_to_uint64_raw)",
+        "Primitive(int_to_uint8_raw)",
+        "Primitive(isize_to_int)",
+        "Primitive(leq_int)",
+        "Primitive(list_char_to_string)",
+        "Primitive(list_to_bytes)",
+        "Primitive(mul_float)",
+        "Primitive(mul_int)",
+        "Primitive(neg_int16)",
+        "Primitive(neg_int32)",
+        "Primitive(neg_int64)",
+        "Primitive(neg_int8)",
+        "Primitive(not_bool)",
+        "Primitive(or_bool)",
+        "Primitive(string_to_list_char)",
+        "Primitive(sub_float)",
+        "Primitive(sub_int)",
+        "Primitive(uint16_to_int)",
+        "Primitive(uint32_to_int)",
+        "Primitive(uint64_to_int)",
+        "Primitive(uint8_to_int)",
+        "Primitive(usize_to_int)",
+        "Primitive(wrapping_add_int16)",
+        "Primitive(wrapping_add_int32)",
+        "Primitive(wrapping_add_int64)",
+        "Primitive(wrapping_add_int8)",
+        "Primitive(wrapping_add_uint16)",
+        "Primitive(wrapping_add_uint32)",
+        "Primitive(wrapping_add_uint64)",
+        "Primitive(wrapping_add_uint8)",
     ];
     expected.sort();
     assert_eq!(

@@ -220,35 +220,41 @@ line below the claim does not travel with the claim.
 > ride-along would have waited on an answer unrelated to it. The work is
 > unchanged; only its route is. Retiring these two sections is that node's `D5`.
 
-### Residual: `env.globals` injectivity is measured, not enforced
+### Residual (DISCHARGED): `env.globals` injectivity was measured, not enforced
+
+**Discharged by `LANG-TRUSTED-BASE-LABEL-KIND-TAG` D3.** See
+[[LANG-TRUSTED-BASE-LABEL-KIND-TAG]].
 
 Architect finding, non-blocking, at `evt_4bdcm6fer2570`. `trusted_base_labels`
 depends on `env.globals` being injective, and the census measured it — `452`
-globals, `452` distinct ids, zero aliased. That is true **at this tip** and the
-comment dates it honestly.
+globals, `452` distinct ids, zero aliased. That was true **at this tip** and
+the comment dated it honestly.
 
-**Nothing fails if a later prelude addition registers a second name for an
-existing id.** The consequence is not a wrong test but a **flaky** one: an
-intermittently-changing label whose diff will not explain itself. The closing
-line already exists in the function that depends on it —
+**Nothing failed if a later prelude addition registered a second name for an
+existing id.** The consequence was not a wrong test but a **flaky** one: an
+intermittently-changing label whose diff would not explain itself. The closing
+line already existed in the function that depended on it —
 
 ```rust
 assert_eq!(by_global_name.len(), env.globals.len(),
     "env.globals is not injective; labels would be order-dependent");
 ```
 
-— which converts a measured fact into a maintained one. **Not filed as a node**
-(one line, inside a function an open node already touches); it rides the next
-Language candidate that enters this file. `LANG-COMMENT-POPULATION-PARITY` does
-not touch it, so this is carried rather than assigned.
+— and `D3` added exactly that assertion, converting the measured fact into a
+maintained one. Verified live: registering a second surface name for an
+existing `GlobalId` now reds the assertion with that message
+(`by_global_name.len() != env.globals.len()`), then restores clean.
 
-### Residual: `trusted_base_labels` flattens two namespaces into one untagged list
+### Residual (DISCHARGED): `trusted_base_labels` flattened two namespaces into one untagged list
+
+**Discharged by `LANG-TRUSTED-BASE-LABEL-KIND-TAG` D1/D2/D4.** See
+[[LANG-TRUSTED-BASE-LABEL-KIND-TAG]].
 
 Adversary hunt `evt_31dc9xfdp2ny`, Finding 3, triaged by the Steward
 2026-08-14. **Re-verified against the landed code before filing**, at
 `crates/ken-elaborator/tests/lang_prelude_collections.rs:205-211`.
 
-The `match decl` has two arms feeding one `Vec<String>`, and they draw from
+The `match decl` had two arms feeding one `Vec<String>`, and they drew from
 **different namespaces**:
 
 - `Decl::Opaque { name, .. } => name.clone()` — the **kernel declaration**
@@ -256,27 +262,22 @@ The `match decl` has two arms feeding one `Vec<String>`, and they draw from
 - `_ => by_global_name.get(&id.0)` — the **surface** name from `env.globals`,
   falling back to `"<unregistered>"`.
 
-**Nothing in the emitted label records which arm produced it.** So a
-trusted-base entry that changes **kind** while keeping its spelling renders
+**Nothing in the emitted label recorded which arm produced it.** So a
+trusted-base entry that changed **kind** while keeping its spelling rendered
 identically, and the enumeration this node landed as `AC-6` — 107 entries, by
-name — cannot see the change. **That is not a cosmetic distinction:** an
+name — could not see the change. **That was not a cosmetic distinction:** an
 opaque is an axiom, a primitive is a thing with a reduction, and they are not
 the same trust claim. A postulate becoming a primitive under the same name is
 exactly the movement an enumeration of the trusted base exists to catch, and
-this one is blind to it.
+this one was blind to it.
 
-**The repair is to tag the label with the decl's kind** — `Opaque(Bytes)`,
+**`D1` tags the label with the decl's kind** — `Opaque(Bytes)`,
 `Primitive(add_int)` — so the namespace each name came from is on the face of
-the label. **It also fixes `<unregistered>` for free**, which the finding
-scoped itself out of: `decl` is in hand on both arms, so the three
-deliberately-dropped `conversions.rs` entries can carry their kind even when
-no surface name resolves. The `AC-6` expected-list in this file updates with
-it; that is the same edit, not a second one.
-
-**Not filed as a node**, same reasoning as the injectivity residual above and
-the same route: it rides the next Language candidate that enters this file.
-**These two now travel together** — both are inside `trusted_base_labels`,
-both are one-function edits, and whichever candidate takes one should take
-both rather than leaving a second pass on the same twenty lines.
-`LANG-COMMENT-POPULATION-PARITY` does not touch this file, so this is carried
-rather than assigned.
+the label. **`D2` fixes `<unregistered>` for free**, which the finding
+scoped itself out of: `decl` was in hand on both arms, so the three
+deliberately-dropped `conversions.rs` entries now carry their kind even when
+no surface name resolves (`Primitive(<unregistered>)`, never a bare
+`<unregistered>`). `D4` updates the `AC-6` expected-list in the same edit —
+verified a pure retagging, membership and the 107 count unchanged. Verified
+live: forcing one entry (`RecordNil`) down the opposite arm reds the `AC-6`
+enumeration, naming the entry, then restores clean.
