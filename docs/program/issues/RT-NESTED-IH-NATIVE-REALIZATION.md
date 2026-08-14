@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-IH-NATIVE-REALIZATION
 title: "Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3"
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
@@ -10,6 +10,59 @@ blocks: [KERNEL-NESTED-IND]
 github: null
 origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statement of c2's AC-K12 relationship, evt_77pege8j5cv14, requested at evt_6pmftb5fpxrkm. Discharges the second Steward condition on the c1/c2 cut (evt_6z7wf6dw94cym), which required c2 to state that relationship before assignment.
 ---
+
+## D1 MERGED 2026-08-14 as an ACCEPTED PARTIAL. The node stays `active`, and what remains is GATED, not merely unstarted.
+
+**Candidate `ed854c859b0daa58a0664e38ad1526659c8ce0a9`, landed as squash
+`2e1f0340`** (PR #2176, CI green; Decision `dec_y75rp1fhq0y8`, Architect, read
+`resolved` from the object; QA `evt_27yb8tcs78tx8`). Merge-base `6b3b5b40`
+derived independently and matching the declared value; one non-merge commit,
+one path, `+105/-23`; **1/1 blob verified identical after landing.**
+
+**`D1` delivered an `AC-6` hard stop, and that is the outcome the frame asked
+for.** The real package-backed in-edge `emit_runtime_ir_object_with_cranelift`
+**reaches** native lowering and then refuses before `merge_scalar_operand`:
+
+```
+Unsupported { construct: "Closure",
+              reason: "closures are callable but not observable ground values
+                       in native lowering" }
+```
+
+The feature-gated scalar-merge observer records **zero arrivals for that exact
+attempt**. ⇒ **This is a predecessor decline, not the absence of a native
+path** — which is the distinction `AC-6` exists to force, and the two have
+different repairs. The committed sentinel reports the declaration set
+`{liftAdd, liftSize, liftSizeResult}`, target presence, the refusal, and the
+zero count; its refusal-text mutation reddened it and then restored green, so it
+is a control rather than a claim. **`AC-5` holds** — both `c2` seat controls
+pass and the `c2` result-match region is byte-identical.
+
+**No `AC-K12` claim is made and none is owed here** (`AC-7`).
+
+### What remains, stated as of 2026-08-14 — READ THE GATE BEFORE PLANNING D2
+
+**`D2`-`D5` are owed. `D2` and `D3` are NOT startable**, and prose that reads
+otherwise would send the next turn straight into the boundary question this
+node was cut to keep out.
+
+The implementer identified a repair direction: the static-constructor `Match`
+path binds fields into `case_env`, then lowers `LiftNode`'s one-parameter
+`LexicalClosure` **as a value**, reaching `ground_value` instead of applying it.
+
+**The Steward did NOT authorize that direction**, because the description is
+equally consistent with two situations that have different owners:
+
+| reading | disposition |
+|---|---|
+| a **defect in the `Match` lowering path** — it should apply the closure and instead grounds it | in scope, no design call, `D2` proceeds |
+| a **widening of what native lowering accepts** — the refusal is correct and something upstream should not demand an observable ground value there | moves the fail-closed boundary `c1`/`c2` were cut to establish; **not Runtime's and not the Steward's** |
+
+**These are not distinguishable from the sentence.** Routed to the Architect as
+*"which of these is it?"* — deliberately **not** as *"may I apply the
+closure?"*, which presumes the first answer. **Until that ruling lands, `D2` is
+gated.** `Forbidden` is unchanged and still binds.
+
 
 ## Why this node exists
 
