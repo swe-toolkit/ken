@@ -13,6 +13,23 @@ unparseable `ken ignore` or `ken reject` fence is deliberately exempt only from
 structural layout: B2 token-kind canonicalization still applies where lexing
 succeeds, and the original body layout otherwise remains byte-identical.
 
+**Formatting-seed fixture census.** The marker above is occurrence 1 of 20 at
+the candidate base. It is a scope declaration, not a fixture; the 18 marked
+cases and FMT9's marked scope declaration are adjudicated in place below. Of
+those 18 cases, 16 name fixtures the landed lexer and formatter surface can
+produce. Two are blocked by the same missing surface distinction: FMT1 includes
+every FMT2–FMT8 fixture, and FMT8's membership case asks source `in` to occupy a
+membership role that production cannot represent. The lexer emits `KwIn` for
+ASCII `in`, emits `Member` only for source `∈`, and the parser has no membership
+expression arm. No blocker node exists for that missing surface distinction.
+
+This census is formatting-seed-only. Seven markers elsewhere in conformance are
+not swept: five in
+`stdlib/collections/seed-cat3-collection-laws.md`, one in
+`stdlib/collections/seed-cat4-maps-sets-relations.md`, and one in
+`surface/bytes-io/seed-bytes-io.md`. Their fixtures turn on collections and
+bytes-I/O machinery rather than the lexer/formatter surface.
+
 The formatter is syntax-aware. Assertions compare parsed token roles, ASTs,
 surface-to-core results, protected payload bytes, and masked prose bytes; raw
 substring replacement is never an acceptable witness.
@@ -31,6 +48,11 @@ substring replacement is never an acceptable witness.
 - expect: **RED-UNTIL-BUILT (B3/B4/C)** — byte-for-byte
   `fmt(fmt(source)) == fmt(source)`. The comparison includes final newline,
   blank lines, comment placement, fence markers, and Markdown outside fences.
+- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE (no blocker node exists)** —
+  production exposes `format_ken` and `format_ken_md` for the other referenced
+  fixtures, but this aggregate also includes FMT8's unproducible membership
+  arm. The lexer maps ASCII `in` to `KwIn`; only source `∈` yields `Member`, and
+  the parser has no membership-expression arm.
 - why: a formatter that oscillates between flat and broken groups, relocates a
   comment on each pass, or repeatedly rewrites a fence marker can satisfy
   parse preservation while failing to define one canonical form. Byte identity
@@ -53,6 +75,10 @@ substring replacement is never an acceptable witness.
   ASCII/Unicode aliases. Declaration and arm order, binder grouping,
   parentheses required by precedence, literal lexemes, type-application form,
   and attached-proof spelling are unchanged.
+- fixture: **PRODUCIBLE** — `parse_lossless` supplies typed declarations and
+  `format_ken` consumes that same `FormattableSource`; the landed parser has
+  declaration, block, match, projection, qualified-path, and attached-proof
+  arms for the named fixture families.
 - why: the equality excludes exactly trivia and same-token notation. A printer
   that sorts, regroups, desugars, changes `Equal` to `==`, changes bracketed
   type application, or switches proof-reference form changes the compared AST
@@ -83,6 +109,9 @@ substring replacement is never an acceptable witness.
 - expect: **RED-UNTIL-BUILT (B3/C)** — both elaborate successfully to the
   byte-identical stable core serialization and identical `trusted_base()`;
   resolved `GlobalId`s and declaration order are identical
+- fixture: **PRODUCIBLE** — production exposes `format_ken`, `parse_lossless`,
+  `resolve_decls`, and `ElabEnv::elaborate_file`; the B3 preservation controls
+  already run the format/parse/resolve/elaborate path on closed sources.
 - why: AST equality alone can miss a resolution, fixity, or source-order bug.
   The stable core result is structural: a formatter that reorders imports,
   fields, instances, or declarations cannot pass merely because both sources
@@ -101,6 +130,9 @@ substring replacement is never an acceptable witness.
   stable core comparison is available, FMT6, and FMT7. Every parseable `ken`,
   `ken example`, `ken ignore`, and `ken reject` body is included according to
   its role; deliberately invalid bodies use the narrow FMT8 exemption.
+- fixture: **PRODUCIBLE** — the landed capstone enumerates plain catalog units
+  and recognized literate fences, dispatching them through `format_ken` or
+  `format_ken_md`; invalid eligible bodies take B4's lexed-token fallback.
 - why: the catalog's long telescopes, nested proofs, comments, and literals are
   the formatter's real domain. A representative sample can be green while an
   unvisited production silently loses syntax or trivia.
@@ -120,6 +152,9 @@ substring replacement is never an acceptable witness.
   the corresponding input ranges: they are byte-identical. Only recognized
   fence markers and bodies may differ. Adjacent fences are not joined or
   moved, and roles do not change.
+- fixture: **PRODUCIBLE** — `extract_ken_md` exposes all four fence roles and
+  byte ranges, while `format_ken_md` splices formatted bodies without rewriting
+  the non-body ranges; B4's prose-identity control exercises this surface.
 - why: ordinary prose contains bytes that resemble Ken aliases. Comparing the
   masked byte ranges catches a raw global canonicalizer or Markdown reflow;
   comparing only rendered text would not.
@@ -139,6 +174,9 @@ substring replacement is never an acceptable witness.
   remain attached to the same AST node; a fitting EOL comment stays inline and
   the non-fitting one moves immediately above its same node. Each interstitial
   comment forces its containing group to break and crosses no token boundary.
+- fixture: **PRODUCIBLE** — the lossless source records comment trivia and
+  span-keyed attachments, and the landed layout tests exercise leading,
+  interstitial, fitting EOL, and moved EOL comments through `format_ken`.
 - why: comment presence alone is green-vs-green under misattachment. Node
   identity plus exact text and relative token interval make relocation
   observable.
@@ -160,6 +198,10 @@ substring replacement is never an acceptable witness.
   source lexeme is byte-identical after formatting: base, separators, suffix,
   exponent, delimiter, escape spelling, and payload all survive. Alias-looking
   bytes inside any protected region are not converted to glyphs.
+- fixture: **PRODUCIBLE** — the lexer accepts the listed literal families and
+  the lossless stream retains their source spans; token canonicalization
+  replays literals, comments, temporal text, and foreign-name payloads from
+  those spans rather than scanning their bytes.
 - why: this exercises each literal form independently. Testing only an ordinary
   string would leave raw/multiline strings, chars, bytes, numeric spellings,
   comments, foreign names, and temporal payloads unguarded.
@@ -259,6 +301,9 @@ substring replacement is never an acceptable witness.
   classified by a span wholly containing one indivisible identifier/literal or
   a specified verbatim region; no line exceeds 96 solely because breakable
   syntax was left flat. Indentation is two ASCII spaces per level, never tabs.
+- fixture: **PRODUCIBLE** — `format_ken`, `display_width`, and the fixed
+  `CANONICAL_WIDTH` are landed, and the B3/capstone controls feed parseable
+  96/97 and indentation pairs through that production surface.
 - why: every 96/97 pair fixes both boundary orientation and display-width
   counting. The paired arms differ by one ASCII identifier character while
   retaining multibyte Unicode syntax, so a byte-counting implementation or a
@@ -278,6 +323,9 @@ accepting both arms is insufficient.
 - given: an ASCII function type `A -> B` and a match arm `Some x |-> x`
 - expect: **RED-UNTIL-BUILT (B2/B3/C)** — output contains `A → B` and
   `Some x ↦ x`; neither token is printed as the other
+- fixture: **PRODUCIBLE** — the lexer emits distinct `Arrow` and `MapsTo`
+  kinds, and `canonicalize_tokens` maps them independently; B2's landed
+  function/match-arrow control drives both through the production parser.
 - why: longest-token and parsed-role discrimination. A raw `->` pass can
   corrupt `|->` while still producing arrow-looking text.
 
@@ -287,6 +335,9 @@ accepting both arms is insufficient.
 - given: `(x : A)` adjacent to the reference `subject::proof_name`
 - expect: **RED-UNTIL-BUILT (B3/C)** — binding spaces around `:`, while `::`
   remains attached with no spaces; token count and roles are unchanged
+- fixture: **PRODUCIBLE** — the lexer and parser expose distinct binding-colon
+  and attached-selector paths, and `format_ken` consumes both through the
+  lossless token stream.
 - why: a punctuation pass that handles `:` before `::` changes the selector or
   inserts spaces that split it.
 
@@ -298,20 +349,30 @@ accepting both arms is insufficient.
 - expect: **RED-UNTIL-BUILT (B3/C)** — both print without spaces around `.`,
   and parsing the outputs preserves their distinct AST/resolution roles and
   `GlobalId`/projection targets
+- fixture: **PRODUCIBLE** — the parser constructs dotted paths and projection
+  expressions, while `resolve_decls` supplies the contextual distinction the
+  formatter-preservation comparison observes.
 - why: spelling identity is not role identity. The structural comparison
   catches a printer/parser path that silently reparses every dot as one class.
 
 ### surface/formatting/l-identifier-is-not-a-level-token (ambiguity)
 
-- spec: `31 §1b`/`§1d` (token-kind rule closes the `ℓ` overload)
-- given: `fn keep_l (l : Nat) : Nat = l` beside a genuine level-token fixture
-  using the canonical level role
-- expect: **RED-UNTIL-BUILT (B2/B3/C)** — both identifier occurrences remain
-  the stored spelling `l`; only the parsed level token prints `ℓ`. Repeat with
-  an identifier named `level`, which also remains `level`.
-- why: this is the direct raw-byte over-fire discriminator: the buggy
-  canonicalizer changes the binding and its use, while the correct token-kind
-  printer changes only the level token.
+- spec: `31 §1b`/`§1d` (semantic-name/source-lexeme distinction)
+- given: one fixture containing
+  `fn keep_level_glyph (ℓ : Nat) : Nat = ℓ`,
+  `fn keep_l (l : Nat) : Nat = l`, and
+  `fn keep_level_word (level : Nat) : Nat = level`; inspect each binder and use
+  before formatting, then format the fixture
+- expect: **RED-UNTIL-BUILT (B2/B3/C)** — all six identifier tokens carry the
+  same stored `Ident("level")`. The formatted source preserves the three
+  distinct binder/use lexeme pairs byte-for-byte as `ℓ`/`ℓ`, `l`/`l`, and
+  `level`/`level`.
+- fixture: **PRODUCIBLE** — the landed lexer maps each of `ℓ`, `l`, and `level`
+  to `Ident("level")`; the lossless stream retains each source span, and
+  `canonicalize_tokens` replays identifier lexemes unchanged.
+- why: this is the direct raw-byte over-fire discriminator. A canonicalizer
+  that collapsed all three sources to one spelling would satisfy the shared
+  stored-name half but fail the three-lexeme preservation half.
 
 ### surface/formatting/in-keyword-and-membership-token-stay-distinct (ambiguity)
 
@@ -320,6 +381,10 @@ accepting both arms is insufficient.
   its accepted ASCII alias in an otherwise fixed proposition
 - expect: **RED-UNTIL-BUILT (B2/B3/C)** — the keyword remains ASCII `in`; the
   parsed membership operator prints `∈`
+- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE (no blocker node exists)** — the
+  lexer maps ASCII `in` only to `KwIn`, maps source `∈` to `Member`, and the
+  parser has no membership-expression arm. Production therefore cannot assign
+  the accepted ASCII bytes the membership role this `given` requires.
 - why: the same input bytes occupy opposite token roles. Replacing every `in`
   either corrupts the keyword or fails to canonicalize membership.
 
@@ -329,6 +394,9 @@ accepting both arms is insufficient.
 - given: ASCII lambda `\\x. x` beside dependent arrow `(x : A) -> B x`
 - expect: **RED-UNTIL-BUILT (B2/B3/C)** — `λx. x` and
   `(x : A) → B x`; neither construct is desugared into the other
+- fixture: **PRODUCIBLE** — the lexer emits distinct `Lambda` and `Arrow`
+  kinds, the parser constructs both expressions, and token canonicalization
+  maps their ASCII spellings independently.
 - why: pins the S-owned lambda resolution and the distinct arrow role.
 
 ### surface/formatting/ascription-binder-fixity-and-associativity-survive (ambiguity)
@@ -340,6 +408,9 @@ accepting both arms is insufficient.
 - expect: **RED-UNTIL-BUILT (B3/C)** — formatted output reparses to the exact
   same tree for each construct, inserting mandatory-clarity parentheses where
   needed but never changing grouping
+- fixture: **PRODUCIBLE** — the landed parser represents ascription, binders,
+  arrows, application, arithmetic precedence, and declared fixity; the layout
+  path formats their lossless tokens and reparses the result.
 - why: catches a pretty-printer that preserves tokens yet changes the parse at
   a line break or precedence boundary.
 
@@ -351,6 +422,9 @@ accepting both arms is insufficient.
 - expect: **RED-UNTIL-BUILT (B3/C)** — the first prints as `a + b`; the second
   retains `(a + b) * c`; and the arrow-type argument retains its mandatory
   clarity parentheses. All three outputs reparse to their original ASTs.
+- fixture: **PRODUCIBLE** — `parse_lossless` accepts all three parenthesized
+  orientations and `format_ken` has a production parentheses/precedence path;
+  producibility does not assert that the pending removal verdict is green.
 - why: pins both orientations of canonical grouping. Preserving every source
   parenthesis fails the first arm; stripping every parenthesis fails a required
   or mandatory-clarity arm.
@@ -370,6 +444,10 @@ accepting both arms is insufficient.
   Markdown prose passes FMT5. A parseable `ignore` or `reject` body is formatted
   structurally; the exemption follows actual parse failure plus the eligible
   role, not role alone.
+- fixture: **PRODUCIBLE** — `extract_ken_md` exposes all four roles and
+  `format_ken_md` implements the parse-first split: parseable bodies take full
+  layout, while unparseable `ignore`/`reject` bodies take
+  `canonicalize_lexed_tokens`.
 - why: the last sentence is the boundary discriminator. Exempting every
   `ignore`/`reject` fence under-formats valid code; attempting AST layout on an
   invalid body rejects the document. Holding body fixed and varying
@@ -385,6 +463,14 @@ orientations: a non-canonical source must normalize to the displayed bytes,
 and those displayed bytes must format to themselves. Every assertion is
 **RED-UNTIL-BUILT (B3)** except a record-bearing input, which is
 **RED-UNTIL (record-surface + B3)**.
+
+The marker above is occurrence 19 of 20 at the candidate base. It is a scope
+declaration, not a fixture. The landed parser and `format_ken` can produce the
+embedded FMT9 families, including the record forms added after the historical
+reachability measurement below; B3's
+`ac6_reachable_fmt9_fences_remain_parse_preserved_after_horizontal_supersession`
+drives every currently parseable embedded orientation without a hand-built
+`FormattableSource`.
 
 ### surface/formatting/blank-runs-normalize-in-both-orientations (property)
 
@@ -452,6 +538,9 @@ and those displayed bytes must format to themselves. Every assertion is
   ```
 
   Formatting those bytes again is byte-identical.
+- fixture: **PRODUCIBLE** — the given is a landed nonempty class block;
+  `parse_lossless` accepts it, and the FMT9 reachability control extracts this
+  exact embedded source and feeds it through `format_ken`.
 - why: this reconstructs the record fixture's construct-agnostic sibling
   blank-collapse invariant on a block that `parse_lossless` can produce now.
   The forward record fixture remains gated on record-surface, but B3 cannot
