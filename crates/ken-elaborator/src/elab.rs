@@ -1854,6 +1854,58 @@ fn check_structured_constructor_method(
     Ok(method)
 }
 
+/// LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT D2: `check_match_dependent`'s
+/// capability-3 goal-refinement retry -- the arm taken only when the cheap
+/// unrefined attempt fails -- pulled into its own `#[inline(never)]` frame.
+/// Same reasoning as `LANG-RECORD-STACK-OVERFLOW`'s `check_pair_or_record`/
+/// `infer_record_requires_expected_type`: in an unoptimized build a
+/// function's frame is sized for every local declared anywhere in its body,
+/// paid on every call regardless of which branch runs. Unlike that node's
+/// extraction targets, this one matters here for a *narrower* reason worth
+/// recording: `check_match_dependent` is on the `check` <-> `check_match_
+/// dependent` mutual-recursion cycle that `decimal_char.rs`'s fixed
+/// 31-level `decimalPow10` cascade drives to full depth on every compile,
+/// and every one of that cascade's arms is a bare literal that the cheap
+/// unrefined attempt always resolves -- so this fallback's own frame is
+/// declared (and paid for by its caller) on every level, but never
+/// otherwise entered on this path. Moving it out removes dead weight from
+/// the caller's always-paid frame without adding a frame that this
+/// particular recursion ever pays for. Unchanged control flow and
+/// semantics -- same `refine_branch_goal`/`simplify_branch_goal`/`check`/
+/// `Term::Cast` calls in the same order, only their host frame moved.
+#[inline(never)]
+fn check_match_dependent_refined_fallback(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    ind: &InductiveDecl,
+    params_terms: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    n: usize,
+    expected_here: &Term,
+) -> Result<Term, ElabError> {
+    let (goal_refined, goal_casts) = refine_branch_goal(
+        cx,
+        ind,
+        params_terms,
+        target_indices,
+        scrut_indices,
+        n,
+        expected_here,
+    )?;
+    let expected_here_refined = if matches!(arm.body, RExpr::RLam(_, _, _)) {
+        goal_refined
+    } else {
+        simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
+    };
+    let body_core_checked = check(cx, &arm.body, &expected_here_refined, &arm.span)?;
+    let mut body_core = body_core_checked;
+    for (src, tgt, e) in goal_casts.into_iter().rev() {
+        body_core = Term::Cast(Box::new(src), Box::new(tgt), Box::new(e), Box::new(body_core));
+    }
+    Ok(body_core)
+}
+
 /// Check `match scrut { C₁ p… => e₁ ; … }` against a KNOWN `expected` goal
 /// that may reference the scrutinee (a per-branch-varying `Ω`- or `Type`-
 /// motive) — the K4/AC4 dependent-elimination path. Only FLAT constructor
@@ -2191,32 +2243,19 @@ fn check_match_dependent(
                     Ok(body_core_checked) => body_core_checked,
                     Err(_) => {
                         cx.obligations.truncate(obl_snapshot);
-                        let (goal_refined, goal_casts) = refine_branch_goal(
+                        // Moved to `check_match_dependent_refined_fallback`
+                        // (LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT D2) -- see
+                        // its doc comment. Same calls, same order.
+                        check_match_dependent_refined_fallback(
                             cx,
+                            arm,
                             &ind,
                             &params_terms,
                             &target_indices,
                             &scrut_indices,
                             n,
                             &expected_here,
-                        )?;
-                        let expected_here_refined = if matches!(arm.body, RExpr::RLam(_, _, _)) {
-                            goal_refined
-                        } else {
-                            simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
-                        };
-                        let body_core_checked =
-                            check(cx, &arm.body, &expected_here_refined, &arm.span)?;
-                        let mut body_core = body_core_checked;
-                        for (src, tgt, e) in goal_casts.into_iter().rev() {
-                            body_core = Term::Cast(
-                                Box::new(src),
-                                Box::new(tgt),
-                                Box::new(e),
-                                Box::new(body_core),
-                            );
-                        }
-                        body_core
+                        )?
                     }
                 };
                 for pos in installed_refinements {
