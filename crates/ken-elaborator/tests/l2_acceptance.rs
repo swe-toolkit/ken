@@ -6,7 +6,7 @@
 //! AC5 (indexed families) and AC6 (dependent motive) are deferred — they
 //! require `indices` support and dependent motives respectively.
 
-use ken_elaborator::{error::ElabError, ElabEnv};
+use ken_elaborator::{error::ElabError, ArmDeadCause, ElabEnv, Span};
 use ken_kernel::{whnf, Context, GlobalId, Level, Term};
 
 // ----- helpers -----
@@ -306,6 +306,58 @@ fn ac4_all_distinct_arms_accept() {
     assert!(matches!(body, Term::Elim { .. }), "AC4: all-distinct match should produce Elim");
 }
 
+// `LANG-REACHABILITY-SUBSUMING-ARMS` control 1: `Subsumed` with EXACTLY ONE
+// winner, via the single-column `check_match_dependent` path (a flat,
+// checking-mode match against a known expected type -- same dispatch shape
+// as `ac4_duplicate_arm_is_reachability_error` above, now asserting the
+// structured `cause` rather than only the bare variant).
+#[test]
+fn duplicate_flat_arm_is_subsumed_by_exactly_one_earlier_arm() {
+    let mut env = mk_env();
+    setup_color(&mut env);
+
+    let src = "let bad : Int = match Red { Red |-> 0 ; Green |-> 1 ; Blue |-> 2 ; Red |-> 9 }";
+    let result = elab(&mut env, src);
+
+    match &result {
+        Err(
+            e @ ElabError::ReachabilityError {
+                span,
+                cause: ArmDeadCause::Subsumed { first, rest },
+            },
+        ) => {
+            assert!(
+                rest.is_empty(),
+                "a single-column duplicate constructor has exactly one claimant, got \
+                 rest={rest:?}"
+            );
+            assert_eq!(
+                &src[first.start..first.end],
+                "Red |-> 0",
+                "the winner should be the FIRST Red arm"
+            );
+            assert_eq!(
+                &src[span.start..span.end],
+                "Red |-> 9",
+                "the dead arm should be the SECOND Red arm"
+            );
+            let rendered = e.to_string();
+            println!("rendered diagnostic: {rendered}");
+            assert_eq!(
+                rendered,
+                format!(
+                    "redundant match arm at {}-{}: pattern already covered by the earlier \
+                     arm(s) at {}-{}",
+                    span.start, span.end, first.start, first.end
+                ),
+                "the rendered diagnostic must name exactly the one claimant"
+            );
+        }
+        Ok(_) => panic!("duplicate constructor arm should have been flagged"),
+        Err(other) => panic!("expected ReachabilityError(Subsumed), got: {other}"),
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Nested constructor patterns (`34 §3.1` pattern-matrix compilation).
 //
@@ -428,6 +480,179 @@ fn non_dependent_arity_one_constructor_witness_derives_its_own_arity() {
         }
         Ok(_) => panic!("non-exhaustive match accepted (should have been rejected)"),
         Err(other) => panic!("expected ExhaustivenessError naming 'Succ', got: {}", other),
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// `LANG-REACHABILITY-SUBSUMING-ARMS` AC-1/AC-2 -- control 2 (matrix path,
+// >=2 winners): `ReachabilityError` carries `cause: ArmDeadCause`, total by
+// construction (`ArmDeadCause::Subsumed { first, rest }` /
+// `ArmDeadCause::NoInhabitants`), naming the earlier arm(s) whose union
+// already covers the dead arm's pattern as DATA rather than only folded
+// into rendered prose. A single subsuming arm degenerates "which arms" the
+// same way a zero-arity constructor degenerated "name vs applied pattern"
+// on the exhaustiveness side, so the discriminating case here needs at
+// least two -- a wildcard sub-pattern shadowed at three distinct leaves
+// (one per `T3` constructor), each already won by a different earlier arm.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn redundant_wildcard_arm_shadowed_at_three_leaves_names_every_subsuming_arm() {
+    let mut env = mk_env();
+    elab_ok(&mut env, "data T3 = A | B | C");
+    elab_ok(&mut env, "data Wrap = MkWrap T3");
+
+    let src = "let bad : Int = match MkWrap A { \
+               MkWrap A |-> 0 ; MkWrap B |-> 1 ; MkWrap C |-> 2 ; MkWrap y |-> 3 }";
+    let result = elab(&mut env, src);
+
+    match &result {
+        Err(
+            e @ ElabError::ReachabilityError {
+                span,
+                cause: ArmDeadCause::Subsumed { first, rest },
+            },
+        ) => {
+            // AC-1: at least two distinct earlier subsuming arms total.
+            assert!(
+                !rest.is_empty(),
+                "AC-1: expected at least two subsuming arms (first + rest), got just \
+                 first={first:?}"
+            );
+
+            // AC-2: read the arms as DATA, not rendered text -- each
+            // subsuming span slices back to one of the three earlier,
+            // distinct arm sources.
+            let mut spans: Vec<&Span> = vec![first];
+            spans.extend(rest.iter());
+            let texts: Vec<&str> = spans.iter().map(|s| &src[s.start..s.end]).collect();
+            for expected in ["MkWrap A |-> 0", "MkWrap B |-> 1", "MkWrap C |-> 2"] {
+                assert!(
+                    texts.iter().any(|t| *t == expected),
+                    "AC-2: expected a subsuming span covering '{expected}', got {texts:?}"
+                );
+            }
+            assert_eq!(
+                texts.len(),
+                3,
+                "the wildcard arm is shadowed at all three leaves (A, B, C), so it \
+                 should name all three earlier arms, got {texts:?}"
+            );
+
+            // The reported span is the dead wildcard arm itself.
+            assert_eq!(
+                &src[span.start..span.end],
+                "MkWrap y |-> 3",
+                "the reported span should be the dead wildcard arm itself"
+            );
+
+            // Report the diagnostic verbatim, per the frame.
+            let rendered = e.to_string();
+            println!("rendered diagnostic: {rendered}");
+            assert_eq!(
+                rendered,
+                "redundant match arm at 84-98: pattern already covered by the earlier \
+                 arm(s) at 33-47, 50-64, 67-81",
+                "the rendered diagnostic must include each structured subsuming span"
+            );
+        }
+        Ok(_) => panic!("wildcard arm shadowed at every leaf should have been flagged"),
+        Err(other) => panic!("expected ReachabilityError(Subsumed), got: {other}"),
+    }
+}
+
+// `LANG-REACHABILITY-SUBSUMING-ARMS` controls 3/4: `ArmDeadCause::
+// NoInhabitants` for a foreign/typo constructor arm -- one that resolves to
+// a REAL global constructor (so name resolution does not reject it first),
+// but not one of the scrutinee's own inductive's constructors, so no earlier
+// arm ever claims it and it wins at no leaf. Before this repair this shape
+// reached the new single-column `.expect()` and panicked (Architect finding,
+// evt_5hwsbae6kqj5w; independently reproduced by QA, evt_69dkk9q8hn3ye); the
+// matrix-path variant previously produced a representable-but-false empty
+// `Subsumed` payload. Both must now return `Err(NoInhabitants)`, never panic
+// and never claim false coverage.
+
+#[test]
+fn foreign_constructor_arm_is_no_inhabitants_not_a_panic_single_column() {
+    let mut env = mk_env();
+    elab_ok(&mut env, "data NatProbe = ZProbe | SProbe NatProbe");
+    elab_ok(&mut env, "data Foreign = NProbe");
+
+    // Flat arms (`ZProbe`, `SProbe n`, `NProbe`) route to the single-column
+    // `check_match_dependent` path (control 3).
+    let src = "let bad : Int = match ZProbe { ZProbe |-> 0 ; SProbe n |-> 1 ; NProbe |-> 2 }";
+    let result = elab(&mut env, src);
+
+    match &result {
+        Err(e @ ElabError::ReachabilityError { span, cause: ArmDeadCause::NoInhabitants }) => {
+            assert_eq!(
+                &src[span.start..span.end],
+                "NProbe |-> 2",
+                "the reported span should be the foreign-constructor arm itself"
+            );
+            let rendered = e.to_string();
+            println!("rendered diagnostic: {rendered}");
+            assert_eq!(
+                rendered,
+                format!(
+                    "unreachable match arm at {}-{}: no value of the scrutinee type can \
+                     match this pattern",
+                    span.start, span.end
+                ),
+                "NoInhabitants must not claim any covering arm"
+            );
+        }
+        Ok(_) => panic!(
+            "a foreign-constructor arm (NProbe, not a NatProbe constructor) elaborated \
+             successfully"
+        ),
+        Err(other) => panic!(
+            "expected a clean ReachabilityError(NoInhabitants), NOT a panic; got: {other}"
+        ),
+    }
+}
+
+#[test]
+fn foreign_constructor_arm_is_no_inhabitants_not_empty_subsumed_matrix() {
+    let mut env = mk_env();
+    elab_ok(&mut env, "data NatProbe = ZProbe | SProbe NatProbe");
+    elab_ok(&mut env, "data Foreign = NProbe");
+
+    // Nested sub-patterns (`SProbe ZProbe`, `SProbe (SProbe n)`) are NOT
+    // flat, so this routes to `infer_match`'s general matrix path (control
+    // 4) instead of the single-column path above. `NProbe`'s row never
+    // matches either of NatProbe's own constructor ids and is not a
+    // Wild/Var row either, so it is filtered out of every bucket and never
+    // reaches a leaf -- `subsumed_by` for it stays empty.
+    let src = "let bad : Int = match ZProbe { \
+               ZProbe |-> 0 ; SProbe ZProbe |-> 1 ; SProbe (SProbe n) |-> 2 ; NProbe |-> 3 }";
+    let result = elab(&mut env, src);
+
+    match &result {
+        Err(e @ ElabError::ReachabilityError { span, cause: ArmDeadCause::NoInhabitants }) => {
+            assert_eq!(
+                &src[span.start..span.end],
+                "NProbe |-> 3",
+                "the reported span should be the foreign-constructor arm itself"
+            );
+            let rendered = e.to_string();
+            println!("rendered diagnostic: {rendered}");
+            assert_eq!(
+                rendered,
+                format!(
+                    "unreachable match arm at {}-{}: no value of the scrutinee type can \
+                     match this pattern",
+                    span.start, span.end
+                ),
+                "NoInhabitants must not claim any covering arm, and must not be an empty \
+                 Subsumed payload"
+            );
+        }
+        Ok(_) => panic!(
+            "a foreign-constructor arm (NProbe, not a NatProbe constructor) elaborated \
+             successfully"
+        ),
+        Err(other) => panic!("expected ReachabilityError(NoInhabitants), got: {other}"),
     }
 }
 

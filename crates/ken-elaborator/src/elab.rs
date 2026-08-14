@@ -24,7 +24,7 @@ use ken_kernel::{
 use crate::ast::{BinOp, DefKeyword, NumLit, RecursiveResultSelector};
 use crate::classes::{ClassEnv, ClassInfo, ClassKind, InstanceConstraintInfo, InstanceInfo};
 use crate::data;
-use crate::error::{ElabError, MissingPatternWitness, RecursiveResultSort, Span};
+use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResultSort, Span};
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
@@ -1574,6 +1574,7 @@ fn check_match_with_lift(
 
     let mut methods = Vec::with_capacity(support_decl.constructors.len());
     let mut arm_used = vec![false; arms.len()];
+    let mut subsumed_by: Vec<Option<usize>> = vec![None; arms.len()];
     for (ordinal, support_ctor) in support_decl.constructors.iter().enumerate() {
         let host_ctor = &host.constructors[ordinal];
         let (arm_index, arm) = arms
@@ -1587,6 +1588,7 @@ fn check_match_with_lift(
                 span: span.clone(),
             })?;
         arm_used[arm_index] = true;
+        mark_shared_ctor_subsumption(cx, arms, host_ctor.id, arm_index, &mut subsumed_by);
         let sub_pats = match &arm.pat.kind {
             RPatKind::Ctor(_, fields) => fields,
             _ => unreachable!("arm selected by constructor guard"),
@@ -1734,8 +1736,16 @@ fn check_match_with_lift(
     }
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
+            let cause = match subsumed_by[i] {
+                Some(claimant) => ArmDeadCause::Subsumed {
+                    first: arms[claimant].span.clone(),
+                    rest: Vec::new(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
             return Err(ElabError::ReachabilityError {
                 span: arms[i].span.clone(),
+                cause,
             });
         }
     }
@@ -2090,6 +2100,7 @@ fn check_match_dependent(
 
     let mut methods: Vec<Option<Term>> = vec![None; ind.constructors.len()];
     let mut arm_used = vec![false; arms.len()];
+    let mut subsumed_by: Vec<Option<usize>> = vec![None; arms.len()];
     for (k, ctor) in ind.constructors.iter().enumerate() {
         let arm_idx = arms
             .iter()
@@ -2097,6 +2108,7 @@ fn check_match_dependent(
         let n = ctor.args.len();
         if let Some(arm_idx) = arm_idx {
             arm_used[arm_idx] = true;
+            mark_shared_ctor_subsumption(cx, arms, ctor.id, arm_idx, &mut subsumed_by);
             let arm = &arms[arm_idx];
             let sub_pats = match &arm.pat.kind {
                 RPatKind::Ctor(_, subs) => subs.clone(),
@@ -2424,8 +2436,16 @@ fn check_match_dependent(
     }
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
+            let cause = match subsumed_by[i] {
+                Some(claimant) => ArmDeadCause::Subsumed {
+                    first: arms[claimant].span.clone(),
+                    rest: Vec::new(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
             return Err(ElabError::ReachabilityError {
                 span: arms[i].span.clone(),
+                cause,
             });
         }
     }
@@ -3228,6 +3248,31 @@ fn missing_pattern_witness(cx: &ElabCtx, id: GlobalId) -> MissingPatternWitness 
     MissingPatternWitness {
         constructor: ctor_name(cx, id),
         arity: ind.constructors[ordinal].args.len(),
+    }
+}
+
+/// For the single-column, top-level-constructor-identity matching shape
+/// shared by `check_match_with_lift` and `check_match_dependent`: every OTHER
+/// arm in `arms` whose top-level pattern names `ctor_id` is subsumed by the
+/// arm that already claimed it (`claiming_idx`). At most one arm is ever
+/// marked as the claimant of a given constructor at these sites (the
+/// enclosing loop's `.find()`/`.position()` returns the lowest-index match),
+/// so `get_or_insert` never overwrites a prior claim.
+fn mark_shared_ctor_subsumption(
+    cx: &ElabCtx,
+    arms: &[RMatchArm],
+    ctor_id: GlobalId,
+    claiming_idx: usize,
+    subsumed_by: &mut [Option<usize>],
+) {
+    for (idx, arm) in arms.iter().enumerate() {
+        if idx == claiming_idx {
+            continue;
+        }
+        if matches!(&arm.pat.kind, RPatKind::Ctor(name, _) if cx.globals.get(name).copied() == Some(ctor_id))
+        {
+            subsumed_by[idx].get_or_insert(claiming_idx);
+        }
     }
 }
 
@@ -8090,14 +8135,28 @@ fn compile_match_matrix(
     top_span: &Span,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
 ) -> Result<Term, ElabError> {
     if col_types.is_empty() {
         // Leaf: the first row in preserved (first-match-wins) order claims
         // this path; any others are shadowed here (possibly still reachable
         // via a different expansion elsewhere — checked globally by the
-        // caller via `arm_used`).
+        // caller via `arm_used`). Record each shadowed row's winner at THIS
+        // leaf into `subsumed_by` -- the same information the caller's final
+        // `arm_used` sweep needs, captured where it is already in hand
+        // rather than re-derived by a second walk. A wildcard/variable row
+        // can reach more than one leaf (expanded into every constructor
+        // bucket in `build_ctor_buckets`), so a dead arm can accumulate more
+        // than one distinct subsuming winner across the whole compile;
+        // dedup so repeats across leaves don't inflate the reported set.
         let winner = rows[0].arm_idx;
         arm_used[winner] = true;
+        for shadowed in &rows[1..] {
+            let entry = &mut subsumed_by[shadowed.arm_idx];
+            if !entry.contains(&winner) {
+                entry.push(winner);
+            }
+        }
         let arm = &arms[winner];
         let (body_core, body_ty_ctx) = infer(cx, &arm.body)?;
         if ret_ty_slot.is_none() {
@@ -8150,6 +8209,7 @@ fn compile_match_matrix(
                 top_span,
                 ret_ty_slot,
                 arm_used,
+                subsumed_by,
             )?;
             Ok(Term::lam(ih_ty, weaken(&inner, 1)))
         }
@@ -8179,6 +8239,7 @@ fn compile_match_matrix(
                     top_span,
                     ret_ty_slot,
                     arm_used,
+                    subsumed_by,
                 );
                 cx.ctx.pop();
                 return Ok(Term::lam(col_types[0].clone(), inner?));
@@ -8217,6 +8278,7 @@ fn compile_match_matrix(
                 top_span,
                 ret_ty_slot,
                 arm_used,
+                subsumed_by,
             )?;
 
             // The split column itself is a fresh binder no surface pattern
@@ -8286,6 +8348,7 @@ fn build_ctor_buckets(
     top_span: &Span,
     ret_ty_slot: &mut Option<Term>,
     arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
 ) -> Result<Vec<Term>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
 
@@ -8358,6 +8421,7 @@ fn build_ctor_buckets(
             top_span,
             ret_ty_slot,
             arm_used,
+            subsumed_by,
         )?;
         methods[k0] = Some(inner);
     }
@@ -8427,6 +8491,7 @@ fn infer_match(
 
     let mut ret_ty_slot: Option<Term> = None;
     let mut arm_used = vec![false; arms.len()];
+    let mut subsumed_by: Vec<Vec<usize>> = vec![Vec::new(); arms.len()];
 
     let raw_methods = build_ctor_buckets(
         cx,
@@ -8442,14 +8507,23 @@ fn infer_match(
         span,
         &mut ret_ty_slot,
         &mut arm_used,
+        &mut subsumed_by,
     )?;
 
     // 6. AC4: reachability — an arm that never won at any leaf (including any
     //    it was expanded into via a wildcard row) is dead code.
     for (i, used) in arm_used.iter().enumerate() {
         if !used {
+            let cause = match subsumed_by[i].split_first() {
+                Some((&first, rest)) => ArmDeadCause::Subsumed {
+                    first: arms[first].span.clone(),
+                    rest: rest.iter().map(|&w| arms[w].span.clone()).collect(),
+                },
+                None => ArmDeadCause::NoInhabitants,
+            };
             return Err(ElabError::ReachabilityError {
                 span: arms[i].span.clone(),
+                cause,
             });
         }
     }

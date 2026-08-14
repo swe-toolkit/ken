@@ -62,7 +62,7 @@ pub use diagnostics::{
     TypedHole, WorldId,
 };
 pub use elab::{elaborate_rdecl, elaborate_rexpr, ElabResult, Obligation, ObligationKind};
-pub use error::{ElabError, MissingPatternWitness, Span};
+pub use error::{ArmDeadCause, ElabError, MissingPatternWitness, Span};
 pub use export::{
     canonical_host_perform_signature_v1, canonical_l5_perform_signature_v1,
     canonical_perform_node_signature_v1, emit_checked_target_export, serialize_export,
