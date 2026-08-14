@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 11:07:49Z — from 261 issue file(s) in `docs/program/issues/`.
+2026-08-14 11:18:17Z — from 262 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -140,6 +140,7 @@ the committed file matches the generator's output.
 | `LANG-SELECTOR-SORT-SPLIT-ELAB` | Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates | merged | language | L | none | — |
 | `LANG-SORT-META-CAPABILITY` | Rule whether a term/sort metavariable representation is authorized -- the elaborator cannot today leave a selected result undecided between Type and Omega, so the spec's conditional ambiguity clause has an unreachable antecedent | draft | spec-enclave | S | none | — |
 | `LANG-SPACE-PRESTATE-BIND` | `old` in a block-space operation's `ensures` still fails closed, though the cell environment it was waiting for now exists -- bind s_pre/s_post and elaborate the Hoare pair against the state transformer | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1848 |
+| `LANG-STACK-ARC-EVIDENCE-USABILITY` | The trusted-base guard now localizes the bracket but reports a bare GlobalId, so it names no offender; and both frame-size figures this arc produced cite objdump without naming the artifact, so neither is reproducible by the next reader -- three repairs that make the arc's own evidence usable | ready | language | S | none | — |
 | `LANG-STRUCTURAL-RESULT-ELAB` | Implement the structural-result selector in the elaborator -- derive the field/evidence/result association from the kernel method telescope and elaborate `structural result of x` to the hidden recursive method result | merged | language | L | none | — |
 | `LANG-SURFACE-BLOCK-COMMENTS` | `31-lexical.md:562-567` specifies nestable block comments `{- ... -}` and doc comments `--- ...` / `{-- ... --}` attaching to the following declaration, and neither exists -- the semantic lexer's skip_ws_comments knows only whitespace and `--`, and TriviaKind carries only Whitespace and LineComment, so the two independent scanners that must agree about comments have only ever been exercised on the one form that cannot nest and cannot fail to terminate | merged | language | M | none | — |
 | `LANG-SURFACE-DECIMAL-PRECISION` | `Decimal` is specified with an arbitrary-precision coefficient and the spec explicitly forecloses a fixed-width one, but the surface caps it at `i64` across three carriers -- `Token::DecimalLit(i64, i32)`, `NumLit::Decimal(i64, i32)`, and `NumericLitVal::Decimal { coeff: i64 }` -- and the lexer refuses a wider coefficient outright | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1876 |
@@ -307,6 +308,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `LANG-GADT-SEQUENCE-TRACKER-GAP` — `34 §8` names four `SURF-gadt-*` build WPs and all four have frames in `docs/program/wp/` -- none has a tracker node, so `gen-progress.sh` shows the whole dependent-constructor area as absent, while the code has in fact moved past every one of the four frames' stated baselines
 - `LANG-POW10-CASCADE-LITERAL-CLAUSE` — The pow10 generator's own doc comment says every branch is a concrete literal, which its own recursion refutes in the same way the elab.rs copy did -- but its conclusion rests on a DIFFERENT and TRUE property (no saturating/min/clamp anywhere in the generated cascade), so this is a wording repair on a sound argument, not a second false justification
+- `LANG-STACK-ARC-EVIDENCE-USABILITY` — The trusted-base guard now localizes the bracket but reports a bare GlobalId, so it names no offender; and both frame-size figures this arc produced cite objdump without naming the artifact, so neither is reproducible by the next reader -- three repairs that make the arc's own evidence usable
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed

@@ -190,13 +190,43 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 >
 > **No seat holds this node.** Deps met, unassigned ⇒ `ready`.
 >
-> **Sequenced second, deliberately.** Runtime's next assignment is
-> [[RT-DYNAMIC-ARM-SCALAR-MERGE]], kicked 2026-08-14. That node unblocks
-> `KERNEL-NESTED-IND`, and behind it three Kernel seats and Foundation's
-> `DS-9`; this node blocks `RT-RECURSOR-TRANSPORT`, which is inside Runtime's
-> own lane. **Six seats idle beats one lane's depth.** This is a Steward
-> sequencing call under `ken-steward` §3, not a judgment about this node's
-> readiness or size.
+> **~~Sequenced second, deliberately.~~ SUPERSEDED BY THE OPERATOR, 2026-08-14
+> — see the block immediately below. The reasoning is retained only so the
+> override is legible; do not act on it.** It read: Runtime's next assignment
+> is [[RT-DYNAMIC-ARM-SCALAR-MERGE]]; that node unblocks `KERNEL-NESTED-IND`
+> and behind it three Kernel seats and Foundation's `DS-9`, whereas this node
+> blocks `RT-RECURSOR-TRANSPORT` inside Runtime's own lane, so *"six seats idle
+> beats one lane's depth."*
+
+> # OPERATOR PRIORITY RULING, 2026-08-14. THIS IS RUNTIME'S PRIORITY WORK.
+>
+> **Verbatim:** *"that is the priority for the runtime team. prioritize that
+> work over other runtime work."* — issued on the Steward's measured answer that
+> **nothing in the preceding twelve hours advanced the `RecursiveDescent`
+> retirement**: 49 commits on `main`, none touching `RecursiveDescent` in
+> `crates/`.
+>
+> ⇒ **This node outranks every other Runtime node**, including
+> [[RT-CHECKED-IH-REALIZATION-AUTHORITY]], which is `ready` and stays unreleased
+> until this lands. **A priority call between `ready` WPs is the operator's
+> under `ken-steward` §3; the Steward's own contrary call above was surfaced and
+> overruled.** Do not re-derive the trade-off — it was made and answered.
+>
+> **Why this node specifically, and it is the whole reason the ruling is
+> narrow:** it is the **single unblocked node** on the retirement path. Both its
+> deps are merged ([[RT-MATCH-RECURSOR-CONSUMERS]],
+> [[RT-LEXICAL-R3-FUSION-EMITTER]]). It blocks [[RT-RECURSOR-TRANSPORT]] —
+> `draft`, whose other four deps are all merged — which blocks
+> [[RT-DESCENT-RETIRE]] — `draft`, whose other four deps are all merged.
+> **Every other node on both paths is done. This one is the whole remaining
+> chain.**
+>
+> **The debt it is holding, measured at `main` `6c574cdd`:** 92
+> `recursive_descent_residual`, 58 `RecursiveDescentResidual`, 28
+> `select_body_emission_authority`, 17 `BodyEmissionAuthority::RecursiveDescent`
+> (12 outside tests). The selector still evaluates on every compilation and the
+> emission lane is still compiled in — **which is exactly the "half-migrated
+> state carrying tech debt for no benefit" the original directive named.**
 >
 > **What Runtime still owes here, unchanged:** the `D2k-0` redness claim is
 > still unverified by anyone (see the block above), and the residual at the

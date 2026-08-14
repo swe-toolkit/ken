@@ -94,6 +94,31 @@
 > `saturating_*`/`.min(_)`/`clamp` in the generated cascade). **A wording repair
 > on a sound argument, not a second false justification.**
 >
+> ### OPERATOR PRIORITY RULING 2026-08-14 — RUNTIME'S LANE IS RE-RANKED
+>
+> **Verbatim:** *"that is the priority for the runtime team. prioritize that
+> work over other runtime work."* Issued on my measured answer that **nothing in
+> the preceding twelve hours advanced the `RecursiveDescent` retirement** — 49
+> commits on `main`, none touching `RecursiveDescent` in `crates/`.
+>
+> ⇒ **Runtime's next release is `RT-LEXICAL-RECURSOR-CONSUMERS`** (`ready`,
+> `M`), **not `RT-CHECKED-IH-REALIZATION-AUTHORITY`**, which stays `ready` and
+> held. Both nodes carry the ruling in their own text.
+>
+> **Why that node:** it is the **single unblocked node** on the whole retirement
+> chain. Its two deps are merged; it blocks `RT-RECURSOR-TRANSPORT` (`draft`,
+> other four deps merged), which blocks `RT-DESCENT-RETIRE` (`draft`, other four
+> deps merged). **Everything else on both paths is done.**
+>
+> **The remaining work is `D2k`** — five expressions at the `StaticWorkerBinding`
+> wall plus row 3's singular-specialization wall. Architect ruled
+> (`evt_5wvk3e8k1bjqn`) it is `#6d`'s next `D2` increment **inside this node, no
+> new node.** Runtime's own estimate to closure was *"closer to a week"*.
+>
+> **My contrary sequencing call was surfaced and overruled** — I had ranked it
+> second on "six seats idle beats one lane's depth." **A priority call between
+> `ready` WPs is the operator's under §3.** Do not re-derive it.
+>
 > ### OWED AFTER #2196 LANDS, IN ORDER
 >
 > 1. **M6** blob 2/2 from **declared** base `5edd3de3` —
