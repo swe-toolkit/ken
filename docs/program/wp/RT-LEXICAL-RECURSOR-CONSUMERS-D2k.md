@@ -723,6 +723,37 @@ this consumer is a silent accept, measured at `739cfde3`.
 Authorized by Architect `evt_5ed8ee70cmrt`. **RELEASED to the runtime ring
 2026-08-12, anchor `evt_2b1zhe78c81at`.**
 
+> # BLOCKED 2026-08-14 ON A RELATION THAT DOES NOT EXIST. THE STOP FIRED AND
+> # WAS RULED CORRECT.
+>
+> **Section 8's hard stop fired on rows 4 and 5, and the Architect ruled it
+> fired correctly** (`evt_3zjhbbr7k3ky6`). The fork resolved to a **new exact
+> relation on the specialization key, BESIDE `consumer_owner`** — never
+> widening it (its own validator fails closed on the equality), never on
+> `ContinuationInputProjection` (a per-input carrier, and these edges have zero
+> inputs), and never reconstructed from the continuation (mint it **forward** at
+> the enclosing eliminator).
+>
+> **Sizing turned on one probe, the probe was run, and it came back on the
+> larger side.** At `origin/main` `0644ab95` (`evt_3tkyp322dh4c7`) the enclosing
+> eliminator occurrence is **not in hand** at the specialization-key interning
+> site: the outer scan holds `m` whose `children[0]` is the key's
+> `continuation_origin`, and at interning what is in scope is the current
+> *producer* occurrence with a different `children[0]`. **⇒ The fact must be
+> seeded at the outer-match walk and threaded to interning — a
+> plan-construction change.**
+>
+> **That work is NOT `D2k-1c`. It is [[RT-CONTKEY-CONSUMING-OCCURRENCE]]**,
+> filed and released 2026-08-14, and it is in this node's `depends_on`.
+> **`D2k-1c` stays framed here and stays this node's work** — it consumes the
+> relation and repairs the route. Do not fold the two; a plan-construction
+> change and a lowering change in one candidate is two reviewers' questions in
+> one diff.
+>
+> **Row 1 is blocked by the same absent relation** (`evt_1f4yp49cx23m4`), and
+> its earlier `NativeJoinPlanV1` refusal is a separate second dependency that
+> `RT-CONTKEY-CONSUMING-OCCURRENCE` does not supply.
+
 > **BASE: the naming event has FIRED. `D2k-1b-i` merged as PR #1992, and
 > `origin/main` is `45addeaf`** — a landed object, not a candidate.
 >

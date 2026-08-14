@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER]
+depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER, RT-CONTKEY-CONSUMING-OCCURRENCE]
 blocks: [RT-RECURSOR-TRANSPORT]
 github: null
 origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT hard stop 4, narrowed to rows 1-5 by the re-rule evt_3r4j14fv1jtj2 on the nine-expression census evt_16cmej481q7ns. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -26,6 +26,31 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > the two `D1` causal partitions later prove one exact shared production root,
 > **route a subsumption proposal before coding** — it may not be inferred from
 > shared retirement timing or shared syntax.
+
+> # ALL FIVE EXPRESSIONS ARE STOPPED ON ONE ABSENT RELATION — 2026-08-14.
+> # THE NODE IS `active` AND ITS RING IS NOT BUILDING IT.
+>
+> **This is a dependency, not a defeat, and it is measured rather than
+> inferred.** Rows 4 and 5 fired the section 8 hard stop; the Architect ruled it
+> **fired correctly** (`evt_3zjhbbr7k3ky6`) and fixed the amendment shape. Row 1
+> was then read independently and is blocked by **the same** absent relation
+> (`evt_1f4yp49cx23m4`) — its `NativeJoinPlanV1` refusal is a *separate* second
+> dependency and removing it would not supply the consumer identity.
+>
+> **The relation is now its own node: [[RT-CONTKEY-CONSUMING-OCCURRENCE]]**,
+> `ready`, size `M`, released 2026-08-14. It is in this node's `depends_on`.
+> The sizing probe the Architect made the fork turn on was run at `0644ab95`
+> (`evt_3tkyp322dh4c7`) and came back **not in hand** — the enclosing eliminator
+> is absent at the specialization-key interning site — so the fact must be
+> seeded at the outer-match walk and threaded there. That is a
+> plan-construction change and it does not fit inside `D2k-1c`.
+>
+> **`D2k-1c` remains this node's work and remains framed** in section 5 of the
+> frame. What it is waiting for is the relation, nothing else.
+>
+> **Do not read `active` as "someone is building this."** The landed partials
+> (`D2k-0`, `D2k-1a`, `D2k-1b-i`, eleven `D2f` increments) are real and this node
+> is not reset; the ring is on the successor.
 
 > # THE RESIDUAL IS SIX EXPRESSIONS AT TWO WALLS — updated 2026-08-12
 >
