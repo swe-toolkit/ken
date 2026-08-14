@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 13:17:01Z — from 264 issue file(s) in `docs/program/issues/`.
+2026-08-14 13:50:54Z — from 268 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -296,6 +296,10 @@ the committed file matches the generator's output.
 | `STR-NFC-CONSTRUCTION` | NFC-at-construction is normative and unimplemented: all three `EvalVal::Str` ingresses store the raw string, so `char_length`/`byte_length`/`s2l`/`==` observe unnormalized values and the interp carrier disagrees with the runtime carrier | merged | language | L | none | https://github.com/swe-toolkit/ken/pull/1109 |
 | `SURF-IDENT-TR39` | The lexer's confusable-resistance is satisfied VACUOUSLY by an ASCII-only identifier rule — spec 31 §2's blessed Unicode letters are unimplemented, and the test that looks like the TR39 gate cannot see the difference | merged | ergo | S–M | none | — |
 | `SURF-SPACE-CELLS` | The `space` block surface — cells and `becomes` — is unbuilt, while its entire desugaring target (the `State` effect: Get/Put/run_state) is built and live | merged | language | M–L | none | https://github.com/swe-toolkit/ken/pull/1152 |
+| `SURF-gadt-coverage-diagnostics` | Tracker node for the landed dependent-constructor coverage/diagnostics slice (`34 §4.3`/`§8`): points at `docs/program/wp/SURF-gadt-coverage-diagnostics.md`, and carries the tracker-gap node's two D3 findings -- the AC5 reject half EXISTS and is cited, and the exhaustiveness diagnostic names the missing CONSTRUCTOR, not `§4.1`'s most-general PATTERN witness, for any constructor with arguments | merged | language | S | none | — |
+| `SURF-gadt-elaboration` | Tracker node for the landed dependent-constructor elaboration slice (`34 §8`): points at `docs/program/wp/SURF-gadt-elaboration.md`, filed retroactively for the same tracker-generation reason as its parser/AST predecessor | merged | language | M | none | — |
+| `SURF-gadt-field-sugar` | Tracker node for the landed dependent-constructor field-sugar slice (`34 §8`): points at `docs/program/wp/SURF-gadt-field-sugar.md`; the frame's own D0 audit bounded the slice to declaration-only labels, which is why AC3's unknown/missing/extra-field checks have no corresponding test -- there is no named-argument constructor expression or pattern syntax to check them against | merged | language | S | none | — |
+| `SURF-gadt-parser-ast` | Tracker node for the landed dependent-constructor parser/AST slice (`34 §8`): points at `docs/program/wp/SURF-gadt-parser-ast.md`, filed retroactively because `gen-progress.sh` generates the tracker from `docs/program/issues/` and this slice landed with a frame but no issue node | merged | language | S | none | — |
 | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Five landed `ken-cli` native-production tests each provision `stack_size(256 MiB)` while `LANG-RECORD-STACK-OVERFLOW` says stack-limit raises are refused -- but that refusal is a `Not this node` bullet whose rationale is about MASKING A REGRESSION, and baseline provisioning for a legitimately deep workload is a different act that no artifact has ever distinguished | ready | language | S | architect | — |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
