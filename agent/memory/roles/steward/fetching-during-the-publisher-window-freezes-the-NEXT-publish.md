@@ -62,6 +62,44 @@ notification is the interlock. Never verify off a `sleep`, and never verify
 > to land — recoverable from the reflog and the pushed branch, but only if you
 > notice.
 
+> ### A THIRD bundling trigger the rule above does not cover: DRAINING A QUEUE
+>
+> **Measured 2026-08-14, twice in one turn, by a Steward who had this file's
+> scope loaded.** Neither fetch was bundled with a log read, so the mechanical
+> rule above was honoured and did not bind.
+>
+> **The collision is between two standing rules, and it only appears with more
+> than one thing queued:**
+>
+> - **M6** says: after a candidate lands, `fetch --prune` and verify blob
+>   identity against the landed squash.
+> - **This file** says: do not fetch while a publisher holds its window.
+>
+> Draining a queue by launching publisher N+1 the moment N lands puts them in
+> direct conflict — M6 for N now needs a fetch, and N+1 is already running.
+>
+> ⇒ **Fix the ORDER, not the discipline:**
+>
+> ```
+> publisher N finishes  ->  fetch --prune, M6 verify N      (nothing running)
+>                       ->  THEN launch publisher N+1
+> ```
+>
+> Nothing is lost by not racing: M6 is a handful of `rev-parse` calls, and the
+> next publisher's first act is a multi-minute sleep.
+>
+> **Do not take the wrong lesson from a clean outcome.** Both fetches landed
+> inside the next publisher's initial `Waiting Ns before polling` sleep —
+> **before** its merge, so genuinely outside the merge→verify window, and no
+> freeze file appeared. That is a structural reason, not luck. But acting on it
+> requires knowing where the publisher is in its lifecycle **every time,
+> forever**, and the reordering makes the question stop existing.
+>
+> **The tell:** you are justifying a prohibited action by its *timing* rather
+> than not taking it. That is the same failure as the bundling relapse above,
+> one level up — there the excuse was "this is only a log read," here it is
+> "the publisher is only sleeping."
+
 ## Clearing it — diagnose first, then by hand
 
 The freeze is deliberate and there is no auto-clear. Before removing it,

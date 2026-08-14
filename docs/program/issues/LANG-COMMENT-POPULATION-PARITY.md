@@ -143,8 +143,68 @@ independently: grepping `catalog/` for `{-` and leading `---` returns zero files
 > would have written a justification for a line that stated a theorem.
 > `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` D1 deleted the count comparison and D2
 > reverted `is_comment` to private, closing both. No replacement control was
-> added; `D4`'s fixture (`block_and_doc_comments_are_counted_for_attachment`)
-> is what guards the population now.
+> added.
+>
+> **CORRECTED 2026-08-14 — the sentence that stood here named the wrong guard,
+> and it was the Steward's.** It read: *"`D4`'s fixture
+> (`block_and_doc_comments_are_counted_for_attachment`) is what guards the
+> population now."* **False, and false in the direction that gets a control
+> deleted.** Architect measurement at `evt_tt31sfem2vnw`.
+>
+> **Two different mutations, and only one of them is caught.**
+>
+> | mutation | caught? | by what |
+> |---|---|---|
+> | narrow **`attach_comments`'s filter** at `:408` | yes | production — the two sides now disagree, and `D4` reds at `kenfmt_b1_lossless.rs:10` |
+> | narrow **`is_comment` itself** | **no** | nothing here. Both `:408` and `:798` move together, so `validate_attachment_totality` compares a set against itself-mapped and is **invariant** under it. `D4`'s fixture then yields zero comments, zero attachments, a byte-exact round-trip and an unchanged AST — **green** |
+>
+> **The real guards against the second are FOUR sites, in two files no frame in
+> this arc mentioned.** Adversary measurement at `evt_1ezcaqqqd62ge`, which ran
+> the mutation across every `ken-elaborator` binary reaching a block or doc
+> fixture:
+>
+> | site | test | what its failure says |
+> |---|---|---|
+> | `tests/lang_surface_block_comments.rs:121` | `ac3` (both `---` and `{-- --}`) | an attachment record exists |
+> | `tests/lang_trivia_kind_mapping_pin.rs:59` | `d1` | an attachment record exists |
+> | `tests/lang_trivia_kind_mapping_pin.rs:100` | `d2`, ordinary `{- note -}` | an attachment record exists |
+> | **`tests/lang_surface_block_comments.rs:253`** | **`ac7_formatter_round_trips_a_block_comment`** | **the comment's TEXT survives `format_ken`** |
+>
+> ⇒ **`D4` guards the coupling between `attach_comments`'s filter and its own
+> output. Those four guard the population.** Do not treat them as
+> interchangeable: an author tidying either of those two files would have read
+> the old sentence, believed `D4` covered them, and deleted the only controls
+> that do.
+>
+> **Separate MECHANISM guards from CONSEQUENCE guards — the correction above
+> was itself short by one, and the missing one is the only consequence guard.**
+> The first three assert that an internal record exists. `:253` asserts
+> `out1.contains("{- leading -}")` — that the user's comment is still in the
+> formatter's output. Under this mutation `ken fmt` **silently deletes a block
+> comment**, which is the harm this whole arc exists to prevent, and exactly one
+> assertion in the tree catches it. The three mechanism guards read as a
+> complete list *because they are all the same shape*, and the shape is what
+> makes them greppable; a `contains` on formatter output is invisible to the
+> search that found them.
+>
+> **And the three mechanism guards are SETUP LINES, not assertions.** All three
+> are `.find(...).unwrap_or_else(|| panic!("… must have an attachment"))`,
+> running before the real assertions of a test that is about placement and home
+> spans. **Attachment existence is not what any of those tests checks — it is
+> the lookup each does first**, so an author rewriting the lookup for an
+> unrelated reason removes the guard without touching an assertion. That is the
+> same incidental-guard shape this arc has twice now retired. `:253` is the only
+> one of the four whose failure message names the property it protects.
+>
+> **Bound on the sweep, stated rather than implied:** other crates were not run.
+> `ken-cli`'s formatter and documentation-gate suites run `ken fmt` over
+> `catalog/`, and no catalog source contains a block or doc comment, so nothing
+> is expected there — but it is unmeasured.
+>
+> **The generalizable form, from the same measurement:** an assertion whose
+> expected value is computed from the thing it is testing is a theorem, not a
+> check — and here that defect occurred at **two layers at once**, in the
+> retired test and in the production validator underneath it.
 
 Architect finding, non-blocking, at `evt_73bmxjfmkv7bq`, on the approved
 candidate. **Not a defect in what landed** and not a reason to reopen the node.

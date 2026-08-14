@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 04:04:10Z — from 252 issue file(s) in `docs/program/issues/`.
+2026-08-14 05:29:20Z — from 253 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -126,7 +126,7 @@ the committed file matches the generator's output.
 | `LANG-LEX-HEX-FLOAT` | Both spec literal tables give `0x1p-3` as a `Float` form, but the lexer has no hex-float path at all -- and unlike every other numeric form in this arc it cannot be reached by handing a string to `parse::<f64>()`, because Rust's float parser rejects hex-float syntax, so the value must be assembled and correctly rounded by hand | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1885 |
 | `LANG-LEX-NUMERIC-FORMS` | The lexer implements none of the numeric literal forms 31-lexical and 35-numbers list besides bare decimal -- no `1_000` separators, no `0xFF`/`0b1010`/`0o17` radix integers, no `0x1p-3` hex float -- and `1e-9`, which both spec tables give as the canonical Float example, does not lex as a float at all because the exponent branch is gated on having seen a dot | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/1881 |
 | `LANG-LEX-PROJECTION-ADJACENCY` | The positional-projection lexer guard tests raw character adjacency, so exactly one of four spacing variants fails -- `p.1.2`, `p.1 .2` and `p. 1 .2` all lex as two projections while `p. 1.2` lexes as `Dot, FloatLit(1.2)` -- and the refusal comes from the number scanner rather than from any grammar rule | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/1864 |
-| `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` | `assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it | active | language | XS | none | — |
+| `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` | `assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it | merged | language | XS | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
 | `LANG-PRELUDE-COLLECTIONS` | `37 §9` requires the List combinators delivered in the prelude and they are declared inside a test file instead -- `prelude.rs` supplies `data List` and no operation over it, so a program that imports the prelude has a list type and no way to map over it; and `filter` was deferred on the ground that `Bool` is an opaque non-matchable primitive, which is no longer true, with the promised follow-on never filed | merged | language | S-M | none | 2144 |
 | `LANG-PRELUDE-ELABORATION-DEPTH` | Elaboration has an unstated stack requirement that exceeds Rust's 2 MiB spawned-thread default: every compilation elaborates the whole prelude, `elab.rs:997` measures ~115 KiB of headroom out of 2 MiB, and thirteen sites across four crates independently bumped their thread to 256 MiB without any stated rule -- so the rest of `37 §9` is a queue of prelude additions spending a margin nobody measures and no site states | merged | language | S | none | — |
@@ -145,7 +145,7 @@ the committed file matches the generator's output.
 | `LANG-SURFACE-RECORD-DECL` | `33 §2` specifies `record Point { x : Int, y : Int }` and `record` is already a reserved keyword, but the lexer emits no token for it and the parser has no declaration form -- while the elaboration target is complete and already exercised, since `class` elaborates to exactly the right-nested Sigma chain a record needs and `p.x` already parses and resolves, refusing only at `infer_proj` because that lookup scans the class registry | merged | language | M | none | — |
 | `LANG-SURFACE-RECORD-LITERAL` | `33 §2` names record literals `{ x = 1, y = 2 }`, punning `{ x, y }` and functional update `{ p | y = 3 }` as having their expected definitional behaviour, and none of the three parses -- expression-position `{` has no arm in `parse_atom_expr_base` at all, so the brace fork the sibling frame warned about does not exist here: refinement braces live in `parse_type`, which is a separate parser | merged | language | M | none | — |
 | `LANG-TRIVIA-KIND-MAPPING-PIN` | `LANG-COMMENT-CLASSIFIER-SHARED` made scanner divergence unrepresentable and moved the surface one hop to `From<CommentKind> for TriviaKind`, which is now the sole place a classification becomes a behaviour -- the completeness axis is closed by the compiler but the per-arm mapping is asserted nowhere, and the one fixture that covers the block form is a configuration where the doc rule and the positional heuristic return the same answer, so a Block/DocBlock transposition compiles and reds nothing | merged | language | XS | none | — |
-| `LANG-TRUSTED-BASE-LABEL-KIND-TAG` | The `AC-6` trusted-base enumeration is blind to the one movement it exists to catch -- `trusted_base_labels` flattens kernel-declaration and surface names into one untagged `Vec<String>`, so a postulate becoming a primitive under the same spelling renders identically across all 107 entries, and the injectivity the fallback depends on is measured rather than enforced | ready | language | XS | none | — |
+| `LANG-TRUSTED-BASE-LABEL-KIND-TAG` | The `AC-6` trusted-base enumeration is blind to the one movement it exists to catch -- `trusted_base_labels` flattens kernel-declaration and surface names into one untagged `Vec<String>`, so a postulate becoming a primitive under the same spelling renders identically across all 107 entries, and the injectivity the fallback depends on is measured rather than enforced | merged | language | XS | none | — |
 | `LANG-VIEW-RETIRE` | Operator ruling SURF-1 retired the single definition keyword `view` and split it into `const`/`fn`/`proc`, but the landed elaborator still accepts it -- and `view` is not an alias: it takes an EARLY RETURN out of the bidirectional purity check that `33 §1` calls a hard error, so every definition still spelled `view` has never been checked for the effect discipline the spec requires | merged | language | M | none | — |
 | `LIB-GATE-DECOUPLE` | main is red on two library documentation-census gates: the currency gate the operator decoupled from merges still fires from inside CI, and a doc-only merge invalidated the ledger unreported | merged | verify | S | none | 1039 |
 | `LOADER-CITE-ANCHOR` | LOADER-STALE-PREMISE cites the spec by line number (:147-158) — rots silently in the one catalog file outside the currency gate | merged | doc | XS | none | — |
@@ -180,6 +180,7 @@ the committed file matches the generator's output.
 | `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` | Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER | draft | runtime | M | none | — |
 | `RT-BACKEND-SPLIT-CENSUS` | Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves | draft | runtime | M | none | — |
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
+| `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` | The always-on `dasm-c2-observation` feature has no artifact-identity control, and the always-on choice is what makes the off-configuration unreachable from the crate the controls live in -- the sibling's nested-cargo A/B needs a carrier feature before it can be reused | ready | runtime | S | none | — |
 | `RT-CALL-EDGE-EXECUTABILITY-AXIS` | executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error | ready | runtime | S | none | — |
 | `RT-CANDIDATE-LEDGER-RESIDUALS` | Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed | ready | runtime | S | none | — |
 | `RT-CARRIED-CONTINUATION-RESUME` | A carried scrutinee reaching a continuation frame has no resume path — the carried elimination does not implement the Carried x {PendingLet, Active} arm | merged | runtime | M | none | — |
@@ -205,7 +206,7 @@ the committed file matches the generator's output.
 | `RT-CONTSRC-PRODUCER-LOCAL` | Producer-local continuation source coordinate — a mid-body value is a third availability class with no ABI seat, so continuation specialization cannot name its environment | merged | runtime | L | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | draft | runtime | M | none | — |
-| `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | active | runtime | M | none | — |
+| `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-ENTRY-TRAP-254` | public_source_observes_raw_argv_environment_cwd_bytes_in_field_order exits 1 with an explicit entry trap where it expects 254 — branch-introduced, and the only tip failure that is not the byte-span gap | closed | runtime | M | none | — |
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
@@ -296,8 +297,8 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `LANG-TRUSTED-BASE-LABEL-KIND-TAG` — The `AC-6` trusted-base enumeration is blind to the one movement it exists to catch -- `trusted_base_labels` flattens kernel-declaration and surface names into one untagged `Vec<String>`, so a postulate becoming a primitive under the same spelling renders identically across all 107 entries, and the injectivity the fallback depends on is measured rather than enforced
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
+- `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` — The always-on `dasm-c2-observation` feature has no artifact-identity control, and the always-on choice is what makes the off-configuration unreachable from the crate the controls live in -- the sibling's nested-cargo A/B needs a carrier feature before it can be reused
 - `RT-CALL-EDGE-EXECUTABILITY-AXIS` — executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
@@ -306,6 +307,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-LEXICAL-RECURSOR-CONSUMERS` — Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam
+- `RT-NESTED-IH-NATIVE-REALIZATION` — Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 
@@ -329,7 +331,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
-- `KERNEL-NESTED-IND` blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE` (status: active)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: ready)
 - `NATIVE-HANDLE-CARRIER` blocked by `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` (status: draft)
 - `PX10` blocked by `PX9` (status: draft)
@@ -348,7 +349,6 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
-- `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-DYNAMIC-ARM-SCALAR-MERGE` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
