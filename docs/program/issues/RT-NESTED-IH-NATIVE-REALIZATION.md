@@ -49,6 +49,70 @@ origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statemen
 > for the capsule and no catch-all change; no unchecked plan minted to get past
 > the chain.
 
+> ### THE ABI ORDER IS UNPINNED, AND IT BECOMES LOAD-BEARING AT THE MOMENT THE SUCCESSOR LIFTS THE STOP
+>
+> **Adversary hunt `evt_54sb0z31q5qhn` on `f7ec9f59`, triaged by the Steward and
+> ACCEPTED. Re-verified against `main` `d8de7023` before filing.** This is a
+> confirmed defect whose severity is **deferred, not absent**, and it is
+> recorded here rather than as a new node because it is an obligation on this
+> node's own successor.
+>
+> **The measurement.** The Adversary transposed the ABI order in the new arm —
+> one `inputs.rotate_left(args.len())` before the call, turning `[f0, c0, c1]`
+> into `[c0, c1, f0]` on a **non-empty** capture suffix, which is the
+> configuration the hazard needs. The arm was **reached twice**
+> (`fields=1 captures=2`). Result:
+>
+> | suite | under the transposition | reached the arm |
+> |---|---|---|
+> | `ken-elaborator --test nc14_data_match_lowering` | 18 passed, 0 failed | **yes, twice** |
+> | `ken-runtime --lib` | 926 passed, 0 failed | no |
+> | `ken-cli --test px4b_native_production` | 16 passed, 0 failed | no |
+>
+> ⇒ **A swapped ABI order compiles a wrong program and nothing in the tree
+> notices.** Mutation restored and re-run green.
+>
+> **Why no execution control can catch it today — and this is the part that
+> makes it structural rather than a test gap.** `D2` is terminal at a measured
+> stop, so every program that reaches this arm builds `inputs`, **commits the
+> order, and then refuses** for absent checked-IH plan authority. **The
+> population that exercises the ABI is exactly the population that never
+> emits.** There is no executed artifact to be wrong. The only things holding
+> the order are the call-position precedent at `core.rs:18186` and the
+> `Parameter ++ Capture` statement at `core.rs:18143` — **and the latter says in
+> terms that the two runs "are not interchangeable even when their arities
+> coincide," which is the hazard stated and not enforced.**
+>
+> **THE FORWARD CONSEQUENCE, which is the obligation.** When the successor mints
+> checked-IH realization authority and the stop lifts, this arm's output becomes
+> an **executed program for the first time**, and the ABI order becomes
+> load-bearing **at exactly the moment nothing has ever tested it.** Until then
+> the failure mode is not "a refusal changes" — it is **"a wrong answer appears
+> in the first release that removes the stop."** The two events arrive together
+> unless something is written first.
+>
+> **A structural pin is writable NOW and does not need the authority.** The two
+> halves have *different* lengths here (1 and 2), so a **positional** assertion
+> discriminates where a length check would not: an in-crate `#[cfg(test)]`
+> observation that the first `args.len()` entries of `inputs` are the matched
+> fields, in source order. Same shape as the `d2f` / `dasm_c2` observers already
+> in this file; **adds no admitted merge shape and touches no boundary.** The
+> Adversary did not write it.
+>
+> **The transferable point, which is why this is filed and not carried:** the
+> blocked-by-the-stop argument is correct for an **execution** control and does
+> **not** reach a **structural** one. "Nothing executes it yet" is a reason a
+> runtime test cannot exist; it is not a reason an assertion about the
+> constructed vector cannot exist.
+>
+> **Also closed by `D2`, recorded so the cheaper repair is the one reused:** the
+> `D1` hunt reported a shared helper carrying an `AC-6` sentinel documented at
+> only one of its three call sites. **Renaming the helper to
+> `assert_nested_checked_pipeline_nat` put the new promise class at all three
+> call sites** — the disclosure travels with the name rather than with a comment
+> on one caller. That is cheaper than the three comments originally suggested,
+> and it is the form to prefer next time.
+
 ## D1 MERGED 2026-08-14 as an ACCEPTED PARTIAL. The node stays `active`, and what remains is GATED, not merely unstarted.
 
 **Candidate `ed854c859b0daa58a0664e38ad1526659c8ce0a9`, landed as squash
@@ -98,9 +162,9 @@ at each of `:559` and `:581`.
 
 ### What remains, stated as of 2026-08-14 — READ THE GATE BEFORE PLANNING D2
 
-**`D2`-`D5` are owed. `D2` was gated and is now UNGATED — see the ruling below**, and prose that reads
-otherwise would send the next turn straight into the boundary question this
-node was cut to keep out.
+**`D2`-`D5` are owed. `D2` was gated and is now UNGATED — see the
+ruling below**, and prose that reads otherwise would send the next turn
+straight into the boundary question this node was cut to keep out.
 
 The implementer identified a repair direction: the static-constructor `Match`
 path binds fields into `case_env`, then lowers `LiftNode`'s one-parameter
