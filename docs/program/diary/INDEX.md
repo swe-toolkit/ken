@@ -29,6 +29,12 @@ carried a derivable date).
 
 | Date | Summary |
 |---|---|
+| [2026-08-15](2026/Aug/15.md) | `RT-REQUIRED-OCCURRENCE-PROJECTION` merged after a cross-node control-population collision reddened it; `RT-REQUIRED-CONSUMER-REACH-CENSUS` filed and kicked on the finding that the new surface does not reach row 4 depth 1. |
+| [2026-08-14](2026/Aug/14.md) | See the [August index](2026/Aug/INDEX.md). |
+| [2026-08-13](2026/Aug/13.md) | See the [August index](2026/Aug/INDEX.md). |
+| [2026-08-12](2026/Aug/12.md) | See the [August index](2026/Aug/INDEX.md). |
+| [2026-08-10](2026/Aug/10.md) | See the [August index](2026/Aug/INDEX.md). |
+| [2026-08-08](2026/Aug/08.md) | See the [August index](2026/Aug/INDEX.md). |
 | [2026-07-25](2026/Jul/25.md) | Two concurrent implementation lanes (`RT-FNSPLIT-B2V`, `KW-THEOREM`). B2V is QA-approved at `78a57d90` then Architect-blocked on persistent-handle lifetime and an undischarged `AC-4`; its Decision is rejected. Three B2V frame amendments. Two branches found stranded on single local refs; ~64G disk reclaimed. |
 | [2026-07-22](2026/Jul/22.md) | `RT-SPLIT` slices 3–5; `main` found RED on its own documentation gate; three silent-stall classes identified. |
 | [2026-07-21](2026/Jul/21.md) | SPAN-SEAL and RT-PARITY both merged and closed (9 Decisions total, 7 spent on the Steward's own defects, not the rings'). Adversary's RT-PARITY hunt found **BUDGET-EFF**: `TransferCount.remaining` is computed from the raw request length, not the capped effective one, on both interpreter and native — fail-closed but wrong against locked spec `38`. ADR-0010 amended (STR-BIJ) reasoning from PRINCIPLES alone; RT-ESCAPE filed; provider-refusal routing rule set (route to Opus, then gpt-5.6); MODELS.md tier-table fleet-wide correction identified. |
@@ -53,3 +59,4 @@ carried a derivable date).
 ## Month indexes
 - [2026 / Jun](2026/Jun/INDEX.md)
 - [2026 / Jul](2026/Jul/INDEX.md)
+- [2026 / Aug](2026/Aug/INDEX.md)
