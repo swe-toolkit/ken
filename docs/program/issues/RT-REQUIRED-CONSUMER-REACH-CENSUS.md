@@ -1,13 +1,13 @@
 ---
 id: RT-REQUIRED-CONSUMER-REACH-CENSUS
 title: "The projection mints an entry only where required differs from source, so row 4 depth 1 is excluded from the new surface BY CONSTRUCTION -- census which rows the surface reaches, and attribute by SENTENCE the Closure refusal depths 2 and 3 now sit at"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-REQUIRED-OCCURRENCE-PROJECTION]
-blocks: []
-github: null
+blocks: [RT-CROSSING-CALL-SITE-ATTRIBUTION]
+github: https://github.com/swe-toolkit/ken/pull/2305
 origin: Steward, 2026-08-15, on the RT-REQUIRED-OCCURRENCE-PROJECTION merge (66715f9fb, PR #2293). Its D4 recorded that row 4 depths 2 and 3 advance to Closure and that rows 1, 4-depth-1 and 5 are unchanged -- the boundary NAME but not the refusal SENTENCE, which is exactly the shape RT-CONSUMING-OCCURRENCE-ROUTE-WIRE's D4 discipline requires of a residual. Steward-filed (agents cannot create tracked work per COORDINATION section 2).
 ---
 
@@ -232,6 +232,32 @@ is contracted to realize the projection *"without exporting a compiler-only
 static worker through a function ABI"*, handing the result *"straight back to
 the caller's existing exact eliminator."* **A value realized locally to avoid a
 boundary should not be reaching `transfer_into_carrier` at all.**
+
+> #### `D5` MEASURED, AND THE TABLE ABOVE IS NOW HISTORY. Steward, 2026-08-15.
+>
+> **Row 2 is ELIMINATED. Rows 1 and 3 are NOT SEPARATED and may not be.**
+> Measured: enabled rows are `(present, reached) = (true, true)`; both suppressed
+> legs are `(false, false)` and return to `StaticWorkerBinding`.
+>
+> **Row 2's antecedent required `reached` to be TRUE under suppression. It is
+> false.** ⇒ **the durable-closure branch is dead, and with it the only branch
+> under which these rows could ever have been one defect with
+> [[RT-CLOSURE-BOUNDARY-LANE]].** That is my derivation from the Architect's own
+> pre-committed dispositions, not a sentence he wrote — but rows 1 and 3 both
+> leave that node untouched by their own terms, so it holds either way.
+>
+> **Rows 1 and 3 are not separated, because `closure_path` is computed ONLY at
+> the crossing** (`dec_35e0tfng528d`, `evt_38p42gjq12br`). On the suppressed
+> rows, `closure_child_present: false` is an artifact of there being no
+> observation point — **both branches predict it exactly.** `D5`'s `CLAIMED`
+> line was amended to stop claiming otherwise. **What `D5` DID establish:** the
+> required-consumer route manufactures the **closure-bearing crossing** at
+> `StaticOriginId(5)` / `Constructor.arg[0].Closure`.
+>
+> **The separator is the CALL SITE, and it is
+> [[RT-CROSSING-CALL-SITE-ATTRIBUTION]]** — not another differential.
+> Suppression may not settle it at all: without the projection these rows never
+> build the subgraph, so *"does the closure pre-exist"* may be **ill-posed**.
 
 **One more reason not to fold, stronger than the totality argument:**
 `boundary_transfer_admissibility` carries **two** closure arms, and

@@ -43,6 +43,29 @@ origin: Measured at frozen base 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differ
 > node as their owner, and do not treat this node's size as covering them.**
 > Whichever way it goes, the frame this node still owes is unchanged.
 
+> ## RULED. THE RECURSOR ROWS ARE NOT THIS NODE'S. Steward, 2026-08-15.
+>
+> **The fork above is settled against subsumption, and this node's scope is
+> unchanged by it.** [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] `D5` measured the
+> enabled rows at `(closure_present, crossing_reached) = (true, true)` and both
+> suppressed legs at `(false, false)`, returning to `StaticWorkerBinding`
+> (`dec_35e0tfng528d`, Architect verdict `evt_38p42gjq12br`).
+>
+> **The Architect's dispositions named exactly one branch under which the two
+> populations could be one defect: closure PRESENT under suppression AND the
+> crossing ALSO reached under suppression.** The crossing is **not** reached
+> under suppression. ⇒ **That branch is excluded by measurement.**
+>
+> The two branches still live — the realization produces a value that should not
+> be closure-shaped, or the value is legitimately closure-shaped and should never
+> have been **routed** — **both leave this node untouched by their own terms.**
+> The separator between them is [[RT-CROSSING-CALL-SITE-ATTRIBUTION]].
+>
+> ⇒ **Do not wait on the recursor chain to size this node**, and do not expect a
+> shared repair from it. **The frame this node owes is its own**, over the row it
+> already lists. The shared refusal sentence was totality, as the predecessor
+> block said, and that reading is now measured rather than argued.
+
 ## Exact signature
 
 ```text

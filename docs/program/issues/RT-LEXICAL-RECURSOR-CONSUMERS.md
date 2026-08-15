@@ -47,9 +47,10 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 >
 > ### THE ROUTE QUESTION IS [[RT-CONSUMING-OCCURRENCE-ROUTE-WIRE]]
 >
-> **UPDATED 2026-08-15 — that node is `merged`, and so is the surface node after
-> it.** The live successor is [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] (`ready`,
-> `S`). Route-wire measured the depth-2+ boundary to be a representation problem;
+> **UPDATED 2026-08-15 — that node is `merged`, and so are the two after it.**
+> The live successor is now [[RT-CROSSING-CALL-SITE-ATTRIBUTION]] (`ready`,
+> `S`); [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] merged with `D1`-`D5` delivered.
+> Route-wire measured the depth-2+ boundary to be a representation problem;
 > [[RT-REQUIRED-OCCURRENCE-PROJECTION]] built the lawful surface and advanced
 > **row 4 depths 2 and 3** to a `Closure` refusal at `66715f9fb`. **Row 4 depth 1
 > is outside that surface by construction** — the projection is minted only where
