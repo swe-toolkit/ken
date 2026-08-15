@@ -276,6 +276,49 @@ reading trusted over a probe.
 plainly: that moves ownership of future wording changes, and `D5`'s doc comment
 needs to say which constraint it is enforcing.
 
+> ### `D6` IS DISCHARGED AND THE ANSWER IS YES. The reading was wrong.
+>
+> **The label reaches the hash.** Two `Decl::Opaque` values differing only in
+> `name` produced unequal `canonical_decl_bytes` — 166 vs 236 bytes under the
+> same `StableSymbolTable`. `encode_decl` serializes the Opaque name
+> unconditionally; `emit_package_from_env` serializes admitted declarations into
+> the canonical semantic bytes with no Opaque exclusion. Probe
+> `evt_3twtwsv7fhadh`, uncommitted and reverted, with `D5` restored byte-exact.
+>
+> **This is a pre-existing general property, not a `D5` defect, and the Architect
+> ruled it must not be filed as one** (`evt_2q0bm3ez5aczd`). Every
+> `declare_postulate` audit label is already a canonical input, including the
+> unchanged `"prover unknown goal"`. `D5` is the first thing to have looked.
+> **Home: [[CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY]]**, filed and owned so this
+> question is not carried inside a signature-discovery arc.
+>
+> **`D5`'s approval stands and its object is unchanged.** One supporting clause
+> of `dec_3dv5462aen3g`'s resolution text — that the label does not reach a hash
+> — is measured false; the verdict is not. The FO-withheld label reaches no
+> artifact today because nothing admits a prover hole into an emitted package
+> through route FO, so `D5` as approved changes no existing hash. **It is future
+> reachability that makes this live, which is what `D1`-`D3` create.**
+>
+> ### `D1`-`D3` ARE BOUNDED BY THIS, NOT BLOCKED BY IT
+>
+> Three constraints, from the same ruling. They are not gates and nothing is owed
+> back before starting.
+>
+> 1. **Every audit label is a frozen artifact-identity input, not prose.**
+> 2. **No further citation-bearing labels** until the encoding question is
+>    settled. Each one adds another spec-number-to-hash edge, and the `§4.4`
+>    citation already in the approved label is the sharpest form of the problem:
+>    **a renumbered spec section would force a choice between a stale label and
+>    a hash change across every package carrying such a hole.**
+> 3. **Record it at `emit_unknown_hole_fo_withheld`** — one sentence saying the
+>    do-not-reword instruction is load-bearing for artifact stability as well as
+>    for `AC-8`'s presentation property. The current wording gives a reader no
+>    way to infer the second reason.
+>
+> **The probe method is the transferable part.** The Architect asked for a
+> measurement instead of shipping his reading, and the measurement contradicted
+> it. `AC-9` is why this is known rather than assumed.
+
 ## Acceptance criteria
 
 **`AC-1`.** No signature-selection rule is landed that `D0`'s ruling did not
