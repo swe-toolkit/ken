@@ -517,51 +517,55 @@ fn specialize_int_goal(
 
 /// Fragment FO dispatch point (`23 §4`, `V3-FO-KRIPKE-SLICE`).
 ///
-/// **This function cannot currently reach the Kripke slice at all, for any
-/// real obligation — this is not an oversight, and the reason is structural,
-/// not a bug to fix here.** Each call declares a FRESH
-/// [`crate::fo_kripke::FoSliceSignature`] via `declare_fo_slice_signature`,
-/// which mints brand-new `GlobalId`s every time (`declare_postulate`/
-/// `declare_inductive` are not idempotent, not even against the same
-/// `env`). `quote_fo` recognizes a signature's sort/predicate by exact
-/// `GlobalId` — so an obligation built against ANY other signature (which
-/// is every externally-constructed obligation there is, since nothing
-/// outside this function has ever seen the ids it just minted) is refused
-/// by `quote_fo` and falls straight through to the unchanged IPC
-/// propositional fallback below, exactly as before this slice existed.
-/// **Route FO is built and kernel-vocabulary-checked, but is currently
-/// unreachable in production**: nobody should read "the FO Kripke slice
-/// landed" as "route FO now behaves differently" for any real obligation —
-/// it does not, and will not until a successor discovers a real
-/// obligation's own (sort, predicate) signature (filed as
-/// `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY`, gated on its own Architect
-/// ruling, explicitly out of this slice's scope — "do not widen the
-/// slice").
+/// **This is the PUBLIC route, and it now reaches the Kripke slice for a
+/// real, externally-constructed obligation**
+/// (`V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` `D1`-`D3`). Before this node, each
+/// call declared a FRESH [`crate::fo_kripke::FoSliceSignature`] via
+/// `declare_fo_slice_signature`, which mints brand-new `GlobalId`s every time
+/// (`declare_postulate`/`declare_inductive` are not idempotent, not even
+/// against the same `env`); since `quote_fo` recognizes a signature's
+/// sort/predicate by exact `GlobalId`, every real obligation — built against
+/// ids nothing outside this function had ever seen — was refused by
+/// `quote_fo` and fell straight through to the IPC fallback, unconditionally.
+/// That was the ENTIRE reason route FO was reachable only through
+/// [`attempt_fo_with_signature`]'s own explicit-signature test seam and not
+/// through this function.
 ///
-/// The slice's own logic — quotation (`quote_fo`), the exact classical
-/// Kripke theory with `K(Sigma)` inside the target (`embed`), and a
-/// computable certificate checker (`check_cert`) over the slice's one rigid
-/// sort, one unary predicate, and `init`/`imp-right`/`forall-right`
-/// certificate rules — is real, not stubbed, and is exercised (and
-/// verifiable) through [`attempt_fo_with_signature`] below, which this
-/// function is a thin, non-signature-discovering wrapper over.
+/// `crate::fo_kripke::discover_and_quote_fo` replaces that always-fresh
+/// signature with one matched against `phi_closed`'s OWN `GlobalId`s (`D0`'s
+/// four-conjunct rule), returning `Some` only once preservation
+/// (`denote(sig, f) ≡ phi_closed`, checked by the kernel's own `convert`,
+/// never assumed) has been established. On `Some`, this reaches the exact
+/// same boundary logic as [`attempt_fo_with_signature`] below — the two
+/// functions differ only in where the signature comes from, never in what
+/// happens once one is in hand, so the fail-safe proved against the helper is
+/// the fail-safe this route now genuinely exercises, not merely inherits on
+/// paper.
+///
+/// On `None` — ambiguous or absent role assignment, a declaration-shape
+/// mismatch, a quotation refusal, or an unestablished preservation
+/// obligation — this still falls straight through to the unchanged IPC route
+/// (`D4`): refusal is always safe and always available, and an out-of-slice
+/// or unrecognized obligation is refused exactly as before this node.
 fn attempt_fo(
     env: &mut GlobalEnv,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
 ) -> Verdict {
-    let sig = crate::fo_kripke::declare_fo_slice_signature(env);
-    attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig)
+    match crate::fo_kripke::discover_and_quote_fo(env, phi_closed) {
+        Some((sig, _problem)) => attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig),
+        None => attempt_ipc(env, ctx, phi, phi_closed),
+    }
 }
 
-/// The Kripke slice's actual boundary logic, factored out so it is testable
-/// independent of `attempt_fo`'s own always-fresh, externally-unreachable
-/// signature (see `attempt_fo`'s doc comment for why that matters): a
-/// caller here supplies its OWN [`crate::fo_kripke::FoSliceSignature`] and
-/// builds obligations against it directly, so quotation can actually
-/// succeed and the fail-safe below is genuinely exercised rather than
-/// measuring the IPC fallback under a different name. **The fail-safe**:
+/// The Kripke slice's actual boundary logic, factored out as its own testable
+/// seam: a caller here supplies its OWN [`crate::fo_kripke::FoSliceSignature`]
+/// directly, rather than going through `attempt_fo`'s discovery step (see
+/// `attempt_fo`'s doc comment — `crate::fo_kripke::discover_and_quote_fo`
+/// re-quotes against this SAME `sig` before ever reaching this function, so
+/// the two entry points share this one boundary logic exactly). **The
+/// fail-safe**:
 /// when `quote_fo` + `find_certificate` + `check_cert` together accept a
 /// genuine certificate, the verdict returned is still `Unknown`, never
 /// `Proved` — `embedding_adequacy`/`checker_soundness` (`23 §4.4`) have no
@@ -779,6 +783,20 @@ fn emit_unknown_hole(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
 /// checked, or more "nearly proved" than [`emit_unknown_hole`]'s label; a
 /// reader auditing `trusted_base()` must be able to tell the two states
 /// apart without being invited to discount either one.
+///
+/// **This exact wording is ALSO frozen artifact-identity input, not only an
+/// `AC-8` presentation choice** ([[CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY]],
+/// measured by probe, `D6`: `Decl::Opaque.name` is serialized unconditionally
+/// into `canonical_decl_bytes`, and `emit_package_from_env` admits Opaque
+/// postulates into the hashed semantic bytes with no exclusion). `D1`-`D3`
+/// are what first let route FO admit a hole reachable from a real
+/// elaboration, so this label can now reach a package's `core_semantic_hash`
+/// for the first time. Do not add a citation to a spec section number here
+/// or anywhere else in this string: every citation is another
+/// spec-renumbering-to-hash-change edge, and this one is already the
+/// sharpest instance of that problem. Changing this string changes emitted
+/// artifact bytes for every package that carries one of these holes — treat
+/// it exactly like changing a wire format, not like editing a comment.
 fn emit_unknown_hole_fo_withheld(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
     let hole_id = declare_postulate(
         env,
