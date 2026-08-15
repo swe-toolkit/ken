@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 13:49:22Z — from 311 issue file(s) in `docs/program/issues/`.
+2026-08-15 13:55:07Z — from 311 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -342,7 +342,7 @@ the committed file matches the generator's output.
 | `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | ready | runtime | M | none | — |
 | `V3-D-OPEN-GOAL-WITNESS-ROUTE` | The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver | merged | verify | S | none | — |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
-| `V3-KRIPKE-THEORY-CLOSURE` | Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes | ready | spec-enclave | M | none | — |
+| `V3-KRIPKE-THEORY-CLOSURE` | Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes | merged | spec-enclave | M | none | https://github.com/swe-toolkit/ken/pull/2323 |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
 | `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | merged | verify | S | none | 2120 |
 | `V3-Z3-EMISSION-CONTROL` | Put a control on the SMT-LIB query generator that does not need an installed solver, so the emission path stops being witnessed only by a fleet-wide required CI job | ready | verify | S | none | — |
@@ -356,6 +356,7 @@ Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
 - `CONF-BLOCKER-OWNER-RESOLVABILITY` — 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all
+- `CONF-PROVER-SEED-KRIPKE-DRIFT` — Clear what the Kripke chapter merge left behind: a conformance seed asserting a settled trusted-base outcome the chapter re-opens, two sibling drift sites, and the one-clause witness-direction fix
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
 - `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
@@ -377,7 +378,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
-- `V3-KRIPKE-THEORY-CLOSURE` — Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes
 - `V3-Z3-EMISSION-CONTROL` — Put a control on the SMT-LIB query generator that does not need an installed solver, so the emission path stops being witnessed only by a fleet-wide required CI job
 
 ## Blockers
@@ -398,7 +398,6 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
-- `CONF-PROVER-SEED-KRIPKE-DRIFT` blocked by `V3-KRIPKE-THEORY-CLOSURE` (status: ready)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
