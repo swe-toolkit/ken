@@ -17988,9 +17988,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // field becomes one closure parameter, in source order,
                         // before the capture suffix is appended.
                         #[cfg(test)]
-                        let callee = self
-                            .static_transition_plan
-                            .child_static_origin(body.static_origin, 0)?;
+                        let callee = self.generated_unit_call_body_callee(body.static_origin);
                         let mut inputs = args
                             .iter()
                             .map(|field| {
@@ -18351,9 +18349,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         }
                         let closure_origin = callee.static_origin;
                         #[cfg(test)]
-                        let callee_body_origin = self
-                            .static_transition_plan
-                            .child_static_origin(closure_origin, 0)?;
+                        let callee_body_origin =
+                            self.generated_unit_call_body_callee(closure_origin);
                         let mut inputs = args
                             .iter()
                             .enumerate()
@@ -18437,9 +18434,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         }
                         let closure_origin = callee.static_origin;
                         #[cfg(test)]
-                        let callee_body_origin = self
-                            .static_transition_plan
-                            .child_static_origin(closure_origin, 0)?;
+                        let callee_body_origin =
+                            self.generated_unit_call_body_callee(closure_origin);
                         // ⭐ **Each input crosses the boundary at ITS OWN
                         // caller-side occurrence.** The exact origins are
                         // already issued two lines up — `child_occurrence` for

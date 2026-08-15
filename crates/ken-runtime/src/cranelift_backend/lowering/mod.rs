@@ -2502,6 +2502,68 @@ pub(in crate::cranelift_backend) enum GeneratedUnitCallInputCaller {
     SourceMachineDeclaredUnit,
 }
 
+/// The planner level named by a generated-unit call-input diagnostic.
+///
+/// Five callers enter through a closure and therefore name its planned body.
+/// The source-machine declared-unit route starts from a scheduling entry; it
+/// names the same body when child zero exists, and otherwise states explicitly
+/// that the entry is the only available identity. A missing diagnostic child
+/// is data, never a reason for the test build to refuse compilation.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::cranelift_backend) enum GeneratedUnitCallInputCallee {
+    Body(StaticOriginId),
+    Entry(StaticOriginId),
+    MissingBodyChild { entry: StaticOriginId },
+}
+
+#[cfg(test)]
+thread_local! {
+    static CALL_INPUT_CALLEE_CHILD_MISSING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static CALL_INPUT_CALLEE_CHILD_MISSING_HITS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// RAII scope for the missing diagnostic-child control.
+#[cfg(test)]
+pub(in crate::cranelift_backend) struct CallInputCalleeDiagnosticMutationGuard {
+    previous: bool,
+    previous_hits: u32,
+}
+
+#[cfg(test)]
+impl CallInputCalleeDiagnosticMutationGuard {
+    pub(in crate::cranelift_backend) fn install() -> Self {
+        let previous = CALL_INPUT_CALLEE_CHILD_MISSING.with(|cell| cell.replace(true));
+        let previous_hits = CALL_INPUT_CALLEE_CHILD_MISSING_HITS.with(|cell| cell.replace(0));
+        Self {
+            previous,
+            previous_hits,
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn hits(&self) -> u32 {
+        CALL_INPUT_CALLEE_CHILD_MISSING_HITS.with(std::cell::Cell::get)
+    }
+}
+
+#[cfg(test)]
+impl Drop for CallInputCalleeDiagnosticMutationGuard {
+    fn drop(&mut self) {
+        CALL_INPUT_CALLEE_CHILD_MISSING.with(|cell| cell.set(self.previous));
+        CALL_INPUT_CALLEE_CHILD_MISSING_HITS.with(|cell| cell.set(self.previous_hits));
+    }
+}
+
+#[cfg(test)]
+fn call_input_callee_child_missing() -> bool {
+    CALL_INPUT_CALLEE_CHILD_MISSING.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+fn note_call_input_callee_child_missing() {
+    CALL_INPUT_CALLEE_CHILD_MISSING_HITS.with(|cell| cell.set(cell.get().saturating_add(1)));
+}
+
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::cranelift_backend) enum BoundaryTransferInvokingSite {
@@ -2510,7 +2572,7 @@ pub(in crate::cranelift_backend) enum BoundaryTransferInvokingSite {
     /// [`Lowering::carry_call_input`], the ordinary generated-unit input route.
     GeneratedUnitCallInput {
         caller: GeneratedUnitCallInputCaller,
-        callee: StaticOriginId,
+        callee: GeneratedUnitCallInputCallee,
     },
 }
 
@@ -7586,7 +7648,7 @@ impl<'a> Lowering<'a> {
         origin: StaticOriginId,
         input: LoweringOperand,
         #[cfg(test)] caller: GeneratedUnitCallInputCaller,
-        #[cfg(test)] callee: StaticOriginId,
+        #[cfg(test)] callee: GeneratedUnitCallInputCallee,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         #[cfg(test)]
         let _invoking_site = BoundaryTransferInvokingSiteGuard::enter(
@@ -7597,6 +7659,58 @@ impl<'a> Lowering<'a> {
             LoweringOperand::Specialized(value) => Ok(LoweringOperand::Carried(
                 self.transfer_into_carrier(builder, origin, &value)?,
             )),
+        }
+    }
+
+    /// Resolve the body-level identity used only by the call-input diagnostic.
+    ///
+    /// Under the missing-child mutation the real planner lookup is redirected
+    /// to a position that cannot exist. The failure becomes an explicit tag;
+    /// it cannot become an early return from the compile it observes.
+    #[cfg(test)]
+    fn generated_unit_call_body_callee(
+        &self,
+        entry: StaticOriginId,
+    ) -> GeneratedUnitCallInputCallee {
+        let mutated = call_input_callee_child_missing();
+        let position = if mutated { usize::MAX } else { 0 };
+        match self
+            .static_transition_plan
+            .child_static_origin(entry, position)
+        {
+            Ok(body) => GeneratedUnitCallInputCallee::Body(body),
+            Err(_) => {
+                if mutated {
+                    note_call_input_callee_child_missing();
+                }
+                GeneratedUnitCallInputCallee::MissingBodyChild { entry }
+            }
+        }
+    }
+
+    /// Resolve the source-machine declared unit's diagnostic identity.
+    ///
+    /// This route begins with a scheduling entry rather than a closure. Child
+    /// zero is still the comparable body-level identity when the plan has one;
+    /// otherwise the unmutated entry is retained and its different level is
+    /// represented in the tag.
+    #[cfg(test)]
+    fn generated_unit_call_entry_callee(
+        &self,
+        entry: StaticOriginId,
+    ) -> GeneratedUnitCallInputCallee {
+        let mutated = call_input_callee_child_missing();
+        let position = if mutated { usize::MAX } else { 0 };
+        match self
+            .static_transition_plan
+            .child_static_origin(entry, position)
+        {
+            Ok(body) => GeneratedUnitCallInputCallee::Body(body),
+            Err(_) if mutated => {
+                note_call_input_callee_child_missing();
+                GeneratedUnitCallInputCallee::MissingBodyChild { entry }
+            }
+            Err(_) => GeneratedUnitCallInputCallee::Entry(entry),
         }
     }
 
@@ -7626,7 +7740,11 @@ impl<'a> Lowering<'a> {
         // ⭐ **`D7` — the call-USE coordinate discriminator, at the same seam.**
         // It moves the coordinate every input is transferred at while the
         // certificate mutation above moves the certificate one input carries.
-        // Same call, same arguments, same moment, two axes.
+        // The diagnostic callee is derived from the pre-mutation scheduling
+        // entry, so it is not a third consumer of the mutated coordinate.
+        // Same call, same arguments, same moment, two mutation axes.
+        #[cfg(test)]
+        let callee = self.generated_unit_call_entry_callee(origin);
         #[cfg(test)]
         let origin = self.call_input_transfer_origin_under_mutation(origin)?;
         let mut carried = Vec::with_capacity(inputs.len());
@@ -7638,7 +7756,7 @@ impl<'a> Lowering<'a> {
                 #[cfg(test)]
                 GeneratedUnitCallInputCaller::SourceMachineDeclaredUnit,
                 #[cfg(test)]
-                origin,
+                callee,
             )?);
         }
         Ok(carried)

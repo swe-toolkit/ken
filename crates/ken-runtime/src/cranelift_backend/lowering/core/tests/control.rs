@@ -6179,7 +6179,7 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
     };
     use crate::cranelift_backend::lowering::{
         d2k_owner_trace_take, BoundaryTransferInvokingSite, D2kOwnerEvent,
-        GeneratedUnitCallInputCaller,
+        GeneratedUnitCallInputCallee, GeneratedUnitCallInputCaller,
     };
 
     #[derive(Debug, Eq, PartialEq)]
@@ -6330,7 +6330,7 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
                     root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
                     invoking_site: BoundaryTransferInvokingSite::GeneratedUnitCallInput {
                         caller: GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
-                        callee: depth_2_callee,
+                        callee: GeneratedUnitCallInputCallee::Body(depth_2_callee),
                     },
                 }],
                 closure_child_present: true,
@@ -6354,7 +6354,7 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
                     root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
                     invoking_site: BoundaryTransferInvokingSite::GeneratedUnitCallInput {
                         caller: GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
-                        callee: depth_3_callee,
+                        callee: GeneratedUnitCallInputCallee::Body(depth_3_callee),
                     },
                 }],
                 closure_child_present: true,
@@ -6370,6 +6370,196 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
             },
         ],
         "D5 must preserve the exact enabled/suppressed origin-5 crossing table",
+    );
+}
+
+/// `RT-PLANNED-CLOSURE-PREEXISTENCE` D1/D2: ask the planner whether the
+/// origin-5 result already has a closure-typed field, without executing the
+/// projected route or observing a crossing.
+///
+/// MEASURED: for row 4 at depths 2 and 3, the planner's closed
+/// result-producer analysis selects source `Construct` origin 12, whose field
+/// zero is a `LexicalClosure`. Changing that already-real source field to an
+/// integer changes the planner-side classification to `Other`.
+///
+/// CLAIMED: the closure shape pre-exists in both governed source plans, so both
+/// rows select the durable-lane branch and become rows of
+/// `RT-CLOSURE-BOUNDARY-LANE`. That node's sizing population is therefore its
+/// original explicit escape row plus these two recursor rows, not the original
+/// row alone; its numeric size remains for that node to frame.
+///
+/// THE GAP: this classifies source construction and routes the rows. It does
+/// not select the durable-lane repair, infer ownership beyond that routing, or
+/// promise that origin 12 remains stable after an authorized planner rewrite.
+///
+/// Promise class: transition sentinel. Rewrite the exact origins when an
+/// authorized planning change moves the producer; do not preserve the ordinal
+/// as a permanent ABI.
+#[test]
+fn planned_closure_preexistence_routes_recursors_to_the_durable_lane() {
+    use crate::cranelift_backend::planning::PlannedResultFieldKindForTest;
+
+    fn classify(expression: &RuntimeExpr) -> (bool, Vec<(String, PlannedResultFieldKindForTest)>) {
+        let plan = plan_static_transition_graph(expression, &BTreeMap::new())
+            .expect("the governed recursor expression must plan");
+        let origin = plan
+            .source_occurrence_origin_at_ordinal_for_test(5)
+            .expect("the planner-side probe must retain source origin 5");
+        let (closed, fields) = plan
+            .planned_result_field_kinds_for_test(origin, 0)
+            .expect("the planner must classify origin 5's closed result producers");
+        (
+            closed,
+            fields
+                .into_iter()
+                .map(|(producer, kind)| (format!("{producer:?}"), kind))
+                .collect(),
+        )
+    }
+
+    for (label, depth) in [("row4-depth-2", 2), ("row4-depth-3", 3)] {
+        let expression = host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+        assert_eq!(
+            classify(&expression),
+            (
+                true,
+                vec![(
+                    "StaticOriginId(12)".to_string(),
+                    PlannedResultFieldKindForTest::LexicalClosure,
+                )],
+            ),
+            "{label}: field zero must be closure-typed by source construction",
+        );
+    }
+
+    let mut changed = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let RuntimeExpr::Call { args, .. } = &mut changed else {
+        panic!("the real HostResult wrapper must remain a Call")
+    };
+    let RuntimeExpr::ComputationalMatch { cases, .. } = &mut args[0] else {
+        panic!("the real depth-2 result must remain a ComputationalMatch")
+    };
+    let RuntimeExpr::Let { body, .. } = &mut cases[0].body else {
+        panic!("the real selected Node case must retain its Let")
+    };
+    let RuntimeExpr::Construct { args, .. } = body.as_mut() else {
+        panic!("the real selected Node case must return a Construct")
+    };
+    args[0] = RuntimeExpr::Value(RuntimeValue::Int(0.into()));
+    let (closed, changed_fields) = classify(&changed);
+    assert!(
+        closed,
+        "the source-field mutation must keep the producer set closed"
+    );
+    assert_eq!(
+        changed_fields
+            .iter()
+            .map(|(_, kind)| *kind)
+            .collect::<Vec<_>>(),
+        vec![PlannedResultFieldKindForTest::Other],
+        "the planner-side classifier must distinguish a non-closure source field",
+    );
+}
+
+/// `RT-PLANNED-CLOSURE-PREEXISTENCE` D3: a test-only diagnostic lookup cannot
+/// alter the compile outcome it exists to report.
+///
+/// Population predicate: an exact `#[cfg(test)]` binding in `core.rs` whose
+/// initializer contains `?`, so that error propagation can change test-profile
+/// control flow. The base `ad47054a5` census is 14 bindings:
+/// `_aggregate_relation`, `_effect_seats`, `(returned, _call)`, `vector`, two
+/// outer `target` bindings, two nested `substitute` bindings, `claimed_owner`,
+/// `discharge`, `callee`, two `callee_body_origin` bindings, and `_`. Eleven
+/// are mutation/control machinery whose refusal is their intended behavior;
+/// the three call-input callee tags are diagnostic-only and are the repaired
+/// population. The five production `child_static_origin(...)?` calls are not
+/// members because they are not test-only bindings.
+///
+/// MEASURED: forcing the diagnostic's real planner lookup to a missing child
+/// preserves the exact `Closure` compile outcome while changing the call-input
+/// tag from `Body` to `MissingBodyChild` and recording a non-zero mutation hit.
+/// CLAIMED: missing diagnostic metadata degrades only the tag. THE GAP: this
+/// says nothing about a missing production child or a production compile.
+#[test]
+fn missing_call_input_callee_child_degrades_the_tag_not_the_compile() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    use crate::cranelift_backend::lowering::{
+        d2k_owner_trace_take, BoundaryTransferInvokingSite, CallInputCalleeDiagnosticMutationGuard,
+        D2kOwnerEvent, GeneratedUnitCallInputCallee, GeneratedUnitCallInputCaller,
+    };
+
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+
+    fn run(mutate: bool) -> (String, u32, Vec<GeneratedUnitCallInputCallee>) {
+        let _ = d2k_owner_trace_take();
+        let guard = mutate.then(CallInputCalleeDiagnosticMutationGuard::install);
+        let expression = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+        let (result, _trace) =
+            px8j_capture_source_trace(&expression, false, "ken_planned_closure_d3");
+        let hits = guard
+            .as_ref()
+            .map_or(0, CallInputCalleeDiagnosticMutationGuard::hits);
+        drop(guard);
+        let callees = d2k_owner_trace_take()
+            .into_iter()
+            .filter_map(|event| match event {
+                D2kOwnerEvent::BoundaryTransferEntered {
+                    origin,
+                    invoking_site:
+                        BoundaryTransferInvokingSite::GeneratedUnitCallInput {
+                            caller: GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
+                            callee,
+                        },
+                    ..
+                } if format!("{origin:?}") == "StaticOriginId(5)" => Some(callee),
+                _ => None,
+            })
+            .collect();
+        let outcome = match result {
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, .. })) => {
+                construct.to_string()
+            }
+            Ok(_) => "compiled".to_string(),
+            Err(other) => format!("other:{other}"),
+        };
+        (outcome, hits, callees)
+    }
+
+    set_selector_variant_exclusion(Some(RecursiveDescentResidual::LexicalCallArgumentRecursor));
+    let _restore = Restore;
+    let baseline = run(false);
+    let missing = run(true);
+    assert_eq!(baseline.0, "Closure");
+    assert_eq!(
+        missing.0, baseline.0,
+        "the diagnostic mutation must not change compilation"
+    );
+    assert_eq!(baseline.1, 0, "the baseline installs no mutation");
+    assert!(
+        missing.1 > 0,
+        "the missing-child mutation must reach a real lookup"
+    );
+    let [GeneratedUnitCallInputCallee::Body(body)] = baseline.2.as_slice() else {
+        panic!(
+            "the baseline must retain one exact body-level tag: {:?}",
+            baseline.2
+        )
+    };
+    assert_eq!(format!("{body:?}"), "StaticOriginId(49)");
+    let [GeneratedUnitCallInputCallee::MissingBodyChild { entry }] = missing.2.as_slice() else {
+        panic!(
+            "the missing planner child must degrade the exact call-input tag: {:?}",
+            missing.2
+        )
+    };
+    assert_ne!(
+        entry, body,
+        "the degraded tag must retain the closure entry rather than mislabel it as its body",
     );
 }
 
