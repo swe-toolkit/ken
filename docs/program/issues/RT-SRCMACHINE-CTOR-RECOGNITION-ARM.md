@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 depends_on: [RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY]
-blocks: []
+blocks: [RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]
 github: null
 origin: "Architect mechanism disposition evt_rdks1pn7cpb (2026-08-14) on RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY's D1. Recognition-gap branch confirmed and not close; he also refuted his own route-diversion hypothesis and refined his own one-need ruling against himself. Steward-filed (agents cannot create tracked work per COORDINATION §2), and he asked explicitly that this disposition, the advancing-refusal prediction, and the recognition-versus-disposition split live in the frame rather than in the thread."
 ---
@@ -161,6 +161,31 @@ discriminator.** Do not fold it into the row-4 result:
 
 **AC-5.** No repair is retained beyond what the outcome requires. Blob identity
 on any file this node does not intend to change.
+
+## The reachability residual routes to a successor — RECORD it, do not build it
+
+**Steward scope disposition 2026-08-15, answering `evt_48cjhd4pdeey4`.**
+
+**A governed source-machine route fixture warrants a successor, and it is filed:
+[[RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]] (`ready`, `S`).** It does **not**
+belong in this node and it does **not** hold this candidate.
+
+**The successor does NOT ask for the D2k-1c harness.** The Architect's refusal
+stands and is inherited: no test-only field on a production type. The successor
+asks the prior question — *is there an acceptable-cost observation of
+source-machine dispatch at all?* — and **"no, and here is the limit" is a
+complete outcome there.**
+
+**This node's obligation is unchanged and is exactly the Architect's two
+disclosures:** the recording half is unrepresentable, so the committed control's
+discriminating value is its dispatch assertion and it cannot see the arm ceasing
+to dispatch; and the depth-3 governed transition `value_at` →
+`StaticWorkerBinding` is **MEASURED-BUT-UNPINNED**. **Write both where the
+control lives.** The successor starts from that measured fact — losing it here
+costs the successor its starting point.
+
+**The depth-2 discriminator is still owed** and gates closing this node. It is
+not affected by any of the above.
 
 ## Stop condition — return to the Architect, do not decide
 

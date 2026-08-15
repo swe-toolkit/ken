@@ -17,6 +17,39 @@ origin: PX8-SPAN-PROV Phase 2 native reachability wall (runtime-implementer meas
 > any ring. ⛔ Do not re-open it, and do not read a section further down as live
 > work — several were written while the gate was open and read as if it still is.
 >
+> ## CORRECTION 2026-08-15 — ONE CONTRACT CLAUSE CLOSED UNMET. The status is NOT changed.
+>
+> **Measured by the spec enclave under [[CONF-STALE-RED-DISPOSITIONS]]
+> (`evt_1wsetx2v2xyr0`), confirmed by the Steward against this file.** The
+> scaling verdict above stands and this node's own deliverable was met. **What
+> was not met is the Contract's native-reachability clause**, and it is recorded
+> here because four conformance rows have pointed at this node ever since.
+>
+> The Contract required *"make native compilation accept ... the actual
+> SP-A-write / SP-B / SP-C programs without source contortions"* and *"run the
+> exact native SP matrices currently blocked."* The closure below anticipates
+> the reconciliation — *"CV flips the PX8-SPAN-PROV native SP rows ... a small
+> conformance-only follow-up fold."* **That fold was never possible.** At
+> `43bd0d597`, `rt_span_prov_native` is 5 passed / 1 ignored: the only
+> both-engine cell is `#[ignore]`d, and forcing it fails at native
+> `ObjectEmission` with *"unsupported runtime-IR lowering: ComputationalMatch:
+> tree-producing match scrutinee is not Bool or a constructor."* The other three
+> native cells have **no executing native arm at all.**
+>
+> ⇒ **This node lifted the `VReg::MAX` / single-function wall it was framed on.
+> A DIFFERENT native-lowering wall sits behind it**, now owned by
+> [[RT-COMPMATCH-TREE-SCRUTINEE]]. Two walls, one marker — that is why the flip
+> read as due.
+>
+> **The generalisable failure, and it is not this ring's:** nothing re-examines
+> a `BLOCKED-ON-<node>` marker when `<node>` flips to `merged`, and **a node's
+> closure is not checked against the markers pointing at it.** A closure clause
+> about someone else's artifact is discharged by nobody by default.
+>
+> **Do not re-open this node.** The live blocker is
+> [[RT-COMPMATCH-TREE-SCRUTINEE]]; the rows are corrected under
+> [[CONF-STALE-RED-DISPOSITIONS]].
+>
 > **How it closed.** The merge condition was the three-part scaling gate at
 > §"SCALING GATE" below. Both boundary nodes landed and the verdict is **(a)**:
 >
