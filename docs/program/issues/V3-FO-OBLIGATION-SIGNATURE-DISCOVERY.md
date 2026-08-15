@@ -1,15 +1,38 @@
 ---
 id: V3-FO-OBLIGATION-SIGNATURE-DISCOVERY
 title: "Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all"
-status: active
+status: merged
 owner: language
 size: L
 gate: none
 depends_on: [V3-FO-KRIPKE-SLICE]
 blocks: []
-github: null
+github: 2353
 origin: "Steward, 2026-08-15. Filed as the named home for the public-route residual cut out of V3-FO-KRIPKE-SLICE D5/AC-5 (disposition in that node's leading banner). Architect finding evt_30mehjtecaazy; QA block on e0474679c upheld. The load-bearing mechanism was re-derived by the Steward from crates/ at e0474679c before filing. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED 2026-08-15 at `3a2c46d4b49f6ea2c3d9fe5ae7687a9bd1c7c198`, PR #2353
+>
+> **Candidate exact `427fc40698c83a37ca7ad60b6ad5bc5c7dc5b7a6`**, two commits
+> from merge-base `de551a4ddebeedfb22a93b7f98c0ebd799405ddd`, exactly
+> `fo_kripke.rs`, `prover.rs`, and the discovery acceptance test, `+502/-37`.
+> Decision `dec_4ekc1j3qb8xdm` resolved APPROVED (Architect
+> `evt_6psj9y9e0ah41`); QA exact approval `evt_7sj97mws2279h`. Verified on
+> `main` by blob identity on all three declared paths, enumerated from the
+> declared merge-base.
+>
+> **This is the node that removes gate 1**, so `23 §4.4` is now the only thing
+> between an accepted certificate and `proved`. The gate holds: `check_cert`
+> acceptance returns `emit_unknown_hole_fo_withheld` — Unknown, never Proved.
+>
+> **`proved` remains forbidden.** `embedding_adequacy` and `checker_soundness`
+> are unproved, unstarted, and have no node. Steward framing debt.
+>
+> **The Architect's non-blocking residual has a home:** nothing observes
+> conjunct 3 refusing, because both refusal controls are caught by conjuncts 1
+> and 2 first. It is `D0` plus `AC-1a` of
+> [[V3-FO-CONVERSION-LOAD-MEASURED]].
+
 
 ## The gap, stated as a fact about the tree
 
