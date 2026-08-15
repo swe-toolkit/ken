@@ -78,7 +78,7 @@ pub(super) use static_transition::{set_effect_seat_plan_mutation, EffectSeatPlan
 pub(super) use static_transition::{
     ContinuationCallIdentity, ContinuationCallView, ContinuationContextId,
     ContinuationConsumingOccurrence, ContinuationContextView, ContinuationEmissionOwner,
-    ContinuationInputView,
+    ContinuationInputView, RequiredConsumerProjection,
     ContinuationOrdinaryEnvelopeRole, ContinuationResultEdge,
     // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — the closed coordinate sum reaches
     // lowering because the emission resolver must MATCH on it; there is no
@@ -114,7 +114,9 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     set_composed_call_target_defect, set_continuation_descent_owner_duplication, set_envelope_defect, EnvelopeDefect,
     with_continuation_consuming_eliminator_seed_mutated,
-    with_continuation_consuming_occurrence_seed_mutated, ComposedCallTargetDefect,
+    with_continuation_consuming_occurrence_seed_mutated,
+    with_required_consumer_projection_mutation, ComposedCallTargetDefect,
+    RequiredConsumerProjectionMutation,
 };
 
 // `D3b` stage-2 controls. ⛔ `#[cfg(test)]` on the RE-EXPORT as well as on the

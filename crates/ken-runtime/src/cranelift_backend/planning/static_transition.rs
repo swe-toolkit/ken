@@ -1635,6 +1635,38 @@ impl ContinuationConsumingOccurrence {
     }
 }
 
+/// A continuation call's independently derived consumer-level occurrence.
+///
+/// This is deliberately separate from
+/// [`ContinuationSpecializationKey::consuming_occurrence`]. That key field is
+/// the source-level certificate whose position-zero child is the target
+/// continuation. This projection names the occurrence required after the
+/// target body is realized: the same occurrence at depth one, and the unique
+/// outer consumer from depth two onward.
+///
+/// The fields are private and there is no constructor outside planning.
+/// Lowering can only receive a value that the whole-plan validator has matched
+/// against [`derive_required_consumer_occurrence`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RequiredConsumerProjection {
+    source: ContinuationConsumingOccurrence,
+    required: ContinuationConsumingOccurrence,
+}
+
+impl RequiredConsumerProjection {
+    pub(in crate::cranelift_backend) fn source(self) -> ContinuationConsumingOccurrence {
+        self.source
+    }
+
+    pub(in crate::cranelift_backend) fn body_origin(self) -> StaticOriginId {
+        self.required.body_origin
+    }
+
+    pub(in crate::cranelift_backend) fn eliminator_origin(self) -> StaticOriginId {
+        self.required.eliminator_origin
+    }
+}
+
 /// The complete immutable identity of one continuation specialization.
 ///
 /// The ordered projection vector is owned directly. There is no parallel
@@ -2703,6 +2735,11 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// facts, but no lowering accessor exists until the activation slice.
     continuation_specializations: Vec<PlannedContinuationSpecialization>,
     continuation_specialization_calls: Vec<PlannedContinuationSpecializationCall>,
+    /// One independently validated consumer-level occurrence per continuation
+    /// call whose discovery established the relation. Keyed by the whole opaque
+    /// call identity, never by specialization identity or function provenance.
+    required_consumer_projections:
+        BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
     /// `RT-DECL-CLOSURE-PORT` `D5a`. The generated producer execution contexts,
     /// derived after the specialization fixed point closes.
     continuation_contexts: Vec<PlannedContinuationContext>,
@@ -8163,6 +8200,7 @@ pub(in crate::cranelift_backend) struct ContinuationRequiredConsumerObservation 
     continuation_origin: StaticOriginId,
     result_root: StaticOriginId,
     required: ContinuationConsumingOccurrence,
+    derived_at_consumer: Option<ContinuationConsumingOccurrence>,
     child_push: bool,
 }
 
@@ -8180,6 +8218,12 @@ impl ContinuationRequiredConsumerObservation {
         self.required
     }
 
+    pub(in crate::cranelift_backend) fn derived_at_consumer(
+        self,
+    ) -> Option<ContinuationConsumingOccurrence> {
+        self.derived_at_consumer
+    }
+
     pub(in crate::cranelift_backend) fn is_child_push(self) -> bool {
         self.child_push
     }
@@ -8188,6 +8232,13 @@ impl ContinuationRequiredConsumerObservation {
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ContinuationConsumingOccurrenceSeedMutation {
+    BodyOrigin,
+    EliminatorOrigin,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum RequiredConsumerProjectionMutation {
     BodyOrigin,
     EliminatorOrigin,
 }
@@ -8209,9 +8260,34 @@ thread_local! {
     static MUTATE_PRIMARY_FUSION_KEY_DERIVATION: Cell<bool> = const { Cell::new(false) };
     static DUPLICATE_DESCENT_AS_TOP_LEVEL: Cell<bool> = const { Cell::new(false) };
     static MUTATE_CONTINUATION_CONSUMING_OCCURRENCE_SEED: Cell<Option<ContinuationConsumingOccurrenceSeedMutation>> = const { Cell::new(None) };
+    static REQUIRED_CONSUMER_PROJECTION_MUTATION:
+        Cell<Option<RequiredConsumerProjectionMutation>> = const { Cell::new(None) };
+    static REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS: Cell<usize> = const { Cell::new(0) };
     static CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS:
         std::cell::RefCell<Vec<ContinuationRequiredConsumerObservation>> =
         const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_required_consumer_projection_mutation<T>(
+    mutation: RequiredConsumerProjectionMutation,
+    run: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore(Option<RequiredConsumerProjectionMutation>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REQUIRED_CONSUMER_PROJECTION_MUTATION.with(|cell| cell.set(self.0));
+        }
+    }
+    let previous = REQUIRED_CONSUMER_PROJECTION_MUTATION
+        .with(|cell| cell.replace(Some(mutation)));
+    REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS.with(|cell| cell.set(0));
+    let restore = Restore(previous);
+    let result = run();
+    let applications =
+        REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS.with(Cell::get);
+    drop(restore);
+    (result, applications)
 }
 
 #[cfg(test)]
@@ -10783,7 +10859,7 @@ fn fusion_root_source_for_future_enumerator(
 fn admitted_continuation_discoveries(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<AdmittedContinuationDiscovery>, CraneliftBackendError> {
-    let (_, _, _, admitted) = build_continuation_specialization_plan(plan)?;
+    let (_, _, _, _, admitted) = build_continuation_specialization_plan(plan)?;
     Ok(admitted)
 }
 
@@ -10981,7 +11057,6 @@ fn consuming_occurrence_from_seed(
 /// Source candidates are selected through their own eliminator's forward
 /// position-zero continuation. Generated descents have already performed that
 /// selection and therefore carry an exact occurrence.
-#[cfg(test)]
 fn required_consuming_occurrence_for_alternative(
     plan: &StaticTransitionPlan<'_>,
     discovery: &ContinuationDiscovery,
@@ -11027,6 +11102,55 @@ fn required_consuming_occurrence_for_alternative(
     Ok(match matching.as_slice() {
         [only] => Some(*only),
         _ => None,
+    })
+}
+
+fn derive_required_consumer_occurrence(
+    plan: &StaticTransitionPlan<'_>,
+    key: &ContinuationSpecializationKey,
+) -> Result<Option<ContinuationConsumingOccurrence>, CraneliftBackendError> {
+    let Some(source_level) = key.consuming_occurrence else {
+        return Ok(None);
+    };
+    if rederive_consuming_occurrence(plan, key, source_level)? != Some(source_level) {
+        return Err(planner_error(
+            "a required-consumer derivation starts from an invalid source-level occurrence",
+        ));
+    }
+    let produced = continuation_result_constructor_identities(plan, source_level.body_origin)?;
+    let mut matching = Vec::new();
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        let RuntimeExpr::ComputationalMatch { cases, .. } = occurrence.expr else {
+            continue;
+        };
+        if forward_match_scrutinee(plan, occurrence.static_origin)?
+            != source_level.eliminator_origin
+        {
+            continue;
+        }
+        for alternative in 0..cases.len() {
+            let identity = plan.case_constructor_identity(occurrence.static_origin, alternative)?;
+            if produced.contains(&identity) {
+                let candidate = ContinuationConsumingOccurrence {
+                    body_origin: plan
+                        .semantic
+                        .child_origin(occurrence.static_origin, 1 + alternative)?,
+                    eliminator_origin: occurrence.static_origin,
+                };
+                if !matching.contains(&candidate) {
+                    matching.push(candidate);
+                }
+            }
+        }
+    }
+    Ok(match matching.as_slice() {
+        [only] => Some(*only),
+        [] => Some(source_level),
+        _ => {
+            return Err(planner_error(
+                "more than one outer consumer is derivable for one continuation call level",
+            ));
+        }
     })
 }
 
@@ -11121,6 +11245,7 @@ fn build_continuation_specialization_plan(
     (
         Vec<PlannedContinuationSpecialization>,
         Vec<PlannedContinuationSpecializationCall>,
+        BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
         Vec<PlannedContinuationContext>,
         Vec<AdmittedContinuationDiscovery>,
     ),
@@ -11140,6 +11265,8 @@ fn build_continuation_specialization_plan(
     let mut interned = BTreeMap::new();
     let mut units: Vec<PlannedContinuationSpecialization> = Vec::new();
     let mut calls = BTreeSet::new();
+    let mut required_consumer_projections = BTreeMap::new();
+    let mut pending_required_consumer_projections = Vec::new();
     let mut sequences = BTreeMap::<
         (PredeclaredFunctionId, StaticOriginId, StaticOriginId),
         u32,
@@ -11347,27 +11474,12 @@ fn build_continuation_specialization_plan(
                             enclosing_inputs,
                         },
                     };
-                    #[cfg(test)]
-                    {
-                        let required_consuming_occurrence =
-                            required_consuming_occurrence_for_alternative(
-                                plan,
-                                &discovery,
-                                alternative,
-                            )?;
-                        if let Some(required) = required_consuming_occurrence {
-                            CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
-                                observations.borrow_mut().push(
-                                    ContinuationRequiredConsumerObservation {
-                                        continuation_origin: discovery.continuation_origin,
-                                        result_root: discovery.result_root,
-                                        required,
-                                        child_push: false,
-                                    },
-                                );
-                            });
-                        }
-                    }
+                    let required_consuming_occurrence =
+                        required_consuming_occurrence_for_alternative(
+                            plan,
+                            &discovery,
+                            alternative,
+                        )?;
                     let key = ContinuationSpecializationKey {
                         producer_owner: producer_environment.producer_owner,
                         emission_owner,
@@ -11404,20 +11516,33 @@ fn build_continuation_specialization_plan(
                         producer_construct_origin,
                     );
                     let sequence = sequences.entry(sequence_key).or_insert(0);
-                    let call = PlannedContinuationSpecializationCall {
-                        token: ContinuationSpecializationCallToken {
-                            producer_owner,
-                            emission_owner,
-                            producer_result_origin: discovery.result_root,
-                            producer_construct_origin,
-                            producer_alternative: u32::try_from(alternative).map_err(|_| {
-                                planner_capacity_error("continuation alternative exhausted")
-                            })?,
-                            call_site_sequence: *sequence,
-                            target,
-                            worker: worker.clone(),
-                        },
+                    let token = ContinuationSpecializationCallToken {
+                        producer_owner,
+                        emission_owner,
+                        producer_result_origin: discovery.result_root,
+                        producer_construct_origin,
+                        producer_alternative: u32::try_from(alternative).map_err(|_| {
+                            planner_capacity_error("continuation alternative exhausted")
+                        })?,
+                        call_site_sequence: *sequence,
+                        target,
+                        worker: worker.clone(),
                     };
+                    let identity = ContinuationCallIdentity {
+                        token: token.clone(),
+                        recursive_position: u32::try_from(position).map_err(|_| {
+                            planner_capacity_error("continuation recursive position exhausted")
+                        })?,
+                    };
+                    if let Some(required) = required_consuming_occurrence {
+                        pending_required_consumer_projections.push((
+                            identity,
+                            required,
+                            discovery.continuation_origin,
+                            discovery.result_root,
+                        ));
+                    }
+                    let call = PlannedContinuationSpecializationCall { token };
                     if calls.insert(call) {
                         *sequence = sequence.checked_add(1).ok_or_else(|| {
                             planner_capacity_error("continuation call sequence exhausted")
@@ -11476,6 +11601,7 @@ fn build_continuation_specialization_plan(
                                                 continuation_origin: discovery.continuation_origin,
                                                 result_root: worker.body_origin,
                                                 required: *required,
+                                                derived_at_consumer: None,
                                                 child_push: true,
                                             },
                                         );
@@ -11518,10 +11644,83 @@ fn build_continuation_specialization_plan(
         }
     }
     let calls = calls.into_iter().collect::<Vec<_>>();
+    // Preserve the source-level certificate's established refusal priority.
+    // The required relation is derived only after that independently checked
+    // certificate has passed; otherwise a source mutation would be mislabeled
+    // as a required-consumer failure.
     validate_continuation_consuming_occurrences(plan, &units)?;
     validate_continuation_specialization_closure(&interned, &units, &calls)?;
+    for (identity, required, _continuation_origin, _result_root) in
+        pending_required_consumer_projections
+    {
+        let target_unit = units.get(identity.target().0 as usize).ok_or_else(|| {
+            planner_error("a required-consumer projection names an uninstalled target")
+        })?;
+        let derived_at_consumer = derive_required_consumer_occurrence(plan, &target_unit.key)?;
+        #[cfg(test)]
+        CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
+            observations
+                .borrow_mut()
+                .push(ContinuationRequiredConsumerObservation {
+                    continuation_origin: _continuation_origin,
+                    result_root: _result_root,
+                    required,
+                    derived_at_consumer,
+                    child_push: false,
+                });
+        });
+        if derived_at_consumer != Some(required) {
+            return Err(planner_error(
+                "a continuation call's required consumer does not match the consumer-level \
+                 occurrence independently derived from its target",
+            ));
+        }
+        let source = target_unit.key.consuming_occurrence.ok_or_else(|| {
+            planner_error(
+                "a required-consumer projection's target has no source-level consuming occurrence",
+            )
+        })?;
+        if required != source {
+            let projection = RequiredConsumerProjection { source, required };
+            if required_consumer_projections
+                .insert(identity, projection)
+                .is_some_and(|prior| prior != projection)
+            {
+                return Err(planner_error(
+                    "one continuation call identity claims two required consumers",
+                ));
+            }
+        }
+    }
+    #[cfg(test)]
+    if let Some(mutation) = REQUIRED_CONSUMER_PROJECTION_MUTATION.with(Cell::get) {
+        if let Some(projection) = required_consumer_projections.values_mut().next() {
+            match mutation {
+                RequiredConsumerProjectionMutation::BodyOrigin => {
+                    projection.required.body_origin = projection.source.body_origin;
+                }
+                RequiredConsumerProjectionMutation::EliminatorOrigin => {
+                    projection.required.eliminator_origin = projection.source.eliminator_origin;
+                }
+            }
+            REQUIRED_CONSUMER_PROJECTION_MUTATION_APPLICATIONS
+                .with(|applications| applications.set(applications.get() + 1));
+        }
+    }
+    validate_required_consumer_projections(
+        plan,
+        &units,
+        &calls,
+        &required_consumer_projections,
+    )?;
     let contexts = intern_generated_contexts(&units, &calls)?;
-    Ok((units, calls, contexts, admitted))
+    Ok((
+        units,
+        calls,
+        required_consumer_projections,
+        contexts,
+        admitted,
+    ))
 }
 
 /// The `Parameter` run of the generated context that executes one specialization
@@ -11674,6 +11873,67 @@ fn validate_continuation_specialization_closure(
         return Err(planner_error(
             "continuation planned-edge closure does not reach every unit",
         ));
+    }
+    Ok(())
+}
+
+fn validate_required_consumer_projections(
+    plan: &StaticTransitionPlan<'_>,
+    units: &[PlannedContinuationSpecialization],
+    calls: &[PlannedContinuationSpecializationCall],
+    projections: &BTreeMap<ContinuationCallIdentity, RequiredConsumerProjection>,
+) -> Result<(), CraneliftBackendError> {
+    let mut call_identities = BTreeSet::new();
+    for call in calls {
+        let target = units
+            .get(call.token.target.0 as usize)
+            .ok_or_else(|| planner_error("a continuation call names no target unit"))?;
+        call_identities.insert(ContinuationCallIdentity {
+            token: call.token.clone(),
+            recursive_position: target.key.recursive_position,
+        });
+    }
+    for (identity, projection) in projections {
+        if !call_identities.contains(identity) {
+            return Err(planner_error(
+                "a required-consumer projection names no planned continuation call",
+            ));
+        }
+        let target = units
+            .get(identity.target().0 as usize)
+            .ok_or_else(|| planner_error("a required-consumer projection names no target unit"))?;
+        if identity.recursive_position != target.key.recursive_position {
+            return Err(planner_error(
+                "a required-consumer projection's call position disagrees with its target",
+            ));
+        }
+        let derived = derive_required_consumer_occurrence(plan, &target.key)?;
+        let source = rederive_consuming_occurrence(plan, &target.key, projection.source)?;
+        if source != Some(projection.source) {
+            return Err(planner_error(
+                "a required-consumer projection's source occurrence does not match the exact \
+                 source-level occurrence independently derived from its target",
+            ));
+        }
+        if derived != Some(projection.required) {
+            #[cfg(test)]
+            {
+                let reason = match derived {
+                    Some(expected)
+                        if expected.eliminator_origin != projection.required.eliminator_origin =>
+                    {
+                        "a required-consumer projection has a mismatched eliminator_origin"
+                    }
+                    _ => "a required-consumer projection has a mismatched body_origin",
+                };
+                return Err(planner_error(reason));
+            }
+            #[cfg(not(test))]
+            return Err(planner_error(
+                "a required-consumer projection is not the exact consumer-level occurrence \
+                 independently derived from its target",
+            ));
+        }
     }
     Ok(())
 }
@@ -11913,7 +12173,13 @@ fn validate_static_worker_member_population(
 fn validate_continuation_specialization_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<(), CraneliftBackendError> {
-    let (expected_units, expected_calls, expected_contexts, _admitted) =
+    let (
+        expected_units,
+        expected_calls,
+        expected_required_consumers,
+        expected_contexts,
+        _admitted,
+    ) =
         build_continuation_specialization_plan(plan)?;
     // ⛔⛔ **The comparison is against the DERIVATION, and `D3b`'s stage-2
     // finalization is not part of it.**
@@ -11939,6 +12205,7 @@ fn validate_continuation_specialization_plan(
     }
     if landed_units != expected_units
         || plan.continuation_specialization_calls != expected_calls
+        || plan.required_consumer_projections != expected_required_consumers
         || landed_contexts != expected_contexts
     {
         return Err(planner_error(
@@ -11990,6 +12257,7 @@ impl<'src> Planner<'src> {
                 occurrence_authorities: Vec::new(),
                 continuation_specializations: Vec::new(),
                 continuation_specialization_calls: Vec::new(),
+                required_consumer_projections: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
@@ -12913,11 +13181,13 @@ impl<'src> Planner<'src> {
         let (
             continuation_specializations,
             continuation_specialization_calls,
+            required_consumer_projections,
             continuation_contexts,
             _admitted_discoveries,
         ) = build_continuation_specialization_plan(&self.plan)?;
         self.plan.continuation_specializations = continuation_specializations;
         self.plan.continuation_specialization_calls = continuation_specialization_calls;
+        self.plan.required_consumer_projections = required_consumer_projections;
         self.plan.continuation_contexts = continuation_contexts;
         validate_continuation_specialization_plan(&self.plan)?;
         install_continuation_specialization_abi(
@@ -16139,6 +16409,19 @@ impl<'src> StaticTransitionPlan<'src> {
             }
         }
         Ok(found)
+    }
+
+    /// The independently validated consumer-level occurrence for one exact
+    /// continuation call.
+    ///
+    /// The map is built and checked in planning. Lowering receives only this
+    /// opaque value; it neither sees the derivation nor manufactures a fallback
+    /// from the source-level specialization key.
+    pub(in crate::cranelift_backend) fn required_consumer_projection_for(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Option<RequiredConsumerProjection> {
+        self.required_consumer_projections.get(identity).copied()
     }
 
     /// **`RT-CONTSRC-PRODUCER-LOCAL` `D7a` — the planner-issued composed worker
