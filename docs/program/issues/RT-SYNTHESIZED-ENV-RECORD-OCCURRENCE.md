@@ -1,7 +1,7 @@
 ---
 id: RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE
 title: "Give the unit-boundary environment record a planner-issued occurrence by extending the synthesized producer arm, so the closure crossing is attempted at the seam that actually refused it"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -149,12 +149,92 @@ what decides whether a further node exists.
 > this node is to establish which of the two halves is actually load-bearing,
 > because the Steward asserted both were and measured neither.
 
+## THE FIRST CANDIDATE WENT RED. MECHANISM AND RECUT CONDITION ARE BOTH GROUNDED.
+
+**Candidate `1b8a57de6` was approved on exact SHA (`dec_6758m1a7g7e55`) and
+failed CI.** Base `75a91d2ba` was green, all four shards failed, and the failing
+controls are pre-existing and untouched by the diff. Regression, not a flake.
+Handback `evt_37ht96vrm9nx4`; PR #2335 closed. **A corrected candidate is a new
+SHA and needs a fresh exact-SHA Decision.**
+
+**One narrow signature — rows `row4-depth-2` and `row4-depth-3` only**, every
+other row byte-identical:
+
+```
+expected:  "refused:Closure"
+actual:    Backend(PlannerInvariant(
+             "aggregate producer has no planned ownership record"))
+```
+
+⇒ **A designed, user-facing refusal became a "please report this compiler bug"
+panic.** `missing_call_input_callee_child_degrades_the_tag_not_the_compile` is
+named for exactly the property that broke.
+
+### The mechanism, grounded by the Architect at `evt_2p007te58p8y3`
+
+**It is not the absent-key path. It is the path where the substitution
+SUCCEEDS.** The substitution replaces a `ConstructorField` holding
+`Lowered::Closure` with one holding `Lowered::Record`, **which changes the
+value's kind — and a downstream consumer dispatches on kind.** In
+`reconcile_source_aggregate`'s child loop (`mod.rs:6937`),
+`lowered_aggregate_shape(child)` returns `None` for `Closure` and `Some(Record)`
+for `Record` (`mod.rs:7050-7056`). Before the change the substituted child hit
+`continue` and was invisible to source-producer reconciliation; after it, the
+child enters that lane and resolves through `source_aggregate_occurrence`, which
+looks up `AggregateOccurrenceProducer::Source(origin)` **exclusively**. The
+occurrence the substitution minted is a **synthesized** one, so no `Source`
+record exists for it by construction, and that lookup's documented *"absence is a
+loud failure, never a default"* fires — correctly, **on a question it should
+never have been asked.**
+
+**The actual defect is an asymmetry.** That same loop already gates the **parent**
+on producer class at `mod.rs:6934` (`if planned.producer_origin().is_none() {
+continue }`), and its comment gives the general reason: a compiler-synthesized
+aggregate's children have no occurrence in the program, and re-deriving agreement
+from source origins the planner deliberately recorded as absent would be a
+second, weaker authority. **That rationale applies verbatim to a synthesized
+child. The parent arm has a producer-class gate; the child arm has only a shape
+test.** This change introduced the first value that is **synthesized by producer
+yet aggregate by shape**, and that combination is what the child arm cannot
+express.
+
+> **One step is inferred, not measured, and the Architect flagged it himself:**
+> that the depth-2/3 rows take this specific child path. **Measure it before
+> building to it.** If the actual path is a different one, the finding is wrong
+> and should be reported as wrong rather than fitted.
+
+**The design is not retracted.** The structural `(producer, position)` key and
+the non-aliasing argument are untouched, as is the `41-values.md` reading. Two
+repair directions are both in scope and the choice is the ring's: give the child
+arm a producer-class gate, or do not present a synthesized record where a
+source-lane consumer will shape-dispatch on it.
+
+### Binding condition on the next approval
+
+> **A by-construction argument about the substitution function's own early
+> returns will not be accepted again.** The re-approval must trace the **success
+> path** to every consumer that dispatches on `Lowered` kind, and show each one
+> either handles a synthesized-producer aggregate or is unreachable for one.
+
+**Why this is stated as a condition rather than a lesson:** the original review
+named the planner/lowering divergence as a non-blocking flag and dispositioned it
+*"both directions fail closed, costing coverage not soundness."* **One direction
+does not fail closed.** The soundness half of that call stands — nothing unsound
+is admitted — but *"fails closed"* was a reading where a test was owed.
+
 ## Acceptance criteria
 
 **`AC-1`.** `D0` attempts the stated claim directly. **A handback reporting that
 no lawful `seat`/`path` key can name the crossing, with the mechanism and site,
 satisfies this criterion** — a refuted guess is the deliverable when an attempt
 refutes it.
+
+**`AC-8`.** **Added after `1b8a57de6` went red.** No pre-existing control
+changes disposition. In particular, no row that previously produced a designed
+refusal may come to produce a `PlannerInvariant` or any other
+report-a-compiler-bug failure. **If a control's expectation genuinely should
+change, that is a handback and not an edit** — the four controls that caught this
+are owned elsewhere and pin dispositions this node was not licensed to move.
 
 **`AC-2`.** The non-aliasing law holds: every ownership record still names a
 distinct producer. **Demonstrate that a new root or role cannot alias an
