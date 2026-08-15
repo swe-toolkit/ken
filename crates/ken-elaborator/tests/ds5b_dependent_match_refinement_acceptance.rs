@@ -441,3 +441,67 @@ fn let_interleaved_outer_binder_not_skipped_by_convoy() {
          }",
     );
 }
+
+/// `LANG-INTERVENING-LET-FRAME-WEAKENING` `D1` -- the three-way
+/// attribution the Architect required as a follow-up of his approval of
+/// `LANG-CONVOY-MATCH-FIELD-PROVENANCE` (`evt_5b3c38r3xrqm6`), measuring
+/// whether this fixture's failure is a regression on that merge or a
+/// pre-existing gap. The program is a fresh `let k` bound to a genuine
+/// `Vec Nat n` value (via `repl`, NOT an already-refined alias of `w` --
+/// that would be "born correct" and prove nothing), interleaved between
+/// the outer match's premise and a nested match, consumed by a further
+/// nested match on `k` itself.
+///
+/// **Measured, three ways, run not read (the discipline the predecessor's
+/// two recuts existed to enforce):**
+///
+/// 1. **Predecessor's merge-base `43bd0d597`** (pre-remedy `elab.rs`, no
+///    `match_field_regions` at all): fails.
+/// 2. **Shipped region-set `elab.rs`, capability 2's guard replaced by the
+///    prohibited positional floor** (`if abs_pos >= 3`): fails, byte-for-
+///    byte the same error.
+/// 3. **Shipped region-set `elab.rs`, as landed**: fails, byte-for-byte
+///    the same error.
+///
+/// All three: `ElabError::Internal("index refinement: could not classify
+/// the branch goal: TypeMismatch { expected: Dg67, found: ((Dg574 Dg67)
+/// @8) }")`, raised at `refine_branch_goal` (`elab.rs:2913-2917`).
+///
+/// **INVARIANT across all three ⇒ per the node's own branch condition,
+/// this is a clean pre-existing gap, independent of the merged region-set
+/// predicate -- NOT an acceptance regression on `LANG-CONVOY-MATCH-FIELD-
+/// PROVENANCE`.** This pins that measurement so it survives being findable
+/// by grep rather than living only in convo history. Diagnosing WHERE the
+/// three-way-invariant failure originates (`D2`) and whether `RVar`
+/// resolution is the actual route (`D3`) are this node's next
+/// deliverables, not this commit's -- no repair lands here.
+#[test]
+fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
+    let mut env = vec_env();
+    elab_ok(
+        &mut env,
+        "fn repl (n : Nat) : Vec Nat n = \
+         match n { Zero |-> VNil Nat; Suc m |-> VCons Nat m Zero (repl m) }",
+    );
+    let err = expect_err_val(
+        &mut env,
+        "fn zipK (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
+         match v { \
+           VNil |-> VNil Nat; \
+           VCons m a xs |-> \
+             let k = repl n in \
+             match w { \
+               VCons _ b ys |-> \
+                 match k { VCons _ c ks |-> VCons Nat m a (zipK m xs ys) } \
+             } \
+         }",
+    );
+    assert!(
+        matches!(
+            &err,
+            ElabError::Internal(msg) if msg.contains("could not classify the branch goal")
+        ),
+        "expected the measured, three-way-invariant `refine_branch_goal` \
+         classification failure, got: {err:?}"
+    );
+}
