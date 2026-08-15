@@ -33,6 +33,51 @@ write that line truthfully, you did not run the gate.
 2. **Quiescent.** `capture-pane` each member; none mid-reasoning, because
    compaction summarizes in-flight work away.
 
+## Handoff gate, step 2a: the receiving seat's LAW must be current
+
+**Compare the seat's home branch against `origin/main`, and do it before the
+compaction — a compaction is exactly when the seat re-reads the stale copy.**
+
+```sh
+M=$(git rev-parse origin/main:agent/COORDINATION.md)
+for b in <role>/work ...; do
+  [ "$(git rev-parse $b:agent/COORDINATION.md)" = "$M" ] || echo "STALE $b"
+done
+```
+
+**Why this is a gate step and not a lesson.** `agent/memory/fleet/`'s
+`the-law-you-re-orient-against-is-your-branch-s-base-not-main` records the
+mechanism: the SessionStart hook tells every seat to read
+`agent/COORDINATION.md`, each seat reads it **from its own worktree**, so what it
+reads is a snapshot of the law taken at its branch's base. **Law lands without
+touching anything the seat owns, so no local signal goes red when its copy goes
+stale**, and nothing about reading the file tells you how stale it is.
+
+⇒ **The seat cannot detect this condition from anything it owns. You can.** That
+asymmetry is why the check sits here rather than in the seat's playbook — and it
+is why the memory lesson alone did not work: the seats most likely to be stale
+are the ones that cannot read the lesson.
+
+**Measured 2026-08-15** (Architect, verified independently by the Steward across
+all 28 home branches): **seven seats** — `research` at a 2026-07-15 base,
+`foundation-implementer` at 07-23, and `foundation-leader`/`-qa` plus all three
+`ergo` seats at 07-27 — were missing **§8a** (Architect/Librarian domains and
+review surfaces), **§10⁻** (process subordinate to product flow), and **§10⁻a**
+(the adversary channel is report-only). The Architect's own seat was an eighth
+and had been **casting merge votes under month-old law**, including posting
+decorative icons banned by an operator instruction two weeks old that its copy
+did not contain.
+
+**Note the shape, because it defeats the obvious mitigation.** A per-WP rebase
+does **not** fix it: those seats cut `wp/<ID>` from current `main`, so their
+*work* is current. It is the **`<role>/work` home branch** — where a seat sits
+between WPs and what it re-orients from after compaction — that ages.
+
+**Do not reset another seat's home branch yourself.** A hard reset destroys
+uncommitted seat work (`handoff-gate-hard-reset-destroys-uncommitted-seat-work`),
+and you cannot see whether the seat is mid-turn. **Carry the refresh in the kick**
+and let the seat run it against its own worktree.
+
 ## Handoff gate, steps 3-4: compact and verify the drop
 
 3. **Start all compactions, before the kickoff, never after.** Mechanism and
