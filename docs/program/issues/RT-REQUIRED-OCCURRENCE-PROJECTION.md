@@ -22,6 +22,67 @@ origin: "Architect ruling evt_1y5bfgkg6v5b6 (2026-08-15), answering the Steward'
 > node; the projection belongs to **this successor with its own ACs**, not to a
 > widened frame there.
 
+> # CANDIDATE `e9e980988` PASSED REVIEW AND WENT RED IN CI. THE CANDIDATE IS
+> # NOT THE DEFECT — READ THIS BEFORE AUTHORING THE NEXT ONE.
+>
+> **2026-08-15, PR #2293.** `D1` came back **derivable**, so the Architect's
+> pre-authorized fork did not fire and `D2`-`D4` were built to his §4 shape.
+> QA approved (`evt_mhwbc6jcvchz`), the Architect approved after an explicit
+> hollowness review (`evt_hrsvkkf7ef1b`), `dec_310crgf5mashb` resolved. **CI
+> then failed one test the candidate never edited.**
+>
+> `lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compiles`
+> — the **suppressed leg** of the D2a A/B control:
+> *"suppressing the forward did NOT recreate R1 on {label}, so the repair is
+> not what removed it"*.
+>
+> ### The cause is a POPULATION COLLISION between two nodes, not a defect in either
+>
+> That control asserts its property over **five named compiles**: row 1 exact,
+> row 1 deleted-scope, and **row 4 depths 1, 2 and 3**. This node's approved
+> `D4` deliverable **advances row 4 depths 2 and 3 to `Closure`**. Those two
+> rows no longer reach the refusal the control is about, so suppression can no
+> longer recreate it there.
+>
+> **Every AC of both nodes is satisfied.** The collision lives in the space
+> between them, which is exactly where no node's acceptance criteria look.
+>
+> **The control's own doc comment predicted this**, which is why the failure is
+> legible rather than silent: *"Asserting only that the sentence is gone would
+> pass for free if the sentence were deleted from production, **or if the row
+> failed earlier for an unrelated reason**."* A one-sided control asserting only
+> the absence would have gone **green** here and quietly lost its attribution.
+>
+> ### Attribution, so nobody repeats it
+>
+> **`main`'s `crates/` tree was byte-identical to `9bc035710`**, the last green
+> code merge — every commit since was doc-only. The candidate was the only code
+> change in the tree, so the red could not be infra or flake. **Not
+> re-triggered**; `M5a`'s re-trigger is for reds that are not the candidate's.
+>
+> **This is not a QA miss.** Local runs are targeted-only by operator rule and
+> the failing test sits outside every filter the ring ran (`contkey_`,
+> `required_consumer_`, `d2k_` vs `lrc_d2a_*`). **`AC-7` — no-regression, in
+> CI — is the criterion that catches cross-node collisions, and it is the only
+> one that can.** It worked.
+>
+> ### OPEN FORK, routed to the Architect at `evt_5gp130crvvm3x`
+>
+> Reverting the advance is **not** an option — it is the approved deliverable.
+> The question is what D2a's control asserts now:
+>
+> | option | cost |
+> |---|---|
+> | **(a)** re-scope its population to the three rows that still route the old way | coverage shrinks, and **nothing reds** if it is done quietly |
+> | **(b)** keep all five, assert the **new** boundary for the two moved rows | preserves the A/B's discriminating power over the same set |
+>
+> **Steward leans (b)**; the meaning of that control is the Architect's call.
+> **If (a) is chosen, say so at the site** — a silently shrunk population is
+> indistinguishable from one that was always that size.
+>
+> **`dec_310crgf5mashb` is spent.** It approved exact `e9e980988`; the next
+> candidate is a new SHA and needs fresh QA and Architect verdicts.
+
 ## Why the existing key slot is refused, and it is stronger than "the validator objects"
 
 The predecessor's measurement routed the lagged value through
