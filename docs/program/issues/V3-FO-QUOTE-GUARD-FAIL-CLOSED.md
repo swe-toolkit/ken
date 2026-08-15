@@ -165,7 +165,39 @@ deliverable; a silent restatement of the status quo is not.
 > in two lanes on 2026-08-15.
 >
 > **The durable fix, if one is ever cheap: derive one traversal from the other
-> rather than mirror it.** Until then this is a recorded coupling, not a defect.
+> rather than mirror it.**
+>
+> ### RESOLVED 2026-08-15, AFTER THE MERGE: THE FIX IS CHEAP AND IT IS EXACT.
+>
+> **Adversary hunt `evt_4vnyb89s5ameq` on the landed range supplied an oracle
+> built from `shift` itself:**
+>
+> ```
+> mentions_var0(t)  ⟺  shift(shift(t, -1, 0), 1, 0) != t
+> ```
+>
+> **Why it is exact.** Down-shift at cutoff 0 leaves a free `Var(0)` unchanged
+> at the underflow guard while every other free `Var(i)` becomes `Var(i-1)`; the
+> up-shift restores each `Var(i-1)` but sends the stayed `Var(0)` to `Var(1)`.
+> The round trip is the identity **iff** no free `Var(0)` occurs. Under binders
+> `shift` raises its own cutoff, so a bound `Var(0)` is untouched both ways.
+>
+> ⇒ **The oracle is built from the exact function whose discipline must be
+> matched, so it cannot disagree with it.** If `Pair` became a binder, the
+> oracle tracks it automatically — **the drift becomes structurally impossible
+> rather than documented.**
+>
+> **Take it as a DIFFERENTIAL TEST, not as a rewrite.** Replacing the body with
+> the round trip removes the duplication and costs legibility — the traversal is
+> readable and the round trip is a trick. The test converts *"nothing enforces
+> that the two agree"* into something that reds.
+>
+> **One dependency, and it fails in the right direction:** the oracle relies on
+> the underflow guard leaving `Var(0)` unchanged — the exact semantics `D3` just
+> documented. If that guard changed to panic or wrap, the differential test
+> breaks **loudly**.
+>
+> Carried to [[V3-FO-GUARD-SHIFT-DIFFERENTIAL]].
 
 **`D3` — two comment corrections where the conclusion holds and the stated reason
 does not.** Both were checked and both conclusions stand; only the justifications
@@ -180,8 +212,30 @@ are wrong, and a later author will rely on them.
   self-contradicting.** The module doc justifies the absent `QSort` by *"every
   relation and quantifier already fixes which sort each slot is"* — and
   `ForallRight` is the one site that consumes a quantifier **without recording
-  which**. Freshness plus `Init`'s syntactic equality is what actually blocks
-  confusion. **That is the sentence a second sort would be added against.**
+  which**. **That is the sentence a second sort would be added against.**
+
+  > **CORRECTED 2026-08-15, AFTER THIS NODE MERGED. This bullet named the wrong
+  > replacement mechanism, and the wrong one was mine to have shipped.**
+  >
+  > It read: *"Freshness plus `Init`'s syntactic equality is what actually
+  > blocks confusion."* **That is false.** Neither freshness nor `Init` inspects
+  > sorts at all. Language QA refuted it with a literal checker probe —
+  > `check_cert` returns `true` on a hand-built ill-sorted `Form`, and `Init` is
+  > exactly what accepts it, because syntactic equality is all `Init` needs.
+  >
+  > **The true mechanism is caller-side, not checker-side:** `Form` is strictly
+  > larger than the image of `embed` on `IForm Sigma`, and the malformed formula
+  > lives entirely in that excess. Architect ruling `evt_71g1xf5vkf1ek`; landed
+  > in the `D3` recut and in `AC-4a` on
+  > [[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]].
+  >
+  > **Provenance of the error, because it is the reusable part.** The claim came
+  > from Adversary finding `evt_235vyn7za92ry`, I transcribed it into this
+  > deliverable, and the implementer built the comment to my wording. **Its
+  > author retracted it unprompted** (`evt_4vnyb89s5ameq`): *"my conclusion held
+  > and my reason did not, and the reason is what got written down."* A frame
+  > that transcribes a cited reason inherits that reason's defects, and **the
+  > conclusion surviving is what makes the wrong reason cheap to keep.**
 
 ## Acceptance criteria
 

@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 20:54:24Z — from 318 issue file(s) in `docs/program/issues/`.
+2026-08-15 20:59:07Z — from 319 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -345,6 +345,7 @@ the committed file matches the generator's output.
 | `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | ready | runtime | M | none | — |
 | `V3-D-OPEN-GOAL-WITNESS-ROUTE` | The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver | merged | verify | S | none | — |
 | `V3-FO-CONVERSION-LOAD-MEASURED` | Measure what kernel conversion actually costs when it runs check_cert, on real source programs, before any of it is argued about | draft | language | M | none | — |
+| `V3-FO-GUARD-SHIFT-DIFFERENTIAL` | Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently | ready | language | S | none | — |
 | `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | merged | language | L | none | — |
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | active | language | L | none | — |
 | `V3-FO-QUOTE-GUARD-FAIL-CLOSED` | Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true | merged | language | S | none | 2346 |
@@ -383,6 +384,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
+- `V3-FO-GUARD-SHIFT-DIFFERENTIAL` — Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently
 
 ## Blockers
 
