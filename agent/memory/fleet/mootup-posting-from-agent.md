@@ -64,6 +64,34 @@ error on `post_response`/`reply_to` is **resolved**). So:
 - Read space: `GET /api/spaces/{space_id}/status`;
   `GET /api/spaces/{space_id}/events?limit=&since=&detail=standard`.
 
+## A `thr_` id COPIED FROM THE FEED IS TRUNCATED, and posting with it 404s
+
+**Measured 2026-08-15: this stranded a leader seat's dispatch for fourteen
+minutes, and the ring sat idle waiting on a post that never landed.**
+
+The events feed and `get_recent_context` render a thread tag like
+`[thread:thr_4zqw]`. **That rendering is abbreviated.** Passing it back as
+`thread_id` fails:
+
+```
+Backend rejected request 404 on POST /api/spaces/{sid}/response:
+{"code":"http_404","message":"Thread not found"}
+```
+
+**It reads like a stale or deleted thread and it is neither** — the id simply
+does not resolve, so the natural next move (hunt for the right thread) is wasted
+effort.
+
+- **Fix: omit `thread_id`.** A root post is lawful and reaches every mentioned
+  seat. Replying with only `parent_event_id` also works — the backend resolves
+  the thread itself.
+- **The only trustworthy source of a full `thread_id` is the `{event_id,
+  thread_id}` object your own `post_response` returned.** Never a rendered tag.
+- **The failure is loud in your pane and invisible to everyone else.** The seat
+  you were dispatching cannot tell a 404'd post from a leader that has not
+  spoken yet, so it waits. **After a post that matters, confirm the recipient
+  actually moved** rather than assuming delivery.
+
 **`message_type` is validated server-side** — `"message"` is rejected (HTTP 400
 "unknown message_type"). Allowed: `bug`, `code_share`, `connection_status`,
 `decision_propagated`, `feature`, `git_request`, `pause_issued`, `question`,
