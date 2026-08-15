@@ -323,6 +323,64 @@ establishes that no program reaches them. **Those two facts together mean the
 mechanism this node builds is exercised only by hand-authored IR** — which is
 worth knowing before the next node in this campaign is sized against it.
 
+## THIS CANDIDATE CARRIES TWO MECHANISMS AND THE FRAME SCOPES ONE
+
+**Architect finding in the `evt_24sn918ngybnc` audit ruling, verified against
+the objects by the Steward. Recorded here because it is a scope fact and the
+scope is the Steward's.**
+
+```
+38cbba9c1  17:22  3 files  +480/-35   static_transition.rs +353   ANCESTOR
+257a9ddcc  20:46  2 files   +90/-49   mod.rs +23                  the recut
+```
+
+**`38cbba9c1` predates both the `D3` disposition (19:04) and the recut dispatch
+(20:13).** The substitution mechanism — a source-derived population plus a
+lowering substitution that removes a closure child before
+`boundary_transfer_admissibility` runs — is **carried forward from the
+pre-recut candidate**, and this node's frame is about the child arm.
+
+⇒ **Nobody has been assigned to measure that population, because it is not what
+this node is about, and it has now ridden through two review rounds under a
+frame that does not scope it.**
+
+### The disposition: no split yet, and the rule that decides it later
+
+**The Architect's block is an existential over a bounded set** — instrument
+`unit_boundary_environment_fields` and report whether it returns anything
+non-empty for any Ken-source input in the existing suite. One run; he expects
+comment-only. **Restructuring on the prediction that a bounded measurement will
+turn expensive is the same error as folding a node on an unmeasured
+prediction.**
+
+| the measurement returns | disposition |
+|---|---|
+| empty or cheap | **land as-is.** The carried-forward mechanism is scoped retroactively here, not re-cut |
+| a real population | **split: land the producer-class gate, take the substitution to its own node with the population as its subject** |
+
+**The split is NOT "cut back to `D3` plus the `AC-8` handback"** — that would
+discard the child-arm gate, which is proved on both mutation legs and is this
+node's whole subject.
+
+**Two things unmeasured before any split:** whether the gate is exercised at all
+without the substitution (the row4 controls need it to produce a `Record` at
+that arm, so the gate may be inert alone), and what the population is.
+
+### `COORDINATION §8a`'S PREFIX RULE SELECTS THE WRONG HALF HERE
+
+> *"Prefer a cut that is a straight ancestor of the working tip"* — because a
+> contiguous prefix preserves every exact SHA and every verdict below it.
+
+**That rule assumes the proved, cheap work is the ancestor and the risky work
+sits on top. This candidate is inverted.** The prefix is the expensive
+unmeasured mechanism; the cheap proved fix is the descendant. **Taking the
+prefix would land precisely what nobody has measured and drop precisely what is
+proved.**
+
+⇒ **The prefix rule is a heuristic about verdict preservation, not about risk
+ordering. Check which half carries the unmeasured work before invoking it.** A
+split here is a real re-authoring and must be priced as one, not as a prefix.
+
 ## Superseded framing: the oracle ruling that produced `D3`
 
 **Operator ruling, verbatim:**
