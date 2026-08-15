@@ -166,6 +166,44 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > > holds is a closure-criterion question for the ring and the Architect**, asked
 > > at the durable-lane node's `D1`/`D2` rather than answered here. **Do not
 > > assume either while sizing.**
+> >
+> > ##### ANSWERED, AND MY FRAMING OF IT WAS WRONG IN ONE PLACE
+> >
+> > **Architect `evt_3emtcx20vjg8s`. The criterion below is his sentence; landing
+> > it is mine, and it is landed here.**
+> >
+> > **No, they need not be green — and *"route them out"* is not the reason.**
+> > This node already states that its population is *"the production
+> > `LexicalCallArgumentRecursor` predicate"* and that the eight expressions are
+> > *"a floor, not a perimeter"*. Row 2 already left without a production repair.
+> > **The list was never the criterion.**
+> >
+> > **But routing them out does NOT make the retirement safe, and that is the
+> > step my flagging skipped.** These eight expressions are **previously green** —
+> > they compile today on the descent lane and fail closed on the functionized
+> > lane. **They are not invariant across the lane change**, so after `D3` retires
+> > the class, **two programs that compile today refuse.** Relabelling the owner
+> > does not make that disposition acceptable.
+> >
+> > > **THE CRITERION, as ratified:** this node closes when **every expression in
+> > > the production predicate's population carries a recorded disposition** —
+> > > **repaired**, or **refused with its spec clause cited and its
+> > > pre-retirement behaviour accounted for.**
+> >
+> > **It is satisfiable under both spec readings.** It keeps the real gate — no
+> > silent capability regression — and drops the false one, compile-green.
+> >
+> > ⇒ **It also decouples [[RT-DESCENT-RETIRE]] from the SIZING of the durable
+> > lane**, which is the coupling flagged above. **The lane's size stops being on
+> > the critical path; the disposition stays on it.** That is the sequencing
+> > answer, and it is better than either reading I offered.
+> >
+> > **The measurement that settles the disposition is `D0` of
+> > [[RT-CLOSURE-BOUNDARY-LANE]]** — does the **descent** lowering of these two
+> > expressions perform an equivalent boundary crossing? Nobody has measured it.
+> > If it does, the retirement **corrects** a live defect; if it does not, the
+> > retirement is a capability regression that must be covered or explicitly
+> > recorded as a narrowing.
 >
 > > ### THE `StaticWorkerBinding` WALL IS `D2k`, INSIDE THIS NODE — 2026-08-12
 > >
