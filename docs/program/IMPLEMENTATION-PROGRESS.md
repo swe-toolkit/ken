@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 05:40:01Z — from 304 issue file(s) in `docs/program/issues/`.
+2026-08-15 07:23:53Z — from 304 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -282,7 +282,7 @@ the committed file matches the generator's output.
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | active | runtime | M | none | — |
-| `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | active | runtime | M | none | — |
+| `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | merged | runtime | M | none | — |
 | `RT-SCALE-A` | Boundary A — re-derive the planner census for n=3..7 against the COMPLETED factored representation, superseding the provisional outer-planner numbers | merged | runtime | M | none | — |
 | `RT-SCALE-B` | Boundary B — the full n=3..7 emission measurement, the research-grounded analytical model, and the operator scaling verdict that gates RT-NATIVE-FNSPLIT's merge | merged | runtime | L | none | — |
 | `RT-SCRATCH-LIFETIME-REMAINING-CRATES` | `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names | ready | runtime | M | none | — |
@@ -411,7 +411,6 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: active)
-- `RT-LEXICAL-RECURSOR-CONSUMERS` blocked by `RT-REQUIRED-OCCURRENCE-PROJECTION` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
