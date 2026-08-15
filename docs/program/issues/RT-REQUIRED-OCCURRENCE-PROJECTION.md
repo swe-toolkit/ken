@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 depends_on: [RT-CONSUMING-OCCURRENCE-ROUTE-WIRE]
-blocks: []
+blocks: [RT-LEXICAL-RECURSOR-CONSUMERS]
 github: null
 origin: "Architect ruling evt_1y5bfgkg6v5b6 (2026-08-15), answering the Steward's mechanism question evt_5pmepsy308e8r on the RT-CONSUMING-OCCURRENCE-ROUTE-WIRE hard stop (runtime-implementer evt_3kk9xbfpfwcqn, measured at 46a8ba199). The ruling states every option in mechanism terms and pre-authorizes the D1 fork so the ring cannot stall a second time. Steward-filed per COORDINATION section 2."
 ---
