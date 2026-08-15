@@ -1,7 +1,7 @@
 ---
 id: LANG-CONVOY-MATCH-FIELD-PROVENANCE
 title: "capability 2's sibling-convoy candidate range is a positional proxy for a provenance property -- carry the match-field regions explicitly on the elaboration context and skip them, closing spec 34 section 3.2's Boundary gap without the incompleteness a positional floor would introduce"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -133,6 +133,60 @@ sides are **the same head differing only in the de Bruijn index**.
 > remedy closed the gap"* from *"the remedy perturbed the program onto a
 > different error path"*. A regression that broke the `VNil` arm instead would
 > keep the loose assertion green while reading as "the known gap is unchanged."
+
+### `D1` HAS TWO HALVES, AND THE SECOND ONE CANNOT BE DONE THE OBVIOUS WAY
+
+**Adversary hunt on `00efd1f41` (`evt_1e17vjqkdsg13`), triaged and folded in
+here 2026-08-15.** The finding is independent of the residual above, and it
+lands on this deliverable specifically.
+
+**The fixture's doc comment says the recursive call's `xs` argument fails the
+`TypeMismatch`. Nothing observed supports that.** The error's span is
+`Span { start: 0, end: 167 }`, and the source string is **167 characters** —
+measured, not inferred. ⇒ **The span covers the entire declaration.** It names
+no argument, no sub-expression, and no position.
+
+⇒ **The `xs` localisation is an authoring analysis, not an observation.** It is
+unpinned by the assertion *and* unrepresented in the error itself.
+
+**So the discriminating fact has two halves — WHICH ERROR SHAPE, and WHICH
+OPERAND — and pinning the first does not give you the second.** Tightening the
+`matches!` to *"same head, differing only in the index"* would still not
+establish that the mismatch is on `xs` rather than on `ys`, on `m`, or on the
+result type.
+
+**Why this matters at exactly this node:** if the remedy lands and the fixture
+goes green, *"the gap closed"* and *"the mismatch moved to a different
+operand"* remain indistinguishable. **That is the same question `D1`'s ordering
+exists to answer, one level down.**
+
+**What to do:** pin the error shape as above, and for the operand half either
+obtain a narrower span from the kernel or make an elaborator-side observation
+of which binder was re-typed. **If neither is available at acceptable cost, say
+so and state the limit explicitly** — an unpinnable operand is a legitimate
+outcome, but it must be recorded rather than left implied by a green test.
+
+**Two smaller carries from the same hunt:**
+
+- **The fixture is a conjunction, not a single property.** The inner
+  `match w { VCons _ b ys => … }` has one arm against `Vec`'s two constructors
+  and elaborates only because `VNil` is index-impossible at `Vec Nat (S m)`
+  (`34 §4.3`). ⇒ **It reaches the convoy gap only while index-impossibility
+  holds.** The direction is safe — a regression there yields
+  `ExhaustivenessError` and reds the assertion — but **"which property moved?"
+  has two candidates and only one is currently named.** Name both.
+- **The measured indices exist only in a notification.** `@9` and `@4` are in
+  the handbacks; the doc comment says only *"differing only in the de Bruijn
+  index"* with no numbers, and the test records neither. **Carry them into the
+  fixture's doc at zero cost** rather than re-measuring them.
+
+**Confirmed green for the right reason today, which the residual did not
+establish:** the Adversary printed the live error and it is byte-for-byte the
+one reported, so the committed fixture has not drifted and the loose `matches!`
+is not currently being satisfied by some other mismatch. *"The assertion cannot
+distinguish"* and *"the assertion is currently satisfied by the wrong thing"*
+are different claims; only the first was carried, and the second is now
+measured false.
 
 **`D2` — the `let`-interleaved discriminator fixture. THE ARCHITECT DID NOT
 BUILD THIS AND SAID SO.** A `zip`-shaped program with a `let` between the outer

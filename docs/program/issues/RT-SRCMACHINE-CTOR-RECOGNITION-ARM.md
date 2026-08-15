@@ -13,16 +13,26 @@ origin: "Architect mechanism disposition evt_rdks1pn7cpb (2026-08-14) on RT-CTOR
 
 > # AN ADVANCING REFUSAL IS THE SUCCESS SIGNAL. READ THIS BEFORE YOU MEASURE.
 >
-> **Arming recognition should move row 4 deep from its `value_at` refusal to a
-> `close()` conservation refusal — the same one row 5 already has. That is what
-> success looks like. It does not close row 4.**
+> **Arming recognition should move row 4 deep from its `value_at` refusal to
+> its DISPOSITION-CORRECT OWNER-GUARD. For a transfer-bound field that is
+> `boundary_transfer_admissibility` — NOT `close()`. That is what success
+> looks like. It does not close row 4.**
 >
-> The Architect stated this **in advance, and said why**: otherwise the ring
-> arms the classifier, sees a refusal, and reads a working increment as a
-> failed one. Only once row 4 deep is refusing at `close()` alongside row 5 is
-> the rebinding question properly posed — and that is where a vehicle question
+> The Architect stated the *shape* of this in advance, and said why: otherwise
+> the ring arms the classifier, sees a refusal, and reads a working increment
+> as a failed one. Only once row 4 deep advances to its owner-guard is the
+> rebinding question properly posed — and that is where a vehicle question
 > would finally arise, on a properly stated need, **coming back to him. Not
 > now.**
+>
+> **CORRECTED 2026-08-15 (`evt_692wak3h89gv6`). This paragraph named the wrong
+> guard, and it is the first thing you read.** It said the target was *"a
+> `close()` conservation refusal — the same one row 5 already has."* **A
+> transfer-bound field's owner-guard is `boundary_transfer_admissibility`;
+> row 5's close seat is unchanged and row 4 does not join it.** Reaching a
+> `close()` refusal here would have satisfied the old wording while being the
+> wrong seat. See `AC-4`, which carries the full correction and the separate
+> handling depth 2 now requires.
 >
 > **Both dissolved-fork vehicles stay untaken.** `ContinuationTemplate` is not
 > populated and no continuation-source projection surface is added.
@@ -103,6 +113,14 @@ the way. State the direction of every behaviour change you make.
 **and a new control must red if a source-machine-recognized field is recognized
 but not transitioned.**
 
+> **SEAT THE CONTROL AT DEPTH 3 OR ROW 5 — NOT AT DEPTH 2.** Amended
+> 2026-08-15 by the same Architect ruling (`evt_692wak3h89gv6`). Depth 2 is
+> subject to the existing-trace discriminator in `AC-4` and can be legitimately
+> masked by [[RT-CLOSURE-BOUNDARY-LANE]], so **a control seated there cannot
+> distinguish "recognized but not transitioned" from "masked, as expected"** —
+> it would be green for a reason unrelated to the property it is meant to
+> guard.
+
 > `close()`'s ledger is what makes *constructed-then-forgotten* impossible, so
 > **a recognition that does not record its obligation at `core.rs:15368` is
 > strictly worse than the refusal it replaces.** Recognition without
@@ -113,10 +131,33 @@ but not transitioned.**
 **AC-3.** Both banned surfaces stay untaken — no `ContinuationTemplate`
 population, no continuation-source projection surface.
 
-**AC-4.** Row 4 deep's refusal is reported **after** the change, with the tree
-named. The expected result is a `close()` conservation refusal, not a green.
+**AC-4 — AMENDED 2026-08-15 by Architect ruling, relayed at `evt_692wak3h89gv6`.
+The original prediction named the wrong guard and is corrected below.**
+
+Row 4 deep **advances** from its `value_at` refusal to its **disposition-correct
+owner-guard**. For a **transfer-bound** field that is
+`boundary_transfer_admissibility` — **never `close()`**. Row 5's close seat is
+**unchanged**.
+
 **Reporting "still refuses" without naming which law refused does not satisfy
-this** — the whole prediction is about *which* refusal fires.
+this** — the whole prediction is about *which* refusal fires, and an advancing
+refusal is the success signal, not a failure.
+
+> **What this criterion originally said, retained because the correction is the
+> useful part:** *"The expected result is a `close()` conservation refusal, not
+> a green."* **That named the wrong guard.** A transfer-bound field's owner-guard
+> is `boundary_transfer_admissibility`; routing its disposition through `close()`
+> would be the wrong seat, not a stricter one. A candidate that reached a
+> `close()` refusal here would have satisfied the old wording while being wrong.
+
+**Depth 2 is recorded SEPARATELY and is subject to the existing-trace
+discriminator.** Do not fold it into the row-4 result:
+
+- **Recognition recorded AND the closure trace names an enclosing variant** ⇒
+  **masked by [[RT-CLOSURE-BOUNDARY-LANE]]**. That is an explained outcome, not
+  a gap.
+- **No recognition** ⇒ **a bounded residual, and it returns to the Architect.**
+  Do not repair it here and do not widen this node to cover it.
 
 **AC-5.** No repair is retained beyond what the outcome requires. Blob identity
 on any file this node does not intend to change.
