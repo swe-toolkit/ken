@@ -29,6 +29,7 @@
 use ken_kernel::{
     check, declare_postulate, subst::subst0, Context, GlobalEnv, GlobalId, Term,
 };
+use num_bigint::BigInt;
 
 use crate::extract::{ObligationId, ObligationTriple};
 
@@ -136,9 +137,13 @@ pub struct ProverResult {
 /// dropped. This makes completeness-of-routing a compile-time structural
 /// property, not a runtime check — the V3 analog of V2's `exhaustive-by-
 /// construction` (`22 §2.5`).
-pub fn classify(phi: &Term) -> Route {
+pub fn classify(env: &GlobalEnv, phi: &Term) -> Route {
     if is_ground_decidable(phi) {
         // Closed ground atoms — φ ∨ ¬φ holds (23 §3).
+        Route::D
+    } else if is_pi_bound_int_arithmetic(env, phi) {
+        // Open Int arithmetic under an explicit Π telescope (`23 §3.2`).
+        // Classification remains syntactic: no search result participates.
         Route::D
     } else if is_first_order_intuit(phi) {
         // First-order connective structure over decidable atoms (23 §4).
@@ -147,6 +152,73 @@ pub fn classify(phi: &Term) -> Route {
         // HO: the default. Everything outside D/FO lands here. (23 §5)
         // NO `_ ⇒ skip` — "HO with hole" is always a legal outcome.
         Route::HO
+    }
+}
+
+/// A `23 §3.2` goal: one or more registered-`Int` Π binders ending in an
+/// equality or comparison atom over those binders and checked `IntLit`s.
+fn is_pi_bound_int_arithmetic(env: &GlobalEnv, phi: &Term) -> bool {
+    let Some(int_id) = env.int_lit_type() else {
+        return false;
+    };
+    let mut binders = 0;
+    let mut body = phi;
+    while let Term::Pi(domain, codomain) = body {
+        if !matches!(domain.as_ref(), Term::Const { id, .. } if *id == int_id) {
+            return false;
+        }
+        binders += 1;
+        body = codomain;
+    }
+    binders > 0 && is_int_arithmetic_atom(body, int_id, binders)
+}
+
+fn is_int_arithmetic_atom(atom: &Term, int_id: GlobalId, binders: usize) -> bool {
+    let Term::Eq(ty, lhs, rhs) = atom else {
+        return false;
+    };
+
+    // Int equality, including linear expressions a future search adapter may
+    // ground. The witness seam below initially consumes the literal/literal
+    // floor and fails closed on every other grounded expression.
+    if matches!(ty.as_ref(), Term::Const { id, .. } if *id == int_id) {
+        return is_linear_int_expr(lhs, binders) && is_linear_int_expr(rhs, binders);
+    }
+
+    // Surface inequalities are Bool-valued comparison applications equated to
+    // a Bool constructor. Recognize the typed syntax, not a particular solver
+    // or search outcome. Well-formedness supplies the operation's Bool result.
+    comparison_operands(lhs)
+        .filter(|(left, right)| {
+            is_linear_int_expr(left, binders) && is_linear_int_expr(right, binders)
+        })
+        .is_some()
+        && matches!(rhs.as_ref(), Term::Constructor { .. })
+}
+
+fn comparison_operands(term: &Term) -> Option<(&Term, &Term)> {
+    let Term::App(partial, right) = term else {
+        return None;
+    };
+    let Term::App(operation, left) = partial.as_ref() else {
+        return None;
+    };
+    matches!(operation.as_ref(), Term::Const { .. }).then_some((left, right))
+}
+
+fn is_linear_int_expr(term: &Term, binders: usize) -> bool {
+    match term {
+        Term::Var(index) => *index < binders,
+        Term::IntLit(_) => true,
+        Term::App(partial, right) => {
+            let Term::App(operation, left) = partial.as_ref() else {
+                return false;
+            };
+            matches!(operation.as_ref(), Term::Const { .. })
+                && is_linear_int_expr(left, binders)
+                && is_linear_int_expr(right, binders)
+        }
+        _ => false,
     }
 }
 
@@ -219,7 +291,9 @@ fn has_free_vars(t: &Term, depth: usize) -> bool {
 ///
 /// Route selection is **exhaustive**: every obligation is attempted (§2.1).
 pub fn attempt_obligation(env: &mut GlobalEnv, triple: &ObligationTriple) -> ProverResult {
-    let route = classify(&triple.phi);
+    // Classify the closed telescope so syntactic routing can see the types of
+    // V2's open-context binders. Proof search still receives the original Γ ⊢ φ.
+    let route = classify(env, &triple.goal_closed);
     let ctx = context_from_triple(triple);
     let verdict = match route {
         Route::D => attempt_d(env, &ctx, &triple.phi, &triple.goal_closed),
@@ -319,6 +393,74 @@ fn attempt_d(
     // Conservative: emit exactly one honest hole after proof and refutation
     // candidates have both failed.
     emit_unknown_hole(env, phi_closed)
+}
+
+/// Attempt a search-proposed assignment for a Π-bound `Int` goal (`23 §3.2`).
+///
+/// Search is untrusted: this function substitutes the candidate into the goal,
+/// builds a refutation candidate only at the existing ground `IntLit` equality
+/// floor, and delegates the verdict to [`attempt_with_refutation`]'s kernel
+/// check. A non-refuting assignment therefore becomes `Unknown`, never
+/// `Disproved`.
+pub fn attempt_d_with_int_assignment(
+    env: &mut GlobalEnv,
+    triple: &ObligationTriple,
+    assignment: &[BigInt],
+) -> Verdict {
+    if classify(env, &triple.goal_closed) != Route::D {
+        return emit_unknown_hole(env, &triple.goal_closed);
+    }
+
+    let Some((ground, applied_proof)) = specialize_int_goal(env, &triple.goal_closed, assignment)
+    else {
+        return emit_unknown_hole(env, &triple.goal_closed);
+    };
+    let int_id = env.int_lit_type().expect("classification required registered Int");
+    let is_ground_int_equality = matches!(
+        &ground,
+        Term::Eq(ty, lhs, rhs)
+            if matches!(ty.as_ref(), Term::Const { id, .. } if *id == int_id)
+                && matches!(lhs.as_ref(), Term::IntLit(_))
+                && matches!(rhs.as_ref(), Term::IntLit(_))
+    );
+    if !is_ground_int_equality {
+        return emit_unknown_hole(env, &triple.goal_closed);
+    }
+
+    // Under the outer `λh : goal`, `applied_proof` is `h` applied to every
+    // proposed witness. It has the specialized ground equality type. Only when
+    // the kernel reduces that equality to Bottom does this refutation check.
+    let refutation = Term::lam(triple.goal_closed.clone(), applied_proof);
+    attempt_with_refutation(
+        env,
+        &Context::new(),
+        &triple.goal_closed,
+        &triple.goal_closed,
+        refutation,
+        Countermodel::root(format!("candidate Int assignment {assignment:?}")),
+    )
+}
+
+fn specialize_int_goal(
+    env: &GlobalEnv,
+    goal: &Term,
+    assignment: &[BigInt],
+) -> Option<(Term, Term)> {
+    let int_id = env.int_lit_type()?;
+    let mut specialized = goal.clone();
+    let mut applied_proof = Term::var(0);
+    for value in assignment {
+        let Term::Pi(domain, body) = specialized else {
+            return None;
+        };
+        if !matches!(domain.as_ref(), Term::Const { id, .. } if *id == int_id) {
+            return None;
+        }
+        let witness = Term::IntLit(value.clone());
+        specialized = subst0(&body, &witness);
+        applied_proof = Term::app(applied_proof, witness);
+    }
+    (!matches!(&specialized, Term::Pi(_, _))).then_some((specialized, applied_proof))
 }
 
 // ─── Fragment FO ─────────────────────────────────────────────────────────────

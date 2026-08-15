@@ -93,8 +93,8 @@ pub use protocol::{
     ObligationStatus, WireVerdict,
 };
 pub use prover::{
-    attempt_obligation, attempt_with_cert, classify, Countermodel, FormulaPath, FormulaStep,
-    ProverResult, Route, StructuralRefutation, Verdict,
+    attempt_d_with_int_assignment, attempt_obligation, attempt_with_cert, classify, Countermodel,
+    FormulaPath, FormulaStep, ProverResult, Route, StructuralRefutation, Verdict,
 };
 pub use resolve::{RDecl, RDeclKind, RExpr, RType};
 pub use temporal::{
