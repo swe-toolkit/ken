@@ -66,19 +66,64 @@ origin: "Architect ruling evt_1y5bfgkg6v5b6 (2026-08-15), answering the Steward'
 > CI — is the criterion that catches cross-node collisions, and it is the only
 > one that can.** It worked.
 >
-> ### OPEN FORK, routed to the Architect at `evt_5gp130crvvm3x`
+> ### RULED, `evt_prwxvqcq17cj` — MEASURE FIRST. The fork as the Steward posed
+> ### it presupposed an unmeasured fact, and BOTH branches are pre-committed.
 >
-> Reverting the advance is **not** an option — it is the approved deliverable.
-> The question is what D2a's control asserts now:
+> Reverting the advance is **not** an option — it is the approved deliverable,
+> and the Architect confirms that.
 >
-> | option | cost |
+> **The Steward framed this as "keep coverage" versus "trade coverage for a
+> green". That framing was wrong on the likely branch**, and the correction is
+> the useful part:
+>
+> **The panic is on the suppressed leg, which means the repaired leg PASSED for
+> all five.** If depths 2/3 now refuse at `Closure` *before* the scrutinee seat,
+> then `!rendered.contains(R1)` passed on those two rows **for free** — the
+> sentence cannot render if the compile died earlier. ⇒ **On that branch the
+> coverage is already gone, in the half that is still passing.** Shrinking the
+> population would not concede coverage; it would be **the first honest
+> statement of a loss that already happened.**
+>
+> ### Why nobody can choose from the prose: the denominator is POOLED
+>
+> `reset_lrc_d2a_counts()` is called **once per `run`, outside the case loop**
+> (`control.rs:33291`), and the counters are read **after** it. So
+> `arrivals`/`forwards` are **summed over all five cases**. Rows 1 and depth 1
+> still arrive, so the aggregate stays non-zero and every `NonZeroUsize` clause
+> keeps passing **while two rows contribute nothing.**
+>
+> ⇒ **The control structurally cannot report whether the moved rows still reach
+> the seat.** Both options are dispositions of that fact, and it is unmeasured.
+>
+> ### The measurement that decides it — `evt_prwxvqcq17cj` §3
+>
+> Replace the pooled `run` with a **per-case** one: move `reset_lrc_d2a_counts()`
+> inside the loop and report `(label, arrivals, forwards, rendering)` for all
+> five in **both** legs. The three helpers are already imported at
+> `control.rs:33240-33243`. **No production change, no new seat.**
+>
+> ### Pre-committed dispositions — do NOT return to the Architect for this
+>
+> | measurement | disposition |
 > |---|---|
-> | **(a)** re-scope its population to the three rows that still route the old way | coverage shrinks, and **nothing reds** if it is done quietly |
-> | **(b)** keep all five, assert the **new** boundary for the two moved rows | preserves the A/B's discriminating power over the same set |
+> | **Branch B — moved rows show `arrivals == 0`** (his stated PREDICTION, not a finding) | They are outside D2a's mechanism entirely. Option (b) is **not constructible** — no backedge boundary is left on those rows to assert. Take (a) in its **structural** form: select the population **by arrival** (`arrivals > 0` qualifies a case), let every dependent clause range over the qualified set, and assert independently that the qualified set is non-empty. **Not a hand-written three-label list** — selection by arrival re-selects automatically on the next routing change instead of silently under-covering. Then assert the **complement loudly**: the non-qualifying rows must be non-qualifying *because they refuse before the seat*, naming this node as the owner, so a row that stops arriving for any **other** reason reds. |
+> | **Branch A — moved rows show `arrivals > 0`** | They still reach the seat; keep all five. The suppressed-leg claim for those two becomes a **differential** — toggling the forward changes the rendering at the seat — rather than a fixed `R1` string. |
 >
-> **Steward leans (b)**; the meaning of that control is the Architect's call.
-> **If (a) is chosen, say so at the site** — a silently shrunk population is
-> indistinguishable from one that was always that size.
+> The `NonZeroUsize`-as-constructor discipline stays on both branches, applied
+> per qualifying case, with any aggregate derived by summing the per-case data.
+>
+> ### BINDING ON BOTH BRANCHES: D2a must NOT assert the `Closure` refusal string
+>
+> **That boundary is this node's, and this node's controls own it.** If D2a
+> pins it, a later change to that boundary reds a test named for the backedge
+> forward — **recreating this exact cross-node coupling one level over.** The
+> disease is a control whose population is owned by another node; curing it by
+> importing the other node's boundary is the same defect wearing the fix's name.
+>
+> **Steward constraint, accepted:** do not publish a candidate built to option
+> (b) before the per-case table exists. **Post the table with the candidate** —
+> the pre-commitment above is what lets the next candidate need one Architect
+> pass instead of two.
 >
 > **`dec_310crgf5mashb` is spent.** It approved exact `e9e980988`; the next
 > candidate is a new SHA and needs fresh QA and Architect verdicts.
