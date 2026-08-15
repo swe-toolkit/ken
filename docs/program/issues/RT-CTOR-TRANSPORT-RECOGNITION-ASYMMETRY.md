@@ -1,7 +1,7 @@
 ---
 id: RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY
 title: "Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it"
-status: active
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,38 @@ blocks: []
 github: null
 origin: "Architect mechanism ruling evt_57atrppgx2exe (2026-08-14) on RT-DEPTH2-VAR-PARENT-DERIVATION's measurement. Branch (b) selected, the route fork DISSOLVED rather than decided, and this asymmetry named as the successor. Steward-filed (agents cannot create tracked work per COORDINATION §2)."
 ---
+
+> # CLOSED 2026-08-15 — ANSWERED, CANDIDATE-FREE. `closed`, NOT `merged`.
+>
+> **D1 was delivered and ruled on, and nothing landed.** The node's whole
+> deliverable was a determination, its `AC-5` forbade retaining any repair, and
+> the ring reverted every probe and proved blob identity on all six touched
+> Runtime paths before deleting its branch. **No QA vote, no PR, no merge gate
+> applies**, and `merged` would assert a landing that does not exist. Ring
+> handback and leader confirmation are in thread `thr_45da`; the Architect's
+> disposition on them is `evt_rdks1pn7cpb`.
+>
+> **The answer is the recognition-gap branch, and it is not close.** The
+> classifier at `core.rs:15301-15318` has **exactly one** production dispatch —
+> `lower_expr`'s direct `Construct` arm at `core.rs:17416` — and the
+> source-machine `Construct` arm at `core.rs:7494-7534` never calls it. With the
+> route applied, the classifier's own two conditions **both hold** at
+> constructor 26 field 0. **Production simply never asks.** The comment at
+> `core.rs:17410-17415` names the other producers as fail-closed *"for now"* —
+> implementation scope, not a semantic exclusion, so `AC-4` does not arise.
+>
+> **The route exposes the gap; it does not create it.** The route only flips the
+> classifier's *input* from `[false]` to `[true]` by supplying a real
+> `StaticWorker` binding. It cannot divert an already-recognized field, because
+> there is no recognition dispatch on that arm to divert it from. That refutes
+> the Architect's own lead hypothesis, and it is the half of the question the
+> title asks second.
+>
+> **Successor: [[RT-SRCMACHINE-CTOR-RECOGNITION-ARM]]**, which carries the
+> bounded population check, the arming repair, and the advancing-refusal
+> prediction. The one-need ruling below is **sharpened there, not reversed** —
+> row 4 deep is a recognition gap, row 5 a disposition gap; they become one need
+> after recognition is armed, not before.
 
 > # THE FORK IS DISSOLVED, NOT DECIDED. NEITHER BANNED SURFACE IS ESTABLISHED.
 >

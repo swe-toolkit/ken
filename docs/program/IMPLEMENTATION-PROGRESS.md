@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-14 23:38:34Z — from 287 issue file(s) in `docs/program/issues/`.
+2026-08-15 00:03:47Z — from 287 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -123,7 +123,7 @@ the committed file matches the generator's output.
 | `LANG-CONVOY-ENCLOSING-FIELD` | spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed | ready | language | S | none | — |
 | `LANG-DECEQ-CHAR-LAWFUL-INSTANCES` | `37 §2.5` defers the proof-carrying `DecEq String` / `Ord String` instances as a `tracked follow-on` because the transport needs a lawful `DecEq Char` that is not landed -- and the follow-on was never filed, so the second unowned obligation in this chapter sits in spec prose with no tracker row | draft | language | unsized | operator | — |
 | `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` | 34 §4.1 requires naming the unmatched PATTERN WITNESS, and ExhaustivenessError's payload is a single String documented as a constructor NAME -- so no change at any emission site can discharge the obligation, and it reads as satisfied today only because every landed omission test uses a zero-arity constructor where name and most-general pattern coincide | merged | language | M | none | — |
-| `LANG-FOREIGN-CTOR-ARM-REJECT` | a match arm naming a constructor of a DIFFERENT inductive family reaches match compilation instead of being rejected as a constructor/type mismatch, so a Nat match with a List.Nil arm is diagnosed by whatever the coverage machinery happens to conclude about it rather than by the mismatch that is actually present | active | language | S | none | — |
+| `LANG-FOREIGN-CTOR-ARM-REJECT` | a match arm naming a constructor of a DIFFERENT inductive family reaches match compilation instead of being rejected as a constructor/type mismatch, so a Nat match with a List.Nil arm is diagnosed by whatever the coverage machinery happens to conclude about it rather than by the mismatch that is actually present | merged | language | S | none | — |
 | `LANG-FOREIGN-NAME-CONTROL-CHARS` | Escape decoding made `foreign` symbol and library names able to carry an embedded NUL, where the source text `\\0` previously reached the compiler as two harmless characters -- a NUL in a name that will cross a C-ABI boundary is the classic truncation vector, the declared and effective names silently differ, and there is no consumer today only because the loader path has not landed yet | merged | language | XS | none | 2128 |
 | `LANG-FOREIGN-NAME-FORMAT-CHARS` | Unicode Cf format characters -- bidi overrides, zero-width joiners, U+FEFF -- are a visual-spoofing vector at the same `foreign`-name trust boundary the Cc control-character check just closed, and they are a DIFFERENT vector: not truncation but two distinct declarations rendering identically to the reviewer doing the check | draft | language | XS | operator | — |
 | `LANG-GADT-SEQUENCE-TRACKER-GAP` | `34 §8` names four `SURF-gadt-*` build WPs and all four have frames in `docs/program/wp/` -- none has a tracker node, so `gen-progress.sh` shows the whole dependent-constructor area as absent, while the code has in fact moved past every one of the four frames' stated baselines | merged | language | S | none | — |
@@ -228,7 +228,7 @@ the committed file matches the generator's output.
 | `RT-CONTSRC-CALLABLE-CONTRACT` | Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns | ready | runtime | M | none | — |
 | `RT-CONTSRC-FRAME-FINALIZE` | The continuation availability lifecycle stops one stage short -- Stage 1 interns a `ContinuationFrameRequirement` before the context ids that would resolve it are minted, so Stage 2's `ContinuationFrameIdentity` never runs for the five governed rows and the publication gate correctly refuses to publish an unfinalized claim; the storage-independent view both consumers read is designed, typed and landed, it is simply never finalized | closed | runtime | M | none | — |
 | `RT-CONTSRC-PRODUCER-LOCAL` | Producer-local continuation source coordinate — a mid-body value is a third availability class with no ABI seat, so continuation specialization cannot name its environment | merged | runtime | L | none | — |
-| `RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY` | Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it | active | runtime | S | none | — |
+| `RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY` | Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it | closed | runtime | S | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
 | `RT-DEPTH2-VAR-PARENT-DERIVATION` | Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one | closed | runtime | S | none | — |
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | draft | runtime | M | none | — |
@@ -345,6 +345,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
+- `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` — Arm static-worker recognition on the source-machine Construct arm, which never dispatches the classifier, after a bounded check that every eligible-field state can enter the template
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 
@@ -387,7 +388,6 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
-- `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` blocked by `RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress

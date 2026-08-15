@@ -1,7 +1,7 @@
 ---
 id: LANG-FOREIGN-CTOR-ARM-REJECT
 title: "a match arm naming a constructor of a DIFFERENT inductive family reaches match compilation instead of being rejected as a constructor/type mismatch, so a Nat match with a List.Nil arm is diagnosed by whatever the coverage machinery happens to conclude about it rather than by the mismatch that is actually present"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
@@ -11,21 +11,52 @@ github: null
 origin: "Architect-ruled finding raised to the Steward by language-leader at evt_736qmrew9ymdp as outside the LANG-REACHABILITY-SUBSUMING-ARMS recut and needing its own node. Observed panic/empty-winner evidence evt_69dkk9q8hn3ye; Architect disposition evt_1abn5x4rnxzyb. Steward-filed per COORDINATION §2, and filed rather than folded because the leader is right that it is a different defect: the recut repairs what the coverage machinery REPORTS, and this is about a program that should never reach that machinery."
 ---
 
-> ## THE `depends_on` EDGE IS BOTH PREMISE AND CONTENTION HERE
+> # MERGED 2026-08-15 as squash `0c6c1747a`, from base `701390fd0`.
 >
-> **Premise:** the interim `NoInhabitants` diagnostic that currently keeps the
-> foreign-constructor case from being worse **is not on `main`** — it arrives
-> with [[LANG-REACHABILITY-SUBSUMING-ARMS]]. Measuring this node's "before"
-> against `main` therefore measures a different program from the one the fix
-> lands on.
+> Candidate `a9a733922`, PR #2260. Exactly
+> `crates/ken-elaborator/src/elab.rs` and
+> `crates/ken-elaborator/tests/l2_acceptance.rs`, `+180/-52`; both paths
+> blob-identical between the candidate and the landed squash. QA
+> `evt_5e8vhy1egh6b6`, Architect Decision `dec_44xxyg4bhepew`.
+>
+> **The repair sits before match compilation, which is the whole point of the
+> node:** `ensure_arm_ctors_belong_to_family` runs immediately after each
+> dispatch resolves the scrutinee's `InductiveDecl` — `check_match_dependent`
+> and `infer_match` — ahead of lift, matrix, and reachability work. A foreign
+> arm head is now a `TypeMismatch` naming both the written constructor and the
+> expected family, rather than whatever the coverage machinery concluded about
+> a program it presumed well-formed.
+>
+> **This discharges the Architect's carry on
+> [[LANG-REACHABILITY-SUBSUMING-ARMS]]** — a foreign constructor is a *type*
+> error, not a reachability error, and it needed its own node.
+>
+> **Residual, carried not hidden: nested sub-patterns are out of scope.** The
+> checked path admits only flat `Var`/`Wild`, and the general path's nested
+> positions each carry their own expected type. `mark_shared_ctor_subsumption`
+> contains no `expect`/`unwrap`/`panic` after `7a47682e`, so the worst case for
+> a nested foreign constructor is a **misleading diagnostic, not a crash**.
+> Whoever picks up nested patterns inherits this.
+
+> ## THE `depends_on` EDGE WAS BOTH PREMISE AND CONTENTION HERE
+>
+> **Premise:** the interim `NoInhabitants` diagnostic that kept the
+> foreign-constructor case from being worse **was not on `main`** when this node
+> was framed — it arrived with [[LANG-REACHABILITY-SUBSUMING-ARMS]]. Measuring
+> this node's "before" against `main` would therefore have measured a different
+> program from the one the fix landed on.
 >
 > **Contention:** both nodes edit `crates/ken-elaborator/src/elab.rs` and
-> Language runs one node at a time.
+> Language ran one node at a time.
 >
-> ⇒ **`D0` re-measures at the delivered base and does not inherit the numbers
-> below.** This is the same discipline that saved the `D2k` route selection on
-> the Runtime lane: a probe specified against the wrong base answers correctly
-> and selects the wrong branch.
+> ⇒ **`D0` re-measured at the delivered base and did not inherit the numbers
+> below — and the re-measurement changed the answer.** It found
+> `ReachabilityError { cause: NoInhabitants }`, **not the panic the original
+> evidence reported.** The inherited panic claim did not survive, and refusing
+> to inherit it is why the node's control tests the defect that was actually
+> there. Same discipline that saved the `D2k` route selection on the Runtime
+> lane: a probe specified against the wrong base answers correctly and selects
+> the wrong branch.
 
 ## What this is
 
