@@ -161,12 +161,12 @@ fn classically_valid_topos_invalid_cert_rejected() {
 /// Syntactic classifier routes correctly by formula shape (`23 §2`/§2.1).
 #[test]
 fn classify_routes_each_shape_d_fo_ho() {
-    let ProofEnv { env: _, p, q, .. } = make_proof_env();
+    let ProofEnv { env, p, q, .. } = make_proof_env();
 
     // D: a closed ground constant atom (Term::Const with no free vars)
     let phi_d = p.clone(); // Const — is_ground_decidable = true
     assert_eq!(
-        classify(&phi_d),
+        classify(&env, &phi_d),
         Route::D,
         "closed constant atom must route D (23 §3)"
     );
@@ -174,7 +174,7 @@ fn classify_routes_each_shape_d_fo_ho() {
     // FO: Pi over constants — first-order connective structure (23 §4)
     let phi_fo = Term::pi(p.clone(), q.clone());
     assert_eq!(
-        classify(&phi_fo),
+        classify(&env, &phi_fo),
         Route::FO,
         "Pi over consts must route FO (23 §4)"
     );
@@ -182,7 +182,7 @@ fn classify_routes_each_shape_d_fo_ho() {
     // HO: Lam term — neither ground-decidable nor first-order-intuit (23 §5)
     let phi_ho = Term::lam(p.clone(), Term::var(0));
     assert_eq!(
-        classify(&phi_ho),
+        classify(&env, &phi_ho),
         Route::HO,
         "lambda term must route HO (23 §5)"
     );
@@ -202,7 +202,7 @@ fn unrecognized_shape_to_ho_default_no_skip() {
     // for is_first_order_intuit, not a const atom for is_ground_decidable).
     let lam_shape = Term::lam(p.clone(), Term::var(0));
     assert_eq!(
-        classify(&lam_shape),
+        classify(&env, &lam_shape),
         Route::HO,
         "Lam must route to HO default (23 §2.1); \
          no `_ => skip` arm can silently drop obligations"
@@ -218,7 +218,7 @@ fn unrecognized_shape_to_ho_default_no_skip() {
         Box::new(q.clone()),                  // b = Q : Ω₀
     );
     assert_eq!(
-        classify(&phi_eq),
+        classify(&env, &phi_eq),
         Route::HO,
         "Eq(Ω₀, P, Q) must route to HO default (23 §2.1)"
     );
