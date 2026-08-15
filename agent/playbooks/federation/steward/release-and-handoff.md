@@ -62,6 +62,30 @@ write that line truthfully, you did not run the gate.
    publishing it is a separate act you can complete in your head. Check it
    mechanically rather than remembering whether you published.
 
+   **EXISTENCE IS NOT ENOUGH — check the FIELD you are asserting, not the
+   file.** `git cat-file -e` answers *"is the artifact there?"*, and a status
+   flip is a claim about **content**. The file is already on `main`; the field
+   is what your kickoff moved. So the existence check **passes cleanly on the
+   exact defect it looks like it should catch.**
+
+   ```sh
+   git rev-parse <base>:<path> HEAD:<path>   # two different blobs => UNPUBLISHED
+   git show <base>:<path> | head -5          # and read the field you are asserting
+   ```
+
+   2026-08-15: a verify kickoff announced `V3-Z3-PROCESS-ADAPTER` flipped
+   `draft → ready` while the flip sat in an unpublished commit on
+   `steward/work`. `origin/main` read `draft`. `verify-leader` refused to cut
+   the branch — *"I will not rely on a transient post over the tracked node"* —
+   which is the correct call and the reason the cost was one blocked start
+   rather than a branch cut against a state that did not exist.
+
+   ⇒ **The ring treats the tracked artifact as authoritative over anything you
+   say about it, and it is right to.** If the publish has not happened, do not
+   describe the state as changed: **name the commit, say it is queued, and say
+   what it is queued behind.** A kickoff that asserts an unpublished state is
+   false when sent even though every word of it will be true in ten minutes.
+
 ## Handoff gate, steps 6-7: contention and the ledger
 
 6. **Contention check, against every WP in flight** — not just the frontier

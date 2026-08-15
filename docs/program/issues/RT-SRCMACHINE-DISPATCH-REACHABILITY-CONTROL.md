@@ -25,6 +25,61 @@ origin: "Architect ruling evt_9qn4nm8gg0ye section 4 on RT-SRCMACHINE-CTOR-RECOG
 >
 > **"No, and here is the limit" is a COMPLETE outcome of this node** — recorded
 > permanently, not a failure to deliver.
+>
+> ### THE ANSWER IS PROBABLY "YES", AND IT IS MEASURED
+>
+> Adversary hunt on `301b7af20` (`evt_7d22mprba897f`), re-checked against
+> `origin/main` by the Steward.
+>
+> **The refusal's ground is about a FIELD, and the available instrument adds
+> none.** The Architect declined *"a test-only required field on production
+> planned units."* A `cfg(test)` thread-local arrival counter is not that.
+>
+> **The precedent is in the same file**, so this is convention rather than a new
+> shape: `D2F_GATE_ARRIVALS` at `core.rs:971`, `d2f_gate_note_arrival` at
+> `:979`, the take at `:1016`, with a gated note call at a production site.
+>
+> **`recognized_constructor_worker_fields` has exactly two call sites on
+> `origin/main`: `core.rs:7506` — the arm the predecessor just armed — and
+> `:17442`.** Instrumenting `:7506` and running `-p ken-runtime --lib` gave
+> **569 arrivals**, suite green at 931 passed / 4 ignored.
+>
+> **The cost ladder, and the middle rung is the one to notice:**
+>
+> | tier | surface it adds | obligation |
+> |---|---|---|
+> | `cfg(test)` thread-local | one `cfg`-gated call at `:7506` | none |
+> | `cfg(any(test, feature))` | a feature plus a forwarding feature | the whole `RT-C2-OBSERVATION-ARTIFACT-IDENTITY` node |
+> | the refused `D2k-1c` route | **a field on production planned units** | what the Architect declined |
+>
+> **The middle tier is only needed if the observation must be driven from
+> another crate. 569 in-crate arrivals say it does not.**
+>
+> ### WHAT 569 DOES NOT PROVE — carry this into `D2`, it is the whole of `AC-2`
+>
+> **It proves the SITE is reached. It does not prove any existing test would red
+> on deletion** — a test reds only if it asserts something that depends on the
+> dispatch. **The counter is that assertion**, and the arrival count being large
+> is what makes the assertion trivially satisfiable rather than a
+> fixture-authoring problem.
+>
+> ⇒ **The mutation proof is still owed and still unrun.** Nobody has deleted the
+> dispatch call and watched a control red. `AC-2` is unchanged and is the
+> deliverable.
+>
+> ### A STEWARD ERROR WORTH THE LINE, because it nearly buried this
+>
+> **My first re-check said the two call sites "do not reproduce" — one call, not
+> two, and `:7506` a different function entirely.** The hunt's numbers ran ~26
+> lines high and that looked like the signature of a stale measurement.
+>
+> **I was grepping the WORKTREE, which was one commit behind `origin/main` and
+> did not contain the merge the hunt was about.** `git show origin/main:<path>`
+> reproduces the hunt exactly, to the line.
+>
+> ⇒ **A finding about a just-landed merge cannot be re-checked in a worktree that
+> predates it, and the failure looks exactly like the finding being wrong.**
+> Re-check against `origin/main` by `git show`, not against the checkout.
 
 > ## SEQUENCING — THIS NODE DOES NOT COME NEXT. Steward, 2026-08-15.
 >
@@ -70,6 +125,23 @@ obligation was never recorded"* is **unrepresentable**, enforced by the required
 `RecognitionIdIssuer::mint()` (`mod.rs:4316`, `:4345`). That was measured and
 settled. **The residual is reachability alone.**
 
+> **Unrepresentability rests on a DERIVE LIST, and its neighbour derives the
+> thing that would break it.** Verified on `origin/main`:
+>
+> ```rust
+> #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]   // mod.rs:4315
+> pub(super) struct StaticWorkerRecognitionId(u64);               // :4316
+> ...
+> #[derive(Default)]                                              // :4338
+> pub(super) struct RecognitionIdIssuer { ...                     // :4339
+> ```
+>
+> **No `Default`, no `From`, no deserialization on the id** — that plus the
+> private tuple field is the whole enforcement. The **issuer** two lines below
+> legitimately derives `Default`. ⇒ **Adding `Default` to the id would break the
+> property silently, locally, and while looking like consistency with its
+> neighbour.** Record that beside the claim; do not re-open the question.
+
 ## What is already measured — start here, do not re-derive
 
 **The governed depth-3 transition was OBSERVED.** Under the since-reverted
@@ -89,9 +161,15 @@ For each candidate, state what it would observe, what it would cost in
 **production surface**, and whether it discriminates the regression above.
 At minimum consider:
 
+- **The `cfg(test)` arrival counter — measured available, and it is the
+  presumptive answer.** See the banner: the `D2F_GATE_ARRIVALS` shape at
+  `core.rs:971`/`:979`/`:1016`, a gated note call at `:7506`, ~15 lines, no new
+  production surface. **Start here and cost the alternatives against it**, not
+  the other way round.
 - **An already-existing governed compile** whose output would change if the arm
-  stopped dispatching. **Check this first** — the cheapest acceptable answer is
-  one that needs no new machinery, and nobody has looked.
+  stopped dispatching. **Check this first anyway** — an answer needing no new
+  machinery at all beats a cheap one, and nobody has looked. **If none exists,
+  say so**; that is the finding that justifies the counter.
 - A test-only observation that reads existing state rather than adding a field
   (the predecessor's `d5a_trace` shape is the local precedent).
 - A structural argument that makes the dispatch **unremovable** rather than

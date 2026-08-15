@@ -1,7 +1,7 @@
 ---
 id: LANG-INTERVENING-LET-FRAME-WEAKENING
 title: "An intervening let between an outer match's premise and a nested match reaches install_index_refinements and dies in refine_branch_goal with 'could not classify the branch goal: TypeMismatch' -- and the Architect refused 'orthogonal', because the reported found term carries LANG-CONVOY's own D1 signature and there is an influence path through RVar resolution"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
@@ -24,6 +24,71 @@ origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytre
 >
 > ⇒ **Do not start `D2` before `D1` is reported.** The second row is the reason
 > this node exists at all, and it is cheap to settle.
+>
+> ### THE TWO-ROW TABLE HAS A THIRD CASE, AND IT IS ALREADY MEASURED
+>
+> **Adversary hunt on `f08388396` (`evt_537ca9ady72kg`), run at `origin/main`,
+> probe and guard mutation both reverted, worktree clean.** An interleaved-`let`
+> variant — annotated `k : Vec Nat m`, binding `xs` directly — was run under
+> both guards:
+>
+> | guard | plain zip | this interleaved `let` |
+> |---|---|---|
+> | shipped region set | `Ok(g583)` | `KernelRejected TypeMismatch ((Dg574 Dg67) @9)` vs `@4` |
+> | prohibited floor `abs_pos >= 3` | `Ok(g583)` | `KernelRejected NotTerminating("SCT: idempotent self-loop has no strictly-decreasing parameter")` |
+>
+> ⇒ **It fails under BOTH, in different classes.** The Architect's dichotomy —
+> invariant across three, or fails only under the region set — **does not have a
+> row for that**, so do not force this result into one. Under the shipped guard
+> it carries the predecessor's own pre-remedy signature: same head, one de Bruijn
+> index apart. **That is the original defect still standing on an interleaved
+> shape**, not a new one.
+>
+> **And it is a DIFFERENT failure from the one this node was filed on.** Yours
+> dies in `refine_branch_goal`; this one gets past that and dies in the kernel.
+> ⇒ **Either this node covers a different interleaving, or there are two distinct
+> interleaved-`let` failures at different depths.** The Adversary explicitly did
+> not reconcile them, and naming that is what makes it reconcilable.
+>
+> ⇒ **The question `D1` answers is no longer "is it independent?" but "which
+> interleavings does the region set cover?"** Both variants are inputs to it.
+
+> ## `D1` IS DELIVERED AND MERGED. `fe7be8386`, 2026-08-15. READ THIS BEFORE `D2`.
+>
+> **Result: invariant.** Byte-for-byte the same `ElabError::Internal`, same site
+> (`refine_branch_goal`, `elab.rs:2913-2917`), same operands at **all three**
+> points — base `43bd0d597`, the prohibited floor, and the shipped region set.
+> ⇒ **A clean pre-existing gap. The predecessor's regression trigger did not
+> fire and is closed.**
+>
+> **The landed pin is non-vacuous**, and that is what makes it a measurement: it
+> requires the `Internal` variant, the `could not classify the branch goal` site,
+> **and both exact operands** (`expected: Dg67`, `found: ((Dg574 Dg67) @8)`). A
+> different failure cannot pass it. Expected `Nat` against found `Vec Nat @8` is
+> a **sort** mismatch where an index was expected — the frame/weakening shape
+> this node is named for.
+>
+> ### THREE THINGS `D2`/`D3` OWE THAT `D1` DID NOT COVER
+>
+> **1. CONVERT the landed test, do not delete it (Architect, blocking on `D2`).**
+> When the repair lands this test reds and will read as the fixer's bug. **Turn
+> it into the positive** — the same program asserted to elaborate. Deleting it
+> erases the only durable record that the attribution was performed.
+>
+> **2. Note that `@8` is context-shape-dependent** (Architect, non-blocking). It
+> is an absolute de Bruijn position, so an unrelated edit to `vec_env()` or the
+> prelude reds this spuriously. **One line in the doc comment** saying a shifted
+> index means *re-measure*, not *regression*. Fold into `D2`'s touch.
+>
+> **3. `D1`'s reconciliation half and `D4` were added to this node AFTER it was
+> released, and the ring never saw them.** That is mine, not theirs — they
+> delivered exactly what was published. **Both are still owed** and they are the
+> same program: reconcile the Adversary's variant against the filed repro, and
+> land the discriminating fixture. **The two variants are now known to differ** —
+> the Adversary's dies in the kernel under both guards in *different classes*,
+> this one dies in `refine_branch_goal` *identically* under all three. ⇒ **There
+> are two distinct interleaved-`let` failures, not one**, and `D2` should say
+> which it is localizing.
 
 ## Why "orthogonal" was refused, and it is not a formality
 
@@ -69,6 +134,65 @@ numbers are from its review, not from your tree.
 **`D1` — the three-way attribution, and nothing else until it is reported.**
 Run the failing program at each of the three bases above. Report the exact error
 (or its absence) for each, with the run.
+
+**`D1` now has a second half, and it is one read: reconcile the two variants.**
+Put your repro beside the Adversary's (`k : Vec Nat m` bound to `xs` directly,
+between the outer arm and the nested match) and say whether they are the same
+shape. **That decides whether this node has one failure or two**, and it is the
+one thing the hunt explicitly did not do. If they differ, say what differs —
+the annotation, the bound term, or the position — because that is the variable
+the coverage question turns on.
+
+**`D4` — the discriminating fixture, folded in here rather than filed
+separately.** The Adversary's variant is the first program measured to
+distinguish the shipped region set from the prohibited floor, and
+[[LANG-CONVOY-MATCH-FIELD-PROVENANCE]]'s `AC-1` gap is exactly one such fixture
+wide. **Land it asserting that the two guards' rejection CLASSES differ** —
+type-index versus termination — not that either succeeds. Neither does.
+
+> **Do not assert "the region set is correct here".** Both guards reject this
+> program. The claim the fixture can carry is that they fail differently and
+> that the floor's failure reaches the termination gate. **A fixture asserting
+> more than was measured is how this node's predecessor got recut twice.**
+
+**`D5` — one character on the landed `D1` pin. Take it with `D4`; same file.**
+
+**Adversary hunt on `beb31566b` (`evt_1xk8hj29qn2js`), re-checked against
+`origin/main` by the Steward.** The `D1` assertions are asymmetric, and only
+one of them is anchored:
+
+| line | assertion | anchored? |
+|---|---|---|
+| `:514` | `msg.contains("found: ((Dg574 Dg67) @8)")` | **yes** — the trailing `)` means `@80)` cannot match |
+| `:507` | `msg.contains("expected: Dg67")` | **NO** — also matches `expected: Dg670,` … `Dg679,` |
+
+The message is `format!("… could not classify the branch goal: {e:?}")` over a
+`KernelError`, so the render is `TypeMismatch { expected: <term>, found: <term> }`
+— **there is a comma after `expected`'s value.** ⇒ **`"expected: Dg67,"`.**
+
+> ### THE TELL WAS THE ASYMMETRY INSIDE ONE TEST, NOT THE VALUES
+>
+> `found` is anchored **by accident** — it happens to end on `)`. Nobody chose
+> it. ⇒ **When two assertions of the same kind sit side by side and one is
+> tighter, the loose one is the defect, and you can see it without knowing
+> anything about the domain.**
+>
+> ### AND IT COMPOSES WITH THE `@8` HAZARD INTO ONE EVENT WITH TWO SIGNS
+>
+> The recorded hazard is that prelude growth shifts `@8` and reds `found`
+> spuriously. **The same growth mints the four-digit ids that make
+> `expected: Dg67` match wrongly.** One ordinary prelude edit therefore produces
+> **a loud spurious red and a silent false green at the same time.**
+>
+> ⇒ **The loud half gets investigated and the silent half does not** — and a
+> maintainer re-measuring after the red would be reading an `expected`
+> assertion that had quietly stopped discriminating. **Anchoring the comma
+> removes the silent half and leaves only the hazard already documented.**
+>
+> **The site pin is sound and needs nothing.** `msg.contains("could not classify
+> the branch goal")` is a text match, not a location, so it holds only if the
+> text is site-unique — and it is: **one production emitter** (`elab.rs:2915`),
+> the only other occurrence in `crates/` being the assertion itself.
 
 **`D2` — conditional on `D1` reading "invariant".** Locate the disagreement: two
 things name an absolute position and do not agree on it. Say which two, and

@@ -1,7 +1,7 @@
 ---
 id: V3-D-OPEN-GOAL-WITNESS-ROUTE
 title: "The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none
@@ -142,6 +142,53 @@ means** — a new `Route` variant, a non-syntactic classification, or anything
 that makes routing depend on a search result — that is a design call and his,
 not the ring's. Report the shape you need and why the syntactic gates cannot
 express it.
+
+## CLOSED: the FO-displacement flag, and the corpus control must NOT be required
+
+**Architect finding 2 on `0a45f717` asked for a measurement over the V3 corpus:
+that no obligation newly captured by the D predicate had previously been
+FO-provable. It is not owed, and requiring it later would be a mistake.** The
+property is settled by a total argument over the code path, and the run would
+sample it.
+
+`attempt_obligation` builds `ctx` **before** the match, and nothing executes
+between `classify` and the arm call:
+
+```rust
+let route = classify(env, &triple.goal_closed);
+let ctx   = context_from_triple(triple);          // computed ONCE, before the match
+match route {
+    Route::D  => attempt_d (env, &ctx, &triple.phi, &triple.goal_closed),
+    Route::FO => attempt_fo(env, &ctx, &triple.phi, &triple.goal_closed),
+    Route::HO => attempt_ho(env, &ctx, &triple.phi, &triple.goal_closed),
+}
+```
+
+1. **All three arms receive identical arguments**, so the inputs are
+   route-independent. **This was the gap in the Steward's version of the
+   argument** — a dispatcher doing anything extra on one path would break it.
+   It does not.
+2. `attempt_fo` and `attempt_ho` are `attempt_ipc(env, ctx, phi, phi_closed)`
+   **verbatim**, with no wrapping.
+3. `attempt_ipc`'s **only** `Proved` is `try_ipc_cert(...) == Some(cert)`.
+4. `attempt_d`'s **first statement** is that identical call on the same four
+   arguments, returning `Proved` on `Some`.
+
+⇒ **For every obligation: FO/HO `Proved` ⟺ `try_ipc_cert` `Some` ⟺ D
+`Proved`.** A reroute into D cannot lose a proof. D only adds refutation
+attempts ahead of the same hole.
+
+**Why the control is worse than the argument, which is the part to carry
+forward.** The measurement would be evidence over whatever obligations the V3
+corpus happens to contain; this is a proof over all of them. **Requiring it
+would replace a total argument with a sampled one and produce a green that
+reads as stronger evidence than the thing it replaced.** The general instinct —
+prose about a mechanism needs a probe — is right, and this is the case where it
+is not, because the argument ranges over the **code path** rather than the
+**population**. Adversary `evt_7468zj89pdryh`, closing the step-1 gap by
+reading; Steward's original at `evt_69p93zvzxw286`.
+
+**Do not re-derive this and do not re-file it as owed work.**
 
 ## Why this earns a slot
 
