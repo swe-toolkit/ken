@@ -1,13 +1,13 @@
 ---
 id: V3-FO-QUOTE-GUARD-FAIL-CLOSED
 title: "Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: [V3-FO-KRIPKE-SLICE]
 blocks: []
-github: null
+github: 2346
 origin: "Steward, 2026-08-15, dispositioning Adversary finding evt_235vyn7za92ry on the merged range 75a91d2ba...6ec9694fa. Filed as its own node rather than folded into V3-FO-OBLIGATION-SIGNATURE-DISCOVERY, which is already released and is about a different surface. Steward-filed per COORDINATION section 2."
 ---
 
@@ -99,6 +99,28 @@ while it is cheap rather than when it is load-bearing.
 > unreachable" is a claim about the tree at a moment, and the node that makes it
 > reachable is usually already scheduled. **Ask what would arm a latent defect and
 > when that work lands, rather than filing the latency as if it were durable.**
+
+## MERGED 2026-08-15 at `142cf2336`. All four deliverables landed.
+
+Candidate exact `4674fe84044f473d78e78779e9a0773b085e4d67`, base
+`8fe2264c70c90f7cb99d71f96c0f735de8aab407`, two commits, `+191/-10`, PR #2346.
+Decision `dec_1yc4z7td2a9zw`, resolved by the Architect on that exact SHA.
+Blob-verified 2/2 from the declared base.
+
+**`D1` delivered more than the frame asked for.** The frame said "prefer
+exhaustive matching over a wildcard". The candidate has **zero `_ =>` arms**,
+with the six term-free leaves enumerated individually and returning `false` as
+an exact structural fact. **A runtime "unknown means true" default — the obvious
+fail-closed design — would have been weaker:** it keeps compiling while being
+wrong about a new case.
+
+**`D3` was corrected once under a QA block, and that is the substantive history
+of this node.** The first attempt attributed `ForallRight`'s safety to
+eigenparameter freshness. QA did not argue with it — they built a literal
+checker probe and ran it, and `check_cert` returned `true` on a formula with a
+world eigenparameter in an object slot. Architect ruling `evt_71g1xf5vkf1ek`
+supplied the true mechanism, which is recorded at the site and, as a constraint
+on unstarted work, as `AC-4a` on [[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]].
 
 ## Deliverables
 
