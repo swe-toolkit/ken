@@ -328,18 +328,29 @@ correction.** No operator decision is owed for these rows.
 > may change disposition and that a control whose expectation should change is a
 > handback rather than an edit. **This is that handback, and it is granted:**
 > `row4-depth-2/3` may move from `refused:Closure` to their new disposition,
-> because they pin a shape no compiler input produces. **State the new expectation
+> because they pin a shape **no compiler input in the measured corpus
+> produces** — and that corpus excludes the population by its own selection
+> rule, per the correction below. **State the new expectation
 > and why the control is still worth keeping** — a control over IR unreachable
 > from source is pinning the lowering's internal contract, which is a real thing
 > to pin and a different claim from what its name suggests.
 
 ### The finding underneath, recorded because it outlives this node
 
-**The node's only production witness is not reachable from source.** The ring
-established earlier that these crossings were the node's live path; `D3` now
-establishes that no program reaches them. **Those two facts together mean the
-mechanism this node builds is exercised only by hand-authored IR** — which is
-worth knowing before the next node in this campaign is sized against it.
+**CORRECTED after the merge — this said "not reachable from source" and the
+evidence does not carry that.** See the corpus-exclusion correction below: the
+measurement's own selection rule removes the closure-at-boundary tests, so
+"unreachable from source" is not a thing it can establish. The defensible form
+is **"no witness in the measured corpus,"** and the measured corpus is the one
+that excludes this population.
+
+**The node's only production witness is absent from the measured corpus.** The
+ring established earlier that these crossings were the node's live path; `D3`
+establishes that **no program in that corpus** reaches them. **Those two facts
+together mean the mechanism this node builds is exercised, today, only by
+hand-authored IR** — which is worth knowing before the next node in this
+campaign is sized against it. **Whether a program outside the corpus reaches
+them is open**, and it is the successor's whole subject.
 
 ## THIS CANDIDATE CARRIES TWO MECHANISMS AND THE FRAME SCOPES ONE
 
@@ -383,6 +394,56 @@ node's whole subject.
 **Two things unmeasured before any split:** whether the gate is exercised at all
 without the substitution (the row4 controls need it to produce a `Record` at
 that arm, so the gate may be inert alone), and what the population is.
+
+### THE MEASUREMENT THAT SELECTED "EMPTY" CANNOT SEE THE POPULATION IT BOUNDS
+
+**Adversary hunt `evt_71wmpee00vt3j` on the merged range
+`de551a4dd..4eec77390`, verified against the tree by the Steward. This is a
+correction to the row above, and it lands after the merge.**
+
+The corpus is the **non-ignored** `ken-cli --tests` paths.
+`crates/ken-cli/tests` carries 33 `#[ignore]` attributes, and **six of them
+name this exact condition**, verbatim:
+
+```
+#[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no
+            durable lane across the boundary; fails at base 21fd46dc"]
+```
+
+in `px8l_recursive_decl_native.rs` (two), `rt_escape_second_resource_native.rs`
+(two), `px8ta_oriented_subcontinuation.rs`, and `rt_parity_native.rs`.
+
+⇒ **The sample is "programs that currently compile," and the mechanism exists
+to change what compiles.** The exclusion criterion is the negation of the thing
+being measured, so **the empty set is guaranteed by construction rather than
+observed.** The 7-to-301 occurrence range is genuine anti-vacuity evidence that
+plans were *populated*; it is not evidence the corpus *could* contain the shape.
+
+**This does not claim the six would show a non-empty set** — whether any
+produces a directly carried empty lexical environment with a planner-issued
+synthesized record is what the measurement would have to determine, and cannot,
+because they sit outside it. The claim is narrower and harder to dispute: **the
+corpus is structurally incapable of answering the question it was used to
+answer.**
+
+**Which half of the merge argument this costs.** The fail-safe direction stands
+on its own and was independently traced — every absence returns the value
+unchanged, the producer-class gate refuses outright when a child has no producer
+occurrence, and the `continue` skips only the source-only per-position lookup
+with the generic ownership record checked before it. **The empty-population half
+is the one carrying the weight, and it is the one that does not hold**, because
+"defeats a refusal" is tolerable only if nothing reaches it.
+
+**The landed comment is narrower than the Steward's broadcast of it, and the
+overread was the Steward's.** The comment says "non-ignored" and says in terms
+that this is a scoped corpus measurement and not a universal property. What it
+does not say is that the excluded set is precisely the population of interest —
+a reader takes "non-ignored" as incidental scoping. **The Steward's merge
+notification said "the source-reachable population is measured empty," which is
+the sentence a later reader would cite to conclude this seam was cleared.**
+Corrected at `evt_5hremk2yx49kc`.
+
+⇒ Successor: [[RT-BOUNDARY-IGNORED-CORPUS-MEASURE]].
 
 ### `COORDINATION §8a`'S PREFIX RULE SELECTS THE WRONG HALF HERE
 

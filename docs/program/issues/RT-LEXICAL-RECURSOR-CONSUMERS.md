@@ -30,6 +30,14 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > # THE ROUTE WORK HAS LEFT THIS NODE. `D2k-1c` IS A WRONG CUT — DO NOT REOPEN IT.
 > # Steward, 2026-08-15. Every `depends_on` is now `merged`.
 >
+> ## THE ROUTE WORK LEAVING IS NOT THE SAME AS THE NODE HAVING NOTHING TO DO.
+>
+> **Read this before the rest of the banner.** The route half is finished and
+> nothing here reopens it. **The repair half has a dispatchable increment**, and
+> it is the "THE WAIT IS LIFTED" block further down, not anything on this
+> screen. The 05:41 text below saying otherwise is superseded by a 12:42 commit
+> the same day and is annotated in place.
+>
 > **CORRECTED. This banner previously said all five expressions were stopped on
 > one absent relation, and named [[RT-CONTKEY-CONSUMING-OCCURRENCE]] as `ready`
 > and awaited.** That relation **merged 2026-08-14 at `a998d3f6`**, and so did
@@ -83,15 +91,35 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > **Do not read `active` as "someone is building this."** It stays `active`
 > because increments continue to land against it; the route work does not.
 >
-> ### ZERO DISPATCHABLE INCREMENTS, and as of 2026-08-15 that is MEASURED
+> ### SUPERSEDED AT 12:42 THE SAME DAY. THERE IS A DISPATCHABLE INCREMENT.
 >
-> **Every item this file called owed has been checked against the tree and all
-> three are discharged** — see the table further down. Combined with `D2k-1c`
-> being a wrong cut and `D2k-1c-1a` having moved, **there is nothing a ring can
-> start here.** That is not the same as blocked, and it is not framing debt:
-> the node's five expressions are genuinely unrepaired, and the reason no slice
-> exists is that the repair needs a representation surface that does not exist
-> yet.
+> **This block was written at `e7fedca4e` (05:41) and says the opposite of
+> `c4e622e93` (12:42), which is seven hours later and is the operative one.**
+> It survived in the leading position while the amendment landed in the body,
+> and on 2026-08-15 at 22:05 a leader read this banner, concluded zero
+> dispatchable, and correctly reported an idle ring on the operator's top
+> priority. **The stale claim is the Steward's and the cost was a stalled
+> critical path.**
+>
+> **What is still true from 05:41:** every item this file called owed is
+> discharged against the tree, `D2k-1c` is a wrong cut, and `D2k-1c-1a` has
+> moved. **Those are about the ROUTE work, and the route work has genuinely
+> left this node.**
+>
+> **What is FALSE as written:** *"there is nothing a ring can start here"* and
+> *"the repair needs a representation surface that does not exist yet."* The
+> parked expressions are not waiting on an absent surface — they were waiting on
+> an Architect disposition that **nothing records arriving**, and the operator
+> lifted that wait: *"first make the a priori best guess of what the repair
+> should be with the information you have."* **The guess is written below and it
+> is concrete: the repair is at the constructor-argument position, not the
+> exact-`Var` callee path.** Read that block, not this one.
+>
+> **A count to re-derive at pickup rather than take:** the block below says
+> *"four expressions have been parked"* and then *"for these five there is no
+> call."* **This file states both numbers and does not reconcile them.** Derive
+> the exact population from the committed `D2k-0` control, which asserts the
+> edge and refusal per expression, rather than from either sentence.
 >
 > ⇒ **`depends_on` now names [[RT-REQUIRED-OCCURRENCE-PROJECTION]].** That edge
 > was real and lived only in prose across three files. Writing it down makes
