@@ -182,3 +182,38 @@ fn non_indexed_match_stays_unaffected() {
                     Cons b bs |-> And (Equal Bool b True) (allTrue bs) }",
     );
 }
+
+/// `LANG-CONVOY-ENCLOSING-FIELD` D1 -- the two-vector `zip` recursive step
+/// spec `34-data-match.md §3.2`'s Boundary paragraph names as a known gap:
+/// the inner match on the sibling `w` destructures `w` through its own
+/// nested match, and the same branch's body re-uses `xs` -- a field the
+/// ENCLOSING (outer, `v`) match already bound -- in the same expression
+/// (the recursive call). Measured at this node's base (`6275bbc35`): the
+/// recursive call's `xs` argument fails a kernel `TypeMismatch` -- `xs` is
+/// re-typed against the INNER match's own peeled index instead of being
+/// excluded as an enclosing-match field (D2/D3 in the node's handoff). This
+/// node is the fixture only; no remedy is implemented here (`AC-3`).
+#[test]
+fn two_vector_zip_recursive_step_convoy_fixture() {
+    let mut env = vec_env();
+    let err = expect_err_val(
+        &mut env,
+        "fn zip (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
+         match v { \
+           VNil |-> VNil Nat; \
+           VCons m a xs |-> match w { VCons _ b ys |-> VCons Nat m a (zip m xs ys) } \
+         }",
+    );
+    assert!(
+        matches!(
+            &err,
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "expected the enclosing-match-field wrong-index substitution to \
+         surface as a kernel TypeMismatch on the recursive call's `xs` \
+         argument, got: {err:?}"
+    );
+}
