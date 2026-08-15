@@ -36,7 +36,7 @@ use ken_kernel::{
     check::{declare_inductive, CtorSpec, InductiveSpec},
     declare_postulate,
     subst::shift,
-    GlobalEnv, GlobalId, Level, Term,
+    Context, GlobalEnv, GlobalId, Level, Term,
 };
 
 // ─── Signature: the slice's one-sort, one-predicate vocabulary (`23 §4.1`) ──
@@ -99,6 +99,217 @@ pub fn declare_fo_slice_signature(env: &mut GlobalEnv) -> FoSliceSignature {
     .expect("declare_inductive for FO slice Or family must succeed");
 
     FoSliceSignature { sort_a, pred_p, or_id }
+}
+
+// ─── V3-FO-OBLIGATION-SIGNATURE-DISCOVERY: matching a real obligation to a
+// signature (`D0`'s accepted four-conjunct rule, `evt_2t61wgk7pp896`) ───────
+
+/// `D1`, conjuncts 1+2: discover a candidate [`FoSliceSignature`] from
+/// `phi_closed`'s OWN syntax alone -- no read of any other declaration in
+/// `env` to find "a" candidate, no ordering or recency assumption. Returns
+/// `None` on ANY ambiguity or absence; refusal is always safe and always
+/// available (`D0`).
+///
+/// **Conjunct 1 (deterministic, total-or-refusing role assignment).** Scans
+/// every subterm of `phi_closed` for: a predicate candidate (every
+/// `App(Const{id}, Var(_))` -- an atom-shaped application -- contributes
+/// `id`); a sort candidate (every `Pi` node's domain, when that domain is
+/// itself a bare `Const{id}`, contributes `id`); an `Or`-family candidate
+/// (every `Trunc(App(App(IndFormer{id}, _), _)))` contributes `id`). Exactly
+/// one predicate candidate and exactly one sort candidate are required; zero
+/// or more than one of either is an unresolved ambiguity, refused rather
+/// than guessed. At most one `Or`-family candidate is allowed for the same
+/// reason; zero is fine (the obligation may simply not use `or`).
+///
+/// **Conjunct 2 (declaration shapes validated, not assumed).** The sort
+/// candidate's OWN declared type must be `Type _`; the predicate candidate's
+/// OWN declared type must be `Pi(dom, Omega _)` with `dom` convertible to
+/// the sort candidate. Both must be non-level-polymorphic (this slice is
+/// monomorphic, matching [`declare_fo_slice_signature`]'s own postulates --
+/// widening to level-polymorphic roles is not this node's scope). An
+/// `Or`-family candidate, if present, must be a genuine two-constructor,
+/// non-level-polymorphic inductive.
+///
+/// **Conjunct 3 (preservation) is NOT checked here** -- that is
+/// [`discover_and_quote_fo`], which calls this first and then verifies the
+/// discovered signature's quotation actually denotes back to `phi_closed`.
+/// A signature returned by this function alone is a CANDIDATE, not yet a
+/// safe one to `embed` against.
+fn discover_fo_slice_signature(env: &GlobalEnv, phi_closed: &Term) -> Option<FoSliceSignature> {
+    use std::collections::BTreeSet;
+
+    let mut pred_ids = BTreeSet::new();
+    let mut sort_ids = BTreeSet::new();
+    let mut or_ids = BTreeSet::new();
+    collect_signature_candidates(phi_closed, &mut pred_ids, &mut sort_ids, &mut or_ids);
+
+    let mut sort_iter = sort_ids.into_iter();
+    let sort_id = sort_iter.next()?;
+    if sort_iter.next().is_some() {
+        return None; // more than one candidate sort: ambiguous, refuse.
+    }
+    let mut pred_iter = pred_ids.into_iter();
+    let pred_id = pred_iter.next()?;
+    if pred_iter.next().is_some() {
+        return None; // more than one candidate predicate: ambiguous, refuse.
+    }
+    let mut or_iter = or_ids.into_iter();
+    let or_id_candidate = or_iter.next();
+    if or_iter.next().is_some() {
+        return None; // more than one candidate Or family: ambiguous, refuse.
+    }
+
+    let ctx = Context::new();
+
+    // Conjunct 2: the sort candidate must be a genuine, monomorphic declared
+    // type.
+    let (sort_level_params, sort_ty) = env.const_type(sort_id)?;
+    if !sort_level_params.is_empty() {
+        return None;
+    }
+    if !matches!(ken_kernel::whnf(env, &ctx, &sort_ty), Term::Type(_)) {
+        return None;
+    }
+    let sort_a = Term::const_(sort_id, vec![]);
+
+    // Conjunct 2: the predicate candidate must be a genuine, monomorphic
+    // `sort_a -> Omega _`.
+    let (pred_level_params, pred_ty) = env.const_type(pred_id)?;
+    if !pred_level_params.is_empty() {
+        return None;
+    }
+    let pred_ty_w = ken_kernel::whnf(env, &ctx, &pred_ty);
+    let Term::Pi(dom, cod) = &pred_ty_w else {
+        return None;
+    };
+    if !ken_kernel::convert_type(env, &ctx, dom, &sort_a) {
+        return None;
+    }
+    if !matches!(ken_kernel::whnf(env, &ctx, cod), Term::Omega(_)) {
+        return None;
+    }
+
+    // `or_id`: validated as a genuine two-constructor, non-level-polymorphic
+    // family if the obligation uses one; otherwise a value that can never
+    // match `quote_iform`'s `Or` arm (`pred_id` denotes a `Decl::Opaque`, so
+    // it can never head an `IndFormer` node -- an always-inert placeholder,
+    // harmless because nothing in `phi_closed` was found to need it).
+    let or_id = match or_id_candidate {
+        Some(id) => {
+            let ind = env.inductive(id)?;
+            if !ind.level_params.is_empty() || ind.constructors.len() != 2 {
+                return None;
+            }
+            id
+        }
+        None => pred_id,
+    };
+
+    Some(FoSliceSignature { sort_a, pred_p: pred_id, or_id })
+}
+
+/// Recursive syntax scan backing [`discover_fo_slice_signature`]'s conjunct
+/// 1. A missed occurrence here only costs COMPLETENESS (a discoverable
+/// obligation goes unrecognized, falls through to IPC/HO exactly like an
+/// out-of-slice one) -- never SOUNDNESS, because [`discover_and_quote_fo`]'s
+/// separate conjunct-3 preservation check is the actual safety gate against
+/// adopting a wrong candidate. This walk therefore does not need
+/// `mentions_var0`'s exhaustive-match discipline; it recurses into the
+/// shapes a slice-fragment-shaped obligation can plausibly use and stops at
+/// the rest.
+fn collect_signature_candidates(
+    term: &Term,
+    pred_ids: &mut std::collections::BTreeSet<GlobalId>,
+    sort_ids: &mut std::collections::BTreeSet<GlobalId>,
+    or_ids: &mut std::collections::BTreeSet<GlobalId>,
+) {
+    if let Term::App(f, a) = term {
+        if let Term::Const { id, level_args } = f.as_ref() {
+            if level_args.is_empty() && matches!(a.as_ref(), Term::Var(_)) {
+                pred_ids.insert(*id);
+            }
+        }
+    }
+    if let Term::Pi(domain, _) = term {
+        if let Term::Const { id, level_args } = domain.as_ref() {
+            if level_args.is_empty() {
+                sort_ids.insert(*id);
+            }
+        }
+    }
+    if let Term::Trunc(inner) = term {
+        if let Term::App(f1, _q) = inner.as_ref() {
+            if let Term::App(f0, _p) = f1.as_ref() {
+                if let Term::IndFormer { id, level_args } = f0.as_ref() {
+                    if level_args.is_empty() {
+                        or_ids.insert(*id);
+                    }
+                }
+            }
+        }
+    }
+    match term {
+        Term::Pi(a, b) | Term::Lam(a, b) | Term::Sigma(a, b) | Term::Pair(a, b) => {
+            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(b, pred_ids, sort_ids, or_ids);
+        }
+        Term::App(f, a) => {
+            collect_signature_candidates(f, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
+        }
+        Term::Proj1(t) | Term::Proj2(t) | Term::Trunc(t) | Term::TruncProj(t) => {
+            collect_signature_candidates(t, pred_ids, sort_ids, or_ids);
+        }
+        Term::Ascript(t, a) => {
+            collect_signature_candidates(t, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
+        }
+        Term::Eq(a, t, u) => {
+            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(t, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(u, pred_ids, sort_ids, or_ids);
+        }
+        Term::Let { ty, val, body } => {
+            collect_signature_candidates(ty, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(val, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(body, pred_ids, sort_ids, or_ids);
+        }
+        _ => {}
+    }
+}
+
+/// `D1`-`D3`: discover a signature from `phi_closed`'s own syntax, quote
+/// against it, and accept the result only if quotation genuinely PRESERVED
+/// the obligation's meaning (`D0` conjunct 3) -- `denote(sig, f)` must be
+/// definitionally equal to `phi_closed` itself, checked with the kernel's
+/// own `convert`, never assumed. `embed` is later applied by the caller to
+/// this exact `f` (conjunct 4): the returned [`FOProblem`] is the one and
+/// only quotation performed, never re-derived downstream.
+///
+/// Returns `None` on ANY failure at any stage: ambiguous/absent role
+/// assignment, a declaration-shape mismatch, a quotation refusal, or an
+/// unestablished preservation obligation. Refusal is always safe and always
+/// available (`D0`); the caller falls through to the ordinary IPC route on
+/// `None`, exactly as on a plain quotation refusal (`D4`).
+pub fn discover_and_quote_fo(
+    env: &GlobalEnv,
+    phi_closed: &Term,
+) -> Option<(FoSliceSignature, FOProblem)> {
+    let sig = discover_fo_slice_signature(env, phi_closed)?;
+    let problem = quote_fo(env, &sig, phi_closed).ok()?;
+
+    // Conjunct 3: preservation is ESTABLISHED, not assumed. `denote` must
+    // reconstruct exactly the proposition asked, up to the kernel's own
+    // definitional equality -- never a different proposition that merely
+    // looks similar.
+    let ctx = Context::new();
+    let denoted = denote(env, &sig, &problem.f);
+    let phi_ty = ken_kernel::infer(env, &ctx, phi_closed).ok()?;
+    if !ken_kernel::convert(env, &ctx, &phi_ty, &denoted, phi_closed) {
+        return None;
+    }
+
+    Some((sig, problem))
 }
 
 // ─── D0: quoted source data (`23 §4.3`, slice subset) ──────────────────────
