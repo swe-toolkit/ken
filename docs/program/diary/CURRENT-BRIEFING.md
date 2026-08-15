@@ -44,11 +44,11 @@
 > what found two self-declared-authoritative blocks that were wrong, and a
 > hand-maintained list of 6 preserved refs when origin held 26.)
 
-## LIVE — 2026-08-15 08:20Z
+## LIVE — 2026-08-15 09:30Z
 
-**`main` = `a737d8c9b`.** One publisher running (PR #2299, language `D1`); node
-edits are held uncommitted until it clears, because a background publisher
-races the next commit in this worktree.
+**`main` = `505e9b5cd`.** Tree clean, nothing held, no publisher running.
+Today's PRs: #2298, #2300, #2302, #2303 (mine, doc-only); #2301 (language `D4`,
+code); #2299 closed empty.
 
 **TWO LANES AND NOTHING ELSE GETS A RING** (operator, 2026-08-15; `steward.md`
 §0). Runtime retires `RecursiveDescent`; language + verify do the z3 round-trip.
@@ -100,28 +100,28 @@ attribution is misaddressed — say so rather than forcing a branch.
 (`enum RecursiveDescentResidual`, `core.rs:1979`, two live variants), never on
 node status. **Do not "fix" that wording.**
 
-### LANE 2 — language's `D1` was already landed, verify between work
+### LANE 2 — language's `D4` merged, `D2` widened, verify between work
 
-**`LANG-INTERVENING-LET-FRAME-WEAKENING` `D1` LANDED AT `beb31566b`, PR #2282,
-2026-08-15T03:49:57Z.** The test blob
-`7c9d1eb06e7ad3f2e6a6d2be4579f1d28359caf9` is byte-identical on `origin/main`
-and on the candidate `fe7be838`, and a squash merge of that candidate onto
-`main` stages **nothing**. **`fe7be838` is not an ancestor of `main` and never
-will be** — a squash rewrites the commit, so a landed branch head reads as owed
-forever. Both `language-qa`'s and the leader's statuses were stale reads of
-merged work. PR #2299 closed, branch deleted, evidence in the close comment.
+**`LANG-INTERVENING-LET-FRAME-WEAKENING` `D4` MERGED AT `7b11bbd84`** (PR
+#2301, exact `956d86921`, `dec_7r12dsg9py2a4`). M6-M9 all discharged. **The node
+stays `active` — `D2` and `D3` are deferred, not done.** `D1` had already landed
+at `beb31566b` (PR #2282) when its publish was requested; PR #2299 closed empty.
 
-**Two corrections, both mine.** I did mis-resolve a participant id at 08:04 and
-that post woke nobody — real, and the reason to use
-`scripts/moot-actor-id.sh <role>` every time. **But I then attributed a
-four-and-a-half-hour delay to it, and that delay did not exist**: `D1` had
-merged four hours earlier. **A stale status corroborated by a second stale
-status is not corroboration** — both seats were reading the same unlanded-looking
-branch head. The blob test settles it in one command and should lead, not
-follow, the next such exchange.
+**`D2` is now WIDENED to all four operand assertions in
+`ds5b_dependent_match_refinement_acceptance.rs`** (Adversary hunt
+`evt_399y8ys1ftnee`, accepted; landed `505e9b5cd`, PR #2303; notified
+`evt_1s48da3b9zzga`). `contains("@4")` was one of **three** unanchored
+substrings, and the third (`:507`) sat on merged `D1`'s node — a file-level
+convention split across two nodes, with one half owned by nobody.
 
-`D4` is on its own child branch, unblocked, and the rebase deferred *"until D1
-lands"* can proceed.
+> **The two findings do NOT stack.** Architect Finding 1 **deletes** `:599`
+> and `:604` — the error class alone discriminates — so anchoring them is moot.
+> **Anchoring is the live repair only at `:507`**, where `Dg67` is a name, not a
+> positional level. `AC-6` states the four-site outcome. Details in the node.
+
+**Before publishing anything:** `git diff --quiet origin/main <head> -- <declared
+paths>`. A squash rewrite makes a **landed** head read as owed forever, and two
+seats' statuses agreed on that stale read — which is not corroboration.
 
 **`V3-Z3-PROCESS-ADAPTER` merged.** `blocks: []`, and the throughput successor
 needs a catalog-scale corpus that does not exist. **Do NOT invent a z3
@@ -191,3 +191,10 @@ the `LANG-FOREIGN-NAME-FORMAT-CHARS` threat model; `evt_30gckze0jryj4`.
 7. **A pooled denominator structurally cannot report per-row facts.**
 8. **Attribute before re-triggering:** is `main`'s `crates/` tree identical to
    the last **green** code merge?
+9. **Two accepted findings on one site can prescribe OPPOSITE remedies.** Both
+   were right; one deletes the assertion, the other anchors it, and doing both
+   is a defect. When you widen a scope from a second report, state per site
+   **which** remedy applies — a merged list reads as "apply everything."
+10. **A defect spanning two nodes has a half owned by nobody** once one of them
+    merges. Check whether the sibling half sits on a closed node before scoping
+    the repair to the open one.
