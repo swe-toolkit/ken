@@ -1617,3 +1617,57 @@ tuple, with `core.rs` restored byte-identical afterwards.
 > is the same shape as
 > [[RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]] and is why that node exists.
 > Do not treat the three-state repair as folded in here; it is not.
+>
+> ### CONFIRMED BY MECHANISM, and it re-scopes the repair. Adversary `evt_582zrq09zr1ft`.
+>
+> **It is not a worry about initialization semantics — it follows from row
+> creation and outcome recording being two independent calls:**
+>
+> ```rust
+> rows.push(MatchRecursorCensusRow {
+>     … validator_admitted: false, reached_selector: false, authority: None });  // :1236
+>
+> fn mrc_census_validator(index: Option<usize>, admitted: bool) {                // :1246
+>     let Some(index) = index else { return };
+>     … row.validator_admitted = admitted;
+> }
+> ```
+>
+> Deleting the outer validator deletes **only the `mrc_census_validator(..)`
+> call**. The row is still created, the flag stays at its birth `false`,
+> `census.as_slice()` still destructures as `[row]`, and the tuple reads
+> `(0, false, true)`. **The three rows pass.**
+>
+> **WIDER THAN ONE FIELD — scope the repair to the row's INITIALIZATION
+> CONVENTION.** The row is born with **three** absence-valued fields:
+> `validator_admitted: false`, `reached_selector: false`, `authority: None`. The
+> tuple reads only the first today, so **any future row asserting
+> `reached_selector == false` or `authority.is_none()` inherits the identical
+> conflation.** A one-field fix lets the next assertion re-acquire the blindness
+> for free.
+>
+> **A second silent route to `false` that the destructure does not catch.**
+> `mrc_census_validator` opens `let Some(index) = index else { return }`, so even
+> with the validator present a `None` index makes the outcome call a **no-op**.
+> The `[row]` destructure catches *no row*; **nothing catches "row created,
+> outcome never recorded."**
+>
+> **NARROWER IN WHAT IT LEAVES STANDING — and this bounds the repair.**
+>
+> | member | what it can distinguish |
+> |---|---|
+> | `arrivals == 0` | **not phase** — the assertion's own message says a zero alone cannot tell which phase fired |
+> | `named_authority == true` | **not phase** — both validators emit the same named refusal, so it holds under either |
+> | `validator_admitted == false` | **phase, and it is the blind one** |
+>
+> ⇒ **The tuple has exactly ONE discriminating member, and that member cannot
+> see its own subject being deleted.** That is stronger than *"one of three is
+> weak"*. **Do not add a fourth member** — the other three are already
+> non-discriminating for phase. The repair is to make `validator_admitted`
+> separate *ran-and-refused* from *never-ran*, which the birth-value convention
+> currently prevents.
+>
+> **The landed mutation proof is the other half and remains correct.** Bypassing
+> the outer validator while leaving the builder's intact flips the flag `true`
+> and reds the three rows — **that establishes the ADMIT direction. The DELETE
+> direction has no observation, and now has a mechanism for why.**
