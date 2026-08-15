@@ -1,7 +1,7 @@
 ---
 id: CONF-STALE-RED-DISPOSITIONS
 title: "Eleven conformance sites assert RED-UNTIL-BUILT or BLOCKED-ON against producers that have already landed -- the mirror of the unproducible-fixture defect, and it makes finished work read as outstanding"
-status: active
+status: merged
 owner: spec-enclave
 size: M
 gate: none
@@ -10,6 +10,20 @@ blocks: [CONF-BLOCKER-OWNER-RESOLVABILITY]
 github: null
 origin: "Produced by CONF-BLOCKER-MARKER-RECONCILE's D4 stop. spec-leader verified at exact base e2c2e6e78 that D4's premise was false -- the CAT-3, bytes-CP0, and CAT-4 producers are landed -- and the conformance-validator independently added the coupled AC-2 finding that the four buffer-I/O markers resolve to merged RT-NATIVE-FNSPLIT, whose closure records no residual build work. Steward ruling evt_bgat447r9s6w removed D4 and filed this. Steward-filed per COORDINATION §2."
 ---
+
+> # MERGED 2026-08-15 — PR #2276, squash `edbb5fc68` from declared base `aa1ab8cee`.
+>
+> Five paths, `+165/-122`, `crates/` byte-identical. Decision
+> `dec_6hb6ww6x5qvc8` resolved by the Architect on the exact SHA; Spec/Fidelity
+> `evt_3j0jcsg5q2jpd`, Architect soundness `evt_5g5kpme0qh2xj`. Blob identity
+> verified on all five paths, enumerated from the declared base.
+>
+> **`D4`'s unmet branch fired and none of the four buffer-I/O cells went green.**
+> They now name [[RT-COMPMATCH-TREE-SCRUTINEE]], with the ignored-arm cell and
+> the three no-native-arm cells stated as distinct conditions.
+>
+> **Successor: [[CONF-BLOCKER-OWNER-RESOLVABILITY]]** — 72 of 77 conformance
+> blocker markers name a condition with no resolvable owner.
 
 > # THIS IS THE MIRROR OF `CONF-FMT8-LEVELTOK`, AND IT IS THE COMMONER DIRECTION.
 >
