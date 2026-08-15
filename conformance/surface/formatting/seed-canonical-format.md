@@ -22,7 +22,10 @@ membership role, bracketed hexadecimal bytes, and user-declared fixity, while
 FMT1 aggregates all three. The lexer emits `KwIn` for ASCII `in`, emits
 `Member` only for source `∈`, and has no bracketed-byte token; the parser has
 neither a membership-expression arm nor a fixity-declaration arm. No blocker
-node exists for any of those missing surfaces.
+has landed any of those missing surfaces. Ownership is filed as
+[[LANG-MEMBERSHIP-OPERATOR-SURFACE]], [[LANG-BYTES-HEX-LIST-LITERAL]], and
+[[LANG-FIXITY-DECL-SURFACE]]; filing a blocker does not make its fixture
+producible.
 
 This census is formatting-seed-only. Seven markers elsewhere in conformance are
 not swept: five in
@@ -49,12 +52,16 @@ substring replacement is never an acceptable witness.
 - expect: **RED-UNTIL-BUILT (B3/B4/C)** — byte-for-byte
   `fmt(fmt(source)) == fmt(source)`. The comparison includes final newline,
   blank lines, comment placement, fence markers, and Markdown outside fences.
-- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE, HEX-BYTE-LIST-SURFACE, AND
-  USER-FIXITY-SURFACE (no blocker nodes exist)** — production exposes
+- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE
+  ([[LANG-MEMBERSHIP-OPERATOR-SURFACE]]),
+  BLOCKED-ON-HEX-BYTE-LIST-SURFACE ([[LANG-BYTES-HEX-LIST-LITERAL]]), AND
+  BLOCKED-ON-USER-FIXITY-SURFACE ([[LANG-FIXITY-DECL-SURFACE]])** — production
+  exposes
   `format_ken` and `format_ken_md` for the other referenced fixtures, but this
   aggregate also includes all three unproducible direct cases: FMT8's ASCII
   membership role, FMT6's bracketed `0x[...]` bytes, and FMT8's user-declared
-  fixity expression. Production has no surface for any of the three.
+  fixity expression. All three blockers are filed, but none has landed its
+  surface; production still has no surface for any of the three.
 - why: a formatter that oscillates between flat and broken groups, relocates a
   comment on each pass, or repeatedly rewrites a fence marker can satisfy
   parse preservation while failing to define one canonical form. Byte identity
@@ -200,8 +207,9 @@ substring replacement is never an acceptable witness.
   source lexeme is byte-identical after formatting: base, separators, suffix,
   exponent, delimiter, escape spelling, and payload all survive. Alias-looking
   bytes inside any protected region are not converted to glyphs.
-- fixture: **BLOCKED-ON-HEX-BYTE-LIST-SURFACE (no blocker node exists)** —
-  production can lex the other listed literal families, but has no `0x[...]`
+- fixture: **BLOCKED-ON-HEX-BYTE-LIST-SURFACE
+  ([[LANG-BYTES-HEX-LIST-LITERAL]])** — the blocker is filed, not landed.
+  Production can lex the other listed literal families, but has no `0x[...]`
   byte-list token or AST path. Source `0x[` enters radix-integer lexing and
   fails for having no hexadecimal digit before `[`, so the complete fixture
   cannot be parsed and handed to `format_ken`.
@@ -384,10 +392,11 @@ accepting both arms is insufficient.
   its accepted ASCII alias in an otherwise fixed proposition
 - expect: **RED-UNTIL-BUILT (B2/B3/C)** — the keyword remains ASCII `in`; the
   parsed membership operator prints `∈`
-- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE (no blocker node exists)** — the
-  lexer maps ASCII `in` only to `KwIn`, maps source `∈` to `Member`, and the
-  parser has no membership-expression arm. Production therefore cannot assign
-  the accepted ASCII bytes the membership role this `given` requires.
+- fixture: **BLOCKED-ON-MEMBERSHIP-ASCII-ROLE
+  ([[LANG-MEMBERSHIP-OPERATOR-SURFACE]])** — the blocker is filed, not landed.
+  The lexer maps ASCII `in` only to `KwIn`, maps source `∈` to `Member`, and
+  the parser has no membership-expression arm. Production therefore cannot
+  assign the accepted ASCII bytes the membership role this `given` requires.
 - why: the same input bytes occupy opposite token roles. Replacing every `in`
   either corrupts the keyword or fails to canonicalize membership.
 
@@ -411,7 +420,8 @@ accepting both arms is insufficient.
 - expect: **RED-UNTIL-BUILT (B3/C)** — formatted output reparses to the exact
   same tree for each construct, inserting mandatory-clarity parentheses where
   needed but never changing grouping
-- fixture: **BLOCKED-ON-USER-FIXITY-SURFACE (no blocker node exists)** — the
+- fixture: **BLOCKED-ON-USER-FIXITY-SURFACE
+  ([[LANG-FIXITY-DECL-SURFACE]])** — the blocker is filed, not landed. The
   landed parser represents ascription, binders, arrows, application, and
   built-in arithmetic precedence, but exposes no fixity-declaration arm or
   user-fixity token. Production therefore cannot construct the named
