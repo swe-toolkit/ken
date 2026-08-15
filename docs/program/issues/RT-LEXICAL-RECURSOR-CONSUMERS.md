@@ -47,6 +47,16 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 >
 > ### THE ROUTE QUESTION IS [[RT-CONSUMING-OCCURRENCE-ROUTE-WIRE]]
 >
+> **UPDATED 2026-08-15 — that node is `merged`, and so is the surface node after
+> it.** The live successor is [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] (`ready`,
+> `S`). Route-wire measured the depth-2+ boundary to be a representation problem;
+> [[RT-REQUIRED-OCCURRENCE-PROJECTION]] built the lawful surface and advanced
+> **row 4 depths 2 and 3** to a `Closure` refusal at `66715f9fb`. **Row 4 depth 1
+> is outside that surface by construction** — the projection is minted only where
+> `required != source` — so it is a different residual, and the census node is
+> what establishes the per-row reach. **Everything below this line describes the
+> state before that merge; read the successor for what is live.**
+>
 > `ready`, `M`, runtime-owned, filed 2026-08-15. The chain's three landed nodes
 > each supplied an input and **not one closed a row**:
 > `RT-CONTKEY-CONSUMING-OCCURRENCE` gave the source-keyed relation, complete at
