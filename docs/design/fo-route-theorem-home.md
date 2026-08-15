@@ -2,9 +2,16 @@
 
 **Architect design ruling, 2026-08-15.** Settles the *artifact home* half of
 `spec/20-verification/23-prover.md §4.4`, which assigns the placement to the
-Architect and the operator jointly. **It does not settle the evaluator/TCB
-posture**, which stays with the operator; §4 below says why that is the
-right split and what evidence it should be decided against.
+Architect and the operator jointly. **This ruling did not settle the
+evaluator/TCB posture** — the other half — and §4 is where it argued why that
+split was right and what evidence the posture should be decided against.
+
+**Both halves of `§4.4` are now closed.** The operator settled the posture the
+same day — *build it and measure it* — and §4 carries that ruling and what it
+does and does not clear. **`§4.4` has no open decision left.** What remains is a
+**precondition**, not a decision: `§4.4` still forbids `proved` until both
+theorems are kernel-checked in the home ruled below, and neither is proved or
+started.
 
 This ruling does not reopen `OQ-12`. Reflective route (a) is decided, on
 intrinsic merits, and everything here assumes it.
@@ -84,7 +91,12 @@ home, route FO cannot return `proved`"* — and admitting them would put two
 load-bearing metatheorems into `trusted_base()`, which is the opposite of the
 result above.
 
-## 4. What this ruling does NOT settle, and why
+## 4. The evaluator/TCB posture: what this ruling left open, and how it closed
+
+**The posture is SETTLED — see the subsection below.** The argument that leads
+to it is kept as written, because it is what the settlement was decided
+against, and because the cost it names is now something to measure rather than
+something to worry about.
 
 The discharge shape in `23 §4.4` is
 
@@ -143,20 +155,23 @@ obtainable well before the metatheory is proved.** Framed as
 `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` because nothing real reaches route FO
 until then.
 
-### The evidence this should be decided against
+### The evidence it was decided against
 
 `OQ-12` records its own residual risk as *whether the adequacy +
 checker-soundness metatheory mechanizes cleanly — a **feasibility** risk,
 retired by a thin front-loaded (a) slice.* **`V3-FO-KRIPKE-SLICE` is that
-slice.** So the posture decision does not have to be made in the abstract; it
-can be made against the slice's evidence, which costs only sequencing.
+slice.** So the posture decision did not have to be made in the abstract, and it
+was not: it was made against the slice's evidence, at the cost of sequencing
+alone.
 
-One obstacle, already routed: route FO's accepted-certificate path and its
-"nothing could establish this" path both converge on `emit_unknown_hole` with
-the audit label `"prover unknown goal"`, so the two are indistinguishable in
-`trusted_base()`. The count the posture decision most needs — how often route FO
-would actually discharge a real obligation — is generated at that line and
-discarded. `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` carries the fix.
+One obstacle, since **fixed**: route FO's accepted-certificate path and its
+"nothing could establish this" path both converged on `emit_unknown_hole` with
+the audit label `"prover unknown goal"`, so the two were indistinguishable in
+`trusted_base()` — and the count the posture decision most needs, how often
+route FO would actually discharge a real obligation, was generated at that line
+and discarded. `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` `D5` separated them:
+the withheld exit now emits its own label naming `§4.4`
+(`emit_unknown_hole_fo_withheld`, `prover.rs`), so the count is recoverable.
 
 **When reading that count: a large withheld count is evidence that route FO
 would discharge real work. It is NOT evidence that those obligations are closer
