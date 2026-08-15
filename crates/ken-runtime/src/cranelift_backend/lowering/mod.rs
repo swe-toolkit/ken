@@ -6937,6 +6937,29 @@ impl<'a> Lowering<'a> {
             let Some(child_shape) = Self::lowered_aggregate_shape(child) else {
                 continue;
             };
+            let Some(child_occurrence) = child.source_aggregate_producer() else {
+                return Err(unsupported(
+                    lowered_value_kind(child),
+                    "an aggregate child reached the carrier with no planner-issued producer \
+                     occurrence, so its producer class cannot be established",
+                ));
+            };
+            // Producer class, not aggregate shape, decides whether a child has
+            // source coordinates to validate. Source-produced children retain
+            // the exact per-position lookup below. A synthesized child has no
+            // source occurrence by construction; its generic ownership record
+            // was already checked above and is checked again when the recursive
+            // preflight visits that child. The source-child certificate control
+            // reaches this arm and still refuses a sibling occurrence, while
+            // the unit-boundary Record reaches the synthesized branch.
+            if self
+                .static_transition_plan
+                .aggregate_record_view(child_occurrence)?
+                .producer_origin()
+                .is_none()
+            {
+                continue;
+            }
             let Some(child_origin) = planned_child.origin else {
                 return Err(unsupported(
                     lowered_value_kind(child),
@@ -7657,10 +7680,102 @@ impl<'a> Lowering<'a> {
         );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
-            LoweringOperand::Specialized(value) => Ok(LoweringOperand::Carried(
-                self.transfer_into_carrier(builder, origin, &value)?,
-            )),
+            LoweringOperand::Specialized(value) => {
+                let value = self.unit_boundary_environment_record(value)?;
+                Ok(LoweringOperand::Carried(
+                    self.transfer_into_carrier(builder, origin, &value)?,
+                ))
+            }
         }
+    }
+
+    /// Replace one directly carried, empty lexical environment with the
+    /// planner-issued synthesized record that names it.
+    ///
+    /// The planner and lowering derive the key independently. The planner
+    /// follows the closed result of a direct lexical-closure call argument to
+    /// one source constructor field. Lowering recovers that constructor's
+    /// source origin from the occurrence carried on the template and enumerates
+    /// the actual field position here, at the generated-unit boundary. The
+    /// lookup succeeds only when owner, producer, structural path, and role all
+    /// agree.
+    ///
+    /// An absent key leaves the closure unchanged, so the existing whole-graph
+    /// refusal remains the authority for every unplanned occurrence.
+    fn unit_boundary_environment_record(
+        &self,
+        value: Lowered,
+    ) -> Result<Lowered, CraneliftBackendError> {
+        let Some(owner) = self.defining_emission_owner else {
+            return Ok(value);
+        };
+        let (constructor, synthesized_identity, occurrence, args) = match value {
+            Lowered::Constructor {
+                constructor,
+                synthesized_identity,
+                occurrence,
+                args,
+            } => (constructor, synthesized_identity, occurrence, args),
+            other => return Ok(other),
+        };
+        let Some(aggregate_occurrence) = occurrence else {
+            return Ok(Lowered::Constructor {
+                constructor,
+                synthesized_identity,
+                occurrence,
+                args,
+            });
+        };
+        let Some(producer) = self
+            .static_transition_plan
+            .aggregate_record_view(aggregate_occurrence)?
+            .producer_origin()
+        else {
+            return Ok(Lowered::Constructor {
+                constructor,
+                synthesized_identity,
+                occurrence,
+                args,
+            });
+        };
+        let args = args
+            .into_iter()
+            .enumerate()
+            .map(|(position, field)| {
+                let ConstructorField::Specialized(Lowered::Closure {
+                    captures,
+                    ..
+                }) = &field
+                else {
+                    return Ok(field);
+                };
+                if !captures.is_empty() {
+                    return Ok(field);
+                }
+                let position = u32::try_from(position).map_err(|_| {
+                    backend_module(
+                        "unit-boundary environment field exceeds the position space"
+                            .to_string(),
+                    )
+                })?;
+                let Some(occurrence) = self
+                    .static_transition_plan
+                    .unit_boundary_environment_occurrence(owner, producer, position)
+                else {
+                    return Ok(field);
+                };
+                Ok(ConstructorField::specialized(Lowered::Record {
+                    occurrence: Some(occurrence),
+                    fields: Vec::new(),
+                }))
+            })
+            .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+        Ok(Lowered::Constructor {
+            constructor,
+            synthesized_identity,
+            occurrence,
+            args,
+        })
     }
 
     /// Resolve the body-level identity used only by the call-input diagnostic.
