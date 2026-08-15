@@ -1,15 +1,82 @@
 ---
 id: RT-EMITTED-WORKER-CONSUMER-WALK
 title: "Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition"
-status: ready
+status: closed
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-LEXICAL-RECURSOR-CONSUMERS]
-blocks: []
+blocks: [RT-SECOND-RECOGNITION-ERASURE, RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE]
 github: null
 origin: "Architect ruling evt_4hs6teqd9yks2, 2026-08-15, on the Steward's question at evt_4x72jp54qwp after two refuted repair attempts. Every symbol cited below was located by name against origin/main 3d69257b5 by the Steward before filing; the ruling's line numbers were not carried. Steward-filed per COORDINATION section 2."
 ---
+
+## CLOSED, NOT MERGED — and the distinction matters to the two successors.
+
+**This node is measurement-only. It produced no candidate and never will**, so
+it can never reach `merged`. Its successors depend on it, and a successor gated
+on a predecessor's `merged` would wait forever.
+
+⇒ **`closed` = resolved-without-landing.** `D0`, `D1`, and `D2` are all
+discharged; the result is the section below, and the disposition went to the
+Architect at `evt_38tt8vj6hnfn0` and was ruled at `evt_3cxm6654d5cjb`.
+**Read the result here; there is no diff to read.**
+
+## MEASURED at `ac8a73d1b`. `D0` DELIVERED, AND IT REFUTED THIS FRAME'S PREMISE.
+
+**Read this before anything below it. Everything downstream was written against
+a premise the measurement corrected.**
+
+**The premise this frame asserted — "the five reach the emission, so it cannot
+come back empty" — is false.** Tagging **both** production constructors of
+`StaticWorkerCallOutcome::Emitted`:
+
+| row | reaches an emitter? | first disposition-changing site |
+|---|---|---|
+| row1 owned-scope | no | `NativeJoinPlanV1` refusal, retained |
+| row4 depth-1 | no | `StaticWorkerFieldLedger::close` |
+| row4 depth-2 | **yes** | `StaticWorkerFieldLedger::close` |
+| row4 depth-3 | **yes** | `StaticWorkerFieldLedger::close` |
+| row5 after-hole | no | `StaticWorkerFieldLedger::close` |
+
+**Where the premise came from, because the error class is the point.**
+`D2k-0`'s rider said *"the last tag before every refusal was the successful
+emission."* That is a statement about **the sites that were TAGGED** — the four
+`value_at` callers plus the `Construct` arm. The Architect read it as a
+universal over the five, and this frame amplified it into an `AC`. **The same
+tagged-population-read-as-universal error the node was filed to correct, one
+level up.**
+
+**`D0`'s actual answer: four of five rows converge on
+`StaticWorkerFieldLedger::close`**
+(`lowering/mod.rs:4721` at `ac8a73d1b`, named by symbol because that file moves).
+For the two emitted rows, `SourceContinuation::CallArgument` consumes the
+emission and **root-adapter lowering then creates a DIFFERENT
+`ConstructorField::StaticWorker` recognition**, which is what `close` refuses on.
+⇒ **The refused recognition is not a consumer of the earlier emission**, which
+is the half of the ruling the measurement refutes. **`lower_binder` is not on the
+measured suffix**, so the recorded hypothesis is answered: no.
+
+**What `close` link one enforces, in its own words:** a constructed field
+*"that no static elimination rebinds, so the field is neither consumed at an
+exact-`Var` call nor erased before construction"*, with erasure *"structurally
+absent here — a recognition exists only because the field was built."*
+
+⇒ The chain is **construct → transition → consume**, and this population
+**constructs and never transitions**, because `rebind` is minted by a static
+elimination and these five have no exact-`Var` call. **Attempt one was not
+looking at the wrong site. It was looking at the missing one.**
+
+**`D2` disposition: routed to the Architect at `evt_38tt8vj6hnfn0`** as the one
+question the ledger's law admits two answers to — **give the population a lawful
+transition, or prevent the recognition.** No banned edge was crossed, no repair
+site proposed, probes reverted, the three named `D2k` controls pass 1/1, base
+equals tip, worktree clean.
+
+> **The refusal text ends *"has no runtime representation."* That is the third
+> impossibility claim in this node's history and it is true of an UNCONSUMED
+> worker. Whether these five must be unconsumed is the question, not the
+> premise.**
 
 ## Two attempts missed, and they were the same KIND of attempt
 
