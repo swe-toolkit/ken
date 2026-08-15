@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 16:39:34Z — from 313 issue file(s) in `docs/program/issues/`.
+2026-08-15 17:37:15Z — from 314 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -342,7 +342,8 @@ the committed file matches the generator's output.
 | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split | merged | doc | S | none | — |
 | `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | ready | runtime | M | none | — |
 | `V3-D-OPEN-GOAL-WITNESS-ROUTE` | The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver | merged | verify | S | none | — |
-| `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | ready | language | L | none | — |
+| `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | active | language | L | none | — |
+| `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | ready | language | L | none | — |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
 | `V3-KRIPKE-THEORY-CLOSURE` | Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes | merged | spec-enclave | M | none | https://github.com/swe-toolkit/ken/pull/2323 |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
@@ -379,7 +380,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE` — Give the unit-boundary environment record a planner-issued occurrence by extending the synthesized producer arm, so the closure crossing is attempted at the seam that actually refused it
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
-- `V3-FO-KRIPKE-SLICE` — Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls
 
 ## Blockers
 
@@ -424,6 +424,7 @@ is itself not yet `merged`/`closed`:
 - `RT-DESCENT-RETIRE` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
+- `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` blocked by `V3-FO-KRIPKE-SLICE` (status: active)
 
 ## Gate progress
 
