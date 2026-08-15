@@ -374,8 +374,9 @@ trusted base, emits the trichotomy verdict keyed by `id` for V1's status
 projection (`21 §5.3`), and adds **no new kernel former or universe**
 (`23 §4.2`/§8: goals stay `φ : Ω_ℓ`, the proof `p : φ` at the same `Ω_ℓ`;
 the classical meanings of `World`/`Le`/`Dom`/`Force` live in the emitted FO
-problem, while `K(Sigma)` is a premise inside `embed`; `Form`/`Cert`/`Decidable`
-are derived inductives at their natural `Type ℓ`; adequacy +
+problem, while `K(Sigma)` is a premise inside `embed`;
+`IForm`/`Form`/`Cert`/`Decidable` are derived inductives at their natural
+`Type ℓ`; adequacy +
 `check_cert`-soundness are kernel-checked terms landing in Ω). Z3/cvc5 are
 **never** in `trusted_base()` (`18 §5`, `23 §7`). Diagnostic *shapes*
 (countermodel, typed hole) are `24`-owned and tagged `(oracle)` here pending
