@@ -1555,3 +1555,45 @@ message. A bare `len() == 2` with no reason is the next thing to rot.
 Severity is **evidence completeness, not correctness.** `D2j` merged correctly
 and its three deliverables are discharged; this is inherited by the next `#6d`
 slice frame.
+
+## `D2k-1e` — the refusal-phase census, MERGED 2026-08-15 at `00fad9da9`, PR #2284
+
+**An increment inside `#6d`. It does NOT retire a residual class**, and nothing
+about the campaign's remaining scope moved. Measured on `main` after the merge:
+`enum RecursiveDescentResidual`
+(`crates/ken-runtime/src/cranelift_backend/lowering/core.rs:1979`) still carries
+**`MatchScrutineeRecursor` and `LexicalCallArgumentRecursor`**. Three classes
+are retired; these two are not, and [[RT-RECURSOR-TRANSPORT]] owns them.
+
+Candidate `152a7d13a`, declared base `301b7af20`, two `ken-runtime` paths,
+`+77/-35`. Blob identity on both paths against `origin/main`: MATCH. QA
+`evt_56jz5wbsmsdrh`; Architect `evt_6tmzxsc6684gc` resolving `dec_6q652b4y857pw`.
+
+**What it establishes.** The three tier-3 rows now assert
+`(arrivals, validator_admitted, named authority) == (0, false, true)`, which
+separates the **phase** of a refusal from its **reason** — the outer
+pre-builder validator and the builder's duplicated validator produce the same
+named refusal, and before this the rows could not tell them apart.
+`with_match_recursor_census` owns only `MRC_CENSUS` and restores nested prior
+state; `compile_cause` drains only `D2F_GATE_ARRIVALS`; the nesting yields one
+census row without cross-draining. Production feature-off behaviour is
+unchanged — the production delta is one line.
+
+The mutation proof is real and was run in both seats: bypassing only the outer
+validator while leaving the builder's own validator intact flipped
+`validator_admitted` to `true` and reddened exactly the three rows on the phase
+tuple, with `core.rs` restored byte-identical afterwards.
+
+> ### CARRIED, NOT CLOSED — the initialization value conflates two states
+>
+> **The Architect's non-blocking finding on this candidate, deliberately
+> excluded from it and owed by the duplicated-validator node.**
+> `validator_admitted` is `false` **as its initialization value**, so `false`
+> means *"the outer validator refused"* **and** *"the outer validator never
+> ran"* — one bit for two facts.
+>
+> The rows red if the outer validator admits, and they **pass if it is removed
+> entirely.** ⇒ **The control cannot see its own subject being deleted**, which
+> is the same shape as
+> [[RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]] and is why that node exists.
+> Do not treat the three-state repair as folded in here; it is not.
