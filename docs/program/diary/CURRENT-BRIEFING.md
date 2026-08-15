@@ -44,19 +44,20 @@
 > what found two self-declared-authoritative blocks that were wrong, and a
 > hand-maintained list of 6 preserved refs when origin held 26.)
 
-## LIVE — 2026-08-15 10:40Z
+## LIVE — 2026-08-15 11:05Z
 
-**`main` = `a1b8a244c`.** Tree clean, nothing held, no publisher running.
-Today's code PRs: #2301 (language `D4`), #2305 (runtime census). Doc-only:
-#2298, #2300, #2302, #2303, #2304, #2306, #2308. Closed: #2299 (empty), #2307
-(conflicting — predated the census merge; superseded by #2308).
+**`main` = `030373602`.** Tree clean, nothing held, no publisher running.
+Today's code PRs: #2301 (language `D4`), #2305 (runtime census), #2310 (runtime
+call-site attribution). Doc-only: #2298, #2300, #2302, #2303, #2304, #2306,
+#2308, #2309, #2311. Closed: #2299 (empty), #2307 (conflicting — predated the
+census merge; superseded by #2308).
 
 **TWO LANES AND NOTHING ELSE GETS A RING** (operator, 2026-08-15; `steward.md`
 §0). Runtime retires `RecursiveDescent`; language + verify do the z3 round-trip.
 Finished work still merges, filings queue, and framing for these two lanes is
 lane work.
 
-### LANE 1 — the census merged, and its `D5` killed a branch
+### LANE 1 — three merges this morning; the fork is one field from settled
 
 **`RT-REQUIRED-CONSUMER-REACH-CENSUS` merged at `50aff29b4`** (PR #2305), `D1`
 through `D5` delivered. M6 blob identity verified against the **declared**
@@ -82,26 +83,51 @@ never build the subgraph, so *"does the closure pre-exist"* may be **ill-posed**
 **Do not re-run the differential.** `D5`'s `CLAIMED` line was amended (Architect
 `evt_38p42gjq12br`) to stop carrying a branch label it did not establish.
 
-**The successor is [[RT-CROSSING-CALL-SITE-ATTRIBUTION]]** — `ready`, `S`, kicked
-at `evt_18awbed73jy7a` (**new thread**). The separator is the **call site**, not
-another differential: is `transfer_into_carrier` invoked on origin 5's
-constructor from the **realization's return path** (⇒ 3', keep it local) or from
-a path that **would have run regardless** (⇒ 1, repair the value production)?
+**[[RT-CROSSING-CALL-SITE-ATTRIBUTION]] then MERGED at `637781f41`** (PR #2310),
+`D1`-`D3` delivered. Both enabled rows enter the origin-5 crossing with
+`invoking_site = GeneratedUnitCallInput` — the tag on `carry_call_input`, **not**
+the realization's return surface. `D3` closed all three latent misreports,
+including the Adversary's stale-origin-key check (`evt_6mpw6frz1h508`), which now
+fires **before** the four-row table and was demonstrated by mutation.
 
-**Its `D3` carries three latent misreports in the same diagnostic**, the third
-from Adversary hunt `evt_6mpw6frz1h508` and verified on `main`: the probe's `[]`
-arm returns silently while its sibling panics, so **a stale
-`StaticOriginId(5)` key would leave the two rows expecting `false` green**. Half
-the census is protected by a shift being loud and half is *satisfied* by it.
-`AC-4` requires the fix be **demonstrated**, not just written.
+> ### BRANCH 1 IS SELECTED **PROVISIONALLY**, AND THE QUALIFIER IS LOAD-BEARING
+>
+> The tag sits on a **shared helper with six callers** (`core.rs:17996`,
+> `:18014`, `:18350`, `:18434`, `:18449`, and the `carry_source_call_inputs` loop
+> at `mod.rs:7618`). It establishes *"a generated-unit call input was being
+> carried"* — **not whose call**, which is exactly what separates the branches.
+> Callee the source program already calls ⇒ **1**; the projected consumer's
+> generated unit ⇒ **3'** survives.
+>
+> **The supporting claim grounds and is still not enough.**
+> `realize_required_consumer_locally` ends at `RoutedAnswer::composed_answer(...)`
+> and carries nothing, so this is not its **return** surface — **but ruling out
+> the return surface does not rule out the realization emitting a CALL.**
 
-**No further successor is framable until `D2` selects a branch. That is not
-framing debt.**
+**The successor is [[RT-CROSSING-CALLEE-IDENTITY]]** — `ready`, `S`, kicked at
+`evt_7v2y8ptre3xfs` (**new thread**). One tag finer, not a new instrument: record
+the callee's unit identity, decide the branch per row, and **resolve the
+"provisional" qualifier in the tree**. Its `D3` exercises the tag's unused
+negative arm — `BoundaryTransferInvokingSite` has two inhabitants and every
+assertion reports the same one (`control.rs:6305`, `:6329`).
 
-**Chain:** `PROJECTION` (merged) → `CENSUS` (merged) → `CALL-SITE` (ready) →
-repair → `TRANSPORT` → `DESCENT-RETIRE`. `RT-RECURSOR-TRANSPORT`'s `D3` gate is
-keyed on the **tree** (`enum RecursiveDescentResidual`, `core.rs:1979`, two live
-variants), never on node status. **Do not "fix" that wording.**
+> **NO REPAIR NODE MAY BE CUT BEFORE IT MEASURES** — the Architect's sequencing
+> (`dec_5m10b60wam0rz`), because a repair cut against branch 1 while 3' holds is
+> the `D2k-1c` cost arriving at the last possible moment.
+
+**Three merges on this chain this morning.** The recurring shape, worth naming:
+**the measurements have been sound and the labels have overreached** — `D5`'s
+`CLAIMED` line, then `D2`'s delivery inference. Both were caught by reading the
+instrument rather than the result.
+
+**No further successor is framable until `CALLEE-IDENTITY` decides the branch —
+the repair node's owner and file follow from that selection. Not framing debt.**
+
+**Chain:** `PROJECTION` (merged) → `CENSUS` (merged) → `CALL-SITE` (merged) →
+`CALLEE-IDENTITY` (ready) → repair → `TRANSPORT` → `DESCENT-RETIRE`.
+`RT-RECURSOR-TRANSPORT`'s `D3` gate is keyed on the **tree** (`enum
+RecursiveDescentResidual`, `core.rs:1979`, two live variants), never on node
+status. **Do not "fix" that wording.**
 
 ### LANE 2 — language's `D4` merged, `D2` widened, verify between work
 
