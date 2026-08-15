@@ -8196,12 +8196,21 @@ struct ContinuationDiscovery {
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum RequiredConsumerProjectionDisposition {
+    Minted,
+    SkippedRequiredEqualsSource,
+    AbsentNoRequiredConsumer,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) struct ContinuationRequiredConsumerObservation {
     continuation_origin: StaticOriginId,
     result_root: StaticOriginId,
-    required: ContinuationConsumingOccurrence,
+    required: Option<ContinuationConsumingOccurrence>,
     derived_at_consumer: Option<ContinuationConsumingOccurrence>,
     child_push: bool,
+    projection_disposition: Option<RequiredConsumerProjectionDisposition>,
 }
 
 #[cfg(test)]
@@ -8214,7 +8223,9 @@ impl ContinuationRequiredConsumerObservation {
         self.result_root
     }
 
-    pub(in crate::cranelift_backend) fn required(self) -> ContinuationConsumingOccurrence {
+    pub(in crate::cranelift_backend) fn required(
+        self,
+    ) -> Option<ContinuationConsumingOccurrence> {
         self.required
     }
 
@@ -8226,6 +8237,12 @@ impl ContinuationRequiredConsumerObservation {
 
     pub(in crate::cranelift_backend) fn is_child_push(self) -> bool {
         self.child_push
+    }
+
+    pub(in crate::cranelift_backend) fn projection_disposition(
+        self,
+    ) -> Option<RequiredConsumerProjectionDisposition> {
+        self.projection_disposition
     }
 }
 
@@ -11534,6 +11551,24 @@ fn build_continuation_specialization_plan(
                             planner_capacity_error("continuation recursive position exhausted")
                         })?,
                     };
+                    #[cfg(test)]
+                    if required_consuming_occurrence.is_none() {
+                        CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
+                            observations.borrow_mut().push(
+                                ContinuationRequiredConsumerObservation {
+                                    continuation_origin: discovery.continuation_origin,
+                                    result_root: discovery.result_root,
+                                    required: None,
+                                    derived_at_consumer: None,
+                                    child_push: false,
+                                    projection_disposition: Some(
+                                        RequiredConsumerProjectionDisposition::
+                                            AbsentNoRequiredConsumer,
+                                    ),
+                                },
+                            );
+                        });
+                    }
                     if let Some(required) = required_consuming_occurrence {
                         pending_required_consumer_projections.push((
                             identity,
@@ -11600,9 +11635,10 @@ fn build_continuation_specialization_plan(
                                             ContinuationRequiredConsumerObservation {
                                                 continuation_origin: discovery.continuation_origin,
                                                 result_root: worker.body_origin,
-                                                required: *required,
+                                                required: Some(*required),
                                                 derived_at_consumer: None,
                                                 child_push: true,
+                                                projection_disposition: None,
                                             },
                                         );
                                     },
@@ -11657,18 +11693,6 @@ fn build_continuation_specialization_plan(
             planner_error("a required-consumer projection names an uninstalled target")
         })?;
         let derived_at_consumer = derive_required_consumer_occurrence(plan, &target_unit.key)?;
-        #[cfg(test)]
-        CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
-            observations
-                .borrow_mut()
-                .push(ContinuationRequiredConsumerObservation {
-                    continuation_origin: _continuation_origin,
-                    result_root: _result_root,
-                    required,
-                    derived_at_consumer,
-                    child_push: false,
-                });
-        });
         if derived_at_consumer != Some(required) {
             return Err(planner_error(
                 "a continuation call's required consumer does not match the consumer-level \
@@ -11680,6 +11704,8 @@ fn build_continuation_specialization_plan(
                 "a required-consumer projection's target has no source-level consuming occurrence",
             )
         })?;
+        #[cfg(test)]
+        let projection_minted = required != source;
         if required != source {
             let projection = RequiredConsumerProjection { source, required };
             if required_consumer_projections
@@ -11691,6 +11717,24 @@ fn build_continuation_specialization_plan(
                 ));
             }
         }
+        #[cfg(test)]
+        CONTINUATION_REQUIRED_CONSUMER_OBSERVATIONS.with(|observations| {
+            let projection_disposition = if projection_minted {
+                RequiredConsumerProjectionDisposition::Minted
+            } else {
+                RequiredConsumerProjectionDisposition::SkippedRequiredEqualsSource
+            };
+            observations
+                .borrow_mut()
+                .push(ContinuationRequiredConsumerObservation {
+                    continuation_origin: _continuation_origin,
+                    result_root: _result_root,
+                    required: Some(required),
+                    derived_at_consumer,
+                    child_push: false,
+                    projection_disposition: Some(projection_disposition),
+                });
+        });
     }
     #[cfg(test)]
     if let Some(mutation) = REQUIRED_CONSUMER_PROJECTION_MUTATION.with(Cell::get) {
