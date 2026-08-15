@@ -254,6 +254,28 @@ one of them is a limitation of Ken's logic.**
 > **not** evidence that those obligations are closer to proved. Both are true at
 > once. (Architect, `evt_7h0jnhhwtrah5`.)
 
+**`D6` — measure whether the audit label reaches a hash. GATES `D1`-`D3`.**
+Added 2026-08-15 from the Architect's non-blocking item on the approved `D5`
+(`evt_241vfpwng5jym`), which asked for it before `D1`-`D3` rather than after.
+
+**Today nothing in production reaches either label.** `D1`-`D3` are exactly what
+makes them appear in real elaborations for the first time. **If the label
+participates in any canonical or content-addressed encoding, then its wording is
+an artifact-stability concern and not only an audit-honesty one** — and `D5`'s
+"do not reword this label" doc comment silently changes from good practice into
+a hard constraint with a different owner.
+
+**The Architect's reading, offered as a hypothesis and explicitly not as the
+answer:** `trusted_base_delta` is keyed on `StableSymbol`, and `18 §4.2` calls
+the postulate name a non-positional audit label, which he takes to mean not
+identity-bearing. **He read that; he did not measure it**, and said so while
+naming the shape he had already been wrong in once that day — a structural
+reading trusted over a probe.
+
+⇒ **Probe it. Report either outcome.** If the label does reach a hash, say so
+plainly: that moves ownership of future wording changes, and `D5`'s doc comment
+needs to say which constraint it is enforcing.
+
 ## Acceptance criteria
 
 **`AC-1`.** No signature-selection rule is landed that `D0`'s ruling did not
@@ -309,6 +331,13 @@ either one.**
 > missing theorem home is the fact; the certificate is not. **The exact wording is
 > the implementer's to propose** — the Architect declined to write the string so
 > that a real proposal gets reviewed rather than his phrasing being built to.
+
+**`AC-9`.** `D6`'s answer is established **by a probe, not by a citation.**
+Changing the label text and observing whether any canonical or content-addressed
+value moves is a measurement; re-reading `18 §4.2` and concluding it is
+non-positional is the reading that already exists and is what `D6` was raised to
+check. **Report the outcome either way** — "the label does not reach a hash" is
+a result, and so is the opposite.
 
 ## Banned scope
 
