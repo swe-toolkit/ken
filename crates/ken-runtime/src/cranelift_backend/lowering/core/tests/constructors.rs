@@ -8224,6 +8224,75 @@ fn a_call_use_coordinate_substitution_is_inert_for_a_self_authorizing_aggregate(
     }
 }
 
+/// `RT-CLOSURE-BOUNDARY-LANE` D4: a diagnostic mutation is not a hit when the
+/// unmutated child lookup was already absent.
+///
+/// MEASURED: the source-machine entry route produces real `Entry` callee tags;
+/// arming the missing-child mutation leaves those tags and the compile outcome
+/// unchanged and records zero hits. CLAIMED: the mutation counter records only
+/// changed lookups. THE GAP: this control covers the honest-absence entry route;
+/// the separate closure-route control proves that removing an existing child is
+/// tagged as a mutation and counted.
+#[test]
+fn a_missing_diagnostic_child_that_was_already_absent_is_not_a_mutation_hit() {
+    fn source_machine_callees() -> Vec<GeneratedUnitCallInputCallee> {
+        d2k_owner_trace_take()
+            .into_iter()
+            .filter_map(|event| match event {
+                D2kOwnerEvent::BoundaryTransferEntered {
+                    invoking_site:
+                        BoundaryTransferInvokingSite::GeneratedUnitCallInput {
+                            caller: GeneratedUnitCallInputCaller::SourceMachineDeclaredUnit,
+                            callee,
+                        },
+                    ..
+                } => Some(callee),
+                _ => None,
+            })
+            .collect()
+    }
+
+    let program = d7_constructor_arguments();
+    let _ = d2k_owner_trace_take();
+    let (baseline, baseline_hits, _, _) =
+        d7_ownership_run(&program, GovernedAllocationMutation::None);
+    let baseline_callees = source_machine_callees();
+
+    let _ = d2k_owner_trace_take();
+    let guard = CallInputCalleeDiagnosticMutationGuard::install();
+    let (mutated, mutation_hits, _, _) =
+        d7_ownership_run(&program, GovernedAllocationMutation::None);
+    let diagnostic_hits = guard.hits();
+    drop(guard);
+    let mutated_callees = source_machine_callees();
+
+    baseline.expect("the unmutated source-machine entry route compiles");
+    mutated.expect("the diagnostic mutation cannot change compilation");
+    assert_eq!(baseline_hits, 0, "the baseline installs no ownership mutation");
+    assert_eq!(
+        mutation_hits, 0,
+        "the diagnostic control must not install an ownership mutation",
+    );
+    assert!(
+        !baseline_callees.is_empty(),
+        "the control must reach a real source-machine entry callee",
+    );
+    assert!(
+        baseline_callees
+            .iter()
+            .all(|callee| matches!(callee, GeneratedUnitCallInputCallee::Entry(_))),
+        "the unmutated lookup must already be absent: {baseline_callees:?}",
+    );
+    assert_eq!(
+        diagnostic_hits, 0,
+        "redirecting an already-missing lookup must not count as a mutation hit",
+    );
+    assert_eq!(
+        mutated_callees, baseline_callees,
+        "an honest absence must remain an Entry tag under the mutation",
+    );
+}
+
 /// The one bare-rig device the direct-API `D7` rows share.
 ///
 /// ⭐ A function with NO boundary-carrier refs: the first thing an emitted

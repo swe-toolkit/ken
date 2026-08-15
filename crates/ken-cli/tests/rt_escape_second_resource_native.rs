@@ -603,6 +603,26 @@ fn escape_resource_plus_plain_matches_interpreter() {
 // RT-SRCBODY-BIND-ORDER commit.
 // It refuses at object emission, so the program never executes and no
 // binding order is observable in it.
+//
+// RT-CLOSURE-BOUNDARY-LANE D1 measured the refusing caller separately. The
+// specialized-child screen in `transfer_constructor_operands` is building the
+// source `ITree::Vis` constructor directly in the carrier because a sibling is
+// already carried. Its planned allocation is `InvocationAggregate`, not
+// `PersistentGround`, so this row is a live-domain exchange governed by
+// `41-values.md:76-83`, not durable publication under `:72-75`.
+//
+// The repair attempt stops at B2F's closed carrier language. Generated-unit
+// values cross as one `BoundaryWord`; its only `Closure` tag/class row is the
+// explicitly retired persistent lane, and the invocation-owned aggregate row
+// admits only constructors and records. B2F can directly call a statically
+// selected closure body, but it cannot carry this first-class closure while
+// checking defining-owner/artifact liveness, same-domain use, and checked
+// dispatch. Adding that representation and authority would be a new carrier,
+// not wiring the existing one, so this row remains conservatively refused.
+//
+// D3 removes this ignore only with that live-domain validation in place and a
+// passing native/interpreter differential. Re-labelling the refusal without
+// executing the row does not discharge the skip.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
 #[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]
