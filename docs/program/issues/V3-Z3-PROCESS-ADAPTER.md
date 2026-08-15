@@ -109,6 +109,39 @@ false contract for whoever writes against the name.** That is you.
 **`D5` below is the one-line fix**, and it is the Architect's own remedy —
 rename to what it verifies, or state the non-guarantee in its doc comment.
 
+## WHY THE TRUST CLAIM HOLDS — it is carried by a TYPE, not by discipline
+
+Verified on the landed candidate (Adversary `evt_1cg4kd7edak6c`). Record the
+**reason**, not just the conclusion, because the reason is what a successor must
+not break.
+
+**`attempt_d_with_z3_process` obtains a `Vec<BigInt>` from
+`candidate_assignment` — or `Unknown` — and hands it to the pre-existing
+`attempt_d_with_int_assignment`.** ⇒ **Z3's output cannot carry a verdict, a
+certificate, or a term. It can only propose numbers.** The
+oracle-not-authority property is **structural in the ingestion type**, not
+maintained by care at the call site. That is the strongest available form.
+
+**And the placement composes with the D-route containment argument.** The z3
+call is the **final** statement of `attempt_d`, after IPC and the ground
+refutation floor have both failed ⇒ enabling the feature can only turn
+`Unknown` → `Disproved` and **can never displace a `Proved`.** Feature-on
+cannot lose a verdict, by the same argument shape as the D reroute.
+
+**Feature gating checked:** `default = []`, every reaching site is
+`#[cfg(feature = "z3-process")]` with no `any(test, …)`, so a default
+`cargo test` does not invoke a process either.
+
+> **One bounded limit worth a clause, because two different events read as one
+> in the failure taxonomy.** There is a real timeout — a `try_wait` poll loop
+> with `kill()`/`wait()` on expiry, a kill on write failure, `stderr` nulled.
+> **But the poll loop never drains stdout**, so an answer exceeding the OS pipe
+> buffer blocks the child, which then cannot exit, so **the timeout fires and
+> yields `Unknown`.** Fail-safe, and not live for a handful of `Int` bindings.
+> **The drain and the timeout are mutually exclusive in this structure and the
+> code correctly chose the timeout** — but *"timeout on a hung solver"* and
+> *"timeout on an oversized answer"* are not the same event.
+
 ## SUCCESSOR LEDGER — the two Architect carries, dispositioned. Steward, 2026-08-15.
 
 `verify-leader` asked for the authoritative disposition on both so neither is
@@ -227,11 +260,36 @@ acceptable; one that changes the verdict is not, and is a hard stop.
 >
 > **This was merged deliberately** — both required gates were in, and a
 > hypothetical infrastructure flake is not a sequencing constraint
-> (playbook §4c, the safety-of-`main` trap). **The remedy is named here so
-> nobody has to rediscover it under a red fleet:** drop the job from the
-> aggregate's `needs:` and pass/fail loop, leaving it advisory. Pinning or
-> vendoring the solver is the heavier alternative and is not obviously worth it
-> for an off-by-default feature.
+> (playbook §4c, the safety-of-`main` trap).
+>
+> ### THE ONE-LINE REMEDY I FIRST NAMED IS WRONG. DO NOT APPLY IT AS STATED.
+>
+> **Adversary `evt_1cg4kd7edak6c`, and it is the reason this block was
+> rewritten.** I wrote *"drop the job from the aggregate's `needs:` and pass/fail
+> loop, leaving it advisory."* **That would remove the only control on the query
+> generator**, and neither of this node's two recorded items mentions that
+> component.
+>
+> **`stub(..)` writes `#!/bin/sh\ncat >/dev/null\n{body}` — it DISCARDS STDIN
+> and prints canned output.** So every stub test exercises the **parser** and the
+> **failure taxonomy** and **cannot see the SMT-LIB emission at all**: a query
+> generator producing garbage still gets the canned model back, and
+> `parsed_model_is_candidate_not_verdict` still passes.
+>
+> **Only `installed_z3_round_trip_reaches_kernel_checked_refutation` drives a
+> real binary**, and it does not skip when `z3` is absent — it asserts
+> `Disproved` unconditionally. Its own doc says the claim is *"CI installs a
+> working process adapter, not merely stub coverage."*
+>
+> ⇒ **That claim is made true BY the required CI job.** Making the job advisory
+> leaves a stub suite that a **completely broken query generator passes with
+> everything green.**
+>
+> ⇒ **The two items are individually right and pull against each other, so
+> decide them together.** Keeping the job required is what keeps the emission
+> path witnessed. **Dropping it first requires a replacement control over
+> `emit_int_expr` / the query builder that does not depend on an installed
+> binary.** Pinning or vendoring the solver is the heavier alternative.
 
 **`AC-7`.** `D5` landed, and **the set of goals `is_linear_int_expr` accepts is
 unchanged** — demonstrated by the predicate's body being untouched, or by a
