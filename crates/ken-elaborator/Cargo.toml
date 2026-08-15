@@ -11,6 +11,7 @@ rust-version.workspace = true
 [features]
 default = []
 r3-4b-observation = ["ken-runtime/r3-4b-observation"]
+z3-process = []
 
 [dependencies]
 ken-host = { path = "../ken-host" }

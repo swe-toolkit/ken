@@ -351,6 +351,21 @@ jobs:
       - name: Test
         run: cargo nextest run --locked -p ken-cli --test rt_parity_native
 
+  z3-process-adapter:
+    name: optional z3 process adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Z3
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes z3
+          z3 -version
+      - name: Test feature-on adapter
+        run: >-
+          cargo test --locked -p ken-elaborator --features z3-process
+          --test v3_z3_process_adapter
+
   # ⛔ DO NOT RENAME OR DELETE THIS JOB. `build + test` is a REQUIRED status
   # check in branch protection (docs/ops/github-setup.md §"Required status
   # checks"). The sharded matrix above publishes checks named `test shard
@@ -375,6 +390,7 @@ jobs:
       - native-write-partition
       - native-buffer
       - native-rt-parity
+      - z3-process-adapter
       - ignored-row-sweep
     # `always()` so this reports a definite conclusion even when a job fails
     # or is skipped. Without it, a failed dependency leaves this job *skipped*,
@@ -387,17 +403,20 @@ jobs:
           write='${{ needs.native-write-partition.result }}'
           buffer='${{ needs.native-buffer.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
+          z3_adapter='${{ needs.z3-process-adapter.result }}'
           ignored_sweep='${{ needs.ignored-row-sweep.result }}'
           echo "test-shard matrix:      $shards"
           echo "native-write-partition: $write"
           echo "native-buffer:          $buffer"
           echo "native-rt-parity:       $rt_parity"
+          echo "z3-process-adapter:     $z3_adapter"
           echo "ignored-row-sweep:      $ignored_sweep"
           failed=0
           for pair in "test shards:$shards" \
                       "native-write-partition:$write" \
                       "native-buffer:$buffer" \
                       "native-rt-parity:$rt_parity" \
+                      "z3-process-adapter:$z3_adapter" \
                       "ignored-row-sweep:$ignored_sweep"; do
             name="${pair%:*}"; result="${pair##*:}"
             if [ "$result" != "success" ]; then
