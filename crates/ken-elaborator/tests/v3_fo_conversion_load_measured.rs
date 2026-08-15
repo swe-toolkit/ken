@@ -268,7 +268,7 @@ fn measure_one(env: &mut ElabEnv, label: &str, source: &str, formula_depth: usiz
 /// thread (`D4` correction, module doc) so the corpus's own margin past the
 /// original false depth-56 boundary is real, not merely asserted.
 #[test]
-fn measure_kernel_conversion_load_on_real_source_programs() {
+fn measure_rust_reference_checker_load_on_real_source_programs() {
     run_with_big_stack(|| {
         let mut env = ElabEnv::new().expect("base env");
         declare_fo_vocabulary(&mut env, "A", "P");
