@@ -13653,6 +13653,19 @@ impl<'src> StaticTransitionPlan<'src> {
         Ok(occurrence.expr)
     }
 
+    /// Test-only typed recovery of one source occurrence by its asserted
+    /// ordinal. The production lowering cannot mint a [`StaticOriginId`] from
+    /// an integer; this diagnostic likewise returns only an identity the plan
+    /// already contains.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn source_occurrence_origin_at_ordinal_for_test(
+        &self,
+        ordinal: usize,
+    ) -> Option<StaticOriginId> {
+        let occurrence = self.source_occurrences.get(ordinal)?.as_ref()?;
+        (occurrence.static_origin.0 as usize == ordinal).then_some(occurrence.static_origin)
+    }
+
     /// The preallocated origin of one positional syntax child of `parent`.
     ///
     /// This is the **sole** production point for a child's static name, and the
