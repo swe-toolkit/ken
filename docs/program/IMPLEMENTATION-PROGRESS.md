@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 00:35:05Z — from 291 issue file(s) in `docs/program/issues/`.
+2026-08-15 00:45:05Z — from 293 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -67,10 +67,11 @@ the committed file matches the generator's output.
 | `CI-ROW-CLAIM-NAMESPACE` | verify-row-claims hardcodes surface/ in both its claim and heading patterns, so eight of the nine conformance namespaces are structurally invisible to it -- a claim it cannot see is indistinguishable from a claim that does not exist | merged | verify | S | none | — |
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
-| `CONF-BLOCKER-MARKER-RECONCILE` | Three landed `BLOCKED-ON-` markers say 'no blocker node exists' and two of them are now false, while seven other blocked rows name their blockers in prose that no grep can find -- reconcile the corpus against the tracker and adjudicate the one blocker still unowned | ready | spec-enclave | S | none | — |
+| `CONF-BLOCKER-MARKER-RECONCILE` | Three landed `BLOCKED-ON-` markers say 'no blocker node exists' and two of them are now false, while seven other blocked rows name their blockers in prose that no grep can find -- reconcile the corpus against the tracker and adjudicate the one blocker still unowned | active | spec-enclave | S | none | — |
 | `CONF-EVAL-COMPUTED-BOOL-ELIM` | The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together | merged | spec-enclave | S | none | — |
 | `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | merged | spec-enclave | S | none | — |
 | `CONF-SEC4-REFL-PAIR` | Sec4's C1/C2 refl pair is stale against ADR-0013: the suite half of the repair landed with SEC4-TCB, the seed half did not | merged | spec-enclave | S | none | — |
+| `CONF-STALE-RED-DISPOSITIONS` | Eleven conformance sites assert RED-UNTIL-BUILT or BLOCKED-ON against producers that have already landed -- the mirror of the unproducible-fixture defect, and it makes finished work read as outstanding | ready | spec-enclave | M | none | — |
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE | merged | spec-enclave | S | none | — |
 | `DOC-AGENT-CITE` | agent core modules name normative authorities as a reading list rather than binding them to claim classes, so seven of seven cold runs made material claims without citing the sources D2 requires | merged | doc | M | none | — |
@@ -137,6 +138,7 @@ the committed file matches the generator's output.
 | `LANG-LOSSLESS-COUNT-ASSERTION-RETIRE` | `assert_round_trip`'s comment-count assertion cannot fire -- production reconciles the same two sets and refuses first, so `kenfmt_b1_lossless.rs:27` states a theorem while its message reads as a live check, and the `pub fn is_comment` it is the sole external caller of exists only to feed it | merged | language | XS | none | — |
 | `LANG-MATCH-DIAGNOSTIC-PROSE` | The match checker's two error variants now SAY things that are false -- the exhaustiveness message calls an applied pattern a constructor, the reachability doc cites 34 §5 (Refinement types) for an obligation in §4.2, and a test file's header still advertises a gap the same file's own regression test proves closed | merged | language | S | none | — |
 | `LANG-MATCH-PATTERN-FORMS-ABSENT` | spec 34 §3 normatively lists nine pattern forms and the elaborator's PatKind has three -- literals, tuple/record patterns, as-patterns, or-patterns and guards are all absent from the AST, with no deferral statement anywhere in a chapter marked impl-ready and high-priority, and no tracker row for any of them | draft | language | unsized | none | — |
+| `LANG-MEMBERSHIP-OPERATOR-SURFACE` | membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator | ready | language | M | none | — |
 | `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` | `ken-cli` native production runs `px4b_native_production` at effectively zero stack margin -- base passes with a few hundred bytes to spare, so any candidate adding a few hundred bytes aborts it, and `98e6ac51` is the trigger that exposed this rather than its cause | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
 | `LANG-POW10-CASCADE-LITERAL-CLAUSE` | The pow10 generator's own doc comment says every branch is a concrete literal, which its own recursion refutes in the same way the elab.rs copy did -- but its conclusion rests on a DIFFERENT and TRUE property (no saturating/min/clamp anywhere in the generated cascade), so this is a wording repair on a sound argument, not a second false justification | merged | language | XS | none | — |
@@ -335,10 +337,10 @@ the committed file matches the generator's output.
 Items whose status is `ready` and whose every `depends_on` entry is
 itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 
-- `CONF-BLOCKER-MARKER-RECONCILE` — Three landed `BLOCKED-ON-` markers say 'no blocker node exists' and two of them are now false, while seven other blocked rows name their blockers in prose that no grep can find -- reconcile the corpus against the tracker and adjudicate the one blocker still unowned
 - `LANG-BYTES-HEX-LIST-LITERAL` — the bracketed `0x[deadbeef]` Bytes literal is normative in two spec sections and absent from the lexer, so the only landed way to write a Bytes value is `b\"…\"` and any `0x[` source fails as an invalid radix integer
 - `LANG-CONVOY-ENCLOSING-FIELD` — spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed
 - `LANG-LIFT-DISPATCH-SELF-GUARD` — `check_match_with_lift`'s family-membership protection is transitive -- it holds only because the dispatch has exactly one caller, while its sibling in the same file already has two -- so make the dispatch self-guarding instead of documenting the hazard
+- `LANG-MEMBERSHIP-OPERATOR-SURFACE` — membership has no parser arm in either spelling, and ASCII `in` -- which `31 §1b` requires to be the same token as `∈` -- is consumed by the `let … in` keyword, so the spec's accepted-forever ASCII guarantee fails for exactly this operator
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
 - `RT-C2-DRIVER-STAGE-ATTRIBUTION` — The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors
@@ -374,6 +376,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
+- `CONF-STALE-RED-DISPOSITIONS` blocked by `CONF-BLOCKER-MARKER-RECONCILE` (status: active)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
