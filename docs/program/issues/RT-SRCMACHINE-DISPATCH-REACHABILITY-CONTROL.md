@@ -26,6 +26,17 @@ origin: "Architect ruling evt_9qn4nm8gg0ye section 4 on RT-SRCMACHINE-CTOR-RECOG
 > **"No, and here is the limit" is a COMPLETE outcome of this node** — recorded
 > permanently, not a failure to deliver.
 
+> ## SEQUENCING — THIS NODE DOES NOT COME NEXT. Steward, 2026-08-15.
+>
+> **When `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` closes, runtime returns to
+> [[RT-NESTED-IH-NATIVE-REALIZATION]] — not here.** That node is `active`, size
+> `L`, partially built on `wp/RT-NESTED-IH-NATIVE-REALIZATION`, and it
+> **`blocks: [KERNEL-NESTED-IND]`**. The kernel ring has been idle behind it.
+>
+> **Unblocking an idle team outranks closing a regression-detection residual**,
+> and this node is the residual. `ready` means framed and startable, **not next
+> in line.**
+
 ## The gap, exactly
 
 The predecessor armed recognition on the source-machine `Construct` arm, and its
