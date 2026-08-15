@@ -172,8 +172,35 @@ Closure: a closure cannot cross the boundary: it is runtime-local and live-domai
 >   define. That is spec work, not a runtime lane.
 > - **The boundary these rows cross is a live-domain cross-artifact exchange.**
 >   The spec **already grants the lane** and the implementation has not built it.
->   The refusal is then **over-broad**, and the repair is bounded: a typed opaque
->   carrier with explicit owner and lifetime.
+>   The refusal is then **over-broad** — but see the correction immediately
+>   below, because "over-broad" does not mean "delete the arm".
+>
+> ### CLAUSE 2 IS A RESTRICTION WEARING A PERMISSION'S CLOTHES
+>
+> **Architect `evt_3emtcx20vjg8s`, from the spec text rather than this frame's
+> summary. This corrects the sizing this section originally implied.**
+>
+> The clause reads *"may exchange an ordinary closure **only** within one live
+> runtime domain, **while the defining owner and artifact remain live**"*, and
+> *"a wrong-domain, expired, or forged representation **MUST refuse before
+> invocation**."*
+>
+> ⇒ **Even on the live-domain branch the repair is not "stop refusing" — it is
+> "refuse on the RIGHT PREDICATE", carrying a liveness and domain check.** That
+> is **materially larger than deleting a match arm**, and it is the sizing input
+> `AC-2` needs. **Check `B2F` first.**
+>
+> ### THE THIRD CLAUSE FORBIDS THE FIRST THING ANYONE WILL REACH FOR
+>
+> **`41-values.md:84-91`, and it binds on BOTH branches.** A stable serializable
+> callable MUST be exposed as an explicit `StaticCallableRef`-class value, with
+> identity qualified by package/artifact, callable unit/export, and ABI
+> signature, and **no captured environment** — and *"empty-capture optimization
+> MUST NOT silently convert an ordinary closure"* into one.
+>
+> ⇒ **Defunctionalizing the zero-capture case into a static reference is
+> spec-forbidden as a silent conversion.** It is the cheap-looking repair, and it
+> is not available. **Know this before `D2` sizes anything.**
 >
 > **I am not deciding which. The premise is grounded enough to measure and not
 > grounded enough to rule** — and the two answers differ by roughly the whole
@@ -224,7 +251,27 @@ Closure: a closure cannot cross the boundary: it is runtime-local and live-domai
 - **recursor row 4 depths 2 and 3** — routed here 2026-08-15 on the planner
   measurement above. Pooled for sizing, **not** assumed to share a mechanism.
 
+> # ARCHITECT, `evt_3emtcx20vjg8s`: RUN `D0` FIRST. IT IS SMALLER THAN THE
+> # CLASSIFICATION AND IT CAN MOOT ITS SEQUENCING CONSEQUENCE.
+>
+> **He read `41-values.md §2.1` directly rather than taking this frame's
+> summary. Both clauses are as stated, and he found a third** — see `D0`, the
+> amended live-domain reading, and the third clause below. **All three change
+> what `D2` may size.**
+
 ## Deliverables
+
+**`D0` — does the DESCENT lowering of these two expressions perform an
+equivalent boundary crossing?** Architect-specified, and **run it before `D1`**.
+He has **not** measured it and asserts nothing about the answer.
+
+**Why it comes first: it is the question that decides whether anything is
+wrong today**, and it is smaller than the classification.
+
+| `D0` reads | then |
+|---|---|
+| **it does** | the descent lane is **today** accepting a closure-carrying graph across a boundary `§2.1` says MUST reject ⇒ a defect in the **current** tree. The retirement **corrects** it, the two rows re-baseline as expected refusals with the clause cited, and [[RT-DESCENT-RETIRE]] is unblocked **regardless of this lane's size** |
+| **it does not** | nothing is violated today, and the retirement converts **two compiling programs into refusals** — a real capability regression. Then either this lane covers it before `D3`, or the retirement carries an **explicit, recorded narrowing** of what the functionized lane accepts |
 
 **`D1` — classify each owned row's boundary against the two clauses.** For every
 row this node owns, name **which of the two production callers** reaches the
@@ -252,6 +299,56 @@ that is a cheaper thing to learn now than after a repair is cut.
 this node's CI row being skipped. A skipped row measures nothing, and that
 obligation does not move with the classification.
 
+**`D4` — the missing-child mutation counts a hit when it changed nothing.**
+Adversary `evt_1rdqcjzy9p4h8`, **verified on `main` `ddeb200a3`**. It lands in
+the machinery [[RT-PLANNED-CLOSURE-PREEXISTENCE]] merged one hour earlier, and
+it is a trap for whoever arms that mutation next.
+
+**Symptom 1 — `generated_unit_call_entry_callee` (`mod.rs:7697-7714`).** At the
+source-machine entry route the **unmutated lookup already fails**. That is not
+an inference: `Entry(_)` is reachable **only** through the unmutated `Err` arm,
+and `constructors.rs:8217` asserts every callee on that route is `Entry(_)` —
+*"a declared-unit scheduling entry with no child zero must state its level"*.
+
+⇒ **Arming the mutation there redirects a lookup that was already failing,
+changes no outcome, and still counts a hit.**
+
+**Both neighbouring mutations state this hazard and defend against it. These two
+resolvers are the only ones that do not:**
+
+> `mod.rs:7768` — *"**The hit is counted only when the coordinate actually
+> CHANGES.** A call already made at the root would otherwise report a
+> substitution that substituted nothing, **which is indistinguishable from a
+> well-defended one**."* The occurrence twin says the same at `:7796`, and
+> `constructors.rs:7863` enforces it with `assert_ne!(passed_in, used, "… a
+> no-op wearing a hit count")`.
+
+**Symptom 2, same root — `generated_unit_call_body_callee` (`mod.rs:7671-7688`)
+returns `MissingBodyChild` for an unmutated `Err` WITHOUT counting a hit.** So
+the variant means *either* "the mutation removed child zero" *or* "this plan node
+genuinely has none", and the only separator is a **global** counter that cannot
+be attributed to an event.
+
+**Severity: masked today, live for the next row.** The existing control's weight
+is carried by the tag flip `Body(StaticOriginId(49)) → MissingBodyChild`, which
+genuinely discriminates because child zero exists at that route; the
+`assert!(missing.1 > 0)` beside it is redundant **there**. **The moment a row
+arms this mutation and rests on `hits > 0` alone — the shape `constructors.rs`
+already uses for `D7` — it can be satisfied entirely by entry-route hits that
+moved nothing.**
+
+**Direction, not a prescription: neither resolver compares against its own
+unmutated outcome, and one repair covers both.** The comparison is available —
+the unmutated outcome is just `child_static_origin(entry, 0)`. Count only when
+the two results disagree, which is exactly what `assert_ne!(passed_in, used)`
+does one file over.
+
+> **The `D3` exclusion of the five production `child_static_origin(...)?` calls
+> was attacked and held.** A production `?` behaves identically in both profiles,
+> so it cannot produce the test-profile-only divergence the predecessor existed
+> to close. **The criterion is the argument; it needs no independent control.**
+> Recorded so it is not re-litigated.
+
 ## The live stop
 
 **Do not build a carrier, a lane, or a `FrozenClosure` in this node.** `D1` is a
@@ -264,6 +361,11 @@ rather than picking the likelier one. That is a finding about the boundary's
 observability and it routes to the Architect, not to a fourth measurement.
 
 ## Acceptance criteria
+
+**`AC-0`.** `D0` answers the descent-crossing question and states which of its
+two consequences follows. **It runs before `D1`.** If `D0` shows the descent lane
+is already crossing, say so plainly — that makes the retirement a **correction**
+and decouples [[RT-DESCENT-RETIRE]] from this lane's size.
 
 **`AC-1`.** `D1` classifies **per owned row**, naming the production caller and
 citing `41-values.md:72-75` or `:76-83` for each. **A node-level verdict fails
@@ -279,8 +381,21 @@ the Architect's caveat is why.
 weakened, narrowed, or made conditional. **The classification is a reading of the
 callers, not an edit to the gate.**
 
+**`AC-2a`.** Any size `D2` derives for the live-domain branch accounts for the
+**liveness and domain predicate** clause 2 requires, and states that
+`StaticCallableRef` defunctionalization of the zero-capture case is **not
+available**. **A size premised on deleting the match arm fails this.**
+
 **`AC-4`.** No closure carrier, durable lane, or `FrozenClosure`-class value is
-introduced. **`D1`-`D3` are classification and routing work.**
+introduced. **`D0`-`D3` are classification and routing work; `D4` is
+diagnostic-correctness work. Neither breaches this.**
+
+**`AC-4a`.** `D4` lands: both resolvers count a hit **only when the mutated and
+unmutated lookups disagree**, and `MissingBodyChild` distinguishes a mutated
+removal from an honest absence. **Demonstrated** — arm the mutation at the
+**entry** route and show the hit count **unchanged**. **A control that only arms
+it at a closure route does not discharge this**, because that is the route where
+the defect is already masked.
 
 **`AC-5`.** Nothing added to a production build surface, verified by a targeted
 `ken-runtime` check rather than asserted.
