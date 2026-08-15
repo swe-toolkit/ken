@@ -22,13 +22,13 @@
 
 use ken_elaborator::{
     extract::{ObligationId, ObligationTriple, ProvKind, Provenance},
-    fo_kripke::{check_cert, discover_and_quote_fo, embed, find_certificate},
+    fo_kripke::{check_cert, denote, discover_and_quote_fo, embed, find_certificate, IForm},
     prover::Route,
     attempt_obligation, classify,
     error::Span,
     prover::Verdict,
 };
-use ken_kernel::{declare_postulate, subst::shift, Decl, GlobalEnv, GlobalId, Level, Term};
+use ken_kernel::{declare_postulate, subst::shift, Context, Decl, GlobalEnv, GlobalId, Level, Term};
 
 const FO_WITHHELD_MARKER: &str = "theorem-home unapproved";
 const ORDINARY_LABEL: &str = "prover unknown goal";
@@ -151,6 +151,55 @@ fn accepted_certificate_through_public_route_yields_unknown_never_proved() {
              decision is made (23 §4.4) -- got {other:?}"
         ),
     }
+}
+
+/// `V3-FO-CONVERSION-LOAD-MEASURED` `D0`/`AC-1a`: pin conjunct 3's
+/// NON-VACUITY as a property THIS FILE checks, not merely a fact about the
+/// kernel nothing local asserts. `ken_kernel::convert`'s proof-irrelevance
+/// shortcut (`conv.rs:341`) returns `true` unconditionally whenever
+/// `ty : Omega`; conjunct 3 (inside `discover_and_quote_fo`) passes
+/// `phi_ty = infer(phi_closed)` as that `ty`. This is the ONE local
+/// assertion that would go red the day that shortcut started firing here --
+/// `Omega` becoming self-typed, or the guard widening.
+///
+/// This is deliberately a TEST-LEVEL call to `convert`, not a production
+/// obligation routed through `discover_and_quote_fo` to refuse there
+/// (the earlier search for such an obligation was reported as a systematic
+/// negative -- `denote . quote_iform` is a retraction on everything
+/// `quote_iform` accepts, so conjunct 3 cannot be made to REFUSE for any
+/// input that reaches it, as the mechanism stands). That finding is exactly
+/// why THIS property is the one worth pinning: if the denote/quote_iform
+/// pair is what carries the safety today, conjunct 3's one contribution is
+/// to catch a mismatch the day that pair drifts apart, and it can only do
+/// that if `convert` itself still discriminates at `phi_ty`.
+#[test]
+fn conjunct_3_convert_distinguishes_structurally_different_iforms() {
+    let mut env = GlobalEnv::new();
+    let (sort_a, pred_id) = declare_real_program_signature(&mut env);
+    let phi = real_positive_obligation(&sort_a, pred_id);
+
+    let (sig, problem) =
+        discover_and_quote_fo(&env, &phi).expect("discovery must succeed for this obligation");
+
+    let ctx = Context::new();
+    let phi_ty = ken_kernel::infer(&env, &ctx, &phi).expect("phi must type-check");
+
+    // `other_f`: any `IForm` structurally different from `problem.f` (which
+    // is `Forall(Imp(Atom(0), Atom(0)))` for this obligation) -- `Bottom` is
+    // maximally different in shape.
+    let other_f = IForm::Bottom;
+    assert_ne!(
+        problem.f, other_f,
+        "precondition: other_f must genuinely differ from the obligation's own quotation"
+    );
+
+    assert!(
+        !ken_kernel::convert(&env, &ctx, &phi_ty, &denote(&env, &sig, &other_f), &phi),
+        "convert must NOT treat denote(sig, Bottom) as equal to the original \
+         obligation -- if this assertion ever passes, conjunct 3's \
+         proof-irrelevance shortcut has started firing at phi_ty and \
+         preservation is silently vacuous"
+    );
 }
 
 /// `D0` conjunct 1 / `AC-1`: an obligation using TWO distinct declared
