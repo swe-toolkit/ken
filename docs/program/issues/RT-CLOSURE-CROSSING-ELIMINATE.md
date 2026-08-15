@@ -48,6 +48,58 @@ A true measurement does not entail what the sentence built on it claims. The
 predecessor's text forecloses in prose a route the measurement leaves open, and
 this node is that route.
 
+## THREE GUESSES HAVE MISSED. THE SHARED PREMISE IS THE UNIT BOUNDARY.
+## Steward, 2026-08-15, on runtime's `D2k-2` stop `evt_1rq93nqwe1jtr`.
+
+**Three repair guesses in a row have been refuted on this campaign, all three
+mine.** Individually each looked like a different problem. Read together they
+are one wall seen from three sides, and **that synthesis is what this node
+should be sized against.**
+
+| guess | what refused it |
+|---|---|
+| admit the closure crossing on clause 2's predicate via `B2F`'s carrier | no admitted live-domain lane for `BoundaryClass::Closure` exists in the ABI |
+| recognize the static worker at the computational-producer `Construct` arm | the arm is never reached; recognition already happens earlier |
+| route the conservation consumption through `constructor_field_bindings` | the consumer is in a detached ordinary unit; the result crosses as a runtime carrier word, not a compiler-only `ConstructorField` slice |
+
+**The shared premise: that the repair lives on the compiler-side traversal
+inside one unit.** All three assumed the static worker and its consumer sit in
+the same compilation unit, so a compiler-only representation could carry the
+fact between them.
+
+**The measurement says otherwise, and now says it from both ends.** Runtime
+measured that for both conservation rows, match-binder descent happens **before**
+worker recognition; recognition occurs later in the detached ordinary unit
+(`units.rs:6143`), and the non-root result exits **only** via
+`transfer_unit_result_into_carrier` (`units.rs:6227-6234`) and
+`call_declared_unit_target`, which yield a **runtime carrier word**. Their
+conclusion: routing through `constructor_field_bindings` would require **a
+cross-unit result edge or representation**, or undoing the unit boundary.
+
+=> *"No admitted `Closure` lane at the boundary"* and *"no lawful
+`ConstructorField` input at this consumer"* are **the same unit boundary,
+reported from opposite sides.**
+
+### What this means for THIS node, stated as a question and not an assumption
+
+**This node's route is a cross-unit representation** -- carry an admitted
+`Record` across the boundary and dispatch statically. That is precisely the
+thing the third guess found missing.
+
+=> **The two conservation rows are a CANDIDATE member of this node's
+population, not a confirmed one.** If the same cross-unit representation serves
+them, this node closes four expressions rather than two and the campaign's
+remaining size collapses. If it does not, they need separate treatment.
+
+> **Check this immediately after the signature-machinery joint, and check it as
+> a question.** I have **not** verified that the conservation rows' captured
+> environment is record-shaped, nor that one carrier serves both shapes.
+> **Pooling them for sizing is not assuming one mechanism** -- that error has
+> already been made once on this campaign and is called out in
+> [[RT-LEXICAL-RECURSOR-CONSUMERS]].
+>
+> **If the answer is no, do not widen this node to chase them. Hand back.**
+
 ## The a priori best guess — build this
 
 **Operator ruling, 2026-08-15: frame the repair, state the guess as an
@@ -160,6 +212,25 @@ spec clause cited and its pre-retirement behaviour accounted for. This is the
 ratified closure criterion for [[RT-LEXICAL-RECURSOR-CONSUMERS]] and it is
 **not** compile-green.
 
+**`D2a` — the co-population question, answered.** State whether the two
+conservation rows (row 4 depth 1, row 5 after-hole) are served by whatever `D1`
+produces. **A recorded "no, and here is what refuses them" is a complete
+answer** and is worth as much as a yes: it is the input that decides whether the
+campaign still has one repair left or two.
+
+**`D2b` — row 1's disposition, which no increment has ever addressed.** Row 1
+owned-scope stands at `NativeJoinPlanV1`, a construct unrelated to every wall
+this campaign has worked. Under the closure criterion it owes a disposition and
+**has neither a repair nor a recorded refusal.** Either the route in `D1`
+reaches it — repair it — or **state its wall and what discharging it would
+take.**
+
+> **This is a disposition deliverable, not a measurement node.** It is one
+> expression; naming its wall is a paragraph, not a turn. It is called out
+> separately because it is the expression most likely to be read as closed —
+> the other four have all moved, so a reader sweeping the campaign sees motion
+> everywhere and row 1 goes quiet.
+
 **`D3` — the un-skip, or the exact reason it cannot happen.** The escape row is
 skipped. If `D1` succeeds, un-skip it and demonstrate the native and interpreter
 paths agree. If `D1` stops, state exactly what the un-skip still waits on.
@@ -210,6 +281,17 @@ excluded-variant arm inside the same loop, in the same process, records a
   split; do not rebuild it.
 - **Retiring `RecursiveDescent`.** [[RT-DESCENT-RETIRE]] is downstream and is
   not this node.
+
+## The stop that is NOT a failure, named in advance
+
+**A cross-unit result edge or representation is exactly what the third guess
+found missing, and building one is a design, not a wiring job.** If `D1` finds
+that eliminating the crossing requires inventing that representation rather than
+using an admitted one, **that is the stop** — hand back with the mechanism
+named.
+
+**Do not undo the unit boundary to make the repair fit.** Runtime named that as
+the alternative and correctly refused it without a release; it stays refused.
 
 ## The fork this node does not settle, recorded so it is not lost
 

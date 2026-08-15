@@ -466,6 +466,57 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > That is a product call and it is not the ring's to make. **Hand back rather
 > than writing a refusal that quietly accepts a capability loss.**
 
+> # `D2k-2` HIT ITS NAMED DIFFERENT-EDGE STOP. THE CONSERVATION ROWS LEAVE
+> # THIS NODE. Steward, 2026-08-15, on `evt_1rq93nqwe1jtr`.
+>
+> **The conservation-rebind guess was mine and it is refuted.** Empty range at
+> `3df1afe7b`, all three targeted controls green, diagnostic reverted. **The
+> stop was the one the increment named in advance**, which is the increment
+> working rather than failing.
+>
+> **The measurement, and it is the most useful thing this node has produced in
+> three attempts.** For both remaining rows, **match-binder descent happens
+> before worker recognition.** Recognition occurs later in the **detached
+> ordinary unit** (`units.rs:6143`), and the non-root result exits **only** via
+> `transfer_unit_result_into_carrier` (`units.rs:6227-6234`) and
+> `call_declared_unit_target` — which yield a **runtime carrier word, not a
+> compiler-only `ConstructorField` slice.**
+>
+> => **`constructor_field_bindings` has no lawful input at this consumer**, and
+> routing through it would need a cross-unit result edge or representation, or
+> undoing the unit boundary. Both are outside the increment and both were
+> correctly refused without a release.
+>
+> ## THREE GUESSES, ONE SHARED PREMISE — and it is the unit boundary
+>
+> The closure guess died on *"no admitted `Closure` lane at the boundary"*; this
+> one died on *"no lawful `ConstructorField` input at this consumer."* **Those
+> are the same unit boundary reported from opposite sides.** All three guesses
+> assumed the repair lives on the compiler-side traversal **inside one unit**.
+>
+> => **The two conservation rows are routed to
+> [[RT-CLOSURE-CROSSING-ELIMINATE]] as a CANDIDATE co-population**, because that
+> node's whole route is a cross-unit representation. **Routed for sizing, not
+> merged into one mechanism** — `D2a` there answers whether one carrier serves
+> both shapes, and a recorded "no" is a complete answer. **This node does not
+> claim them closed.**
+>
+> ## Row 1 goes with them, and it is the one at risk of going quiet
+>
+> Row 1 owned-scope is still at `NativeJoinPlanV1` with **neither a repair nor a
+> recorded refusal**, and no increment here has ever addressed it. It is now
+> `D2b` of the successor. **Recording that is the point:** the other four
+> expressions have all moved, so a reader sweeping this campaign sees motion
+> everywhere and row 1 reads as done.
+>
+> ## What this node still owes
+>
+> Nothing dispatchable. Its remaining population is dispositioned in the
+> successor, and **the closure criterion is not met until those dispositions are
+> recorded** — repaired, or refused with the spec clause and the pre-retirement
+> behaviour accounted for. **Compile-green does not close this node** and never
+> did.
+
 > # R3 MERGED. THE BLOCKER IS DISCHARGED AND THE STATUS IS NOW `ready`.
 > # Steward, 2026-08-14. Nothing was un-landed and nothing is re-ranked.
 >
