@@ -79,22 +79,82 @@ an early return production never executes**, so the test profile can refuse a
 compile that production accepts — **in a chain whose entire output is which
 refusal each row reached.**
 
-> **The exact lines, verified on the candidate `9ba3950af`, because the frame is
-> what you will grep from.** The `?` calls are `core.rs:17993`, `:18356` and
-> `:18442`. The Architect cited `:17990`, `:18352` and `:18438` — those are the
-> **starts of the same three constructs** (the `#[cfg(test)]` attribute and the
-> two `let closure_origin` bindings), not the `?` itself. Same three sites,
-> named at their region rather than at the defect.
+> **The three named sites, verified on the candidate `9ba3950af`.** The `?`
+> calls are `core.rs:17993`, `:18356` and `:18442`. The Architect cited
+> `:17990`, `:18352` and `:18438` — those are the **starts of the same three
+> constructs**, not the `?` itself.
 >
 > **`child_static_origin(...)?` appears at five further sites** — `:4047`,
-> `:15222`, `:15240`, `:15565`, `:15712`. **None is `cfg(test)`-gated**, so `?`
-> is correct there and they are not in scope. Confirmed by inspection, so a
-> census of the call name alone does not become the work list.
+> `:15222`, `:15240`, `:15565`, `:15712` — and **none is `cfg(test)`-gated**, so
+> `?` is correct there.
+>
+> > ### THOSE THREE ARE NOT THE POPULATION. RE-CENSUS BEFORE YOU WORK THE LIST.
+> >
+> > **Adversary `evt_161q9d2281s20`, and he is right about my error.** The
+> > Architect's finding is keyed on the **name** `child_static_origin(..., 0)?`.
+> > **The mechanism is wider: any `#[cfg(test)]` binding that can alter control
+> > flow in the test profile.** Measured on `main` — `core.rs` alone carries
+> > **14** `#[cfg(test)]` bindings using `?`, against the three this frame
+> > originally named.
+> >
+> > **The enumeration above made this worse rather than better.** By pinning
+> > three exact lines and then ruling five others out of scope, it reads as a
+> > complete census. **It is a complete census of a name and not of the
+> > mechanism**, and a frame that looks exhaustive is what stops the next reader
+> > checking. **Derive `D3`'s population from the mechanism at `D3` time.**
 
 It fails **loudly** rather than silently, so severity is low and this is not a
 reason to hold anything. **The cheap form is strictly better: let a missing
 child degrade the TAG, not the COMPILE**, so the diagnostic cannot alter the
 outcome it exists to record.
+
+**`D4` — the `callee` field you are about to read is corrupted under an existing
+mutation, at exactly one of its six sites.** Adversary `evt_161q9d2281s20`,
+verified on `main` at `mod.rs:7631`.
+
+`carry_source_call_inputs` shadows its own coordinate and then passes **the same
+shadowed binding twice** — once as the transfer origin, once as `callee`:
+
+```rust
+#[cfg(test)]
+let origin = self.call_input_transfer_origin_under_mutation(origin)?;  // shadows
+for input in inputs {
+    carried.push(self.carry_call_input(
+        builder, origin, input,
+        #[cfg(test)] GeneratedUnitCallInputCaller::SourceMachineDeclaredUnit,
+        #[cfg(test)] origin,        // the SAME shadowed binding, as `callee`
+    )?);
+}
+```
+
+**The mutation is a substitution, not a flag** — it returns
+`root_static_origin()`. ⇒ **When the `CallInputTransferOrigin`
+mutation is armed, the recorded `callee` is the program root.** The mutation
+moves the transfer coordinate **and the callee identity together**.
+
+**`D7`'s own comment, three lines above, now states something false of its own
+seam:** *"Same call, same arguments, same moment, **two axes**."* The new field
+is a **third** consumer of that variable, and that sentence is what a reader uses
+to decide the mutation is attributable.
+
+**Severity: latent, not live — which is why nothing was held for it.**
+`SourceMachineDeclaredUnit` is asserted in **zero** controls; the only variant
+any control asserts is `SourceLexicalClosureArgument` (`control.rs:6332`,
+`:6356`), verified. **Nothing reads the corrupted value today. It is a trap for
+whoever reads `callee` next — which is this node.**
+
+**Second symptom, same root: the field holds two different levels.** The other
+five sites derive `child_static_origin(..., 0)` — the callee's **body**. The
+sixth passes `origin`, the callee's **scheduling entry**. Pre-mutation that is
+defensible, but it is one level up, so **a control comparing `callee` across
+callers reads a disagreement where there is none.**
+
+**Both symptoms have one cause: the sixth site reuses a binding instead of
+deriving one.** Direction, not a prescription — derive it like the other five
+from the **pre-mutation** origin, captured before the `D7` line. **Check whether
+a child at ordinal 0 exists at that plan node**; if it does not, the entry origin
+is the right value and the fix is only to take it before the mutation, plus a
+clause saying this variant's `callee` is an entry rather than a body.
 
 ## The live stop
 
@@ -123,9 +183,22 @@ outcome. **Demonstrated** — show the missing-child path degrading the tag whil
 the compile result is unchanged, in the shape the predecessors' mutation
 evidence took.
 
+**`AC-4a`.** `D3`'s population is **derived from the mechanism**, not from the
+three sites this frame names — *"any `#[cfg(test)]` binding that can alter
+control flow in the test profile"*. **State the census and its predicate.**
+Working the three named sites and stopping fails this.
+
+**`AC-4b`.** `D4` lands: the sixth `carry_call_input` site no longer records a
+`callee` that the `D7` mutation substitutes, and `D7`'s *"two axes"* comment is
+corrected or the third consumer removed. **Demonstrated** — arm
+`CallInputTransferOrigin` and show `callee` unchanged. **A control that never
+arms the mutation does not discharge this**, since the defect is invisible
+unarmed.
+
 **`AC-5`.** No repair to either branch lands here, and no ownership is inferred
-beyond the routing `D2` states. **This node finishes the fork; the repair is cut
-after it, from its result.**
+beyond the routing `D2` states. **`D3` and `D4` are diagnostic-correctness
+work, not branch repairs, and do not breach this.** **This node finishes the
+fork; the repair is cut after it, from its result.**
 
 **`AC-6`.** Nothing added to a production build surface, verified by a targeted
 `ken-runtime` check rather than asserted.
