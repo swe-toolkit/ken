@@ -5864,7 +5864,19 @@ fn contkey_row_four_discovery_carries_the_outer_boundary_then_previous_consumers
                 format!("{:?}", observation.result_root()),
                 format!("{:?}", observation.required().body_origin()),
                 format!("{:?}", observation.required().eliminator_origin()),
+                format!("{:?}", observation.derived_at_consumer()),
             ));
+            if !observation.is_child_push() {
+                let derived = observation.derived_at_consumer().expect(
+                    "a consumer-level observation must carry the independent derivation",
+                );
+                assert_eq!(
+                    derived,
+                    observation.required(),
+                    "row4-depth-{depth}: the lagged required occurrence must re-derive from \
+                     the enclosing specialization at the consumer level",
+                );
+            }
             if observation.is_child_push() {
                 advanced.insert(observation.required());
             } else {
@@ -5909,6 +5921,103 @@ fn contkey_row_four_discovery_carries_the_outer_boundary_then_previous_consumers
         [depth_1.units, depth_2.units, depth_3.units],
         [1, 1, 1],
         "the discovery-only carry must leave the interned-unit population unchanged",
+    );
+}
+
+/// `RT-REQUIRED-OCCURRENCE-PROJECTION` AC-1: each coordinate of the new
+/// consumer-level relation is independently validated before lowering can
+/// receive the opaque projection.
+#[test]
+fn required_consumer_projection_refuses_each_wrong_coordinate() {
+    use crate::cranelift_backend::planning::{
+        with_required_consumer_projection_mutation, RequiredConsumerProjectionMutation,
+    };
+
+    let expression = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+    let declarations = BTreeMap::new();
+    for (mutation, expected, other) in [
+        (
+            RequiredConsumerProjectionMutation::BodyOrigin,
+            "a required-consumer projection has a mismatched body_origin",
+            "mismatched eliminator_origin",
+        ),
+        (
+            RequiredConsumerProjectionMutation::EliminatorOrigin,
+            "a required-consumer projection has a mismatched eliminator_origin",
+            "mismatched body_origin",
+        ),
+    ] {
+        let (error, applications) = with_required_consumer_projection_mutation(mutation, || {
+            match plan_static_transition_graph(&expression, &declarations) {
+                Ok(_) => panic!("a mutated required-consumer coordinate must refuse"),
+                Err(error) => error,
+            }
+        });
+        let rendered = format!("{error:?}");
+        assert_eq!(
+            applications, 1,
+            "the mutation must alter one real depth-2 projection rather than a sentinel",
+        );
+        assert!(
+            rendered.contains(expected),
+            "the mutated relation field must name its own refusal: {rendered}",
+        );
+        assert!(
+            !rendered.contains(other),
+            "the refusal must not attribute the other relation field: {rendered}",
+        );
+    }
+}
+
+/// `RT-REQUIRED-OCCURRENCE-PROJECTION` D3/D4: the production funnel consumes
+/// the opaque projection. Suppressing only that branch restores depth 2's old
+/// `StaticWorkerBinding` boundary and removes both binder installations.
+#[test]
+fn required_consumer_projection_reaches_the_depth_two_funnel() {
+    use crate::cranelift_backend::lowering::core::{
+        set_selector_variant_exclusion, with_required_consumer_route_suppressed,
+    };
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+
+    fn compile() -> (String, usize) {
+        let _ = d2k_owner_trace_take();
+        let expression = host_result_closure_match(px8j_scope_chain_observation_result(2, 0));
+        let (result, _trace) =
+            px8j_capture_source_trace(&expression, false, "ken_required_consumer_depth2");
+        let installs = d2k_owner_trace_take()
+            .iter()
+            .filter(|event| {
+                matches!(event, D2kOwnerEvent::StaticWorkerBinderInstalled { .. })
+            })
+            .count();
+        let outcome = match result {
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct, ..
+            })) => construct.to_string(),
+            Ok(_) => "compiled".to_string(),
+            Err(other) => format!("other:{other}"),
+        };
+        (outcome, installs)
+    }
+
+    set_selector_variant_exclusion(Some(
+        RecursiveDescentResidual::LexicalCallArgumentRecursor,
+    ));
+    let _restore = Restore;
+    assert_eq!(compile(), ("Closure".to_string(), 2));
+    let (suppressed, applications) = with_required_consumer_route_suppressed(compile);
+    assert_eq!(applications, 1, "the mutation must suppress one real funnel route");
+    assert_eq!(
+        suppressed,
+        ("StaticWorkerBinding".to_string(), 0),
+        "without the projected consumer depth 2 must return to the exact old boundary",
     );
 }
 
@@ -6076,6 +6185,7 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
     // the case that matters most, so each row is compared against its own
     // literal.
     let conservation = Some("StaticWorkerBinding".to_string());
+    let later_closure = Some("Closure".to_string());
     assert_eq!(
         five.iter()
             .map(|(label, outcome)| (
@@ -6090,14 +6200,13 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
             // is equally consistent with the arming having done nothing.
             ("row1-owned-scope", Some("NativeJoinPlanV1".to_string())),
             ("row4-depth-1", conservation.clone()),
-            ("row4-depth-2", conservation.clone()),
-            ("row4-depth-3", conservation.clone()),
+            ("row4-depth-2", later_closure.clone()),
+            ("row4-depth-3", later_closure),
             ("row5-after-hole", conservation.clone()),
         ],
-        "D2k-0 RE-DERIVED: with the producer armed, none of the five stands at a value-producing \
-         read of a static worker. Four now reach the conservation close, which refuses because \
-         nothing rebinds the recognized field; row 1 reaches an unrelated wall first. A row \
-         reporting the old edge would mean the recognition stopped happening."
+        "D2k-0 RE-DERIVED: no row reaches a value-producing static-worker read. Depth 2 and \
+         depth 3 now advance through the required-consumer projection to Closure; depth 1 and \
+         row 5 retain the StaticWorkerBinding conservation refusal; row 1 remains unrelated."
     );
     assert!(
         five.iter().all(|(_, outcome)| outcome
@@ -34068,15 +34177,12 @@ fn d2e_ac9_layout_agrees_with_the_prefix_production_assembled() {
 ///   ever compile while a worker was recognized and nothing consumed it. That
 ///   is the conservation total; it survives every extension that preserves the
 ///   contract, and it is the assertion that would have caught `739cfde3`.
-/// - **Transition sentinel** on the literal rows: `installs == 0` records the
-///   measured **route gap**, not a property of the world. The eliminations
-///   these rows need exist in their source graphs; the excluded lane's route
-///   reaches a *different occurrence* of the same constructor, so the field the
-///   producer recognizes is never the field an elimination sees. **Retiring
-///   event:** the candidate that makes the elimination reach the recognized
-///   occurrence. At that point these rows install, consume, and go green under
-///   `AC-1` — and this table must be rewritten to those values rather than
-///   restored.
+/// - **Transition sentinel** on the literal rows: depth 2 and depth 3 now take
+///   the separately validated required-consumer projection, install two and
+///   three exact worker binders respectively, and advance to `Closure`. Depth 1
+///   and row 5 still refuse at `StaticWorkerBinding`; row 1 is excluded and
+///   remains at `NativeJoinPlanV1`. These are measured boundaries, not closure
+///   claims, and the table is rewritten when any later route advances them.
 #[test]
 fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
@@ -34186,6 +34292,7 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
     let scope = vec!["ctor:fixture::PX8JScopeTree::Node".to_string()];
     let hole = vec!["ctor:fixture::PX8JHoleOutput::Node".to_string()];
     let refused_worker = "refused:StaticWorkerBinding".to_string();
+    let refused_closure = "refused:Closure".to_string();
     assert_eq!(
         rows,
         [
@@ -34204,18 +34311,16 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
             ),
             (
                 "row4-depth-2",
-                (scope.clone(), 0, 0, 0, refused_worker.clone())
+                (scope.clone(), 0, 2, 0, refused_closure.clone())
             ),
-            ("row4-depth-3", (scope, 0, 0, 0, refused_worker.clone())),
+            ("row4-depth-3", (scope, 0, 3, 0, refused_closure)),
             ("row5-after-hole", (hole, 0, 0, 0, refused_worker)),
         ],
-        "D2k-1b-i conservation: each row must recognize its worker at the owning constructor \
-         ahead of any value-producing read (bare_var_reads == 0), and then reach a disposition. \
-         installs == 0 is the measured ROUTE GAP -- the excluded lane's static eliminations \
-         consume a different occurrence of the same constructor than the one the producer \
-         recognizes -- so the lawful disposition available today is REFUSE, keyed by the \
-         planner's (owner, position) origin. If a row here installs and consumes, the route gap \
-         is closed and this table is rewritten to AC-1's green, never restored."
+        "RT-REQUIRED-OCCURRENCE-PROJECTION D4: every row remains attributed separately. \
+         Depth 2 and depth 3 take the one depth-2+ consumer, rebind at each traversed level, \
+         and advance from StaticWorkerBinding to the later Closure refusal. Depth 1 and row 5 \
+         remain at StaticWorkerBinding, while excluded row 1 remains at NativeJoinPlanV1. \
+         None of these refusals is a closure claim."
     );
 }
 
@@ -34831,9 +34936,9 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
     // The FIRST column is the route observation -- repeated binder descents --
     // kept because it is what makes the route repair an ordering problem, and
     // labelled here so it is never again read as multiplicity evidence. `row4`'s
-    // three depths are its scale check: one repeated eliminating occurrence per
-    // level, so the repetition tracks the source graph rather than being an
-    // artifact of the harness. The SECOND column is the deciding read.
+    // depth-2+ rows are now empty because the required-consumer projection
+    // changes which route is traversed. That column remains non-load-bearing;
+    // the SECOND column is the deciding read.
     // A STABLE ROUTE NAME, never a line number. The label was
     // `core.rs:5411`, which re-aims itself at an unrelated site on any edit
     // above it and is then green for the wrong reason -- the same defect this
@@ -34867,24 +34972,11 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
             ),
             (
                 "row4-depth-2",
-                (
-                    vec![
-                        (format!("{composed} eliminating StaticOriginId(21)"), 2),
-                        (format!("{composed} eliminating StaticOriginId(5)"), 2),
-                    ],
-                    vec![],
-                )
+                (vec![], vec![])
             ),
             (
                 "row4-depth-3",
-                (
-                    vec![
-                        (format!("{composed} eliminating StaticOriginId(21)"), 2),
-                        (format!("{composed} eliminating StaticOriginId(31)"), 2),
-                        (format!("{composed} eliminating StaticOriginId(5)"), 2),
-                    ],
-                    vec![],
-                )
+                (vec![], vec![])
             ),
             (
                 "row5-after-hole",
@@ -34900,9 +34992,8 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
          occurrence. Such a field is therefore rebound more than once as soon as the route repair \
          delivers it, so `consumptions == rebinds` per origin cannot be the conservation proof: \
          transport #1 consumed twice and transport #2 dropped balances at 2 == 2. The first \
-         column -- every row repeating a binder descent over one eliminating match occurrence -- \
-         is a ROUTE observation and proves no field multiplicity: those descents visit different \
-         constructors (rows 4 and 5 take a Node then a Leaf at match origin 5). Do not infer \
+         column is a ROUTE observation and proves no field multiplicity: depth 2 and depth 3 are \
+         now empty after the required-consumer projection changes their traversal. Do not infer \
          transport multiplicity from it. If this table moves, re-run the read before trusting any \
          pairing built on it."
     );
@@ -34998,6 +35089,7 @@ fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
     // resolved, and the one plane the builder built was empty.
     let absent = (false, 0usize, vec![0usize]);
     let conservation = Some("StaticWorkerBinding".to_string());
+    let later_closure = Some("Closure".to_string());
 
     assert_eq!(
         [
@@ -35017,8 +35109,8 @@ fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
                 absent.clone(),
             ),
             ("row4-depth-1", conservation.clone(), absent.clone()),
-            ("row4-depth-2", conservation.clone(), absent.clone()),
-            ("row4-depth-3", conservation.clone(), absent.clone()),
+            ("row4-depth-2", later_closure.clone(), absent.clone()),
+            ("row4-depth-3", later_closure, absent.clone()),
             ("row5-after-hole", conservation.clone(), absent.clone()),
         ],
         "AC-1b: each unmarked seed must REACH a refusal and, on that same compile, carry NO \

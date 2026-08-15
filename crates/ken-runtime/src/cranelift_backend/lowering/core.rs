@@ -17,6 +17,29 @@ thread_local! {
         const { std::cell::Cell::new(None) };
     static RECURSIVE_POSITION_UNIT_CALLS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
+    static SUPPRESS_REQUIRED_CONSUMER_ROUTE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(in crate::cranelift_backend) fn with_required_consumer_route_suppressed<T>(
+    run: impl FnOnce() -> T,
+) -> (T, usize) {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SUPPRESS_REQUIRED_CONSUMER_ROUTE.with(|cell| cell.set(self.0));
+        }
+    }
+    let previous = SUPPRESS_REQUIRED_CONSUMER_ROUTE.with(|cell| cell.replace(true));
+    REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS.with(|cell| cell.set(0));
+    let restore = Restore(previous);
+    let result = run();
+    let applications = REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS.with(std::cell::Cell::get);
+    drop(restore);
+    (result, applications)
 }
 
 /// **`RT-SEED-CALL-PORT` `D1` — the residual set observed at the PRODUCTION
@@ -11948,6 +11971,35 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 eliminators,
             );
         }
+        let required_consumer = self
+            .static_transition_plan
+            .required_consumer_projection_for(identity);
+        #[cfg(test)]
+        let required_consumer = if required_consumer.is_some()
+            && SUPPRESS_REQUIRED_CONSUMER_ROUTE.with(std::cell::Cell::get)
+        {
+            REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS
+                .with(|applications| applications.set(applications.get() + 1));
+            None
+        } else {
+            required_consumer
+        };
+        if let Some(required) = required_consumer {
+            let answer = self.realize_required_consumer_locally(
+                builder,
+                identity,
+                required,
+                fields,
+                recursive_position,
+                producer_env,
+                eliminators,
+            )?;
+            self.settle_continuation_candidate(
+                identity,
+                super::units::CandidateDisposition::InlineNoCall,
+            )?;
+            return Ok(answer);
+        }
         let answer = self.claim_and_call_resolved_continuation_inner(
             builder,
             identity,
@@ -12895,6 +12947,140 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         // closed above against the actual stack head; nothing here derives it
         // from the operand's shape or from the target's origin.
         Ok(RoutedAnswer::composed_answer(lowered, discharged))
+    }
+
+    /// Realize one planner-validated required-consumer projection without
+    /// exporting a compiler-only static worker through a function ABI.
+    ///
+    /// The projection is deliberately separate from static fusion. It neither
+    /// consumes nor consults the fusion claim ledger. Its only authority is the
+    /// independently rederived plan relation keyed by the exact call identity.
+    /// Lowering receives the opaque validated pair, checks its source-level and
+    /// consumer-level eliminators against the actual stack, and does not
+    /// rederive either body coordinate.
+    fn realize_required_consumer_locally(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        identity: &ContinuationCallIdentity,
+        required: RequiredConsumerProjection,
+        fields: &[LoweringOperand],
+        recursive_position: usize,
+        producer_env: &[LoweringEnvironmentBinding],
+        eliminators: &[EliminatorFrame<'_>],
+    ) -> Result<RoutedAnswer, CraneliftBackendError> {
+        let identity = identity.clone();
+        let defining = self.defining_unit.ok_or_else(|| {
+            unsupported(
+                "ContinuationSpecialization",
+                "a required-consumer realization was reached with no unit currently being \
+                 defined",
+            )
+        })?;
+        let defining_owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(
+                "ContinuationSpecialization",
+                "a required-consumer realization was reached with no emission owner bound for \
+                 the context currently being defined",
+            )
+        })?;
+        let operands = self.assemble_continuation_call_operands(
+            &identity,
+            fields,
+            recursive_position,
+            producer_env,
+            defining,
+            defining_owner,
+        )?;
+        let Some(EliminatorFrame::Computational(head)) = eliminators.first() else {
+            return Err(unsupported(
+                "ContinuationSpecialization",
+                "a required-consumer realization has no computational frame at the head of its \
+                 eliminator stack",
+            ));
+        };
+        if head.static_origin != operands.body.continuation_origin {
+            return Err(unsupported(
+                "ContinuationSpecialization",
+                format!(
+                    "a required-consumer realization would answer for continuation {:?}, but \
+                     the eliminator stack's head is {:?}",
+                    operands.body.continuation_origin, head.static_origin
+                ),
+            ));
+        }
+        let source = required.source();
+        let suffix = &eliminators[1..];
+        let Some(EliminatorFrame::Computational(source_frame)) = suffix.first() else {
+            return Err(unsupported(
+                "ContinuationSpecialization",
+                "a required-consumer realization has no source-level computational consumer \
+                 after the frame its target body discharges",
+            ));
+        };
+        if source_frame.static_origin != source.eliminator_origin() {
+            return Err(unsupported(
+                "ContinuationSpecialization",
+                format!(
+                    "a required-consumer realization projects source eliminator {:?}, but the \
+                     exact next computational frame is {:?}",
+                    source.eliminator_origin(),
+                    source_frame.static_origin
+                ),
+            ));
+        }
+        let required_index = usize::from(
+            source.body_origin() != required.body_origin()
+                || source.eliminator_origin() != required.eliminator_origin(),
+        );
+        let Some(EliminatorFrame::Computational(required_frame)) = suffix.get(required_index)
+        else {
+            return Err(unsupported(
+                "ContinuationSpecialization",
+                "a required-consumer realization has no computational frame at the projected \
+                 consumer level",
+            ));
+        };
+        if required_frame.static_origin != required.eliminator_origin() {
+            return Err(unsupported(
+                "ContinuationSpecialization",
+                format!(
+                    "a required-consumer realization projects required eliminator {:?}, but the \
+                     exact consumer-level frame is {:?}",
+                    required.eliminator_origin(),
+                    required_frame.static_origin
+                ),
+            ));
+        }
+
+        let worker_body = operands.body.worker_body_origin;
+        let retargeted_worker_body = match (
+            self.function_local.worker_calls.get(&worker_body),
+            self.function_local.raw_worker_calls.get(&worker_body),
+        ) {
+            (Some(current), Some(raw)) if current.function != raw.function => Some(worker_body),
+            _ => None,
+        };
+        let target = identity.target();
+        let ambient = AmbientBodyAuthority::bind(
+            self,
+            ContinuationEmissionOwner::Specialization(target),
+            operands.consumer_owner,
+        );
+        let lowered = super::units::lower_continuation_selected_case_body(
+            self,
+            builder,
+            &operands.body,
+            &operands.envelope,
+            &operands.ordinary,
+            &operands.continuation_inputs,
+            retargeted_worker_body,
+        );
+        ambient.release(self);
+        let lowered = lowered?;
+        Ok(RoutedAnswer::composed_answer(
+            lowered,
+            operands.body.continuation_origin,
+        ))
     }
 
     fn claim_and_call_resolved_continuation_inner(
