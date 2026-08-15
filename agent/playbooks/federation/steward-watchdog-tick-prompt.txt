@@ -4,7 +4,7 @@ STEWARD WATCHDOG TICK. Run these in order; stop as soon as one produces an actio
 
 1. PRIORITY LANES ARE THE ONLY LANES (operator, 2026-08-15). Lane 1 = runtime, retire RecursiveDescent. Lane 2 = language+verify, z3 round-trip and FO Kripke embedding. No third lane gets a ring however idle or well-framed. Finished work still merges; filings queue.
 
-2. ARE THE LANES' CRATES MOVING? `git log --since='12 hours ago' --oneline origin/main -- crates/ | wc -l`. If the priority lanes' crates are not moving, stop and find out why before framing anything.
+2. ARE THE LANES' CRATES MOVING? ANCHOR THE PATHSPEC TO THE REPO ROOT -- `git log -1 --pretty='%ci %h %s' origin/main -- ':/crates/'` and `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A BARE `-- crates/` RESOLVES RELATIVE TO cwd, and the Bash tool's cwd PERSISTS across calls: after any earlier `cd crates/...`, the filter silently becomes `<subdir>/crates/`, matches nothing, and git reports 0 WITHOUT erroring. Measured 2026-08-15: reported 0 twice while the true count was 10. A false 0 reads exactly like a stalled lane and halts framing. If crates genuinely have not moved, find out why before framing anything.
 
 3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file; do not work from memory.
 
