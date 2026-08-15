@@ -6141,11 +6141,13 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// that origin-5 crossing from `GeneratedUnitCallInput`, the stable tag on
 /// `carry_call_input`. CLAIMED: this is the ordinary generated-unit input route
 /// that carries every specialized input; it is not the required-consumer
-/// realization's return surface. The carrier path would therefore run for any
-/// specialized value delivered there, selecting branch 1: the realization
-/// produced the wrong value shape into a pre-existing carrier path. THE GAP:
-/// this says nothing about closure pre-existence, does not implement the repair,
-/// and does not infer its owner.
+/// realization's return surface. This provisionally selects branch 1: the
+/// realization produced the wrong value shape into a pre-existing carrier path.
+/// THE GAP: `GeneratedUnitCallInput` is measured at the shared
+/// `carry_call_input` helper; six callers share it. Delivery-versus-helper
+/// ordinariness is argued, not measured, so branch 1 remains provisional. This
+/// says nothing about closure pre-existence, does not implement the repair, and
+/// does not infer its owner.
 ///
 /// D3 MEASURED: the depth-2 plan's source-occurrence table contains the typed
 /// identity at ordinal 5, and it renders as `StaticOriginId(5)`. CLAIMED: that
