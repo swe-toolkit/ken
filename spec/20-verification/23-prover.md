@@ -1,25 +1,25 @@
 # The automated prover
 
-> Status: **V3 elaborated** (implementation-ready). Normative for the prover
+> Status: **V3 specified**. Normative for the prover
 > contract, the **verdict trichotomy** and its projection to V1's four-way
 > epistemic status (§1), the **exhaustive** classifier (§2), the soundness
 > discipline (the de Bruijn re-check, §1.5), and the Kripke embedding +
 > **reflective certificate route (a)** (`OQ-12` DECIDED, §4). The embedding's
-> exact frame axioms are tagged `(oracle/standard)`; what must be *proved* vs
-> *assumed* is ledgered (§4/§7). **★★ (untrusted):** every certificate is
-> kernel-re-checked (`../10-kernel/18 §4`), so a prover bug is a failed/weaker
-> verdict, never unsoundness. Contract for WS-V **V3** (third WP of the spine
-> V1→V2→V3).
+> frame, domain, forcing, quotation, and certificate contracts are closed in
+> §4; the two kernel-facing theorem statements are required but their artifact
+> placement is not decided here. **Untrusted:** every certificate is kernel-
+> re-checked (`../10-kernel/18 §4`), so a prover bug is a failed/weaker verdict,
+> never unsoundness. Contract for WS-V **V3** (third WP of the spine V1→V2→V3).
 
 ## 1. Contract
 
 ### 1.1 Input — one obligation
 
 The prover consumes **one obligation at a time**: a triple
-`⟨id, Γ ⊢ φ, provenance⟩` (`22 §1`) with goal `φ : Ω_ℓ` in a local hypothesis
-context `Γ`. Obligations are **independent** — provable in any order / in
-parallel (`22 §5`/§6) — so the prover is a per-obligation function with no
-cross-obligation state. `id` and `provenance` are threaded to the verdict for
+`⟨id, Γ ⊢ φ, provenance⟩` (`22 §1`) with goal `φ : Ω_ℓ` in a local
+hypothesis context `Γ`. Obligations are **independent** — provable in any
+order / in parallel (`22 §5`/§6) — so the prover is a per-obligation function
+with no cross-obligation state. `id` and `provenance` are threaded to the verdict for
 diagnostics (`24`) and the protocol (`25`); the proof search reads only `Γ ⊢ φ`.
 
 ### 1.2 Output — the verdict trichotomy (`21 §5.1`)
@@ -94,7 +94,7 @@ it mentions) to the cheapest **sound** method. Three fragments:
 | Fragment | What's in it | Method |
 |---|---|---|
 | **D — decidable** | atoms where `φ ∨ ¬φ` holds: equality/disequality of scalars & handles, `Int`/`Decimal` arithmetic comparisons, Boolean combinations, finite/bounded membership and quantifiers | **direct** decision (reflective) + Z3 to *search* |
-| **FO — first-order intuitionistic** | first-order formulas over decidable atoms with intuitionistic connectives/quantifiers that are *not* themselves decidable | **Kripke embedding** → Z3 (§4) |
+| **FO — first-order intuitionistic** | the closed source grammar and uninterpreted persistent relations fixed in §4 | **Kripke embedding** → Z3 (§4) |
 | **HO — higher-order / inductive** | quantification over types or predicates, goals needing induction, anything outside FO | **native intuitionistic** (prop skeleton) + **tactics / manual**; typed hole if open |
 
 - For **D**, classical and intuitionistic logic **coincide** (excluded middle is
@@ -163,95 +163,396 @@ Two cooperating mechanisms, both yielding kernel certificates:
    procedure) or by reconstructing the proof (SMTCoq-style) and re-checking. The
    solver finds the witness/cut; the kernel re-derives validity.
 
-## 4. Fragment FO — the Kripke embedding (the headline)
+## 4. Fragment FO — the closed Kripke contract
 
 A genuinely intuitionistic first-order obligation **cannot** be sent to Z3
-directly (Z3 would use `¬¬`-elimination / excluded middle and accept topos-false
-goals). Ken instead sends Z3 the obligation's **Kripke truth condition**.
+directly: a classical solver may use excluded middle and accept a goal that is
+not intuitionistically valid. Route (a), fixed by `OQ-12`, instead checks a
+classical proof of the obligation's exact Kripke translation. This section
+fixes that translation and its proof objects. It does not build them.
 
-**The translation `φ ↦ φ#`.** Introduce a sort `World` with a preorder `≤`
-(accessibility = information growth) and a monotone forcing predicate `⊩`. Each
-n-ary Ken predicate `P` becomes an `(n+1)`-ary classical predicate `P#(w, …)`
-monotone in `w`. The connectives translate by the Kripke clauses:
+### 4.1 Supported source fragment and total quotation
+
+The FO source signature is finite and many-sorted. Quotation synthesizes it
+from the eligible heads in the obligation; no new surface declaration is
+required. Each object sort names a closed, rigid Ken type `A : Type l`, after
+level instantiation and canonicalization by kernel conversion. It may not
+depend on a term or proof in the obligation context. Each predicate symbol is
+a global `Const` with a fixed checked telescope
+`A1 -> ... -> An -> Omega_l` over those sorts. Its applications are quoted
+atomically whether or not the constant has a body; the FO route does not unfold
+that body.
+
+Quotation recognizes the registered logical heads and normalizes only their
+canonical expansions; it does not unfold arbitrary definitions. The accepted
+proposition shapes are exactly these canonical core shapes:
+
+| source proposition | accepted core `Term` shape |
+|---|---|
+| truth / falsity | the registered `Top` / `Bottom` `Const` |
+| `P t1 ... tn` | an `App` spine headed by an eligible predicate `Const`; every `ti` is an in-scope object `Var` of the declared sort |
+| `p and q` | `Sigma(p, q)` with both components in Omega and the proof binder absent from `q` |
+| `p => q` | `Pi(p, q)` with `p` in Omega and the proof binder absent from `q` |
+| `not p` | the preceding implication shape with `q = Bottom` |
+| `p or q` | the canonical `Trunc` of the two-constructor Omega-parameterized sum from `16 §1.3` |
+| `forall x : A. p` | `Pi(A, p)` for a declared rigid object sort `A`, with `p` in Omega |
+| `exists x : A. p` | `Trunc(Sigma(A, p))` for a declared rigid object sort `A`, with `p` in Omega |
+
+An obligation context is quoted from oldest binder to newest. An object binder
+becomes `forall`; a proof hypothesis becomes implication. Thus quotation first
+produces a closed intuitionistic `IForm`, even when the extracted obligation
+was an open `Gamma |- phi`. This closure preserves dependency on earlier
+object binders but refuses dependency on proof terms. A context entry that is
+neither an eligible object binder nor an accepted proposition hypothesis
+refuses the whole obligation.
+
+The result package is
 
 ```
-  (P t̄)#      :=  w ⊩ P# t̄
-  (φ ∧ ψ)#    :=  φ# ∧ ψ#
-  (φ ∨ ψ)#    :=  φ# ∨ ψ#
-  (φ ⇒ ψ)#    :=  ∀ w' ≥ w.  φ#[w'] ⇒ ψ#[w']        -- the intuitionistic clause
-  (¬ φ)#      :=  ∀ w' ≥ w.  ¬ φ#[w']
-  (∀x. φ)#    :=  ∀ w' ≥ w. ∀x ∈ dom(w'). φ#[w']
-  (∃x. φ)#    :=  ∃x ∈ dom(w).  φ#
+FOProblem ::= problem
+  (Sigma : Signature)
+  (C : Carriers Sigma)
+  (rho : AtomEnv Sigma C)
+  (f : IForm Sigma)
+
+FoBoundary ::= unsupported-term-shape
+             | unsupported-atom-theory
+             | non-rigid-sort
+             | higher-order-use
+             | dependent-proof-use
+             | ill-scoped-or-ill-sorted
+
+quote_fo : Obligation -> Accepted FOProblem | Refused FoBoundary
 ```
 
-(Exact domain/monotonicity axioms **(oracle / standard)** — the Kripke-sheaf
-semantics of the topos.) The **soundness theorem** the embedding rests on:
+It returns `Accepted` only after arity, sort, scope, and Omega checks succeed.
+Every other well-formed Ken `Term` returns `Refused`; it never drops a subterm,
+invents an atom, or silently treats a form as classical. The refusal boundary
+includes:
 
-> **`φ` is intuitionistically valid in the topos iff `φ#` (a classical FO
-> theory) is classically valid.**
+- equality, arithmetic, order, collection membership, and every other
+  interpreted atom theory;
+- constants, constructors, literals, projections, functions, or eliminators
+  in object-term position;
+- a predicate-valued variable, quantification over a type or predicate, a
+  higher-order application, or a predicate head without an eligible checked
+  telescope;
+- a dependent object sort, a dependent proposition over a proof, multiple
+  uses of one predicate head at inconsistent arities or sorts, or an ill-scoped
+  variable; and
+- every remaining `Term` constructor, including `Type`, `Omega`, `Eq`, `Lam`,
+  `Pair`, `Let`, `Ascript`, `Elim`, `Cast`, `J`, quotient forms, and a `Trunc`
+  that is not one of the two canonical logical expansions above.
 
-Z3 then decides `φ#` with full classical power, *soundly*, because the
-intuitionistic content lives in the translation, not in an assumption. The
-reason this is principled and not a trick: **Ken's topos semantics *are* Kripke
-semantics** (`README.md §4`), so `φ#` is `φ`'s *native meaning*.
+Those forms route to HO under §2.1. The supported atom theory is therefore
+only a finite family of **uninterpreted persistent relations**. Equality,
+functions, constants, algebraic datatypes, arithmetic, order, and solver
+theory atoms are refused here; D may still accept its independently specified
+closed decidable cases under §3. This boundary is deliberately smaller than a
+general first-order solver language.
 
-**Producing a kernel certificate (the trust step).** Even here, "Z3 says `φ#` is
-valid" is **not** accepted by itself. Two routes, both ending at a
-kernel-checked term:
+### 4.2 Exact classical Kripke theory
 
-- **(a) Reflective: proved adequacy + verified certificate checker (the target,
-  `OQ-12` DECIDED).** Mechanize, *once and in the kernel*, two theorems: the
-  **embedding-adequacy** lemma `classically_valid(φ#) → φ` (the §4 soundness
-  theorem, internalized — Ken's topos = Kripke semantics makes it a genuine
-  theorem), and the **soundness of a deep-embedded checker** `check_cert : Form
-  → Cert → Bool` for the solver's proof certificate. (`check_cert` is a
-  *Ken-level reflective function* over quoted formulas — **distinct from the
-  kernel API `check`** of `18 §4`, which is the trusted re-check of its output.)
-  Then a positive Z3 result discharges `φ` by **computation**: `check_cert
-  (embed φ) π` reduces to `true` (canonicity, `16 §9`), and the discharge is
-  `sound φ π (refl true)`. Per obligation is a tiny term + a kernel evaluation;
-  no per-proof reconstruction.
-- **(b) Reconstruction (feasibility hedge).** Translate the solver's proof of
-  `φ#` rule-by-rule into a native kernel proof (SMTCoq-style), or constructivize
-  a classical proof (Herbrand/expansion-proof) — re-checked by the kernel.
-  Retained **only** for any theory whose adequacy/checker proof turns out
-  genuinely intractable, and as a differential cross-check during bring-up.
+For a quoted signature `Sigma`, `K(Sigma)` is a closed, two-level many-sorted
+classical first-order theory. It contains one nonempty sort `World`, one
+nonempty classical sort `Obj(A)` for each source object sort, and only these
+relations:
 
-**Decision (`OQ-12`, ADR-class):** **(a) is the target architecture**, chosen on
-*intrinsic* merits — it is a permanent semantic artifact (the kernel is
-permanent), robust to solver proof-format drift, scales (tiny proof terms), and
-**yields the mechanized embedding-adequacy theorem the kernel-soundness story
-(G5) wants anyway**. It is *not* deferred on effort grounds; effort is the wrong
-axis for a foundation (`OQ-12`). (a) leans on the kernel already decided:
-**canonicity** (proven for OTT, ADR 0005) makes the reflective discharge
-compute, and **definitional proof irrelevance** (Ω is strict-prop) means *any*
-kernel-accepted inhabitant discharges a propositional goal. The one residual
-risk — whether the adequacy + checker-soundness metatheory *mechanizes cleanly*
-— is a **feasibility** risk, not a labor one; it is retired by front-loading a
-thin vertical slice of (a) (a minimal rule set, proved end-to-end) before the
-full build, with (b) as the hedge if a fragment resists.
+```
+Le        : World -> World -> Prop
+Dom_A     : World -> Obj(A) -> Prop
+Force_P   : World -> Obj(A1) -> ... -> Obj(An) -> Prop
+```
 
-**Proved vs assumed — the soundness ledger (route (a)).** State precisely what
-the FO tier rests on; only the first two rows are theorems the build must
-*prove*, the rest is computed-and-re-checked or assumed-as-standard:
+There are no classical function symbols, object constants, or built-in
+equality atoms in this theory. Its axioms are exactly:
 
-| Piece | Status | How it is discharged |
-|---|---|---|
-| **Embedding-adequacy** `classically_valid(φ#) → φ` | **must be PROVED** — mechanized *once* as a kernel meta-lemma (Ken's topos = Kripke semantics makes it a genuine theorem, not an axiom) | a kernel-checked term: the §4 soundness theorem internalized |
-| **Checker soundness** `check_cert (embed φ) π = true → φ` | **must be PROVED** — proved once for the deep-embedded `check_cert` | kernel-checked; thereafter each discharge is `sound φ π (refl true)` |
-| **Per-obligation discharge** `check_cert (embed φ) π ⇝ true` | **computed + re-checked** every time | `whnf`/`check` (`18 §4`), canonicity (`16 §9`) |
-| **Kripke frame axioms** (domain monotonicity, `≤` preorder, monotone forcing) | **ASSUMED** `(oracle/standard)` — the standard Kripke-sheaf side conditions of the topos | not Ken terms; they shape `φ#`, the *external* classical theory only |
-| **Z3 / cvc5 "unsat"** | **ASSUMED NOTHING** — a search oracle only | discarded unless it yields a `check_cert`-passing `π` |
+```
+preorder-reflexive:
+  forall w. Le w w
 
-The two **PROVED** rows are the soundness bridge; everything the solver does is
-*search* whose output (a certificate `π`) is re-validated. A backend "unsat"
-with **no constructible `π`** is **`unknown`**, never `proved` (§1.2) — the same
-de Bruijn discipline as D, one tier up. Front-loading a thin vertical slice of
-the two PROVED rows (a minimal rule set proved end-to-end) is what retires the
-one residual feasibility risk (`OQ-12`), with (b) as the per-fragment hedge.
+preorder-transitive:
+  forall w v u. Le w v and Le v u => Le w u
 
-Cost note: the embedding adds a `World` sort and +1 arity to every predicate,
-slowing Z3 — so it is reserved for FO; D uses direct/decision (§3).
+domain-inhabited-A:
+  forall w. exists x : Obj(A). Dom_A w x
+
+domain-growth-A:
+  forall w v x. Le w v and Dom_A w x => Dom_A v x
+
+atom-domain-P:
+  forall w x1 ... xn.
+    Force_P w x1 ... xn => Dom_A1 w x1 and ... and Dom_An w xn
+
+atom-persistence-P:
+  forall w v x1 ... xn.
+    Le w v and Force_P w x1 ... xn => Force_P v x1 ... xn
+```
+
+`domain-inhabited-A` and `domain-growth-A` occur once for each object sort;
+the two atom axioms occur once for each predicate. For a nullary predicate the
+domain conclusion is `Top`. These are emitted premises of the classical
+formula, not trusted propositions or solver assumptions hidden outside the
+certificate.
+
+Write `w |= f` for the following classical formula, with object variables
+interpreted in their declared `Obj` sorts:
+
+```
+w |= Top           := Top
+w |= Bottom        := Bottom
+w |= P xs          := Force_P w xs
+w |= (p and q)     := (w |= p) and (w |= q)
+w |= (p or q)      := (w |= p) or (w |= q)
+w |= (p => q)      := forall v. Le w v => ((v |= p) => (v |= q))
+w |= (forall A p)  := forall v. Le w v =>
+                        forall x : Obj(A). Dom_A v x => (v |= p[x])
+w |= (exists A p)  := exists x : Obj(A). Dom_A w x and (w |= p[x])
+```
+
+Negation uses the implication clause because `not p` is `p => Bottom`. In
+particular it is not translated as classical negation at the current world.
+Implication and universal quantification inspect every accessible future
+world; existential quantification uses the current world's domain.
+The clauses and the displayed axioms entail, by structural induction on every
+accepted `f`, the required persistence property
+
+```
+forall w v. Le w v and (w |= f) => (v |= f)
+```
+
+This is a theorem of the emitted theory and translation, not an additional
+forcing axiom. In particular, the existential case uses domain growth and atom
+persistence; neither may be omitted.
+
+For the closed `IForm f` produced by `quote_fo`, the complete target is
+
+```
+embed(Sigma, f) := K(Sigma) => forall w : World. w |= f
+```
+
+Because `K(Sigma)` is inside the target formula, no frame or forcing premise
+exists outside `embed`. The proof-theoretic meaning of
+`classically_valid(embed(Sigma, f))` is fixed with the certificate calculus in
+§4.3; it is not a backend verdict or a semantic oracle.
+
+### 4.3 Quoted formulas and certificates
+
+`IForm` is the source-side inductive used above:
+
+```
+IForm ::= top | bottom | atom PredId (Vector IVar arity)
+        | and IForm IForm | or IForm IForm | imp IForm IForm
+        | forall SortId IForm | exists SortId IForm
+
+IVar  ::= bound Nat
+```
+
+`Signature` is the finite pair of the `SortId` population and the
+arity-indexed predicate profiles. `Carriers Sigma` is a sort-indexed family of
+the corresponding closed rigid Ken types. `IForm Sigma` admits only identifiers
+and vectors well-formed under that signature.
+
+`Form` is the target classical inductive. A relation carries its complete sort
+profile, so `check_cert` needs no ambient, unchecked signature:
+
+```
+QSort ::= world | object SortId
+QTerm ::= bound QSort Nat | parameter QSort Nat
+QRel  ::= access
+        | domain SortId
+        | forcing PredId (Vector SortId arity)
+
+Form  ::= top | bottom | rel QRel (Vector QTerm relation_arity)
+        | and Form Form | or Form Form | imp Form Form
+        | forall QSort Form | exists QSort Form
+```
+
+Indices are de Bruijn indices. `parameter` is a certificate-local free
+parameter, not a source constant or target function symbol. Formula
+well-formedness checks every binder, relation arity, relation argument sort,
+and consistent use of each identifier. `embed` produces a closed, well-formed
+`Form`.
+
+A sequent is a pair of finite multisets of well-formed `Form`s, written
+`Gamma => Delta`; its classical meaning is that the conjunction of `Gamma`
+implies the disjunction of `Delta`. `Cert` is an inductive proof tree whose
+node stores a conclusion sequent, one of these rule tags, its explicit
+principal-formula occurrence, any witness or eigenparameter, and the indicated
+child certificates:
+
+```
+Sequent ::= sequent (List Form) (List Form)
+
+Rule ::= init Nat Nat | top-right Nat | bottom-left Nat
+       | and-left Nat | and-right Nat
+       | or-left Nat | or-right Nat
+       | imp-left Nat | imp-right Nat
+       | forall-left Nat QTerm | forall-right Nat QTerm
+       | exists-left Nat QTerm | exists-right Nat QTerm
+       | weaken-left Nat | weaken-right Nat
+       | contract-left Nat | contract-right Nat
+       | cut Form
+
+Cert ::= node Sequent Rule (List Cert)
+```
+
+Each `Nat` selects the named formula occurrence on the indicated side; the two
+indices of `init` select its left and right occurrences. The quantifier term is
+respectively the witness or eigenparameter described below.
+
+| `Cert` rule | premises checked for conclusion `Gamma => Delta` |
+|---|---|
+| `init` | closes when the same formula occurs in both multisets |
+| `top-right` / `bottom-left` | closes when `Top` occurs on the right / `Bottom` on the left |
+| `and-left` | replace left `p and q` by both `p` and `q` in one child |
+| `and-right` | replace right `p and q` by `p` and by `q` in two children |
+| `or-left` | replace left `p or q` by `p` and by `q` in two children |
+| `or-right` | replace right `p or q` by both `p` and `q` in one child |
+| `imp-left` | for left `p => q`, check `Gamma => Delta,p` and `Gamma,q => Delta` |
+| `imp-right` | for right `p => q`, check `Gamma,p => Delta,q` |
+| `forall-left` | instantiate a left universal with a same-sorted quoted term |
+| `forall-right` | instantiate a right universal with a fresh same-sorted eigenparameter |
+| `exists-left` | instantiate a left existential with a fresh same-sorted eigenparameter |
+| `exists-right` | instantiate a right existential with a same-sorted quoted term |
+| `weaken-left` / `weaken-right` | add one formula on the named side |
+| `contract-left` / `contract-right` | replace two equal occurrences by one |
+| `cut` | check `Gamma => Delta,p` and `Gamma,p => Delta` for the recorded `p` |
+
+Contexts are canonical multisets, so exchange is representation equality, not
+a rule. Quantifier substitution is capture-avoiding. An eigenparameter is
+fresh when it occurs in neither the conclusion sequent nor any parameter
+recorded above that node. A witness must be well-sorted in the conclusion's
+parameter context. The checker rejects any other child count, context change,
+principal occurrence, substitution, freshness claim, free index, or sort
+mismatch.
+
+`Derivation(Gamma => Delta) : Type` is the indexed proof-tree family generated
+by exactly the same rules, with each premise represented by a derivation of its
+checked child sequent. Its propositional reflection is truncated, rather than
+declared as a proof-relevant inductive in Omega (`16 §1.3`):
+
+```
+Derives(s) : Omega := || Derivation(s) ||
+```
+
+It is proof data, not an assumed classical oracle. For this route, the name in
+the adequacy theorem is defined proof-theoretically:
+
+```
+classically_valid : Form -> Omega
+classically_valid q := Derives([] => [q])
+```
+
+Thus "classically valid" means derivable in this fixed two-sided classical
+first-order calculus. The calculus has the ordinary classical sequent meaning
+given above; a separate completeness result against model-theoretic semantics
+is not used by the discharge path.
+
+The executable meaning is fixed by
+
+```
+check_cert : Form -> Cert -> Bool
+check_cert q pi = check_tree ([] => [q]) pi
+```
+
+where `check_tree` performs exactly the local checks in the table and returns
+`True` only if every leaf closes. This is a Ken-level total function over
+ordinary derived data, distinct from the kernel API `check` in `18 §4`. A
+solver proof format has no authority: an adapter must produce this `Cert` or
+the outcome is `unknown`. `FormRef` and `KripkeCountermodel` from §1 and
+`24 §1` remain advisory diagnostic data and are not aliases, constructors, or
+input evidence for `Form`, `IForm`, or `Cert`.
+
+### 4.4 Required theorem statements and trust boundary
+
+For `C : Carriers Sigma`, let `AtomEnv Sigma C` be the arity- and sort-indexed
+family interpreting each quoted predicate as a Ken proposition over the
+corresponding carrier types. Let
+
+```
+denote : (C : Carriers Sigma) -> AtomEnv Sigma C -> IForm Sigma -> Omega
+```
+
+interpret the `IForm` constructors by Ken's connectives and quantifiers from
+`16 §1.3`. Quotation also owes preservation: if
+`quote_fo(o) = Accepted(problem Sigma C rho f)`, then `denote C rho f` is the
+Pi-closed proposition of the original obligation `o`, up to the kernel's
+definitional equality.
+
+Route (a) requires these two theorem statements for exactly the data above:
+
+```
+embedding_adequacy :
+  (Sigma : Signature) ->
+  (C : Carriers Sigma) ->
+  (rho : AtomEnv Sigma C) ->
+  (f : IForm Sigma) ->
+  classically_valid (embed Sigma f) -> denote C rho f
+
+checker_soundness :
+  (q : Form) -> (pi : Cert) ->
+  check_cert q pi = True -> classically_valid q
+```
+
+The first statement is the validity-to-Ken direction needed by discharge; this
+contract does not require the unused converse. The second ranges over every
+quoted target formula, not only an `embed` result. Their composition is the
+well-typed discharge:
+
+```
+sound Sigma C rho f pi ok :=
+  embedding_adequacy Sigma C rho f
+    (checker_soundness (embed Sigma f) pi ok)
+
+-- where ok : check_cert (embed Sigma f) pi = True
+-- hence sound Sigma C rho f pi (refl True) : denote C rho f
+```
+
+After quotation preservation identifies `denote C rho f` with the extracted
+goal, the ordinary kernel `check` re-checks the resulting proof at that goal.
+A backend `unsat` with no constructible, accepted `Cert` is `unknown`, never
+`proved`.
+
+This section states the proof obligations; it does not prove, admit, or place
+them. The concrete home of `IForm`, `Form`, `Cert`, `check_cert`,
+`embedding_adequacy`, and `checker_soundness`, and the resulting evaluator/TCB
+boundary, remain an Architect and operator placement decision. Until both
+theorems are kernel-checked in an approved home, route FO cannot return
+`proved`. No new kernel primitive or trusted axiom is authorized here.
+
+Route (b), reconstruction of external proof evidence into native kernel terms,
+remains only the feasibility hedge recorded by `OQ-12` and the decomposition
+report. This contract neither specifies nor changes that route.
+
+### 4.5 First route-(a) vertical slice
+
+The smallest coherent first slice has one rigid object sort `A`, one unary
+uninterpreted predicate `P : A -> Omega`, and source forms `Bottom`, atom,
+`or`, `imp`, and `forall`. It retains the complete `World` preorder,
+`Dom_A` nonemptiness and growth, and `Force_P` domain and persistence axioms.
+Its emitted target uses `bottom`, relation, `and`, `or`, `imp`, `forall`, and
+`exists`. The positive proof needs exactly the `init`, `imp-right`, and
+`forall-right` certificate rules. The slice theorem restricts `Cert` to that
+constructor subset; the full §4.3 theorem remains owed for the remaining
+constructors and is not implied by this slice.
+
+The end-to-end positive is the closed intuitionistic identity
+`forall x : A. P x => P x`. The classical-only negative control is
+`forall x : A. P x or not (P x)`: it must not obtain an accepted certificate
+or a `proved` verdict merely because the backend reasons classically. A slice
+is complete only when quotation accepts both, the positive certificate
+computes to `True` and yields a kernel-checked Ken term through the two stated
+theorems, and the negative remains honestly not proved. A translation-only,
+checker-only, or solver-only increment is not this slice.
+
+Route (a) remains the `OQ-12` target on intrinsic merits. This named slice
+prices its residual mechanization risk without changing priority, selecting a
+proof-artifact home, building route (b), or extending the atom theories.
+
+Cost note: the embedding adds a `World` argument to every predicate and emits
+the closed frame/domain theory, so it is reserved for FO; D uses the direct
+decision route in §3.
 
 ## 5. Fragment HO — native intuitionistic + tactics
 
@@ -261,12 +562,12 @@ slowing Z3 — so it is reserved for FO; D uses direct/decision (§3).
   `proved`) or a **Kripke counter-model**. The counter-model's verdict follows
   §1.2 and `24 §1`/§3 — **not** "invalid ⇒ disproved": a model that **forces
   `¬φ`** (the `S_{¬φ}` region, `24 §3`) is `disproved`; a model that merely
-  **fails to force `φ`** while `¬¬φ` still holds — the `¬¬φ ⇒ φ` gap, e.g. an
-  abstract-atom LEM instance `p ∨ ¬ p` (intuitionistically invalid but **not
-  refutable**, since `¬(p ∨ ¬ p)` is itself false) — is **`unknown`**, not
-  `disproved`. (The de Bruijn discipline still holds either way: `proved`
-  requires the returned proof term to `check`.) This handles the connective
-  scaffolding even when atoms are abstract.
+  **fails to force `φ`** while `¬¬φ` still holds — the `¬¬φ ⇒ φ` gap,
+  e.g. an abstract-atom LEM instance `p ∨ ¬ p` (intuitionistically
+  invalid but **not refutable**, since `¬(p ∨ ¬ p)` is itself false) — is
+  **`unknown`**, not `disproved`. (The de Bruijn discipline still holds either
+  way: `proved` requires the returned proof term to `check`.) This handles the
+  connective scaffolding even when atoms are abstract.
 - **Induction / higher-order.** Goals needing induction over an inductive
   family, or quantifying over types/predicates, are out of SMT scope. The prover
   applies a small library of **tactics**
@@ -278,8 +579,8 @@ slowing Z3 — so it is reserved for FO; D uses direct/decision (§3).
   each itself routed (§2.1) and discharged, with the certificate **composed**
   from the parts — never a single opaque obligation over the whole structured
   term:
-  - **∧-split / all-prop record goal** `φ ∧ ψ` → subgoals `φ`, `ψ`; certificate
-    is the pair `(p_φ, p_ψ)` (`16 §1.3`).
+  - **∧-split / all-prop record goal** `φ ∧ ψ` → subgoals `φ`,
+    `ψ`; certificate is the pair `(p_φ, p_ψ)` (`16 §1.3`).
   - **⇒/∀-intro** → move the antecedent / binder into `Γ`, discharge the body;
     certificate is the `λ`.
   - **induction over an inductive family** → **one subgoal per constructor**,
@@ -335,11 +636,12 @@ for the (a) checker and for cross-checking).
    (1), since the certificate is re-checked regardless.
 
 Only (1) and (3) are *enforced* by the kernel automatically; (2) is a proof
-obligation on the prover's construction (the §4 ledger); (4) is a **structural
+obligation on the prover's construction (§4.4); (4) is a **structural
 completeness** obligation on the classifier — *not* kernel-caught, discharged by
 exhaustive-by-construction routing (§2.1); and (5) is a quality property. The
-trusted base (`../10-kernel/18 §5`) gains **nothing** from the prover — Z3/cvc5
-are never trusted.
+solver is never trusted. Whether the approved home and evaluator for the two
+kernel-facing route-(a) theorems change the trusted-base account remains the
+Architect/operator placement question in §4.4; this chapter does not settle it.
 
 **Two classical bridges, not one (contrast with the Ward seam).** This chapter's
 bridge uses a classical solver to discharge an obligation **here, with a kernel
@@ -366,18 +668,16 @@ universe**, so the reconcile is mostly accounting that nothing bumps a level:
   **same** `Ω_ℓ` — proof terms in Ω are proof-irrelevant and erasable
   (`16 §1.2`), so the certificate adds no level. `check(env, Γ, p, φ)` is an
   ordinary kernel check (`18 §4.5`); no level appears beyond the goal's.
-- **The Kripke embedding is external.** `φ#`, the `World` sort, and the
-  `(n+1)`-ary `P#` (§4) live in the **classical FO theory handed to Z3** — they
-  are **not** Ken kernel terms and carry **no Ken universe level**. The only Ken
-  terms the FO tier produces are the certificate `π : Cert` and the discharge
-  `sound φ π (refl true) : φ`, at `Ω_ℓ` as above.
-- **The reflective types are ordinary data.** `Form`, `Cert`, `Decidable P`
-  (§3), and the IPC proof terms (§5) are **derived inductives** (`14`, `16 §1.3`
-  connectives + `Empty`) at their natural `Type ℓ` — concrete data with no level
-  parameters beyond those of the atoms they quote — and `check_cert : Form →
-  Cert → Bool` is an ordinary kernel-checked function. None introduces a
-  universe or a proposition former.
-- **The adequacy + checker-soundness meta-lemmas** (§4 ledger) are themselves
+- **The Kripke theory is external; its quotation is data.** The meanings of
+  `World`, `Le`, `Dom`, and `Force` (§4.2) live in the classical FO problem and
+  have no Ken universe level. `IForm`, `Form`, and `Cert` (§4.3) are Ken data
+  that quote that problem; the certificate and final discharge are Ken terms.
+- **The reflective types are ordinary data.** `IForm`, `Form`, `QTerm`, `Cert`,
+  `Decidable P` (§3), and the IPC proof terms (§5) are **derived inductives**
+  (`14`, `16 §1.3` connectives + `Empty`) at their natural `Type l`. The
+  checker `check_cert : Form -> Cert -> Bool` is an ordinary total function.
+  None introduces a universe or a proposition former.
+- **The adequacy + checker-soundness meta-lemmas** (§4.4) are themselves
   kernel-checked terms whose statements are propositions (`→`/`∀` over the
   reflective data, landing in Ω by codomain-keying, `16 §1.1`); they reuse Ω and
   `Eq`, introducing no new universe. Consistent with `12`'s predicative,
@@ -390,8 +690,8 @@ The per-obligation contract emitting the **verdict trichotomy** (§1.2) keyed by
 kernel-structural via `trusted_base()` (§1.3); the **exhaustive** classifier
 (D/FO/HO with HO the default, §2.1); reflective decision for D + SMT
 search/reconstruction; the Kripke embedding + the **reflective certificate route
-(a)** — mechanized adequacy + a verified `check_cert`, the proved-vs-assumed
-ledger (§4) — with (b) reconstruction as a feasibility hedge; the IPC reflective
+(a)** — the closed theory, mechanized adequacy, and a verified `check_cert`
+(§4) — with (b) reconstruction as a feasibility hedge; the IPC reflective
 tactic and the core induction/rewrite tactics with **per-branch sub-obligation
 descent + certificate composition** (§5); generalization beyond the naturality
 domain; and the documented guarantee (G3) that the classical solver cannot yield
