@@ -143,6 +143,26 @@ one thing the hunt explicitly did not do. If they differ, say what differs —
 the annotation, the bound term, or the position — because that is the variable
 the coverage question turns on.
 
+> ### `D4` MERGED 2026-08-15 at `7b11bbd84`, PR #2301, exact `956d86921`.
+> ### `D1` LANDED EARLIER at `beb31566b` (PR #2282, 03:49:57Z). NODE STAYS
+> ### `active` — `D2` and `D3` are deferred, not done.
+>
+> `dec_7r12dsg9py2a4` resolved 08:31:56Z; QA `evt_7qxcwvx2vnrnx`, Architect
+> `evt_41nczz7c68t5y`. Declared base `a737d8c9b`; **one path enumerated from
+> it, blob MATCH** (`e0f71ee19`), `+90/-0`, no production, spec or conformance
+> delta. **Two non-blocking Architect findings carry to `D2`** — recorded in
+> full further down; neither is a reason to recut, and the first discharges a
+> standing note of his.
+>
+> **`D1` had already merged when its publish was requested**, and that is worth
+> keeping rather than filing away. `fe7be838` is not an ancestor of `main` and
+> never will be — **a squash rewrites the commit, so a landed branch head reads
+> as owed forever.** Both the leader's and QA's statuses said "awaiting merge
+> routing" while the content sat in `main`, and two seats reading the same
+> unlanded-looking head is not corroboration. **The blob test settles it in one
+> command and belongs before the publish, not after:**
+> `git diff --quiet origin/main <head> -- <declared paths>`.
+
 **`D4` — the discriminating fixture, folded in here rather than filed
 separately.** The Adversary's variant is the first program measured to
 distinguish the shipped region set from the prohibited floor, and
@@ -203,6 +223,42 @@ it.**
 Architect's influence path is a *possible* route, traced by reading. Establish
 whether it is the **actual** route here — if `RVar` resolution is not involved
 in this failure, say so with the evidence, because that materially narrows `D2`.
+
+> ### `D2` CARRIES TWO ARCHITECT FINDINGS FROM THE `D4` APPROVAL
+> ### `evt_41nczz7c68t5y` / `dec_7r12dsg9py2a4`, both non-blocking, recorded
+> ### here because `D2` is deferred and a finding left in a thread is lost.
+>
+> **Neither is a reason to hold or recut anything**, and the Architect said so
+> explicitly: nothing in either can change program behaviour. **Both are `D2`
+> work, and the first one discharges a standing note of his.**
+>
+> **Finding 1 — the positional literals add nothing to the discrimination they
+> appear to make.** `D4`'s control separates the shipped region set from the
+> prohibited positional floor **entirely by error class** — floor gives
+> `NotTerminating`, which lands in the `other =>` arm. The `contains("@9")` and
+> `contains("@4")` assertions contribute **no** discriminating power on top of
+> that, while carrying full exposure to any unrelated binder-structure shift.
+> **And `contains("@4")` also matches `@40` and `@43`** — so the literal is
+> simultaneously **too strong against position and too weak against
+> neighbours.**
+>
+> **The positive form is already written in this same file**, in the convoy
+> `D1` doc: *"expected and found were the SAME HEAD, differing only in the
+> trailing de Bruijn index."* ⇒ **Convert BOTH pins in one `D2` edit** —
+> `D4`'s `@9`/`@4` and `D1`'s `@8`: assert the shared head, assert the two
+> renderings differ, and **keep the literals in the doc comment as the measured
+> instance** rather than as assertions.
+>
+> **Finding 2 — the fixture inherits an index-impossibility dependency without
+> its warning.** The inner match `w` has **one arm against `Vec`'s two
+> constructors**, and elaborates only while `VNil` is index-impossible at
+> `Vec Nat (S m)` (`34 §4.3`). **This file already documents, for the sibling
+> fixture, that a regression there surfaces as `ExhaustivenessError`** — a
+> different route entirely. This fixture carries the dependency and not the
+> warning, and its `other =>` message says a different error means
+> *"guard-dependent behaviour needs re-measuring"*, **which would misdirect the
+> next reader straight past the real cause.** Name the alternative route in the
+> message, or restate the conjunction.
 
 ## Acceptance criteria
 
