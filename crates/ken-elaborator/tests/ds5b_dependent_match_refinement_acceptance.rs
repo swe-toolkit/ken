@@ -32,13 +32,6 @@ use std::collections::BTreeSet;
 /// across two independently-evaluated bodies sharing one store). Two
 /// evaluations of textually distinct but structurally identical terms are
 /// expected to be `EvalVal`-equal in every field EXCEPT `slot`.
-///
-/// Currently unused by any assertion: `two_vector_zip_recursive_step_
-/// convoy_fixture`'s evaluation half is blocked by an unrelated, pre-
-/// existing `ken-interp` gap (see that test's doc comment) and pins
-/// `Unknown` instead. Kept for the day that gap closes, at which point the
-/// sentinel assertion there becomes a real call to this function.
-#[allow(dead_code)]
 fn vec_nat_structurally_eq(a: &EvalVal, b: &EvalVal) -> bool {
     match (a, b) {
         (
@@ -275,36 +268,53 @@ fn non_indexed_match_stays_unaffected() {
 /// exhaustiveness) and reconstructs each level from `v`'s own `m`/`a`, so
 /// its correct result is structurally `v` itself.
 ///
-/// **The evaluated-value half of `AC-1` is BLOCKED by an orthogonal,
-/// pre-existing `ken-interp` gap, found while building this control --
-/// escalated, not silently routed around.** `zip`'s elaborated body embeds
-/// real `Cast`/`J` terms (capability 1/2/3's proof machinery, `elab.rs`) at
-/// EVERY arm, including the base case (capability 3's goal-cast for `VNil
-/// Nat`). `ken_interp::eval`'s `Term::J` arm does not exist -- it falls
-/// through the function's own final catch-all, `crates/ken-interp/src/
-/// eval.rs:1916` (`_ => EvalVal::Neutral`, comment: "Remaining K2 forms:
-/// not reduced in the G1 scope"). `cast_reduce` (`eval.rs:1144-1156`)
-/// requires the equality proof to evaluate to `EvalVal::ReflVal` to take
-/// its one reducing branch (C5 regularity); a `Neutral` proof always falls
-/// to its "(oracle)" branch, `EvalVal::Unknown`, which then propagates
-/// strictly (`eval.rs:21`, `:1145`). So ANY dependent-match program that
-/// exercises DS-5b's capability 1/2/3 evaluates to `Unknown` today, for a
-/// reason that has nothing to do with this node's remedy -- the SAME
-/// machinery backs `sibling_convoy_retypes_outer_binder_through_nested_
-/// match` and `tail_constructor_injectivity_retypes_peeled_recursive_
-/// field` above, neither of which this file has ever evaluated (both only
-/// assert `elab_ok`). This predates `LANG-CONVOY-MATCH-FIELD-PROVENANCE`
-/// entirely.
+/// **`AC-1`'s HAZARD -- distinguishing a correct refinement from an
+/// over-wide skip -- is discharged elsewhere, by the right instrument
+/// (Architect ruling `evt_b4hfddjceg8d`): the non-degenerate pair
+/// `sibling_convoy_retypes_outer_binder_through_nested_match` (positive:
+/// the enclosing field IS refined) /
+/// `let_interleaved_outer_binder_not_skipped_by_convoy` (negative: an
+/// interleaved outer binder is NOT skipped -- an over-wide skip reds this
+/// one), plus D2's structural record that `k` sits at `abs_pos=6`,
+/// OUTSIDE `[3..6, 7..10]`. That pair, not this fixture's evaluated value,
+/// is what actually catches the hazard `AC-1` was written against.
 ///
-/// The assertion below is therefore a NAMED SENTINEL, not the value
-/// comparison `AC-1` asked for: it pins `Unknown` for the documented
-/// reason above and will legitimately go red the day `Term::J` gets a
-/// reduction rule -- at which point replace it with a real
-/// `vec_nat_structurally_eq` comparison against the expected value (also
-/// constructed below, and already known-correct: it elaborates and its own
-/// evaluation is exercised nowhere else in this fixture only because
-/// `zipResult`'s `Unknown` makes the comparison moot today).
+/// **This fixture's evaluation is nonetheless the literal `AC-1` ask, and
+/// it is retained here, real, and IGNORED rather than weakened or
+/// deleted.** It is blocked by an orthogonal, pre-existing `ken-interp`
+/// gap, found while building this control: `zip`'s elaborated body embeds
+/// real `Cast`/`J` terms (capability 1/2/3's proof machinery, `elab.rs`)
+/// at EVERY arm, including the base case (capability 3's goal-cast for
+/// `VNil Nat`). `ken_interp::eval`'s `Term::J` arm does not exist -- the
+/// crate's only `Term::J` match arm is `term_var_free`'s free-variable
+/// walk (`eval.rs:958`), not a reduction; `Term::J` in `eval()` itself
+/// falls through the function's own final catch-all,
+/// `crates/ken-interp/src/eval.rs:1916` (`_ => EvalVal::Neutral`, comment:
+/// "Remaining K2 forms: not reduced in the G1 scope"). `cast_reduce`
+/// (`eval.rs:1144-1156`) requires the equality proof to evaluate to
+/// `EvalVal::ReflVal` to take its one reducing branch (C5 regularity); a
+/// `Neutral` proof always falls to its "(oracle)" branch,
+/// `EvalVal::Unknown` -- declared, not accidental, per that function's own
+/// comment. So ANY dependent-match program that exercises DS-5b's
+/// capability 1/2/3 evaluates to `Unknown` today, for a reason that has
+/// nothing to do with this node's remedy and predates it entirely -- the
+/// SAME machinery backs `sibling_convoy_retypes_outer_binder_through_
+/// nested_match` and `tail_constructor_injectivity_retypes_peeled_
+/// recursive_field` above, neither of which this file has ever evaluated
+/// (both only assert `elab_ok`).
+///
+/// Per the ruling, this is an AUTHORIZED HARD STOP owned by a `ken-interp`
+/// successor (Steward-filed, scope), not a defect in this node and not
+/// something this node repairs. The assertion below is the REAL `AC-1`
+/// expectation (a `vec_nat_structurally_eq` comparison against the
+/// expected value, not an `Unknown` sentinel -- pinning `Unknown` would
+/// freeze `ken-interp`'s declared G1 scope limit as an expectation, and
+/// red the day the capability lands instead of passing). It is registered
+/// in `.github/ignored-test-exemptions.toml` under `blocked-upstream-
+/// relation`, readmission `TermJReduction`, following the
+/// `RT-CLOSURE-BOUNDARY-LANE` row's contract.
 #[test]
+#[ignore = "TermJReduction: the convoy cast's proof is not ReflVal and ken-interp has no Term::J reduction arm, so cast_reduce yields Unknown for the G1 scope; fails at base 7aae5fcc6"]
 fn two_vector_zip_recursive_step_convoy_fixture() {
     let mut env = vec_env();
     elab_ok(
@@ -349,23 +359,11 @@ fn two_vector_zip_recursive_step_convoy_fixture() {
     let result = ken_interp::eval(&[], &result_body, &env.env, &mut store);
     let expected = ken_interp::eval(&[], &expected_body, &env.env, &mut store);
 
-    // `expected` alone (no `zip` call, no Cast/J) DOES reduce to a concrete
-    // value -- confirming the `Unknown` below is specific to the Cast/J
-    // path `zip` embeds, not a general evaluator failure on this fixture.
     assert!(
-        !matches!(expected, EvalVal::Unknown),
-        "sanity: the expected value alone (no Cast/J involved) must reduce \
-         to a concrete Ctor, got {expected:?} -- if this fails, the gap \
-         documented above has moved and this whole control needs \
-         re-deriving"
-    );
-    assert!(
-        matches!(result, EvalVal::Unknown),
-        "sentinel: zip's evaluated result is expected to be Unknown today \
-         (unreduced Term::J, see the doc comment above) -- got {result:?} \
-         instead, which means either the ken-interp gap closed (replace \
-         this assertion with vec_nat_structurally_eq(&result, &expected)) \
-         or something else changed and needs re-deriving"
+        vec_nat_structurally_eq(&result, &expected),
+        "zip 2 v w must evaluate to v itself (this fixture's zip ignores \
+         w's payload and reconstructs each level from v's own m/a) -- got \
+         {result:?}, expected {expected:?}"
     );
 }
 
