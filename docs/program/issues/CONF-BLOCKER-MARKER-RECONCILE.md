@@ -1,7 +1,7 @@
 ---
 id: CONF-BLOCKER-MARKER-RECONCILE
 title: "Three landed `BLOCKED-ON-` markers say 'no blocker node exists' and two of them are now false, while seven other blocked rows name their blockers in prose that no grep can find -- reconcile the corpus against the tracker and adjudicate the one blocker still unowned"
-status: active
+status: merged
 owner: spec-enclave
 size: S
 gate: none
@@ -10,6 +10,33 @@ blocks: []
 github: null
 origin: "Direct consequence of CONF-FMT8-LEVELTOK (merged 2026-08-15 at 2ed8bbfd8). Its census correctly wrote `(no blocker node exists)` rather than inventing nodes; the Steward then filed LANG-BYTES-HEX-LIST-LITERAL and LANG-FIXITY-DECL-SURFACE per COORDINATION §2, which makes two of those three parentheticals stale in a landed artifact. Steward-filed and framed 2026-08-15, measuring every marker at the base below."
 ---
+
+> # MERGED 2026-08-15 as squash `e6d2716cf`, from base `87ff7900b`.
+>
+> Candidate `c4103bec1`, PR #2267. One commit, sole path
+> `conformance/surface/formatting/seed-canonical-format.md`, `+21/-11`.
+> `crates/` byte-identical both sides at tree `d491f1493`. CV Spec/Fidelity
+> approval `evt_qz6xc0jk0k7t`, Architect approval `evt_29h3antjhtfvw`, Decision
+> `dec_77t41fm3j2qzc`.
+>
+> **Delivered: the three markers plus FMT1's aggregate now link the three filed
+> nodes, and zero `no blocker node exists` parentheticals survive in the
+> formatting seed.** Every disposition held — 28 row headings, 20
+> `RED-UNTIL-BUILT`, 14 `PRODUCIBLE`, unchanged on both sides. The seed states
+> that a filed blocker is not a landed one, which is the distinction the marker
+> exists to carry.
+>
+> **`D4` was removed and `AC-2` narrowed mid-flight, because two of this
+> frame's premises were false and the ring stopped before editing anything.**
+> Both corrections are retained in the body below as quoted withdrawals rather
+> than deleted. The eleven sites they concerned are
+> [[CONF-STALE-RED-DISPOSITIONS]].
+>
+> **Residual, carried not hidden:** `D3` established that the membership
+> operator has no parser arm in *either* spelling, so the surface gap is wider
+> than the ASCII-alias question the row asked. That is
+> [[LANG-MEMBERSHIP-OPERATOR-SURFACE]], filed `ready`, and this node did not
+> attempt it.
 
 > # THE SEED WAS RIGHT WHEN IT LANDED AND IS WRONG NOW. THAT IS THE WHOLE NODE.
 >

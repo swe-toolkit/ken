@@ -1,98 +1,166 @@
 ---
 id: LANG-FIXITY-DECL-SURFACE
-title: "user-declared operator fixity -- `infixl`/`infixr`/`infix N op` -- is in the grammar, the declaration section, and the taxonomy's affordance list, and has zero implementation hits under crates/, so every operator in the landed language is at the default precedence"
+title: "`infixl N op` / `infixr N op` / `infix N op` populate a fixity table the parser consults -- the third and last part of user-defined operators, and the only one carrying a real design call: declaration-before-use versus whole-module collection, and scoping across imports"
 status: draft
 owner: language
-size: null
+size: M
 gate: none
-depends_on: []
+depends_on: [LANG-INFIX-APPLICATION-DEFAULT]
 blocks: []
 github: null
-origin: "Surfaced by CONF-FMT8-LEVELTOK's census (merged 2026-08-15 at 2ed8bbfd8): the conformance-validator found `surface/formatting/ascription-binder-fixity-and-associativity-survive` unproducible and it landed marked `BLOCKED-ON-USER-FIXITY-SURFACE (no blocker node exists)`. Steward-filed per COORDINATION §2 to supply that blocker. Filed `draft` and UNSIZED deliberately -- the gap is certain, the remedy is a design call the Steward may not make, and the scope question below has to be answered before this can be cut."
+origin: "Filed 2026-08-15 by the Steward from CONF-FMT8-LEVELTOK's census, originally scoped to fixity alone and left `draft`/unsized pending a scope ruling. Architect ruling evt_1s7mqjg4tyxx1 answered it: declared fixity is OWED, not an endpoint -- 32-grammar.md:392-393 names its existence as explicitly NOT an open question. The same ruling established the node was scoped to a third of the feature and decomposed it; this node is now part (iii). Import-scoping measured and costed by the Architect at evt_33rw7w8xkdya2, re-verified by the Steward. Steward re-cut per COORDINATION section 2."
 ---
 
-> # THE GAP IS CERTAIN. THE SCOPE IS NOT, AND THAT IS WHY THIS IS `draft`.
+> # THE ID IS DELIBERATELY UNCHANGED. DO NOT RENAME THIS NODE.
 >
-> **Do not flip this `ready` without an Architect ruling on the scope question
-> below.** A precedence-parsing change is not a bounded lexer addition, and the
-> spec's own framing leaves genuinely open how much of it Ken intends to land
-> now. Filing it `draft` records the obligation without asserting a cut I have
-> no grounds for.
+> The Architect's ruling observed that the *feature* is user-defined operators,
+> not fixity, and initially instructed a rename to match. **He then withdrew
+> that instruction** (`evt_33rw7w8xkdya2`), and the reason is worth keeping:
+> **his rename was conditioned on this staying ONE node covering all three
+> parts.** Once it was cut into three, **(iii) genuinely is just fixity** — the
+> id is the accurate name for what this node now contains, not a legacy
+> compromise.
+>
+> There is a second, independent reason. `seed-canonical-format.md` links
+> `[[LANG-FIXITY-DECL-SURFACE]]` at three live sites (`:27`, `:58`, `:424`),
+> landed at `e6d2716cf`. **Renaming would dangle every one of them, recreating
+> the exact defect [[CONF-BLOCKER-MARKER-RECONCILE]] existed to remove**, hours
+> after it merged.
+>
+> The feature as a whole is [[LANG-SYMBOLIC-OPERATOR-NAMES]] +
+> [[LANG-INFIX-APPLICATION-DEFAULT]] + this node. **No node is named
+> `LANG-USER-DEFINED-OPERATORS`** — that would be a fourth name for work three
+> nodes already cover.
 
-## What this is
+## `draft` for one reason, and one further thing is owed
 
-`spec/30-surface/33-declarations.md:755` states it normatively:
+**Its predecessors have not landed** — `a <+> b` cannot yet parse, so a fixity
+table would have nothing to bind. Flip it `ready` when
+[[LANG-INFIX-APPLICATION-DEFAULT]] goes `active`.
 
-> `infixl N op` / `infixr N op` / `infix N op` declare operator fixity (`32 §6`).
+**Unlike its two siblings, this frame is NOT yet fully shovel-ready.** The
+Architect named a live design call inside it and handed the decomposition
+rather than a frame. `D1` reports the remaining fork rather than deciding it —
+the pattern that worked on [[LANG-MEMBERSHIP-OPERATOR-SURFACE]].
 
-It is not an isolated line. It appears in the grammar as a production —
-`spec/30-surface/32-grammar.md:47`, `| fixity_decl -- infixl/r N op` — in the
-expression grammar at `32-grammar.md:199` (`| expr binop expr -- operators
-(declared fixity)`), in the lexical section's operator definition
-(`31-lexical.md:494`, *"symbolic, from a fixed set plus user-defined (`33`)"*),
-and in the taxonomy's affordance list at `30-taxonomy.md:82`.
+## The scope question is ANSWERED. Recorded so it is not re-litigated.
 
-**`32-grammar.md:373` supplies the default:** operators *"take declared fixity
-(`infixl`/`infixr`/`infix N`, default `infixl 9`)"*.
+This node was `draft` and unsized because the Steward would not paraphrase
+`spec/30-surface/32-grammar.md:393` into a ruling. The Architect ruled on the
+verbatim sentence:
 
-**A census of `crates/` for `fixity`, `Fixity`, `infixl`, or `InfixL` returns
-zero hits** — no token, no AST node, no parser arm, no test. Not a partial
-implementation: the surface is entirely absent.
+> *"The remaining spellings and the levels of non-arithmetic user operators
+> stay `OQ-syntax`; the existence of declared fixity, and this arithmetic
+> ordering, are **not**."*
 
-⇒ **Every operator in the landed language sits at the default `infixl 9`**,
-which is a coherent state and is why nothing is visibly broken. What is absent
-is the author's ability to change it.
+`OQ-syntax` is the open-question marker; the sentence names the **existence of
+declared fixity** as explicitly not open. ⇒ **Not an endpoint. It is owed.**
 
-## The scope question, which is the reason this is not framed
+**The V0 objection is a category error and is closed.** `32-grammar.md:410`
+excludes *"operators or fixity"* — and in the same list excludes **literals**
+and **`match`**, both landed. It is a bootstrap staging subset, not a statement
+about what the L-level owes. Do not re-raise it.
 
-`32-grammar.md:393` says the arithmetic ordering *"and this fixity"* **are
-not** — the sentence's subject matters and I am not going to paraphrase it into
-a ruling. `32-grammar.md:410` separately describes a restricted profile with
-*"no operators or fixity"*.
+## Deliverables
 
-**So the spec contains both the full fixity surface and at least one profile
-that explicitly excludes it.** Before this is cut, someone with the authority
-has to answer:
+**`D1` — report the design fork with citations, before any table is built.**
 
-1. **Does the landed L-level owe user-declared fixity at all**, or is
-   `infixl 9` for every operator the intended endpoint for now — the same shape
-   of ruling that settled the level-token question as endpoint (b) in
-   `CONF-FMT8-LEVELTOK`?
-2. If it is owed, **is the deliverable the declaration form alone** (parse and
-   record `infixl N op`, honour it in expression parsing) **or does it include
-   the operator-definition surface** that `31-lexical.md:494`'s *"plus
-   user-defined"* implies? Those are different nodes.
-3. **What does the formatter owe?** The blocked conformance row is about
-   fixity and associativity **surviving formatting**, which is a distinct
-   obligation from parsing them.
+**1. Declaration-before-use, or whole-module collection?** Must `infixl 5 <+>`
+appear textually before the first use of `<+>`, or does the parser collect
+every fixity declaration in the module first? **These differ observably** on a
+module that uses an operator above its declaration, and the choice constrains
+whether parsing can stay single-pass. **Open — report what the spec settles.**
 
-**Question 1 is the one that decides whether this node exists at all.** If the
-answer is that `infixl 9` is the endpoint, this node closes and the conformance
-row's marker becomes permanent-by-ruling rather than pending — exactly the
-distinction `CONF-FMT8-LEVELTOK` was filed to make visible, arrived at from the
-other direction.
+**2. Scoping across imports — MEASURED AND COSTED. A two-option fork, not an
+open question.** Measured by the Architect (`evt_33rw7w8xkdya2`) and
+re-verified by the Steward at `e6d2716cf`:
 
-## Why it is filed rather than left in the seed
+```rust
+exports: HashMap<String, HashMap<String, String>>    // modules.rs:54
+```
 
-`conformance/surface/formatting/seed-canonical-format.md` now carries
-`BLOCKED-ON-USER-FIXITY-SURFACE (no blocker node exists)` on
-`ascription-binder-fixity-and-associativity-survive`, and FMT1's aggregate
-marker names the same surface. **That is an honest statement in a landed
-artifact that the tracker owns nothing behind it.** The seed said the true
-thing; this node is what makes it stop being true.
+**Module → local name → resolved name. Names only, no attributes.** ⇒ **A
+fixity declaration on an exported operator has nowhere to live in the current
+representation.** The two options and their prices:
 
-**A `RED-UNTIL-BUILT` row blocked on an unfiled surface is the exact defect
-class `CONF-FMT8-LEVELTOK` existed to expose** — it reads as pending work
-forever. Filing this converts it from *unowned* to *owned and unscheduled*,
-which is a different and honest state.
+| option | meaning | price |
+|---|---|---|
+| **module-local fixity** | an operator's fixity does not cross an `import` | **zero change to `modules.rs`** |
+| **propagating fixity** | the export value widens from `String` to a record carrying fixity | **10 threading sites**: `:54`, `:176`, `:221`, `:248`, `:317`, `:819`, `:868`, `:1011`, `:1031`, `:1327` |
 
-## What must not happen here
+**Do not re-derive this.** Report which option the spec supports, against the
+two above. The conflicting-fixity-on-two-imports sub-question only arises under
+the second option.
 
-- **Do not implement precedence climbing on the ring's authority.** The scope
-  question above is unanswered and question 1 may close this node entirely.
-- **Do not delete or weaken the conformance row.** Its intent is sound; if
-  fixity is ruled out of the landed surface, the row's marker changes to name
-  that ruling, and that edit is the spec enclave's.
-- **Do not fold this into a formatter node.** Parsing fixity and preserving it
-  across formatting are separate obligations and `32-grammar.md:199` is about
-  the first.
+> **The Architect has committed to ruling question 2 at
+> [[LANG-INFIX-APPLICATION-DEFAULT]]'s merge Decision** — deliberately not
+> earlier, because the right base to rule it on is one where the parser's
+> actual table-consultation shape is visible, rather than asserting it from the
+> export type alone. **Steward: raise it at that Decision** so this node is not
+> waiting on a round-trip when the ring reaches it. If the ruling has landed by
+> release, pin it here and drop this sub-question from `D1`.
+
+**3. Redeclaration within a module.** Error, or last-wins?
+
+**Ground each against `spec/30-surface/33-declarations.md §6` and the module
+chapter, and report what the spec settles versus what it leaves open.** Where
+the spec settles it, that is the answer and no ruling is needed.
+
+**`D2` — the fixity table and the parser's consultation of it.** `infixl N op`,
+`infixr N op`, `infix N op` populate it; the infix parser consults it in place
+of the hard-wired default from [[LANG-INFIX-APPLICATION-DEFAULT]].
+
+**`D3` — `infix N` (non-associative) rejects `a <+> b <+> c`.** With a
+diagnostic that says so. **This is the arm most likely to be silently omitted**,
+because both associative arms have obvious behaviour and this one only shows up
+as an error path.
+
+**`D4` — precedence level bounds.** State what range of `N` is accepted and
+what happens outside it. `32-grammar.md:373` gives the default as `9`; if the
+spec bounds the range, cite it — **if it does not, say so and pick, stating the
+choice as a choice.**
+
+## Acceptance criteria
+
+**`AC-1`.** `D1` is reported with citations before `D2` is implemented. **A
+candidate that implements the table without first reporting the fork has
+skipped the deliverable**, even if the table is right.
+
+**`AC-2`.** Declared fixity changes parse shape. **Control:** the same source
+text parses to **different** trees under `infixl 5` and `infixr 5`, asserted
+structurally. **A value assertion fails this** — a symmetric operator evaluates
+identically under both.
+
+**`AC-3`.** An operator with no fixity declaration still parses at `infixl 9`.
+**Control:** [[LANG-INFIX-APPLICATION-DEFAULT]]'s fixtures stay green
+unchanged. **This node adds a table; it must not make the default path
+conditional on one existing.**
+
+**`AC-4`.** `D3`'s non-associative rejection has its own fixture and its own
+diagnostic assertion.
+
+**`AC-5` — direction stated.** Declared fixity **changes the parse** of
+programs that declare it. Programs that declare nothing are unaffected. **If a
+program with no fixity declaration changes meaning, stop** — that is `AC-3`
+failing by another route.
+
+**`AC-6`.** No-regression, in CI (`COORDINATION §12`). Targeted:
+`-p ken-parser`, `-p ken-elaborator`.
+
+## What this unblocks, and the follow-through that is NOT yours
+
+`conformance/surface/formatting/seed-canonical-format.md` carries
+`BLOCKED-ON-USER-FIXITY-SURFACE ([[LANG-FIXITY-DECL-SURFACE]])`, and FMT1's
+aggregate names it. **When this lands, that fixture becomes producible and FMT1
+loses one of its three blockers.**
+
+**Do not edit `conformance/`.** Say in the handback that the row is now
+producible; the spec enclave owns the flip.
+
+## Banned scope
+
+- **Do not re-open whether fixity is owed.** Ruled, `evt_1s7mqjg4tyxx1`, on the
+  spec's own words.
+- **Do not decide the `D1` fork unilaterally** where the spec leaves it open.
+- **Do not change the arithmetic ordering.** Landed, normative, and settled by
+  the same sentence that settles this node's existence.
