@@ -8110,10 +8110,14 @@ fn a_sibling_aggregates_producer_certificate_is_refused_before_any_allocation() 
 /// **`D7` — the call-USE coordinate is INERT, and that is why it cannot be
 /// cited as the ownership control.**
 ///
-/// MEASURED, on the same two fixtures: with `CallInputTransferOrigin` installed
+/// MEASURED, on the same four fixtures: with `CallInputTransferOrigin` installed
 /// every input is transferred at the program ROOT -- the maximally wrong
-/// coordinate -- the seam fires, and **both programs still compile**, emitting
-/// exactly their baselines' raw allocations.
+/// coordinate -- the seam fires, and **all four programs still compile**, emitting
+/// exactly their baselines' raw allocations. Each compile also observes at
+/// least one `SourceMachineDeclaredUnit` diagnostic. These declared-unit
+/// scheduling entries have no child zero, so their tags state the `Entry`
+/// level explicitly. The callee identities are byte-for-byte equal between
+/// baseline and mutation because they retain the pre-mutation entry.
 ///
 /// ⭐⭐ **This is the positive statement of a negative result, and it is the
 /// point of the row.** An aggregate's ownership record is the one its template
@@ -8134,28 +8138,58 @@ fn a_sibling_aggregates_producer_certificate_is_refused_before_any_allocation() 
 /// and only the one that moves the certificate is observable.
 ///
 /// CLAIMED: use and production are distinct authorities, and only production
-/// governs ownership.
+/// governs ownership; moving the use coordinate cannot move the diagnostic
+/// callee. THE GAP: this asserts identity stability under the existing D7
+/// mutation, not that every scheduling entry has a body child. The tag records
+/// `Entry` explicitly when child zero is absent.
 #[test]
 fn a_call_use_coordinate_substitution_is_inert_for_a_self_authorizing_aggregate() {
+    fn source_machine_callees() -> Vec<GeneratedUnitCallInputCallee> {
+        d2k_owner_trace_take()
+            .into_iter()
+            .filter_map(|event| match event {
+                D2kOwnerEvent::BoundaryTransferEntered {
+                    invoking_site:
+                        BoundaryTransferInvokingSite::GeneratedUnitCallInput {
+                            caller: GeneratedUnitCallInputCaller::SourceMachineDeclaredUnit,
+                            callee,
+                        },
+                    ..
+                } => Some(callee),
+                _ => None,
+            })
+            .collect()
+    }
+
     for (label, program) in [
         ("two constructors", d7_constructor_arguments()),
         ("two records", d7_record_arguments()),
-        ("forwarded constructors", d7_forwarded_constructor_arguments()),
+        (
+            "forwarded constructors",
+            d7_forwarded_constructor_arguments(),
+        ),
         ("forwarded records", d7_forwarded_record_arguments()),
     ] {
+        let _ = d2k_owner_trace_take();
         let (_, baseline_hits, baseline_allocations, _) =
             d7_ownership_run(&program, GovernedAllocationMutation::None);
-        assert_eq!(baseline_hits, 0, "{label}: the baseline installs no mutation");
+        let baseline_callees = source_machine_callees();
+        assert_eq!(
+            baseline_hits, 0,
+            "{label}: the baseline installs no mutation"
+        );
         assert!(
             baseline_allocations > 0,
             "{label}: the baseline must actually allocate, or 'the mutated run emits \
              the baseline's allocations' is a comparison between two zeroes"
         );
 
+        let _ = d2k_owner_trace_take();
         let (result, hits, allocations, _) = d7_ownership_run(
             &program,
             GovernedAllocationMutation::CallInputTransferOrigin,
         );
+        let mutated_callees = source_machine_callees();
         assert!(
             hits > 0,
             "{label}: the use-coordinate substitution must FIRE, or its inertness is \
@@ -8171,6 +8205,21 @@ fn a_call_use_coordinate_substitution_is_inert_for_a_self_authorizing_aggregate(
         assert_eq!(
             allocations, baseline_allocations,
             "{label}: an inert substitution must emit exactly the baseline's allocations"
+        );
+        assert!(
+            !baseline_callees.is_empty(),
+            "{label}: the control must observe at least one real source-machine callee tag",
+        );
+        assert!(
+            baseline_callees
+                .iter()
+                .all(|callee| matches!(callee, GeneratedUnitCallInputCallee::Entry(_))),
+            "{label}: a declared-unit scheduling entry with no child zero must state its level: \
+             {baseline_callees:?}",
+        );
+        assert_eq!(
+            mutated_callees, baseline_callees,
+            "{label}: moving the transfer coordinate must not move the diagnostic callee",
         );
     }
 }

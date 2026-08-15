@@ -3400,6 +3400,18 @@ struct CaseProducerFact {
     frontier: BTreeSet<StaticOriginId>,
 }
 
+/// Test-only plan-side classification of one field on a closed constructor
+/// result. This names the source expression kind which the planner's existing
+/// producer-flow analysis selected; it does not inspect a lowered value.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum PlannedResultFieldKindForTest {
+    Closure,
+    LexicalClosure,
+    Other,
+    Absent,
+}
+
 impl CaseProducerFact {
     fn open(origin: StaticOriginId) -> Self {
         Self {
@@ -13664,6 +13676,46 @@ impl<'src> StaticTransitionPlan<'src> {
     ) -> Option<StaticOriginId> {
         let occurrence = self.source_occurrences.get(ordinal)?.as_ref()?;
         (occurrence.static_origin.0 as usize == ordinal).then_some(occurrence.static_origin)
+    }
+
+    /// Test-only projection of the existing closed constructor-result analysis.
+    ///
+    /// The boolean is whether the producer set is closed. The vector preserves
+    /// every source constructor occurrence admitted by that analysis and the
+    /// source kind at `position`. No crossing or lowered-value observation
+    /// participates.
+    #[cfg(test)]
+    pub(in crate::cranelift_backend) fn planned_result_field_kinds_for_test(
+        &self,
+        origin: StaticOriginId,
+        position: usize,
+    ) -> Result<(bool, Vec<(StaticOriginId, PlannedResultFieldKindForTest)>), CraneliftBackendError>
+    {
+        let mut match_scrutinees = BTreeMap::new();
+        let fact = derive_case_producer_fact(self, origin, &[], &mut match_scrutinees)?;
+        let closed = matches!(fact.producers, CaseProducerSet::Closed(_));
+        let mut fields = Vec::new();
+        for (_, origins) in fact.producer_origins {
+            for producer in origins {
+                let RuntimeExpr::Construct { args, .. } = self.source_occurrence(producer)? else {
+                    return Err(planner_error(
+                        "planned constructor-result origin is not a source Construct",
+                    ));
+                };
+                let kind = match args.get(position) {
+                    Some(RuntimeExpr::Closure { .. }) => {
+                        PlannedResultFieldKindForTest::Closure
+                    }
+                    Some(RuntimeExpr::LexicalClosure { .. }) => {
+                        PlannedResultFieldKindForTest::LexicalClosure
+                    }
+                    Some(_) => PlannedResultFieldKindForTest::Other,
+                    None => PlannedResultFieldKindForTest::Absent,
+                };
+                fields.push((producer, kind));
+            }
+        }
+        Ok((closed, fields))
     }
 
     /// The preallocated origin of one positional syntax child of `parent`.
