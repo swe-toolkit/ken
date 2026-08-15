@@ -132,6 +132,41 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > [[RT-DESCENT-RETIRE]]. The measured remainder for closure is **closer to a
 > week** (runtime-leader `evt_645tm43wf1cne`).
 >
+> > ### TWO MORE EXPRESSIONS HAVE LEFT. ROW 4 DEPTHS 2 AND 3 ARE THE
+> > ### DURABLE LANE'S. Steward, 2026-08-15.
+> >
+> > **Routed on [[RT-PLANNED-CLOSURE-PREEXISTENCE]] exact `1cd9947cf`,
+> > Architect `dec_55a8p5m2f8gzk`.** The planner gives field 0 of origin 12 a
+> > closed producer set of exactly `[(StaticOriginId(12), LexicalClosure)]` in
+> > both governed plans ⇒ **the source program authored the closure and the
+> > realization did not manufacture it.** Branch 1 is refuted, and the repair for
+> > these two expressions is [[RT-CLOSURE-BOUNDARY-LANE]]'s, not this node's.
+> >
+> > **Row 4 depth 1 stays here.** It is outside the projection surface by
+> > construction — the projection is minted only where `required != source` — so
+> > it is a different residual and was never part of this routing.
+> >
+> > ⇒ **The table above overstates this node's surface by two.** The residual it
+> > owns is **four** expressions: rows 1 and 4-depth-1 and row 5's after-hole at
+> > the `StaticWorkerBinding` wall, plus row 3 at the retained
+> > singular-specialization wall. **This is the third time expressions have left
+> > this node and a heading has kept describing the old population** — row 2,
+> > row 5's before-hole, and now these two.
+> >
+> > #### THE SEQUENCING CONSEQUENCE IS NOT MINE TO SETTLE, AND IT IS LIVE
+> >
+> > **If these two expressions must be green for this node to close, then
+> > [[RT-CLOSURE-BOUNDARY-LANE]] now sits on the critical path to
+> > [[RT-DESCENT-RETIRE]]** — this node gates [[RT-RECURSOR-TRANSPORT]] `D3`,
+> > which gates the retirement, which is the operator's top-priority work. **That
+> > node was framed today and is deliberately unsized past `D1`.**
+> >
+> > **The alternative is that this node closes with those two expressions routed
+> > out**, exactly as row 2 left without a production repair. **Which reading
+> > holds is a closure-criterion question for the ring and the Architect**, asked
+> > at the durable-lane node's `D1`/`D2` rather than answered here. **Do not
+> > assume either while sizing.**
+>
 > > ### THE `StaticWorkerBinding` WALL IS `D2k`, INSIDE THIS NODE — 2026-08-12
 > >
 > > `docs/program/wp/RT-LEXICAL-RECURSOR-CONSUMERS-D2a.md` filed it as
