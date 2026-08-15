@@ -5854,16 +5854,19 @@ fn contkey_row_four_discovery_carries_the_outer_boundary_then_previous_consumers
             .consuming_occurrence()
             .expect("the existing depth-specific key relation remains populated");
 
-        let mut required = BTreeSet::new();
+        let mut required_at_use = BTreeSet::new();
         let mut advanced = BTreeSet::new();
         let mut raw = BTreeSet::new();
         for observation in take_continuation_required_consumer_observations() {
+            let observed_required = observation
+                .required()
+                .expect("a carry observation must name the required consumer");
             raw.insert((
                 observation.is_child_push(),
                 format!("{:?}", observation.continuation_origin()),
                 format!("{:?}", observation.result_root()),
-                format!("{:?}", observation.required().body_origin()),
-                format!("{:?}", observation.required().eliminator_origin()),
+                format!("{:?}", observed_required.body_origin()),
+                format!("{:?}", observed_required.eliminator_origin()),
                 format!("{:?}", observation.derived_at_consumer()),
             ));
             if !observation.is_child_push() {
@@ -5872,21 +5875,21 @@ fn contkey_row_four_discovery_carries_the_outer_boundary_then_previous_consumers
                 );
                 assert_eq!(
                     derived,
-                    observation.required(),
+                    observed_required,
                     "row4-depth-{depth}: the lagged required occurrence must re-derive from \
                      the enclosing specialization at the consumer level",
                 );
             }
             if observation.is_child_push() {
-                advanced.insert(observation.required());
+                advanced.insert(observed_required);
             } else {
-                required.insert(observation.required());
+                required_at_use.insert(observed_required);
             }
         }
         eprintln!(
             "row4-depth-{depth}: unit_consumer={unit_consumer:?} raw_required_carry={raw:?}"
         );
-        let required = required.into_iter().collect::<Vec<_>>();
+        let required = required_at_use.into_iter().collect::<Vec<_>>();
         let [required] = required.as_slice() else {
             panic!("row4-depth-{depth}: producer-use carry is not one exact identity");
         };
@@ -5921,6 +5924,104 @@ fn contkey_row_four_discovery_carries_the_outer_boundary_then_previous_consumers
         [depth_1.units, depth_2.units, depth_3.units],
         [1, 1, 1],
         "the discovery-only carry must leave the interned-unit population unchanged",
+    );
+}
+
+fn required_consumer_projection_census(
+) -> Vec<(
+    &'static str,
+    crate::cranelift_backend::planning::RequiredConsumerProjectionDisposition,
+)> {
+    use crate::cranelift_backend::planning::{
+        take_continuation_required_consumer_observations,
+        RequiredConsumerProjectionDisposition,
+    };
+
+    fn observe(expression: RuntimeExpr) -> RequiredConsumerProjectionDisposition {
+        let _ = take_continuation_required_consumer_observations();
+        plan_static_transition_graph(&expression, &BTreeMap::new())
+            .expect("the governed expression must reach static-transition planning");
+        let dispositions = take_continuation_required_consumer_observations()
+            .into_iter()
+            .filter_map(|observation| observation.projection_disposition())
+            .collect::<BTreeSet<_>>();
+        let dispositions = dispositions.into_iter().collect::<Vec<_>>();
+        let [disposition] = dispositions.as_slice() else {
+            panic!(
+                "one governed row must report one projection disposition, got {dispositions:?}"
+            );
+        };
+        *disposition
+    }
+
+    vec![
+        (
+            "row1-owned-scope",
+            observe(host_result_closure_match(px8j_layered_recursive_result(1, 1))),
+        ),
+        (
+            "row4-depth-1",
+            observe(host_result_closure_match(px8j_scope_chain_observation_result(1, 0))),
+        ),
+        (
+            "row4-depth-2",
+            observe(host_result_closure_match(px8j_scope_chain_observation_result(2, 0))),
+        ),
+        (
+            "row4-depth-3",
+            observe(host_result_closure_match(px8j_scope_chain_observation_result(3, 0))),
+        ),
+        (
+            "row5-after-hole",
+            observe(host_result_closure_match(px8j_equal_payload_hole_placement(
+                Px8jSelectedScopePlacement::AfterReturnHole,
+            ))),
+        ),
+    ]
+}
+
+/// `RT-REQUIRED-CONSUMER-REACH-CENSUS` D2: the existing required-consumer
+/// observation reports each governed row's projection disposition without
+/// inferring it from the later refusal.
+///
+/// MEASURED: each row's real planner call reports whether it minted a
+/// projection, skipped minting because `required == source`, or had no required
+/// consumer to place in the pending projection list. CLAIMED: the projection
+/// surface reaches exactly the rows classified `Minted`. THE GAP: this is a
+/// planning-surface census only; it does not claim that any residual is closed.
+///
+/// Promise class: transition sentinel. Rewrite this table when an authorized
+/// route changes which governed call enters or mints from the projection list.
+#[test]
+fn required_consumer_projection_censuses_each_governed_row() {
+    use crate::cranelift_backend::planning::RequiredConsumerProjectionDisposition;
+
+    let census = required_consumer_projection_census();
+    assert_eq!(
+        census,
+        vec![
+            (
+                "row1-owned-scope",
+                RequiredConsumerProjectionDisposition::SkippedRequiredEqualsSource,
+            ),
+            (
+                "row4-depth-1",
+                RequiredConsumerProjectionDisposition::SkippedRequiredEqualsSource,
+            ),
+            (
+                "row4-depth-2",
+                RequiredConsumerProjectionDisposition::Minted,
+            ),
+            (
+                "row4-depth-3",
+                RequiredConsumerProjectionDisposition::Minted,
+            ),
+            (
+                "row5-after-hole",
+                RequiredConsumerProjectionDisposition::SkippedRequiredEqualsSource,
+            ),
+        ],
+        "each governed row must retain its measured projection-surface disposition",
     );
 }
 
@@ -6018,6 +6119,174 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
         suppressed,
         ("StaticWorkerBinding".to_string(), 0),
         "without the projected consumer depth 2 must return to the exact old boundary",
+    );
+}
+
+/// `RT-REQUIRED-CONSUMER-REACH-CENSUS` D5: the route-suppression differential
+/// records closure presence and transfer reach as separate facts.
+///
+/// MEASURED: at the real `transfer_into_carrier` entry, both enabled depth-2+
+/// rows present origin 5's constructor with a closure at argument 0. Suppressing
+/// the one real required-consumer route returns each row to its old
+/// `StaticWorkerBinding` refusal and removes that exact crossing entirely.
+///
+/// CLAIMED: the required-consumer route manufactures the closure-bearing
+/// crossing at `StaticOriginId(5)` / `Constructor.arg[0].Closure` for both
+/// rows. THE GAP: branch 1 versus branch 3′ remains unseparated because
+/// suppression removes the only observation point along with the crossing.
+/// This does not establish the later repair, its owner, or any subsumption with
+/// the separate durable-closure population.
+///
+/// Promise class: transition sentinel. The exact origin and path are the
+/// measured residual. Rewrite this table when an authorized lowering repair
+/// moves either row; do not preserve it as a permanent shape requirement.
+#[test]
+fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
+    use crate::cranelift_backend::lowering::core::{
+        set_selector_variant_exclusion, with_required_consumer_route_suppressed,
+    };
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct Observed {
+        label: &'static str,
+        outcome: String,
+        suppressions: usize,
+        transferred_root_origin: Option<String>,
+        transferred_root_kind: Option<&'static str>,
+        root_to_closure_path: Option<String>,
+        closure_child_present: bool,
+        transfer_into_carrier_reached: bool,
+    }
+
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+
+    fn compile(depth: usize) -> (String, Vec<D2kOwnerEvent>) {
+        let _ = d2k_owner_trace_take();
+        let expression =
+            host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+        let (result, _trace) = px8j_capture_source_trace(
+            &expression,
+            false,
+            &format!("ken_required_consumer_d5_depth{depth}"),
+        );
+        let outcome = match result {
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct, ..
+            })) => construct.to_string(),
+            Ok(_) => "compiled".to_string(),
+            Err(other) => format!("other:{other}"),
+        };
+        (outcome, d2k_owner_trace_take())
+    }
+
+    fn observe(label: &'static str, depth: usize, suppressed: bool) -> Observed {
+        let ((outcome, events), suppressions) = if suppressed {
+            with_required_consumer_route_suppressed(|| compile(depth))
+        } else {
+            (compile(depth), 0)
+        };
+        let targeted = events
+            .into_iter()
+            .filter_map(|event| match event {
+                D2kOwnerEvent::BoundaryTransferEntered {
+                    origin,
+                    root_kind,
+                    closure_path,
+                } if format!("{origin:?}") == "StaticOriginId(5)" => Some((
+                    format!("{origin:?}"),
+                    root_kind,
+                    closure_path,
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let (transferred_root_origin, transferred_root_kind, root_to_closure_path) =
+            match targeted.as_slice() {
+                [] => (None, None, None),
+                [(origin, root_kind, closure_path)] => (
+                    Some(origin.clone()),
+                    Some(*root_kind),
+                    closure_path.clone(),
+                ),
+                _ => panic!(
+                    "{label}: origin 5 must identify at most one predecessor crossing, got \
+                     {targeted:?}"
+                ),
+            };
+        let closure_child_present = root_to_closure_path.is_some();
+        let transfer_into_carrier_reached = transferred_root_origin.is_some();
+        Observed {
+            label,
+            outcome,
+            suppressions,
+            transferred_root_origin,
+            transferred_root_kind,
+            root_to_closure_path,
+            closure_child_present,
+            transfer_into_carrier_reached,
+        }
+    }
+
+    set_selector_variant_exclusion(Some(
+        RecursiveDescentResidual::LexicalCallArgumentRecursor,
+    ));
+    let _restore = Restore;
+    assert_eq!(
+        [
+            observe("row4-depth-2/enabled", 2, false),
+            observe("row4-depth-2/suppressed", 2, true),
+            observe("row4-depth-3/enabled", 3, false),
+            observe("row4-depth-3/suppressed", 3, true),
+        ],
+        [
+            Observed {
+                label: "row4-depth-2/enabled",
+                outcome: "Closure".to_string(),
+                suppressions: 0,
+                transferred_root_origin: Some("StaticOriginId(5)".to_string()),
+                transferred_root_kind: Some("Constructor"),
+                root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                closure_child_present: true,
+                transfer_into_carrier_reached: true,
+            },
+            Observed {
+                label: "row4-depth-2/suppressed",
+                outcome: "StaticWorkerBinding".to_string(),
+                suppressions: 1,
+                transferred_root_origin: None,
+                transferred_root_kind: None,
+                root_to_closure_path: None,
+                closure_child_present: false,
+                transfer_into_carrier_reached: false,
+            },
+            Observed {
+                label: "row4-depth-3/enabled",
+                outcome: "Closure".to_string(),
+                suppressions: 0,
+                transferred_root_origin: Some("StaticOriginId(5)".to_string()),
+                transferred_root_kind: Some("Constructor"),
+                root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                closure_child_present: true,
+                transfer_into_carrier_reached: true,
+            },
+            Observed {
+                label: "row4-depth-3/suppressed",
+                outcome: "StaticWorkerBinding".to_string(),
+                suppressions: 1,
+                transferred_root_origin: None,
+                transferred_root_kind: None,
+                root_to_closure_path: None,
+                closure_child_present: false,
+                transfer_into_carrier_reached: false,
+            },
+        ],
+        "D5 must preserve the exact enabled/suppressed (closure present, transfer reached) table",
     );
 }
 
@@ -6168,6 +6437,72 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
         ("row4-depth-3", wall(&row4_d3, "ken_d2k0_row4_d3")),
         ("row5-after-hole", wall(&row5_after, "ken_d2k0_row5")),
     ];
+    use crate::cranelift_backend::planning::RequiredConsumerProjectionDisposition;
+    let projection_census = required_consumer_projection_census();
+    let residuals = five
+        .iter()
+        .zip(projection_census)
+        .map(|((label, outcome), (census_label, disposition))| {
+            assert_eq!(*label, census_label, "D2 and D3 row labels diverged");
+            (
+                *label,
+                outcome.clone(),
+                match disposition {
+                    RequiredConsumerProjectionDisposition::Minted => "behind-boundary",
+                    RequiredConsumerProjectionDisposition::SkippedRequiredEqualsSource
+                    | RequiredConsumerProjectionDisposition::AbsentNoRequiredConsumer => {
+                        "outside-surface"
+                    }
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        residuals,
+        vec![
+            (
+                "row1-owned-scope",
+                Some((
+                    "NativeJoinPlanV1".to_string(),
+                    "terminal answer has no affine checked-root authority".to_string(),
+                )),
+                "outside-surface",
+            ),
+            (
+                "row4-depth-1",
+                Some((
+                    "StaticWorkerBinding".to_string(),
+                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(26) transports a static worker in field 0 (field origin StaticOriginId(25), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so the field is neither consumed at an exact-Var call nor erased before construction; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
+                )),
+                "outside-surface",
+            ),
+            (
+                "row4-depth-2",
+                Some((
+                    "Closure".to_string(),
+                    "a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane".to_string(),
+                )),
+                "behind-boundary",
+            ),
+            (
+                "row4-depth-3",
+                Some((
+                    "Closure".to_string(),
+                    "a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane".to_string(),
+                )),
+                "behind-boundary",
+            ),
+            (
+                "row5-after-hole",
+                Some((
+                    "StaticWorkerBinding".to_string(),
+                    "constructor ctor:fixture::PX8JHoleOutput::Node at origin StaticOriginId(22) transports a static worker in field 0 (field origin StaticOriginId(21), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so the field is neither consumed at an exact-Var call nor erased before construction; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
+                )),
+                "outside-surface",
+            ),
+        ],
+        "the governed residual record must retain each exact boundary sentence and its measured projection-surface position",
+    );
 
     // **RE-DERIVED at `D2k-1b-i`. This control went red because the RULED
     // SEMANTICS CHANGED, not because the repair is incomplete.** Its retiring
@@ -33222,7 +33557,8 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 /// The arrival count is a per-case structural qualifier, not a pooled
 /// denominator. Every forward and rendering clause is inside that qualified
 /// branch and reads a `NonZeroUsize` constructed for that exact compile. The
-/// aggregate is derived only after those case-local obligations hold.
+/// all-case aggregate is accumulated before qualification, while each
+/// forwarding and rendering obligation remains case-local.
 ///
 /// PROMISE CLASS: durable invariant. The test asserts relations over the
 /// observed arriving set and proves the complement's ownership by suppressing
@@ -33319,6 +33655,12 @@ fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() 
             label, suppressed_label,
             "the two D2a legs must preserve case identity",
         );
+        aggregate_arrivals = aggregate_arrivals
+            .checked_add(*arrivals)
+            .expect("the all-case arrival aggregate overflowed");
+        aggregate_forwards = aggregate_forwards
+            .checked_add(*forwards)
+            .expect("the all-case forward aggregate overflowed");
 
         if let Some(established_arrivals) = std::num::NonZeroUsize::new(*arrivals) {
             qualified_cases += 1;
@@ -33355,12 +33697,6 @@ fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() 
                 "suppressing the forward did not recreate R1 on arriving case {label}: \
                  {suppressed_rendering}",
             );
-            aggregate_arrivals = aggregate_arrivals
-                .checked_add(established_arrivals.get())
-                .expect("the per-case arrival aggregate overflowed");
-            aggregate_forwards = aggregate_forwards
-                .checked_add(*forwards)
-                .expect("the per-case forward aggregate overflowed");
         } else {
             complement_cases += 1;
             assert!(
@@ -33417,7 +33753,7 @@ fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() 
     );
     assert_eq!(
         aggregate_forwards, aggregate_arrivals,
-        "the aggregate derived from the qualified per-case rows disagrees",
+        "the all-case forward aggregate disagrees with the all-case arrival aggregate",
     );
     assert!(
         complement_cases > 0,
