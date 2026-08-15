@@ -1,7 +1,7 @@
 ---
 id: RT-CONSUMING-OCCURRENCE-ROUTE-WIRE
 title: "The carried consuming occurrence is production-written and test-only-read, so no production path has ever consulted it -- wire one consumer at the refusing boundary and MEASURE what the route then does, without assuming it closes"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,59 @@ blocks: []
 github: null
 origin: "Architect scope statement recorded on the RT-CONTKEY-CONSUMER-DESCENT-CARRY merge (PR #2233, exact b0f9c2ff2), verbatim in substance: required_consuming_occurrence is the bounded discovery-only increment he authorized, the carry has not been validated by any production consumer, and the successor that wires one must not treat that node as having done so. The route question was ruled a separate increment twice -- evt_6td3bs6j6g14m and evt_56dvtaft7ep38. Steward-filed per COORDINATION section 2."
 ---
+
+> # MEASURED 2026-08-15 AT `46a8ba199`. `D1`-`D3` DELIVERED, NO CANDIDATE, AND
+> # THAT IS THE FRAMED OUTCOME — NOT A FAILED TURN.
+>
+> **Runtime ran it and hit the stop condition exactly as written**
+> (`evt_3kk9xbfpfwcqn`). Probe fully reverted, WP branch deleted,
+> `runtime-implementer/work` clean at the base, targeted post-cleanup control
+> 1 passed. **No mutation, source change, commit, or branch retained.**
+>
+> **The node said a measured refusal with the refusal attributed fully
+> discharges it. It does, and this measurement did better than that — the route
+> ADVANCED at depth 1.**
+>
+> ### WHAT THE ROUTE DID, per row. This is `D2`, and it is the durable record.
+>
+> One consumer was installed at the shared continuation-call funnel
+> (`lowering/core.rs:11844`), with the resolved required value temporarily routed
+> through the only existing production projection,
+> `ContinuationSpecializationKey.consuming_occurrence` (populated from the
+> same-level source relation at `static_transition.rs:11380`). No
+> `ContinuationTemplate` and no continuation-source-projection change.
+>
+> | row | outcome |
+> |---|---|
+> | row 4 depth 1 | **ADVANCED.** Same-level required and source values coincide; the real route recognized one field, rebound once, consumed once, and moved from `StaticWorkerBinding` to a **new `Closure` refusal**. |
+> | row 4 depths 2/3 | **REJECTED BEFORE LOWERING** by the independent validator at `static_transition.rs:11049-11103`: *"a continuation specialization's consuming occurrence has a mismatched `eliminator_origin`: it does not select the continuation as its position-zero child"*. |
+> | row 5 after-hole | recognized once, rebound once, consumed once, then **remained behind a later `StaticWorkerBinding` refusal**. |
+> | row 1 | **unchanged** at `NativeJoinPlanV1` — it remains a separate class, as this node's excluded scope predicted. |
+>
+> ### `D3` ANSWERED, AND IT CONFIRMS THE INERTNESS
+>
+> **`(None, None, None)` on the reached recognize / rebind / consume path.**
+> These compiles use `RecursiveDescent`, so `defining_function_id` is absent
+> throughout and **both `Option<FuncId>` inequality guards pass vacuously** —
+> exactly as this node predicted. `D2k-1c-1a` is now **measured, not merely
+> argued**. Do not re-file it.
+>
+> ### `D4` — THE RESIDUAL, and it is a REPRESENTATION boundary
+>
+> **The depth-2+ value cannot lawfully inhabit the existing key slot.** The
+> validator's rejection is not an accident of the probe: it **proves the slot is
+> source-keyed by contract**, not spare carrier storage. Putting the lagged value
+> there violates the source-key validator and the key's interning law.
+>
+> ⇒ **A lawful depth-2+ consumer needs the required relation projected
+> SEPARATELY from specialization identity into lowering.** That is
+> representation/projection widening, which `AC-5` forbids here. **`AC-2` cannot
+> be authored lawfully until that surface exists** — which is why the implementer
+> was right to author no candidate rather than take the surface on the ring's
+> authority.
+>
+> **The successor is a mechanism question for the Architect, routed 2026-08-15.**
+> Do not frame it, and do not widen this node to swallow it.
 
 > # THE ROUTE QUESTION IS THIS NODE. IT IS NOT AN INCREMENT ON `D2k-1c`.
 >
