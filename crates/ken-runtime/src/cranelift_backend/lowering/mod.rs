@@ -2515,6 +2515,7 @@ pub(in crate::cranelift_backend) enum GeneratedUnitCallInputCallee {
     Body(StaticOriginId),
     Entry(StaticOriginId),
     MissingBodyChild { entry: StaticOriginId },
+    MissingBodyChildByMutation { entry: StaticOriginId },
 }
 
 #[cfg(test)]
@@ -7673,19 +7674,28 @@ impl<'a> Lowering<'a> {
         entry: StaticOriginId,
     ) -> GeneratedUnitCallInputCallee {
         let mutated = call_input_callee_child_missing();
-        let position = if mutated { usize::MAX } else { 0 };
-        match self
+        let unmutated = self
             .static_transition_plan
-            .child_static_origin(entry, position)
-        {
-            Ok(body) => GeneratedUnitCallInputCallee::Body(body),
-            Err(_) => {
-                if mutated {
-                    note_call_input_callee_child_missing();
-                }
-                GeneratedUnitCallInputCallee::MissingBodyChild { entry }
-            }
+            .child_static_origin(entry, 0)
+            .ok();
+        let selected = if mutated {
+            self.static_transition_plan
+                .child_static_origin(entry, usize::MAX)
+                .ok()
+        } else {
+            unmutated
+        };
+        if mutated && selected != unmutated {
+            note_call_input_callee_child_missing();
+            return selected.map_or(
+                GeneratedUnitCallInputCallee::MissingBodyChildByMutation { entry },
+                GeneratedUnitCallInputCallee::Body,
+            );
         }
+        selected.map_or(
+            GeneratedUnitCallInputCallee::MissingBodyChild { entry },
+            GeneratedUnitCallInputCallee::Body,
+        )
     }
 
     /// Resolve the source-machine declared unit's diagnostic identity.
@@ -7700,18 +7710,28 @@ impl<'a> Lowering<'a> {
         entry: StaticOriginId,
     ) -> GeneratedUnitCallInputCallee {
         let mutated = call_input_callee_child_missing();
-        let position = if mutated { usize::MAX } else { 0 };
-        match self
+        let unmutated = self
             .static_transition_plan
-            .child_static_origin(entry, position)
-        {
-            Ok(body) => GeneratedUnitCallInputCallee::Body(body),
-            Err(_) if mutated => {
-                note_call_input_callee_child_missing();
-                GeneratedUnitCallInputCallee::MissingBodyChild { entry }
-            }
-            Err(_) => GeneratedUnitCallInputCallee::Entry(entry),
+            .child_static_origin(entry, 0)
+            .ok();
+        let selected = if mutated {
+            self.static_transition_plan
+                .child_static_origin(entry, usize::MAX)
+                .ok()
+        } else {
+            unmutated
+        };
+        if mutated && selected != unmutated {
+            note_call_input_callee_child_missing();
+            return selected.map_or(
+                GeneratedUnitCallInputCallee::MissingBodyChildByMutation { entry },
+                GeneratedUnitCallInputCallee::Body,
+            );
         }
+        selected.map_or(
+            GeneratedUnitCallInputCallee::Entry(entry),
+            GeneratedUnitCallInputCallee::Body,
+        )
     }
 
     /// Carry a source-machine call's inputs across a **declared generated
