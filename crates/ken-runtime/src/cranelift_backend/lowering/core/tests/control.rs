@@ -6151,13 +6151,12 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// The caller/callee refinement closes the remaining breadth axis across its six
 /// direct callers.
 ///
-/// CLAIMED: delivery is source-program-authored, so branch 1 is selected: the
-/// value arriving through that intended call-input route has the wrong shape.
-/// THE GAP: this does not establish closure pre-existence, choose a repair, or
-/// infer its owner. The caller/callee identities are transition sentinels for
-/// this measured route and must be rewritten if an authorized lowering change
-/// moves it; the predecessor's provisional qualifier is resolved here rather
-/// than retained.
+/// CLAIMED: branch 3' is closed because each callee is a source-program-authored
+/// direct HostResult `Match` body. THE GAP: branch 1 versus the durable-lane
+/// branch remains open on closure pre-existence. This does not choose a repair
+/// or infer its owner. The caller/callee identities are transition sentinels
+/// for this measured route and must be rewritten if an authorized lowering
+/// change moves it.
 ///
 /// D3 MEASURED: the depth-2 plan's source-occurrence table contains the typed
 /// identity at ordinal 5, and it renders as `StaticOriginId(5)`. CLAIMED: that
