@@ -1,7 +1,7 @@
 ---
 id: RT-CONSUMING-OCCURRENCE-ROUTE-WIRE
 title: "The carried consuming occurrence is production-written and test-only-read, so no production path has ever consulted it -- wire one consumer at the refusing boundary and MEASURE what the route then does, without assuming it closes"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
