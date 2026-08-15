@@ -6131,9 +6131,11 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// `StaticWorkerBinding` refusal and removes that exact crossing entirely.
 ///
 /// CLAIMED: the required-consumer route manufactures the closure-bearing
-/// transfer for these two rows, selecting D5's pre-authorized `incorrect`
-/// branch. THE GAP: this does not establish the later repair, its owner, or any
-/// subsumption with the separate durable-closure population.
+/// crossing at `StaticOriginId(5)` / `Constructor.arg[0].Closure` for both
+/// rows. THE GAP: branch 1 versus branch 3′ remains unseparated because
+/// suppression removes the only observation point along with the crossing.
+/// This does not establish the later repair, its owner, or any subsumption with
+/// the separate durable-closure population.
 ///
 /// Promise class: transition sentinel. The exact origin and path are the
 /// measured residual. Rewrite this table when an authorized lowering repair
