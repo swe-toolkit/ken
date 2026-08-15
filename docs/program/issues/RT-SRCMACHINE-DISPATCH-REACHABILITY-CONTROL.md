@@ -28,14 +28,26 @@ origin: "Architect ruling evt_9qn4nm8gg0ye section 4 on RT-SRCMACHINE-CTOR-RECOG
 
 > ## SEQUENCING — THIS NODE DOES NOT COME NEXT. Steward, 2026-08-15.
 >
-> **When `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` closes, runtime returns to
-> [[RT-NESTED-IH-NATIVE-REALIZATION]] — not here.** That node is `active`, size
-> `L`, partially built on `wp/RT-NESTED-IH-NATIVE-REALIZATION`, and it
-> **`blocks: [KERNEL-NESTED-IND]`**. The kernel ring has been idle behind it.
+> **When `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` closes, runtime goes to
+> [[RT-LEXICAL-RECURSOR-CONSUMERS]] — campaign node #6d, `active` and fully
+> unblocked.** `ready` means framed and startable, **not next in line.**
 >
-> **Unblocking an idle team outranks closing a regression-detection residual**,
-> and this node is the residual. `ready` means framed and startable, **not next
-> in line.**
+> **The RecursiveDescent retirement campaign
+> ([[16-recursive-descent-retirement]]) is the priority lane and nothing may be
+> scheduled ahead of it** — operator, 2026-08-15, reaffirming the 2026-07-29
+> directive against leaving the migration half-done.
+>
+> > **CORRECTED. This banner first said runtime returns to
+> > [[RT-NESTED-IH-NATIVE-REALIZATION]] to unblock the idle kernel ring.** That
+> > was a Steward call made on ring-idleness grounds **without weighing it
+> > against the standing directive, and the operator reversed it.** Kernel stays
+> > blocked behind that node, and **that is the accepted cost of the priority,
+> > not a scheduling problem to be solved around.**
+> >
+> > The superseded reasoning is retained because it is the trap: **"an idle team
+> > is my backlog" is a real rule, and it does not outrank an explicit operator
+> > priority.** A second lane that is individually well-justified is still a
+> > distraction from a directed one.
 
 ## The gap, exactly
 

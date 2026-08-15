@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 01:58:53Z — from 298 issue file(s) in `docs/program/issues/`.
+2026-08-15 02:19:55Z — from 298 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -279,7 +279,7 @@ the committed file matches the generator's output.
 | `RT-PLANNER-DIAGNOSTIC-K` | Boundary A planner: report planner-invariant failures as planner defects, and assert fixed_k CONSTANT rather than merely affine | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/929 |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
-| `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | draft | runtime | M | none | — |
+| `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | ready | runtime | M | none | — |
 | `RT-SCALE-A` | Boundary A — re-derive the planner census for n=3..7 against the COMPLETED factored representation, superseding the provisional outer-planner numbers | merged | runtime | M | none | — |
 | `RT-SCALE-B` | Boundary B — the full n=3..7 emission measurement, the research-grounded analytical model, and the operator scaling verdict that gates RT-NATIVE-FNSPLIT's merge | merged | runtime | L | none | — |
 | `RT-SCRATCH-LIFETIME-REMAINING-CRATES` | `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names | ready | runtime | M | none | — |
@@ -402,7 +402,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
-- `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: draft)
+- `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: ready)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` blocked by `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
