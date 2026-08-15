@@ -1184,7 +1184,7 @@ thread_local! {
 ///
 /// Hidden and default-off: with no scope active the recorder is `None` and
 /// every hook below returns immediately. Prior state is restored on unwind.
-#[cfg(feature = "px8-ds-test-support")]
+#[cfg(any(test, feature = "px8-ds-test-support"))]
 #[doc(hidden)]
 pub fn with_match_recursor_census<R>(body: impl FnOnce() -> R) -> (R, Vec<MatchRecursorCensusRow>) {
     struct Restore(Option<Vec<MatchRecursorCensusRow>>);

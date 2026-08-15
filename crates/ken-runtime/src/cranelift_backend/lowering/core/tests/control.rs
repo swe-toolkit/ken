@@ -2729,14 +2729,16 @@ const R3_TERMINAL_STOP_POPULATION: [(crate::cranelift_backend::planning::D2jCaus
 /// | old `px8j` seed | builder, `oriented_present = false` | nothing | 0 |
 /// | `Exact`, applied root | builder, then the twin's OWN ordinary refusal | one key, one descriptor | 0 |
 /// | `ReHomed`, bare root | builder, then its OWN ordinary refusal | one key, one descriptor | 0 |
-/// | `Frame` / `SelectedSlot` / `Invocation` | **transport validation, refusing at its own named authority — no arrival** | nothing | 0 |
+/// | `Frame` / `SelectedSlot` / `Invocation` | **outer transport validation, `validator_admitted = false`, refusing at its own named authority — no arrival** | nothing | 0 |
 /// | `ExactSuffix` / `CallIdentity` | builder | nothing | 0 |
 ///
-/// **The five refusal causes are TWO phases, not one.** Three refuse upstream
-/// of the builder and never arrive; two arrive and resolve zero. Both end with
-/// no key, ID, descriptor or definition — so a control asserting only that
-/// shared consequence would read as satisfied while being blind to which phase
-/// actually fired. The phase is asserted per row.
+/// **The five refusal causes are TWO phases, not one.** The census records that
+/// the outer validator did not admit three before the builder, while two arrive
+/// and resolve zero. Both end with no key, ID, descriptor or definition — so a
+/// control asserting only that shared consequence would read as satisfied while
+/// being blind to which phase actually fired. `validator_admitted` asserts the
+/// outer-validator phase per tier-3 row; arrival asserts the builder phase for
+/// the remaining pair.
 ///
 /// **What arrival LENGTH actually counts, and why it is NOT what carries the
 /// tier-3 rows.** `D2k-1d`, from Adversary `evt_1gk177jznv5rz`. An earlier
@@ -2751,18 +2753,17 @@ const R3_TERMINAL_STOP_POPULATION: [(crate::cranelift_backend::planning::D2jCaus
 /// case the old dichotomy omitted, and one that genuinely occurs for these same
 /// three causes wherever the builder is called directly.
 ///
-/// **So each tier-3 row asserts its refusal SENTENCE, and its count is
-/// supplementary.** The three read `0` today because the OUTER
+/// **So each tier-3 row asserts the census PHASE and its refusal SENTENCE, and
+/// its count is supplementary.** The three read `0` today because the OUTER
 /// `validate_oriented_subcontinuation_transport` at the compile entry runs
 /// before the builder and returns through `?` — while the builder's own first
 /// statement is a second call of that same validator. That ordering is the real
-/// ground of the two-tier split and nothing in the tree states it, so a
-/// reordering would leave every tier-3 row reading `0` unchanged while the
-/// phase the row names inverted. The sentence is emitted by the refusing
-/// authority itself and is identical under either copy, which makes these rows
-/// independent of the ordering without legislating it. `D2k-1d` deliberately
+/// ground of the two-tier split. A reordering would leave every tier-3 row
+/// reading `0` unchanged, but `validator_admitted` would change to `true` if the
+/// outer validator admitted and the builder's copy refused. The refusal
+/// sentence separately names the authority that refused. `D2k-1e` deliberately
 /// does not touch the duplicated validator; whether the outer call should exist
-/// is a separate question from whether this control depends on it.
+/// is a separate question from whether this control measures which copy fired.
 ///
 /// **The arrived-empty pair still rests on its count, and soundly.** For
 /// `ExactSuffix` and `CallIdentity` a length of `1` is a positive fact — the
@@ -4758,6 +4759,24 @@ fn d2f_0_the_applied_root_production_path_gate() {
         )
     }
 
+    /// Compile one cause inside the existing entry census. The census and the
+    /// D2f arrival recorder are separate thread locals: `compile_cause` drains
+    /// only the latter, while this scope restores only the former.
+    fn compile_cause_with_census(
+        cause: D2jCause,
+        symbol: &str,
+    ) -> (
+        Vec<crate::cranelift_backend::lowering::core::D2fGateArrival>,
+        Option<CraneliftBackendError>,
+        Vec<crate::cranelift_backend::lowering::core::MatchRecursorCensusRow>,
+    ) {
+        let ((arrivals, error), rows) =
+            crate::cranelift_backend::lowering::core::with_match_recursor_census(|| {
+                compile_cause(cause, symbol)
+            });
+        (arrivals, error, rows)
+    }
+
     /// The planner comparator for one cause, on that cause's OWN root. This is
     /// a DIFFERENT derivation from the compile above; neither reads the other,
     /// which is the only reason their agreement says anything.
@@ -4843,20 +4862,27 @@ fn d2f_0_the_applied_root_production_path_gate() {
     //
     // Every number in the refusal rows is a zero and no zero proves anything by
     // itself, so the positives' populations are operands of the same assertion.
-    // `D2k-1d`: the count is supplementary, and the refusal SENTENCE is what
-    // carries these rows. `compile_cause` already returns the error; the
-    // previous revision dropped it with `.0` and kept a bare zero, which is
-    // precisely the shape that cannot tell "the validator refused" from "the
-    // compile failed earlier for an unrelated reason" -- the standard
-    // `d0_r3_...` states and `d2j_the_source_side_causes_refuse_before_any_id_exists`
-    // applies. Each row now names the authority that refused it, and that name
-    // is the same whichever copy of the validator fires, so no row here depends
-    // on the outer call preceding the builder.
+    // `D2k-1e`: the count is supplementary; the census phase and refusal
+    // SENTENCE carry these rows together. `compile_cause` already returns the
+    // error; the previous revision dropped it with `.0` and kept a bare zero,
+    // which is precisely the shape that cannot tell "the validator refused"
+    // from "the compile failed earlier for an unrelated reason" -- the
+    // standard `d0_r3_...` states and
+    // `d2j_the_source_side_causes_refuse_before_any_id_exists`
+    // applies. Each row now names the authority that refused it and reads the
+    // census bit written from the OUTER validator, so the same error from the
+    // builder's own validator cannot silently satisfy the phase claim.
     //
     // The expected sentences are the ones the transport validator itself emits;
     // the two occurrence-mismatch reasons continue past this prefix with the
     // declaration they were raised in, so `contains` is the right relation.
-    let no_arrival: Vec<(D2jCause, usize, bool, Option<CraneliftBackendError>)> = [
+    let no_arrival: Vec<(
+        D2jCause,
+        usize,
+        bool,
+        bool,
+        Option<CraneliftBackendError>,
+    )> = [
         (
             D2jCause::Frame,
             "checked plan frame marker is missing or transplanted",
@@ -4872,13 +4898,28 @@ fn d2f_0_the_applied_root_production_path_gate() {
     ]
     .into_iter()
     .map(|(cause, expected)| {
-        let (arrivals, error) = compile_cause(cause, "ken_d2f_gate_neg");
+        let (arrivals, error, census) =
+            compile_cause_with_census(cause, "ken_d2f_gate_neg");
+        let validator_admitted = match census.as_slice() {
+            [row] => row.validator_admitted,
+            rows => panic!(
+                "{cause:?}: one production compile must record exactly one census row, got {}: \
+                 {rows:?}",
+                rows.len()
+            ),
+        };
         let named_its_own_authority = matches!(
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
                 if *construct == "OrientedSubcontinuationPlanV1" && reason.contains(expected)
         );
-        (cause, arrivals.len(), named_its_own_authority, error)
+        (
+            cause,
+            arrivals.len(),
+            validator_admitted,
+            named_its_own_authority,
+            error,
+        )
     })
     .collect();
     let arrived_empty: Vec<_> =
@@ -4920,7 +4961,7 @@ fn d2f_0_the_applied_root_production_path_gate() {
             // AC-6a phase A: refused at its OWN named authority, never arrived
             no_arrival
                 .iter()
-                .map(|(_, arrivals, named, _)| (*arrivals, *named))
+                .map(|(_, arrivals, admitted, named, _)| (*arrivals, *admitted, *named))
                 .collect::<Vec<_>>(),
             // AC-6a phase B: arrived once, resolved nothing
             arrived_empty
@@ -4935,7 +4976,7 @@ fn d2f_0_the_applied_root_production_path_gate() {
             (true, 1, 1, 0),
             (true, 1, 1, 0),
             (false, 0, 0, 0),
-            vec![(0, true), (0, true), (0, true)],
+            vec![(0, false, true), (0, false, true), (0, false, true)],
             vec![
                 (1, 0, 0, 4, 2, 0, 2, 1),
                 (1, 0, 0, 4, 2, 0, 2, 1),
@@ -4945,12 +4986,13 @@ fn d2f_0_the_applied_root_production_path_gate() {
          count zero, while the unmarked seed reaches the same builder and resolves nothing, \
          three marker causes refuse at their own named authority without ever reaching the \
          builder's Ok return, and two source-shape causes reach it and resolve nothing. The \
-         two refusal tiers are kept apart deliberately, and each tier-3 row is carried by its \
-         refusal SENTENCE rather than by its zero: an arrivals count counts builder calls that \
-         returned Ok, so a zero alone cannot tell 'refused upstream' from 'reached the builder \
-         and errored'. The named authority can, and it is the same sentence whichever copy of \
-         the transport validator fires. Only the arrived-and-empty pair is evidence about the \
-         builder, and every tier is an operand of the same assertion as the positives so that \
+         two refusal tiers are kept apart deliberately, and each tier-3 row is carried by the \
+         outer validator's admission bit plus its refusal SENTENCE rather than by its zero: an \
+         arrivals count counts builder calls that returned Ok, so a zero alone cannot tell \
+         'refused upstream' from 'reached the builder and errored'. The census bit identifies \
+         which phase fired, while the named authority identifies why. Only the \
+         arrived-and-empty pair is evidence about the builder, and every tier is an operand of \
+         the same assertion as the positives so that \
          no zero stands alone -- rows {no_arrival:?} and {arrived_empty:?}"
     );
 
