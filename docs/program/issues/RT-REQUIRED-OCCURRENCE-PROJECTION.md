@@ -201,6 +201,63 @@ origin: "Architect ruling evt_1y5bfgkg6v5b6 (2026-08-15), answering the Steward'
 > **`dec_310crgf5mashb` is spent.** It approved exact `e9e980988`; the next
 > candidate is a new SHA and needs fresh QA and Architect verdicts.
 
+> ### THE SUCCESSOR IS [[RT-REQUIRED-CONSUMER-REACH-CENSUS]], AND THIS NODE'S
+> ### `D4` LEFT MORE OPEN THAN "ROWS 2/3 ADVANCED"
+>
+> **Filed `ready` 2026-08-15.** `D4` recorded the boundary **name** and not the
+> refusal **sentence** — and `"Closure"` is the construct label on **four
+> distinct refusals** in `lowering/mod.rs` (`:11550`, `:20247`, `:20312`,
+> `:21272`) with four different meanings. The landed control
+> (`control.rs:5976`) asserts the construct, so which one fires is unrecorded.
+>
+> **And the surface does not reach every row.** The projection is minted under
+> `if required != source` (`static_transition.rs:11683`), so where the two
+> coincide **no projection exists to read**. [[RT-CONSUMING-OCCURRENCE-ROUTE-WIRE]]
+> measured that they coincide at **row 4 depth 1**, which is consistent with
+> `D4` measuring depth 1 unchanged. ⇒ **Depth 1 is outside this surface by
+> construction, not behind its boundary** — a different residual with a
+> different route forward, and no artifact said so until the successor was cut.
+>
+> **This is not a defect in this node.** The guard is correct: the projection
+> exists to carry a value the key cannot already express. What was missing is
+> the census.
+
+> ### ADVERSARY HUNT `evt_62attjpj3esa` — DISPOSITION
+>
+> **Recorded here rather than answered** (`COORDINATION §10⁻a`: the edge is
+> report-only). Re-checked against the tree before disposing, per the standing
+> rule that a hunt is grounded at a SHA and framing happens against `main`.
+>
+> **Accepted, and folded as `D4` of [[RT-REQUIRED-CONSUMER-REACH-CENSUS]].**
+> `aggregate_arrivals` and `aggregate_forwards` are incremented **inside** the
+> `if let Some(established_arrivals)` block, so both sum only over the qualified
+> subset and are entailed by the per-case assertions — a sum of N positives is
+> `>= N`, and elementwise equality is already asserted over exactly the summed
+> set. **The repair is two lines moved, not two assertions deleted:** summing
+> over every case including the complement leaves today's values unchanged and
+> makes a complement case that started arriving able to red. The carry note in
+> `dec_2vtk7e569tdvn` already declared the two derived; this converts the
+> honest declaration into a live check.
+>
+> **Confirmed, not a finding:** the emptiness holes are guarded at both ends
+> (`NonZeroUsize::new(qualified_cases).expect(..)` and `complement_cases > 0`),
+> with the per-case suppressed twin required non-zero and equal. And
+> `validate_required_consumer_projections` calls
+> `derive_required_consumer_occurrence(plan, &target.key)` **without**
+> `projection.required` among its inputs — a recomputation, not a read-back.
+> **`AC-1`'s re-derivation property holds as written.**
+>
+> **Raised, not folded: the tri-state convention.** The empty-scan fallback here
+> and `validator_admitted` on `D2k-1e` are the same shape — a two-state
+> observation standing in for a three-state question whose missing state is *the
+> instrument did not observe* — and both fail toward refusal. **Two nodes owe
+> one conversion, so it wants one convention rather than two independently
+> argued fixes.** Routing that is the Steward's; it is explicitly excluded from
+> the successor's scope so it is not designed twice by halves.
+>
+> **The `Restore` gap** (`dec_2vtk7e569tdvn`) stands as recorded; the hunt added
+> nothing to it and neither does this.
+
 ## Why the existing key slot is refused, and it is stronger than "the validator objects"
 
 The predecessor's measurement routed the lagged value through
