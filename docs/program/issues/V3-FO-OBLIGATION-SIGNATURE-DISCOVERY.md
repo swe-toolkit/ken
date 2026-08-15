@@ -360,11 +360,35 @@ connectives, or `Cert` constructors remain a later node.
 
 **`AC-6`.** No-regression, in CI (`COORDINATION §12`).
 
-**`AC-7`.** `D5`'s two audit labels are distinguishable **by inspecting
-`trusted_base()` output alone**, without knowing which route produced the entry.
-**Demonstrate both states**: one obligation whose certificate was accepted and
-withheld, one nothing could establish. A label only readable by someone who
-already knows which path ran is not the instrument `§4.4` needs.
+**`AC-7`.** `D5`'s two audit labels are distinguishable **from the trusted-base
+entries alone — via `trusted_base()` plus `env.lookup` — without knowing which
+route produced the entry.** **Demonstrate both states**: one obligation whose
+certificate was accepted and withheld, one nothing could establish. A label only
+readable by someone who already knows which path ran is not the instrument `§4.4`
+needs.
+
+> ### CORRECTED 2026-08-15. The old wording said "`trusted_base()` output alone".
+>
+> **`trusted_base()` returns `Vec<GlobalId>`** (`ken-kernel/src/env.rs:568`) — the
+> label is not in it. And `declare_postulate` calls `fresh_id()` unconditionally,
+> so **the two holes were always distinct there**; the candidate's own control
+> proves it with `assert_ne!(accepted_id, ordinary_id)` before reading any label.
+>
+> ⇒ **What the label buys is SEMANTIC distinguishability after `env.lookup`** — a
+> reader learns *why* the entries differ, not *that* they differ. Both are worth
+> having and only the second already existed.
+>
+> **This was a Steward error in the AC, not a defect in the work.** The wording
+> was reviewed and approved by QA and the Architect, and the delivered test does
+> the right thing — its doc says the names are recovered via `env.lookup`. **The
+> `prover.rs` comment was written to the AC, so it inherited the error**; fixing
+> it is folded into the Architect's constraint-3 comment edit rather than filed
+> separately. Adversary hunt `evt_38p85xzh3tge`, re-derived against the tree by
+> the Steward before acceptance.
+>
+> **The reusable shape: an AC that names the wrong surface propagates into the
+> code comment written to satisfy it**, and every reviewer downstream checks the
+> code against the AC rather than the AC against the tree.
 
 **`AC-8`.** **Neither label presents its entry as a lesser assumption**, per the
 provenance-not-strength constraint above. Both are postulates admitted on faith
@@ -396,6 +420,83 @@ value moves is a measurement; re-reading `18 §4.2` and concluding it is
 non-positional is the reading that already exists and is what `D6` was raised to
 check. **Report the outcome either way** — "the label does not reach a hash" is
 a result, and so is the opposite.
+
+## Adversary hunt on the landed `D5` range: dispositions
+
+`evt_38p85xzh3tge`, on `320ef7e6c...c94f0319a`. Recorded here so none of it is
+re-surfaced; each item was re-derived against the tree before acceptance.
+
+**1. The `prover.rs:590` rationale names the wrong surface. CONFIRMED.**
+Folded into the Architect's constraint-3 comment edit — one edit fixes the
+surface claim and records the artifact-identity constraint. The comment should
+also point at [[CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY]], because a reader who
+learns the label is an audit convenience will not expect it to move artifact
+bytes. See the `AC-7` correction above for the origin of the error.
+
+**2. Two identities, opposite answers, and the comment invites conflating them.**
+The same string **does not** participate in *declaration* identity — `fresh_id()`
+is unconditional and `ax2_named_postulate_inertness.rs` pins *"labels do not
+participate in identity"* — and **does** participate in *artifact* identity, per
+`D6`. **Both statements are true and they are about different identities.** The
+replacement comment must say which.
+
+**3. The FO label is a verbatim prefix-extension of the ordinary one. RULED: THE
+PREFIX STANDS**, and not as an accepted limitation (Architect,
+`evt_38w0vqh6rba1h`). The hazard is real; **the remedy was the wrong one.**
+
+> ### THE TWO OPTIONS FAIL IN OPPOSITE DIRECTIONS, and that settles it
+>
+> | option | what a naive `contains("prover unknown goal")` does |
+> |---|---|
+> | **shared prefix, as landed** | matches **both** — an audit of what a package assumes **OVER-includes** |
+> | **distinct leading text** (the proposed fix) | matches only the ordinary ones — the audit **UNDER-reports the trusted base** |
+>
+> **These are not two flavours of one bug.** Over-reporting assumptions is a safe
+> failure: you review more than you must. **Under-reporting the trusted base is
+> the dangerous one** — you conclude a package assumes less than it does, and the
+> silently dropped entries are exactly those where a certificate was found, which
+> is where a reader is most likely to have been reassured already.
+>
+> ⇒ **The proposed fix takes a hazard that currently fails safe and inverts it to
+> fail unsafe.** The prefix is not a cost paid for `AC-8`'s sake; it is
+> independently correct on audit-failure direction, and the two goals agree.
+
+> ### THE DURABLE PART: HOW TO WRITE AN AUDIT AGAINST THESE LABELS
+>
+> Written here rather than left in a thread, because the failure mode is someone
+> reaching for `starts_with` and silently under-reporting.
+>
+> - **Enumerating everything a package assumes:** match the **shared prefix** and
+>   include both. Both are postulates admitted on faith.
+> - **Separating the two causes:** use the **FO-specific token** (`theorem-home`,
+>   or the section citation) **or exact equality** with `"prover unknown goal"`.
+>   **Never a prefix.**
+>
+> **The third option asked for already exists in the landed string** — all three
+> queries are expressible and none requires weakening another. The candidate's own
+> test uses the precise form, asserting the FO name contains `theorem-home`. The
+> finding assumed prefix matching was the only tool; the distinction is not
+> dissolved, only unavailable to one sloppy query.
+
+**3a. The Architect's `AC-8` basis was wrong in the same way `AC-7` was.** He
+reasoned from *"in any `trusted_base()` listing both entries lead with..."* —
+there is no listing of names, only ids a reader looks up. **His conclusion
+survives on the assembled view, which is the only view a reader ever has**, but
+the stated basis does not. Recorded because he asked that the corrected reason
+stand rather than the original.
+
+**4. The `§4.4` gate cannot erode; watch for a SECOND exit instead.** It is an
+unconditional `return` inside the `check_cert`-success branch, so there is no
+condition for `D1`-`D3` to weaken. **The real hazard is a second
+accepted-certificate exit that does not route through it** — a structural check
+on the `D1`-`D3` diff. Carry this into `D1`-`D3` review.
+
+**5. A `check_cert`-false result falls silently through to `attempt_ipc`. NOT A
+DEFECT.** Correct as safety — never trust an unchecked certificate. But
+`find_certificate` is documented as a **decision procedure**, so a `Some(cert)`
+that `check_cert` rejects is a **searcher/checker disagreement that nothing
+observes.** Recorded as a known blind spot; worth a counter if the two ever grow
+apart, and not work for this node.
 
 ## Banned scope
 

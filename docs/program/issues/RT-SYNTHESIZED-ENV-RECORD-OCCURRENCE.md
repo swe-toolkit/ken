@@ -264,7 +264,66 @@ producer; nothing underneath it is broken, and no key needed inventing.
 class, the child arm tests only shape — and **that gate is the uncontested
 repair.**
 
-## UNBLOCKED, 2026-08-15: THE ORACLE IS THE INTERPRETER, NOT `RecursiveDescent`
+## `D3` ANSWERED: THE ROWS HAVE NO SOURCE-LEVEL WITNESS. THE FORK IS VOID.
+
+**Measured by the runtime ring at exact `af13cc7e5`** (`evt_qraaq4ytjxx1`,
+routed `evt_10e5re104zn4h`). Measurement only — no candidate, no commit, scratch
+test deleted, worktree clean.
+
+**The interpreter was never reached, and that is the result.** `D3`'s step 2 was
+written to say that failing to find a surface program is itself a finding. It
+failed, and here is what it found:
+
+- The governed producer is **test-only hand-authored `RuntimeExpr`**
+  (`lowering/core/tests/control.rs:2358`).
+- **Both exact surface routes to that shape refuse before checked-artifact
+  emission.** Naming the W-style recursive result gives
+  `Elaboration(StructuralResultOutOfScope)`; recomputing it by self-call gives
+  `KernelRejected(NotTerminating("SCT: idempotent self-loop has no
+  strictly-decreasing parameter"))`.
+- This **agrees with the operative surface rule**,
+  `spec/30-surface/34-data-match.md:443-445`: the W-style result exists as a
+  Pi-abstracted kernel IH and **no surface selector exposes it.**
+- `Node k` would transport the source closure rather than the recursive result.
+  **The ring correctly declined to substitute a merely similar program.**
+
+### The disposition, and it retires the fork rather than answering it
+
+**Both branches of `evt_3yvhf3hz59eb8` presupposed a capability question that
+does not exist.** There is no widening — no source program reaches these rows, so
+advancing them adds nothing to the accepted language. There is no narrowing —
+nothing compiles to them from source, so no capability is lost. **A fork whose
+two options are both about unreachable rows is void, not close.**
+
+**The child producer-class gate is authorized to land as a compiler-internal
+correction.** No operator decision is owed for these rows.
+
+> ### TWO CONDITIONS, and the first is where this could still go wrong
+>
+> **1. The gate is GENERAL; the measurement was NOT.** `D3` established that
+> `row4-depth-2/3` have no source witness. It established **nothing** about
+> whether some other shape reaching the same child arm does. **The recut must
+> establish that no source-reachable shape changes disposition** — measured, not
+> argued from the fixture's unreachability.
+>
+> **2. `AC-8` is amended for these rows only.** It says no pre-existing control
+> may change disposition and that a control whose expectation should change is a
+> handback rather than an edit. **This is that handback, and it is granted:**
+> `row4-depth-2/3` may move from `refused:Closure` to their new disposition,
+> because they pin a shape no compiler input produces. **State the new expectation
+> and why the control is still worth keeping** — a control over IR unreachable
+> from source is pinning the lowering's internal contract, which is a real thing
+> to pin and a different claim from what its name suggests.
+
+### The finding underneath, recorded because it outlives this node
+
+**The node's only production witness is not reachable from source.** The ring
+established earlier that these crossings were the node's live path; `D3` now
+establishes that no program reaches them. **Those two facts together mean the
+mechanism this node builds is exercised only by hand-authored IR** — which is
+worth knowing before the next node in this campaign is sized against it.
+
+## Superseded framing: the oracle ruling that produced `D3`
 
 **Operator ruling, verbatim:**
 
