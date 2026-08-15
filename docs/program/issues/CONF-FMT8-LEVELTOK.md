@@ -1,7 +1,7 @@
 ---
 id: CONF-FMT8-LEVELTOK
 title: "FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b)"
-status: active
+status: merged
 owner: spec-enclave
 size: S
 gate: none
@@ -11,14 +11,49 @@ github: null
 origin: "Raised by the conformance-validator's block on SPEC-IDENT-BLESSED successor b3468101 (2026-07-27); both carriers independently verified by the Steward at origin/main d6df571e. Ruled out of that WP's scope in evt_7egdvdf68p7a4 and filed here. Framed and flipped ready by the Steward 2026-08-14 at 88667c204, re-measuring every fixed input."
 ---
 
-> # `ready` as of 2026-08-14. Frame: `docs/program/wp/CONF-FMT8-LEVELTOK.md`.
+> # MERGED 2026-08-15 as squash `2ed8bbfd8`, from base `e7f85d48f`.
 >
-> The `depends_on` edge recorded a **scheduling** dependency — the endpoint (b)
-> ruling this node rests on landed with `SPEC-IDENT-BLESSED`, which is
-> `merged`. That dependency is discharged.
+> Candidate `e2c1d25e`, PR #2262. Sole path
+> `conformance/surface/formatting/seed-canonical-format.md`, `+103/-9`,
+> blob-identical between candidate and squash; `crates/` byte-identical across
+> the squash. Decision `dec_3hbwaewwah11b`, Spec/Fidelity `evt_2zdzfgg4jydy1`,
+> Architect `evt_3ttm0sbwccwvy`. Frame:
+> `docs/program/wp/CONF-FMT8-LEVELTOK.md`.
 >
-> **Re-measured at `88667c204`: every claim below still holds**, and the
-> mechanism is now pinned at `file:line` in the frame rather than asserted.
+> **The row was repaired, not deleted.** It now asserts the `31 §1d`
+> conjunction — one stored `Ident("level")` across source `ℓ`, `l`, and `level`,
+> **and** three distinct preserved lexemes — with the collapse-to-one-spelling
+> counterfactual stated. The Architect's grounding is worth carrying: the
+> shared-stored-name half is **near-vacuous**, because no implementation using
+> the real lexer can fail it, and the seed says so. **The discrimination lives
+> entirely in the lexeme-preservation half**, which forces the formatter to
+> replay source spans rather than print the semantic name.
+>
+> ## The census is the deliverable, and the review changed its answer
+>
+> **14 producible / 4 blocked** across 18 adjudicated cases in 20 marker
+> occurrences. The handoff proposed **16/2**; the conformance-validator's block
+> is why it is not. It found two rows marked producible whose fixtures the
+> landed surface cannot parse:
+>
+> | row | blocker |
+> |---|---|
+> | `all-literal-lexemes-are-verbatim` | `0x[...]` enters `lex_radix_integer` with no digit before `[` and fails; there is no byte-list token or AST path |
+> | `ascription-binder-fixity-and-associativity-survive` | no fixity declaration token and no parser arm; zero implementation hits under `crates/` |
+>
+> and required FMT1's aggregate marker to enumerate **all three** missing
+> surfaces rather than membership alone, since its aggregate includes every
+> FMT2-FMT8 fixture.
+>
+> ## Two surfaces are now named with no node behind them — that debt is mine
+>
+> The blocked rows honestly record *"no blocker node exists"* rather than
+> inventing one, which is what the frame asked for. **That is correct in the
+> seed and incomplete in the tracker.** Filing tracked work is the Steward's per
+> `COORDINATION §2`, so the census has handed me two:
+> **bracketed hex-byte list surface** and **user-declared fixity surface**.
+> Until those nodes exist, the seed names a blocker that nothing in the tracker
+> owns.
 
 ## The measurement
 

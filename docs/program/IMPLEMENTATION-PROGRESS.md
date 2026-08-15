@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 00:03:47Z — from 287 issue file(s) in `docs/program/issues/`.
+2026-08-15 00:10:34Z — from 287 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -68,7 +68,7 @@ the committed file matches the generator's output.
 | `CI-SKIPPED-NATIVE-TESTS` | Restore rt_parity_native — dedicated CI job, outlier not fixed | merged | verify | S | none | — |
 | `CI-TRACKER-GATE` | Wire the issue-tracker schema + regeneration gate into CI | closed | operator | S | none | 804 |
 | `CONF-EVAL-COMPUTED-BOOL-ELIM` | The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together | merged | spec-enclave | S | none | — |
-| `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | active | spec-enclave | S | none | — |
+| `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | merged | spec-enclave | S | none | — |
 | `CONF-SEC4-REFL-PAIR` | Sec4's C1/C2 refl pair is stale against ADR-0013: the suite half of the repair landed with SEC4-TCB, the seed half did not | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE | merged | spec-enclave | S | none | — |
