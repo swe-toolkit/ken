@@ -1,6 +1,6 @@
 ---
 id: V3-FO-CONVERSION-LOAD-MEASURED
-title: "Measure what kernel conversion actually costs when it runs check_cert, on real source programs, before any of it is argued about"
+title: "Establish source-level provenance for FO obligations and measure the Rust reference checker over their certificate trees, recording that the kernel-conversion quantity 23 section 4.4 names is not takeable at this SHA"
 status: ready
 owner: language
 size: M
@@ -31,23 +31,62 @@ accepted as something to **measure**, not to pre-empt.
 > unstarted, and have no node. **Steward framing debt, recorded here so the
 > posture ruling is not misread as authorizing `proved`.**
 
-## What is actually being measured, and why it is cheap
+## WITHDRAWN: this node claimed to measure kernel conversion. It cannot.
 
-The expensive computation is one equation, from `23 §4.4`:
+**Architect review `evt_7cmys9wyp7k8c` at `b52d160c8`; Steward scope call
+`evt_6m3q3tsvg09pz`. The claim was wrong when written and the error is the
+Steward's.**
+
+The section here used to argue that the expensive computation is one equation
+from `23 §4.4` —
 
 ```
 ok : check_cert (embed Sigma f) pi = True
 ```
 
-**`refl True` at that type forces exactly the conversion work in question** —
-kernel conversion must evaluate `embed Sigma f` and then run `check_cert` over
-the whole derivation tree.
+— that `refl True` at that type forces exactly the conversion work, and that
+since it *"requires NEITHER theorem"* **the cost number was obtainable now.**
 
-⇒ **It requires NEITHER theorem.** `embedding_adequacy` and `checker_soundness`
-turn that computation into a *discharge*; they are not what makes it expensive.
-**So the cost number is obtainable long before the metatheory is proved**, and
-this node exists to take it at the earliest point it is real rather than at the
-end.
+**That reasoning cleared the metatheory axis and was read as clearing the way.**
+It never asked whether the artifact being measured exists.
+
+⇒ **It does not.** Verified at `origin/main` `30ee4dbf1`:
+`grep -rn check_cert library/ catalog/` **returns nothing.** The only
+`check_cert` in the tree is `ken_elaborator::fo_kripke::check_cert`
+(`fo_kripke.rs:807`), **native Rust** recursing through `check_tree` (`:812`)
+over Rust `Cert`/`Sequent` structs. `embed` is Rust-side too.
+
+`conformance/verify/prover/seed-prover.md:49-50` states the distinction
+normatively: `check_cert` is *"the **Ken-level reflective Bool checker** over
+quoted formulas ... an ordinary kernel-checked function, **distinct** from the
+kernel API `check`."*
+
+⇒ **ZERO kernel conversion is inside anything this node can measure.** What it
+measures is **the elaborator's Rust reference checker over the same certificate
+trees.** `cert_nodes` — the structural size of the work — is the transferable
+part; the timings are **a lower bound of unknown tightness** and say **nothing
+about termination under kernel reduction**, which is the half `18 §6` leaves
+argued.
+
+> **This number must NOT enter the posture record as the cost of route (a).**
+> `docs/design/fo-route-theorem-home.md` §4 names the new load class as
+> conversion executing a deep recursive function correctly and terminating, and
+> says a Rust home is strictly worse **on exactly this axis** because it moves
+> the computation outside the re-checked region. **A Rust number measures the
+> mechanism that ruling declined.**
+
+**The gap is closed by [[V3-FO-KEN-LEVEL-CHECKER-AUTHORING]]**, filed as a
+separate lane-2 node. **It is not a prerequisite here** — the predecessor's
+`D1` finding is that no Ken program in this repository produces an FO-quotable
+obligation, so a cost number for checking one gates nothing while that
+population is zero.
+
+> ### THE ERROR SHAPE, RECORDED BECAUSE IT IS THIS CAMPAIGN'S SIGNATURE
+>
+> **A warrant that reaches one axis, read as reaching another.** *"Requires
+> neither theorem"* was true about the **metatheory** and said nothing about
+> **existence**. Lane 1 paid for the same shape twice in the same week: a limit
+> stated on the **instrumented sites** read as a limit on the **population**.
 
 ## The hazard this node exists to avoid, stated as a constraint
 
@@ -175,19 +214,45 @@ whether the corpus had to be written**; if real programs producing such
 obligations are scarce, that is a finding about the route's reach and is worth
 more than a timing table.
 
-**`D2` — the measurement.** For each, the wall-clock and, where obtainable, the
-reduction-step count that conversion spends on
-`check_cert (embed Sigma f) pi = True`. **Report the distribution, not an
-average** — the interesting number is the worst case, and a mean hides it.
+**`D2` — the measurement, OF THE RUST REFERENCE CHECKER.** For each obligation,
+the wall-clock that `ken_elaborator::fo_kripke::check_cert` spends over the
+certificate tree, plus `cert_nodes`. **Report the distribution, not an average**
+— the interesting number is the worst case, and a mean hides it. **State the
+build profile**; CI and `ken-cargo` both run debug, and microseconds without a
+profile are not interpretable.
 
-**`D3` — the shape of the growth.** How the cost scales with certificate size
-and formula depth. **A blowup on small input is a checker bug, not a budget
-problem**, and this deliverable is what tells the two apart.
+> **`D2` USED TO DEMAND KERNEL-CONVERSION REDUCTION STEPS. Withdrawn** — that
+> quantity is not takeable at this SHA, per the section above. **Reduction steps
+> under kernel conversion are [[V3-FO-KEN-LEVEL-CHECKER-AUTHORING]] `D4`.**
 
-**`D4` — the honest report.** Whether conversion terminated on every case, and
-any case where it did not. **A non-terminating or pathological case is the most
-valuable result this node can produce** and must be reported as a result rather
-than worked around.
+**`D3` — the shape of the growth.** How the **Rust checker's** cost scales with
+certificate size and formula depth. **A blowup on small input is a checker bug,
+not a budget problem**, and this deliverable is what tells the two apart.
+**Report it as observed, not guaranteed.**
+
+**`D4` — the honest report, and it now carries the `AC-2` finding.** Whether
+**the Rust checker** terminated on every case, and any case where it did not.
+**A non-terminating or pathological case is the most valuable result this node
+can produce** and must be reported as a result rather than worked around.
+
+**`D4` also reports the gap itself**: the measurement `23 §4.4` calls for is not
+takeable at this SHA, because the Ken-level artifacts kernel conversion would
+reduce do not exist in the tree. **Cite `seed-prover.md:49-50`.**
+
+> **Distinguish a MECHANISM pathology from a HARNESS limit before reporting
+> either.** A stack abort on a deep case is the signature this repo has already
+> classified as *"plain (non-algorithmic) stack exhaustion"* and built an
+> instrument for. **Run under `run_with_big_stack` first** (`AC-2a`). If it
+> completes, the finding is that the limit measured was the harness's — **and a
+> claimed pathology is removed from the posture record.** If it still aborts,
+> it is a real robustness defect and **deserves a routed node, not a paragraph.**
+>
+> **The reason once given here for not automating `D4` — that an overflow
+> "would take the whole suite down" — does not hold on the CI harness.** CI runs
+> `cargo nextest run`, which executes each test in its own process, so an abort
+> surfaces as an attributed single-test failure. **It holds only under a local
+> `cargo test` of that target.** Architect `evt_7cmys9wyp7k8c`, correcting his
+> own first reading.
 
 ## Acceptance criteria
 
@@ -201,10 +266,31 @@ that would pass under it is testing nothing. **The two propositions compared
 must be genuinely different at `phi_ty`**; showing that is the whole content of
 the control.
 
-**`AC-2`.** The measurement is of kernel conversion, not of the solver. z3's
-wall-clock is out of scope — it runs outside the kernel and carries no
-authority (`23 §4.3`). **If a number in the report includes solver time, it is
-the wrong number.**
+**`AC-2`, AMENDED.** Steward scope call `evt_6m3q3tsvg09pz`, adopted by the
+Architect at `evt_5wz8x7kt4rkkt`.
+
+1. **The solver exclusion STANDS.** z3's wall-clock runs outside the kernel and
+   carries no authority (`23 §4.3`). **A number including solver time is the
+   wrong number.**
+2. **`AC-2` no longer claims kernel conversion.** The measured quantity is
+   **the elaborator's Rust reference checker over the same certificate trees**,
+   declared as a proxy. **`cert_nodes` is the transferable part.**
+3. **The gap is reported as a RESULT, in `D4`'s voice** — the measurement
+   `23 §4.4` calls for is **not takeable at this SHA**, because the Ken-level
+   `check_cert`/`embed`/`Form`/`Cert` that kernel conversion would reduce do
+   not exist in the tree. **Cite `seed-prover.md:49-50`.**
+4. **The number is a lower bound of unknown tightness and must not enter the
+   posture record as the cost of route (a).**
+
+> **An amendment that only redefined the target would be worse than the
+> original claim.** Condition 3 is what makes this an honest narrowing rather
+> than a quiet one, and it is the condition of the amendment, not a suggestion.
+
+**`AC-2a`.** Deep cases run on the oversized test-thread stack helper
+(`run_with_big_stack`, present in four `crates/` test files today), **so a
+harness stack limit is never reported as a mechanism property.** The shipped
+corpus runs at implication depth 48 on the default stack; **48 was not chosen
+for margin**, and 49..55 was never bisected. **CI is different hardware.**
 
 **`AC-3`.** No `proved` verdict is produced for FO. `23 §4.4`'s reservation is
 untouched by this node, which measures the computation rather than trusting it.
@@ -215,10 +301,15 @@ untouched by this node, which measures the computation rather than trusting it.
 
 ## Banned scope
 
-- **Proving either theorem.** That is the unfiled successor and it is not this.
+- **Proving either theorem.** `embedding_adequacy` and `checker_soundness` are
+  still unfiled and are still not this.
+- **Authoring the Ken-level `check_cert`/`embed`/`Form`/`Cert`.** That is
+  [[V3-FO-KEN-LEVEL-CHECKER-AUTHORING]], filed on this node's `AC-2` gap, and
+  it is a route (a) build rather than anything this measurement node does.
 - **Optimizing what is measured.** Measure first. A repair chosen before the
   distribution is known is a guess with a number attached.
 - **Widening the slice.** `§4.5`'s bounds are unchanged.
+- **Reporting a harness stack limit as a mechanism property.** `AC-2a`.
 
 ## Sequencing
 
