@@ -269,15 +269,46 @@ fn non_indexed_match_stays_unaffected() {
 /// its correct result is structurally `v` itself.
 ///
 /// **`AC-1`'s HAZARD -- distinguishing a correct refinement from an
-/// over-wide skip -- is discharged elsewhere, by the right instrument
-/// (Architect ruling `evt_b4hfddjceg8d`): the non-degenerate pair
-/// `sibling_convoy_retypes_outer_binder_through_nested_match` (positive:
-/// the enclosing field IS refined) /
-/// `let_interleaved_outer_binder_not_skipped_by_convoy` (negative: an
-/// interleaved outer binder is NOT skipped -- an over-wide skip reds this
-/// one), plus D2's structural record that `k` sits at `abs_pos=6`,
-/// OUTSIDE `[3..6, 7..10]`. That pair, not this fixture's evaluated value,
-/// is what actually catches the hazard `AC-1` was written against.
+/// over-wide skip -- is WITHDRAWN, not discharged (Architect ruling
+/// `evt_2hfhtcqk3fpn7`, refuting the prior `evt_b4hfddjceg8d` §3 claim
+/// made without running the mutation).** `let_interleaved_outer_binder_
+/// not_skipped_by_convoy`'s `let k = 0` gives `k` no index-dependent type
+/// (`cur_ty` is bare `Nat`), so `try_reindex_cast`'s own no-spurious-
+/// refinement guard (`elab.rs:2830`, `AC8`) makes the loop a no-op at `k`
+/// whether or not the region guard skips it -- QA measured this directly
+/// by replacing the guard with the prohibited positional floor
+/// (`if abs_pos >= 3`) and re-running the file: exit 0, 7 passed, 1
+/// ignored, 0 failed, identical to the region-set run. Reproduced
+/// independently here. **No test in this file currently distinguishes the
+/// ruled region set from the refuted floor.**
+///
+/// A genuinely discriminating fixture needs three constraints together:
+/// (1) position above the enclosing field region (a `let`/`λ` push,
+/// already satisfied by `k`); (2) a type that literally depends on the
+/// index the nested match peels, so `try_reindex_cast` returns `Some`
+/// rather than the AC8 no-op above; (3) consumption where the unrefined
+/// type fails to check. A bounded attempt at (2)+(3) -- binding `k` to a
+/// fresh `Vec Nat n` value (via a small `repl : (n : Nat) -> Vec Nat n`
+/// helper, so `k`'s type is NOT inherited from an already-refined
+/// reference) and consuming it either as a further nested match's
+/// scrutinee or via the recursive call -- hit an apparently unrelated
+/// internal elaborator error (`index refinement: could not classify the
+/// branch goal: TypeMismatch { expected: Dg67, found: ((Dg574 Dg67)
+/// @N) }`, from `refine_branch_goal`, `elab.rs:2913-2917`) in every
+/// variant tried, and a diagnostic probe on `try_reindex_cast`'s own
+/// operands showed `k`'s weakened raw type and the middle match's `b2`
+/// disagreeing on which absolute position they name -- consistent with a
+/// frame/weakening mismatch specific to an intervening `let` between an
+/// outer match's premise computation and a nested match's own field push.
+/// That is a plausible, DIFFERENT, and orthogonal gap from this node's own
+/// remedy; it is reported, not fixed, here (out of scope -- `install_
+/// index_refinements` consumers beyond this node's own fix are explicitly
+/// banned scope). The region-set-vs-floor choice therefore remains
+/// **design-justified but behaviourally unwitnessed at this node**: the
+/// region set is the provenance-correct predicate (a field bound by an
+/// enclosing match is not a genuine outer binder, independent of whether
+/// a program can currently observe the difference), but no surface
+/// program in this file currently exercises the divergence.
 ///
 /// **This fixture's evaluation is nonetheless the literal `AC-1` ask, and
 /// it is retained here, real, and IGNORED rather than weakened or
@@ -368,25 +399,34 @@ fn two_vector_zip_recursive_step_convoy_fixture() {
 }
 
 /// `LANG-CONVOY-MATCH-FIELD-PROVENANCE` D2 -- the let-interleaved
-/// discriminator. The Architect explicitly did NOT build this fixture: he
-/// established from `elab.rs:1143`/`:1132` (`RLet`/`RLam` push `cx.ctx` and
-/// elaborate the body inside that push) that a `let` between the outer
-/// match's arm and a nested inner match strands a genuine outer binder
-/// (`k`) ABOVE the enclosing arm's own field region -- but did not confirm
-/// the shape reaches capability 2 at all. `AC-3` measured that it does:
-/// a temporary `#[cfg(debug_assertions)]` probe at capability 2's loop
-/// (`elab.rs`, removed before commit) showed `k` sits at `abs_pos=6` with
-/// `match_field_regions=[3..6, 7..10]` (the enclosing arm's `m,a,xs` and
-/// the inner arm's own `_,b,ys`) at the moment the loop reaches it --
-/// `skipped=false`, `k` is outside every active range, and the
-/// declaration elaborates. This is the only fixture that separates the
-/// ruled region-set remedy from a floor: a floor keyed on the enclosing
-/// match's entry depth (3) would treat `k`'s position (6, above that
-/// depth) as ineligible for sibling convoy, identically to how it
-/// (wrongly) treats the enclosing match's own fields -- the region set
-/// does not, because `k`'s position was never recorded in
-/// `match_field_regions` (that push closed at `6`, the enclosing arm's own
-/// field count, before the `let` ran).
+/// POSITION record (NOT a region-set-vs-floor discriminator -- that claim
+/// was made, then measured false; see the correction below). The Architect
+/// explicitly did NOT build this fixture: he established from
+/// `elab.rs:1143`/`:1132` (`RLet`/`RLam` push `cx.ctx` and elaborate the
+/// body inside that push) that a `let` between the outer match's arm and a
+/// nested inner match strands a genuine outer binder (`k`) ABOVE the
+/// enclosing arm's own field region -- but did not confirm the shape
+/// reaches capability 2 at all. A temporary `#[cfg(debug_assertions)]`
+/// probe at capability 2's loop (`elab.rs`, removed before commit) showed
+/// the shape DOES reach it: `k` sits at `abs_pos=6` with `match_field_
+/// regions=[3..6, 7..10]` (the enclosing arm's `m,a,xs` and the inner
+/// arm's own `_,b,ys`) at the moment the loop reaches it -- `k` is outside
+/// every active range, and the declaration elaborates.
+///
+/// **This does NOT, however, distinguish the region set from a floor --
+/// measured, not merely unclaimed (Architect ruling
+/// `evt_2hfhtcqk3fpn7` §2, refuting his own earlier `evt_b4hfddjceg8d`
+/// §3 claim that "an over-wide skip reds this one").** `k`'s type here is
+/// `Nat` (`let k = 0`), which mentions no index at all, so `try_reindex_
+/// cast`'s own no-spurious-refinement guard (`elab.rs:2830`, `AC8`) makes
+/// capability 2's loop a no-op at `k`'s position REGARDLESS of whether the
+/// region guard skips it. QA confirmed this by replacing the guard with
+/// the prohibited positional floor (`if abs_pos >= 3`) and running the
+/// whole file: exit 0, 7 passed, 1 ignored, 0 failed -- identical to the
+/// region-set run. Independently reproduced here (same result, both
+/// directions). See `two_vector_zip_recursive_step_convoy_fixture`'s doc
+/// comment for the bounded attempt at a genuinely discriminating fixture
+/// and why it was not completed within this node's scope.
 #[test]
 fn let_interleaved_outer_binder_not_skipped_by_convoy() {
     let mut env = vec_env();
