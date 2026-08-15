@@ -43,20 +43,97 @@ The missing step is **deciding which signature an incoming obligation belongs
 to.** That is a design call with its own review, per `evt_30mehjtecaazy`, and it
 must be made before anything is built.
 
-> ### THE CHEAP REPAIR IS THE DANGEROUS ONE. Named so nobody reaches for it.
+> ### CORRECTED. The old prohibition was RIGHT ON SITE, WRONG ON REASON.
 >
-> The obvious fix is to have `attempt_fo` adopt the signature implied by the
-> incoming term's own `GlobalId`s. **Do not build that, and in particular do not
-> build it to make an acceptance criterion pass.**
+> **This block previously said the obligation must not be allowed to determine its
+> own signature, because `embed` would then be computed over caller-chosen
+> predicates. The Architect re-derived that against `23 §4.4` and it is wrong**
+> (`evt_4v2j0e05t5ew9`). It was my restatement of his earlier warning, inherited
+> rather than re-derived — the same failure this node's own frame warns about.
 >
-> It makes the term dictate the signature it is quoted against, so **`embed` is
-> computed over predicates the caller chose.** Signature selection sits upstream
-> of everything the embedding's soundness argument assumes. A route where the
-> obligation picks its own signature is a surface to be designed deliberately,
-> not introduced as test-enablement.
+> **`embedding_adequacy` is universally quantified over `Sigma`, `C`, `rho`, and
+> `f`.** A caller-chosen `Sigma` is therefore **inside** the theorem's statement,
+> not outside it. So obligation-derived selection is **not per se unsound**, and
+> the old sentence forbade something the theorem already covers.
 >
-> **The shape, which recurs:** the cheapest-looking repair is cheap precisely
-> because it skips the part that needed deciding.
+> ⇒ **A rule built to the wrong reason over-constrains in one direction while
+> leaving the actual hole open.** That is what happened here, and it is why the
+> correction changes what this node builds rather than merely how it is worded.
+>
+> **The real hazard is QUOTATION PRESERVATION**, the obligation `§4.4` states one
+> paragraph earlier: if `quote_fo(o) = Accepted(problem Sigma C rho f)` then
+> `denote C rho f` must be the `Pi`-closed proposition of the **original**
+> obligation `o`, up to definitional equality. **The danger is not that the caller
+> picks the vocabulary — it is that quotation accepts a `(Sigma, C, rho, f)` whose
+> `denote` is a DIFFERENT proposition from the one asked, and then discharges `o`
+> with a proof of that other thing.**
+
+### The lawful rule: forbid UNVERIFIED selection, not obligation-derived selection
+
+**An obligation MAY determine which of its own `GlobalId`s fill the sort and
+predicate roles.** Four conjuncts, and the third is the one that carries it:
+
+1. **Role assignment is a deterministic function of the obligation's own syntax**,
+   total-or-refusing. **No ambient declaration-order matching, no environment
+   scan, no "most recent postulate of the right shape."** That prohibition stands.
+2. **Declaration shapes are validated:** the sort is a declared type, the
+   predicate is `A -> Omega` at that sort. **Necessary, not sufficient.**
+3. **Quotation ESTABLISHES PRESERVATION and refuses otherwise:** `denote C rho f`
+   is definitionally the `Pi`-closed proposition of `o`. **This must be
+   discharged, not assumed.** If it cannot be established for a given obligation,
+   the outcome is `Unknown` — **refusing is always available and always safe.**
+4. **`embed` is applied to the very `Sigma` quotation verified**, not to one
+   re-derived downstream. **Two derivations of "the same" signature is exactly the
+   shape that failed on the runtime candidate earlier today** — planner and
+   lowering each computed a key and nothing proved they agreed.
+
+> ### CONJUNCT 3 IS *THE* ATTACKABLE CLAIM. The four are not equals.
+>
+> **Conjuncts 1, 2 and 4 fail LOUDLY.** A non-deterministic matcher, a wrong
+> declaration shape, a re-derived `Sigma` — each produces a refusal or a visible
+> disagreement.
+>
+> **Conjunct 3 is the only one whose failure is SILENT.** Quotation accepts, the
+> certificate checks, the verdict looks honest, and **the proposition discharged
+> is not the one asked.**
+>
+> ⇒ **Whoever attacks this should spend nearly all of their effort on conjunct 3.**
+> Stated here rather than left to be inferred from ordering
+> (Architect rider, `evt_2t61wgk7pp896`).
+
+> ### "ADOPTION" IS NOW A LAWFUL WORD, AND ONLY IN VIRTUE OF CONJUNCT 3.
+>
+> The matcher **may adopt the obligation's own identities BECAUSE preservation is
+> established — never instead of establishing it.**
+>
+> **Adoption without established preservation is exactly the cheap repair that got
+> the predecessor blocked**, now wearing a sanctioned term. Pinned here so the
+> word cannot later be read as sanctioning the unverified version by someone
+> reading the vocabulary and not the conjunct.
+
+> ### THE CONSISTENCY SAFEGUARD IS IN THE TYPE, NOT IN OWNERSHIP.
+>
+> A caller cannot escape by choosing a `Sigma` whose `K(Sigma)` is inconsistent.
+> If `K(Sigma)` were unsatisfiable, `classically_valid(embed Sigma f)` would hold
+> vacuously for **every** `f`, and adequacy would then force `denote C rho f` for
+> every `f` — which is false. **So adequacy is not provable for arbitrary
+> `Sigma`.** What makes it provable is that its statement demands an actual
+> `C : Carriers Sigma` and `rho : AtomEnv Sigma C`. **That is a model**, quotation
+> must produce one, and **an obligation cannot conjure a carrier interpretation
+> for an inconsistent theory.**
+>
+> ⇒ **Spend this node's effort on conjunct 3 and on producing `C`/`rho` honestly.
+> Do not spend it on signature-ownership machinery**, which buys provenance you do
+> not need at the cost of the reachability you do.
+
+> **Why "prover-owned, pre-registered" was rejected, since it is the intuitive
+> answer:** it is **too strong** — a real obligation's sort and predicate are the
+> user program's `GlobalId`s, a pre-registered signature holds prover-minted ones,
+> and those are never equal. It converts fresh-per-call unreachability into
+> fresh-per-registration unreachability and **fails `D3` by construction.** It is
+> also **too weak** on the half that matters: ownership is a provenance property,
+> preservation is a semantic one, and you can own `Sigma` and still quote `o` into
+> an `f` whose `denote` is not `o`.
 
 ## THIS NODE REMOVES THE FIRST OF TWO GATES THAT ARE MASKING EACH OTHER
 
@@ -90,14 +167,30 @@ someone who does not know it is the last one.**
 
 ## Deliverables
 
-**`D0` — the design question, posed to the Architect before any code.** State
-the candidate rule for matching an obligation to a signature **as an attackable
-claim**, with the soundness obligation it must discharge: what prevents the
-obligation from selecting the predicates its own embedding is computed over.
-**And state the `§4.4` interaction explicitly**, per the two-gate section above —
-a `D0` that covers only the signature-matching rule does not meet the Architect's
-stated condition. **Hand this to the Architect and stop.** `D1` onward is gated
-on that ruling.
+**`D0` — RE-POSED, 2026-08-15.** The first `D0` was ruled not accepted
+(`evt_4v2j0e05t5ew9`) because it was built to the superseded reason above.
+
+**Re-pose it as the four conjuncts, with conjunct 3 as the attackable claim** —
+that is the one an adversary should be invited to break, **because its failure
+yields a wrong proof rather than a refusal.** Still state the `§4.4` interaction
+explicitly, per the two-gate section.
+
+> **The Architect ruled the SHAPE, not the mechanism.** How preservation is
+> established is this ring's. **If it turns out preservation cannot be established
+> without something he has banned, come back and say so rather than routing
+> around it.**
+>
+> **And he asked for disagreement over deference:** he derived the adequacy
+> quantification and the model-witness argument from `23 §4.2`/`§4.4` at ruling
+> time rather than from the earlier thread. **If you read those sections and reach
+> a different conclusion, that is wanted.**
+
+**`D0` IS NOW ACCEPTED** (`evt_2t61wgk7pp896`): all four conjuncts carried
+faithfully, the model-witness safeguard stated as structural rather than as
+machinery, and the `§4.4` interaction and `AC-2` aim correct.
+
+⇒ **Sequence: `D5` first (ungated), then `D1`-`D3`.** The Architect released
+`D1`-`D3` to begin after `D5` closes.
 
 **`D1` — the discovery mechanism**, built to whatever `D0` rules. Recognition
 must be by a checked structural property, not by ambient state and not by
