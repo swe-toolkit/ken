@@ -103,6 +103,39 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > the `D5` control — but **this control would not notice if the excluded arm
 > changed from refusing to compiling.** One line if you want it; not a defect.
 
+> # THE PRODUCT FORK IN FRONT OF THIS NODE WAS POSED ON A FALSE PREMISE
+> # Steward, 2026-08-15. Do not act on the fork as previously stated.
+>
+> The fork put to the operator was: **cover the refused rows (requires inventing
+> a cross-unit representation, large node) / accept and record the narrowing /
+> stop the campaign.** The first option was priced against a prohibition that
+> does not exist.
+>
+> **`spec/40-runtime/41-values.md:76-83` specifies live-domain cross-artifact
+> closure exchange**, and `:116-118` explicitly declines to constrain its
+> mechanism. What the chapter forbids is the **durable** lane (`:73-76`), which
+> is the retired `(PersistentClosure, Closure)` pair — a different pair from the
+> one a live-domain crossing would need. The "no `(tag, class)` admission"
+> criterion that this was read out of is a **scope boundary on
+> [[RT-CLOSURE-CROSSING-ELIMINATE]]**, phrased as a handback trigger, not a
+> statement about the ABI.
+>
+> ⇒ **The prior question is the Architect's: does the generated-unit boundary
+> sit inside "one live runtime domain, while the defining owner and artifact
+> remain live"?**
+>
+> - **If yes** — the refused rows are refusing something the spec grants. That
+>   makes them a **gap**, and retirement would ship a narrowing **below spec**,
+>   which is a different and worse thing than narrowing an unspecified
+>   convenience. The cover option is then a specified build (owner/lifetime
+>   encoding plus the refuse-before-invocation check `:81-83` requires), not an
+>   invention.
+> - **If no** — the crossing is a durable export under another name, today's
+>   refusal is correct on the merits, and the fork stands exactly as posed.
+>
+> **Do not ask the operator to choose until this is answered**, and do not read
+> the earlier three-option framing as still current.
+
 > # RETIRING ALL FIVE RESIDUAL CLASSES IS NOT THE FINISH LINE
 >
 > With every class retired, the selector still exists, still evaluates on every
