@@ -251,14 +251,41 @@ fn reflective_decision_computes_cert_d_placeholder() {
 }
 
 /// C2: kripke-embedding-cert-rechecks-FO
-/// [placeholder — reifies in V4]: requires Kripke embedding φ ↦ φ#, World sort,
-/// adequacy lemma `classically_valid(φ#) → φ`, and `check_cert` soundness (23 §4).
+///
+/// `V3-FO-KRIPKE-SLICE` built the first route-(a) vertical slice
+/// (`23 §4.5`): quotation (`quote_fo`), the exact classical Kripke theory
+/// with `K(Sigma)` inside the target (`embed`), and a computable certificate
+/// checker (`check_cert`) — see `crates/ken-elaborator/src/fo_kripke.rs` and
+/// its acceptance tests in `v3_fo_kripke_slice_acceptance.rs`, which run the
+/// positive/negative controls named by `23 §4.5` and confirm
+/// `prover::attempt_fo_with_signature` still returns `Unknown`, never
+/// `Proved`, for an explicitly accepted slice certificate.
+///
+/// **Route FO is built and checked, but currently unreachable in production
+/// through the public `attempt_fo`/`attempt_obligation` entry point.**
+/// `attempt_fo` mints a fresh `FoSliceSignature` on every call (`prover.rs`),
+/// so no externally-constructed obligation can ever quote against it —
+/// every real obligation refuses quotation and falls through unchanged to
+/// the IPC fallback, exactly as before this slice landed. Reaching the
+/// slice at all currently requires the caller-supplied-signature entry
+/// point, `attempt_fo_with_signature`. Recognizing a real obligation's own
+/// (sort, predicate) signature is `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY`,
+/// filed as this node's successor and explicitly gated on its own
+/// Architect ruling before starting -- not landed here, and not implied by
+/// anything in this row.
+///
+/// **What remains a genuine placeholder, not landed here:** `checker_
+/// soundness`/`embedding_adequacy` (`23 §4.4`) are not yet kernel-checked in
+/// an approved home — that placement is an Architect/operator decision
+/// `V3-FO-KRIPKE-SLICE` explicitly did not make. So `sound φ π (refl true)`
+/// does not yet exist as a discharge term, and route FO cannot return
+/// `proved` — this seed row's own `expect` clause already states that
+/// ("until then route FO cannot return proved"). This test stays a
+/// placeholder for exactly that reserved half, not for the whole row.
 #[test]
 fn kripke_embedding_cert_rechecks_fo_placeholder() {
-    // [placeholder — reifies in V4]
-    // When landed: an FO goal φ routed to Kripke; Z3 decides φ# valid;
-    // discharge term `sound φ π (refl true)` checks → proved.
-    // trusted_base() delta = 0 (adequacy is a proved kernel def).
+    // [placeholder — reifies once the theorem-home placement decision is
+    // made (23 §4.4); quotation/embed/check_cert are real, see above]
     let _ = "placeholder";
 }
 
