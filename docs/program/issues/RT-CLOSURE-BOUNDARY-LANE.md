@@ -1,15 +1,61 @@
 ---
 id: RT-CLOSURE-BOUNDARY-LANE
 title: "Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-SRCBODY-BIND-ORDER, RT-PLANNED-CLOSURE-PREEXISTENCE]
-blocks: []
-github: null
+blocks: [RT-CLOSURE-CROSSING-ELIMINATE]
+github: https://github.com/swe-toolkit/ken/pull/2322
 origin: Measured at frozen base 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differential (evt_2jc88hbzfskpm). All 16 CI failures at aa032cc2 fail at the base too -- ZERO bind-order flips -- so this is pre-existing base debt, not a regression. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # MERGED 2026-08-15 — PR #2322, squash `3025b6d0a`. THE GUESS WAS REFUTED,
+> # AND THAT IS THE DELIVERABLE.
+>
+> **Exact `5e8907597446ee524b2e8ab11804f1e1a30488ac`, two commits from
+> `c4e622e93`, four paths, `+195/-23`, blob identity MATCH 4/4.** Decision
+> `dec_650dc1x38n4jh` read `resolved` from the object; QA `evt_2th73cw9fsfgt`,
+> Architect `evt_2nwtjekh4qtnk`. The whole Rust surface is `cfg(test)`, and
+> `mod.rs` is byte-identical to the previously approved object, so the shared
+> gate and its refusal string were never touched.
+>
+> **The frame's constraint 2 turned out UNSATISFIABLE.** The guess was to route
+> the crossing through `B2F`'s existing carrier and design no new one. Grounded
+> at `boundary_value.rs`: `BOUNDARY_TAG_CLASS_RELATION` (`:670`) is mechanically
+> reconciled to the partition-derived relation over the full product in both
+> directions and drift either way reddens, so the language is **enforced-closed**;
+> `BoundaryClass::Closure` has exactly one row, `(PersistentClosure, Closure)` at
+> `:683`; that pair is the sole entry in `BOUNDARY_RETIRED_LANES` (`:723-724`)
+> and `boundary_relation_admits` returns `false` for it before reading the schema
+> at all (`:769+`); `InvocationAggregate` admits exactly `Constructor` and
+> `Record` (`:706-711`).
+>
+> ⇒ **No admitted live-domain lane for `BoundaryClass::Closure` exists anywhere
+> in the ABI**, so carrying a first-class closure requires a new `(tag, class)`
+> admission — the one thing the frame forbade. **The guess was refuted from the
+> inside, by its own second constraint.**
+>
+> **This is the operator's 2026-08-15 ruling working, and the comparison is
+> measurable.** The attempt ran and stopped in roughly an hour. The
+> classification-first structure this node carried for one turn spent a full day
+> across five measurement nodes and removed zero residuals. The Architect
+> grounded the stop independently at the ABI rather than taking the report and
+> called it **stronger than reported**.
+>
+> ### THE DISPOSITION OVER-NARROWS ITS OWN SUCCESSOR. Architect finding.
+>
+> The text says the row remains refused until a successor **carrier** exists.
+> The measurement establishes something narrower: **the closure *value* cannot
+> cross.** It does **not** establish that the *capability* requires a carrier.
+>
+> ⇒ A true measurement does not entail what the sentence built on it claims, and
+> the sentence forecloses in prose a route the measurement leaves open. That
+> route is [[RT-CLOSURE-CROSSING-ELIMINATE]] — carry the environment as an
+> already-admitted `Record`, dispatch statically to a body `D1` measured as
+> statically known, and no `Closure` ever reaches the boundary. **Read the
+> successor before acting on the refusal sentence above.**
 
 > ## FRAMED AND `ready`, 2026-08-15. IT IS A REPAIR ATTEMPT, `size: M`.
 >

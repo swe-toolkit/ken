@@ -370,6 +370,102 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > > a repair moves any of them.** That is what makes this durable rather than a
 > > one-time reading — **a red there is information, not a test to update.**
 
+> # THE CONSTRUCTOR-ARGUMENT GUESS WAS MINE AND IT IS REFUTED.
+> # Steward, 2026-08-15, on runtime's bounded attempt `evt_67eenae3karvq`.
+>
+> **The attempt ran, produced no candidate, and the empty range is the correct
+> outcome — not a failure to deliver.** Base and tip both `c4e622e93`, worktree
+> released clean, both committed controls green after full cleanup.
+>
+> **What was attempted:** in `lower_computational_producer_expr`'s
+> `RuntimeExpr::Construct` arm, ahead of its ordinary argument walk, recognize a
+> static-worker argument with the existing `recognized_constructor_worker_fields`,
+> build the existing compiler-only `static_worker_constructor_template`, and feed
+> it to the existing composed eliminator. Nothing touched `value_at`, the
+> exact-`Var` route, planner population, ABI, or runtime representation.
+>
+> **Why it is refuted, and the evidence is a measurement rather than a reading.**
+> The ring armed that exact new branch with a `cfg(test)` panic **after
+> recognition** and ran the committed `D2k` control: all five compiles completed
+> and the control stayed green. ⇒ **The route is not reached by the governed
+> population at all.** The source-grounded reason is that these worker-bearing
+> constructors are **already recognized earlier** by ordinary and source-machine
+> `Construct` handling, and arrive at their present later dispositions; they
+> never present a recognized worker environment to the computational-producer
+> arm.
+>
+> **Arming the branch is what makes this conclusive rather than suggestive.** An
+> unarmed attempt that changed nothing would have produced the same green control
+> and the same empty range, and *"my repair was inert"* and *"my repair was never
+> reached"* are different facts. The arming separates them.
+>
+> ## THE FOUR ARE NOT ONE WALL. My framing said they were, and that was wrong.
+>
+> The kick called these *"the four parked expressions at the `StaticWorkerBinding`
+> wall."* The committed `D2k-0` re-derivation says otherwise, per expression:
+>
+> | expression | where it actually stands |
+> |---|---|
+> | row 1 owned-scope | `NativeJoinPlanV1` — **a different construct entirely** |
+> | row 4 depth 1 | `StaticWorkerBinding` **conservation** refusal |
+> | row 4 depth 2 | `Closure` — advanced, and dispositioned in [[RT-CLOSURE-BOUNDARY-LANE]] |
+> | row 4 depth 3 | `Closure` — same |
+> | row 5 after-hole | `StaticWorkerBinding` **conservation** refusal |
+>
+> ⇒ **The population still unaccounted for in this node is TWO expressions**, not
+> four: row 4 depth 1 and row 5 after-hole. **Row 1 is at a wall this node's
+> increments do not reach**, and the control's own comment says so — it is kept
+> in the five precisely because a row that moves for a different reason is what
+> distinguishes a real arming from one that did nothing.
+>
+> **Note what the refusal is NOT.** It is no longer the bare-`Var` value read;
+> `D2k-1b` recognizes ahead of that, and the durable half of `D2k-0` asserts no
+> row may reach that edge again. The remaining wall is **conservation**.
+>
+> ## `D2k-2` — the next increment, and the next guess
+>
+> **Operator ruling, 2026-08-15: attempt the repair on the best available guess.
+> This is that guess, and it is the Steward's, so attack it.**
+>
+> > **The two remaining rows consume a `StaticWorkerBinding` at a site that does
+> > not pass through `constructor_field_bindings`, so no rebind is ever marked
+> > and the conservation ledger refuses. The repair is to route that consumption
+> > through the one binder that marks the ledger — not to add a second
+> > recognition beside it.**
+>
+> **The grounding, and it is one read rather than a measurement.**
+> `constructor_field_bindings` (`lowering/mod.rs:4935`) documents itself as *"the
+> one place a `ConstructorField` becomes a `LoweringEnvironmentBinding` ... so
+> **the conservation ledger is marked exactly where the rebinding happens**
+> rather than at each caller"*, and its `ConstructorField::StaticWorker` arm
+> (`:4945`) is where the identity is minted, scoped to the generated function
+> body. A conservation refusal is therefore what a consumption reaching lexical
+> authority by some **other** path produces.
+>
+> **What I did not verify, stated so it is not inherited as established:**
+> whether these two rows' consumption sites *can* be routed through that binder,
+> or whether their shape forbids it. **That is the first thing to attack, in
+> code.** If the binder cannot take them, name what refuses and hand back — the
+> previous attempt shows how cheaply that resolves.
+>
+> **Bounded to one attempt, and the same two hard stops bind.** A red on the
+> committed `D2k-0` control is information, not a test to update. A different
+> `edge` is a second root: stop and hand back.
+>
+> ## Row 1 and the closure criterion — do not let this one go quiet
+>
+> **Row 1 is at `NativeJoinPlanV1` and no increment here has ever addressed it.**
+> Under the ratified closure criterion it still owes a disposition: repaired, or
+> refused with its spec clause cited and its pre-retirement behaviour accounted
+> for. **It currently has neither**, and it is the expression most likely to be
+> read as closed because the other four have moved.
+>
+> **The same is true of the two conservation rows if `D2k-2` also fails.** At
+> that point the honest disposition is a recorded refusal — which, given `D0`'s
+> measurement that descent compiles these today, means **recording a narrowing**.
+> That is a product call and it is not the ring's to make. **Hand back rather
+> than writing a refusal that quietly accepts a capability loss.**
+
 > # R3 MERGED. THE BLOCKER IS DISCHARGED AND THE STATUS IS NOW `ready`.
 > # Steward, 2026-08-14. Nothing was un-landed and nothing is re-ranked.
 >

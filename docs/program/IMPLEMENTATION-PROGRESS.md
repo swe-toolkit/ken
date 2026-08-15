@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 12:41:40Z — from 308 issue file(s) in `docs/program/issues/`.
+2026-08-15 13:49:22Z — from 311 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -71,6 +71,7 @@ the committed file matches the generator's output.
 | `CONF-BLOCKER-OWNER-RESOLVABILITY` | 72 of 77 conformance blocker markers name a condition with no resolvable owner, so nothing can ever re-examine them when the work lands -- the wikilinked five are the only ones that were findable at all | ready | spec-enclave | M | none | — |
 | `CONF-EVAL-COMPUTED-BOOL-ELIM` | The conformance matrix does not state that a closed computed Bool consumed by the Bool eliminator selects the same method as the corresponding constructor -- the two runtime representations reach the eliminator by independent index derivations and nothing ties them together | merged | spec-enclave | S | none | — |
 | `CONF-FMT8-LEVELTOK` | FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b) | merged | spec-enclave | S | none | — |
+| `CONF-PROVER-SEED-KRIPKE-DRIFT` | Clear what the Kripke chapter merge left behind: a conformance seed asserting a settled trusted-base outcome the chapter re-opens, two sibling drift sites, and the one-clause witness-direction fix | ready | spec-enclave | S | none | — |
 | `CONF-SEC4-REFL-PAIR` | Sec4's C1/C2 refl pair is stale against ADR-0013: the suite half of the repair landed with SEC4-TCB, the seed half did not | merged | spec-enclave | S | none | — |
 | `CONF-STALE-RED-DISPOSITIONS` | Eleven conformance sites assert RED-UNTIL-BUILT or BLOCKED-ON against producers that have already landed -- the mirror of the unproducible-fixture defect, and it makes finished work read as outstanding | merged | spec-enclave | M | none | — |
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
@@ -218,7 +219,8 @@ the committed file matches the generator's output.
 | `RT-CARRIER-PRODUCER-OCCURRENCE` | a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property | ready | runtime | M | none | — |
 | `RT-CENSUS-CAVEAT-GUARD` | The identifier-census caveat's staleness guard is an existence check standing in for a count check, so it cannot detect the drift it was written to catch | ready | runtime | S | none | — |
 | `RT-CHECKED-IH-REALIZATION-AUTHORITY` | Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing | ready | runtime | M | none | — |
-| `RT-CLOSURE-BOUNDARY-LANE` | Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails | ready | runtime | M | none | — |
+| `RT-CLOSURE-BOUNDARY-LANE` | Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2322 |
+| `RT-CLOSURE-CROSSING-ELIMINATE` | Eliminate the closure crossing instead of admitting it: carry the captured environment as an already-admitted Record and dispatch statically to the known body, so no Closure value ever reaches the boundary | ready | runtime | M | none | — |
 | `RT-COMPMATCH-TREE-SCRUTINEE` | ComputationalMatch refuses a tree-producing scrutinee that is not Bool or a constructor (rt_span_prov) | draft | runtime | TBD | none | — |
 | `RT-CONSUMER-CARRY-CONTROL-DEBT` | five carries on the consumer-descent-carry merge: two new planner refusals are unreachable in production because the interned target is not an independent authority, two of four equality assertions are vacuous, the lag law is NOT uniform and its depth-1 boundary is asserted nowhere, the primary Source branch is unexercised and sits one level off from the fallback, and the D8a twin clones where the real descent advances | merged | runtime | S | none | — |
 | `RT-CONSUMING-OCCURRENCE-ROUTE-WIRE` | The carried consuming occurrence is production-written and test-only-read, so no production path has ever consulted it -- wire one consumer at the refusing boundary and MEASURE what the route then does, without assuming it closes | merged | runtime | M | none | — |
@@ -343,6 +345,7 @@ the committed file matches the generator's output.
 | `V3-KRIPKE-THEORY-CLOSURE` | Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes | ready | spec-enclave | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
 | `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | merged | verify | S | none | 2120 |
+| `V3-Z3-EMISSION-CONTROL` | Put a control on the SMT-LIB query generator that does not need an installed solver, so the emission path stops being witnessed only by a fleet-wide required CI job | ready | verify | S | none | — |
 | `V3-Z3-PROCESS-ADAPTER` | The z3 half of the round-trip: an off-by-default external solver that proposes candidate assignments into the kernel-gated witness seam, adding a dependency and zero trusted base | merged | verify | M | none | — |
 | `V4-RESIDUAL` | The Kripke countermodel is an inert shell: it is never related to `φ` at all — no interpretation of the formula, no recursive forcing evaluator — and V3's prose `description` is stuffed into `FormRef`, a slot meant for a structural subformula reference | merged | verify | L | G2-G3 | 1117 |
 | `VIS-BR-LITERAL` | visibility walk: raw-string prefixes br and cr are unrecognized by the literal scanner | merged | runtime | XS | none | — |
@@ -365,7 +368,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
 - `RT-CENSUS-CAVEAT-GUARD` — The identifier-census caveat's staleness guard is an existence check standing in for a count check, so it cannot detect the drift it was written to catch
 - `RT-CHECKED-IH-REALIZATION-AUTHORITY` — Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing
-- `RT-CLOSURE-BOUNDARY-LANE` — Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails
+- `RT-CLOSURE-CROSSING-ELIMINATE` — Eliminate the closure crossing instead of admitting it: carry the captured environment as an already-admitted Record and dispatch statically to the known body, so no Closure value ever reaches the boundary
 - `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` — the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
@@ -375,6 +378,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 - `V3-KRIPKE-THEORY-CLOSURE` — Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes
+- `V3-Z3-EMISSION-CONTROL` — Put a control on the SMT-LIB query generator that does not need an installed solver, so the emission path stops being witnessed only by a fleet-wide required CI job
 
 ## Blockers
 
@@ -394,6 +398,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
+- `CONF-PROVER-SEED-KRIPKE-DRIFT` blocked by `V3-KRIPKE-THEORY-CLOSURE` (status: ready)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)
