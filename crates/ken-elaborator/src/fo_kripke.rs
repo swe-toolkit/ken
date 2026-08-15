@@ -129,10 +129,41 @@ pub enum IForm {
 /// A quoted-target variable, de Bruijn bound or a certificate-local free
 /// eigenparameter (`23 §4.3` `QTerm`). The slice folds `QSort` (world vs.
 /// object) into which `Form`/`Rule` variant is used rather than carrying it
-/// on `QTerm` itself -- correct by construction here because every relation
-/// (`Access`/`DomainA`/`ForcingP`) and quantifier (`ForallWorld`/`ForallObj`)
-/// already fixes which sort each slot is; a general multi-sort `QSort` tag
-/// is unneeded generality for a one-object-sort slice.
+/// on `QTerm` itself.
+///
+/// **`V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D3`, recut.** `Form`/`QTerm` are
+/// UNTYPED and `check_tree` performs no sort validation: `check_cert` is
+/// total over `Form`, and a hand-constructed ill-sorted target -- e.g. a
+/// world eigenparameter substituted into an object slot of `ForcingP` --
+/// closes and returns `true` (`Init` needs only syntactic `Form` equality,
+/// which the malformed formula still has once instantiated). Neither
+/// eigenparameter freshness nor `Init`'s equality check sort at all, so an
+/// earlier version of this comment attributing safety to them named a
+/// mechanism that does not do the work.
+///
+/// **The real mechanism is at the CALLER, not in `check_cert` itself.**
+/// `quote_iform` admits only an in-scope object `Var` of the declared sort
+/// as an atom's argument, refusing everything else as
+/// `FoBoundary::IllScopedOrIllSorted` -- so the `IForm` it produces carries
+/// ONLY object-sort de Bruijn indices; there is no world variable anywhere
+/// in `IForm`, because worlds do not exist until [`embed`] introduces them.
+/// `Form` is therefore STRICTLY LARGER than `embed`'s image on `IForm
+/// Sigma`: the probe's malformed formula is real, but it lives entirely in
+/// that excess and no `IForm` maps to it. The route's discharge composition
+/// only ever calls `check_cert(embed(f), pi)` for `f : IForm Sigma` --
+/// never on an arbitrary hand-built `Form` -- so the accepted-but-ill-sorted
+/// certificates the probe found exist in `check_cert`'s domain and are
+/// unreachable from that composition.
+///
+/// **This guarantee belongs to the CALLER, not to `check_cert`.** Any future
+/// caller that hands `check_cert` a `Form` obtained some way other than
+/// `embed Sigma f` loses this property entirely, with NO diagnostic --
+/// `check_cert` will accept and say nothing. A sort-validating `check_tree`
+/// would make the checker's own domain honest instead of relying on its
+/// caller; that is legitimate future hardening, not required for this
+/// route's soundness, and it is its own scoped item (widening `D3` here is
+/// explicitly out of scope). A general multi-sort `QSort` tag remains
+/// unneeded generality for this one-object-sort slice, for this reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QTerm {
     Bound(usize),
@@ -359,17 +390,77 @@ fn quote_iform(env: &GlobalEnv, sig: &FoSliceSignature, term: &Term) -> Result<I
 /// at the top call)? Used to enforce "the proof binder absent from `q`"
 /// (`23 §4.1`) -- distinct from `prover.rs`'s own `has_free_vars`, which
 /// checks for ANY free var at or above a depth, not this specific one.
+///
+/// **`V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D0`-`D2`.** This runs BEFORE
+/// `quote_iform`'s `_ => Err(UnsupportedTermShape)` refusal, on unvalidated
+/// input -- so it cannot rely on `quote_iform`'s accepted grammar to bound
+/// what it sees. `D2`'s coupling is expressed structurally, not recorded as
+/// an argument: `go` is an EXHAUSTIVE match over every [`Term`] constructor,
+/// not a subset scoped to what `quote_iform` currently accepts, and there is
+/// no wildcard arm. Adding a new kernel `Term` constructor is therefore a
+/// compile error here, not a silent fail-open -- `quote_iform`'s accepted
+/// grammar is a subset of ALL of `Term` by definition, so it can never grow
+/// past what this function correctly traverses, at any future point.
+///
+/// Each arm's depth discipline mirrors `ken_kernel::subst::shift`'s cutoff
+/// exactly (confirmed against the tree, not merely cited): `Pi`/`Lam`/
+/// `Sigma`/`Let` are binders (second/body subterm at `depth + 1`); `Pair` is
+/// **not** a binder (`subst.rs:44`, `:147` shift/subst both children at the
+/// same index) despite being grouped with `Sigma` in earlier code -- a
+/// `Pair(_, Var(0))` proof-hypothesis codomain was previously misread as not
+/// mentioning the proof variable, the unsound (false-negative) direction
+/// (`D0`'s finding). Every other multi-subterm constructor (`App`, `Proj1`/
+/// `Proj2`, `Ascript`, `Eq`, `Cast`, `J`, `Quot`, `QuotClass`/`Trunc`/
+/// `TruncProj`/`Refl`, `QuotElim`, `Elim`, `Absurd`) recurses at the same
+/// depth for every subterm, per `shift`'s own non-binder arms (`D1`). The
+/// six term-free leaves (`Type`, `Omega`, `Const`, `IndFormer`,
+/// `Constructor`, `IntLit`) return `false` because they are STRUCTURALLY
+/// incapable of carrying a `Var` -- an exact fact, not a default.
 fn mentions_var0(term: &Term) -> bool {
     fn go(term: &Term, depth: usize) -> bool {
         match term {
             Term::Var(i) => *i == depth,
-            Term::Pi(a, b) | Term::Lam(a, b) | Term::Sigma(a, b) | Term::Pair(a, b) => {
+
+            // Binders: matches `shift`'s `cutoff + 1` discipline exactly.
+            Term::Pi(a, b) | Term::Lam(a, b) | Term::Sigma(a, b) => {
                 go(a, depth) || go(b, depth + 1)
             }
+            Term::Let { ty, val, body } => go(ty, depth) || go(val, depth) || go(body, depth + 1),
+
+            // Non-binders: every subterm recurses at the SAME depth
+            // (`subst.rs`'s own non-binder arms). `Pair` belongs here, not
+            // with `Sigma` above -- `subst.rs:44`/`:147`.
             Term::App(f, a) => go(f, depth) || go(a, depth),
-            Term::Proj1(t) | Term::Proj2(t) | Term::Trunc(t) | Term::TruncProj(t) => go(t, depth),
+            Term::Pair(a, b) => go(a, depth) || go(b, depth),
+            Term::Proj1(t) | Term::Proj2(t) => go(t, depth),
+            Term::Ascript(t, a) => go(t, depth) || go(a, depth),
             Term::Eq(a, t, u) => go(a, depth) || go(t, depth) || go(u, depth),
-            _ => false,
+            Term::Cast(a, b, e, t) => go(a, depth) || go(b, depth) || go(e, depth) || go(t, depth),
+            Term::J(m, d2, e) => go(m, depth) || go(d2, depth) || go(e, depth),
+            Term::Quot(a, r) => go(a, depth) || go(r, depth),
+            Term::QuotClass(t) | Term::Trunc(t) | Term::TruncProj(t) | Term::Refl(t) => {
+                go(t, depth)
+            }
+            Term::QuotElim { motive, method, respect, scrut } => {
+                go(motive, depth) || go(method, depth) || go(respect, depth) || go(scrut, depth)
+            }
+            Term::Elim { params, motive, methods, indices, scrut, .. } => {
+                params.iter().any(|p| go(p, depth))
+                    || go(motive, depth)
+                    || methods.iter().any(|m| go(m, depth))
+                    || indices.iter().any(|i| go(i, depth))
+                    || go(scrut, depth)
+            }
+            Term::Absurd(motive, proof) => go(motive, depth) || go(proof, depth),
+
+            // Term-free leaves: structurally cannot carry a `Var`. An exact
+            // fact per constructor, not a wildcard-style default.
+            Term::Type(_)
+            | Term::Omega(_)
+            | Term::Const { .. }
+            | Term::IndFormer { .. }
+            | Term::Constructor { .. }
+            | Term::IntLit(_) => false,
         }
     }
     go(term, 0)
@@ -831,5 +922,82 @@ mod tests {
             }
             other => panic!("embed's target must be Imp(K(Sigma), forall w. w|=f), got {other:?}"),
         }
+    }
+
+    /// `V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D0`/`AC-1`: `Pair` is not a binder
+    /// (`subst.rs:44`, `:147` shift/subst both children at the SAME index).
+    /// A `Pair(_, Var(0))` mentions the outermost bound variable in its
+    /// second component at the top-level depth -- grouping `Pair` with
+    /// `Sigma`'s binder discipline (the pre-fix code) checked the second
+    /// component at `depth + 1` instead, so `Var(0)` read as `Var(0) == 1`,
+    /// false, and this case was silently missed. This test fails against
+    /// that pre-fix code (confirmed by hand before this commit) and passes
+    /// against the same-depth traversal `D0` requires.
+    #[test]
+    fn mentions_var0_detects_var0_in_pair_second_component() {
+        let term = Term::Pair(Box::new(Term::Type(Level::zero())), Box::new(Term::Var(0)));
+        assert!(
+            mentions_var0(&term),
+            "Pair(_, Var(0)) must be detected as mentioning the outermost \
+             bound variable -- Pair is a term former, not a binder"
+        );
+    }
+
+    /// `V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D1`/`AC-1`: a constructor that fell
+    /// to the pre-fix wildcard `_ => false` -- `Let` was never enumerated --
+    /// must be detected once it is given its own arm. `ty` is a non-binding
+    /// position (only `body` binds, at `depth + 1`), so `Var(0)` inside `ty`
+    /// is exactly the outermost bound variable and must be found at the
+    /// SAME depth. This test fails against the pre-fix wildcard (confirmed
+    /// by hand before this commit) and passes against the exhaustive match
+    /// `D1` requires.
+    #[test]
+    fn mentions_var0_detects_var0_in_a_former_wildcard_constructor() {
+        let term = Term::Let {
+            ty: Box::new(Term::Var(0)),
+            val: Box::new(Term::Type(Level::zero())),
+            body: Box::new(Term::Type(Level::zero())),
+        };
+        assert!(
+            mentions_var0(&term),
+            "Let{{ ty: Var(0), .. }} must be detected -- ty is a non-binding \
+             position at the same depth as the Let itself, and no \
+             term-carrying constructor may reach the false default"
+        );
+    }
+
+    /// `V3-FO-QUOTE-GUARD-FAIL-CLOSED` `AC-2`: the coupling between
+    /// `quote_iform`'s accepted grammar and `mentions_var0`'s traversal is
+    /// a STRUCTURAL property, demonstrated here by exercising it on the
+    /// slice's own controls (not merely by the exhaustive match compiling).
+    /// Every `Term` shape `quote_fo` actually accepts for the positive and
+    /// negative controls must also be traversed correctly by
+    /// `mentions_var0` on their sub-derivations -- exercised indirectly by
+    /// `quote_fo_accepts_both_controls_and_refuses_outside_the_slice` and
+    /// `positive_control_certificate_computes_true` continuing to pass
+    /// unchanged (`AC-3`): if the fix had narrowed or mis-shifted any arm
+    /// reachable from the slice's own accepted grammar, those tests would
+    /// regress. The growth guarantee itself -- that no FUTURE accepted
+    /// shape can outrun the guard -- is structural (no `_ =>` arm in
+    /// `mentions_var0`, so a new `Term` constructor is a compile error
+    /// here), not re-provable by a runtime test over a still-finite grammar.
+    #[test]
+    fn mentions_var0_has_no_wildcard_arm_left_to_outrun() {
+        // A representative of every binder AND non-binder shape reachable
+        // through `quote_iform`'s accepted grammar today (`Pi`, and via
+        // recursion `App`/`Trunc`/`IndFormer`-headed `or`) must resolve
+        // through an explicit arm, not a wildcard -- run each and confirm
+        // none silently defaults.
+        assert!(mentions_var0(&Term::Var(0)));
+        assert!(!mentions_var0(&Term::Var(1)));
+        assert!(mentions_var0(&Term::Pi(
+            Box::new(Term::Type(Level::zero())),
+            Box::new(Term::Var(1)),
+        )));
+        assert!(mentions_var0(&Term::App(
+            Box::new(Term::Var(0)),
+            Box::new(Term::Type(Level::zero())),
+        )));
+        assert!(mentions_var0(&Term::Trunc(Box::new(Term::Var(0)))));
     }
 }

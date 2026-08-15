@@ -12,9 +12,22 @@ use crate::term::{Level, LevelVar, Term};
 ///
 /// Defensive against underflow: a negative `d` that would take a free index
 /// below 0 is left unchanged rather than wrapped (which `as usize` would turn
-/// into a huge, silently-corrupt index). No current caller causes underflow
-/// (`weaken` only increases context size), but `shift`/`weaken` are `pub` — the
-/// guard keeps the contract "no corruption on any input."
+/// into a huge, silently-corrupt index).
+///
+/// **This guard is fail-safe at the REPRESENTATION level, not the semantic
+/// one — it prevents corruption, not capture** (`ken-elaborator`'s
+/// `V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D3`). If `Var(0)` reaches this branch at
+/// `d = -1, cutoff = 0`, the index is left as `Var(0)` unchanged: no panic,
+/// no wrapped index. But that un-shifted `Var(0)` now ALIASES whatever the
+/// next enclosing binder becomes once every OTHER index in the term shifts
+/// down by one — a real semantic capture, produced silently. The guard's own
+/// contract is exactly "no corruption on any input"; a caller that also
+/// needs "no capture" must establish `Var(0)`'s absence independently before
+/// calling with a negative `d` (e.g. `ken-elaborator`'s `fo_kripke.rs`
+/// `quote_iform` calls `shift(codomain, -1, 0)` only after `mentions_var0`
+/// has confirmed `Var(0)` is genuinely absent from `codomain`, so this
+/// branch is never reached on that path — that absence is a property the
+/// CALLER establishes, not one this guard provides).
 pub fn shift(term: &Term, d: i64, cutoff: usize) -> Term {
     match term {
         Term::Var(i) => {
