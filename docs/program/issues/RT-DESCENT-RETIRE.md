@@ -54,6 +54,55 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > **narrowing of a presently-compiling capability** rather than debt removal.
 > That is a product call, and this node is where it lands.
 
+> # `D0`'s promise-class sentence WILL BLOCK YOU, and it is worded wrong
+>
+> **Read this before you touch
+> `recursive_descent_recursors_compile_without_a_boundary_crossing`.** Its
+> promise class reads:
+>
+> > *"Promise class: transition sentinel. Retirement or an authorized boundary
+> > repair must rewrite this route comparison rather than preserve its current
+> > exact outcomes."*
+>
+> **That sentence names this node explicitly, and as written it forbids the
+> hardening edit rather than the thing it means to forbid.** An arm-order
+> inversion — or any added arm, or a stronger anchor — **preserves both outcomes
+> exactly** and changes only how they are established. So it lands on the
+> *"preserve its current exact outcomes"* side, which is the side the sentence
+> exists to prohibit.
+>
+> ⇒ **The sentence states a requirement on future SEMANTIC change and omits the
+> LICENCE underneath it.** The licence is that the promise is the **route
+> comparison**, not the exact outcomes — so edits that preserve both outcomes
+> while strengthening how they are established are permitted and expected. That
+> is implied by the class name and never written, so an author who checks the
+> promise class before hardening the control finds what reads as a ban.
+>
+> **Fix the clause when you get here.** A promise class that has to be
+> interpreted is not governing. Adversary `evt_2ka6ngwcm5r44`.
+>
+> **`D0`'s own non-vacuity is settled by MEASUREMENT, not by reading — use it.**
+> The Architect enumerated the shared mutable state and found no memoization
+> hazard, and was explicit that this was a reading rather than a measurement. The
+> Adversary then ran the inversion on both depths in one process:
+>
+> ```
+> depth=2 FIRST=unexcluded crossings=0   SECOND=excluded crossings=2
+> depth=3 FIRST=unexcluded crossings=0   SECOND=excluded crossings=2
+> ```
+>
+> ⇒ **The empty `RecursiveDescent` observation survives being first**, on a
+> compile nothing could have memoized, **and the non-empty anchor survives being
+> second.** Both orders, both depths. `D1`'s residual census leans on `D0`, so
+> this is the evidence that makes a zero meaningful — landing the inversion is now
+> optional, not load-bearing.
+>
+> **One gap left open deliberately:** `_excluded_result` is discarded, so the
+> excluded arm's *compile outcome* is unasserted. Correct as written — the
+> crossing is recorded before the refusal, and pinning it there would duplicate
+> the `D5` control — but **this control would not notice if the excluded arm
+> changed from refusing to compiling.** One line if you want it; not a defect.
+
 > # RETIRING ALL FIVE RESIDUAL CLASSES IS NOT THE FINISH LINE
 >
 > With every class retired, the selector still exists, still evaluates on every
