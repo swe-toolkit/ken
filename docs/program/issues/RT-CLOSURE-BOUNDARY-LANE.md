@@ -1,9 +1,9 @@
 ---
 id: RT-CLOSURE-BOUNDARY-LANE
-title: "Classify which spec clause governs each refused closure crossing -- durable-export, where the refusal is CORRECT, or live-domain cross-artifact exchange, where the spec GRANTS a lane the implementation has not built -- then size the repair"
+title: "Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails"
 status: ready
 owner: runtime
-size: S
+size: M
 gate: none
 depends_on: [RT-SRCBODY-BIND-ORDER, RT-PLANNED-CLOSURE-PREEXISTENCE]
 blocks: []
@@ -11,17 +11,22 @@ github: null
 origin: Measured at frozen base 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differential (evt_2jc88hbzfskpm). All 16 CI failures at aa032cc2 fail at the base too -- ZERO bind-order flips -- so this is pre-existing base debt, not a regression. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> ## FRAMED AND `ready`, 2026-08-15. `size: S` IS THIS INCREMENT, NOT THE REPAIR.
+> ## FRAMED AND `ready`, 2026-08-15. IT IS A REPAIR ATTEMPT, `size: M`.
 >
 > **The frame this node owed is below.** It was owed because nothing measured
-> bounded the repair; [[RT-PLANNED-CLOSURE-PREEXISTENCE]] supplied the first
+> bounded the repair; [[RT-PLANNED-CLOSURE-PREEXISTENCE]] supplied the
 > measurement that does, and this frame is cut against it.
 >
-> **`size: S` describes `D1`-`D2` — a classification and a routing — and nothing
-> else. The repair is still unsized and is a separate cut made from `D1`'s
-> result.** The node's standing warning is unchanged and is why this frame does
-> not guess: *a guessed size on this campaign has been wrong every time it was
-> guessed.* Do not read `S` as a bound on the lane.
+> **This node was briefly framed as a classification with the repair cut after
+> it. That structure is withdrawn** — operator ruling, 2026-08-15, recorded at
+> the deliverables. **Make the best guess from what is known, build it, and let
+> the attempt correct the guess.** The guess is stated explicitly so a reviewer
+> can attack it directly rather than inferring it from the work.
+>
+> **`size: M` is the attempt.** The node's standing warning still applies to
+> anything beyond it — *a guessed size on this campaign has been wrong every time
+> it was guessed* — which is why the size covers **one honest attempt and a
+> handback**, not an open-ended lane build.
 >
 > It also still exists so that a **skipped CI row has an owner**. A skipped row
 > measures nothing; the node that owns it owns **un-skipping** it.
@@ -251,53 +256,95 @@ Closure: a closure cannot cross the boundary: it is runtime-local and live-domai
 - **recursor row 4 depths 2 and 3** — routed here 2026-08-15 on the planner
   measurement above. Pooled for sizing, **not** assumed to share a mechanism.
 
-> # ARCHITECT, `evt_3emtcx20vjg8s`: RUN `D0` FIRST. IT IS SMALLER THAN THE
-> # CLASSIFICATION AND IT CAN MOOT ITS SEQUENCING CONSEQUENCE.
+> # REFRAMED. ATTEMPT THE REPAIR. DO NOT MEASURE FIRST.
+> # Operator ruling, 2026-08-15. This supersedes the classification-first
+> # structure this node carried for one turn.
 >
-> **He read `41-values.md §2.1` directly rather than taking this frame's
-> summary. Both clauses are as stated, and he found a third** — see `D0`, the
-> amended live-domain reading, and the third clause below. **All three change
-> what `D2` may size.**
+> **Verbatim:** *"Roughly 50% of design discovery happens in implementation, and
+> there's often no way to understand the structure of a problem without trying to
+> solve it directly. The measure node, then repair node runs directly against
+> that. Measure after a failed repair, but first make the a priori best guess of
+> what the repair should be with the information you have."*
+>
+> **The Steward's error, named so it is not re-inherited:** a measure-then-repair
+> split was the correct reaction to **one** earlier failure on this campaign, and
+> it was promoted into standard process and written into every frame. **QA and
+> Architect review already catch mis-framings** — the split was buying a
+> guarantee those reviews already provide, at the cost of a turn each time.
+>
+> ⇒ **This node is now a REPAIR ATTEMPT with a stated best guess.** The
+> classification below is retained **as the fallback**, to be run only if the
+> attempt fails, and as the vocabulary for recording the disposition.
+
+## The a priori best guess — build this
+
+**Steward's call on the information in this node. State it as an assumption,
+attempt it, and let the attempt correct it.**
+
+> **The crossing is a LIVE-DOMAIN CROSS-ARTIFACT EXCHANGE, and the refusal is
+> over-broad.**
+
+**Why this is the best guess and not a coin flip.** The measured facts point one
+way: the closure is **source-authored** (predecessor, measured); it crosses **as
+a call argument at a unit boundary between separately compiled artifacts**; and
+`41-values.md:76-83` describes exactly that scenario as **permitted**. The gate
+that refuses it is `transfer_into_carrier` — *"transfer a compile-time `Lowered`
+into the operational carrier"* — which is the value-carrying ABI between units,
+not a persistence or serialization boundary.
+
+**So build the repair that guess implies:**
+
+1. **Admit the crossing under clause 2's predicate, not by deleting the arm.**
+   Exchange is lawful **only** within one live runtime domain and **while the
+   defining owner and artifact remain live**; a wrong-domain, expired, or forged
+   representation **MUST refuse before invocation**. The repair is **refuse on
+   the right predicate**.
+2. **Route it through `B2F`'s cross-owner callable carrier** rather than
+   designing a new one. `boundary_value.rs:1319-1339` already names that as its
+   design.
+3. **Do not defunctionalize the zero-capture case into a `StaticCallableRef`.**
+   `41-values.md:84-91` forbids it as a silent conversion. It is the
+   cheap-looking route and it is closed.
+
+**If the attempt fails, that failure is the measurement — hand it back.** A
+carrier that cannot represent the value, or a boundary that turns out to be
+durable-export, tells us more than the classification would have, and it tells us
+from the inside. **Do not grind: one honest attempt, then the fallback below.**
 
 ## Deliverables
 
-**`D0` — does the DESCENT lowering of these two expressions perform an
-equivalent boundary crossing?** Architect-specified, and **run it before `D1`**.
-He has **not** measured it and asserts nothing about the answer.
+**`D1` — the repair, per the guess above.** Both owned rows.
 
-**Why it comes first: it is the question that decides whether anything is
-wrong today**, and it is smaller than the classification.
+**`D2` — the disposition record.** Whatever `D1` produces, every expression in
+the population carries a **recorded disposition** — repaired, or refused with its
+spec clause cited and its **pre-retirement behaviour accounted for**. That is the
+ratified closure criterion (Architect `evt_3emtcx20vjg8s`), and it is what
+[[RT-LEXICAL-RECURSOR-CONSUMERS]] and [[RT-DESCENT-RETIRE]] actually need.
 
-| `D0` reads | then |
-|---|---|
-| **it does** | the descent lane is **today** accepting a closure-carrying graph across a boundary `§2.1` says MUST reject ⇒ a defect in the **current** tree. The retirement **corrects** it, the two rows re-baseline as expected refusals with the clause cited, and [[RT-DESCENT-RETIRE]] is unblocked **regardless of this lane's size** |
-| **it does not** | nothing is violated today, and the retirement converts **two compiling programs into refusals** — a real capability regression. Then either this lane covers it before `D3`, or the retirement carries an **explicit, recorded narrowing** of what the functionized lane accepts |
+**Part of accounting for pre-retirement behaviour is the Architect's question:
+does the DESCENT lowering perform an equivalent crossing today?** If it does, the
+retirement **corrects** a live violation; if it does not, retiring the class
+converts two compiling programs into refusals and that narrowing must be
+**explicitly recorded**. **Answer it while dispositioning — it is not a gate in
+front of the repair.**
 
-**`D1` — classify each owned row's boundary against the two clauses.** For every
-row this node owns, name **which of the two production callers** reaches the
-refusal and **what that caller is doing at that moment**: publishing into a
-durable/serialized artifact, or handing a value to a separately compiled artifact
-inside one live runtime domain.
+**`D3` — the un-skip owner.** State what it takes to stop this node's CI row
+being skipped. A skipped row measures nothing.
 
-**Answer per row, not for the node.** The two sub-shapes reached this gate by
-different routes and there is no measurement yet that they answer alike. **A
-single verdict covering both rows fails `AC-1`** unless it is derived per row and
-the rows then agree.
+## FALLBACK ONLY — the classification, if the repair attempt fails
 
-**`D2` — route and size, against the table.** State plainly, per row:
+**Do not run this first.** It is the vocabulary for the handback and the route to
+take if the guess is wrong.
 
-| `D1` reads | then | and this node |
+Classify **per row** which production caller reaches the refusal and what it is
+doing: `transfer_into_carrier` (`mod.rs:6551`) or the specialized-child screen
+(`core.rs:15696`); publishing into a durable artifact, or handing a value to a
+separately compiled artifact in one live domain.
+
+| the boundary is | then | and this node |
 |---|---|---|
-| a durable-export / persistence / serialization boundary | the refusal is **correct by spec**, permanently | is **not** a repair for that row; the row's disposition is a spec question about `FrozenClosure`, and it routes to the Architect |
-| a live-domain cross-artifact exchange | the spec **grants** the lane and it is unbuilt | **owns** that row, and `D2` states the size against both sub-shapes |
-
-**If the rows split across the two branches, say so and stop.** A split is a
-real and useful outcome — it means this node owns one row and not the other, and
-that is a cheaper thing to learn now than after a repair is cut.
-
-**`D3` — the un-skip owner.** Whatever `D1` returns, state what it takes to stop
-this node's CI row being skipped. A skipped row measures nothing, and that
-obligation does not move with the classification.
+| durable-export / persistence / serialization | the refusal is **correct by spec**, permanently | is **not** a repair for that row; the disposition is a spec question about `FrozenClosure` and routes to the Architect |
+| live-domain cross-artifact exchange | the spec **grants** the lane | **owns** that row — which is the guess above, already attempted |
 
 **`D4` — the missing-child mutation counts a hit when it changed nothing.**
 Adversary `evt_1rdqcjzy9p4h8`, **verified on `main` `ddeb200a3`**. It lands in
@@ -351,44 +398,42 @@ does one file over.
 
 ## The live stop
 
-**Do not build a carrier, a lane, or a `FrozenClosure` in this node.** `D1` is a
-classification and `D2` is a routing. **The repair is cut after them, from their
-result** — the same sequencing that just worked twice on this lane, and the
-reason the fork closed on a measurement instead of a fourth guess.
+**Building the carrier IS this node's work now** — the earlier ban on it was the
+measure-first structure and is withdrawn with it. What remains banned is
+narrower and still real:
 
-**If `D1` cannot separate the two clauses from the caller,** say so and stop
-rather than picking the likelier one. That is a finding about the boundary's
-observability and it routes to the Architect, not to a fourth measurement.
+- **No `FrozenClosure`-class value.** The spec defines none, and inventing one
+  here is a spec change, not a lowering repair.
+- **No silent zero-capture conversion to `StaticCallableRef`** (`:84-91`).
+- **No weakening of the refusal to make the rows pass.** Admitting the crossing
+  means **refusing on the right predicate**, never refusing less.
+
+**One honest attempt, then hand back.** If the repair does not come together —
+the carrier cannot represent the value, the boundary proves to be durable-export,
+or the liveness predicate has no home — **stop and report what blocked it.** That
+report is the measurement, and it is worth more than the classification would
+have been. **Do not grind, and do not fall back to classifying without saying so.**
 
 ## Acceptance criteria
 
-**`AC-0`.** `D0` answers the descent-crossing question and states which of its
-two consequences follows. **It runs before `D1`.** If `D0` shows the descent lane
-is already crossing, say so plainly — that makes the retirement a **correction**
-and decouples [[RT-DESCENT-RETIRE]] from this lane's size.
+**`AC-1`.** `D1` attempts the repair on the stated guess: the crossing is
+admitted under clause 2's **liveness and domain predicate**, routed through
+`B2F`'s carrier. **A candidate that merely classifies, with no attempt, fails
+this** unless the handback states what blocked the attempt.
 
-**`AC-1`.** `D1` classifies **per owned row**, naming the production caller and
-citing `41-values.md:72-75` or `:76-83` for each. **A node-level verdict fails
-this**, and so does a classification that names the gate without naming what the
-caller was doing.
+**`AC-2`.** Every expression in the population carries a **recorded
+disposition** — repaired, or refused with its spec clause cited and its
+pre-retirement behaviour accounted for, including whether the descent lane
+crosses today. **This is the gate `RT-DESCENT-RETIRE` reads.**
 
-**`AC-2`.** `D2` states the routing and, for any row landing on the live-domain
-branch, a size **derived against both sub-shapes** — escape-lifetime and
-argument-crossing. **A size taken from the escape row alone fails this**, and
-the Architect's caveat is why.
+**`AC-3`.** The refusal is **not weakened**. Admitting a lawful crossing is a
+predicate change; a wrong-domain, expired, or forged representation must still
+refuse before invocation, and the durable-export case must still refuse
+outright.
 
-**`AC-3`.** Neither `boundary_transfer_admissibility` nor its refusal message is
-weakened, narrowed, or made conditional. **The classification is a reading of the
-callers, not an edit to the gate.**
-
-**`AC-2a`.** Any size `D2` derives for the live-domain branch accounts for the
-**liveness and domain predicate** clause 2 requires, and states that
-`StaticCallableRef` defunctionalization of the zero-capture case is **not
-available**. **A size premised on deleting the match arm fails this.**
-
-**`AC-4`.** No closure carrier, durable lane, or `FrozenClosure`-class value is
-introduced. **`D0`-`D3` are classification and routing work; `D4` is
-diagnostic-correctness work. Neither breaches this.**
+**`AC-4`.** No `FrozenClosure`-class value, and no silent `StaticCallableRef`
+conversion of the zero-capture case. **`D4` is diagnostic-correctness work and
+does not breach this.**
 
 **`AC-4a`.** `D4` lands: both resolvers count a hit **only when the mutated and
 unmutated lookups disagree**, and `MissingBodyChild` distinguishes a mutated

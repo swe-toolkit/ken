@@ -23,6 +23,50 @@ broken"* is worse than a stale *"what is done"*: it misdirects the team to
 rebuild removed unsoundness. Prefer describing the goal and acceptance, and tag
 any current-state claim *"verify against the landed code, not this line."*
 
+## FRAME THE REPAIR, NOT A MEASUREMENT OF IT. Operator, 2026-08-15.
+
+**Verbatim:** *"Roughly 50% of design discovery happens in implementation, and
+there's often no way to understand the structure of a problem without trying to
+solve it directly. The measure node, then repair node runs directly against
+that. Measure after a failed repair, but first make the a priori best guess of
+what the repair should be with the information you have."*
+
+⇒ **The default frame states a best guess and asks the ring to build it.**
+Discovery is expected to happen *inside* the attempt. A failed attempt is a
+measurement, and a better one than a standalone probe, because it fails from the
+inside with the structure in view.
+
+**Do not split a repair into measure-then-repair to protect against
+mis-framing.** Operator, same ruling: *"we already have a QA and architect review
+process which will catch mis-framings. The basic process should stay simple for
+the majority of the cases that work out as expected."* The split buys a guarantee
+those reviews already provide and costs a full turn every time.
+
+> **The failure this is correcting, because it is easy to repeat.** On the
+> `RecursiveDescent` retirement a measure-first split was the correct **reaction**
+> to one earlier wrong repair — and the Steward promoted it into standard
+> process and wrote it into every frame. **Measured 2026-08-15: five consecutive
+> measurement nodes merged in one day, zero residuals removed, and the counters
+> flat** — while the one cell where a repair would have happened sat blocked and
+> unattended. **Each step was individually justified; the sequence had no
+> termination condition.**
+
+**When a split IS still right** — keep it rare and name the reason in the frame:
+
+- the two outcomes differ by roughly an **order of magnitude** in size, or one
+  is unbounded (a spec change, a new abstraction);
+- the attempt would be **destructive or hard to reverse**;
+- the guess would consume a **scarce shared resource** to find out.
+
+**Otherwise write the guess down explicitly** — as a claim a reviewer can attack
+directly — bound the attempt to **one honest try plus a handback**, and say what
+a blocked attempt should report. **A stated wrong guess is cheap; an unstated one
+is what review cannot catch.**
+
+**Corollary: do not park work on an absent ruling.** If a stop is waiting on a
+disposition and nothing records it arriving, guess and attempt rather than wait.
+Review is the backstop.
+
 ## Before you pin a fixed input: five audits, every time
 
 A fixed input is only as good as the substrate it stands on, and **grounding

@@ -335,6 +335,36 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > > > these five until the Architect's disposition lands** (`evt_78agvsvb0z450`,
 > > > grounding static workers as constructor arguments). **The repair scope is
 > > > open and must not be broadened by the ring.**
+> > >
+> > > > ###### THE WAIT IS LIFTED. ATTEMPT THE REPAIR. Steward, 2026-08-15.
+> > > >
+> > > > **Measured today: `evt_78agvsvb0z450` appears nowhere in this repository
+> > > > except the line directly above, and no decision matching it is in the
+> > > > decisions store.** That read is not exhaustive, so this does not assert
+> > > > the disposition never landed — it asserts that **nothing records it
+> > > > arriving, and four expressions have been parked on it since
+> > > > 2026-08-12.**
+> > > >
+> > > > **Operator ruling, 2026-08-15:** *"first make the a priori best guess of
+> > > > what the repair should be with the information you have"*, and
+> > > > *"we already have a QA and architect review process which will catch
+> > > > mis-framings."*
+> > > >
+> > > > ⇒ **Waiting was the wrong disposition for a stop of this shape.** The
+> > > > measurement that produced it is sound and stands: **for these five there
+> > > > is no call**, the static worker is a constructor argument, and section 3's
+> > > > premise is false for them. **That is enough to guess from.**
+> > > >
+> > > > **The guess to attempt: the repair is at the constructor-argument
+> > > > position, not the exact-`Var` callee path.** Build for a static worker
+> > > > reaching a value-producing position by construction. **If that is wrong,
+> > > > the attempt says so far more cheaply than another three days of waiting**,
+> > > > and the Architect reviews the candidate as he would any other.
+> > > >
+> > > > **Still binding, and not relaxed:** the committed `D2k-0` control reds if
+> > > > a repair moves any edge or refusal — **a red there is information, not a
+> > > > test to update.** And a **different `edge`** met during the attempt is a
+> > > > **second root**, which re-opens the sizing: stop and hand back.
 > >
 > > **The committed test asserts the edge and refusal per expression and reds if
 > > a repair moves any of them.** That is what makes this durable rather than a
