@@ -1,13 +1,13 @@
 ---
 id: V3-Z3-EMISSION-CONTROL
 title: "Put a control on the SMT-LIB query generator that does not need an installed solver, so the emission path stops being witnessed only by a fleet-wide required CI job"
-status: ready
+status: active
 owner: verify
 size: S
 gate: none
 depends_on: [V3-Z3-PROCESS-ADAPTER]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2326
 origin: "Steward, 2026-08-15. The gap is recorded in the merged [[V3-Z3-PROCESS-ADAPTER]] node's live-hazard block, from Adversary evt_1cg4kd7edak6c: the stub harness discards stdin, so no stub test can see the emission at all. Steward-filed per COORDINATION section 2."
 ---
 
@@ -66,8 +66,13 @@ the job first leaves a stub suite that a broken query generator passes with
 everything green. The merged node's own words: the one-line remedy stated there
 first was **wrong**, and this is why.
 
-**`D2` is optional and non-blocking.** If the ring lands `D1` and stops, that is
-a complete increment. Do not hold `D1` to bundle it.
+**`D1` was not held to bundle `D2`, and it landed on its own — squash
+`ad2c5bf12`, 2026-08-15.** That part stands: splitting them was right.
+
+**What did not survive contact is "`D2` is optional."** This section originally
+said so. Architect Finding A shows `D1` alone is executed by no CI job, so
+stopping after `D1` leaves the node's own gap open with a control in the tree
+that reads as coverage. **`D2a` is now required**; see Deliverables.
 
 ## Deliverables
 
@@ -75,11 +80,90 @@ a complete increment. Do not hold `D1` to bundle it.
 query generator produces something wrong, and that runs with the feature enabled
 but no solver installed.
 
-**`D2` — optional, only if `D1` lands.** Make the round-trip test skip when `z3`
-is absent rather than asserting unconditionally, and take the
+**`D2` — no longer optional, and its first step is NOT the one this frame
+originally named.** Corrected by the Steward 2026-08-15 on Architect Finding A
+(`evt_1esqmscbshp0f`, restated `evt_4d3hbvtjwk968`), verified against the tree.
+
+> **The original text said to drop the `z3-process-adapter` job "because the job
+> stops being the witness and `D1` starts being it." That premise is false, and
+> acting on it would have removed the last emission coverage in the tree.**
+>
+> `mod z3_process` is `#[cfg(feature = "z3-process")]` and the feature is
+> default-off. The only feature-on job runs exactly
+> `cargo test --locked -p ken-elaborator --features z3-process --test
+> v3_z3_process_adapter`, and `--test <name>` selects **only that
+> integration-test target**. `D1` is a unit test in the **lib** target. **No CI
+> job executes it.** QA's green came from a local `--lib` run, which CI does not
+> reproduce.
+>
+> ⇒ **`D1` landing does not make `D1` the witness.** Until the run below exists,
+> `D1` is an artifact that reads as coverage and supplies none — which is worse
+> than no control, because it is the thing a future reader will point at when
+> deciding the solver job is redundant. `main` already carries `fa18caec0`
+> (*"dropping the job removes the only emission control"*), so this exact job has
+> had one near-miss already, and the frame was steering into the second.
+
+**`D2a` — make `D1` actually run, and this is the whole point.** Add a
+feature-on `--lib` execution for `ken-elaborator`. **Put it in the ordinary
+required `build + test` job, not the optional solver job.** `D1` was
+demonstrated to pass with `PATH=/definitely/absent`, so it is binary-independent
+and has no reason to hang off the job whose sole purpose is installing the
+solver it does not need.
+
+**`D2b` — only after `D2a` is green on `main`.** Make the round-trip test skip
+when `z3` is absent rather than asserting unconditionally, and take the
 `z3-process-adapter` job out of the required aggregate. **State in the commit
-what coverage moved where**, because the job stops being the witness and `D1`
-starts being it.
+what coverage moved where.** The ordering is not stylistic: `D2b` before `D2a`
+is the coverage hole this node exists to close.
+
+## The de Bruijn fixture: what to build, and the one-binder trap
+
+Architect Finding B (optional, additive) says the landed `Π a b : Int. a = b`
+fixture cannot pin the de Bruijn mapping, because `=` is symmetric and an
+inverted `emit_int_expr` still yields an equivalent query. **True, and the
+proposed replacement is right — but its one-line description is not, and
+implementing the description rather than the fixture produces a test that pins
+nothing.** Adversary `evt_4r7epys21b76a`, re-verified against `origin/main` by
+the Steward before recording.
+
+**The trap.** `emit_int_expr` maps `Var(index) → k{binders - 1 - index}`
+(`z3_process.rs:63`). Finding B describes the repair as *"a second fixture with
+one variable and one literal."* Implemented literally as **one binder**,
+`Π a : Int. a = 0`, the arithmetic is `1 - 1 - 0 = 0` and the identity mapping
+`k{index}` also gives `k0`.
+
+⇒ **At one binder the inversion and the identity are the same function.** That
+fixture emits `(= k0 0)` under both and reds on neither — strictly weaker than
+the fixture it replaces, which at least reds on argument order.
+
+**Build the fixture Finding B actually names: two binders, only one used.**
+
+| mapping | `Π a b : Int. a = 0` emits |
+|---|---|
+| current (inversion) | `(assert (not (= k0 0)))` |
+| identity (the bug) | `(assert (not (= k1 0)))` |
+
+Different queries, and **semantically** different — one asks for a counterexample
+in the outer variable, the other in the inner.
+
+**And Finding B's characterization understates the gap.** It calls
+`Π a b : Int. a = b` *"the one shape in the supported fragment where the mapping
+is invisible."* `emit_query` accepts only `Term::Eq` (`:36`) and `emit_int_expr`
+only `Var` and `IntLit` (`:63-64`), so **no goal in the fragment has an
+asymmetric relation** — the mapping is invisible in essentially *every*
+two-variable shape. **The escape is dropping a variable, not changing the
+operator.**
+
+**Severity, and it bounds how hard to argue this in `D2b`:** a wrong mapping
+costs **completeness, never soundness**. `specialize_int_goal` re-substitutes and
+re-checks, so a mis-mapped assignment specializes to a goal that does not refute
+and the seam returns `Unknown`.
+
+**One gap recorded and not scheduled:** `emit_int_expr`, `parse_assignment`, and
+`specialize_int_goal` do agree on outermost-first ordering — checked, no defect —
+but **nothing in the tree pins that agreement**, and the halves live in different
+files. It is true by inspection only. Not this node's scope; do not let a future
+reader believe the emission control covers it.
 
 ## Acceptance criteria
 
@@ -102,6 +186,12 @@ authority.
 **`AC-6`.** No-regression, in CI (`COORDINATION §12`). **If `D2` lands, say
 explicitly in the handback which required checks changed**, since `D2` edits the
 gate that this criterion is measured by.
+
+**`AC-7`.** `D2a` is demonstrated by **a CI run on the PR that shows `D1`
+executing** — the test name in a job's output, not the workflow diff. A workflow
+edit that looks correct and selects no new target is the exact failure `D2a`
+repairs, and it cannot be caught by reading the YAML. **`D2b` may not land until
+this is shown green.**
 
 ## Banned scope
 

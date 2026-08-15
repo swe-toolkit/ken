@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN]
+depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE]
 blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -36,6 +36,23 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > **Flip to `ready` when `RT-RECURSOR-TRANSPORT` is `merged`**, not before, and
 > not on a partial: this node's dependency is the mechanism, and `D1` re-run
 > must find the residual population empty.
+>
+> **Two `depends_on` edges added 2026-08-15 to stop that same mis-flip recurring
+> for the other residual class.** The census above found **74
+> `LexicalCallArgumentRecursor`** rows, and nothing in the original dependency
+> list governed them — so once the five listed nodes merged, `gen-progress.sh`
+> would have shown this node flip-eligible with the larger residual class fully
+> intact. **The prose guard alone was not enough; it is the same shape that put
+> this node wrongly on the frontier the first time**, and `depends_on` is what
+> the generator actually reads.
+>
+> ⇒ Added **[[RT-LEXICAL-RECURSOR-CONSUMERS]]** (the lexical class) and
+> **[[RT-CLOSURE-CROSSING-ELIMINATE]]** (where that node's remaining population
+> is now dispositioned). **The second edge is the load-bearing one**: retirement
+> cannot be assessed while it is still open whether the remaining expressions get
+> a repair or a recorded refusal, because a refusal makes retirement a
+> **narrowing of a presently-compiling capability** rather than debt removal.
+> That is a product call, and this node is where it lands.
 
 > # RETIRING ALL FIVE RESIDUAL CLASSES IS NOT THE FINISH LINE
 >

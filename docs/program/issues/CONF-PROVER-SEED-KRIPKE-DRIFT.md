@@ -1,13 +1,13 @@
 ---
 id: CONF-PROVER-SEED-KRIPKE-DRIFT
 title: "Clear what the Kripke chapter merge left behind: a conformance seed asserting a settled trusted-base outcome the chapter re-opens, two sibling drift sites, and the one-clause witness-direction fix"
-status: ready
+status: merged
 owner: spec-enclave
 size: S
 gate: none
 depends_on: [V3-KRIPKE-THEORY-CLOSURE]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2328
 origin: "Steward, 2026-08-15. Architect finding 2 on the V3-KRIPKE-THEORY-CLOSURE merge review (evt_2wrkjqj5cztxq), routed to me explicitly for an owner and a node before the seed rows harden. All three seed claims and both sibling sites re-verified against the tree by the Steward before framing; nothing below is taken from the report."
 ---
 
@@ -123,6 +123,21 @@ owns the final phrasing.
 `conformance/verify/prover/seed-prover.md`. Re-derive them against the **merged**
 `23-prover.md` rather than against this frame's quotations.
 
+**`D1b` — the coupled sites in the same file, added 2026-08-15 with the `AC-3`
+amendment.** Found by the conformance validator's full-file citation sweep and
+re-verified against `origin/main` by the Steward. **These are not a second
+finding; they are the rest of the first one.**
+
+| site | what the merge falsified |
+|---|---|
+| `:95`, `classically-valid-topos-invalid-cert-rejected` | calls the target `φ#`; the merged chapter defines `embed(Sigma, f)` |
+| `:184`, `:191`, `bare-unsat-no-cert-is-unknown-not-proved` | cites a *"`23 §4` ledger row"* and *"§4 ledger"*; **merged §4 has no ledger.** The rule it wants is real and is at `§4.4:524-527`: *"A backend `unsat` with no constructible, accepted `Cert` is `unknown`, never `proved`."* Also carries `φ#` at `:185` |
+| `:372`, the build-sequencing footer | says `φ#`/`World`/`P#` are **external** to the kernel. Merged §8 instead splits the external meanings of `World`/`Le`/`Dom`/`Force` from the Ken data `IForm`/`Form`/`Cert` |
+
+**Repoint each citation to the text that exists and respell the notation. Do not
+restate any row's claim or verdict** — `AC-3`'s provenance test is the boundary,
+and a row whose staleness predates this merge is not yours.
+
 **`D2` — the status backbone.** `spec/SPEC-PROGRESS.md:80` no longer says the
 named frame axioms remain `(oracle/standard)`.
 
@@ -140,8 +155,41 @@ recoverable from the row itself, not only from the chapter.
 exists in the merged chapter. **Demonstrate it by resolving each citation, not
 by asserting the sweep was done.**
 
-**`AC-3`.** No other seed row is changed. This node corrects drift the Kripke
-merge created; it is not a seed review.
+**`AC-3`.** The changed population is bounded by **provenance, not by row
+count**. A site in `seed-prover.md` may be changed only where **both** hold: its
+text cites `23 §4` or restates a `23 §4` claim, **and the merged rewrite
+falsified it**. Each such change is a respelling of the citation or the notation
+— the row's `given`, its `expect`, and its verdict carry through unchanged.
+Staleness that predates this merge is out of scope and stays.
+
+> **Amended by the Steward, 2026-08-15, on the conformance validator's BLOCK of
+> `c4b2001eb` (`evt_2spz43658dn7t`). The original text read "No other seed row is
+> changed," and it was wrong.**
+>
+> **It forbade the only way to discharge the node's own purpose.** The frame's
+> finding 1 is that *"the Kripke frame axioms are external `(oracle/standard)`"*
+> at `:175-176` is a falsehood the merge created. **Line 372 asserts that same
+> falsehood** — `` `φ#`/`World`/`P#` are **external** to the kernel `` — outside
+> the row I scoped. So the node was required to correct a claim at one site and
+> forbidden from correcting the identical claim two hundred lines later, leaving
+> the file self-contradicting and the merge's largest soundness improvement still
+> denied on `main`.
+>
+> **The framing error was scoping by ROW when the defect is scoped by CHAPTER
+> REWRITE.** The two coincided in the material I checked and diverged in the
+> material I did not: `φ#` also survives at `:95`, and `:184`/`:191` cite a *"§4
+> ledger"* that the merged chapter does not contain, with the substantive rule
+> they want sitting at `§4.4:524-527`. **A row is not the unit the drift travels
+> in.**
+>
+> **The constraint AC-3 was standing in for is real and is unchanged** — this is
+> not a general seed audit, which Banned scope states directly. Row count was a
+> proxy for it, and the proxy failed on the first population that crossed a row
+> boundary. The provenance test above is the constraint stated as itself.
+>
+> **The validator's refusal was correct.** Given two ACs that could not both be
+> met, it blocked and routed the conflict rather than picking one — *"I will not
+> tell the author to violate either."* That is the behaviour the seat is for.
 
 **`AC-4`.** No placement, artifact-home, evaluator-posture, or trusted-base
 decision is made here. **Recording that a question is open is the deliverable;

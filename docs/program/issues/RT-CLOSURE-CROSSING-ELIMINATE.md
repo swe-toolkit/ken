@@ -1,13 +1,13 @@
 ---
 id: RT-CLOSURE-CROSSING-ELIMINATE
 title: "Eliminate the closure crossing instead of admitting it: carry the captured environment as an already-admitted Record and dispatch statically to the known body, so no Closure value ever reaches the boundary"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-CLOSURE-BOUNDARY-LANE]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2327
 origin: "Steward, 2026-08-15, from the Architect's finding on the RT-CLOSURE-BOUNDARY-LANE failed repair attempt (evt_2nwtjekh4qtnk, dec_650dc1x38n4jh). The Architect named the route and routed the framing to me explicitly: the successor question is whether the crossing can be ELIMINATED, not only which carrier admits it. Steward-filed per COORDINATION section 2."
 ---
 
