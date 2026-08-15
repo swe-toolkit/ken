@@ -120,21 +120,38 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > [[RT-CLOSURE-CROSSING-ELIMINATE]]**, phrased as a handback trigger, not a
 > statement about the ABI.
 >
-> ⇒ **The prior question is the Architect's: does the generated-unit boundary
-> sit inside "one live runtime domain, while the defining owner and artifact
-> remain live"?**
+> ⇒ **ANSWERED by the Architect at `evt_1ra9asrda1t94`, and the answer voids
+> both branches it was posed with.**
 >
-> - **If yes** — the refused rows are refusing something the spec grants. That
->   makes them a **gap**, and retirement would ship a narrowing **below spec**,
->   which is a different and worse thing than narrowing an unspecified
->   convenience. The cover option is then a specified build (owner/lifetime
->   encoding plus the refuse-before-invocation check `:81-83` requires), not an
->   invention.
-> - **If no** — the crossing is a durable export under another name, today's
->   refusal is correct on the merits, and the fork stands exactly as posed.
+> **The live-domain clause does not reach this boundary — its subject is
+> "separately compiled artifacts", and there is only one artifact.** Every
+> generated unit is `Linkage::Local` (`units.rs:940`, `:967`, `:983`, `:1005`;
+> zero non-`Local` linkages in the file) and all are declared into one
+> `ObjectModule` per compile (`artifact/mod.rs:186`), emitted to one object with
+> one hash. The unit boundary is a local call between two module-local functions.
+> Re-verified by the Steward.
 >
-> **Do not ask the operator to choose until this is answered**, and do not read
-> the earlier three-option framing as still current.
+> **So the rows are not refusing a granted lane — and retirement is also not a
+> narrowing of an unspecified convenience.** What the spec does reach is
+> `41-values.md`'s removed-constraints paragraph: local machinery for dispatch is
+> permitted *"only when it cannot affect program-observable results."*
+> Functionized units are dispatch machinery, and the governed rows **compile
+> under `RecursiveDescent` and refuse under `FunctionizedUnits`.**
+>
+> ⇒ **Retiring `RecursiveDescent` today would ship a compile-time behavioural
+> difference attributable to nothing in the program** — principle 10,
+> predictability. That is the defect, and it is not a closure-lane question.
+>
+> **The obligation this creates is narrower and cheaper than the cover option as
+> previously priced.** No owner/lifetime encoding and no refuse-before-invocation
+> check are owed. What is owed is: **the unit split must not change which
+> programs compile.**
+>
+> **The inference is attackable and the Architect said so.** The sentence's plain
+> subject is closure-representation machinery; reading it to cover unit splitting
+> is the step under weight. **If it is bounded to closure representation, this
+> whole paragraph falls and the boundary is unregulated** — the negative answer
+> above survives either way.
 
 > # RETIRING ALL FIVE RESIDUAL CLASSES IS NOT THE FINISH LINE
 >

@@ -90,19 +90,74 @@ boundary requires a **new `(tag, class)` admission**.
 > about WHETHER.** It survives unchanged and is the only one of the four that was
 > ever grounded in a measurement.
 >
-> ### THE QUESTION THIS OPENS, WHICH IS THE ARCHITECT'S
+> ### ANSWERED at `evt_1ra9asrda1t94`, AND THE ANSWER IS NEITHER BRANCH
 >
-> **Does the generated-unit boundary sit inside "one live runtime domain, while
-> the defining owner and artifact remain live"?** If yes, the spec already
-> licenses this crossing and the work is building the owner/lifetime encoding and
-> the refuse-before-invocation check `:81-83` requires — a real node, but a
-> **specified** one rather than an invention. If no, the crossing is a durable
-> export wearing a live-domain name and today's refusal is correct on the merits.
+> The question routed to the Architect was: **does the generated-unit boundary
+> sit inside "one live runtime domain, while the defining owner and artifact
+> remain live"?** It was posed as a yes/no with a consequence on each side.
+> **Both consequences are void.**
 >
-> **Resolve this BEFORE the [[RT-DESCENT-RETIRE]] product fork is ruled on.** The
-> fork was put to the operator as *cover it (requires inventing a representation)
-> / accept the narrowing / stop* — and the first option was priced against a
-> prohibition that does not exist.
+> **Ruling: no — and not because the crossing fails the clause's conditions, but
+> because the clause's SUBJECT does not exist here.** It governs *"separately
+> compiled artifacts"*. Measured, and re-verified by the Steward:
+>
+> - every generated unit is `Linkage::Local` (`units.rs:940`, `:967`, `:983`,
+>   `:1005`), with **zero** non-`Local` linkages anywhere in the file;
+> - all units are declared into **one** `ObjectModule` per compile — a single
+>   construction site at `artifact/mod.rs:186`, emitted to one object with one
+>   hash, with only the entrypoint carrying `Linkage::Export`.
+>
+> ⇒ The unit boundary is **a local call between two module-local functions in
+> one artifact.** There is no second artifact and no receiver in the clause's
+> sense. **A clause about separately compiled artifacts neither grants nor denies
+> anything here.**
+>
+> **So the "spec already licenses this crossing" branch is dead.** So is the
+> "refusal is correct on the merits, fork stands as posed" branch — see below.
+>
+> ### WHAT THE SPEC DOES REACH, AND IT IS NOT A CLOSURE-LANE QUESTION
+>
+> `41-values.md`'s removed-constraints paragraph:
+>
+> > An implementation may use pointers, handles, hashing, memoization, or other
+> > local machinery for dispatch, GC, or optimization **only when it cannot
+> > affect program-observable results.**
+>
+> **Functionized units are local machinery for dispatch, and they currently do
+> affect program-observable results** — the governed rows compile under
+> `RecursiveDescent` and refuse under `FunctionizedUnits`. Whether a program
+> compiles is observable in the strongest available sense, and the chapter's own
+> rationale table pins this to principle 10: *"observable behavior depends on the
+> implementation strategy rather than the program, violating predictability."*
+>
+> ⇒ **The spec-relevant defect is an implementation strategy leaking into
+> observable behaviour, not a missing closure lane.**
+>
+> **The Architect flagged this inference as attackable and it should be read that
+> way.** The sentence's plain subject is closure-representation machinery; the
+> ruling applies it to unit splitting, on the grounds that it enumerates *"local
+> machinery for dispatch"* and unit splitting is dispatch machinery. **If that
+> sentence is instead read as bounded to closure representation, this section
+> falls and the boundary is genuinely unregulated.** The negative answer above
+> does **not** depend on it.
+>
+> ### WHAT IS OWED, WHICH IS LESS THAN THE "YES" BRANCH WOULD HAVE DEMANDED
+>
+> **No owner/lifetime encoding and no refuse-before-invocation check are owed** —
+> `:116-118` requires no such encoding, and there is no wrong-domain, expired, or
+> forged representation to refuse between two local symbols in one object. The
+> obligation is narrower and needs no new abstraction: **the unit split must not
+> change which programs compile.** That is a property of the functionization
+> scheme, consistent with `D1` refusing at an **ownership-record** seam rather
+> than a representation or admissibility one.
+>
+> **Two limits the ruling states on itself, carried here so they are not lost.**
+> The `defining owner remains live` condition is answered only for the
+> **argument-crossing** sub-shape, where the caller frame is live for the
+> callee's whole extent; **the escape-lifetime sub-shape is unmeasured and is
+> exactly where it could fail** (caveat on `dec_55a8p5m2f8gzk`). And the ruling
+> selects no mechanism, sizes nothing, and retires none of `D1`'s representation
+> finding.
 
 ## The finding this node is built on — do not restate it as the predecessor's
 
