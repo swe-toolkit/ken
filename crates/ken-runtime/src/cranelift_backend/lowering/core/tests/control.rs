@@ -6122,6 +6122,172 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
     );
 }
 
+/// `RT-REQUIRED-CONSUMER-REACH-CENSUS` D5: the route-suppression differential
+/// records closure presence and transfer reach as separate facts.
+///
+/// MEASURED: at the real `transfer_into_carrier` entry, both enabled depth-2+
+/// rows present origin 5's constructor with a closure at argument 0. Suppressing
+/// the one real required-consumer route returns each row to its old
+/// `StaticWorkerBinding` refusal and removes that exact crossing entirely.
+///
+/// CLAIMED: the required-consumer route manufactures the closure-bearing
+/// transfer for these two rows, selecting D5's pre-authorized `incorrect`
+/// branch. THE GAP: this does not establish the later repair, its owner, or any
+/// subsumption with the separate durable-closure population.
+///
+/// Promise class: transition sentinel. The exact origin and path are the
+/// measured residual. Rewrite this table when an authorized lowering repair
+/// moves either row; do not preserve it as a permanent shape requirement.
+#[test]
+fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
+    use crate::cranelift_backend::lowering::core::{
+        set_selector_variant_exclusion, with_required_consumer_route_suppressed,
+    };
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct Observed {
+        label: &'static str,
+        outcome: String,
+        suppressions: usize,
+        transferred_root_origin: Option<String>,
+        transferred_root_kind: Option<&'static str>,
+        root_to_closure_path: Option<String>,
+        closure_child_present: bool,
+        transfer_into_carrier_reached: bool,
+    }
+
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+
+    fn compile(depth: usize) -> (String, Vec<D2kOwnerEvent>) {
+        let _ = d2k_owner_trace_take();
+        let expression =
+            host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+        let (result, _trace) = px8j_capture_source_trace(
+            &expression,
+            false,
+            &format!("ken_required_consumer_d5_depth{depth}"),
+        );
+        let outcome = match result {
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct, ..
+            })) => construct.to_string(),
+            Ok(_) => "compiled".to_string(),
+            Err(other) => format!("other:{other}"),
+        };
+        (outcome, d2k_owner_trace_take())
+    }
+
+    fn observe(label: &'static str, depth: usize, suppressed: bool) -> Observed {
+        let ((outcome, events), suppressions) = if suppressed {
+            with_required_consumer_route_suppressed(|| compile(depth))
+        } else {
+            (compile(depth), 0)
+        };
+        let targeted = events
+            .into_iter()
+            .filter_map(|event| match event {
+                D2kOwnerEvent::BoundaryTransferEntered {
+                    origin,
+                    root_kind,
+                    closure_path,
+                } if format!("{origin:?}") == "StaticOriginId(5)" => Some((
+                    format!("{origin:?}"),
+                    root_kind,
+                    closure_path,
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let (transferred_root_origin, transferred_root_kind, root_to_closure_path) =
+            match targeted.as_slice() {
+                [] => (None, None, None),
+                [(origin, root_kind, closure_path)] => (
+                    Some(origin.clone()),
+                    Some(*root_kind),
+                    closure_path.clone(),
+                ),
+                _ => panic!(
+                    "{label}: origin 5 must identify at most one predecessor crossing, got \
+                     {targeted:?}"
+                ),
+            };
+        let closure_child_present = root_to_closure_path.is_some();
+        let transfer_into_carrier_reached = transferred_root_origin.is_some();
+        Observed {
+            label,
+            outcome,
+            suppressions,
+            transferred_root_origin,
+            transferred_root_kind,
+            root_to_closure_path,
+            closure_child_present,
+            transfer_into_carrier_reached,
+        }
+    }
+
+    set_selector_variant_exclusion(Some(
+        RecursiveDescentResidual::LexicalCallArgumentRecursor,
+    ));
+    let _restore = Restore;
+    assert_eq!(
+        [
+            observe("row4-depth-2/enabled", 2, false),
+            observe("row4-depth-2/suppressed", 2, true),
+            observe("row4-depth-3/enabled", 3, false),
+            observe("row4-depth-3/suppressed", 3, true),
+        ],
+        [
+            Observed {
+                label: "row4-depth-2/enabled",
+                outcome: "Closure".to_string(),
+                suppressions: 0,
+                transferred_root_origin: Some("StaticOriginId(5)".to_string()),
+                transferred_root_kind: Some("Constructor"),
+                root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                closure_child_present: true,
+                transfer_into_carrier_reached: true,
+            },
+            Observed {
+                label: "row4-depth-2/suppressed",
+                outcome: "StaticWorkerBinding".to_string(),
+                suppressions: 1,
+                transferred_root_origin: None,
+                transferred_root_kind: None,
+                root_to_closure_path: None,
+                closure_child_present: false,
+                transfer_into_carrier_reached: false,
+            },
+            Observed {
+                label: "row4-depth-3/enabled",
+                outcome: "Closure".to_string(),
+                suppressions: 0,
+                transferred_root_origin: Some("StaticOriginId(5)".to_string()),
+                transferred_root_kind: Some("Constructor"),
+                root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                closure_child_present: true,
+                transfer_into_carrier_reached: true,
+            },
+            Observed {
+                label: "row4-depth-3/suppressed",
+                outcome: "StaticWorkerBinding".to_string(),
+                suppressions: 1,
+                transferred_root_origin: None,
+                transferred_root_kind: None,
+                root_to_closure_path: None,
+                closure_child_present: false,
+                transfer_into_carrier_reached: false,
+            },
+        ],
+        "D5 must preserve the exact enabled/suppressed (closure present, transfer reached) table",
+    );
+}
+
 /// AC-2: replacing the forward-selected outer case body with the
 /// continuation's own occurrence is rejected by the independent direct-body
 /// derivation before the plan can escape.

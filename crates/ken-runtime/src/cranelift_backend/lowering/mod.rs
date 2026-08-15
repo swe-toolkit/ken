@@ -2584,6 +2584,18 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
         site: &'static str,
         eliminated_origin: StaticOriginId,
     },
+    /// `RT-REQUIRED-CONSUMER-REACH-CENSUS` `D5` -- the real one-way carrier
+    /// entry, recorded before its admissibility walk can refuse.
+    ///
+    /// Event presence records that the crossing was reached; `closure_path`
+    /// separately records whether the presented graph contains an ordinary
+    /// closure. Keeping those facts separate leaves the frame's third branch
+    /// representable: a crossing may be absent independently of closure shape.
+    BoundaryTransferEntered {
+        origin: StaticOriginId,
+        root_kind: &'static str,
+        closure_path: Option<String>,
+    },
 }
 
 #[cfg(test)]
@@ -6477,6 +6489,12 @@ impl<'a> Lowering<'a> {
         origin: StaticOriginId,
         value: &Lowered,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        #[cfg(test)]
+        record_d2k_owner_event(D2kOwnerEvent::BoundaryTransferEntered {
+            origin,
+            root_kind: lowered_value_kind(value),
+            closure_path: value.first_boundary_closure_path(),
+        });
         value.boundary_transfer_admissibility()?;
         self.source_aggregate_preflight(value)?;
         self.emit_carrier_transfer(builder, origin, value)
@@ -10604,6 +10622,88 @@ impl LoweredVariant {
 }
 
 impl Lowered {
+    /// Test-only diagnostic path to the first ordinary closure in the same
+    /// whole-value graph screened by [`Self::boundary_transfer_admissibility`].
+    ///
+    /// This is not an admission predicate. It records the root-to-child path
+    /// needed to distinguish a closure result from a closure nested in an
+    /// enclosing aggregate, while the production admissibility walk remains
+    /// the sole decision.
+    #[cfg(test)]
+    fn first_boundary_closure_path(&self) -> Option<String> {
+        fn descend(value: &Lowered, path: String) -> Option<String> {
+            match value {
+                Lowered::Closure { .. } | Lowered::DeclarationClosure { .. } => Some(path),
+                Lowered::Constructor { args, .. } => {
+                    for (position, field) in args.iter().enumerate() {
+                        let ConstructorField::Specialized(child) = field else {
+                            continue;
+                        };
+                        if let Some(found) = descend(
+                            child,
+                            format!("{path}.arg[{position}].{}", lowered_value_kind(child)),
+                        ) {
+                            return Some(found);
+                        }
+                    }
+                    None
+                }
+                Lowered::Record { fields, .. } => {
+                    for (position, field) in fields.iter().enumerate() {
+                        if let Some(found) = descend(
+                            &field.value,
+                            format!(
+                                "{path}.field[{position}].{}",
+                                lowered_value_kind(&field.value)
+                            ),
+                        ) {
+                            return Some(found);
+                        }
+                    }
+                    None
+                }
+                Lowered::HostResult { error, ok, .. } => descend(
+                    error,
+                    format!("{path}.error.{}", lowered_value_kind(error)),
+                )
+                .or_else(|| descend(ok, format!("{path}.ok.{}", lowered_value_kind(ok)))),
+                Lowered::DynamicConstructor(dynamic) => {
+                    for (alternative, branch) in dynamic.alternatives.iter().enumerate() {
+                        for (position, field) in branch.fields.iter().enumerate() {
+                            if let Some(found) = descend(
+                                field,
+                                format!(
+                                    "{path}.alternative[{alternative}].field[{position}].{}",
+                                    lowered_value_kind(field)
+                                ),
+                            ) {
+                                return Some(found);
+                            }
+                        }
+                    }
+                    None
+                }
+                Lowered::Int { .. }
+                | Lowered::Bool { .. }
+                | Lowered::ProcessExitStatus { .. }
+                | Lowered::CapabilityToken { .. }
+                | Lowered::ResourceToken { .. }
+                | Lowered::BoundedNat(_)
+                | Lowered::StructuralNat(_)
+                | Lowered::ResponseBytes { .. }
+                | Lowered::Bytes(_)
+                | Lowered::BorrowedNativeValue { .. }
+                | Lowered::BorrowedOption { .. }
+                | Lowered::String(_)
+                | Lowered::ComputationalRecursorClosure { .. }
+                | Lowered::RecursiveBackedge
+                | Lowered::Trap(_) => None,
+            }
+        }
+
+        descend(self, lowered_value_kind(self).to_string())
+    }
+
     /// This value's variant tag. ⛔ Exhaustive, no `_` arm.
     pub(in crate::cranelift_backend) fn variant(&self) -> LoweredVariant {
         match self {
