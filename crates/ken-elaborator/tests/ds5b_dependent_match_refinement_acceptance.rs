@@ -525,3 +525,93 @@ fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
         ),
     }
 }
+
+/// `LANG-INTERVENING-LET-FRAME-WEAKENING` reconciliation -- TWO DIFFERENT
+/// interleaved-`let` failures, not one, independently re-measured here
+/// (not taken from the Adversary's report).
+///
+/// **`intervening_let_fresh_binder_fails_invariantly_across_all_three_
+/// bases` (above) dies in `refine_branch_goal`, invariantly, before
+/// reaching the kernel at all.** Its `k` is a FRESH `Vec Nat n` value
+/// (via `repl`, never an alias of an existing binder), consumed by a
+/// further nested match on `k` itself.
+///
+/// **This fixture's `k` is a DIRECT ALIAS of the enclosing match's own
+/// peeled field** (`let k : Vec Nat m = xs`, `m`/`xs` both already bound
+/// by `VCons m a xs`), consumed by passing `k` -- not `xs` -- as the
+/// recursive call's argument. Measured: it GETS PAST
+/// `refine_branch_goal` cleanly and reaches the KERNEL, where the
+/// rejection CLASS is GUARD-DEPENDENT:
+///
+/// - **shipped region set** (asserted by the control below): `KernelRejected
+///   TypeMismatch`, `expected ((Dg574 Dg67) @9), found ((Dg574 Dg67) @4)`
+///   -- the same convoy-class signature as the predecessor node's own `D1`
+///   (`@9` vs `@4`).
+/// - **prohibited positional floor** (`if abs_pos >= 3`, temporarily
+///   applied and reverted, NOT committed -- a source mutation the shipped
+///   tree cannot express as a runtime toggle): `KernelRejected
+///   NotTerminating("SCT: idempotent self-loop has no strictly-decreasing
+///   parameter")` -- a completely different rejection CLASS, from the SCT
+///   gate rather than the type checker.
+///
+/// **Neither guard makes this program elaborate.** The claim this fixture
+/// carries is narrower and different: the two guards reach DIFFERENT
+/// failure classes on the identical program, which is itself evidence the
+/// guards behave differently here (unlike the withdrawn `D2` pair from the
+/// predecessor node, where the floor and the region set were
+/// indistinguishable). This is NOT a discharge of that withdrawal -- it is
+/// a separate, later-discovered discriminating shape, filed to this node
+/// rather than reopening the predecessor's.
+///
+/// **These are two distinct pre-existing gaps, not one.** Diagnosing which
+/// (if either) shares a root cause with the other is this node's `D2`,
+/// not this commit's -- `D2`/`D3` remain out of scope here (Steward
+/// release, merge-closeout only).
+#[test]
+fn interleaved_let_alias_of_enclosing_field_rejects_differently_under_region_set() {
+    let mut env = vec_env();
+    elab_ok(
+        &mut env,
+        "fn zip (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
+         match v { \
+           VNil |-> VNil Nat; \
+           VCons m a xs |-> match w { VCons _ b ys |-> VCons Nat m a (zip m xs ys) } \
+         }",
+    );
+    let err = expect_err_val(
+        &mut env,
+        "fn zipAdv (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
+         match v { \
+           VNil |-> VNil Nat; \
+           VCons m a xs |-> \
+             let k : Vec Nat m = xs in \
+             match w { VCons _ b ys |-> VCons Nat m a (zipAdv m k ys) } \
+         }",
+    );
+    match &err {
+        ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { expected, found },
+            ..
+        } => {
+            let expected_dbg = format!("{expected:?}");
+            let found_dbg = format!("{found:?}");
+            assert!(
+                expected_dbg.contains("@9"),
+                "expected the measured convoy-class `expected` operand \
+                 (`@9`), got: {expected_dbg:?}"
+            );
+            assert!(
+                found_dbg.contains("@4"),
+                "expected the measured convoy-class `found` operand \
+                 (`@4`) -- the same signature as the predecessor node's \
+                 own D1, got: {found_dbg:?}"
+            );
+        }
+        other => panic!(
+            "expected the measured shipped-region-set rejection (a \
+             kernel TypeMismatch, convoy class @9 vs @4) -- got a \
+             different error, which means this fixture's guard-dependent \
+             behaviour needs re-measuring: {other:?}"
+        ),
+    }
+}
