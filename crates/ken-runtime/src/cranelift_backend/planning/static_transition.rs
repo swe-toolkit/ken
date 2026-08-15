@@ -3962,24 +3962,37 @@ pub(in crate::cranelift_backend) enum AggregateOccurrenceProducer {
         /// records must not alias. Deriving this from the seat's provenance
         /// owner would collapse exactly the distinction `D5a` exists to keep.
         owner: ContinuationEmissionOwner,
-        /// The `Effect` occurrence whose lowering builds this producer, which
-        /// is also what supplies the emission owner.
+        /// The source occurrence that anchors this synthesized use. Host-result
+        /// trees use their `Effect`; a unit-boundary environment uses the exact
+        /// source constructor that owns the closure-valued field.
         seat: StaticOriginId,
-        /// Where in the seat's operation tree this use sits.
+        /// Where in the seat's synthesized tree this use sits.
         ///
         /// ⛔ Not an ordinal. An ordinal would count emissions in lowering's
         /// control flow, which the planner does not execute; a path is measured
         /// structure that both sides state independently and can be checked
         /// against each other at construction.
         path: SynthesizedAggregatePath,
-        /// The constructor this use builds — **fixed or `IOError`**.
-        ///
-        /// ⭐ The full sum, not the fixed half. Every `IOError` alternative is
-        /// a real allocation with its own path, so the domain must be able to
-        /// name one. An earlier spelling typed this as the fixed roles alone,
-        /// which is what excluded them from `P` and from `R`.
-        role: SynthesizedConstructorRole,
+        /// The closed compiler role that builds this use.
+        role: SynthesizedAggregateRole,
     },
+}
+
+/// The closed compiler role that builds one synthesized aggregate.
+///
+/// Constructor roles retain the semantic plane's existing constructor
+/// identity. The environment arm names the record introduced when a
+/// closure-valued source-constructor field is carried as a generated-unit call
+/// input; it has no constructor identity because its shape is
+/// [`PlannedAggregateShape::Record`].
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
+    /// The full semantic constructor-role sum, fixed and `IOError`. Every
+    /// `IOError` alternative is a real allocation with its own path, so this
+    /// cannot be narrowed to the fixed half.
+    Constructor(SynthesizedConstructorRole),
+    /// The captured-environment Record introduced at a generated-unit input.
+    UnitBoundaryEnvironment,
 }
 
 /// Which aggregate shape one producer occurrence builds.
@@ -4186,17 +4199,22 @@ fn aggregate_child_referent_owners(
     }
 }
 
-/// Which arm of a host result one synthesized aggregate tree is rooted at.
+/// Which compiler-built tree one synthesized aggregate path is rooted at.
 ///
 /// A host operation synthesizes two independent values — the `error` arm and
 /// the `ok` arm — and they are separate trees, not two halves of one. Rooting a
 /// path at one of them is what keeps `FsWriteAt`'s `PrivateTransferCount`
 /// (which lives under `ok`, inside `Wrote`) distinct from `FsReadAt`'s
 /// error-side machinery, without either arm having to know the other's shape.
+/// The unit-boundary root instead names the environment record at one exact
+/// source-constructor field.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     HostResultError,
     HostResultOk,
+    /// The environment record nested at one field of a source constructor
+    /// whose closed result reaches a generated-unit call input.
+    UnitBoundaryEnvironment,
 }
 
 /// One step from a synthesized aggregate to one of its ordered children.
@@ -4223,7 +4241,7 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateStep {
     Alternative(u32),
 }
 
-/// The exact position of one synthesized aggregate in its operation's tree.
+/// The exact position of one synthesized aggregate in its compiler-built tree.
 ///
 /// ⭐ **This is the fact a role alone cannot supply.** Six of the measured
 /// construction sites build a repeated role at one seat: `ResourceKind` appears
@@ -4586,6 +4604,13 @@ impl SynthesizedHostResultTree {
         match root {
             SynthesizedAggregateRoot::HostResultError => self.error,
             SynthesizedAggregateRoot::HostResultOk => self.ok,
+            // Environment records are derived from source call-input results,
+            // not from a host operation's synthesized tree. Returning the
+            // absent node keeps the host-tree resolver fail-closed if the two
+            // domains are ever accidentally mixed.
+            SynthesizedAggregateRoot::UnitBoundaryEnvironment => {
+                SynthesizedAggregateNode::Absent
+            }
         }
     }
 }
@@ -5612,12 +5637,87 @@ fn validate_host_effect_seat_plan(
     validate_host_effect_seats_are_unique(records)
 }
 
+/// Source-constructor fields whose empty lexical environment is carried into a
+/// generated-unit call.
+///
+/// The key is derived from source structure on both sides: the direct lexical
+/// callee fixes the generated-unit boundary, the call argument fixes the result
+/// root, and the closed producer analysis fixes each concrete constructor field.
+/// No lowering-order ordinal participates.
+fn unit_boundary_environment_fields(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<BTreeSet<(StaticOriginId, u32)>, CraneliftBackendError> {
+    let mut fields = BTreeSet::new();
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        let RuntimeExpr::Call { args, .. } = occurrence.expr else {
+            continue;
+        };
+        let callee = plan
+            .semantic
+            .child_origin(occurrence.static_origin, 0)?;
+        if !matches!(
+            plan.planned_occurrence_expr(callee)?,
+            RuntimeExpr::LexicalClosure { .. }
+        ) {
+            continue;
+        }
+        for argument_position in 0..args.len() {
+            let argument = plan
+                .semantic
+                .child_origin(occurrence.static_origin, 1 + argument_position)?;
+            let mut match_scrutinees = BTreeMap::new();
+            let fact = derive_case_producer_fact(
+                plan,
+                argument,
+                &[],
+                &mut match_scrutinees,
+            )?;
+            let CaseProducerSet::Closed(_) = fact.producers else {
+                continue;
+            };
+            for (_, origins) in fact.producer_origins {
+                for producer in origins {
+                    let RuntimeExpr::Construct { args, .. } =
+                        plan.planned_occurrence_expr(producer)?
+                    else {
+                        return Err(planner_error(
+                            "closed constructor-result authority names a \
+                             non-Construct producer",
+                        ));
+                    };
+                    for (position, field) in args.iter().enumerate() {
+                        if matches!(
+                            field,
+                            RuntimeExpr::LexicalClosure { captures, .. }
+                                if captures.is_empty()
+                        ) {
+                            fields.insert((
+                                producer,
+                                u32::try_from(position).map_err(|_| {
+                                    planner_capacity_error(
+                                        "unit-boundary environment field exceeds the \
+                                         position space",
+                                    )
+                                })?,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(fields)
+}
+
 /// Derive one ownership record for every aggregate producer occurrence.
 ///
 /// ⛔ **The population is every `Construct`/`Record` source occurrence, not the
 /// ones some reached trace visited.** A lane chosen from the branch this
 /// execution happened to take is exactly the row-driven discovery the frame
 /// forbids.
+///
+/// The synthesized population below adds records for compiler-built trees; it
+/// does not remove any source producer from this population.
 fn build_aggregate_ownership_plan(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<Vec<PlannedAggregateOwnership>, CraneliftBackendError> {
@@ -5694,6 +5794,7 @@ fn build_aggregate_ownership_plan(
             allocation,
         });
     }
+
     // The synthesized half: ONE record per exact allocation-reachable use in
     // the operation's tree, keyed by WHERE that use sits.
     //
@@ -5757,7 +5858,9 @@ fn build_aggregate_ownership_plan(
                         owner,
                         seat,
                         path: semantic_use.path.clone(),
-                        role: semantic_use.role,
+                        role: SynthesizedAggregateRole::Constructor(
+                            semantic_use.role,
+                        ),
                     },
                     // Provenance only, kept for readers. The emission owner that
                     // confers authority is in the key above.
@@ -5769,6 +5872,33 @@ fn build_aggregate_ownership_plan(
                     allocation,
                 });
             }
+        }
+    }
+    // The unit-boundary environment half. Each record is rooted in one exact
+    // source producer and field selected by the closed call-input result
+    // analysis above. Empty captures are the bounded first population: the
+    // record has no fields, so no compiler-created field-name authority is
+    // needed or inferred.
+    for (seat, position) in unit_boundary_environment_fields(plan)? {
+        for owner in synthesized_seat_emission_owners(plan, seat)? {
+            records.push(PlannedAggregateOwnership {
+                id: AggregateOccurrenceId(0),
+                producer: AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat,
+                    path: SynthesizedAggregatePath::root(
+                        SynthesizedAggregateRoot::UnitBoundaryEnvironment,
+                    )
+                    .field(position),
+                    role: SynthesizedAggregateRole::UnitBoundaryEnvironment,
+                },
+                owner: plan.semantic.function_owner(seat)?,
+                shape: PlannedAggregateShape::Record,
+                declared_children: Some(&[]),
+                children: Vec::new(),
+                meet: PlannedReferentLifetime::Persistent,
+                allocation: PlannedAggregateAllocation::PersistentGround,
+            });
         }
     }
     records.sort_by(|left, right| left.producer.cmp(&right.producer));
@@ -14087,7 +14217,43 @@ impl<'src> StaticTransitionPlan<'src> {
         path: &SynthesizedAggregatePath,
         role: SynthesizedConstructorRole,
     ) -> Result<AggregateOccurrenceId, CraneliftBackendError> {
-        self.synthesized_aggregate_record(owner, seat, path, role)
+        self.synthesized_aggregate_record(
+            owner,
+            seat,
+            path,
+            SynthesizedAggregateRole::Constructor(role),
+        )
+        .map(|record| record.id)
+    }
+
+    /// The occurrence of the empty environment record nested in one exact
+    /// source-constructor field that the closed result analysis routes to a
+    /// generated-unit call input.
+    ///
+    /// Absence is ordinary for every other closure-valued field. The full key
+    /// remains owner + producer seat + structural field path + compiler role;
+    /// no lowering-order ordinal is accepted by this interface.
+    pub(in crate::cranelift_backend) fn unit_boundary_environment_occurrence(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+        position: u32,
+    ) -> Option<AggregateOccurrenceId> {
+        let path = SynthesizedAggregatePath::root(
+            SynthesizedAggregateRoot::UnitBoundaryEnvironment,
+        )
+        .field(position);
+        self.aggregate_ownership
+            .iter()
+            .find(|record| {
+                record.producer
+                    == AggregateOccurrenceProducer::SynthesizedUse {
+                        owner,
+                        seat,
+                        path: path.clone(),
+                        role: SynthesizedAggregateRole::UnitBoundaryEnvironment,
+                    }
+            })
             .map(|record| record.id)
     }
 
@@ -14102,7 +14268,7 @@ impl<'src> StaticTransitionPlan<'src> {
         owner: ContinuationEmissionOwner,
         seat: StaticOriginId,
         path: &SynthesizedAggregatePath,
-        role: SynthesizedConstructorRole,
+        role: SynthesizedAggregateRole,
     ) -> Result<&PlannedAggregateOwnership, CraneliftBackendError> {
         self.aggregate_ownership
             .iter()
@@ -14515,7 +14681,12 @@ impl<'src> StaticTransitionPlan<'src> {
         path: &SynthesizedAggregatePath,
         role: SynthesizedConstructorRole,
     ) -> Result<&'static [SynthesizedAggregateNode], CraneliftBackendError> {
-        self.synthesized_aggregate_record(owner, seat, path, role)?
+        self.synthesized_aggregate_record(
+            owner,
+            seat,
+            path,
+            SynthesizedAggregateRole::Constructor(role),
+        )?
             .declared_children
             .ok_or_else(|| {
                 planner_error("synthesized aggregate use has a record but no child model")
@@ -30167,8 +30338,10 @@ mod tests {
                     owner,
                     seat: StaticOriginId(seat),
                     path,
-                    role: SynthesizedConstructorRole::Fixed(
-                        SynthesizedFixedConstructorRole::Unit,
+                    role: SynthesizedAggregateRole::Constructor(
+                        SynthesizedConstructorRole::Fixed(
+                            SynthesizedFixedConstructorRole::Unit,
+                        ),
                     ),
                 },
                 owner: None,
@@ -30226,6 +30399,37 @@ mod tests {
         ])
         .expect("a field step and an alternative step at position 0 are distinct paths");
 
+        // The new Record role shares owner, seat, and field position with an
+        // existing host-result constructor use. Its root and role are both in
+        // the producer key, so the pair remains distinct.
+        let host = at(0, unit_a, 11, ok_root.field(0));
+        let mut environment = host.clone();
+        environment.id = AggregateOccurrenceId(1);
+        environment.producer = AggregateOccurrenceProducer::SynthesizedUse {
+            owner: unit_a,
+            seat: StaticOriginId(11),
+            path: SynthesizedAggregatePath::root(
+                SynthesizedAggregateRoot::UnitBoundaryEnvironment,
+            )
+            .field(0),
+            role: SynthesizedAggregateRole::UnitBoundaryEnvironment,
+        };
+        environment.shape = PlannedAggregateShape::Record;
+        assert_ne!(host.producer, environment.producer);
+        validate_aggregate_producers_are_unique(&[host.clone(), environment.clone()])
+            .expect("the environment root and role cannot alias a host-result use");
+
+        // Nearest-neighbour mutation: collapse only the new key onto the host
+        // key. The production validator must make that one-field perturbation
+        // red.
+        environment.producer = host.producer.clone();
+        let alias =
+            validate_aggregate_producers_are_unique(&[host, environment])
+                .expect_err(
+                    "collapsing the environment key onto a host key must refuse",
+                );
+        assert!(format!("{alias:?}").contains("same producer"));
+
         // Same SEAT, same role, same owner, SAME PATH: one use, so a second is
         // a collision.
         let collided = [record(0, unit_a, 11), record(1, unit_a, 11)];
@@ -30234,6 +30438,112 @@ mod tests {
         assert!(
             format!("{error:?}").contains("same producer"),
             "the refusal must be the aliasing stop itself: {error:?}"
+        );
+    }
+
+    /// `RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE` D0 / AC-2 / AC-3.
+    ///
+    /// MEASURED: a direct lexical-closure call whose closed result producer is
+    /// a constructor with an empty lexical-closure field receives a synthesized
+    /// Record occurrence keyed by emission owner, that exact producer, the
+    /// unit-boundary root followed by field position zero, and the environment
+    /// role.
+    ///
+    /// CLAIMED: the planner-visible producer and source field position form the
+    /// same structural key lowering can recover from the carried constructor;
+    /// no lowering-order ordinal participates. The distinct root and role keep
+    /// the new use disjoint from every host-result constructor use.
+    ///
+    /// GAP: this is the empty-environment first population. Naming captured
+    /// record fields requires field-identity and referent-owner authority that
+    /// this node does not infer.
+    ///
+    /// Promise class: durable invariant. The mutation duplicates the actual
+    /// environment producer key and must be refused by the production
+    /// non-aliasing validator.
+    #[test]
+    fn unit_boundary_environment_record_has_a_structural_non_aliasing_occurrence() {
+        let expression = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: vec!["value".to_string()],
+                body: Box::new(RuntimeExpr::Var(0)),
+            }),
+            args: vec![RuntimeExpr::Construct {
+                constructor: "ctor:fixture::Environment::Wrap".to_string(),
+                args: vec![RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["unit".to_string()],
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::Environment::Leaf".to_string(),
+                        args: Vec::new(),
+                    }),
+                }],
+            }],
+        };
+        let plan = plan_static_transition_graph(&expression, &BTreeMap::new())
+            .expect("the direct unit-boundary fixture must plan");
+        let producer = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find_map(|occurrence| match occurrence.expr {
+                RuntimeExpr::Construct { args, .. }
+                    if matches!(
+                        args.as_slice(),
+                        [RuntimeExpr::LexicalClosure { .. }]
+                    ) =>
+                {
+                    Some(occurrence.static_origin)
+                }
+                _ => None,
+            })
+            .expect("the fixture has one closure-bearing constructor producer");
+        let expected_path = SynthesizedAggregatePath::root(
+            SynthesizedAggregateRoot::UnitBoundaryEnvironment,
+        )
+        .field(0);
+        let environment_records = plan
+            .aggregate_ownership
+            .iter()
+            .filter(|record| {
+                matches!(
+                    &record.producer,
+                    AggregateOccurrenceProducer::SynthesizedUse {
+                        seat,
+                        path,
+                        role: SynthesizedAggregateRole::UnitBoundaryEnvironment,
+                        ..
+                    } if *seat == producer && path == &expected_path
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            environment_records.len(),
+            1,
+            "the one producer field under one emission owner must mint one \
+             occurrence"
+        );
+        let environment = environment_records[0];
+        assert_eq!(environment.shape, PlannedAggregateShape::Record);
+        assert_eq!(environment.declared_children, Some(&[][..]));
+        assert!(environment.children.is_empty());
+        assert_eq!(environment.meet, PlannedReferentLifetime::Persistent);
+        assert_eq!(
+            environment.allocation,
+            PlannedAggregateAllocation::PersistentGround
+        );
+
+        let mut duplicate = environment.clone();
+        duplicate.id = AggregateOccurrenceId(environment.id.0 + 1);
+        let refusal = validate_aggregate_producers_are_unique(&[
+            environment.clone(),
+            duplicate,
+        ])
+        .expect_err("duplicating the real environment key must refuse");
+        assert!(
+            format!("{refusal:?}").contains("same producer"),
+            "the production non-aliasing law must own the refusal: {refusal:?}"
         );
     }
 
@@ -30393,7 +30703,12 @@ mod tests {
 
         // The site-bound child's recorded owners ARE the seat's operand's.
         let record = plan
-            .synthesized_aggregate_record(owner, seat, &err.field(1), Fixed(R::OptionSome))
+            .synthesized_aggregate_record(
+                owner,
+                seat,
+                &err.field(1),
+                SynthesizedAggregateRole::Constructor(Fixed(R::OptionSome)),
+            )
             .expect("`OptionSome` has a record");
         let authority = occurrence_authority(&plan, seat).expect("the seat has an authority");
         let operand = authority
