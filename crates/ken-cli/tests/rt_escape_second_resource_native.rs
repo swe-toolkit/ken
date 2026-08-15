@@ -603,6 +603,25 @@ fn escape_resource_plus_plain_matches_interpreter() {
 // RT-SRCBODY-BIND-ORDER commit.
 // It refuses at object emission, so the program never executes and no
 // binding order is observable in it.
+//
+// RT-CLOSURE-BOUNDARY-LANE D1 measured the refusing caller separately. The
+// specialized-child screen in `transfer_constructor_operands` is building the
+// source `ITree::Vis` constructor directly in the carrier because a sibling is
+// already carried. Its planned allocation is `InvocationAggregate`, not
+// `PersistentGround`, so this row is a live-domain exchange governed by
+// `41-values.md:76-83`, not durable publication under `:72-75`.
+//
+// D2 sizes the missing live-domain closure carrier as L across both required
+// sub-shapes: this escape-lifetime row needs the captured environment to outlive
+// its lexical frame, while the recursor rows need it passed as a generated-unit
+// argument. Both also require defining-owner/artifact liveness, same-domain
+// validation, checked static-body dispatch, and refusal of wrong-domain,
+// expired, or forged representations. The existing B2F carrier is the base to
+// extend; a silent zero-capture `StaticCallableRef` conversion is unavailable.
+//
+// D3 removes this ignore only with that live-domain validation in place and a
+// passing native/interpreter differential. Re-labelling the refusal without
+// executing the row does not discharge the skip.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
 #[ignore = "RT-CLOSURE-BOUNDARY-LANE: a runtime-local closure has no durable lane across the boundary; fails at base 21fd46dc"]

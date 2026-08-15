@@ -6168,6 +6168,16 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// below pins the whole crossing vector per row; it does not panic under a false
 /// general law when another fixture gives one origin multiple crossings.
 ///
+/// `RT-CLOSURE-BOUNDARY-LANE` D1/D2: depth 2 and depth 3 separately reach
+/// `transfer_into_carrier` from `carry_call_input`, as the exact callee bodies
+/// and caller tags below assert. Each caller is handing a source-authored
+/// closure-bearing argument to a generated unit inside the live runtime, not
+/// publishing a durable or serialized artifact. Both therefore route through
+/// `41-values.md:76-83`'s live-domain clause. The existing B2F carrier supplies
+/// generated-unit transport but deliberately has no callable closure row; the
+/// remaining repair must cover invocation ownership, captured carrier words,
+/// static-body dispatch, and wrong-domain, expired, or forged refusal.
+///
 /// Promise class: transition sentinel. The exact origin and path are the
 /// measured residual; the invoking-site tag is the measured route. Rewrite this
 /// table when an authorized lowering repair moves either row; do not preserve
@@ -6373,6 +6383,53 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
     );
 }
 
+/// `RT-CLOSURE-BOUNDARY-LANE` D0: the RecursiveDescent baseline does not
+/// perform the closure-bearing boundary crossing introduced by functionization.
+///
+/// MEASURED: row 4 depths 2 and 3 both compile on RecursiveDescent and record
+/// zero `BoundaryTransferEntered` events. CLAIMED: retiring RecursiveDescent
+/// before the live-domain lane covers these rows would remove a compiling
+/// capability. THE GAP: this does not choose the lane mechanism; retirement may
+/// instead carry an explicit recorded narrowing.
+#[test]
+fn recursive_descent_recursors_compile_without_a_boundary_crossing() {
+    use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+
+    set_selector_variant_exclusion(None);
+    let _restore = Restore;
+    for depth in [2, 3] {
+        let _ = d2k_owner_trace_take();
+        let expression =
+            host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+        let (result, _trace) = px8j_capture_source_trace(
+            &expression,
+            false,
+            &format!("ken_closure_boundary_lane_d0_depth{depth}"),
+        );
+        assert!(
+            result.is_ok(),
+            "row 4 depth {depth} must retain its compiling RecursiveDescent baseline: {result:?}",
+        );
+        let crossings = d2k_owner_trace_take()
+            .into_iter()
+            .filter(|event| matches!(event, D2kOwnerEvent::BoundaryTransferEntered { .. }))
+            .collect::<Vec<_>>();
+        assert!(
+            crossings.is_empty(),
+            "row 4 depth {depth} must not gain a RecursiveDescent boundary crossing: \
+             {crossings:#?}",
+        );
+    }
+}
+
 /// `RT-PLANNED-CLOSURE-PREEXISTENCE` D1/D2: ask the planner whether the
 /// origin-5 result already has a closure-typed field, without executing the
 /// projected route or observing a crossing.
@@ -6477,7 +6534,8 @@ fn planned_closure_preexistence_routes_recursors_to_the_durable_lane() {
 ///
 /// MEASURED: forcing the diagnostic's real planner lookup to a missing child
 /// preserves the exact `Closure` compile outcome while changing the call-input
-/// tag from `Body` to `MissingBodyChild` and recording a non-zero mutation hit.
+/// tag from `Body` to `MissingBodyChildByMutation` and recording a non-zero
+/// mutation hit.
 /// CLAIMED: missing diagnostic metadata degrades only the tag. THE GAP: this
 /// says nothing about a missing production child or a production compile.
 #[test]
@@ -6551,7 +6609,9 @@ fn missing_call_input_callee_child_degrades_the_tag_not_the_compile() {
         )
     };
     assert_eq!(format!("{body:?}"), "StaticOriginId(49)");
-    let [GeneratedUnitCallInputCallee::MissingBodyChild { entry }] = missing.2.as_slice() else {
+    let [GeneratedUnitCallInputCallee::MissingBodyChildByMutation { entry }] =
+        missing.2.as_slice()
+    else {
         panic!(
             "the missing planner child must degrade the exact call-input tag: {:?}",
             missing.2
