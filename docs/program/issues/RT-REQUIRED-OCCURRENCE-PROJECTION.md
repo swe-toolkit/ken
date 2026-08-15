@@ -1,7 +1,7 @@
 ---
 id: RT-REQUIRED-OCCURRENCE-PROJECTION
 title: "Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
