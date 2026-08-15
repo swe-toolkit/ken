@@ -6,29 +6,30 @@
 //! construction, no elaborator surface syntax) and REPLACES that file's
 //! `kripke_embedding_cert_rechecks_fo_placeholder` (`[placeholder — reifies
 //! in V4]`) with a real exercise of the slice this node builds.
+//!
+//! **Scope, stated so it is not lost (Steward disposition on the QA block of
+//! `e0474679c`, `D5`/`AC-5`/`AC-1`):** every claim in this file about the
+//! Kripke-slice boundary (`D5`/`AC-5`/`AC-6`, and the negative control's
+//! `AC-1`) is a claim about `prover::attempt_fo_with_signature`, the
+//! caller-supplied-signature entry point -- NEVER about the public
+//! `prover::attempt_fo`/`attempt_obligation` route. `attempt_fo` mints a
+//! fresh `FoSliceSignature` on every call, so no externally-constructed
+//! obligation can ever quote against it; every real obligation refuses
+//! quotation and falls straight through to the unchanged IPC fallback, and
+//! a test run through that route would measure the fallback, not this
+//! slice, while printing the same `Unknown` word either way. Route FO is
+//! built and checked here, but currently unreachable in production. No
+//! behavioral change to the public prover route is claimed anywhere in this
+//! file.
 
 use ken_elaborator::{
-    extract::{ObligationId, ObligationTriple, ProvKind, Provenance},
     fo_kripke::{
         check_cert, declare_fo_slice_signature, embed, find_certificate,
         negative_control_term, positive_control_term, quote_fo, FoBoundary,
     },
     prover::{attempt_fo_with_signature, Verdict},
-    error::Span,
 };
 use ken_kernel::{Context, GlobalEnv, Level, Term};
-
-fn closed_triple(env: &mut GlobalEnv, id: &str, phi: Term) -> ObligationTriple {
-    let placeholder_hole = env.fresh_id();
-    ObligationTriple {
-        id: ObligationId(id.to_owned()),
-        hole_id: placeholder_hole,
-        context: vec![],
-        phi: phi.clone(),
-        goal_closed: phi,
-        provenance: Provenance { kind: ProvKind::Prove, span: Span::zero() },
-    }
-}
 
 /// `D1`/`AC-3`: both controls quote; a form outside the slice is refused
 /// by construction.
@@ -65,7 +66,14 @@ fn positive_control_certificate_computes_true() {
 }
 
 /// `D4`/`AC-1`: the negative control does NOT obtain an accepted
-/// certificate -- demonstrated by running the search.
+/// certificate -- demonstrated by running the search directly against
+/// `quote_fo`/`find_certificate` with an explicit signature, per the
+/// Steward's `D5`/`AC-1` disposition on `e0474679c`: a negative run through
+/// `attempt_fo`/`attempt_fo_with_signature` would be inert (the IPC
+/// fallback also fails to prove this goal, for its own unrelated reason --
+/// it does not handle `or` at all -- so an `Unknown` from that route would
+/// not discriminate this slice's own behavior). This is the canonical
+/// `AC-1` evidence.
 #[test]
 fn negative_control_obtains_no_certificate() {
     let mut env = GlobalEnv::new();
@@ -94,22 +102,25 @@ fn embed_places_k_sigma_inside_the_target() {
     );
 }
 
-/// `D5`/`AC-5`/`AC-6`: `attempt_fo`'s core wiring, exercised through
-/// `attempt_fo_with_signature` (the caller-supplied-signature variant --
-/// `attempt_fo` itself mints a fresh, unpredictable signature per call, so
-/// this is how the boundary behavior is verified from outside `prover.rs`).
-/// Even though the positive control's certificate is genuinely accepted by
-/// `check_cert`, the verdict must be `Unknown`, never `Proved` -- the
-/// theorem-home placement decision (`23 §4.4`) has not been made.
+/// `D5`/`AC-5`/`AC-6`: the fail-safe, exercised through
+/// `attempt_fo_with_signature` -- a claim about THAT function, never about
+/// the public `attempt_fo` (see this file's own header and
+/// `attempt_fo_with_signature`'s doc comment in `prover.rs` for why a claim
+/// about the public route would be inert). The explicit `check_cert`
+/// precondition below is load-bearing, not decoration: without it, this
+/// test would pass identically via the IPC fallback and prove nothing about
+/// the boundary it names (exactly the failure mode QA's block on
+/// `e0474679c` caught one level up, at the public route).
 #[test]
-fn attempt_fo_returns_unknown_never_proved_for_accepted_slice_certificate() {
+fn attempt_fo_with_signature_returns_unknown_never_proved_for_accepted_slice_certificate() {
     let mut env = GlobalEnv::new();
     let sig = declare_fo_slice_signature(&mut env);
     let positive = positive_control_term(&sig);
 
-    // Sanity: this obligation's certificate really is accepted by the
-    // slice's own check_cert (otherwise this test would trivially pass for
-    // the wrong reason -- the fallback path, not the D5 boundary).
+    // Precondition, not decoration: this obligation's certificate really is
+    // accepted by the slice's own check_cert. Without this assertion, the
+    // test below could pass via the IPC fallback instead of the D5
+    // boundary, and nothing would distinguish the two.
     let problem = quote_fo(&env, &sig, &positive).expect("positive control quotes");
     let cert = find_certificate(&problem.f).expect("a positive certificate must be found");
     let target = embed(&problem.f);
@@ -125,23 +136,5 @@ fn attempt_fo_returns_unknown_never_proved_for_accepted_slice_certificate() {
         "an accepted slice certificate must still yield Unknown, never \
          Proved, until the theorem-home placement decision is made \
          (23 §4.4) -- got {verdict:?}"
-    );
-}
-
-/// `D5`: the negative control (no certificate at all) also returns
-/// `Unknown` via the IPC fallback, never `Proved` -- unaffected by whether
-/// the classical-only reasoning that would forge a certificate is present.
-#[test]
-fn attempt_fo_returns_unknown_for_the_negative_control() {
-    let mut env = GlobalEnv::new();
-    let sig = declare_fo_slice_signature(&mut env);
-    let negative = negative_control_term(&env, &sig);
-    let triple = closed_triple(&mut env, "fo-negative-control", negative.clone());
-
-    let verdict =
-        attempt_fo_with_signature(&mut env, &Context::new(), &triple.phi, &triple.goal_closed, &sig);
-    assert!(
-        matches!(verdict, Verdict::Unknown { .. }),
-        "the negative control must never be Proved, got {verdict:?}"
     );
 }

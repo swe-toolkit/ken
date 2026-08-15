@@ -515,33 +515,36 @@ fn specialize_int_goal(
 
 // ─── Fragment FO ─────────────────────────────────────────────────────────────
 
-/// Fragment FO: Kripke embedding → classical solver → reflective cert
-/// (`23 §4`, `V3-FO-KRIPKE-SLICE`).
+/// Fragment FO dispatch point (`23 §4`, `V3-FO-KRIPKE-SLICE`).
 ///
-/// The first route-(a) vertical slice (`23 §4.5`) is built in
-/// [`crate::fo_kripke`]: quotation (`quote_fo`), the exact classical Kripke
-/// theory with `K(Sigma)` inside the target (`embed`), and a computable
-/// certificate checker (`check_cert`) over the slice's one rigid sort, one
-/// unary predicate, and `init`/`imp-right`/`forall-right` certificate rules.
-/// That machinery is exercised here, not stubbed — but **route FO still
-/// cannot return `Proved`** (`23 §4.4`): the two theorems that would let a
-/// slice certificate discharge a real Ken proof —
-/// `embedding_adequacy`/`checker_soundness` — have no approved kernel-checked
-/// home yet. That placement is an Architect/operator decision
-/// `V3-FO-KRIPKE-SLICE` explicitly did not make (`AC-6`), so an accepted
-/// slice certificate here still yields `Unknown`, honestly, at this
-/// boundary — never a silent skip and never a forged `Proved`.
+/// **This function cannot currently reach the Kripke slice at all, for any
+/// real obligation — this is not an oversight, and the reason is structural,
+/// not a bug to fix here.** Each call declares a FRESH
+/// [`crate::fo_kripke::FoSliceSignature`] via `declare_fo_slice_signature`,
+/// which mints brand-new `GlobalId`s every time (`declare_postulate`/
+/// `declare_inductive` are not idempotent, not even against the same
+/// `env`). `quote_fo` recognizes a signature's sort/predicate by exact
+/// `GlobalId` — so an obligation built against ANY other signature (which
+/// is every externally-constructed obligation there is, since nothing
+/// outside this function has ever seen the ids it just minted) is refused
+/// by `quote_fo` and falls straight through to the unchanged IPC
+/// propositional fallback below, exactly as before this slice existed.
+/// **Route FO is built and kernel-vocabulary-checked, but is currently
+/// unreachable in production**: nobody should read "the FO Kripke slice
+/// landed" as "route FO now behaves differently" for any real obligation —
+/// it does not, and will not until a successor discovers a real
+/// obligation's own (sort, predicate) signature (filed as
+/// `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY`, gated on its own Architect
+/// ruling, explicitly out of this slice's scope — "do not widen the
+/// slice").
 ///
-/// **Scope note, not yet integration:** this wiring uses `fo_kripke`'s own
-/// internally-declared one-sort/one-predicate signature
-/// (`declare_fo_slice_signature`), not a signature discovered from `phi`
-/// itself — so it currently only recognizes obligations shaped like this
-/// module's own signature (in practice: none from arbitrary real
-/// obligations yet). Discovering `phi`'s own (sort, predicate) identities is
-/// later integration work, out of this slice's scope (`V3-FO-KRIPKE-SLICE`
-/// "do not widen the slice"). When quotation refuses or no slice certificate
-/// is found, this falls back to the IPC propositional skeleton, unchanged
-/// from before.
+/// The slice's own logic — quotation (`quote_fo`), the exact classical
+/// Kripke theory with `K(Sigma)` inside the target (`embed`), and a
+/// computable certificate checker (`check_cert`) over the slice's one rigid
+/// sort, one unary predicate, and `init`/`imp-right`/`forall-right`
+/// certificate rules — is real, not stubbed, and is exercised (and
+/// verifiable) through [`attempt_fo_with_signature`] below, which this
+/// function is a thin, non-signature-discovering wrapper over.
 fn attempt_fo(
     env: &mut GlobalEnv,
     ctx: &Context,
@@ -552,15 +555,18 @@ fn attempt_fo(
     attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig)
 }
 
-/// The testable core of [`attempt_fo`]: identical logic, but takes the
-/// [`crate::fo_kripke::FoSliceSignature`] as a caller-supplied parameter
-/// instead of declaring a fresh one internally. `attempt_fo` itself declares
-/// a fresh signature per call (so it cannot recognize any obligation built
-/// against a signature it did not itself just mint — see `attempt_fo`'s own
-/// doc comment); tests exercise this function directly with a signature they
-/// control, so the D5 boundary behavior (accepted certificate → honest
-/// `Unknown`, never `Proved`) is verifiable without needing to guess
-/// `attempt_fo`'s internal, freshly-generated ids.
+/// The Kripke slice's actual boundary logic, factored out so it is testable
+/// independent of `attempt_fo`'s own always-fresh, externally-unreachable
+/// signature (see `attempt_fo`'s doc comment for why that matters): a
+/// caller here supplies its OWN [`crate::fo_kripke::FoSliceSignature`] and
+/// builds obligations against it directly, so quotation can actually
+/// succeed and the fail-safe below is genuinely exercised rather than
+/// measuring the IPC fallback under a different name. **The fail-safe**:
+/// when `quote_fo` + `find_certificate` + `check_cert` together accept a
+/// genuine certificate, the verdict returned is still `Unknown`, never
+/// `Proved` — `embedding_adequacy`/`checker_soundness` (`23 §4.4`) have no
+/// approved kernel-checked home yet, an Architect/operator decision this
+/// slice explicitly did not make (`AC-6`).
 pub fn attempt_fo_with_signature(
     env: &mut GlobalEnv,
     ctx: &Context,

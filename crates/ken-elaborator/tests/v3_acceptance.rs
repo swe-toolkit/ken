@@ -257,9 +257,22 @@ fn reflective_decision_computes_cert_d_placeholder() {
 /// with `K(Sigma)` inside the target (`embed`), and a computable certificate
 /// checker (`check_cert`) — see `crates/ken-elaborator/src/fo_kripke.rs` and
 /// its acceptance tests in `v3_fo_kripke_slice_acceptance.rs`, which run the
-/// positive/negative controls named by `23 §4.5` and confirm `attempt_fo`
-/// still returns `Unknown`, never `Proved`, for an accepted slice
-/// certificate.
+/// positive/negative controls named by `23 §4.5` and confirm
+/// `prover::attempt_fo_with_signature` still returns `Unknown`, never
+/// `Proved`, for an explicitly accepted slice certificate.
+///
+/// **Route FO is built and checked, but currently unreachable in production
+/// through the public `attempt_fo`/`attempt_obligation` entry point.**
+/// `attempt_fo` mints a fresh `FoSliceSignature` on every call (`prover.rs`),
+/// so no externally-constructed obligation can ever quote against it —
+/// every real obligation refuses quotation and falls through unchanged to
+/// the IPC fallback, exactly as before this slice landed. Reaching the
+/// slice at all currently requires the caller-supplied-signature entry
+/// point, `attempt_fo_with_signature`. Recognizing a real obligation's own
+/// (sort, predicate) signature is `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY`,
+/// filed as this node's successor and explicitly gated on its own
+/// Architect ruling before starting -- not landed here, and not implied by
+/// anything in this row.
 ///
 /// **What remains a genuine placeholder, not landed here:** `checker_
 /// soundness`/`embedding_adequacy` (`23 §4.4`) are not yet kernel-checked in
