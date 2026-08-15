@@ -3003,12 +3003,12 @@ enum ConstructorField {
     /// A statically-bound worker transported through the constructor template
     /// without becoming a value.
     ///
-    /// **THIS ARM IS NOW CONSTRUCTED**, at the one armed producer:
-    /// `Lowering::static_worker_constructor_template`, reached from the
-    /// direct-descent `RuntimeExpr::Construct` arm after
+    /// **THIS ARM IS NOW CONSTRUCTED**, at the one compiler-only template:
+    /// `Lowering::static_worker_constructor_template`, reached from both the
+    /// direct-descent and source-machine `RuntimeExpr::Construct` arms after
     /// `recognized_constructor_worker_fields` answers ahead of any
-    /// value-producing read. The `never constructed` warning that stood here as
-    /// `D2k-1b-i0`'s open checkpoint is gone, and its disappearance is the
+    /// value-producing read. The `never constructed` warning that stood here
+    /// as `D2k-1b-i0`'s open checkpoint is gone, and its disappearance is the
     /// compiler's own announcement that the checkpoint closed.
     ///
     /// **It is also READ**, by the kind-preserving static `Match` binder

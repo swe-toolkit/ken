@@ -5421,11 +5421,18 @@ fn static_worker_construction_rejects_slot_run_against_header() {
 /// `declare_target` decides whether this function has a worker call target
 /// declared for the binding's body origin, which is the `D4` axis; the
 /// binding's own arity is the `D3` axis.
+#[derive(Clone, Copy)]
+enum StaticWorkerTestRoute {
+    Direct,
+    SourceMachine,
+}
+
 #[cfg(test)]
 fn lower_against_static_worker(
     subject: &RuntimeExpr,
     declared_arity: u32,
     declare_target: bool,
+    route: StaticWorkerTestRoute,
 ) -> Result<LoweringOperand, CraneliftBackendError> {
     let source = worker_source();
     let (plan, root) = planned_root_occurrence(&source);
@@ -5467,14 +5474,36 @@ fn lower_against_static_worker(
     let mut builder = FunctionBuilder::new(&mut func, &mut function_context);
     let entry = builder.create_block();
     builder.switch_to_block(entry);
-    compiler.lower_expr(
-        &mut builder,
-        SourceOccurrence {
-            expr: subject,
-            static_origin: subject_origin,
-        },
-        &env,
-    )
+    let occurrence = SourceOccurrence {
+        expr: subject,
+        static_origin: subject_origin,
+    };
+    match route {
+        StaticWorkerTestRoute::Direct => compiler.lower_expr(&mut builder, occurrence, &env),
+        StaticWorkerTestRoute::SourceMachine => {
+            let cursor = ContinuationCursorId(0);
+            compiler.lower_source_machine_with_continuation(
+                &mut builder,
+                OwnedSourceOccurrence::cloned(occurrence),
+                env.to_vec(),
+                SourceControl {
+                    continuation: SourceContinuation::Terminal(
+                        SourceContinuationTerminal::ReturnValue,
+                    ),
+                    selected: SourceSelectedContinuation {
+                        activation: ContinuationActivationId(0),
+                        cursor,
+                        parent: None,
+                        pending: Vec::new(),
+                        selected_ancestry: Vec::new(),
+                        selected_scope: None,
+                    },
+                    selected_lineage: Vec::new(),
+                    terminal_outer: cursor,
+                },
+            )
+        }
+    }
 }
 
 /// `LoweringOperand` has no `Debug` either, so worker-consumer rejections are
@@ -5494,7 +5523,12 @@ fn expect_lowering_rejection(
 #[test]
 fn static_worker_fails_closed_in_value_position() {
     let subject = RuntimeExpr::Var(0);
-    let error = expect_lowering_rejection(lower_against_static_worker(&subject, 1, true));
+    let error = expect_lowering_rejection(lower_against_static_worker(
+        &subject,
+        1,
+        true,
+        StaticWorkerTestRoute::Direct,
+    ));
     assert!(
         format!("{error:?}").contains("value-producing position"),
         "fails closed for the value-position reason: {error:?}"
@@ -5531,7 +5565,12 @@ fn static_worker_as_aggregate_field_is_transported_and_non_materializable() {
         constructor: "ctor:fixture::Box::Wrap".to_string(),
         args: vec![RuntimeExpr::Var(0)],
     };
-    let lowered = match lower_against_static_worker(&subject, 1, true) {
+    let lowered = match lower_against_static_worker(
+        &subject,
+        1,
+        true,
+        StaticWorkerTestRoute::Direct,
+    ) {
         Ok(LoweringOperand::Specialized(lowered)) => lowered,
         Ok(LoweringOperand::Carried(_)) => {
             panic!("a template transporting a static worker must not reach the carrier")
@@ -5547,6 +5586,85 @@ fn static_worker_as_aggregate_field_is_transported_and_non_materializable() {
     assert!(
         format!("{error:?}").contains("no value representation"),
         "the boundary refusal names the missing value representation: {error:?}"
+    );
+}
+
+/// `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` AC-2: the source-machine producer
+/// enters the same compiler-only constructor template as direct descent.
+///
+/// The hand-built binding is the existing consumer harness's authority; the
+/// constructor owner and field origin still come from this subject's real
+/// plan. The assertion is on the resulting `ConstructorField::StaticWorker`
+/// and its planner-keyed event, not merely on successful lowering. Removing
+/// the source-machine transition sends the bare `Var` back through `value_at`,
+/// so this control reds at the exact recognition-to-template edge it guards.
+///
+/// **The recording hazard is unrepresentable.** A
+/// `ConstructorField::StaticWorker` requires a `recognition` field, while
+/// `StaticWorkerRecognitionId`'s tuple constructor is private
+/// (`lowering/mod.rs:4316`) and its sole mint is
+/// `RecognitionIdIssuer::mint` (`lowering/mod.rs:4344-4347`). The classifier
+/// records the obligation before constructing the field. This control's
+/// discriminating value is therefore the source-machine arm's dispatch into
+/// the template, not a second assertion that a constructed field was recorded.
+/// Because the harness invokes the source-machine dispatcher directly, it
+/// cannot prove that the governed D2k route continues to reach that dispatcher.
+///
+/// **MEASURED-BUT-UNPINNED:** under the reverted D2k-1c route probe, row 4 at
+/// depth 3 advanced from its old `value_at` refusal to the disposition-correct
+/// `StaticWorkerBinding` refusal. Retaining the six-file route apparatus only
+/// to pin that upstream reachability is outside this node's scope.
+///
+/// Promise class: durable invariant. Every source-machine constructor field
+/// that the shared classifier recognizes must enter the template that records
+/// its conservation obligation before any field descent.
+#[test]
+fn source_machine_recognized_worker_enters_the_constructor_template() {
+    use crate::cranelift_backend::lowering::{d2k_owner_trace_take, D2kOwnerEvent};
+
+    let subject = RuntimeExpr::Construct {
+        constructor: "ctor:fixture::Box::Wrap".to_string(),
+        args: vec![RuntimeExpr::Var(0)],
+    };
+    let (plan, owner) = planned_root_occurrence(&subject);
+    let field_origin = plan
+        .child_static_origin(owner, 0)
+        .expect("the planned constructor has field 0");
+    let _ = d2k_owner_trace_take();
+    let lowered = match lower_against_static_worker(
+        &subject,
+        1,
+        true,
+        StaticWorkerTestRoute::SourceMachine,
+    ) {
+        Ok(LoweringOperand::Specialized(lowered)) => lowered,
+        Ok(LoweringOperand::Carried(_)) => {
+            panic!("the source-machine worker template must not enter the carrier")
+        }
+        Err(error) => panic!(
+            "the source machine must transition a recognized worker before value_at: {error:?}"
+        ),
+    };
+    let Lowered::Constructor { args, .. } = lowered else {
+        panic!("the recognized source-machine field must produce a constructor template")
+    };
+    assert!(
+        matches!(args.as_slice(), [ConstructorField::StaticWorker { .. }]),
+        "the source-machine template must preserve the recognized field as a static worker"
+    );
+    assert!(
+        d2k_owner_trace_take().iter().any(|event| matches!(
+            event,
+            D2kOwnerEvent::StaticWorkerField {
+                owner: observed_owner,
+                position: 0,
+                field_origin: observed_field,
+                constructor,
+            } if *observed_owner == owner
+                && *observed_field == field_origin
+                && constructor == "ctor:fixture::Box::Wrap"
+        )),
+        "the transition must record its obligation against the planner's exact owner and field"
     );
 }
 
@@ -5571,7 +5689,12 @@ fn static_worker_fails_closed_as_match_scrutinee() {
             message: "worker scrutinee control".to_string(),
         },
     };
-    let error = expect_lowering_rejection(lower_against_static_worker(&subject, 1, true));
+    let error = expect_lowering_rejection(lower_against_static_worker(
+        &subject,
+        1,
+        true,
+        StaticWorkerTestRoute::Direct,
+    ));
     assert!(
         format!("{error:?}").contains("value-producing position"),
         "fails closed for the value-position reason: {error:?}"
@@ -5589,7 +5712,12 @@ fn static_worker_call_rejects_arity_disagreement() {
             RuntimeExpr::Value(RuntimeValue::Int(2.into())),
         ],
     };
-    let error = expect_lowering_rejection(lower_against_static_worker(&subject, 1, true));
+    let error = expect_lowering_rejection(lower_against_static_worker(
+        &subject,
+        1,
+        true,
+        StaticWorkerTestRoute::Direct,
+    ));
     assert!(
         format!("{error:?}").contains("static worker expects"),
         "reaches the consumer and rejects on arity: {error:?}"
@@ -5604,7 +5732,12 @@ fn static_worker_call_rejects_undeclared_target() {
         callee: Box::new(RuntimeExpr::Var(0)),
         args: vec![RuntimeExpr::Value(RuntimeValue::Int(1.into()))],
     };
-    let error = expect_lowering_rejection(lower_against_static_worker(&subject, 1, false));
+    let error = expect_lowering_rejection(lower_against_static_worker(
+        &subject,
+        1,
+        false,
+        StaticWorkerTestRoute::Direct,
+    ));
     assert!(
         format!("{error:?}").contains("was declared into this"),
         "rejects for the undeclared-target reason: {error:?}"

@@ -7495,7 +7495,32 @@ impl<'a> Lowering<'a> {
                         constructor,
                         mut args,
                     } => {
-                        if args.is_empty() {
+                        // `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` -- ask the same
+                        // classifier as direct descent before the source
+                        // machine lowers any field. D1 established that every
+                        // eligible state arrives with the complete argument
+                        // run and no pending constructor continuation, so the
+                        // existing template can open its conservation ledger
+                        // without restructuring partial machine state.
+                        let recognized =
+                            Self::recognized_constructor_worker_fields(&args, &env);
+                        if recognized.iter().any(Option::is_some) {
+                            SourceMachineState::Value {
+                                value: RoutedAnswer::direct(
+                                    LoweringOperand::Specialized(
+                                        self.static_worker_constructor_template(
+                                            builder,
+                                            static_origin,
+                                            &constructor,
+                                            &args,
+                                            &recognized,
+                                            &env,
+                                        )?,
+                                    ),
+                                ),
+                                control,
+                            }
+                        } else if args.is_empty() {
                             SourceMachineState::Value {
                                 value: RoutedAnswer::direct(LoweringOperand::Specialized(
                                     self.finish_source_constructor(
@@ -17407,9 +17432,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 // LOWERED. That ordering is the mechanism, not a style: the
                 // lookup emits nothing, so when it answers "worker" no
                 // value-producing read has been taken and there is nothing for
-                // `value_at` to have refused. This is the ONE armed producer,
-                // and it is the one `D2k-1a` measured as the owner of all five
-                // walls; the two `Construct` producers in
+                // `value_at` to have refused. This was the first armed
+                // dispatch; `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` added the
+                // source-machine dispatch to this same classifier and
+                // template. The two `Construct` producers in
                 // `lower_computational_producer_expr` stay fail-closed at
                 // `value_at` for now, which is a refusal rather than a partial
                 // descent.
