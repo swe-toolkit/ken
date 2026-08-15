@@ -118,6 +118,49 @@ nothing.
 fragment is refused by `quote_fo` as before. Discovery must not widen what
 quotes.
 
+**`D5` — the distinguishing audit label. NOT GATED ON `D0`; start here.**
+Today both exits converge on `emit_unknown_hole`, which declares a postulate
+labelled `"prover unknown goal"` (`prover.rs:743-752`) carrying nothing else. So
+**an obligation whose certificate was ACCEPTED and withheld pending `§4.4` is
+indistinguishable in `trusted_base()` from a goal nothing could establish.**
+
+Give them distinct audit labels. **The two states are different facts and only
+one of them is a limitation of Ken's logic.**
+
+> **This is the instrument the `§4.4` theorem-home decision needs**, per
+> `evt_55yxjym31ktxz`: the precise number that would let that decision be made
+> against evidence rather than in the abstract — how often route FO would
+> actually discharge a real obligation — **is generated at that line and thrown
+> away there.**
+>
+> **It is buildable before `D0`'s ruling** and should not wait on it. The
+> accepted-certificate path already reaches `emit_unknown_hole` at
+> `attempt_fo_with_signature`, so the label is meaningful and testable at the
+> helper level today. `D1`-`D3` remain gated; this one is not.
+
+> ### THE LABEL RECORDS PROVENANCE, NOT STRENGTH. This is a constraint, not a nuance.
+>
+> **A `trusted_base()` entry labelled "checked, withheld pending `§4.4`" is
+> exactly as assumed as one labelled "prover unknown goal".** The postulate is
+> admitted either way and the goal is taken on faith either way. **Nothing about
+> the certificate makes the entry weaker as an assumption** — the entire reason it
+> is withheld is that the theorems licensing that step have no approved home. If
+> they had one, it would not be a postulate at all.
+>
+> **The hazard is specific and likely:** a hopeful-sounding label invites a reader
+> to treat the entry as nearly-proved and to discount it when auditing what Ken
+> assumes. **That would make the audit surface worse than the undifferentiated
+> label it replaces**, because today's label at least does not overstate.
+>
+> ⇒ **Neither state may be presentable as a lesser assumption.** Distinguish
+> provenance without grading strength, and say in the code that the label is
+> provenance only.
+>
+> **The same conflation to avoid when the number arrives:** a large count of
+> withheld entries is evidence that route FO would discharge real work. It is
+> **not** evidence that those obligations are closer to proved. Both are true at
+> once. (Architect, `evt_7h0jnhhwtrah5`.)
+
 ## Acceptance criteria
 
 **`AC-1`.** No signature-selection rule is landed that `D0`'s ruling did not
@@ -143,6 +186,36 @@ not discharge it.**
 connectives, or `Cert` constructors remain a later node.
 
 **`AC-6`.** No-regression, in CI (`COORDINATION §12`).
+
+**`AC-7`.** `D5`'s two audit labels are distinguishable **by inspecting
+`trusted_base()` output alone**, without knowing which route produced the entry.
+**Demonstrate both states**: one obligation whose certificate was accepted and
+withheld, one nothing could establish. A label only readable by someone who
+already knows which path ran is not the instrument `§4.4` needs.
+
+**`AC-8`.** **Neither label presents its entry as a lesser assumption**, per the
+provenance-not-strength constraint above. Both are postulates admitted on faith
+and the labels distinguish where the entry came from, never how nearly-proved it
+is. **A reviewer auditing what Ken assumes must not be invited to discount
+either one.**
+
+> **`AC-8` is REVIEW-GATED, not testable, and that is deliberate.** Whether a
+> label invites a reader to discount an entry is a judgment about presentation
+> and no mutation settles it. Every other criterion here demands demonstration by
+> measurement; **this one does not, and a green suite does not discharge it.**
+>
+> **The Architect's standard, stated in advance so it is knowable rather than
+> invented at review time** (`evt_5n9p6qeqhf368`):
+>
+> > Can a reader who does not already know the answer tell the two states apart
+> > **and** come away treating both as fully assumed? **A label that discriminates
+> > but reads as reassuring fails, and so does one that is honest but unreadable
+> > without prior knowledge.**
+>
+> ⇒ **Name the CAUSE of the withholding, not the status of the obligation.** The
+> missing theorem home is the fact; the certificate is not. **The exact wording is
+> the implementer's to propose** — the Architect declined to write the string so
+> that a real proposal gets reviewed rather than his phrasing being built to.
 
 ## Banned scope
 

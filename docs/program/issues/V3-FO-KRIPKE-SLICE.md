@@ -1,7 +1,7 @@
 ---
 id: V3-FO-KRIPKE-SLICE
 title: "Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls"
-status: active
+status: merged
 owner: language
 size: L
 gate: none
