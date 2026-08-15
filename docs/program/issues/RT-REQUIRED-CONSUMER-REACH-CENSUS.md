@@ -50,6 +50,61 @@ origin: Steward, 2026-08-15, on the RT-REQUIRED-OCCURRENCE-PROJECTION merge (667
 > reverted. So depth 1's route forward is a **different edge** from depths 2/3's,
 > and nothing in the tree says so.
 
+> # `D1` IS DISCHARGED, MEASURED 2026-08-15 AT `a737d8c9b`. THE STOP FIRED.
+>
+> Report `evt_6qc0vkzj43c0e`. Measured through the existing five-row
+> `d2k_0_the_five_no_longer_reach_a_static_worker_value_read` control; temporary
+> diagnostic fully reverted, worktree clean at the measured base, **no source
+> diff, commit, or candidate**, and no ownership proposal made.
+>
+> | row | construct | site | sentence |
+> |---|---|---|---|
+> | row 4 depth 2 | `Closure` | `lowering/mod.rs:11550-11552` | *a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane* |
+> | row 4 depth 3 | `Closure` | same | identical |
+>
+> **It is the first of the four candidate refusals — the durable-lane sentence
+> [[RT-CLOSURE-BOUNDARY-LANE]] owns for a different population.** The stop
+> condition below therefore fired as written.
+>
+> ### THE STOP WAS SCOPED TOO WIDE, AND THAT WAS THE FRAME'S DEFECT
+>
+> **`D2` and `D4` have no dependency on which `Closure` sentence fires.** `D2` is
+> decided by `if required != source` in the planner, upstream of the refusal
+> entirely; `D4` is control hygiene in another file. Reading the stop as covering
+> them was the correct reading of what was written. **`D2`, `D3` and `D4` were
+> released at `evt_1eq64yvqc2b96`** with one narrowing: `D3` records the residual
+> as a measured fact and **stops before the ownership and sequencing half.**
+>
+> ### THE CONVERGENCE IS NOT EVIDENCE OF A SHARED ROOT
+>
+> The site is the `Lowered::Closure | Lowered::DeclarationClosure` arm of
+> **`boundary_transfer_admissibility`** (`RT-FNSPLIT-C1` `D5`) — a **total,
+> wildcard-free walk over the whole value graph**, run before any allocation,
+> which exists precisely because *"the root variant table is not sufficient"*.
+>
+> ⇒ **Every closure-carrying graph that attempts the crossing refuses here, by
+> construction.** A shared site is evidence that **the gate is total**, not that
+> two populations share a production root. Folding on a matching sentence is the
+> move this campaign's own banner forbids: *shared syntax is not a proven shared
+> root, and a subsumption is routed before coding rather than inferred.*
+>
+> ### ROUTED TO THE ARCHITECT, `evt_7rpkfc7awktmb` — the UPSTREAM fork
+>
+> **For rows 4 depths 2 and 3, is a closure in the crossing graph correct or
+> incorrect?**
+>
+> - **Correct** ⇒ the lane genuinely needs a closure to cross; the repair is a
+>   **durable lane** — a representation feature, and the two populations are one
+>   defect.
+> - **Incorrect** ⇒ `realize_required_consumer_locally` produces a closure-shaped
+>   value where it should not; the repair is a **lowering fix inside this chain**
+>   that never reaches the admissibility gate, and the convergence is a
+>   coincidence of totality.
+>
+> **These are not variants of one repair** — one grows a representation surface,
+> the other removes a value that should not exist. **Ownership follows the
+> ruling; it is not the question being asked.**
+
 ## What has landed, so you do not re-derive it
 
 | node | what it established | what it did NOT do |
@@ -129,6 +184,63 @@ zero — so this is behaviour-preserving; what changes is that a complement case
 which started arriving would then red. Same four assertions, two of them newly
 able to fail.
 
+**`D5` — ATTRIBUTE THE CROSSING. Added 2026-08-15 by Architect ruling
+`evt_3q0742egf06dg`, which pre-commits every outcome.** `D1` established *which
+boundary*; `D5` establishes *why the row is at it*. **All three outcomes name
+their own repair, so this needs no further Architect pass.**
+
+**Step 0 — free, do it before building anything.** `D1`'s diagnostic already
+printed `lowered_value_kind(self)` at the refusal (`mod.rs:11553-11556`), so
+**`Closure` vs `DeclarationClosure` may already be in `evt_6qc0vkzj43c0e`'s raw
+trace.** `DeclarationClosure` points straight at the `RT-DECL-CLOSURE-PORT`
+`D2a` precedent recorded at `semantic_ir.rs:950-958`.
+
+**Step 1 — locate the crossing.** At the refusal, record which production site
+entered the walk — `transfer_into_carrier` (`mod.rs:6480`) or the
+carried-constructor preflight (`core.rs:15696`) — the `StaticOriginId` handed to
+it, and **the path from the transferred root to the offending child** (root
+variant plus the arg/field index chain). The existing trace says *"first closure
+child"* and not where it sits; **the path is what separates "the projection's
+own result is a closure" from "the projection's result is a field of someone
+else's constructor."**
+
+**Step 2 — the differential, on an existing seat.** Re-compile each row under
+`with_required_consumer_route_suppressed` (`core.rs:27-43`, already test-only,
+already used by `D2a`'s complement) and record **two facts, not one**:
+
+- **(a)** does a closure child appear in the graph at the predecessor boundary?
+- **(b)** is `transfer_into_carrier` / the constructor preflight **reached at
+  all**?
+
+**(a) alone cannot see the third branch.** Only (a) and (b) together separate
+all three.
+
+### The three branches, pre-committed — do NOT return to the Architect to choose
+
+| measurement | branch | repair |
+|---|---|---|
+| closure **ABSENT** under suppression | **incorrect** | the projection manufactures it. A lowering fix **inside this chain**; [[RT-CLOSURE-BOUNDARY-LANE]] untouched; the convergence is a coincidence of totality |
+| closure **PRESENT**, crossing **ALSO reached** under suppression | **correct** | the graph genuinely needs a durable closure. **Only here may the two populations be one defect** — and still subject to the shared-root rule before any subsumption is **coded**, never inferred from the ruling |
+| closure **PRESENT**, crossing **NOT reached** under suppression | **the third branch** (Architect's stated PREDICTION, not a finding) | the projection advanced the row into a transfer it never attempted. The defect is the **routing**; the repair is keeping the realization local, and **neither** candidate mechanism is the right cut |
+
+**The third branch is why a two-way measurement is not enough.** It would be
+attributed to whichever of the other two it superficially resembles — the
+`D2k-1c` failure mode arriving through the measurement instead of the filing.
+
+**Why it is live rather than hypothetical:** `realize_required_consumer_locally`
+is contracted to realize the projection *"without exporting a compiler-only
+static worker through a function ABI"*, handing the result *"straight back to
+the caller's existing exact eliminator."* **A value realized locally to avoid a
+boundary should not be reaching `transfer_into_carrier` at all.**
+
+**One more reason not to fold, stronger than the totality argument:**
+`boundary_transfer_admissibility` carries **two** closure arms, and
+`Lowered::ComputationalRecursorClosure` has its own — *"a computational recursor
+closure names an in-flight activation, not a transferable value"*. **The
+recursor lane already has an arm and these rows are not hitting it.** The
+offending child is a **general closure value**, which the function itself
+distinguishes one arm away.
+
 ## Acceptance criteria
 
 **`AC-1` — no closure is assumed, and none is asserted.** Same rule the two
@@ -158,6 +270,17 @@ and the re-derivation property both stay true.
 **`AC-6` — `D4` is proved behaviour-preserving.** Show the four assertions'
 values are identical before and after the move on the current tree. If any
 value changes, **that is a finding, not a fix to absorb** — stop and report it.
+
+**`AC-8` — `D5` separates all THREE branches, not two.** A measurement that
+records only whether a closure child appears under suppression does not
+discharge `D5`; **whether the crossing is reached must be recorded
+independently.** A two-way result attributes the third branch to whichever of
+the other two it resembles, which is the exact failure this deliverable exists
+to avoid.
+
+**`AC-9` — `D5`'s diagnostics are reverted, as `D1`'s were.** Any temporary
+instrumentation at the refusal or the crossing site is removed before release,
+and the released tree carries no source diff from it. `AC-4` still binds.
 
 **`AC-7` — no-regression, in CI** (`COORDINATION §12`). Local runs stay
 targeted. **The predecessor's red was a cross-node population collision that
@@ -199,13 +322,26 @@ population names the rows this node touches.
 
 ## Stop condition
 
-**If `D1` finds the refusal is `mod.rs:11550`** — the durable-lane sentence
-[[RT-CLOSURE-BOUNDARY-LANE]] owns — **report it and stop before proposing any
-sequencing.** Two nodes converging on one boundary is a Steward call about
-ownership, not a ring call. **Record the measurement; do not fold, do not
-widen, do not file.**
+> **SUPERSEDED IN PART, 2026-08-15. `D1`'s stop has FIRED and is DISCHARGED.**
+> It read *"if `D1` finds the refusal is `mod.rs:11550`, report and stop"*, and
+> **it was scoped too wide** — `D2` and `D4` never depended on which sentence
+> fired. That was a defect in this frame, not in the execution. The ownership
+> question was routed and **ruled** (`evt_3q0742egf06dg`), and `D5` now carries
+> pre-committed dispositions for every outcome. **Do not stop again on the
+> convergence.**
+
+**The one live stop, and it is `D5`'s:** if Step 2 shows the row **reaches no
+transfer under either setting**, then `D1`'s attribution is to something other
+than the projection and **the whole fork is misaddressed.** Say so and stop —
+**do not force a branch.** That outcome is the Architect's explicit escape and
+it is worth more than a forced fit.
 
 **If `D4`'s move changes any assertion's value**, stop and report — see `AC-6`.
+
+**Still not the ring's, even now:** whether the two populations are one defect.
+The `correct` branch makes a subsumption *possible*, not *established* —
+[[RT-LEXICAL-RECURSOR-CONSUMERS]]' shared-root rule requires it to be **coded
+against a proven shared root**, never inferred from a ruling that permits it.
 
 Everything else — sizing, sequencing, whether an increment is releasable — is
 the Steward's.

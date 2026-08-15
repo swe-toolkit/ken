@@ -44,126 +44,150 @@
 > what found two self-declared-authoritative blocks that were wrong, and a
 > hand-maintained list of 6 preserved refs when origin held 26.)
 
-## LIVE — 2026-08-15 07:00Z
+## LIVE — 2026-08-15 08:20Z
 
-**`main` = `ea3315c7c`.** Tree clean, nothing unpublished, no publisher running.
-**33 commits landed 2026-08-15, seven of them code:** `V3-Z3-PROCESS-ADAPTER`,
-`RT-LEXICAL-RECURSOR-CONSUMERS` `D2k-1e`, `V3-D-OPEN-GOAL-WITNESS-ROUTE`,
-`LANG-INTERVENING-LET-FRAME-WEAKENING` `D1`, `RT-SRCMACHINE-CTOR-RECOGNITION-ARM`,
-`LANG-CONVOY-MATCH-FIELD-PROVENANCE`, `LANG-CONVOY-ENCLOSING-FIELD`.
+**`main` = `a737d8c9b`.** One publisher running (PR #2299, language `D1`); node
+edits are held uncommitted until it clears, because a background publisher
+races the next commit in this worktree.
 
 **TWO LANES AND NOTHING ELSE GETS A RING** (operator, 2026-08-15; `steward.md`
 §0). Runtime retires `RecursiveDescent`; language + verify do the z3 round-trip.
 Finished work still merges, filings queue, and framing for these two lanes is
 lane work.
 
-### LANE 1 — one open item, and it is the ring's move, not mine
+### LANE 1 — runtime is working, and the chain moved twice this morning
 
-**`RT-REQUIRED-OCCURRENCE-PROJECTION` candidate `e9e980988` is RED at PR #2293,
-and that is settled work rather than an open incident.** `D1` came back
-**derivable**, so the Architect's pre-authorized fork did not fire; `D2`-`D4`
-built to his §4 shape; QA and Architect both approved the exact SHA. CI then
-failed **one test the candidate never edited** —
-`lrc_d2a_..._from_all_five_compiles`, the **suppressed** leg.
+**`RT-REQUIRED-OCCURRENCE-PROJECTION` merged at `66715f9fb`** (PR #2293), `D1`
+through `D4` delivered. Its `D4` advanced **row 4 depths 2 and 3** to a `Closure`
+refusal. The full record, including the cross-node population collision that
+reddened it once, is in the node.
 
-**Cause: a cross-node control-population collision.** That control asserts over
-five named compiles including row 4 depths 2/3 — exactly the rows this node's
-approved `D4` advances to `Closure`. **Every AC of both nodes holds; the
-collision lives between them, where no node's ACs look.**
+**The successor is [[RT-REQUIRED-CONSUMER-REACH-CENSUS]]** — filed, kicked
+(anchor `evt_37bptmz5tgse5`), and **active**. It exists because settling the
+question in the tree turned up something no artifact recorded:
 
-- **Attributed decisively, do not redo it:** `main`'s `crates/` tree was
-  byte-identical to `9bc035710`, the last green code merge. **Not re-triggered**
-  — `M5a`'s re-trigger is only for reds that are not the candidate's.
-- **Not a QA miss.** Local runs are targeted-only by operator rule and
-  `lrc_d2a_*` sat outside every filter the ring ran. `AC-7`'s
-  no-regression-**in-CI** is the only criterion that sees a cross-node
-  collision, and it did.
-- **Architect ruled `evt_prwxvqcq17cj` and PRE-COMMITTED BOTH BRANCHES**, so the
-  next candidate needs **one** Architect pass, not two. My (a)/(b) fork
-  presupposed an unmeasured fact: the repaired leg passed for all five, so if
-  depths 2/3 die earlier the R1-absence assertion passed **for free** and the
-  coverage is already gone in the green half. `D2a`'s counters are **pooled**
-  (`reset_lrc_d2a_counts()` once per run, outside the case loop,
-  `control.rs:33291`), so it **structurally cannot report per-row arrival**.
-- **BINDING ON ME:** do not publish a candidate built to option (b) before the
-  per-case table exists. **`dec_310crgf5mashb` is SPENT** — a new SHA needs
-  fresh QA and Architect verdicts. Push to
-  `wp/RT-REQUIRED-OCCURRENCE-PROJECTION`; PR #2293 stays open and retriggers.
+> **The projection is minted only under `if required != source`**
+> (`static_transition.rs:11683`). Where the two coincide there is **no
+> projection to read** — and they coincide at **row 4 depth 1**. ⇒ **Depth 1 is
+> outside the new surface by construction, not behind its boundary.** A repair
+> cut on "the projection now serves rows 4 and 5" would be cut wrong in exactly
+> the way `D2k-1c` was.
 
-**The full ruling is in the node** —
-`docs/program/issues/RT-REQUIRED-OCCURRENCE-PROJECTION.md`. Read it there, never
-from this file.
+**`D1` is discharged** (`evt_6qc0vkzj43c0e`): rows 4 depths 2 and 3 both refuse
+at `lowering/mod.rs:11550-11552` — *"a closure cannot cross the boundary: it is
+runtime-local and live-domain only, and it has no durable lane"*. **That is
+[[RT-CLOSURE-BOUNDARY-LANE]]'s exact signature, for a different population.**
 
-**The retirement chain is now machine-readable** (written at `e7fedca4e`; it had
-lived only in prose across three files):
+**Do not fold the two nodes.** The site is the closure arm of
+`boundary_transfer_admissibility`, a **total** graph walk — every
+closure-carrying graph refuses there, so a shared sentence is evidence the gate
+is total, not of a shared root. The Architect sharpened it: the function carries
+a **second** closure arm for `ComputationalRecursorClosure`, and these rows are
+**not** hitting it, so the offending child is a general closure value the
+function itself distinguishes one arm away.
 
-```mermaid
-graph LR
-  PROJ[RT-REQUIRED-OCCURRENCE-PROJECTION] --> CONS[RT-LEXICAL-RECURSOR-CONSUMERS]
-  CONS --> TRANS[RT-RECURSOR-TRANSPORT]
-  TRANS --> RET[RT-DESCENT-RETIRE]
-```
+**`D5` is released and carries three pre-committed branches**
+(`evt_3q0742egf06dg`, released `evt_686me47k2edj2`). The third — closure present
+under suppression but the **crossing not reached** — is the one my own two-way
+fork was missing, and a two-way measurement would misattribute it. `AC-8` exists
+to force the separation.
 
-`RT-LEXICAL-RECURSOR-CONSUMERS` has **zero dispatchable increments and that is
-measured** — all three items it advertised as owed were discharged by its own
-`D2k-1a`. `RT-RECURSOR-TRANSPORT`'s `D3` gate is keyed on the transport landing
-**in the tree** (`enum RecursiveDescentResidual`, `core.rs:1979`, two live
-variants), never on node status. **Do not "fix" that wording.**
+**The one live stop:** if the row reaches no transfer under either setting, the
+attribution is misaddressed — say so rather than forcing a branch.
 
-### LANE 2 — verify is BETWEEN work, not blocked
+**Chain:** `PROJECTION` (merged) → `CENSUS` (active) → ? → `TRANSPORT` →
+`DESCENT-RETIRE`. `RT-RECURSOR-TRANSPORT`'s `D3` gate is keyed on the **tree**
+(`enum RecursiveDescentResidual`, `core.rs:1979`, two live variants), never on
+node status. **Do not "fix" that wording.**
 
-`V3-Z3-PROCESS-ADAPTER` merged at `9bc035710`. The round-trip exists end to end:
-an obligation leaves Ken, z3 proposes a candidate assignment, the kernel
-disposes of it, **and nothing about why a verdict is believed changed** — the
-oracle-not-authority property is structural in the ingestion type.
+### LANE 2 — language's `D1` was already landed, verify between work
 
-**`blocks: []` and the throughput successor needs a catalog-scale corpus that
-does not exist.** Do NOT invent a z3 successor. **This is the first item for the
-operator at 11:30.** `language` is on `LANG-INTERVENING-LET` `D4`, in QA.
+**`LANG-INTERVENING-LET-FRAME-WEAKENING` `D1` LANDED AT `beb31566b`, PR #2282,
+2026-08-15T03:49:57Z.** The test blob
+`7c9d1eb06e7ad3f2e6a6d2be4579f1d28359caf9` is byte-identical on `origin/main`
+and on the candidate `fe7be838`, and a squash merge of that candidate onto
+`main` stages **nothing**. **`fe7be838` is not an ancestor of `main` and never
+will be** — a squash rewrites the commit, so a landed branch head reads as owed
+forever. Both `language-qa`'s and the leader's statuses were stale reads of
+merged work. PR #2299 closed, branch deleted, evidence in the close comment.
+
+**Two corrections, both mine.** I did mis-resolve a participant id at 08:04 and
+that post woke nobody — real, and the reason to use
+`scripts/moot-actor-id.sh <role>` every time. **But I then attributed a
+four-and-a-half-hour delay to it, and that delay did not exist**: `D1` had
+merged four hours earlier. **A stale status corroborated by a second stale
+status is not corroboration** — both seats were reading the same unlanded-looking
+branch head. The blob test settles it in one command and should lead, not
+follow, the next such exchange.
+
+`D4` is on its own child branch, unblocked, and the rebase deferred *"until D1
+lands"* can proceed.
+
+**`V3-Z3-PROCESS-ADAPTER` merged.** `blocks: []`, and the throughput successor
+needs a catalog-scale corpus that does not exist. **Do NOT invent a z3
+successor.**
 
 **LIVE HAZARD:** the `z3-process-adapter` CI job is in the **required**
-`build + test` aggregate, so an apt failure reds every PR fleet-wide. **Do not
-just drop it** — `stub(..)` discards stdin, so only that job witnesses SMT-LIB
-emission; a replacement control over the query builder comes first. Both items
-are coupled in the node.
+aggregate, so an apt failure reds every PR fleet-wide. **Do not just drop it** —
+only that job witnesses SMT-LIB emission, because `stub(..)` discards stdin.
+
+### The operator brief for 11:30 — three items, and that is the whole list
+
+1. **Verify has no directed successor.** Between work, not blocked.
+2. **`V3-KRIPKE-THEORY-CLOSURE` is `ready`, framed, enclave-owned**, and closes
+   lane 2's FO Kripke half; `spec-leader` is idle awaiting a released node. **I
+   did not kick it.** §0 rule 1 bans starting a third ring *"however well-framed
+   and however idle the team"*, and *"this idle team unblocks a priority lane"*
+   is recognizably one of the three arguments that already defeated the priority
+   once today. **Operator's call, and the work is not wasted whenever it runs.**
+3. **Language has no lane-2 successor.** Its current node is elaborator work
+   discharging an Architect follow-up, not the z3 round-trip.
+
+**Still owed by the operator — three, do NOT re-raise:** `evt_h6pbx30amprj`;
+the `LANG-FOREIGN-NAME-FORMAT-CHARS` threat model; `evt_30gckze0jryj4`.
 
 ### Queued, and none of it may jump the lanes
 
-- `CONF-BLOCKER-OWNER-RESOLVABILITY` — `ready`, NOT kicked; enclave, not verify.
-- `V3-KRIPKE-THEORY-CLOSURE` — `ready`, NOT kicked, **spec-blocked**: `23 §4`
-  marks its own domain and monotonicity axioms `(oracle / standard)` in
-  normative text, so the adequacy theorem has no statement to prove. **A third
-  ring is the operator's call.**
-- ken-interp `Term::J`/`cast_reduce` (`evt_21z3jbnj161q7`) — a **declared** G1
-  oracle boundary at `16 §9.1`, **not a defect**.
-
-### Still owed by the operator — three, do NOT re-raise
-
-`evt_h6pbx30amprj`; the `LANG-FOREIGN-NAME-FORMAT-CHARS` threat model;
-`evt_30gckze0jryj4`.
+- **The publisher gate misdiagnoses an already-landed candidate as an
+  environment fault.** `scripts/scripted-pr-automerge.sh:519` does `git merge
+  --squash` then `git commit`; when the candidate is **already contained in
+  `main`** the merge stages nothing and the commit exits non-zero with *"nothing
+  to commit"*. The gate carefully separates merge-failure from commit-failure
+  and then reports *"an environment fault in the publisher... check that the
+  scratch worktree is writable"* — **which sends the reader to look at disk and
+  permissions for a condition that is neither.** Measured 2026-08-15 on PR #2299.
+  **The fix is one probe:** if `git diff --quiet origin/main <head>` (or the
+  squash stages nothing), say *the candidate is already contained in `main`* and
+  name the landing commit. **Mine, and it queues** — it is `scripts/`, so it is
+  outside the Adversary's scope by `COORDINATION §10⁻a` and is found only by
+  whoever trips over it.
+- The **tri-state convention** the Adversary raised (`evt_62attjpj3esa`): the
+  empty-scan fallback and `validator_admitted` on `D2k-1e` are the same shape —
+  a two-state observation standing in for a three-state question whose missing
+  state is *the instrument did not observe*. **Two nodes owe one conversion**,
+  so it wants one convention, not two half-arguments. Explicitly excluded from
+  the census node's scope.
+- `CONF-BLOCKER-OWNER-RESOLVABILITY` — `ready`, NOT kicked; enclave.
+- ken-interp `Term::J`/`cast_reduce` — a **declared** G1 oracle boundary at
+  `16 §9.1`, **not a defect**.
 
 ### Rules earned 2026-08-15
 
-1. **When a node lists owed items, check its OWN landed partials first.** A
-   partial discharges the frame's todo list and nobody updates the frame. All
-   three of `RT-LEXICAL-RECURSOR-CONSUMERS`'s were done by its own `D2k-1a`.
-2. **A repair block carrying line numbers and a cost argument is what a framer
-   turns into a WP.** Open the file before framing it — its line numbers will
-   have shifted.
-3. **A control's population is a claim a sibling node can falsify without
-   touching the control.** Rows migrate; controls written against their old
-   routing do not migrate with them.
-4. **Check the PASSING half before disposing of a red.** An absence-assertion
-   passes for free once the row dies earlier, so the coverage may already be
-   gone in the green leg.
-5. **A pooled denominator structurally cannot report per-row facts.** Reset
-   inside the loop before drawing any per-case conclusion.
-6. **A leader's stale status plus an idle QA is how a handback goes unrouted.**
-   "Last seen 0m" means the transport is alive, not that the seat acted.
-7. **Attribute before re-triggering:** is `main`'s `crates/` tree identical to
-   the last **green** code merge? If every commit since is doc-only, the
-   candidate is the only code change.
-8. **A superseded record is a defect the moment it lands.** I published a fork
-   framing four minutes after the Architect superseded it; fix it in the **next**
-   commit, not later.
-
+1. **"Unblocked" is not "reachable".** A surface can land, clear every tracker
+   edge, and still not reach part of its population — check the guard that
+   mints it, not the node's status.
+2. **Scope a stop condition to the deliverable that depends on it**, never to
+   the node. Mine stopped `D2` and `D4`, which never depended on the fork, and
+   the ring's wide reading was the correct reading of what I wrote.
+3. **A shared refusal sentence is shared syntax.** When the gate is total, every
+   population reaches it; the attribution is upstream.
+4. **Resolve a participant id at post time, from the script.** A guessed id
+   posts successfully and notifies nobody — it looks like a delivered message
+   and is a silent stall.
+5. **A control's population is a claim a sibling node can falsify** without
+   touching the control.
+6. **Check the PASSING half before disposing of a red** — an absence-assertion
+   passes for free once the row dies earlier.
+7. **A pooled denominator structurally cannot report per-row facts.**
+8. **Attribute before re-triggering:** is `main`'s `crates/` tree identical to
+   the last **green** code merge?

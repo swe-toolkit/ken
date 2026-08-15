@@ -18,6 +18,31 @@ origin: Measured at frozen base 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differ
 > deliberately -- nothing measured bounds the repair, and a guessed size on this
 > campaign has been wrong every time it was guessed.
 
+> ## A SECOND POPULATION NOW REACHES THIS SIGNATURE. DO NOT ABSORB IT.
+> ## Steward, 2026-08-15.
+>
+> [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] `D1` measured **row 4 depths 2 and 3 of
+> the recursor campaign** refusing at `lowering/mod.rs:11550-11552` with **this
+> node's exact sentence** (`evt_6qc0vkzj43c0e`, base `a737d8c9b`).
+>
+> **That is not a reason to widen this node's rows**, and the reason is
+> structural rather than procedural. The site is the
+> `Lowered::Closure | Lowered::DeclarationClosure` arm of
+> **`boundary_transfer_admissibility`** — a **total, wildcard-free walk over the
+> whole value graph**. ⇒ **Every closure-carrying graph that attempts the
+> crossing refuses here.** A shared sentence is evidence the gate is total, not
+> evidence of a shared production root.
+>
+> **The upstream fork is with the Architect** (`evt_7rpkfc7awktmb`): for the
+> recursor rows, is a closure in the crossing graph **correct** — in which case
+> the durable lane this node is about is the shared repair and a subsumption is
+> real — or **incorrect**, in which case that chain owns a lowering fix that
+> never reaches this gate and the convergence is a coincidence.
+>
+> **Until that is ruled: do not add the recursor rows here, do not cite this
+> node as their owner, and do not treat this node's size as covering them.**
+> Whichever way it goes, the frame this node still owes is unchanged.
+
 ## Exact signature
 
 ```text
