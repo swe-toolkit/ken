@@ -27,30 +27,50 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > **route a subsumption proposal before coding** — it may not be inferred from
 > shared retirement timing or shared syntax.
 
-> # ALL FIVE EXPRESSIONS ARE STOPPED ON ONE ABSENT RELATION — 2026-08-14.
-> # THE NODE IS `active` AND ITS RING IS NOT BUILDING IT.
+> # THE ROUTE WORK HAS LEFT THIS NODE. `D2k-1c` IS A WRONG CUT — DO NOT REOPEN IT.
+> # Steward, 2026-08-15. Every `depends_on` is now `merged`.
 >
-> **This is a dependency, not a defeat, and it is measured rather than
-> inferred.** Rows 4 and 5 fired the section 8 hard stop; the Architect ruled it
-> **fired correctly** (`evt_3zjhbbr7k3ky6`) and fixed the amendment shape. Row 1
-> was then read independently and is blocked by **the same** absent relation
-> (`evt_1f4yp49cx23m4`) — its `NativeJoinPlanV1` refusal is a *separate* second
-> dependency and removing it would not supply the consumer identity.
+> **CORRECTED. This banner previously said all five expressions were stopped on
+> one absent relation, and named [[RT-CONTKEY-CONSUMING-OCCURRENCE]] as `ready`
+> and awaited.** That relation **merged 2026-08-14 at `a998d3f6`**, and so did
+> the carry that followed it. The banner outlived the blocker it described and
+> read as current state — which is how a leader asking for the next increment
+> got *"the next increment is your cut"* when the honest answer was that this
+> node has none.
 >
-> **The relation is now its own node: [[RT-CONTKEY-CONSUMING-OCCURRENCE]]**,
-> `ready`, size `M`, released 2026-08-14. It is in this node's `depends_on`.
-> The sizing probe the Architect made the fork turn on was run at `0644ab95`
-> (`evt_3tkyp322dh4c7`) and came back **not in hand** — the enclosing eliminator
-> is absent at the specialization-key interning site — so the fact must be
-> seeded at the outer-match walk and threaded there. That is a
-> plan-construction change and it does not fit inside `D2k-1c`.
+> **`D2k-1c` is a wrong cut, not an unfinished one**, ruled on the second
+> boundary. Both ways forward cross this node's own banned scope: one mutates
+> the planner-owned `ContinuationTemplate` population, the other needs a
+> projection through the excluded continuation-source surface. **A WP that must
+> cross its own banned scope to discharge its AC has been cut wrong**, and the
+> repair is a new cut, not a wider one.
 >
-> **`D2k-1c` remains this node's work and remains framed** in section 5 of the
-> frame. What it is waiting for is the relation, nothing else.
+> ### THE ROUTE QUESTION IS [[RT-CONSUMING-OCCURRENCE-ROUTE-WIRE]]
 >
-> **Do not read `active` as "someone is building this."** The landed partials
-> (`D2k-0`, `D2k-1a`, `D2k-1b-i`, eleven `D2f` increments) are real and this node
-> is not reset; the ring is on the successor.
+> `ready`, `M`, runtime-owned, filed 2026-08-15. The chain's three landed nodes
+> each supplied an input and **not one closed a row**:
+> `RT-CONTKEY-CONSUMING-OCCURRENCE` gave the source-keyed relation, complete at
+> depth 1; `RT-CONTKEY-CONSUMER-DESCENT-CARRY` gave `required(N)` = the consumer
+> established at `N-1`; `RT-CONSUMER-CARRY-CONTROL-DEBT` took the five carries
+> off that merge.
+>
+> ⇒ **`required_consuming_occurrence` is production-written and TEST-ONLY-READ.**
+> No production path has ever consulted it. Wiring one consumer and measuring
+> what the boundary then does is that node, and it deliberately carries **no
+> closure AC** — that supplying the relation closes the route is not
+> established, ruled twice.
+>
+> ### WHAT REMAINS HERE
+>
+> **The landed partials are real and this node is not reset** — `D2k-0`,
+> `D2k-1a`, `D2k-1b-i`, eleven `D2f` increments, and `D2k-1e`. **`D2k-1c-0c` is
+> stale in the frame and already repaired in the tree**: the six `site` labels
+> now carry the prescribed `function@qualifier` form. **`D2k-1c-1a` moved** — it
+> needs a rebound field, so it is `D3` of the route-wire node, taken as part of
+> that validation rather than after it.
+>
+> **Do not read `active` as "someone is building this."** It stays `active`
+> because increments continue to land against it; the route work does not.
 
 > # THE RESIDUAL IS SIX EXPRESSIONS AT TWO WALLS — updated 2026-08-12
 >
