@@ -1,7 +1,7 @@
 ---
 id: V3-Z3-PROCESS-ADAPTER
 title: "The z3 half of the round-trip: an off-by-default external solver that proposes candidate assignments into the kernel-gated witness seam, adding a dependency and zero trusted base"
-status: ready
+status: merged
 owner: verify
 size: M
 gate: none
@@ -11,12 +11,23 @@ github: null
 origin: "Steward, 2026-08-15, framing the operator's directed z3 round-trip lane. Split from V3-D-OPEN-GOAL-WITNESS-ROUTE so the routing gap and the soundness seam land before any dependency decision. The deferred docs/program/wp/V3-z3-throughput-evaluation.md frame supplies the guardrails; its throughput-measurement half is NOT this node. Steward-filed per COORDINATION section 2."
 ---
 
-> # READY. The predecessor merged at `c189fa143`; this node is startable.
+> # MERGED 2026-08-15 at `9bc035710` (PR #2288), exact `b22e2dff0`.
 >
-> **It sat at `draft` for a schema reason, not a framing one.**
-> `check-issue-schema.sh --strict` fails a `ready` node whose `depends_on` is
-> itself `ready`, so this node could not carry `ready` until
-> [[V3-D-OPEN-GOAL-WITNESS-ROUTE]] left that state. It has: `merged`.
+> **The z3 half of the operator's directed round-trip is in the tree.** Six
+> paths, `+455/-6`, declared base `46a8ba199` which was also current
+> `origin/main`. Blob identity MATCH on all six. Decision `dec_7jyr8h41epg66`
+> read `resolved` from the object; QA `evt_6b2fqsw5wdj4q`, Architect
+> `evt_5qx7285r9mgdp`.
+>
+> **Verified independently rather than taken from the request:** `Cargo.toml`
+> adds only the feature `z3-process = []` with no dependency, and `Cargo.lock`
+> is untouched — so the zero-supply-chain-delta claim holds. **The solver is an
+> oracle and never an authority**; ingestion parses a candidate assignment that
+> the existing kernel-gated seam disposes of.
+>
+> **Read the SUCCESSOR LEDGER below before acting on anything here** — both
+> Architect carries are dispositioned there, and the `PATH`-resolution one is a
+> live graduation gate, not a closed item.
 >
 > > **A Steward failure worth the line, because it cost the ring a lawful
 > > start.** The kickoff announced the `draft → ready` flip while the flip was
@@ -98,6 +109,63 @@ false contract for whoever writes against the name.** That is you.
 **`D5` below is the one-line fix**, and it is the Architect's own remedy —
 rename to what it verifies, or state the non-guarantee in its doc comment.
 
+## SUCCESSOR LEDGER — the two Architect carries, dispositioned. Steward, 2026-08-15.
+
+`verify-leader` asked for the authoritative disposition on both so neither is
+silently dropped nor silently re-filed (`evt_g6tsbz6944c3`). **These are the
+answers. Do not re-open either on the ring's own motion.**
+
+### (a) Bare `PATH` resolution of `z3` — CONFIRMED, and it is a GRADUATION GATE
+
+**Real, and it is in the landed candidate.** `Z3ProcessConfig::default()` sets
+`program: "z3".into()` (`prover.rs:466`), reached from `prover.rs:396`, and
+`Command::new(&config.program)` (`z3_process.rs:70`) resolves a bare relative
+name through `PATH`.
+
+**Its severity is code execution, NOT soundness, and the distinction is what
+makes it a gate rather than a blocker.** A hostile `z3` on `PATH` cannot forge a
+verdict — it proposes a **candidate assignment**, and `attempt_with_refutation`
+puts it through the kernel, so a bogus one is rejected and the obligation lands
+on the same `Unknown`. What a planted binary gets is **arbitrary execution as
+the build or test user.** That is a genuine local supply-chain vector and it is
+bounded by the feature being off by default.
+
+⇒ **Before this feature is developer-facing or default-on, `program` must come
+from explicit absolute-path configuration, and a bare relative default is not
+permitted at that point.** The carrier already exists — `program` is a
+`PathBuf`, not a hardcoded string — so this is a default-and-policy change, not
+a redesign. **Whoever proposes graduation owns discharging it**, and graduation
+is an operator call, not the ring's.
+
+> **Do not "fix" it now by deleting the default.** Off-by-default with a
+> `PATH`-resolved default is the correct posture for a feature nobody ships;
+> forcing an absolute path today buys nothing and makes the disabled baseline
+> harder to run.
+
+### (b) The FO direction of D-route displacement — CLOSED STRUCTURALLY
+
+**Not owed, and it must not be re-filed.** The argument is total over the code
+path and is written out in full in the merged predecessor
+[[V3-D-OPEN-GOAL-WITNESS-ROUTE]] — read it there. In short: `ctx` is built
+before the match so all three arms take identical arguments; `attempt_fo` and
+`attempt_ho` are `attempt_ipc` verbatim; `attempt_ipc`'s only `Proved` is
+`try_ipc_cert(..) == Some`; and `attempt_d` opens with that identical call.
+⇒ FO/HO `Proved` ⟺ D `Proved`, for every obligation.
+
+**The one gap in the Steward's original version — that a dispatcher doing
+something extra on one path would break step 1 — was closed by reading**
+(Adversary `evt_7468zj89pdryh`). Nothing about the argument is now inferential.
+
+**The corpus control the Steward offered is WITHDRAWN, and withdrawing it is the
+point.** It would be evidence over whatever obligations the V3 corpus happens to
+contain, where the argument is a proof over all of them. **Requiring it would
+replace a total argument with a sampled one and produce a green that reads as
+stronger evidence than the thing it replaced.** Cheapness is not the criterion.
+
+> **If the Architect disagrees, that is his call and I will re-open on his
+> ruling** — but **the ring may not spend a turn on the measurement in the
+> meantime.** Raising it is one line; running it is a turn on the priority lane.
+
 ## Deliverables
 
 **`D1` — the binding decision, costed before it is taken.** Process invocation
@@ -146,6 +214,24 @@ nondeterministic search that changes only which candidate is proposed is
 acceptable; one that changes the verdict is not, and is a hard stop.
 
 **`AC-6`.** No-regression, in CI (`COORDINATION §12`).
+
+> ### LIVE HAZARD ON THE LANDED CANDIDATE — the CI job is a FLEET-WIDE gate
+>
+> **Recorded, not blocked.** `b22e2dff0` adds a `z3-process-adapter` job that
+> `apt-get install`s `z3`, and wires it into the **required `build + test`
+> aggregate** — it is listed in `needs:` and in the pass/fail loop.
+>
+> ⇒ **An apt mirror failure or a distro `z3` change reds every PR in the fleet**,
+> including runtime's `RecursiveDescent` lane, which has nothing to do with z3.
+> A default-off feature has acquired a blocking edge on everyone's merges.
+>
+> **This was merged deliberately** — both required gates were in, and a
+> hypothetical infrastructure flake is not a sequencing constraint
+> (playbook §4c, the safety-of-`main` trap). **The remedy is named here so
+> nobody has to rediscover it under a red fleet:** drop the job from the
+> aggregate's `needs:` and pass/fail loop, leaving it advisory. Pinning or
+> vendoring the solver is the heavier alternative and is not obviously worth it
+> for an off-by-default feature.
 
 **`AC-7`.** `D5` landed, and **the set of goals `is_linear_int_expr` accepts is
 unchanged** — demonstrated by the predicate's body being untouched, or by a

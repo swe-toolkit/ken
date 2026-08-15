@@ -1,7 +1,7 @@
 ---
 id: RT-RECURSOR-TRANSPORT
 title: "Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -11,24 +11,30 @@ github: null
 origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDescent, migrate the remaining residual classes, do not linger half-migrated. Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2). Recut 2026-08-08 per Architect ruling evt_237tbdsacqbk4.
 ---
 
-> # `ready`, and `D3` IS STILL GATED. Both at once — read the second half.
+> # RELEASED 2026-08-15 — `D0`-`D2` ONLY. `D3` IS STILL GATED. Read both halves.
 >
-> **CORRECTED 2026-08-15. This banner previously announced `draft` while the
-> frontmatter said `ready`.** A node whose banner and frontmatter disagree is
-> the defect that cost the verify ring a lawful start the same morning: a seat
-> reads the tracked artifact, finds it contradicting what it was told, and
-> correctly refuses to move. **Do not resolve such a disagreement by picking the
-> half you prefer — the answer here is that both are true of different things.**
+> **Released to the runtime ring 2026-08-15, anchor `evt_1wz8jc8y38xtv`**, base
+> `46a8ba199`. Status is `active`. **`D3` is NOT in that release.**
 >
-> **`ready` is correct, and it is deliberate.** Steward playbook §4e requires
-> every successor of an in-flight node to be `ready` with a shovel-ready frame,
-> so the frontier advances the instant the predecessor lands with no Steward
-> pass in between. `check-issue-schema.sh --strict` permits this — a `ready`
-> node depending on an `active` one **warns**, and only a `draft`/`ready`
-> dependency fails. The warning you will see on this node is that check working,
-> not a defect to repair.
+> > **This banner has now been wrong twice in one day, in opposite directions,
+> > and the shape is the lesson.** It first announced `draft` while the
+> > frontmatter said `ready`; corrected to `ready`, it went stale again within
+> > hours when the release flipped the node `active`. **A banner that names a
+> > status is a claim that ages, and nothing reds when it does.** A seat that
+> > finds the tracked artifact contradicting what it was told is right to refuse
+> > to move — that is exactly what cost the verify ring a lawful start the same
+> > morning. **State the release and the gate; let the frontmatter carry the
+> > status.**
 >
-> **What the old banner got right and this one keeps: `D3` cannot start yet.**
+> **Why the node sat at `ready` while its dependency was `active`, since the
+> schema warns about it:** playbook §4e requires every successor of an in-flight
+> node to be `ready` with a shovel-ready frame, so the frontier advances with no
+> Steward pass between a merge and the next start. `check-issue-schema.sh
+> --strict` permits it — a `ready` node depending on an `active` one **warns**,
+> and only a `draft`/`ready` dependency fails. **That warning is the check
+> working, not a defect to repair.**
+>
+> **The gate, unchanged: `D3` cannot start yet.**
 > Four of the five `depends_on` are `merged`. The single remaining one is
 > [[RT-LEXICAL-RECURSOR-CONSUMERS]], which is **`active`** — it is a
 > multi-increment node on the operator's priority lane and it stays `active`

@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 04:33:35Z — from 303 issue file(s) in `docs/program/issues/`.
+2026-08-15 05:02:37Z — from 304 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -221,7 +221,7 @@ the committed file matches the generator's output.
 | `RT-CLOSURE-BOUNDARY-LANE` | A closure cannot cross the durable boundary -- runtime-local and live-domain only, with no durable lane | draft | runtime | TBD | none | — |
 | `RT-COMPMATCH-TREE-SCRUTINEE` | ComputationalMatch refuses a tree-producing scrutinee that is not Bool or a constructor (rt_span_prov) | draft | runtime | TBD | none | — |
 | `RT-CONSUMER-CARRY-CONTROL-DEBT` | five carries on the consumer-descent-carry merge: two new planner refusals are unreachable in production because the interned target is not an independent authority, two of four equality assertions are vacuous, the lag law is NOT uniform and its depth-1 boundary is asserted nowhere, the primary Source branch is unexercised and sits one level off from the fallback, and the D8a twin clones where the real descent advances | merged | runtime | S | none | — |
-| `RT-CONSUMING-OCCURRENCE-ROUTE-WIRE` | The carried consuming occurrence is production-written and test-only-read, so no production path has ever consulted it -- wire one consumer at the refusing boundary and MEASURE what the route then does, without assuming it closes | active | runtime | M | none | — |
+| `RT-CONSUMING-OCCURRENCE-ROUTE-WIRE` | The carried consuming occurrence is production-written and test-only-read, so no production path has ever consulted it -- wire one consumer at the refusing boundary and MEASURE what the route then does, without assuming it closes | merged | runtime | M | none | — |
 | `RT-CONTINUATION-CALL-DISCHARGE` | A planned continuation call is neither directly emitted nor compositionally consumed once the Active resume path goes live — attribution, not repair | merged | runtime | S | none | — |
 | `RT-CONTINUATION-EDGE-DISPOSITION` | One planner edge carries both binding projection and a causal call obligation — split the representation so a binding candidate can be settled InlineNoCall without ever entering the call-discharge partition | merged | runtime | M | none | — |
 | `RT-CONTKEY-CONSUMER-DESCENT-CARRY` | the consuming-occurrence relation is complete at depth 1 and absent below it because the descent clones the source seed forward unchanged; the value each level needs is the one derived at the level ABOVE it, so carry it -- seeded from the source relation at the top and advanced by target-derivation at each push, attributed to the CHILD | merged | runtime | S | none | — |
@@ -281,7 +281,8 @@ the committed file matches the generator's output.
 | `RT-PLANNER-DIAGNOSTIC-K` | Boundary A planner: report planner-invariant failures as planner defects, and assert fixed_k CONSTANT rather than merely affine | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/929 |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
-| `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | ready | runtime | M | none | — |
+| `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | active | runtime | M | none | — |
+| `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | ready | runtime | M | none | — |
 | `RT-SCALE-A` | Boundary A — re-derive the planner census for n=3..7 against the COMPLETED factored representation, superseding the provisional outer-planner numbers | merged | runtime | M | none | — |
 | `RT-SCALE-B` | Boundary B — the full n=3..7 emission measurement, the research-grounded analytical model, and the operator scaling verdict that gates RT-NATIVE-FNSPLIT's merge | merged | runtime | L | none | — |
 | `RT-SCRATCH-LIFETIME-REMAINING-CRATES` | `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names | ready | runtime | M | none | — |
@@ -338,7 +339,7 @@ the committed file matches the generator's output.
 | `V3-KRIPKE-THEORY-CLOSURE` | Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes | ready | spec-enclave | M | none | — |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
 | `V3-VERDICT-CENSUS` | Every obligation the prover cannot close is registered as a postulate in trusted_base(), so weak proof search is not a convenience gap but a trusted-base gap -- and nobody has measured how large it is; census the verdict distribution over the existing obligation corpus, and for each Unknown record the fragment it routed to and the syntactic shape that defeated the search | merged | verify | S | none | 2120 |
-| `V3-Z3-PROCESS-ADAPTER` | The z3 half of the round-trip: an off-by-default external solver that proposes candidate assignments into the kernel-gated witness seam, adding a dependency and zero trusted base | ready | verify | M | none | — |
+| `V3-Z3-PROCESS-ADAPTER` | The z3 half of the round-trip: an off-by-default external solver that proposes candidate assignments into the kernel-gated witness seam, adding a dependency and zero trusted base | merged | verify | M | none | — |
 | `V4-RESIDUAL` | The Kripke countermodel is an inert shell: it is never related to `φ` at all — no interpretation of the formula, no recursive forcing evaluator — and V3's prose `description` is stuffed into `FormRef`, a slot meant for a structural subformula reference | merged | verify | L | G2-G3 | 1117 |
 | `VIS-BR-LITERAL` | visibility walk: raw-string prefixes br and cr are unrecognized by the literal scanner | merged | runtime | XS | none | — |
 
@@ -364,12 +365,12 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
+- `RT-REQUIRED-OCCURRENCE-PROJECTION` — Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 - `V3-KRIPKE-THEORY-CLOSURE` — Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes
-- `V3-Z3-PROCESS-ADAPTER` — The z3 half of the round-trip: an off-by-default external solver that proposes candidate assignments into the kernel-gated witness seam, adding a dependency and zero trusted base
 
 ## Blockers
 
@@ -410,7 +411,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
-- `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: ready)
+- `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
