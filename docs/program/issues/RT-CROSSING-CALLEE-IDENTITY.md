@@ -1,13 +1,13 @@
 ---
 id: RT-CROSSING-CALLEE-IDENTITY
 title: "GeneratedUnitCallInput is measured at a shared helper with six callers, so branch 1 is provisional -- record WHOSE call is being carried, and exercise the tag's unused negative arm"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-CROSSING-CALL-SITE-ATTRIBUTION]
-blocks: []
-github: null
+blocks: [RT-PLANNED-CLOSURE-PREEXISTENCE]
+github: https://github.com/swe-toolkit/ken/pull/2314
 origin: Architect, 2026-08-15, resolving dec_5m10b60wam0rz on RT-CROSSING-CALL-SITE-ATTRIBUTION (evt_752hfn288jrcs). He named this increment and its sequencing -- "that is the increment I would sequence BEFORE any repair node is cut". Steward-filed (agents cannot create tracked work per COORDINATION section 2).
 ---
 
@@ -219,3 +219,39 @@ closes it.**
 
 **This is lane 1.** `PROJECTION` (merged) → `CENSUS` (merged) → `CALL-SITE` →
 **this** → repair → `TRANSPORT` → `DESCENT-RETIRE`.
+
+> ## MERGED at `dbf7957a3` (PR #2314), `D1`-`D4` delivered. Steward, 2026-08-15.
+>
+> **The result is not the one this node's title anticipated, and that is the
+> point of having run it.** The frame expected the callee to confirm or refute a
+> provisional branch 1. It did neither: **it closed branch 3'.**
+>
+> **`D1`/`D2` closed 3' by proof rather than by label.** `expected_source_callee`
+> recovers the origin from the plan, destructures it as `RuntimeExpr::Match`, and
+> asserts `default.message == "direct HostResult default"`, so *"the callee is
+> the source program's direct `HostResult` `Match` body"* is **proved against the
+> planned occurrence**. With caller `SourceLexicalClosureArgument` the delivery is
+> source-program-authored ⇒ the crossing is **a call the source program itself
+> makes**, not the realization exporting through an ABI it promised to avoid.
+>
+> **Closing 3' does NOT select branch 1** (Architect, `dec_6hwh86vdzp2ha`). Two
+> branches remain and they are separated by **closure pre-existence** alone:
+> branch 1 (the realization produces a closure-shaped value into an intended
+> call-input route) versus the **durable-lane** branch (the source value
+> legitimately carries a closure and Ken has no lane) — which is
+> [[RT-CLOSURE-BOUNDARY-LANE]]'s mechanism after all.
+>
+> **A Steward ruling was withdrawn on the back of this**, in
+> [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] and [[RT-CLOSURE-BOUNDARY-LANE]]: the
+> durable-lane branch had been declared eliminated by an argument that
+> **suppression itself forces**, and it is live.
+>
+> **`D3` discharged the `Direct` finding honestly**, recording that `Direct` is
+> only the unlabelled default bucket and identifies no site. **`D4` replaced a
+> uniqueness law that was false by refinement** — `(origin -> crossing)` is a
+> relation, not a function.
+>
+> **Successor: [[RT-PLANNED-CLOSURE-PREEXISTENCE]]** — *"stop asking the run, ask
+> the planner."* It also carries the Architect's non-blocking finding that three
+> `cfg(test)` sites bind with `?`, letting the test profile refuse a compile
+> production accepts.
