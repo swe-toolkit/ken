@@ -260,6 +260,43 @@ in this failure, say so with the evidence, because that materially narrows `D2`.
 > next reader straight past the real cause.** Name the alternative route in the
 > message, or restate the conjunction.
 
+> ### `D2` IS WIDENED TO ALL FOUR OPERAND ASSERTIONS IN THE FILE, INCLUDING
+> ### `D1`'s. Adversary hunt `evt_399y8ys1ftnee`, ACCEPTED. Steward, 2026-08-15.
+>
+> **Finding 1 above named `contains("@4")`. It is one of three unanchored
+> substrings in this file, and the third one sits on the predecessor's node.**
+> Re-verified against the tree at `7b11bbd84`, not taken from the report:
+>
+> | line | assertion | anchored |
+> |---|---|---|
+> | `:507` | `contains("expected: Dg67")` | no — also matches `Dg670` |
+> | `:514` | `contains("found: ((Dg574 Dg67) @8)")` | yes, by the trailing `)` |
+> | `:599` | `contains("@9")` | no — also matches `@90`, `@93` |
+> | `:604` | `contains("@4")` | no — also matches `@40`, `@43` |
+>
+> **`D4`'s hunk is `@@ -527,0 +528,90 @@`**, so `:599` and `:604` are `D4`'s and
+> `:507`/`:514` are `D1`'s, landed at `beb31566b`. ⇒ **One file-level anchoring
+> convention was being split across two nodes**, with `D2` holding two of the
+> three live sites. **`D2` takes all four.** Leaving `:507` for whoever reopens
+> `D1` means it is repaired by nobody, since `D1` is merged and closed to work.
+>
+> **The two findings do NOT stack, and applying both to one site is the error to
+> avoid.** Finding 1's remedy **deletes** `:599` and `:604` — the error class
+> already discriminates, so an anchored `"@9)"` is a brittle literal that still
+> buys nothing. **Anchoring is the live repair only at `:507`**, where `Dg67` is
+> a **name**, not a positional level, and Finding 1's argument does not reach it.
+> So: convert `:514`/`:599`/`:604` per Finding 1; anchor `:507` per this one.
+>
+> **Two things the hunt confirms, recorded so they are not re-litigated.**
+> First, the obvious criticism of this fixture — that the prohibited-floor arm
+> is prose and therefore not a control — **does not land**: the two outcomes are
+> disjoint error classes (`TypeMismatch` vs `NotTerminating`), so a floor
+> reintroduction fails the fixture's own `match` arm. **A one-armed control over
+> two disjoint error classes is a complete control**; do not "complete" it.
+> Second, Finding 2's index-impossibility dependency has **three** dependent
+> artifacts in this file with the warning written once (`evt_1e17vjqkdsg13`) ⇒
+> state it as a file-level property, not a per-fixture comment.
+
 ## Acceptance criteria
 
 **`AC-1`.** `D1` is reported with three runs and three results. **A `D1` that
@@ -279,6 +316,14 @@ what `D2`'s diagnosis names. The predecessor banned that scope and the ban is
 what kept this finding honest.
 
 **`AC-5`.** No-regression, in CI (`COORDINATION §12`).
+
+**`AC-6`.** `D2` leaves **all four** operand assertions in
+`ds5b_dependent_match_refinement_acceptance.rs` correct by the table above —
+`:507` anchored, `:514`/`:599`/`:604` converted to the head-plus-difference
+form. **Three of four is a fail**, and so is anchoring a literal that Finding 1
+says to delete. **This does not breach `AC-4`:** that ban is on widening to
+other `install_index_refinements` **consumers**, and this is one test file's
+assertion convention with no production reach.
 
 ## Why this earns a slot
 
