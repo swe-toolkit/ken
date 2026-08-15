@@ -139,8 +139,22 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > | **runs the governed rows** | `FunctionizedUnits` must too — the refusal is a compiler defect and repairing it is convergence |
 > | **refuses them** | `RecursiveDescent` was over-accepting; its behaviour is a bug to drop, not a capability to preserve |
 >
-> ⇒ **Retirement never had to wait on a product decision about narrowing. It waits
-> on a measurement**, which is [[RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]] `D3`.
+> ⇒ **Retirement never had to wait on a product decision about narrowing. It
+> waited on a measurement**, which was [[RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]]
+> `D3`.
+>
+> **`D3` REPORTED 2026-08-15 AT 19:04 AND THIS CLAUSE IS DISCHARGED.** The
+> governed rows have **no source-level witness**: the shape is constructible
+> only as hand-authored `RuntimeExpr`, and both surface routes fail before
+> checked-artifact emission — naming the W-style recursive result is
+> `Elaboration(StructuralResultOutOfScope)`, recomputing it by self-call is
+> `KernelRejected(NotTerminating)`. **No program a user could write reaches
+> them**, so there is no capability question in either direction and the fork
+> `evt_3yvhf3hz59eb8` is void rather than answered.
+>
+> ⇒ **Retirement no longer waits on this node at all.** What it waits on is its
+> own `depends_on` edge, where the live members are
+> [[RT-LEXICAL-RECURSOR-CONSUMERS]] and [[RT-RECURSOR-TRANSPORT]].
 >
 > **Do not read this as "retire now".** The predictability defect is real until
 > the two backends agree with the oracle; the ruling changes what agreement means,
@@ -158,9 +172,11 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > it."* What is missing is that its vocabulary is host-result-shaped, which is an
 > extension of a closed mechanism rather than an invention.
 >
-> ⇒ **[[RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]] is `ready` and attacks it.** Until
-> it reports, nobody knows whether these rows are repairable, so **"accept the
-> narrowing" is not a decision anyone is in a position to make.**
+> ⇒ **[[RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]] attacked it and REPORTED.** The
+> question "are these rows repairable?" was dissolved rather than answered:
+> **nothing reaches them from source**, so there is nothing to repair and
+> nothing to narrow. **"Accept the narrowing" is not a decision anyone needs to
+> make**, and no operator ruling is owed for `row4-depth-2/3`.
 >
 > **Two of the Steward's three lane-1 statements today were wrong in the same
 > direction — toward this campaign being more finished than it is.** Treat a
