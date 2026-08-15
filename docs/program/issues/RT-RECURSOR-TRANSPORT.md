@@ -1,7 +1,7 @@
 ---
 id: RT-RECURSOR-TRANSPORT
 title: "Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
