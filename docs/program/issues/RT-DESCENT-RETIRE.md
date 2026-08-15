@@ -53,6 +53,12 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > a repair or a recorded refusal, because a refusal makes retirement a
 > **narrowing of a presently-compiling capability** rather than debt removal.
 > That is a product call, and this node is where it lands.
+>
+> **AMENDED 2026-08-15 — "presently-compiling" meant "compiling under
+> `RecursiveDescent`", and that baseline is retired.** See the oracle ruling
+> below. The edge stands and the reason changes: what must be known before
+> retirement is assessed is **what the interpreter does**, not what
+> `RecursiveDescent` did.
 
 > # `D0`'s promise-class sentence WILL BLOCK YOU, and it is worded wrong
 >
@@ -102,6 +108,43 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > crossing is recorded before the refusal, and pinning it there would duplicate
 > the `D5` control — but **this control would not notice if the excluded arm
 > changed from refusing to compiling.** One line if you want it; not a defect.
+
+> # OPERATOR RULING: THE ORACLE IS THE INTERPRETER, NOT `RecursiveDescent`
+> # 2026-08-15. This governs every "narrowing" sentence in this node.
+>
+> Verbatim:
+>
+> > `RecursiveDescent` should not be taken as de facto spec. It was a failed
+> > implementation attempt that needs to be replaced. The key oracle is not
+> > `RecursiveDescent`, but the interpreter.
+>
+> **"Accept and record the narrowing" is no longer an available decision, because
+> the thing it would narrow relative to is not a specification.** Every option in
+> the fork below was priced against `RecursiveDescent`'s accepted set. A failed
+> implementation attempt does not define the target it failed to hit.
+>
+> ### What SURVIVES this ruling, stated precisely so it is not over-read
+>
+> **The `41-values.md` argument below is NOT killed by it.** That argument says
+> local dispatch machinery is permitted *"only when it cannot affect
+> program-observable results"*, so a `RecursiveDescent`/`FunctionizedUnits`
+> disagreement about which programs compile is a defect **regardless of which
+> backend is right**. That still holds.
+>
+> **What the ruling supplies is the tie-breaker the argument lacked.** A
+> disagreement between two backends is resolved by the oracle:
+>
+> | interpreter | resolution |
+> |---|---|
+> | **runs the governed rows** | `FunctionizedUnits` must too — the refusal is a compiler defect and repairing it is convergence |
+> | **refuses them** | `RecursiveDescent` was over-accepting; its behaviour is a bug to drop, not a capability to preserve |
+>
+> ⇒ **Retirement never had to wait on a product decision about narrowing. It waits
+> on a measurement**, which is [[RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]] `D3`.
+>
+> **Do not read this as "retire now".** The predictability defect is real until
+> the two backends agree with the oracle; the ruling changes what agreement means,
+> not whether it is owed.
 
 > # DO NOT RULE ON THE FORK: ITS SIZING IS WITHDRAWN AND A SUCCESSOR IS OPEN
 > # Steward, 2026-08-15, second correction of the day, same direction.

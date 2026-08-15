@@ -5,6 +5,26 @@ Create WPs to migrate the remaining residual classes and schedule them. Again,
 this is a crucial efficiency issue we should close and we should not let it
 linger in a half-migrated state. That just carries tech debt for no benefit."*
 
+> ### OPERATOR RULING, 2026-08-15: `RecursiveDescent` IS NOT THE ORACLE
+>
+> > `RecursiveDescent` should not be taken as de facto spec. It was a failed
+> > implementation attempt that needs to be replaced. The key oracle is not
+> > `RecursiveDescent`, but the interpreter.
+>
+> **This governs every parity and narrowing argument in this campaign.** Where a
+> row is described as *"compiles under `RecursiveDescent` and refuses under
+> `FunctionizedUnits`"*, that disagreement is still a defect — local dispatch
+> machinery may not affect program-observable results — but **which side is wrong
+> is settled by the interpreter, not by which one compiles.**
+>
+> ⇒ **`RecursiveDescent` behaviour is not a capability to preserve.** A row it
+> accepts and the interpreter rejects is an over-acceptance to drop. A row it
+> accepts and the interpreter runs is an obligation on `FunctionizedUnits`.
+>
+> **Do not read parity runs as the acceptance bar.** `rt_parity_native` compares
+> two backends to each other; it cannot tell you which one matches the oracle.
+> It remains a useful regression net and is not a specification.
+
 **This campaign closes a migration the code itself calls temporary.**
 `select_body_emission_authority` is documented as *"The one **temporary** B2F
 migration selector"* (`lowering/core.rs:174`). It has been temporary long enough
