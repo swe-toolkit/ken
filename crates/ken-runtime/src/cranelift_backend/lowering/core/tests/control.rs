@@ -33205,48 +33205,34 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
     });
 }
 
-/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` — the backedge marker is forwarded
-/// at `ComputationalMatchScrutinee`, and `R1` is gone from all five compiles.**
+/// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2a` — each compile that reaches the
+/// backedge seat forwards its marker, while earlier projection-owned refusals
+/// remain outside that claim.**
 ///
-/// > **MEASURED:** under B-only exclusion the five `R1` compiles (rows 1 and 4)
-/// > deliver a backedge marker to this continuation, every arrival is forwarded,
-/// > and none of the five renders *"source scrutinee is not a constructor
-/// > value"*. Suppressing only the forward brings that refusal back on all five.
-/// > **CLAIMED:** the marker is consumed at its owner rather than reaching a
-/// > value-position guard. **THE GAP:** the rows do not turn green — they
-/// > advance to a further wall this node does not own (see the handback).
+/// > **MEASURED:** counters reset inside each of the five compiles show that
+/// > only a strict subset reaches `ComputationalMatchScrutinee`. Each arriving
+/// > case forwards once with the route enabled and forwards zero times when it
+/// > is suppressed. The complement has zero arrivals in both legs and changes
+/// > at the `RT-REQUIRED-OCCURRENCE-PROJECTION` route before this seat.
+/// > **CLAIMED:** every marker that actually reaches this owner is forwarded;
+/// > nothing is claimed about a compile that refuses earlier. **THE GAP:** the
+/// > arriving rows still refuse later, and the genuine non-marker
+/// > non-constructor control remains D3's work.
 ///
-/// ⛔ **This does NOT key on the absence of the refusal alone.** A repair that
-/// deleted the sentence from production would make `!contains(...)` true for
-/// free, and this campaign has already shipped one control with that defect.
-/// ⛔ **The three assertions below are NOT co-equal, and billing them as a flat
-/// list was wrong.** `arrivals > 0` is the **denominator**, and it is
-/// irreplaceable: every other clause is conditional on it.
-/// `forwards == arrivals` is satisfied by `0 == 0`, so on its own it is a
-/// **prospective** guard — it catches a *future* arrival that fails to forward
-/// and is evidence about nothing today. The **suppression A/B** is likewise
-/// only meaningful once something arrived. So the denominator is asserted
-/// **first and alone**, before either dependent clause is allowed to run.
+/// The arrival count is a per-case structural qualifier, not a pooled
+/// denominator. Every forward and rendering clause is inside that qualified
+/// branch and reads a `NonZeroUsize` constructed for that exact compile. The
+/// aggregate is derived only after those case-local obligations hold.
 ///
-/// **`AC-3` guard 3, as far as this deliverable can establish it.** The
-/// suppressed leg proves the constructor guard is **still present, still
-/// reached, and still refusing** on all five compiles — so `D2a` did not delete
-/// or bypass it; it routed a marker that was never a scrutinee value past it.
-///
-/// ⛔ What that does NOT establish, stated because the difference matters: a
-/// **genuine** non-constructor value refused at this exact seat. No existing
-/// fixture delivers one to `ComputationalMatchScrutinee` — the operands that
-/// reach it are constructors, `Carried` words, and now this marker — and
-/// authoring one is new fixture work outside `D2a`'s one-authority mandate.
-/// That witness is owed to `D3` and is recorded as owed rather than implied.
-///
-/// PROMISE CLASS: durable invariant. Both are relations — never a pinned count —
-/// so a fixture that grows a compile keeps this green.
+/// PROMISE CLASS: durable invariant. The test asserts relations over the
+/// observed arriving set and proves the complement's ownership by suppressing
+/// one real projection route; it does not pin the population's cardinality.
 #[test]
-fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compiles() {
+fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() {
     use crate::cranelift_backend::lowering::core::{
         lrc_d2a_backedge_arrivals, lrc_d2a_backedge_forwards, reset_lrc_d2a_counts,
         set_lrc_d2a_suppress_forward, set_selector_variant_exclusion,
+        with_required_consumer_route_suppressed,
     };
     struct Restore;
     impl Drop for Restore {
@@ -33287,11 +33273,11 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
         ),
     ];
 
-    let run = |suppress: bool| -> (usize, usize, Vec<(&'static str, String)>) {
+    let run = |suppress: bool| -> Vec<(&'static str, usize, usize, String)> {
         let _restore = Restore;
-        let mut rendered = Vec::new();
-        reset_lrc_d2a_counts();
+        let mut observed = Vec::new();
         for (label, expression, delete_scope) in &cases {
+            reset_lrc_d2a_counts();
             set_lrc_d2a_suppress_forward(suppress);
             set_selector_variant_exclusion(Some(
                 RecursiveDescentResidual::LexicalCallArgumentRecursor,
@@ -33300,96 +33286,149 @@ fn lrc_d2a_the_backedge_marker_is_forwarded_and_r1_is_gone_from_all_five_compile
                 px8j_capture_source_trace(expression, *delete_scope, "ken_lrc_d2a");
             set_selector_variant_exclusion(None);
             set_lrc_d2a_suppress_forward(false);
-            rendered.push((*label, format!("{result:?}")));
+            observed.push((
+                *label,
+                lrc_d2a_backedge_arrivals(),
+                lrc_d2a_backedge_forwards(),
+                format!("{result:?}"),
+            ));
         }
-        (
-            lrc_d2a_backedge_arrivals(),
-            lrc_d2a_backedge_forwards(),
-            rendered,
-        )
+        observed
     };
 
-    // ── REPAIRED ────────────────────────────────────────────────────────────
-    let (arrivals, forwards, repaired) = run(false);
+    let enabled = run(false);
+    let suppressed = run(true);
 
-    // ⭐⭐ THE DENOMINATOR, ESTABLISHED FIRST AND ALONE.
-    //
-    // ⛔ It is not one of three peers. `forwards == arrivals` holds at `0 == 0`
-    // and the suppression legs compare refusals that never occurred, so BOTH
-    // are conditional on this line. Reading them as co-equal supports is how a
-    // control can look triply-defended while resting on one clause.
-    // NOT AN ASSERT PLUS A RENAME. An earlier revision wrote
-    // `assert!(arrivals > 0)` and then `let established = arrivals`, which only
-    // NAMED the intent: deleting the assertion left the equality compiling and
-    // passing at `0 == 0`, so the denominator was removable without breaking
-    // anything.
-    //
-    // The non-zero check is now the CONSTRUCTOR of the value the equality
-    // reads. Remove it and `established_arrivals` does not exist, so the
-    // equality below is a COMPILE ERROR rather than a vacuous pass. The
-    // structural form is what makes "the equality is conditional on the
-    // denominator" enforceable instead of merely written down.
-    let established_arrivals = std::num::NonZeroUsize::new(arrivals).expect(
-        "no backedge marker arrived at ComputationalMatchScrutinee, so the forward was never \
-         exercised and every clause below is vacuous",
-    );
     assert_eq!(
-        forwards,
-        established_arrivals.get(),
-        "an arriving marker was not forwarded: arrivals={established_arrivals} \
-         forwards={forwards}. NOTE: this clause is PROSPECTIVE on its own -- it holds at 0 == 0 \
-         -- and is meaningful only because it reads a value that could not be built at zero"
+        enabled.len(),
+        suppressed.len(),
+        "the two D2a legs must compile the same case population",
     );
-    for (label, rendered) in &repaired {
-        assert!(
-            !rendered.contains(R1),
-            "R1 survives the repair on {label}: {rendered}"
+
+    let mut qualified_cases = 0usize;
+    let mut complement_cases = 0usize;
+    let mut aggregate_arrivals = 0usize;
+    let mut aggregate_forwards = 0usize;
+
+    for (
+        (label, arrivals, forwards, rendering),
+        (suppressed_label, suppressed_arrivals, suppressed_forwards, suppressed_rendering),
+    ) in enabled.iter().zip(&suppressed)
+    {
+        assert_eq!(
+            label, suppressed_label,
+            "the two D2a legs must preserve case identity",
         );
+
+        if let Some(established_arrivals) = std::num::NonZeroUsize::new(*arrivals) {
+            qualified_cases += 1;
+            let established_suppressed_arrivals =
+                std::num::NonZeroUsize::new(*suppressed_arrivals).unwrap_or_else(|| {
+                    panic!(
+                        "the enabled leg reached D2a on {label}, but its suppressed twin did not"
+                    )
+                });
+            assert_eq!(
+                established_suppressed_arrivals, established_arrivals,
+                "suppressing only the forward changed the arrival population on {label}",
+            );
+            assert_eq!(
+                *forwards,
+                established_arrivals.get(),
+                "an arriving marker was not forwarded on {label}",
+            );
+            let unforwarded = established_suppressed_arrivals
+                .get()
+                .checked_sub(*suppressed_forwards)
+                .expect("the suppressed leg forwarded more markers than arrived");
+            assert_eq!(
+                unforwarded,
+                established_suppressed_arrivals.get(),
+                "the suppressed leg still forwarded a marker on {label}",
+            );
+            assert!(
+                !rendering.contains(R1),
+                "R1 survives the enabled route on arriving case {label}: {rendering}",
+            );
+            assert!(
+                suppressed_rendering.contains(R1),
+                "suppressing the forward did not recreate R1 on arriving case {label}: \
+                 {suppressed_rendering}",
+            );
+            aggregate_arrivals = aggregate_arrivals
+                .checked_add(established_arrivals.get())
+                .expect("the per-case arrival aggregate overflowed");
+            aggregate_forwards = aggregate_forwards
+                .checked_add(*forwards)
+                .expect("the per-case forward aggregate overflowed");
+        } else {
+            complement_cases += 1;
+            assert!(
+                rendering.starts_with("Err("),
+                "a case outside D2a's arrival set must refuse before that seat: {label}: \
+                 {rendering}",
+            );
+            assert_eq!(
+                (*forwards, *suppressed_arrivals, *suppressed_forwards),
+                (0, 0, 0),
+                "a non-arriving case has inconsistent D2a counters on {label}",
+            );
+            assert_eq!(
+                rendering, suppressed_rendering,
+                "the D2a forward switch changed a case that never reached its seat: {label}",
+            );
+
+            let (_, expression, delete_scope) = cases
+                .iter()
+                .find(|(case_label, _, _)| case_label == label)
+                .expect("every observation must retain its source case");
+            let compile_without_projection = || {
+                set_selector_variant_exclusion(Some(
+                    RecursiveDescentResidual::LexicalCallArgumentRecursor,
+                ));
+                let (result, _trace) = px8j_capture_source_trace(
+                    expression,
+                    *delete_scope,
+                    "ken_lrc_d2a_without_required_projection",
+                );
+                set_selector_variant_exclusion(None);
+                format!("{result:?}")
+            };
+            let (without_projection, applications) =
+                with_required_consumer_route_suppressed(compile_without_projection);
+            assert_eq!(
+                applications, 1,
+                "the non-arriving case must cross one real required-consumer projection route: \
+                 {label}",
+            );
+            assert_ne!(
+                without_projection, *rendering,
+                "suppressing the required-consumer projection did not change the early refusal \
+                 on {label}",
+            );
+            assert!(
+                without_projection.contains("StaticWorkerBinding"),
+                "without the required-consumer projection {label} did not return to the exact \
+                 predecessor boundary: {without_projection}",
+            );
+        }
     }
 
-    // ── SUPPRESSED — the pre-repair state, producible from this tree ────────
-    let (s_arrivals, s_forwards, suppressed) = run(true);
-
-    // The same construction as the repaired leg, for the same reason. `s_forwards
-    // == 0` passes MORE easily at zero arrivals, not less, so its denominator is
-    // load-bearing in the same way -- and this leg had been left with a separable
-    // `assert!(s_arrivals > 0)` that a trim pass could delete without breaking
-    // anything.
-    //
-    // A DENOMINATOR READ ONLY BY THE MESSAGE IS TWO EDITS FROM GONE, NOT ONE.
-    // A previous revision bound this `NonZeroUsize` and then compared against the
-    // literal `0`, reading the value only inside the format string. Deleting the
-    // binding was a compile error -- but *shortening the message* first, which
-    // reads as an innocuous tidy of a verbose string, left the binding merely
-    // `unused`. There is no `deny` in this crate and no `-D warnings` in the
-    // workflows, so nothing made that bite, and the second edit then removed the
-    // denominator in silence.
-    //
-    // So the denominator is an OPERAND of the assertion, not an argument to its
-    // message. The claim is stated as the relation it actually is -- every
-    // arrival went unforwarded -- which reads the established count on both
-    // sides. `checked_sub` keeps a counter disagreement reporting itself rather
-    // than surfacing as a subtract-with-overflow panic.
-    let established_s_arrivals = std::num::NonZeroUsize::new(s_arrivals).expect(
-        "the suppressed run saw no arrivals, so its reds are not attributable to the suppression",
+    let established_qualified_cases = std::num::NonZeroUsize::new(qualified_cases)
+        .expect("no compile reached D2a, so its forwarding claim ranges over nothing");
+    assert!(
+        aggregate_arrivals >= established_qualified_cases.get(),
+        "each qualified case must contribute at least one arrival",
     );
-    let unforwarded = established_s_arrivals
-        .get()
-        .checked_sub(s_forwards)
-        .expect("the suppressed run forwarded more markers than arrived, so the counters disagree");
     assert_eq!(
-        unforwarded,
-        established_s_arrivals.get(),
-        "the suppression did not actually suppress the forward: {s_forwards} of \
-         {established_s_arrivals} arrivals still forwarded"
+        aggregate_forwards, aggregate_arrivals,
+        "the aggregate derived from the qualified per-case rows disagrees",
     );
-    for (label, rendered) in &suppressed {
-        assert!(
-            rendered.contains(R1),
-            "suppressing the forward did NOT recreate R1 on {label}, so the repair is not what \
-             removed it: {rendered}"
-        );
-    }
+    assert!(
+        complement_cases > 0,
+        "the projection-owned complement disappeared; re-evaluate whether D2a now reaches every \
+         case rather than silently broadening this branch",
+    );
 }
 
 /// **`RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` (planner plane) — the runtime
