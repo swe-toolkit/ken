@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 22:26:59Z — from 322 issue file(s) in `docs/program/issues/`.
+2026-08-15 22:45:14Z — from 324 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -296,6 +296,7 @@ the committed file matches the generator's output.
 | `RT-SCALE-A` | Boundary A — re-derive the planner census for n=3..7 against the COMPLETED factored representation, superseding the provisional outer-planner numbers | merged | runtime | M | none | — |
 | `RT-SCALE-B` | Boundary B — the full n=3..7 emission measurement, the research-grounded analytical model, and the operator scaling verdict that gates RT-NATIVE-FNSPLIT's merge | merged | runtime | L | none | — |
 | `RT-SCRATCH-LIFETIME-REMAINING-CRATES` | `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names | ready | runtime | M | none | — |
+| `RT-SECOND-RECOGNITION-ERASURE` | Erase the second static-worker recognition for row4 depths 2 and 3, whose worker was already emitted and lawfully consumed, without relaxing the ledger's law or borrowing that consumption to transition a second recognition | ready | runtime | S | none | — |
 | `RT-SEED-CALL-PORT` | Seed-closure call port — a Call whose callee is the retained non-lexical closure form routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-SITEOP-CARRIED-WITNESS` | Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried | draft | runtime | L | none | — |
 | `RT-SPECIALIZED-ACTIVE-RESUME` | A live specialized value with an Active frame is refused by a constructor-only destructure — Active resume does not require constructor shape | merged | runtime | S | none | — |
@@ -310,6 +311,7 @@ the committed file matches the generator's output.
 | `RT-TERMINAL-ALL-ELIM-AUTHORITY` | Issue the typed terminal-All structured-IH elimination authority upstream in checked erasure/planning, and let only that issued relation license the source-machine Match seat to consume a ComputationalRecursorClosure | draft | runtime | M | none | — |
 | `RT-TEST-SCRATCH-RAII` | Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition | merged | runtime | M | none | — |
 | `RT-UNIT-CLOSURE-CONVERT` | Activate function-unit closure conversion for predeclared units — a retained nested body's free de Bruijn references become declared typed capture slots, reconstructed at unit entry from exact caller operands | closed | runtime | TBD | none | — |
+| `RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE` | Measure whether any lowered consumer reads the static-worker field constructed for row4 depth 1 and row5 after-hole, or whether the recognition is only ever seen by the ledger's close | ready | runtime | S | none | — |
 | `RT-VALUE-TOTALITY` | Make every total traversal of Value non-recursive in the host stack, and remove the closure capabilities the landed closure boundary forbids | merged | runtime | L | none | — |
 | `RT-WORKER-BIND` | compiler-only static-worker binding and transport substrate — lowering cannot bind a worker's carried capture operands into a selected semantic body, and continuation specialization cannot emit a target without it | merged | runtime | L | none | — |
 | `RT-WORKER-FIXTURE-DECODE` | AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes | ready | runtime | M | none | — |
@@ -435,7 +437,9 @@ is itself not yet `merged`/`closed`:
 - `RT-DESCENT-RETIRE` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-EMITTED-WORKER-CONSUMER-WALK` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
+- `RT-SECOND-RECOGNITION-ERASURE` blocked by `RT-EMITTED-WORKER-CONSUMER-WALK` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
+- `RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE` blocked by `RT-EMITTED-WORKER-CONSUMER-WALK` (status: ready)
 
 ## Gate progress
 

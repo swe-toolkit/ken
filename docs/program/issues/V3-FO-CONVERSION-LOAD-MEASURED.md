@@ -108,6 +108,21 @@ existing acceptance test, after `phi_ty = infer(phi_closed)`:
 assert!(!convert(env, &ctx, &phi_ty, &denote(env, &sig, &other_f), phi_closed));
 ```
 
+> ### THE `convert` CALL IS THE TEST'S OWN. Not the production call at `:308`.
+>
+> **This cost a ring a turn on 2026-08-15, and the ambiguity was this frame's.**
+> `D0` does **not** ask for an obligation that routes through
+> `discover_and_quote_fo` and refuses at conjunct 3. **It asks the test to call
+> `convert` directly, with a second `IForm` the test hand-builds.** No input
+> reaches the production call site; nothing has to refuse in production.
+>
+> Everything it needs is public, verified against the tree at `ac8a73d1b`:
+> `denote` at `fo_kripke.rs:463`, `convert` at `conv.rs:337`, `IForm` and
+> `FoSliceSignature` public, and **`ken-kernel` is a direct dependency of
+> `ken-elaborator`**, so `tests/` can name it. The acceptance test already binds
+> `(sig, problem)` from `discover_and_quote_fo`; `other_f` is any `IForm`
+> structurally different from `problem.f`. **Roughly six lines.**
+
 ⇒ **That converts "a property of the kernel, not of this file" into a property
 this file checks.** Same move as the `shift` round-trip oracle in
 [[V3-FO-GUARD-SHIFT-DIFFERENTIAL]], for the same reason: **a cross-crate
@@ -134,6 +149,25 @@ ever seeing this code.**
 > refusal control is kept only **if** a passing-1-and-2-failing-3 obligation
 > turns out to exist; **finding that none does is itself a reportable result**
 > and discharges the question.
+>
+> ### MEASURED: NONE DOES. The refusal control is DISCHARGED — do not build one.
+>
+> The language ring reported that `denote ∘ quote_iform` is a **retraction** on
+> everything `quote_iform` accepts — constructor for constructor, with the
+> `Imp`/`Forall` shift pair an exact round trip wherever `mentions_var0` holds.
+> Four attempts to break it each failed at a **named earlier gate**:
+> `LevelArityMismatch` inside `infer`, conjunct 1's ambiguity rule,
+> `quote_iform`'s own `Atom` arm, and no lever at all in the `Or` handling.
+> **Reported honestly as a systematic negative, not as a proof of
+> impossibility.**
+>
+> ⇒ **Conjunct 3 cannot refuse for any input that reaches it, as the mechanism
+> stands.** That does not retire `D0`; **it is the reason for `D0`.** If the
+> `denote`/`quote_iform` pair is what carries the safety, then conjunct 3
+> contributes exactly one thing — **it would catch a mismatch the day that pair
+> drifts apart**, which a later lossy quotation arm or a widened
+> proof-irrelevance guard would produce. `D0` pins that capability while nothing
+> local asserts it.
 
 **`D1` — the corpus.** A set of Ken source programs whose compilation produces
 first-order obligations route FO can quote. **State how many were found and
