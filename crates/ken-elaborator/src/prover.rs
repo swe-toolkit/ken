@@ -515,21 +515,73 @@ fn specialize_int_goal(
 
 // ─── Fragment FO ─────────────────────────────────────────────────────────────
 
-/// Fragment FO: Kripke embedding → classical solver → reflective cert (`23 §4`).
+/// Fragment FO: Kripke embedding → classical solver → reflective cert
+/// (`23 §4`, `V3-FO-KRIPKE-SLICE`).
 ///
-/// The full Kripke embedding (`φ ↦ φ#`, `World` sort, adequacy lemma
-/// `classically_valid(φ#) → φ`, `check_cert` soundness) is
-/// `[placeholder — reifies in V4]` pending backend infrastructure.
-/// Falls back to the IPC propositional skeleton for the connective structure.
+/// The first route-(a) vertical slice (`23 §4.5`) is built in
+/// [`crate::fo_kripke`]: quotation (`quote_fo`), the exact classical Kripke
+/// theory with `K(Sigma)` inside the target (`embed`), and a computable
+/// certificate checker (`check_cert`) over the slice's one rigid sort, one
+/// unary predicate, and `init`/`imp-right`/`forall-right` certificate rules.
+/// That machinery is exercised here, not stubbed — but **route FO still
+/// cannot return `Proved`** (`23 §4.4`): the two theorems that would let a
+/// slice certificate discharge a real Ken proof —
+/// `embedding_adequacy`/`checker_soundness` — have no approved kernel-checked
+/// home yet. That placement is an Architect/operator decision
+/// `V3-FO-KRIPKE-SLICE` explicitly did not make (`AC-6`), so an accepted
+/// slice certificate here still yields `Unknown`, honestly, at this
+/// boundary — never a silent skip and never a forged `Proved`.
+///
+/// **Scope note, not yet integration:** this wiring uses `fo_kripke`'s own
+/// internally-declared one-sort/one-predicate signature
+/// (`declare_fo_slice_signature`), not a signature discovered from `phi`
+/// itself — so it currently only recognizes obligations shaped like this
+/// module's own signature (in practice: none from arbitrary real
+/// obligations yet). Discovering `phi`'s own (sort, predicate) identities is
+/// later integration work, out of this slice's scope (`V3-FO-KRIPKE-SLICE`
+/// "do not widen the slice"). When quotation refuses or no slice certificate
+/// is found, this falls back to the IPC propositional skeleton, unchanged
+/// from before.
 fn attempt_fo(
     env: &mut GlobalEnv,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
 ) -> Verdict {
-    // The FO propositional structure can be handled by the IPC tactic for the
-    // connective skeleton. The Kripke embedding for quantified FO goals is
-    // [placeholder — reifies in V4].
+    let sig = crate::fo_kripke::declare_fo_slice_signature(env);
+    attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig)
+}
+
+/// The testable core of [`attempt_fo`]: identical logic, but takes the
+/// [`crate::fo_kripke::FoSliceSignature`] as a caller-supplied parameter
+/// instead of declaring a fresh one internally. `attempt_fo` itself declares
+/// a fresh signature per call (so it cannot recognize any obligation built
+/// against a signature it did not itself just mint — see `attempt_fo`'s own
+/// doc comment); tests exercise this function directly with a signature they
+/// control, so the D5 boundary behavior (accepted certificate → honest
+/// `Unknown`, never `Proved`) is verifiable without needing to guess
+/// `attempt_fo`'s internal, freshly-generated ids.
+pub fn attempt_fo_with_signature(
+    env: &mut GlobalEnv,
+    ctx: &Context,
+    phi: &Term,
+    phi_closed: &Term,
+    sig: &crate::fo_kripke::FoSliceSignature,
+) -> Verdict {
+    if let Ok(problem) = crate::fo_kripke::quote_fo(env, sig, phi_closed) {
+        if let Some(cert) = crate::fo_kripke::find_certificate(&problem.f) {
+            let target = crate::fo_kripke::embed(&problem.f);
+            if crate::fo_kripke::check_cert(&target, &cert) {
+                // Genuine, accepted slice certificate — but `23 §4.4`
+                // reserves the kernel-checked home for the two theorems
+                // this discharge needs, and that decision has not been
+                // made. Honest `Unknown`, not `Proved` (`AC-5`).
+                return emit_unknown_hole(env, phi_closed);
+            }
+        }
+    }
+    // Quotation refused this obligation, or the slice's rule set found no
+    // certificate: fall back to the IPC propositional skeleton, as before.
     attempt_ipc(env, ctx, phi, phi_closed)
 }
 

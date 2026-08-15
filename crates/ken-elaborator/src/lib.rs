@@ -23,6 +23,7 @@ pub mod erasure;
 pub mod error;
 pub mod export;
 pub mod extract;
+pub mod fo_kripke;
 pub mod foreign;
 pub mod format;
 pub mod ifc;
