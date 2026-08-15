@@ -41,6 +41,8 @@ pub mod resolve;
 pub mod strings;
 pub mod temporal;
 pub mod trace;
+#[cfg(feature = "z3-process")]
+mod z3_process;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -96,6 +98,8 @@ pub use prover::{
     attempt_d_with_int_assignment, attempt_obligation, attempt_with_cert, classify, Countermodel,
     FormulaPath, FormulaStep, ProverResult, Route, StructuralRefutation, Verdict,
 };
+#[cfg(feature = "z3-process")]
+pub use prover::{attempt_d_with_z3_process, Z3ProcessConfig};
 pub use resolve::{RDecl, RDeclKind, RExpr, RType};
 pub use temporal::{
     closed, elaborate_temporal_expr, temporal_hoas_inductive_spec, temporal_inductive_spec, Pred,

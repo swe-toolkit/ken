@@ -206,6 +206,8 @@ fn comparison_operands(term: &Term) -> Option<(&Term, &Term)> {
     matches!(operation.as_ref(), Term::Const { .. }).then_some((left, right))
 }
 
+/// Recognizes a binary-constant tree over bound variables and `IntLit`s; this
+/// does not establish arithmetic operations, linearity, or typing.
 fn is_linear_int_expr(term: &Term, binders: usize) -> bool {
     match term {
         Term::Var(index) => *index < binders,
@@ -296,7 +298,7 @@ pub fn attempt_obligation(env: &mut GlobalEnv, triple: &ObligationTriple) -> Pro
     let route = classify(env, &triple.goal_closed);
     let ctx = context_from_triple(triple);
     let verdict = match route {
-        Route::D => attempt_d(env, &ctx, &triple.phi, &triple.goal_closed),
+        Route::D => attempt_d(env, &ctx, &triple.phi, &triple.goal_closed, triple),
         Route::FO => attempt_fo(env, &ctx, &triple.phi, &triple.goal_closed),
         // HO: the default — every unrecognized shape also lands here.
         // NO `_ ⇒ skip`: this arm is always present and always attempts.
@@ -357,6 +359,7 @@ fn attempt_d(
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
+    triple: &ObligationTriple,
 ) -> Verdict {
     // IPC assumption lookup has priority over every backend. A proposition can
     // be intrinsically false yet still prove a sequent when it is an explicit
@@ -388,11 +391,18 @@ fn attempt_d(
         }
     }
 
-    // [placeholder — reifies in V4]: kernel whnf + decision procedure (23 §3.1)
-    // + Z3-backed arithmetic search + Decidable constructor extraction (23 §3.2).
-    // Conservative: emit exactly one honest hole after proof and refutation
-    // candidates have both failed.
-    emit_unknown_hole(env, phi_closed)
+    #[cfg(feature = "z3-process")]
+    {
+        return attempt_d_with_z3_process(env, triple, &Z3ProcessConfig::default());
+    }
+
+    #[cfg(not(feature = "z3-process"))]
+    {
+        let _ = triple;
+        // Conservative feature-off baseline: emit exactly one honest hole after
+        // proof and refutation candidates have both failed.
+        emit_unknown_hole(env, phi_closed)
+    }
 }
 
 /// Attempt a search-proposed assignment for a Π-bound `Int` goal (`23 §3.2`).
@@ -439,6 +449,46 @@ pub fn attempt_d_with_int_assignment(
         refutation,
         Countermodel::root(format!("candidate Int assignment {assignment:?}")),
     )
+}
+
+/// Configuration for the optional external Z3 process.
+#[cfg(feature = "z3-process")]
+#[derive(Debug, Clone)]
+pub struct Z3ProcessConfig {
+    pub program: std::path::PathBuf,
+    pub timeout: std::time::Duration,
+}
+
+#[cfg(feature = "z3-process")]
+impl Default for Z3ProcessConfig {
+    fn default() -> Self {
+        Self {
+            program: "z3".into(),
+            timeout: std::time::Duration::from_secs(2),
+        }
+    }
+}
+
+/// Ask an external Z3 process for a candidate assignment, then pass only that
+/// assignment to the existing kernel-gated witness seam.
+///
+/// Spawn failure, timeout, `unknown`, malformed output, and unsupported goals
+/// all take the feature-off `Unknown` baseline. Z3's own verdict is never
+/// ingested as a Ken verdict.
+#[cfg(feature = "z3-process")]
+pub fn attempt_d_with_z3_process(
+    env: &mut GlobalEnv,
+    triple: &ObligationTriple,
+    config: &Z3ProcessConfig,
+) -> Verdict {
+    let Some(assignment) = crate::z3_process::candidate_assignment(
+        &triple.goal_closed,
+        env.int_lit_type(),
+        config,
+    ) else {
+        return emit_unknown_hole(env, &triple.goal_closed);
+    };
+    attempt_d_with_int_assignment(env, triple, &assignment)
 }
 
 fn specialize_int_goal(
