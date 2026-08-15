@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER, RT-CONTKEY-CONSUMING-OCCURRENCE, RT-CONTKEY-CONSUMER-DESCENT-CARRY, RT-CONTKEY-ROUTE-CLOSURE-PROBE]
+depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER, RT-CONTKEY-CONSUMING-OCCURRENCE, RT-CONTKEY-CONSUMER-DESCENT-CARRY, RT-CONTKEY-ROUTE-CLOSURE-PROBE, RT-REQUIRED-OCCURRENCE-PROJECTION]
 blocks: [RT-RECURSOR-TRANSPORT]
 github: null
 origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT hard stop 4, narrowed to rows 1-5 by the re-rule evt_3r4j14fv1jtj2 on the nine-expression census evt_16cmej481q7ns. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -71,6 +71,32 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 >
 > **Do not read `active` as "someone is building this."** It stays `active`
 > because increments continue to land against it; the route work does not.
+>
+> ### ZERO DISPATCHABLE INCREMENTS, and as of 2026-08-15 that is MEASURED
+>
+> **Every item this file called owed has been checked against the tree and all
+> three are discharged** — see the table further down. Combined with `D2k-1c`
+> being a wrong cut and `D2k-1c-1a` having moved, **there is nothing a ring can
+> start here.** That is not the same as blocked, and it is not framing debt:
+> the node's five expressions are genuinely unrepaired, and the reason no slice
+> exists is that the repair needs a representation surface that does not exist
+> yet.
+>
+> ⇒ **`depends_on` now names [[RT-REQUIRED-OCCURRENCE-PROJECTION]].** That edge
+> was real and lived only in prose across three files. Writing it down makes
+> the operator's top-priority chain machine-readable end to end:
+>
+> ```mermaid
+> graph LR
+>   PROJ[RT-REQUIRED-OCCURRENCE-PROJECTION<br/>active] --> CONS[RT-LEXICAL-RECURSOR-CONSUMERS<br/>active, zero dispatchable]
+>   CONS --> TRANS[RT-RECURSOR-TRANSPORT<br/>active, D3 gated]
+>   TRANS --> RET[RT-DESCENT-RETIRE]
+> ```
+>
+> **`RT-RECURSOR-TRANSPORT`'s `D3` gate is unaffected and stays as written** —
+> it is keyed on the transport half *actually landing in the tree*, checked
+> against `enum RecursiveDescentResidual`, **not** on this node's status. That
+> wording is correct and is why the gate survived this correction.
 
 > # THE RESIDUAL IS SIX EXPRESSIONS AT TWO WALLS — updated 2026-08-12
 >
@@ -201,7 +227,13 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > > narrower thing. The leader has ordered the owner assertion committed as its
 > > own pre-repair checkpoint (`evt_4ggrxzk22e46m`).
 > >
-> > **The `D2k-0` redness claim is still unverified by anyone. Still owed.**
+> > **DISCHARGED — the redness claim is executable, not inherited.** That
+> > sentence read *"still unverified by anyone. Still owed."* until 2026-08-15.
+> > `D2k-1a` landed `d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed`
+> > (`control.rs:5994`, `905fd05de`), which runs `D2k-0`'s **own** predicate with
+> > the wrong-consumer condition removed and asserts it answers `None`. **The
+> > owner assertion the leader ordered as a pre-repair checkpoint
+> > (`evt_4ggrxzk22e46m`) is `control.rs:5572+`, also `D2k-1a`.**
 > >
 > > > ##### SECTION 3'S FRONT-LOADED PREMISE IS MEASURED FALSE FOR THESE FIVE
 > > >
@@ -273,24 +305,31 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > emission lane is still compiled in — **which is exactly the "half-migrated
 > state carrying tech debt for no benefit" the original directive named.**
 >
-> **What Runtime still owes here, unchanged:** the `D2k-0` redness claim is
-> still unverified by anyone (see the block above), and the residual at the
-> foot of this file — five groups carrying no cardinality assertion — is
-> inherited by the next `#6d` slice frame, not by this node.
+> **THE THREE ITEMS THIS BLOCK CALLED OWED ARE ALL DISCHARGED — measured at
+> `fa18caec0`, Steward 2026-08-15. Do not frame any of them.**
 >
-> **CARRIED IN, from R3's residual — two `#[cfg(test)]` edits in
-> `control.rs`, for whichever `#6d` slice next touches that file.** Filed
-> against [[RT-LEXICAL-R3-FUSION-EMITTER]] from Adversary hunt
-> `evt_28n873ahnq6z7`; that node has the measurements and the nine call sites.
-> In short: the two-root terminal-stop population is a hard-coded literal at
-> **nine** sites with no name, and the sentence scoping all nine is asserted
-> nowhere. **(a)** name the population once as a `const` and iterate it in the
-> nine controls — no arming needed; **(b)** add the armed `ProducerArity` row
-> to the target-authority validator control, ~6 lines, by relaxing its own
-> `assert!(error.is_none(), ...)` at `control.rs:4325` to return the error.
-> **The "it needs a new armed harness" cost that deferred this was measured
-> false** — `D2fEmitterTestArm::arm()` is already used at twelve sites in that
-> file. Carried here because a residual on a merged node is read by nobody.
+> They were discharged by **this node's own `D2k-1a`**, and the frame never
+> caught up. That is the sharpest form of the staleness: the work did not move
+> to another node and get lost, it landed here and kept advertising itself as
+> owed. Each line below is a file-and-line read, not a status inference.
+>
+> | called owed | actual state at `fa18caec0` |
+> |---|---|
+> | the `D2k-0` **redness claim**, *"still unverified by anyone"* | **executable at `control.rs:5994`**, `d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed`, landed `905fd05de`. It runs `D2k-0`'s **own** predicate with the wrong-consumer condition removed — the source comment says *"not a twin of it"*, which is the failure mode a redness proof usually has. |
+> | **(a)** name the two-root population once as a `const`, iterate it in the nine controls | **`R3_TERMINAL_STOP_POPULATION` at `control.rs:2711`**, landed `12cefd5b3`, iterated at **exactly nine** sites (`:3128, :3290, :3424, :3583, :3718, :3871, :4024, :4181, :4350`). |
+> | **(b)** add the armed `ProducerArity` row, *"~6 lines, by relaxing its own `assert!(error.is_none(), ...)`"* | **present at `control.rs:4365-4386`.** The `assert!(error.is_none(), ..)` now scopes the population loop only (`:4353`); the `ProducerArity` case captures the error, matches the widened-producer refusal literal, and pins `(validations, consumptions, invocations) == (0, 0, 0)`. |
+>
+> **NOT re-measured, and still stated as inherited:** the residual at the foot
+> of this file — five groups carrying no cardinality assertion. It belongs to
+> the next `#6d` slice frame, not to this node. **I checked the three above and
+> not this one**; treat it as unverified in either direction.
+>
+> **Why this mattered enough to correct:** the block prescribed a specific
+> remedy with line numbers and a cost argument (*"the harness cost was measured
+> false"*), which is exactly the shape a framer picks up and turns into a WP.
+> **A repair block reads identically whether it is owed or done**, and the line
+> numbers it carried had already shifted — `:4325` now lands on the `arm()` call
+> inside the very control the item asked for.
 
 ## `active` here means WAITING ON R3, not in progress. Edge declared 2026-08-14
 
