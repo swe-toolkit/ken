@@ -543,8 +543,8 @@ The smallest coherent first slice has one rigid object sort `A`, one unary
 uninterpreted predicate `P : A -> Omega`, and source forms `Bottom`, atom,
 `or`, `imp`, and `forall`. It retains the complete `World` preorder, possibly
 empty `Dom_A` with growth, and the `Force_P` domain and persistence axioms. Its
-emitted target uses `bottom`, relation, `and`, `or`, `imp`, `forall`, and
-`exists`. The positive proof needs exactly the `init`, `imp-right`, and
+emitted target uses `bottom`, relation, `and`, `or`, `imp`, and `forall`. The
+positive proof needs exactly the `init`, `imp-right`, and
 `forall-right` certificate rules. The slice theorem restricts `Cert` to that
 constructor subset; the full §4.3 theorem remains owed for the remaining
 constructors and is not implied by this slice.
