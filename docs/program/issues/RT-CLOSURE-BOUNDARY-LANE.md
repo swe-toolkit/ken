@@ -311,6 +311,58 @@ carrier that cannot represent the value, or a boundary that turns out to be
 durable-export, tells us more than the classification would have, and it tells us
 from the inside. **Do not grind: one honest attempt, then the fallback below.**
 
+> # THE GUESS HAS TWO UNSOUND JOINTS. ARCHITECT `evt_69vj8ye0qcdg9`,
+> # RE-VERIFIED BY THE STEWARD. Amend before building.
+>
+> **This is the attack I asked for at review, and it lands. The conclusion
+> survives — the crossing is a call-argument exchange inside a live runtime, not
+> durable publication, and he verified `D1` himself. Two things I asserted around
+> it were not established.**
+>
+> ## 1. DO NOT ADMIT AT THE GATE. The gate is SHARED and mostly unclassified.
+>
+> **Measured independently by the Steward on `main`: `transfer_into_carrier` has
+> exactly EIGHT non-test call sites** — `mod.rs:7086`, `:7660`, `:8231`, and
+> `core.rs:4250`, `:4457`, `:15398`, `:15716`, `:18569` — and **every one of them
+> funnels through the single `boundary_transfer_admissibility` call at
+> `mod.rs:6613`.** `D1` classified **two**.
+>
+> ⇒ **"Admit on clause 2's predicate" AT THE GATE is `refuse less` on six routes
+> nobody has classified**, including any that is in fact a durable-export
+> boundary — which is the one thing clause 1 forbids absolutely. **It breaks this
+> frame's own constraint 1** (*"refuse on the right predicate, never refuse
+> less"*), and it would do so invisibly, because the gate cannot tell which
+> boundary it is standing at.
+>
+> **The real fork the attempt hits, and it is where to look FIRST:**
+>
+> | option | what it costs |
+> |---|---|
+> | **admit per-route, at the call site** | the two classified routes carry the admission; the other six keep today's refusal untouched |
+> | **give the gate a boundary-kind parameter** | the gate learns to discriminate, and every one of the eight callers must supply its kind |
+>
+> **If that discrimination has no home, THAT is the "stop and report what blocked
+> it" case** — and it is a better handback than a carrier built on the wrong
+> seam. **Do not write a carrier before this is settled.**
+>
+> ## 2. "Between separately compiled artifacts" is UNVERIFIED, and it sizes it
+>
+> **My assertion, not a measurement.** Functionization splits a recursor into
+> generated units; whether those are **separately compiled artifacts** or units
+> **within one compilation output** is measured nowhere.
+>
+> ⇒ **If they are intra-artifact, clause 2's *"defining owner and artifact remain
+> live"* is satisfied BY CONSTRUCTION on the argument-crossing shape**, the
+> liveness/domain predicate has no work to do there, and the repair is
+> **materially smaller** than this frame states.
+>
+> **And the two sub-shapes come apart here, which is the deeper error.** I
+> bundled them under one predicate; `D1` measured that they reach the gate by
+> **different routes**. Liveness genuinely bites on the **escape** shape — a
+> captured environment outliving its lexical frame — and may bite on nothing at
+> all in the argument-crossing shape. **Measure the artifact question before
+> sizing the predicate.**
+
 ## Deliverables
 
 **`D1` — the repair, per the guess above.** Both owned rows.
@@ -430,6 +482,16 @@ crosses today. **This is the gate `RT-DESCENT-RETIRE` reads.**
 predicate change; a wrong-domain, expired, or forged representation must still
 refuse before invocation, and the durable-export case must still refuse
 outright.
+
+**`AC-3a`.** **No admission is installed at the shared gate.** The six
+unclassified `transfer_into_carrier` call sites must reach **today's refusal,
+unchanged**, demonstrated rather than asserted. **A candidate that relaxes
+`boundary_transfer_admissibility` itself fails this**, however the predicate is
+written, because the gate cannot tell which boundary it is standing at.
+
+**`AC-3b`.** If the repair needs the gate to discriminate boundary kinds and
+there is no home for that discrimination, **stop and report it** — that is a
+finding about the seam, and it discharges the attempt.
 
 **`AC-4`.** No `FrozenClosure`-class value, and no silent `StaticCallableRef`
 conversion of the zero-capture case. **`D4` is diagnostic-correctness work and
