@@ -1,12 +1,12 @@
 ---
 id: LANG-CONVOY-MATCH-FIELD-PROVENANCE
 title: "capability 2's sibling-convoy candidate range is a positional proxy for a provenance property -- carry the match-field regions explicitly on the elaboration context and skip them, closing spec 34 section 3.2's Boundary gap without the incompleteness a positional floor would introduce"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: [LANG-CONVOY-ENCLOSING-FIELD]
-blocks: []
+blocks: [LANG-INTERVENING-LET-FRAME-WEAKENING]
 github: null
 origin: "Architect remedy ruling evt_1vyfpyv0t6dgj (2026-08-15), delivered with the approval of LANG-CONVOY-ENCLOSING-FIELD's measurement candidate db399d12d and attached to Decision dec_4vw75zd71kj2g. The predecessor measured the RANGE hypothesis with raw operands; this node implements the remedy the Architect ruled from that measurement. He named the spelling, refused the positional floor, and withheld composition. Steward-filed per COORDINATION section 2."
 ---
@@ -208,6 +208,44 @@ capability 2. **Measure that.**
 **`D4` — flip both fixtures to positive assertions** per `AC-1`.
 
 ## Acceptance criteria
+
+> # MERGED AT `f08388396`. `AC-1`'s HAZARD CLAUSE IS **WITHDRAWN, NOT SATISFIED**.
+>
+> Exact `dac4d16af7584b68adbcb0ed45109dbd146cf3ba`, declared base `43bd0d597`,
+> three paths, `+284/-21`, PR #2279. Decision `dec_63bdyk827f5gf` `resolved`;
+> QA `evt_307nnw77csbmc`, Architect `evt_5b3c38r3xrqm6`.
+>
+> **`AC-1`'s hazard-discriminating pair claim is withdrawn**, and `AC-3`'s
+> control is what was measured inert. QA replaced capability 2's
+> membership guard with the
+> prohibited positional floor `if abs_pos >= 3` and ran the **whole**
+> `ds5b_dependent_match_refinement_acceptance` file: exit 0, 7 passed / 1
+> ignored — **identical to the region-guard run.** The file-wide discriminator
+> population is empty. The implementer reproduced both directions independently.
+>
+> **Two claims, and only one is unwitnessed. Do not collapse them:**
+>
+> | claim | status |
+> |---|---|
+> | the remedy was **necessary** | **witnessed** — `D1`'s pre-remedy red, same head, differing only `@9` vs `@4` |
+> | the **region set beats a positional floor** | **behaviourally unwitnessed.** Both repairs fix the witnessed bug; they diverge only on a genuine outer binder pushed above an enclosing arm's field region, and no program in the suite reaches that |
+>
+> ⇒ **This node proves the fix. It does not prove the choice of fix.** The region
+> set stays on provenance grounds — a field bound by an enclosing match is not a
+> genuine outer binder, which is a statement about what the region set *means* —
+> and that is design-justified, not measured.
+>
+> **The bounded attempt at a discriminating witness was authorized to fail and
+> did.** It reached `install_index_refinements` with a fresh `let k : Vec Nat n`
+> and died in `refine_branch_goal`. **That is
+> [[LANG-INTERVENING-LET-FRAME-WEAKENING]], and its `D1` is a regression check on
+> this node** — the Architect approved with that measurement outstanding.
+>
+> **Why the failure of an AC did not block the merge:** the shipped code is
+> byte-identical to a head already reviewed sound, the suite is green with no
+> behaviour changed, and **this node's own banned scope forbids the repair the
+> block would demand.** Blocking would have spun the ring against its own
+> guardrail.
 
 **`AC-1` — the `zip` fixture elaborates AND evaluates to the correct result.**
 **Control:** assert on the evaluated value, not on the absence of an error.
