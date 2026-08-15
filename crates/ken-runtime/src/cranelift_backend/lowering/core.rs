@@ -17987,6 +17987,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         // parameter check establish one exact run: every matched
                         // field becomes one closure parameter, in source order,
                         // before the capture suffix is appended.
+                        #[cfg(test)]
+                        let callee = self
+                            .static_transition_plan
+                            .child_static_origin(body.static_origin, 0)?;
                         let mut inputs = args
                             .iter()
                             .map(|field| {
@@ -17997,6 +18001,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                     builder,
                                     body.static_origin,
                                     LoweringOperand::Specialized(field),
+                                    #[cfg(test)]
+                                    GeneratedUnitCallInputCaller::StaticMatchCaseParameter,
+                                    #[cfg(test)]
+                                    callee,
                                 )
                             })
                             .collect::<Result<Vec<_>, _>>()?;
@@ -18015,6 +18023,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                         builder,
                                         capture.static_origin,
                                         lowered,
+                                        #[cfg(test)]
+                                        GeneratedUnitCallInputCaller::StaticMatchCaseCapture,
+                                        #[cfg(test)]
+                                        callee,
                                     )
                                 })
                                 .collect::<Result<Vec<_>, _>>()?,
@@ -18337,6 +18349,11 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                 ),
                             ));
                         }
+                        let closure_origin = callee.static_origin;
+                        #[cfg(test)]
+                        let callee_body_origin = self
+                            .static_transition_plan
+                            .child_static_origin(closure_origin, 0)?;
                         let mut inputs = args
                             .iter()
                             .enumerate()
@@ -18347,10 +18364,17 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                     argument,
                                 )?;
                                 let lowered = self.lower_expr(builder, argument, env)?;
-                                self.carry_call_input(builder, argument.static_origin, lowered)
+                                self.carry_call_input(
+                                    builder,
+                                    argument.static_origin,
+                                    lowered,
+                                    #[cfg(test)]
+                                    GeneratedUnitCallInputCaller::SourceClosureArgument,
+                                    #[cfg(test)]
+                                    callee_body_origin,
+                                )
                             })
                             .collect::<Result<Vec<_>, _>>()?;
-                        let closure_origin = callee.static_origin;
                         // Capture SOURCE order, appended after the full
                         // parameter run: the callee unit's ABI inputs are
                         // `Parameter ++ Capture`, and the two runs are not
@@ -18411,6 +18435,11 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                 ),
                             ));
                         }
+                        let closure_origin = callee.static_origin;
+                        #[cfg(test)]
+                        let callee_body_origin = self
+                            .static_transition_plan
+                            .child_static_origin(closure_origin, 0)?;
                         // ⭐ **Each input crosses the boundary at ITS OWN
                         // caller-side occurrence.** The exact origins are
                         // already issued two lines up — `child_occurrence` for
@@ -18431,10 +18460,17 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                     argument,
                                 )?;
                                 let lowered = self.lower_expr(builder, argument, env)?;
-                                self.carry_call_input(builder, argument.static_origin, lowered)
+                                self.carry_call_input(
+                                    builder,
+                                    argument.static_origin,
+                                    lowered,
+                                    #[cfg(test)]
+                                    GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
+                                    #[cfg(test)]
+                                    callee_body_origin,
+                                )
                             })
                             .collect::<Result<Vec<_>, _>>()?;
-                        let closure_origin = callee.static_origin;
                         inputs.extend(
                             captures
                                 .iter()
@@ -18446,7 +18482,15 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                                         capture,
                                     )?;
                                     let lowered = self.lower_expr(builder, capture, env)?;
-                                    self.carry_call_input(builder, capture.static_origin, lowered)
+                                    self.carry_call_input(
+                                        builder,
+                                        capture.static_origin,
+                                        lowered,
+                                        #[cfg(test)]
+                                        GeneratedUnitCallInputCaller::SourceLexicalClosureCapture,
+                                        #[cfg(test)]
+                                        callee_body_origin,
+                                    )
                                 })
                                 .collect::<Result<Vec<_>, _>>()?,
                         );

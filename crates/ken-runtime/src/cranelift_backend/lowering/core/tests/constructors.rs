@@ -6834,6 +6834,120 @@ fn d7_transfer_carried_constructor_operands() -> Result<(), CraneliftBackendErro
     .map(|_| ())
 }
 
+/// `RT-CROSSING-CALLEE-IDENTITY` D3 exercises the existing boundary-transfer
+/// tag's negative arm on a real constructor store-loop child.
+///
+/// MEASURED: the heterogeneous eliminator makes `Outer::Hit` field 0 carried
+/// and field 1 the specialized integer 13. Its store loop transfers that exact
+/// planned child once with `BoundaryTransferInvokingSite::Direct`.
+///
+/// CLAIMED: the default tag is a live observation and the two-inhabitant tag
+/// varies on real transfers; it is not merely an unreachable enum arm. The
+/// independently planned parent/child relation attributes this fixture to the
+/// store loop. `Direct` itself is only the unlabelled default bucket and
+/// identifies no site. THE GAP: this control classifies one existing store-loop
+/// pair only. It does not claim that every direct transfer has a constructor
+/// parent.
+///
+/// Promise class: transition sentinel. The fixture deliberately names the
+/// store-loop route; rewrite the observation if an authorized carrier change
+/// removes that route rather than preserving its current event spelling.
+#[test]
+fn a_constructor_store_loop_child_reports_a_direct_boundary_transfer() {
+    use crate::cranelift_backend::lowering::{
+        d2k_owner_trace_take, BoundaryTransferInvokingSite, D2kOwnerEvent,
+    };
+
+    let outer = heterogeneous_eliminator_fixture(
+        "ctor:fixture::Inner::Hit",
+        "ctor:fixture::Inner::Hit",
+        "ctor:fixture::Outer::Hit",
+        "ctor:fixture::Outer::Hit",
+        1,
+        1,
+        true,
+        false,
+    );
+    let RuntimeExpr::Call { mut args, .. } = outer else {
+        panic!("the heterogeneous fixture must retain its outer call")
+    };
+    let inner_call = args.remove(0);
+    let expression = RuntimeExpr::Construct {
+        constructor: "ctor:fixture::StoreLoop::Pair".to_string(),
+        args: vec![
+            inner_call,
+            RuntimeExpr::Value(RuntimeValue::Int((13).into())),
+        ],
+    };
+    let (plan, _) = planned_root_occurrence(&expression);
+    let mut stack = vec![plan
+        .root_static_origin()
+        .expect("the store-loop fixture has a planned root")];
+    let mut parents = Vec::new();
+    while let Some(origin) = stack.pop() {
+        if matches!(
+            plan.source_occurrence(origin),
+            Ok(RuntimeExpr::Construct { constructor, args })
+                if constructor == "ctor:fixture::StoreLoop::Pair" && args.len() == 2
+        ) {
+            parents.push(origin);
+        }
+        let mut position = 0;
+        while let Ok(child) = plan.child_static_origin(origin, position) {
+            stack.push(child);
+            position += 1;
+        }
+    }
+    let [parent] = parents.as_slice() else {
+        panic!("the fixture must contain one two-field StoreLoop::Pair, got {parents:?}")
+    };
+    let specialized_child = plan
+        .child_static_origin(*parent, 1)
+        .expect("StoreLoop::Pair field 1 must have a planned child origin");
+    assert!(
+        matches!(
+            plan.source_occurrence(specialized_child),
+            Ok(RuntimeExpr::Value(RuntimeValue::Int(value))) if *value == 13.into()
+        ),
+        "the store-loop discriminator must name the specialized integer sibling",
+    );
+
+    let _ = d2k_owner_trace_take();
+    compile_expr_into_module(
+        new_jit_module().expect("the store-loop JIT module constructs"),
+        "ken_d3_direct_store_loop_child",
+        Linkage::Local,
+        &expression,
+        &NativeSeedEnvironment::empty(),
+        BTreeMap::new(),
+        None,
+        true,
+        None,
+        Some(test_only_distinguished_root_join_plan()),
+        None,
+    )
+    .expect("the real carried-constructor fixture must lower");
+    let events = d2k_owner_trace_take();
+    let observed = events
+        .into_iter()
+        .filter_map(|event| match event {
+            D2kOwnerEvent::BoundaryTransferEntered {
+                origin,
+                root_kind,
+                closure_path,
+                invoking_site,
+            } if origin == specialized_child => Some((root_kind, closure_path, invoking_site)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        observed,
+        vec![("Int", None, BoundaryTransferInvokingSite::Direct)],
+        "the exact specialized constructor child must cross once from the store loop, \
+         outside every generated-unit call-input guard",
+    );
+}
+
 /// **`D7` — each of the four governed sites reaches the choke, and cannot
 /// bypass it.**
 ///

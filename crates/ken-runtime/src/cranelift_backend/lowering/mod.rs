@@ -2493,11 +2493,25 @@ pub(in crate::cranelift_backend) fn d6a_route_applications() -> usize {
 /// this discriminator is constructible at all.
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::cranelift_backend) enum GeneratedUnitCallInputCaller {
+    StaticMatchCaseParameter,
+    StaticMatchCaseCapture,
+    SourceClosureArgument,
+    SourceLexicalClosureArgument,
+    SourceLexicalClosureCapture,
+    SourceMachineDeclaredUnit,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::cranelift_backend) enum BoundaryTransferInvokingSite {
     /// A transfer invoked from a site not yet given a narrower diagnostic tag.
     Direct,
     /// [`Lowering::carry_call_input`], the ordinary generated-unit input route.
-    GeneratedUnitCallInput,
+    GeneratedUnitCallInput {
+        caller: GeneratedUnitCallInputCaller,
+        callee: StaticOriginId,
+    },
 }
 
 #[cfg(test)]
@@ -7571,10 +7585,12 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         origin: StaticOriginId,
         input: LoweringOperand,
+        #[cfg(test)] caller: GeneratedUnitCallInputCaller,
+        #[cfg(test)] callee: StaticOriginId,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         #[cfg(test)]
         let _invoking_site = BoundaryTransferInvokingSiteGuard::enter(
-            BoundaryTransferInvokingSite::GeneratedUnitCallInput,
+            BoundaryTransferInvokingSite::GeneratedUnitCallInput { caller, callee },
         );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
@@ -7615,7 +7631,15 @@ impl<'a> Lowering<'a> {
         let origin = self.call_input_transfer_origin_under_mutation(origin)?;
         let mut carried = Vec::with_capacity(inputs.len());
         for input in inputs {
-            carried.push(self.carry_call_input(builder, origin, input)?);
+            carried.push(self.carry_call_input(
+                builder,
+                origin,
+                input,
+                #[cfg(test)]
+                GeneratedUnitCallInputCaller::SourceMachineDeclaredUnit,
+                #[cfg(test)]
+                origin,
+            )?);
         }
         Ok(carried)
     }
