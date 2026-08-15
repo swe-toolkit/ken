@@ -6173,10 +6173,13 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// and caller tags below assert. Each caller is handing a source-authored
 /// closure-bearing argument to a generated unit inside the live runtime, not
 /// publishing a durable or serialized artifact. Both therefore route through
-/// `41-values.md:76-83`'s live-domain clause. The existing B2F carrier supplies
-/// generated-unit transport but deliberately has no callable closure row; the
-/// remaining repair must cover invocation ownership, captured carrier words,
-/// static-body dispatch, and wrong-domain, expired, or forged refusal.
+/// `41-values.md:76-83`'s live-domain clause. The repair attempt stops at B2F's
+/// closed carrier language: generated-unit parameters are one `ValueWord`, but
+/// no invocation-owned tag/class row represents `Closure`; the only closure row
+/// is the explicitly retired persistent lane. B2F directly calls a statically
+/// selected closure body, but cannot carry this first-class closure-bearing
+/// argument without a new representation plus owner/domain/liveness authority.
+/// The exact refusal therefore remains conservative until that successor exists.
 ///
 /// Promise class: transition sentinel. The exact origin and path are the
 /// measured residual; the invoking-site tag is the measured route. Rewrite this

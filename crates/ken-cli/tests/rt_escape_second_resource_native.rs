@@ -611,13 +611,14 @@ fn escape_resource_plus_plain_matches_interpreter() {
 // `PersistentGround`, so this row is a live-domain exchange governed by
 // `41-values.md:76-83`, not durable publication under `:72-75`.
 //
-// D2 sizes the missing live-domain closure carrier as L across both required
-// sub-shapes: this escape-lifetime row needs the captured environment to outlive
-// its lexical frame, while the recursor rows need it passed as a generated-unit
-// argument. Both also require defining-owner/artifact liveness, same-domain
-// validation, checked static-body dispatch, and refusal of wrong-domain,
-// expired, or forged representations. The existing B2F carrier is the base to
-// extend; a silent zero-capture `StaticCallableRef` conversion is unavailable.
+// The repair attempt stops at B2F's closed carrier language. Generated-unit
+// values cross as one `BoundaryWord`; its only `Closure` tag/class row is the
+// explicitly retired persistent lane, and the invocation-owned aggregate row
+// admits only constructors and records. B2F can directly call a statically
+// selected closure body, but it cannot carry this first-class closure while
+// checking defining-owner/artifact liveness, same-domain use, and checked
+// dispatch. Adding that representation and authority would be a new carrier,
+// not wiring the existing one, so this row remains conservatively refused.
 //
 // D3 removes this ignore only with that live-domain validation in place and a
 // passing native/interpreter differential. Re-labelling the refusal without
