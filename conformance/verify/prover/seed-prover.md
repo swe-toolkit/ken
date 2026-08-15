@@ -92,8 +92,10 @@ against `23` + `trusted_base()`.
 - expect: **either** path lands at **not `proved`**: the buggy path's would-be
   certificate **fails** `check` (no kernel term of type `φ` exists — `φ` is
   topos-false), → **unknown**; the **correct** path routes **FO** (§4) and the
-  embedding `φ#` is **not** classically valid (the intuitionistic clause for `⇒`
-  blocks `¬¬`-elimination), so Z3 fails → honest **unknown**. Never `proved`.
+  quotation produces `problem Sigma C rho f`, for which
+  `classically_valid (embed Sigma f)` does **not** hold (the intuitionistic
+  clause for `⇒` blocks `¬¬`-elimination), so Z3 fails → honest **unknown**.
+  Never `proved`.
 - why: §1.5/§7 — a classical solver **cannot** make a Ken proof unsound, because
   the cert is re-checked regardless of how clever (or buggy) the backend is. The
   critical soundness regression (the `23 §9` / `seed-verify.md`
@@ -183,14 +185,14 @@ against `23` + `trusted_base()`.
   flip below.
 
 ### verify/prover/bare-unsat-no-cert-is-unknown-not-proved (soundness)
-- spec: `23 §4` (ledger row: Z3 "unsat" assumes nothing), `§1.2`/§1.5
-- given: a backend returns "unsat" / "valid" for `φ#` but yields **no
+- spec: `23 §4.4`; `§1.2`/§1.5
+- given: a backend returns "unsat" / "valid" for `embed Sigma f` but yields **no
   constructible certificate `π`** (reconstruction fails, or the backend emits no
   usable proof object)
 - expect: there is no `check_cert`-passing `π`, hence **no** discharge term to
   `check` → verdict **unknown** (typed hole, goal in `trusted_base()`), **not**
   `proved`.
-- why: §4 ledger / §1.5 — a backend "unsat" with **no constructible `π`** is
+- why: §4.4/§1.5 — a backend "unsat" with **no constructible `π`** is
   `unknown`, never `proved` (the same de Bruijn discipline as D, one tier up).
   **Verdict-flip on cert-constructibility:** a `check_cert`-passing `π` →
   `proved` (the case above); no `π` → `unknown`. **Guard:** `proved`
@@ -369,10 +371,12 @@ against `23` + `trusted_base()`.
 Build-sequencing: V3 extends the **landed** V1/V2 verification spine — it
 consumes V2's obligation set (`22 §1`/§6) and the `18 §4.5`/§5 cert API +
 trusted base, emits the trichotomy verdict keyed by `id` for V1's status
-projection (`21 §5.3`), and adds **no new kernel former or universe** (`23 §8`:
-goals stay `φ : Ω_ℓ`, the proof `p : φ` at the same `Ω_ℓ`; the Kripke embedding
-`φ#`/`World`/`P#` are **external** to the kernel; `Form`/`Cert`/`Decidable` are
-derived inductives at their natural `Type ℓ`; adequacy + `check_cert`-soundness
-are kernel-checked terms landing in Ω). Z3/cvc5 are **never** in
-`trusted_base()` (`18 §5`, `23 §7`). Diagnostic *shapes* (countermodel, typed
-hole) are `24`-owned and tagged `(oracle)` here pending `24`'s landed schema.
+projection (`21 §5.3`), and adds **no new kernel former or universe**
+(`23 §4.2`/§8: goals stay `φ : Ω_ℓ`, the proof `p : φ` at the same `Ω_ℓ`;
+the classical meanings of `World`/`Le`/`Dom`/`Force` live in the emitted FO
+problem, while `K(Sigma)` is a premise inside `embed`; `Form`/`Cert`/`Decidable`
+are derived inductives at their natural `Type ℓ`; adequacy +
+`check_cert`-soundness are kernel-checked terms landing in Ω). Z3/cvc5 are
+**never** in `trusted_base()` (`18 §5`, `23 §7`). Diagnostic *shapes*
+(countermodel, typed hole) are `24`-owned and tagged `(oracle)` here pending
+`24`'s landed schema.
