@@ -6185,6 +6185,20 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// measured residual; the invoking-site tag is the measured route. Rewrite this
 /// table when an authorized lowering repair moves either row; do not preserve
 /// it as a permanent shape requirement.
+///
+/// `RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE` D0-D2: the planner-issued empty
+/// environment Record replaces the closure child on both enabled rows. The
+/// origin-5 transfer therefore retains the same caller and callee identities but
+/// has no closure path and passes aggregate reconciliation. Lowering then
+/// refuses a source constructor under the enclosing lexical-closure origin,
+/// whose occurrence has no aggregate ownership record. No unit-result transfer
+/// is reached on that failing compile, so the opaque non-root result half is not
+/// yet load-bearing.
+///
+/// CLAIMED: the missing synthesized ownership seam has advanced to the next
+/// truthful planner-identity refusal without weakening the no-occurrence arm.
+/// GAP: this transition sentinel does not repair the mismatched body origin or
+/// establish that the later carrier-word result is sufficient.
 #[test]
 fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
     use crate::cranelift_backend::lowering::core::{
@@ -6211,6 +6225,7 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         origin_5_crossings: Vec<Crossing>,
         closure_child_present: bool,
         origin_5_transfer_into_carrier_reached: bool,
+        unit_result_transfer_reached: Option<bool>,
     }
 
     struct Restore;
@@ -6220,7 +6235,8 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         }
     }
 
-    fn compile(depth: usize) -> (String, Vec<D2kOwnerEvent>) {
+    fn compile(depth: usize) -> (String, Vec<D2kOwnerEvent>, bool) {
+        crate::cranelift_backend::lowering::reset_d5a_trace();
         let _ = d2k_owner_trace_take();
         let expression =
             host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
@@ -6233,10 +6249,25 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
             Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct, ..
             })) => construct.to_string(),
+            Err(CraneliftBackendError::Backend(
+                BackendFailure::PlannerInvariant(reason),
+            ))
+                if reason == "aggregate producer has no planned ownership record" =>
+            {
+                "AggregateProducerOwnership".to_string()
+            }
             Ok(_) => "compiled".to_string(),
             Err(other) => format!("other:{other}"),
         };
-        (outcome, d2k_owner_trace_take())
+        let unit_result_transfer_reached =
+            crate::cranelift_backend::lowering::take_d5a_trace()
+                .iter()
+                .any(|event| event.contains("UNIT-RESULT transfer"));
+        (
+            outcome,
+            d2k_owner_trace_take(),
+            unit_result_transfer_reached,
+        )
     }
 
     fn observe(
@@ -6245,11 +6276,12 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         suppressed: bool,
         target_origin: StaticOriginId,
     ) -> Observed {
-        let ((outcome, events), suppressions) = if suppressed {
-            with_required_consumer_route_suppressed(|| compile(depth))
-        } else {
-            (compile(depth), 0)
-        };
+        let ((outcome, events, unit_result_transfer_reached), suppressions) =
+            if suppressed {
+                with_required_consumer_route_suppressed(|| compile(depth))
+            } else {
+                (compile(depth), 0)
+            };
         let origin_5_crossings = events
             .into_iter()
             .filter_map(|event| match event {
@@ -6278,6 +6310,8 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
             origin_5_crossings,
             closure_child_present,
             origin_5_transfer_into_carrier_reached,
+            unit_result_transfer_reached: (!suppressed)
+                .then_some(unit_result_transfer_reached),
         }
     }
 
@@ -6335,19 +6369,20 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         [
             Observed {
                 label: "row4-depth-2/enabled",
-                outcome: "Closure".to_string(),
+                outcome: "AggregateProducerOwnership".to_string(),
                 suppressions: 0,
                 origin_5_crossings: vec![Crossing {
                     origin: origin_5,
                     root_kind: "Constructor",
-                    root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                    root_to_closure_path: None,
                     invoking_site: BoundaryTransferInvokingSite::GeneratedUnitCallInput {
                         caller: GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
                         callee: GeneratedUnitCallInputCallee::Body(depth_2_callee),
                     },
                 }],
-                closure_child_present: true,
+                closure_child_present: false,
                 origin_5_transfer_into_carrier_reached: true,
+                unit_result_transfer_reached: Some(false),
             },
             Observed {
                 label: "row4-depth-2/suppressed",
@@ -6356,22 +6391,24 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
                 origin_5_crossings: Vec::new(),
                 closure_child_present: false,
                 origin_5_transfer_into_carrier_reached: false,
+                unit_result_transfer_reached: None,
             },
             Observed {
                 label: "row4-depth-3/enabled",
-                outcome: "Closure".to_string(),
+                outcome: "AggregateProducerOwnership".to_string(),
                 suppressions: 0,
                 origin_5_crossings: vec![Crossing {
                     origin: origin_5,
                     root_kind: "Constructor",
-                    root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                    root_to_closure_path: None,
                     invoking_site: BoundaryTransferInvokingSite::GeneratedUnitCallInput {
                         caller: GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
                         callee: GeneratedUnitCallInputCallee::Body(depth_3_callee),
                     },
                 }],
-                closure_child_present: true,
+                closure_child_present: false,
                 origin_5_transfer_into_carrier_reached: true,
+                unit_result_transfer_reached: Some(false),
             },
             Observed {
                 label: "row4-depth-3/suppressed",
@@ -6380,6 +6417,7 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
                 origin_5_crossings: Vec::new(),
                 closure_child_present: false,
                 origin_5_transfer_into_carrier_reached: false,
+                unit_result_transfer_reached: None,
             },
         ],
         "D5 must preserve the exact enabled/suppressed origin-5 crossing table",
