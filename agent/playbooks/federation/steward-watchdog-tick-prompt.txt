@@ -1,36 +1,23 @@
-[steward watchdog tick] Private sweep — post to the space ONLY if there is a real stall to nudge. Plain text, no decorative icons.
-HARD LIMIT 4096 codepoints: over it, set_interval REJECTS and the tick cannot be re-armed. Measure before publishing. Rationale goes in steward/watchdog.md.
+STEWARD WATCHDOG TICK. Run these in order; stop as soon as one produces an action.
 
-STEP 0 — 60-MIN WIP AUDIT CLOCK (playbook §5a-iii). Read the ARMED deadline in your resume checkpoint. If an implementation seat has worked 60+ min since its last GUIDANCE, request an Architect WIP audit NOW.
-- RESETS on: kickoff/re-kickoff · genuine hard stop · Architect audit/ruling · candidate handoff · completion. A routine progress post does NOT reset it — a working seat posts every 15-30 min, and counting those makes the trigger fire NEVER while looking armed.
-- OVERRIDES "do not nudge a building ring" below; an audit is not a nudge.
-- Route: post to @architect naming the seat, elapsed, anchor evt_, last status posts. Architect -> leader -> implementer. NEVER Steward -> implementer.
-- ASK FOR THREE OUTCOMES or (c) is never considered: (a) on track · (b) course correction, wrong implementation right contract · (c) THE WP IS MIS-SIZED, restructure. (c) is the Architect's diagnosis and YOUR recut: retain what is proved, replace what the finding names, freeze its clock.
-- 60 min INDICATES too large, not a verdict. Repeated audits on ONE node is near-conclusive. After firing, RE-ARM the deadline.
+0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then run `cd /workspaces/ken && moot compact steward`. Announcing it is not doing it.
 
-STEP 1 — COMPOSER STRAND SWEEP, before any convo read. A post can land in a composer UNSUBMITTED; no convo read sees that.
+1. PRIORITY LANES ARE THE ONLY LANES (operator, 2026-08-15). Lane 1 = runtime, retire RecursiveDescent. Lane 2 = language+verify, z3 round-trip and FO Kripke embedding. No third lane gets a ring however idle or well-framed. Finished work still merges; filings queue.
 
-bash scripts/steward-pane-sweep.sh
+2. ARE THE LANES' CRATES MOVING? `git log --since='12 hours ago' --oneline origin/main -- crates/ | wc -l`. If the priority lanes' crates are not moving, stop and find out why before framing anything.
 
-It gathers facts and decides nothing; every call below is yours. Columns: seat | LIVE/DONE/(no-footer)/(no-session)/[SAFETY-MODAL] | ok/STRAND.
-- Busy is matched by VERB FAMILY, never a verb; both families are open-ended. A missed live verb reads "(no-footer)"; a missed FINISHED verb is SILENT and leaves a wait loop running against a stopped seat.
-- A counter DROP is a real turn boundary; a lockstep rise proves ONE continuous turn, not the absence of a compaction.
-- STRAND + idle will NEVER fire: send-keys Enter, then confirm live. STRAND + busy = clear it anyway.
-- Composer prefix carries NO information — ❯ and › both render placeholders, which ARE the seat's last submitted prompt and so always look like a plausible pending instruction. The STRAND column only sees pasted/channel text. ONLY sound test: type 2 throwaway chars — REPLACES = empty, APPENDS = real input. Probe BEFORE saying "stranded", not before repairing.
-- "Additional safety checks" modal = NEVER press Enter (option 1 downgrades the model); it needs no answer.
-- (no-footer) = a RENDERING state, not idle — read the pane. Codex seats ("gpt-… · /workspaces/…" last line) render no timing footer either way and always land here; expected, but NOT evidence of idleness.
+3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file; do not work from memory.
 
-STEP 2 — TRANSPORT: NEVER get_transcript (kills the stdio transport). For bodies use the HTTP read path with YOUR OWN credential: GET {api_url}/api/spaces/spc_4q7g0se87rgje/events?limit=100 — oldest-first, newest LAST; time field is `timestamp`.
+4. WIP AUDIT, 60 MINUTES -- AND VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: Architect audit/ruling, QA verdict, candidate handoff, leader routing, my own kick. READ THE THREAD FIRST with get_recent_context(detail="standard"). A reset event you never looked for cannot reset a clock. Measuring elapsed time from your own dispatch alone has fired a false audit.
 
-STEP 3 — patterns:
-- MERGE: CI pending too long · CI green + Decision unresolved · approved + CI red · approved+green but UNMERGED.
-- RING: handed-off-but-silent · merge-Decision-open-no-reviewer · blocked-without-a-blocker-mention · idle-with-ready-work.
-- FEDERATION: whole team idle · stalled LEADER · dropped cross-team query · no movement toward the gate.
-- §1a: holding without naming (a) the evt_/dec_ it waits for AND (b) the seat that owes it = STALLED.
-- Verify delivery POSITIVELY: did the mentioned seat subsequently post?
+5. ONE RELEASE AHEAD. For the in-flight node, grep other nodes' `depends_on` for its id (not its `blocks` edge -- they disagree and gen-progress.sh reads depends_on). Every successor must be `status: ready` with a shovel-ready frame. A MEASUREMENT-ONLY node never reaches `merged` -- close it, or its successors sit gated on a landing that cannot happen.
 
-Do NOT nudge a building ring (except the STEP 0 audit). Do NOT compact/restart a seat mid-turn.
-§10⁻: a ring holding finished unmerged work IS the queue — no process/corpus merge ahead of it.
-Do NOT reclaim /tmp while any seat holds the shared build turn (task #160).
+6. ADVERSARY REPORTS DO APPEAR in get_recent_context(detail="standard") -- verified 2026-08-15 on evt_11cr9qyqympq5. The old threads-endpoint step was INERT: all 20 threads read unread_count_for_actor > 0, including ones read minutes earlier, so a selector on it selected nothing. Poll with since_event_id from the last tick.
 
-Then: is origin/main green? is the frontier moving? If all clear, do nothing and post nothing. Clearing a strand is an ACTION — do it silently, report it in your reply.
+7. RESOLVE ACTOR IDS BEFORE COMPOSING A MENTIONS ARRAY, never after posting: `scripts/moot-actor-id.sh <role>`. A typed-from-memory id either wakes the wrong seat or wakes nobody, silently.
+
+8. A CITED COORDINATE IS NOT A VERIFIED ONE. Before framing on a line number from a ruling or a report, locate the symbol yourself. Three times this campaign a cited site named a function that did not perform the operation attributed to it.
+
+9. NEVER call get_transcript. Use get_recent_context / get_mentions with detail="standard".
+
+If nothing above produces an action, post nothing and stop. A quiet tick is a correct tick.
