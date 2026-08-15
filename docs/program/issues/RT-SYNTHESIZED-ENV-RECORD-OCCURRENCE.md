@@ -209,6 +209,56 @@ repair directions are both in scope and the choice is the ring's: give the child
 arm a producer-class gate, or do not present a synthesized record where a
 source-lane consumer will shape-dispatch on it.
 
+### SUPERSEDED BY MEASUREMENT: there is no key problem underneath this
+
+**The section above was written from a reading. The runtime ring then measured
+it, and the measurement is the authority.** Architect withdrawal at
+`evt_5h64t36bypwfy`.
+
+**What the ring established:** the synthesized occurrence is **valid**, and every
+transfer consumer through emission **accepts it** once the wrong source-only
+child lookup is skipped. ⇒ **The absent-key framing is withdrawn.** The defect is
+purely the child consumer asking a source-producer question about a synthesized
+producer; nothing underneath it is broken, and no key needed inventing.
+
+**What survives unchanged** is the asymmetry — the parent arm gates on producer
+class, the child arm tests only shape — and **that gate is the uncontested
+repair.**
+
+## THIS NODE IS BLOCKED ON AN OPERATOR DECISION. DO NOT RECUT IN EITHER DIRECTION.
+
+**The node cannot close on its current frame** (Architect ruling
+`evt_5h64t36bypwfy`, routed to the Steward as scope).
+
+**Applying the uncontested child gate advances `row4-depth-2/3` from refusal into
+compilation.** That is a **widening of the accepted language**, and by the
+Architect's `41-values.md §2.1` ruling it is right on the merits — a
+compiler-minted unit-boundary environment has no code identity, ABI, export, or
+serializable form, so *"a closure cannot cross the boundary"* is not a true
+sentence about it, and the refusal is a **transition sentinel that has reached
+its boundary** rather than a durable invariant.
+
+**But a widening is the operator's call, not the Architect's and not the
+Steward's.**
+
+| option | why it is not available here |
+|---|---|
+| **advance the rows** | pre-empts the operator's decision |
+| **withhold the substitution from these rows** | **empties the node's only production witness.** By the ring's own measurement these crossings are it. The node would ship a planner record nothing consumes, with ACs discharged by controls that have no live path behind them |
+
+> **Option 2 is not the conservative choice, and that is the part most likely to
+> be misread.** It is a scope cut wearing caution, and it is worse than the
+> widening because it is **invisible afterwards**: a green node whose mechanism is
+> unexercised reads as done.
+
+**Routed to the operator as ONE joined question with the `RecursiveDescent`
+fork** (`evt_3yvhf3hz59eb8`) — the same product surface, narrowing from one side
+and widening from the other. It is not to be re-posed separately or decided twice
+by different routes.
+
+**Until it is answered: no recut, and this node is not to be reframed to make
+either option legal.** Both directions foreclose the decision they wait on.
+
 ### Binding condition on the next approval
 
 > **A by-construction argument about the substitution function's own early
