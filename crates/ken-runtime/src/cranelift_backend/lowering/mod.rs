@@ -2492,6 +2492,15 @@ pub(in crate::cranelift_backend) fn d6a_route_applications() -> usize {
 /// (`AC-2`). Every tag sits on a *caller* or on an enclosing arm, which is why
 /// this discriminator is constructible at all.
 #[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::cranelift_backend) enum BoundaryTransferInvokingSite {
+    /// A transfer invoked from a site not yet given a narrower diagnostic tag.
+    Direct,
+    /// [`Lowering::carry_call_input`], the ordinary generated-unit input route.
+    GeneratedUnitCallInput,
+}
+
+#[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(in crate::cranelift_backend) enum D2kOwnerEvent {
     /// A `Construct` arm was entered, with the constructor it is building.
@@ -2595,6 +2604,7 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
         origin: StaticOriginId,
         root_kind: &'static str,
         closure_path: Option<String>,
+        invoking_site: BoundaryTransferInvokingSite,
     },
 }
 
@@ -2602,6 +2612,33 @@ pub(in crate::cranelift_backend) enum D2kOwnerEvent {
 thread_local! {
     static D2K_OWNER_TRACE: std::cell::RefCell<Vec<D2kOwnerEvent>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    static D2K_BOUNDARY_TRANSFER_INVOKING_SITE:
+        std::cell::Cell<BoundaryTransferInvokingSite> =
+        const { std::cell::Cell::new(BoundaryTransferInvokingSite::Direct) };
+}
+
+#[cfg(test)]
+struct BoundaryTransferInvokingSiteGuard {
+    previous: BoundaryTransferInvokingSite,
+}
+
+#[cfg(test)]
+impl BoundaryTransferInvokingSiteGuard {
+    fn enter(site: BoundaryTransferInvokingSite) -> Self {
+        let previous = D2K_BOUNDARY_TRANSFER_INVOKING_SITE.with(|current| {
+            current.replace(site)
+        });
+        Self { previous }
+    }
+}
+
+#[cfg(test)]
+impl Drop for BoundaryTransferInvokingSiteGuard {
+    fn drop(&mut self) {
+        D2K_BOUNDARY_TRANSFER_INVOKING_SITE.with(|current| {
+            current.set(self.previous);
+        });
+    }
 }
 
 #[cfg(test)]
@@ -6494,6 +6531,8 @@ impl<'a> Lowering<'a> {
             origin,
             root_kind: lowered_value_kind(value),
             closure_path: value.first_boundary_closure_path(),
+            invoking_site: D2K_BOUNDARY_TRANSFER_INVOKING_SITE
+                .with(std::cell::Cell::get),
         });
         value.boundary_transfer_admissibility()?;
         self.source_aggregate_preflight(value)?;
@@ -7533,6 +7572,10 @@ impl<'a> Lowering<'a> {
         origin: StaticOriginId,
         input: LoweringOperand,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        #[cfg(test)]
+        let _invoking_site = BoundaryTransferInvokingSiteGuard::enter(
+            BoundaryTransferInvokingSite::GeneratedUnitCallInput,
+        );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
             LoweringOperand::Specialized(value) => Ok(LoweringOperand::Carried(
@@ -10637,6 +10680,14 @@ impl Lowered {
                 Lowered::Constructor { args, .. } => {
                     for (position, field) in args.iter().enumerate() {
                         let ConstructorField::Specialized(child) = field else {
+                            // `RT-CROSSING-CALL-SITE-ATTRIBUTION` `D3`: the
+                            // production walk refuses this field through
+                            // `specialized_field_refs_at`; this diagnostic has
+                            // no child value to inspect. Its eventual `None`
+                            // therefore means only "no ordinary closure was
+                            // located on the inspectable specialized run", not
+                            // "the whole constructor graph contains no
+                            // closure".
                             continue;
                         };
                         if let Some(found) = descend(
