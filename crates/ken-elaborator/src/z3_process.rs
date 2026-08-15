@@ -178,3 +178,47 @@ fn integer(tokens: &[Token<'_>], cursor: &mut usize) -> Option<BigInt> {
     close(tokens, cursor)?;
     Some(parsed)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Promise class: durable protocol-structure invariant.
+    ///
+    /// MEASURED: the pure query generator emits the complete command structure
+    /// for two Pi-bound Int variables, including their de Bruijn order and the
+    /// negated equality. CLAIMED: SMT-LIB emission has a binary-independent
+    /// witness. THE GAP: token comparison intentionally ignores whitespace but
+    /// does not establish that any external solver accepts the query.
+    #[test]
+    fn fixed_goal_emits_complete_smtlib_structure_without_a_solver() {
+        let int_id = GlobalId(42);
+        let int_ty = Term::const_(int_id, vec![]);
+        let goal = Term::pi(
+            int_ty.clone(),
+            Term::pi(
+                int_ty.clone(),
+                Term::Eq(
+                    Box::new(int_ty),
+                    Box::new(Term::var(1)),
+                    Box::new(Term::var(0)),
+                ),
+            ),
+        );
+
+        let (query, binders) = emit_query(&goal, int_id).expect("supported fixed goal");
+        assert_eq!(binders, 2);
+        assert_eq!(
+            tokenize(&query),
+            tokenize(
+                "(set-option :produce-models true)\n\
+                 (set-logic QF_LIA)\n\
+                 (declare-const k0 Int)\n\
+                 (declare-const k1 Int)\n\
+                 (assert (not (= k0 k1)))\n\
+                 (check-sat)\n\
+                 (get-value (k0 k1))\n"
+            )
+        );
+    }
+}
