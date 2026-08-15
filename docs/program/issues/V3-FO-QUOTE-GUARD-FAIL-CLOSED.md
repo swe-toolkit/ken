@@ -77,6 +77,29 @@ merely unreachable.**
 This is a defect in a guard inside a slice built to grow, filed so it is fixed
 while it is cheap rather than when it is load-bearing.
 
+> ### THE LATENCY HAS A SHELF LIFE, AND IT EXPIRES ON THE NEXT NODE'S `D1`-`D3`
+>
+> **Steward sequencing decision, 2026-08-15.** This node goes **ahead of**
+> `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` `D1`-`D3`, reversing the earlier note
+> that it must not jump that node.
+>
+> **The reason the severity is "latent" is exactly what `D1`-`D3` remove.**
+> Nothing reaches `quote_fo` in production today; `D1`-`D3` are the work that
+> makes route FO reachable, and `mentions_var0` runs **before** `quote_iform`'s
+> refusal, on unvalidated input. **Landing them first arms a guard already known
+> to be fail-open.**
+>
+> **This is not a claim that the bug becomes dangerous.** With `AC-3` holding,
+> route FO still cannot return `proved`, so a bad guard yields a wrong quoted
+> formula and an `Unknown` verdict, not an unsound one. **The argument is cost,
+> not danger:** this node is size `S`, the ordering is free while `D1`-`D3` have
+> not started, and it stops being free afterwards.
+>
+> **The general shape, which outlives this instance:** a severity of "latent,
+> unreachable" is a claim about the tree at a moment, and the node that makes it
+> reachable is usually already scheduled. **Ask what would arm a latent defect and
+> when that work lands, rather than filing the latency as if it were durable.**
+
 ## Deliverables
 
 **`D0` — `Pair` is not a binder.** Traverse both subterms at the same depth,

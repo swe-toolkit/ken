@@ -1,7 +1,7 @@
 ---
 id: V3-FO-OBLIGATION-SIGNATURE-DISCOVERY
 title: "Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all"
-status: ready
+status: active
 owner: language
 size: L
 gate: none
@@ -299,7 +299,22 @@ needs to say which constraint it is enforcing.
 > through route FO, so `D5` as approved changes no existing hash. **It is future
 > reachability that makes this live, which is what `D1`-`D3` create.**
 >
-> ### `D1`-`D3` ARE BOUNDED BY THIS, NOT BLOCKED BY IT
+> ### `D5` MERGED at `e6d7e30f8` (PR #2342), blob-verified 2/2 from `320ef7e6c`.
+>
+> ### `D1`-`D3` NOW WAIT ON [[V3-FO-QUOTE-GUARD-FAIL-CLOSED]] — Steward sequencing
+>
+> That node is size `S`, is `ready`, and fixes a **known fail-open guard** in
+> `quote_fo`: `mentions_var0` misclassifies `Pair` as a binder and defaults ten
+> subterm-carrying constructors to `false`. It runs **before** `quote_iform`'s
+> refusal, on unvalidated input.
+>
+> **`D1`-`D3` are precisely the work that puts live obligations through it.**
+> Fixing the guard first is free while `D1`-`D3` have not started and stops being
+> free afterwards. **The earlier instruction that the quote-guard node must not
+> jump this one is reversed** — it was written when this node's `D5` was the
+> ungated starting point, and `D5` has landed.
+>
+> ### `D1`-`D3` ARE ALSO BOUNDED BY THE ENCODING PROPERTY, NOT BLOCKED BY IT
 >
 > Three constraints, from the same ruling. They are not gates and nothing is owed
 > back before starting.
