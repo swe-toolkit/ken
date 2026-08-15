@@ -678,12 +678,13 @@ this is a recorded no-reference-contact statement.
 ## SP-A. A span is bound to one exact buffer acquisition
 
 The Phase-1 matrix retains one independent cell per engine; interpreter/native
-equality is not an oracle. PX8-SPAN-PROV Phase 2 makes the complete SP-A freeze
-row GREEN on both engines. The complete interpreter cells for SP-A write, SP-B,
-and SP-C are GREEN, while their native cells are explicitly
-**BLOCKED-ON-NATIVE-REACHABILITY** by [[RT-NATIVE-FNSPLIT]]: the current native
-backend lowers the whole valid four-bracket process into one Cranelift function
-and reaches `VReg::MAX` before execution.
+equality is not an oracle. The complete interpreter cells for SP-A freeze,
+SP-A write, SP-B, and SP-C are GREEN. None of their native cells is witnessed:
+SP-A freeze has one executing both-engine arm, but it is `#[ignore]`d and a
+forced run fails during native object emission at
+[[RT-COMPMATCH-TREE-SCRUTINEE]]; SP-A write, SP-B, and SP-C have no executing
+native arm. The four native cells therefore remain explicitly blocked on that
+live Runtime node, not on the merged [[RT-NATIVE-FNSPLIT]].
 
 The native route-1 mechanism still has supporting, non-cell evidence: SP-A
 freeze drives the full native foreign-rejection path; a distinct-token native
@@ -692,8 +693,10 @@ field rather than substituting the target; and the shared host dispatcher
 proves both consumers reject before byte exposure or backend writes. This
 evidence makes the landed mechanism auditable, but does not present an
 interpreter fallback or a composed proof as completion of the blocked native
-cells. Those cells turn GREEN only after [[RT-NATIVE-FNSPLIT]] makes the exact
-programs runnable.
+cells. The targeted `rt_span_prov_native` run passes five interpreter tests and
+ignores the sole both-engine arm; forcing that arm fails with
+`ComputationalMatch: tree-producing match scrutinee is not Bool or a
+constructor`. The native cells turn GREEN only after the exact programs run.
 
 The exact foreign-acquisition result is the existing
 `ResourceError.InvalidBounds`, as locked by `38 §1.7.1`. It is the same public
@@ -703,10 +706,16 @@ constructor-private acquisition binding.
 
 ### buffer-io/foreign-span-freeze-rejected-absolute
 
-- status: **GREEN — PX8-SPAN-PROV Phase 2, interpreter + native absolute**
+- status: **PARTIAL — interpreter GREEN; native
+  BLOCKED-ON-RT-COMPMATCH-TREE-SCRUTINEE
+  ([[RT-COMPMATCH-TREE-SCRUTINEE]])**
 - spec: `38 §1.7.1`; PX8-SPAN-PROV AC-3
-- engine matrix: run the complete given/expect pair independently on
-  `interpreter` and `native`; neither result is inferred from the other
+- engine matrix:
+  - `interpreter`: GREEN; the Phase-2 interpreter half witnesses the complete
+    foreign/own-span pair
+  - `native`: BLOCKED; the only executing both-engine arm is `#[ignore]`d, and
+    forcing it fails at native object emission under
+    [[RT-COMPMATCH-TREE-SCRUTINEE]] before the native observation
 - evidence:
   `crates/ken-cli/tests/rt_span_prov_native.rs::sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines`
 - given: acquire distinct capacity-`8` buffers A and B; use successful
@@ -725,13 +734,15 @@ constructor-private acquisition binding.
 ### buffer-io/foreign-span-write-rejected-before-backend
 
 - status: **PARTIAL — interpreter GREEN; native
-  BLOCKED-ON-NATIVE-REACHABILITY ([[RT-NATIVE-FNSPLIT]])**
+  BLOCKED-ON-RT-COMPMATCH-TREE-SCRUTINEE
+  ([[RT-COMPMATCH-TREE-SCRUTINEE]])**
 - spec: `38 §1.7.1`; PX8-SPAN-PROV AC-3
 - engine matrix:
   - `interpreter`: GREEN; run the complete given/expect pair with a fresh
     recording destination per arm
-  - `native`: BLOCKED; the exact four-bracket program reaches the current
-    single-function Cranelift size limit before execution
+  - `native`: BLOCKED; there is no executing native arm for this exact program;
+    the first reaching both-engine control fails under
+    [[RT-COMPMATCH-TREE-SCRUTINEE]]
 - evidence:
   - interpreter foreign arm:
     `rt_span_prov_native::sp_a_foreign_span_write_rejects_before_backend_interp`
@@ -760,12 +771,14 @@ constructor-private acquisition binding.
 ### buffer-io/span-validity-follows-host-width-and-precedes-host-effects
 
 - status: **PARTIAL — interpreter GREEN; native
-  BLOCKED-ON-NATIVE-REACHABILITY ([[RT-NATIVE-FNSPLIT]])**
+  BLOCKED-ON-RT-COMPMATCH-TREE-SCRUTINEE
+  ([[RT-COMPMATCH-TREE-SCRUTINEE]])**
 - spec: `38 §1.7.1`; PX8-SPAN-PROV AC-1/AC-2/AC-3
 - engine matrix:
   - `interpreter`: GREEN; run every arm independently
-  - `native`: BLOCKED; the exact four-bracket programs reach the current
-    single-function Cranelift size limit before execution
+  - `native`: BLOCKED; there is no executing native arm for these exact
+    programs; the first reaching both-engine control fails under
+    [[RT-COMPMATCH-TREE-SCRUTINEE]]
 - evidence:
   - validity/no-effect arms:
     `rt_span_prov_native::sp_b_foreign_and_stale_window_reject_with_no_effect_interp`
@@ -794,12 +807,14 @@ constructor-private acquisition binding.
 ### buffer-io/closed-span-not-revived-by-buffer-slot-reuse
 
 - status: **PARTIAL — interpreter GREEN; native
-  BLOCKED-ON-NATIVE-REACHABILITY ([[RT-NATIVE-FNSPLIT]])**
+  BLOCKED-ON-RT-COMPMATCH-TREE-SCRUTINEE
+  ([[RT-COMPMATCH-TREE-SCRUTINEE]])**
 - spec: `38 §1.7.1`; PX8-SPAN-PROV AC-3
 - engine matrix:
   - `interpreter`: GREEN; run the complete lifecycle
-  - `native`: BLOCKED; the exact four-bracket program reaches the current
-    single-function Cranelift size limit before execution
+  - `native`: BLOCKED; there is no executing native arm for this exact program;
+    the first reaching both-engine control fails under
+    [[RT-COMPMATCH-TREE-SCRUTINEE]]
 - evidence:
   - complete interpreter lifecycle:
     `rt_span_prov_native::sp_c_released_span_not_revived_by_slot_reuse_interp`
@@ -822,6 +837,19 @@ constructor-private acquisition binding.
 - why: slot identity alone aliases the old and new acquisitions. Requiring the
   full acquisition identity makes release/reallocation a permanent verdict
   flip, while the fresh-span controls reject an always-stale implementation.
+
+## Stale-disposition closure account
+
+The seven producer reds became stale at identifiable landings: CAT-3 at
+`72c2315ca`, CAT-4 as the D0–D4 corpus entered this ancestry through
+`6e34371cc3`/`f71abba014`, and CP0 at `6088e0b8a`; none triggered a seed
+re-adjudication. The buffer markers failed at a different known boundary:
+[[RT-NATIVE-FNSPLIT]] closed `merged` on 2026-07-29 despite its contract to run
+these exact native matrices and its closure promise of a conformance flip. No
+mechanism re-examines a blocked disposition when its named node closes or
+checks that closure against incoming markers. The cheap catch therefore
+belongs at producer/node closure: enumerate dependent dispositions and require
+their measured re-adjudication before closing.
 
 ## Clean-room provenance for SP-A–SP-C
 
@@ -987,9 +1015,9 @@ or a result that claims success with a nonempty remainder does not conform.
 |---|---|
 | AC-1 exact-acquisition binding and both consumers | SP-A, SP-B |
 | AC-2 exact error identity and precedence | SP-A, SP-B, SP-C |
-| AC-3 absolute same-shape freeze pair on both engines | SP-A freeze |
-| AC-3 absolute same-shape write pair | SP-A write: interpreter GREEN; native blocked by [[RT-NATIVE-FNSPLIT]] |
-| AC-3 close/reallocate generation non-revival | SP-C: interpreter GREEN; native blocked by [[RT-NATIVE-FNSPLIT]] |
+| AC-3 absolute same-shape freeze pair | SP-A freeze: interpreter GREEN; native blocked by [[RT-COMPMATCH-TREE-SCRUTINEE]] |
+| AC-3 absolute same-shape write pair | SP-A write: interpreter GREEN; native blocked by [[RT-COMPMATCH-TREE-SCRUTINEE]] |
+| AC-3 close/reallocate generation non-revival | SP-C: interpreter GREEN; native blocked by [[RT-COMPMATCH-TREE-SCRUTINEE]] |
 
 ## Cross-case, verdict-flip, and reachability sweep
 
@@ -1038,10 +1066,12 @@ or a result that claims success with a nonempty remainder does not conform.
 - **The provenance experiments are absolute and controlled at their recorded
   status.** SP-A freeze holds capacity, numeric window, live-window shape, and
   operation fixed while changing only the span's originating acquisition; its
-  foreign arm rejects and its own-span arm succeeds on each engine
-  independently. SP-A write, SP-B, and SP-C run their complete absolute cells
-  on the interpreter; their native cells remain explicitly blocked by
-  [[RT-NATIVE-FNSPLIT]], not inferred from composed evidence. SP-B fixes the
+  foreign arm rejects and its own-span arm succeeds on the interpreter. Its
+  ignored both-engine arm fails at native object emission when forced. SP-A
+  write, SP-B, and SP-C run their complete absolute cells on the interpreter
+  but have no executing native arm; all four native cells remain explicitly
+  blocked by [[RT-COMPMATCH-TREE-SCRUTINEE]], not inferred from composed
+  evidence. SP-B fixes the
   mismatch's position between host-width admission and live-window/backend
   work. SP-C forces actual slot reuse and changes the generation, so a check on
   slot or numeric span alone fails while a full-acquisition check passes.
