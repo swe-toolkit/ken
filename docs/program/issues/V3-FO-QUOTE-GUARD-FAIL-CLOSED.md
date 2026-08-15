@@ -113,6 +113,38 @@ kernel constructor is a compile error rather than a silent fail-open.
 recorded mechanism explaining why the coupling is not expressible is a complete
 deliverable; a silent restatement of the status quo is not.
 
+> ### WHAT `D2` ACTUALLY BOUGHT, AND THE HALF IT DOES NOT COVER
+>
+> **Architect review `evt_1y00bx8za2532`, approving exact `4674fe840`. Recorded
+> as a known coupling at his direction; explicitly NOT asked of this candidate.**
+>
+> **The delivered mechanism is compile-time exhaustiveness, and it is stronger
+> than what was asked for.** No wildcard arm; the six term-free leaves are
+> enumerated individually and return `false` as an exact structural fact rather
+> than as a default. A runtime "unknown means true" default would have been the
+> obvious fail-closed design and would have been **weaker** — it keeps compiling
+> while being wrong about the new case.
+>
+> **The half it does not cover.** `mentions_var0` now encodes `shift`'s binder
+> discipline a **second time, in a second file**, and nothing enforces that the
+> two agree. The `subst.rs:44`/`:147` citations are documentation, not a
+> constraint.
+>
+> ⇒ **Exhaustiveness protects against a NEW `Term` variant. It does not protect
+> against an EXISTING variant changing binder status.** If `Pair` ever became a
+> binder, or a new binding position were added to `Let`, `mentions_var0` would
+> **still compile** and would be silently wrong **in the false-negative
+> direction** — the same direction `D0` just fixed.
+>
+> **This is the shape that broke lane 1 the same day**
+> (`RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE`), and it is conjunct 4 of the `D0`
+> ruling on [[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]]: **two independent
+> derivations of one key, with nothing proving they agree.** Three occurrences
+> in two lanes on 2026-08-15.
+>
+> **The durable fix, if one is ever cheap: derive one traversal from the other
+> rather than mirror it.** Until then this is a recorded coupling, not a defect.
+
 **`D3` — two comment corrections where the conclusion holds and the stated reason
 does not.** Both were checked and both conclusions stand; only the justifications
 are wrong, and a later author will rely on them.
