@@ -1,7 +1,7 @@
 ---
 id: RT-SRCMACHINE-CTOR-RECOGNITION-ARM
 title: "Arm static-worker recognition on the source-machine Construct arm, which never dispatches the classifier, after a bounded check that every eligible-field state can enter the template"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none

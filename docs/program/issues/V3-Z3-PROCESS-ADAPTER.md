@@ -1,7 +1,7 @@
 ---
 id: V3-Z3-PROCESS-ADAPTER
 title: "The z3 half of the round-trip: an off-by-default external solver that proposes candidate assignments into the kernel-gated witness seam, adding a dependency and zero trusted base"
-status: draft
+status: ready
 owner: verify
 size: M
 gate: none

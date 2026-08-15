@@ -1,7 +1,7 @@
 ---
 id: V3-D-OPEN-GOAL-WITNESS-ROUTE
 title: "The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver"
-status: ready
+status: merged
 owner: verify
 size: S
 gate: none

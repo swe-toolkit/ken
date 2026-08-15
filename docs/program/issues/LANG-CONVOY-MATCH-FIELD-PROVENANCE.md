@@ -235,11 +235,55 @@ capability 2. **Measure that.**
 > genuine outer binder, which is a statement about what the region set *means* —
 > and that is design-justified, not measured.
 >
+> ### THE SECOND CLAUSE IS NOW WITNESSED, MEASURED AFTER THE MERGE. Adversary hunt on `f08388396`, `evt_537ca9ady72kg`.
+>
+> **"The file-wide discriminator population is empty" was true and was read too
+> widely.** It is empty *in `ds5b_dependent_match_refinement_acceptance.rs`*.
+> **A discriminating program exists and is the existing zip fixture plus one
+> `let`** — the interleaved shape this node's own design rationale names as the
+> reason a floor fails:
+>
+> | guard | plain zip | interleaved `let` |
+> |---|---|---|
+> | shipped region set | `Ok(g583)` | `KernelRejected TypeMismatch ((Dg574 Dg67) @9)` vs `@4` |
+> | prohibited floor `abs_pos >= 3` | `Ok(g583)` | `KernelRejected NotTerminating("SCT: idempotent self-loop has no strictly-decreasing parameter")` |
+>
+> **Different rejection classes, so the guards are behaviourally
+> distinguishable**, and QA's file-wide result is reproduced exactly — the plain
+> zip cannot tell them apart and one line more program can.
+>
+> **State the direction precisely, because "witnessed" is not "the region set
+> works here".** Both guards reject this program. What differs is the class: the
+> region set fails on a type index, the floor fails **termination checking** —
+> the soundness-adjacent gate — because it mangles the recursive argument until
+> SCT can no longer find a decreasing parameter. **Among two failures the
+> floor's is worse, and that is the sense in which the choice is supported.**
+>
+> ⇒ **`AC-1`'s withdrawal STANDS as written: the shipped suite discharges
+> nothing.** What changes is that the gap is one fixture wide rather than
+> unmeasurable, and that fixture is a deliverable of
+> [[LANG-INTERVENING-LET-FRAME-WEAKENING]] — the same program serves both.
+>
 > **The bounded attempt at a discriminating witness was authorized to fail and
 > did.** It reached `install_index_refinements` with a fresh `let k : Vec Nat n`
 > and died in `refine_branch_goal`. **That is
 > [[LANG-INTERVENING-LET-FRAME-WEAKENING]], and its `D1` is a regression check on
 > this node** — the Architect approved with that measurement outstanding.
+>
+> ### THAT CONDITION IS DISCHARGED. NO REGRESSION. Do not carry it as open.
+>
+> `LANG-INTERVENING-LET-FRAME-WEAKENING` `D1` merged (`fe7be8386`, Decision
+> `dec_2nfjvjm7sypt8`, Architect `evt_13p2qnzj9hh0t`). **The failure is
+> byte-for-byte identical at all three points** — predecessor base `43bd0d597`,
+> the prohibited floor, and the shipped region set: same `ElabError::Internal`,
+> same site (`refine_branch_goal`, `elab.rs:2913-2917`), same operands.
+>
+> **This node's entire production delta IS the region stack**, so base-vs-shipped
+> covers the whole node and the floor run covers the predicate choice. ⇒ **A
+> clean pre-existing gap, independent of the merged predicate.** The trigger the
+> Architect attached to this merge — *"fails only under the region set ⇒
+> acceptance regression, returns to me"* — **did not fire, and it was measured
+> rather than assumed.**
 >
 > **Why the failure of an AC did not block the merge:** the shipped code is
 > byte-identical to a head already reviewed sound, the suite is green with no
