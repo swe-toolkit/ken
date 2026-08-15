@@ -6137,23 +6137,37 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// This does not establish the later repair, its owner, or any subsumption with
 /// the separate durable-closure population.
 ///
-/// `RT-CROSSING-CALL-SITE-ATTRIBUTION` D2 MEASURED: both enabled rows enter
-/// that origin-5 crossing from `GeneratedUnitCallInput`, the stable tag on
-/// `carry_call_input`. CLAIMED: this is the ordinary generated-unit input route
-/// that carries every specialized input; it is not the required-consumer
-/// realization's return surface. This provisionally selects branch 1: the
-/// realization produced the wrong value shape into a pre-existing carrier path.
-/// THE GAP: `GeneratedUnitCallInput` is measured at the shared
-/// `carry_call_input` helper; six callers share it. Delivery-versus-helper
-/// ordinariness is argued, not measured, so branch 1 remains provisional. This
-/// says nothing about closure pre-existence, does not implement the repair, and
-/// does not infer its owner.
+/// `RT-CROSSING-CALLEE-IDENTITY` D1/D2 MEASURED: the depth-2 origin-5 crossing
+/// set is the singleton `{source LexicalClosure argument -> callee body
+/// StaticOriginId(49)}`; depth 3's set is the singleton `{the same caller arm ->
+/// callee body StaticOriginId(59)}`. Both callees are the source program's exact
+/// direct HostResult `Match` bodies, not either row's required-consumer
+/// projection.
+///
+/// The invoking-site tag is ambient for `carry_call_input`'s whole dynamic
+/// guard extent, not lexical proof that the helper directly invoked a transfer.
+/// A reverted re-entrancy probe measured `enclosing_transfers = 0` in all four
+/// compiles, closing that depth axis: the helper is the immediate invoker here.
+/// The caller/callee refinement closes the remaining breadth axis across its six
+/// direct callers.
+///
+/// CLAIMED: delivery is source-program-authored, so branch 1 is selected: the
+/// value arriving through that intended call-input route has the wrong shape.
+/// THE GAP: this does not establish closure pre-existence, choose a repair, or
+/// infer its owner. The caller/callee identities are transition sentinels for
+/// this measured route and must be rewritten if an authorized lowering change
+/// moves it; the predecessor's provisional qualifier is resolved here rather
+/// than retained.
 ///
 /// D3 MEASURED: the depth-2 plan's source-occurrence table contains the typed
 /// identity at ordinal 5, and it renders as `StaticOriginId(5)`. CLAIMED: that
 /// assertion runs before the four-row table, so a stale key is loud even for
 /// the two rows whose expected origin-5 crossing is absent. THE GAP: existence
 /// identifies the probe key, not the meaning of the occurrence it names.
+///
+/// D4 MEASURED: `(origin -> crossing)` is retained as a relation. The table
+/// below pins the whole crossing vector per row; it does not panic under a false
+/// general law when another fixture gives one origin multiple crossings.
 ///
 /// Promise class: transition sentinel. The exact origin and path are the
 /// measured residual; the invoking-site tag is the measured route. Rewrite this
@@ -6166,18 +6180,24 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
     };
     use crate::cranelift_backend::lowering::{
         d2k_owner_trace_take, BoundaryTransferInvokingSite, D2kOwnerEvent,
+        GeneratedUnitCallInputCaller,
     };
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct Crossing {
+        origin: StaticOriginId,
+        root_kind: &'static str,
+        root_to_closure_path: Option<String>,
+        invoking_site: BoundaryTransferInvokingSite,
+    }
 
     #[derive(Debug, Eq, PartialEq)]
     struct Observed {
         label: &'static str,
         outcome: String,
         suppressions: usize,
-        transferred_root_origin: Option<StaticOriginId>,
-        transferred_root_kind: Option<&'static str>,
-        root_to_closure_path: Option<String>,
+        origin_5_crossings: Vec<Crossing>,
         closure_child_present: bool,
-        origin_5_invoking_site: Option<BoundaryTransferInvokingSite>,
         origin_5_transfer_into_carrier_reached: bool,
     }
 
@@ -6218,7 +6238,7 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         } else {
             (compile(depth), 0)
         };
-        let targeted = events
+        let origin_5_crossings = events
             .into_iter()
             .filter_map(|event| match event {
                 D2kOwnerEvent::BoundaryTransferEntered {
@@ -6226,43 +6246,47 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
                     root_kind,
                     closure_path,
                     invoking_site,
-                } if origin == target_origin => {
-                    Some((origin, root_kind, closure_path, invoking_site))
-                }
+                } if origin == target_origin => Some(Crossing {
+                    origin,
+                    root_kind,
+                    root_to_closure_path: closure_path,
+                    invoking_site,
+                }),
                 _ => None,
             })
             .collect::<Vec<_>>();
-        let (
-            transferred_root_origin,
-            transferred_root_kind,
-            root_to_closure_path,
-            origin_5_invoking_site,
-        ) = match targeted.as_slice() {
-            [] => (None, None, None, None),
-            [(origin, root_kind, closure_path, invoking_site)] => (
-                Some(*origin),
-                Some(*root_kind),
-                closure_path.clone(),
-                Some(*invoking_site),
-            ),
-            _ => panic!(
-                "{label}: origin 5 must identify at most one predecessor crossing, got \
-                 {targeted:?}"
-            ),
-        };
-        let closure_child_present = root_to_closure_path.is_some();
-        let origin_5_transfer_into_carrier_reached = transferred_root_origin.is_some();
+        let closure_child_present = origin_5_crossings
+            .iter()
+            .any(|crossing| crossing.root_to_closure_path.is_some());
+        let origin_5_transfer_into_carrier_reached = !origin_5_crossings.is_empty();
         Observed {
             label,
             outcome,
             suppressions,
-            transferred_root_origin,
-            transferred_root_kind,
-            root_to_closure_path,
+            origin_5_crossings,
             closure_child_present,
-            origin_5_invoking_site,
             origin_5_transfer_into_carrier_reached,
         }
+    }
+
+    fn expected_source_callee(depth: usize, ordinal: usize) -> StaticOriginId {
+        let expression = host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+        let plan = plan_static_transition_graph(&expression, &BTreeMap::new())
+            .expect("the callee-identity fixture must plan");
+        let callee = plan
+            .source_occurrence_origin_at_ordinal_for_test(ordinal)
+            .expect("the measured callee body must remain in the planned source population");
+        let RuntimeExpr::Match { default, .. } = plan
+            .source_occurrence(callee)
+            .expect("the measured callee must be a source occurrence")
+        else {
+            panic!("the measured callee must remain the direct HostResult Match body")
+        };
+        assert_eq!(
+            default.message, "direct HostResult default",
+            "the measured callee must remain the source program's direct HostResult body",
+        );
+        callee
     }
 
     set_selector_variant_exclusion(Some(
@@ -6285,6 +6309,10 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
         "StaticOriginId(5)",
         "the row-independent plan lookup must identify the exact hardcoded probe key",
     );
+    let depth_2_callee = expected_source_callee(2, 49);
+    let depth_3_callee = expected_source_callee(3, 59);
+    assert_eq!(format!("{depth_2_callee:?}"), "StaticOriginId(49)");
+    assert_eq!(format!("{depth_3_callee:?}"), "StaticOriginId(59)");
     assert_eq!(
         [
             observe("row4-depth-2/enabled", 2, false, origin_5),
@@ -6297,48 +6325,48 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
                 label: "row4-depth-2/enabled",
                 outcome: "Closure".to_string(),
                 suppressions: 0,
-                transferred_root_origin: Some(origin_5),
-                transferred_root_kind: Some("Constructor"),
-                root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                origin_5_crossings: vec![Crossing {
+                    origin: origin_5,
+                    root_kind: "Constructor",
+                    root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                    invoking_site: BoundaryTransferInvokingSite::GeneratedUnitCallInput {
+                        caller: GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
+                        callee: depth_2_callee,
+                    },
+                }],
                 closure_child_present: true,
-                origin_5_invoking_site: Some(
-                    BoundaryTransferInvokingSite::GeneratedUnitCallInput,
-                ),
                 origin_5_transfer_into_carrier_reached: true,
             },
             Observed {
                 label: "row4-depth-2/suppressed",
                 outcome: "StaticWorkerBinding".to_string(),
                 suppressions: 1,
-                transferred_root_origin: None,
-                transferred_root_kind: None,
-                root_to_closure_path: None,
+                origin_5_crossings: Vec::new(),
                 closure_child_present: false,
-                origin_5_invoking_site: None,
                 origin_5_transfer_into_carrier_reached: false,
             },
             Observed {
                 label: "row4-depth-3/enabled",
                 outcome: "Closure".to_string(),
                 suppressions: 0,
-                transferred_root_origin: Some(origin_5),
-                transferred_root_kind: Some("Constructor"),
-                root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                origin_5_crossings: vec![Crossing {
+                    origin: origin_5,
+                    root_kind: "Constructor",
+                    root_to_closure_path: Some("Constructor.arg[0].Closure".to_string()),
+                    invoking_site: BoundaryTransferInvokingSite::GeneratedUnitCallInput {
+                        caller: GeneratedUnitCallInputCaller::SourceLexicalClosureArgument,
+                        callee: depth_3_callee,
+                    },
+                }],
                 closure_child_present: true,
-                origin_5_invoking_site: Some(
-                    BoundaryTransferInvokingSite::GeneratedUnitCallInput,
-                ),
                 origin_5_transfer_into_carrier_reached: true,
             },
             Observed {
                 label: "row4-depth-3/suppressed",
                 outcome: "StaticWorkerBinding".to_string(),
                 suppressions: 1,
-                transferred_root_origin: None,
-                transferred_root_kind: None,
-                root_to_closure_path: None,
+                origin_5_crossings: Vec::new(),
                 closure_child_present: false,
-                origin_5_invoking_site: None,
                 origin_5_transfer_into_carrier_reached: false,
             },
         ],
