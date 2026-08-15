@@ -149,6 +149,45 @@ what decides whether a further node exists.
 > this node is to establish which of the two halves is actually load-bearing,
 > because the Steward asserted both were and measured neither.
 
+**`D3` — ASK THE ORACLE. This is the node's next turn and the whole of it.**
+Added 2026-08-15 under the operator's oracle ruling.
+
+> **What does the interpreter do with the program these rows stand for?**
+
+**`row4-depth-2/3` are NOT programs, and a dispatch phrased as if they were is
+one level off.** They are in-Rust lowering fixtures —
+`host_result_closure_match(px8j_scope_chain_observation_result(2, 0))` at
+`lowering/core/tests/control.rs:5688` — handed straight to the backend.
+`ken-interp` does not consume that.
+
+The measurement, at the right level:
+
+1. **Find the surface Ken program** whose compilation reaches this shape: a
+   closure captured in a scope-chain observation crossing a unit boundary at
+   depth 2 and 3.
+2. **If none exists, build the smallest one that does**, and confirm it reaches
+   the same refusal through the real pipeline rather than through the fixture.
+3. **Then ask the interpreter.**
+
+> **Step 2 failing is a result, not an obstacle.** If no surface program can
+> reach this shape, these rows have **no source-level witness** — the refusal
+> under argument is unreachable by any program a user could write, and the whole
+> disposition changes. **Do not manufacture a program that merely resembles the
+> fixture** to get past the step.
+
+**Do not derive it** from the lowering path, do not infer it from the
+closure-crossing refusal, and do not extend the measurement into a repair in the
+same turn. One measurement, reported, then stop.
+
+**Either outcome is a complete deliverable.** "The interpreter refuses them too"
+is a real result that changes the disposition, not a failed attempt.
+
+**Why this is stated as a warning and not a method note:** this campaign has
+produced five claims restated from prior prose without re-derivation, and every
+one was wrong — three of them the Steward's about this node, all in the direction
+of *more settled than it is*. **A reading about what the interpreter does is not
+a result.**
+
 ## THE FIRST CANDIDATE WENT RED. MECHANISM AND RECUT CONDITION ARE BOTH GROUNDED.
 
 **Candidate `1b8a57de6` was approved on exact SHA (`dec_6758m1a7g7e55`) and
@@ -225,10 +264,36 @@ producer; nothing underneath it is broken, and no key needed inventing.
 class, the child arm tests only shape — and **that gate is the uncontested
 repair.**
 
-## THIS NODE IS BLOCKED ON AN OPERATOR DECISION. DO NOT RECUT IN EITHER DIRECTION.
+## UNBLOCKED, 2026-08-15: THE ORACLE IS THE INTERPRETER, NOT `RecursiveDescent`
 
-**The node cannot close on its current frame** (Architect ruling
-`evt_5h64t36bypwfy`, routed to the Steward as scope).
+**Operator ruling, verbatim:**
+
+> `RecursiveDescent` should not be taken as de facto spec. It was a failed
+> implementation attempt that needs to be replaced. The key oracle is not
+> `RecursiveDescent`, but the interpreter.
+
+**This dissolves the joined fork `evt_3yvhf3hz59eb8` rather than answering a side
+of it.** The section below is retained because its analysis of the two options is
+still correct; what changed is the baseline both options were measured against.
+
+**The narrowing half is withdrawn.** It asked whether retirement may ship a
+capability loss measured against `RecursiveDescent`. Parity with `RecursiveDescent`
+is not a requirement, because its accepted set was never the specification.
+
+**The widening half becomes a measurement.** "Wider" must be measured against the
+interpreter, and it never was. See `D3`.
+
+> ### THE SCOPE CALL, WHICH IS THE STEWARD'S AND IS FLAGGED AS SUCH
+>
+> **If the interpreter accepts the `row4-depth-2/3` programs, the child
+> producer-class gate lands without a further operator decision.** A compiler
+> refusing what the oracle runs is a compiler defect, and closing it is
+> convergence, not a widening of the accepted language.
+>
+> **If the interpreter refuses them, the refusal is a real language property** and
+> the disposition returns to the Steward. Do not assume which; `D3` measures it.
+
+## The analysis that produced the fork, retained (baseline now superseded)
 
 **Applying the uncontested child gate advances `row4-depth-2/3` from refusal into
 compilation.** That is a **widening of the accepted language**, and by the
@@ -253,11 +318,11 @@ Steward's.**
 
 **Routed to the operator as ONE joined question with the `RecursiveDescent`
 fork** (`evt_3yvhf3hz59eb8`) — the same product surface, narrowing from one side
-and widening from the other. It is not to be re-posed separately or decided twice
-by different routes.
+and widening from the other. **ANSWERED 2026-08-15 by the oracle ruling above.**
 
-**Until it is answered: no recut, and this node is not to be reframed to make
-either option legal.** Both directions foreclose the decision they wait on.
+**The recut is now gated on `D3`'s measurement, not on an operator decision.**
+Both options above still foreclose each other, so neither is taken until the
+interpreter's behaviour is known.
 
 ### Binding condition on the next approval
 
@@ -314,8 +379,11 @@ never by relaxing the check.
   reaches it. Building it is not this node and is not authorized here.
 - **Undoing the unit boundary.** Refused by the runtime ring previously and it
   stays refused.
-- **Retiring `RecursiveDescent`.** [[RT-DESCENT-RETIRE]] is downstream, is a
-  product call the operator has not made, and is not this node.
+- **Retiring `RecursiveDescent`.** [[RT-DESCENT-RETIRE]] is downstream and is not
+  this node. **The clause "a product call the operator has not made" is struck**:
+  the operator ruled 2026-08-15 that `RecursiveDescent` is a failed implementation
+  attempt that needs to be replaced. The direction is settled; the sequencing is
+  still not this node's.
 - **Relaxing `reconcile_source_aggregate`.** The refusal is correct. This node
   supplies the authority the check asks for; it does not weaken the check.
 
@@ -326,9 +394,12 @@ seam is load-bearing. If `D0` passes and `D2` reports the carrier word as the
 next stop, the campaign still has an open question — a **better-located** one
 than it has today.
 
-**It does not resolve the operator's fork.** Whether retirement may ship a
-narrowing remains open at [[RT-DESCENT-RETIRE]], and whether this node gates it
-is the operator's call, which is why no `blocks` edge is asserted here.
+**The operator's fork is resolved and this sentence used to say otherwise.**
+It read *"whether retirement may ship a narrowing remains open at
+[[RT-DESCENT-RETIRE]]"*. **That question no longer exists** — narrowing was
+defined against `RecursiveDescent`, which the operator ruled is not the oracle.
+No `blocks` edge is asserted here, and the reason is now sequencing rather than a
+pending product call.
 
 **The escape-lifetime sub-shape stays unmeasured.** The Architect's ruling covers
 the argument-crossing sub-shape only, and the assumption that two sub-shapes

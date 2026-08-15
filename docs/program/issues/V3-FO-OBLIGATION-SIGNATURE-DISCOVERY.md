@@ -1,7 +1,7 @@
 ---
 id: V3-FO-OBLIGATION-SIGNATURE-DISCOVERY
 title: "Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all"
-status: ready
+status: active
 owner: language
 size: L
 gate: none
@@ -254,6 +254,86 @@ one of them is a limitation of Ken's logic.**
 > **not** evidence that those obligations are closer to proved. Both are true at
 > once. (Architect, `evt_7h0jnhhwtrah5`.)
 
+**`D6` — measure whether the audit label reaches a hash. GATES `D1`-`D3`.**
+Added 2026-08-15 from the Architect's non-blocking item on the approved `D5`
+(`evt_241vfpwng5jym`), which asked for it before `D1`-`D3` rather than after.
+
+**Today nothing in production reaches either label.** `D1`-`D3` are exactly what
+makes them appear in real elaborations for the first time. **If the label
+participates in any canonical or content-addressed encoding, then its wording is
+an artifact-stability concern and not only an audit-honesty one** — and `D5`'s
+"do not reword this label" doc comment silently changes from good practice into
+a hard constraint with a different owner.
+
+**The Architect's reading, offered as a hypothesis and explicitly not as the
+answer:** `trusted_base_delta` is keyed on `StableSymbol`, and `18 §4.2` calls
+the postulate name a non-positional audit label, which he takes to mean not
+identity-bearing. **He read that; he did not measure it**, and said so while
+naming the shape he had already been wrong in once that day — a structural
+reading trusted over a probe.
+
+⇒ **Probe it. Report either outcome.** If the label does reach a hash, say so
+plainly: that moves ownership of future wording changes, and `D5`'s doc comment
+needs to say which constraint it is enforcing.
+
+> ### `D6` IS DISCHARGED AND THE ANSWER IS YES. The reading was wrong.
+>
+> **The label reaches the hash.** Two `Decl::Opaque` values differing only in
+> `name` produced unequal `canonical_decl_bytes` — 166 vs 236 bytes under the
+> same `StableSymbolTable`. `encode_decl` serializes the Opaque name
+> unconditionally; `emit_package_from_env` serializes admitted declarations into
+> the canonical semantic bytes with no Opaque exclusion. Probe
+> `evt_3twtwsv7fhadh`, uncommitted and reverted, with `D5` restored byte-exact.
+>
+> **This is a pre-existing general property, not a `D5` defect, and the Architect
+> ruled it must not be filed as one** (`evt_2q0bm3ez5aczd`). Every
+> `declare_postulate` audit label is already a canonical input, including the
+> unchanged `"prover unknown goal"`. `D5` is the first thing to have looked.
+> **Home: [[CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY]]**, filed and owned so this
+> question is not carried inside a signature-discovery arc.
+>
+> **`D5`'s approval stands and its object is unchanged.** One supporting clause
+> of `dec_3dv5462aen3g`'s resolution text — that the label does not reach a hash
+> — is measured false; the verdict is not. The FO-withheld label reaches no
+> artifact today because nothing admits a prover hole into an emitted package
+> through route FO, so `D5` as approved changes no existing hash. **It is future
+> reachability that makes this live, which is what `D1`-`D3` create.**
+>
+> ### `D5` MERGED at `e6d7e30f8` (PR #2342), blob-verified 2/2 from `320ef7e6c`.
+>
+> ### `D1`-`D3` NOW WAIT ON [[V3-FO-QUOTE-GUARD-FAIL-CLOSED]] — Steward sequencing
+>
+> That node is size `S`, is `ready`, and fixes a **known fail-open guard** in
+> `quote_fo`: `mentions_var0` misclassifies `Pair` as a binder and defaults ten
+> subterm-carrying constructors to `false`. It runs **before** `quote_iform`'s
+> refusal, on unvalidated input.
+>
+> **`D1`-`D3` are precisely the work that puts live obligations through it.**
+> Fixing the guard first is free while `D1`-`D3` have not started and stops being
+> free afterwards. **The earlier instruction that the quote-guard node must not
+> jump this one is reversed** — it was written when this node's `D5` was the
+> ungated starting point, and `D5` has landed.
+>
+> ### `D1`-`D3` ARE ALSO BOUNDED BY THE ENCODING PROPERTY, NOT BLOCKED BY IT
+>
+> Three constraints, from the same ruling. They are not gates and nothing is owed
+> back before starting.
+>
+> 1. **Every audit label is a frozen artifact-identity input, not prose.**
+> 2. **No further citation-bearing labels** until the encoding question is
+>    settled. Each one adds another spec-number-to-hash edge, and the `§4.4`
+>    citation already in the approved label is the sharpest form of the problem:
+>    **a renumbered spec section would force a choice between a stale label and
+>    a hash change across every package carrying such a hole.**
+> 3. **Record it at `emit_unknown_hole_fo_withheld`** — one sentence saying the
+>    do-not-reword instruction is load-bearing for artifact stability as well as
+>    for `AC-8`'s presentation property. The current wording gives a reader no
+>    way to infer the second reason.
+>
+> **The probe method is the transferable part.** The Architect asked for a
+> measurement instead of shipping his reading, and the measurement contradicted
+> it. `AC-9` is why this is known rather than assumed.
+
 ## Acceptance criteria
 
 **`AC-1`.** No signature-selection rule is landed that `D0`'s ruling did not
@@ -309,6 +389,13 @@ either one.**
 > missing theorem home is the fact; the certificate is not. **The exact wording is
 > the implementer's to propose** — the Architect declined to write the string so
 > that a real proposal gets reviewed rather than his phrasing being built to.
+
+**`AC-9`.** `D6`'s answer is established **by a probe, not by a citation.**
+Changing the label text and observing whether any canonical or content-addressed
+value moves is a measurement; re-reading `18 §4.2` and concluding it is
+non-positional is the reading that already exists and is what `D6` was raised to
+check. **Report the outcome either way** — "the label does not reach a hash" is
+a result, and so is the opposite.
 
 ## Banned scope
 
