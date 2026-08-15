@@ -9,6 +9,11 @@ class = "blocked-upstream-relation"
 readmission = "RT-CLOSURE-BOUNDARY-LANE"
 
 [[exemption]]
+test_path = "ken-elaborator::ds5b_dependent_match_refinement_acceptance::two_vector_zip_recursive_step_convoy_fixture"
+class = "blocked-upstream-relation"
+readmission = "TermJReduction"
+
+[[exemption]]
 test_path = "ken-runtime::boundary_value_clif::tests::b2v_ac10_a_deep_acyclic_chain_adopts_at_thirty_thousand"
 class = "policy-cost"
 readmission = "not applicable: the fast depth-3000 instance is the standing gate"

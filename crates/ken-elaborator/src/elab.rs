@@ -344,6 +344,16 @@ struct ElabCtx<'e> {
     /// changes — only which TERM an `RVar` reference resolves to (a
     /// `Cast`-wrapped alias, never the bare `Var`) for one branch's body.
     var_refinements: HashMap<usize, (Term, Term, usize)>,
+    /// Bottom-relative `[start, end)` ranges of `cx.ctx` positions bound as
+    /// constructor fields by a match arm currently under elaboration,
+    /// innermost last. Capability 2 (sibling convoy) must skip these: a field
+    /// bound by an ENCLOSING match is not a genuine outer binder, and refining
+    /// it re-points it at the inner match's peeled index while its sibling
+    /// references keep the enclosing one (`LANG-CONVOY-MATCH-FIELD-
+    /// PROVENANCE`). Provenance, not position — a floor keyed on depth alone
+    /// would misclassify a genuine outer binder pushed after the enclosing
+    /// match's fields (e.g. a `let` between the outer arm and a nested match).
+    match_field_regions: Vec<std::ops::Range<usize>>,
     /// Elaborator-internal method binders are absent from resolved surface
     /// de Bruijn indices. Positions are stable bottom-relative context slots;
     /// `surface_var` skips them when translating an `RVar`.
@@ -380,6 +390,7 @@ impl<'e> ElabCtx<'e> {
             class_env: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
+            match_field_regions: Vec::new(),
             hidden_positions: Vec::new(),
             lift_bindings: HashMap::new(),
             space_state: None,
@@ -2215,6 +2226,16 @@ fn check_match_dependent(
                 // index once `check` returns (the premises only become real
                 // λ-binders afterward, via `wrap_premise_lams_from_full`).
                 let outer_scope_depth = cx.ctx.len() - n;
+                // Record this arm's own field region BEFORE calling
+                // `install_index_refinements` so capability 2's loop (which
+                // ranges over `0..outer_scope_depth`, disjoint from this
+                // region) can already see it and skip an enclosing match's
+                // fields. The current arm's own region is
+                // `outer_scope_depth..cx.ctx.len()`, disjoint from that
+                // loop's range, so pushing it here cannot affect this arm's
+                // own installation.
+                let field_region = outer_scope_depth..cx.ctx.len();
+                cx.match_field_regions.push(field_region);
                 let premise_count = premise_domains.len();
                 let installed_refinements = install_index_refinements(
                     cx,
@@ -2319,6 +2340,7 @@ fn check_match_dependent(
                 for pos in installed_refinements {
                     cx.var_refinements.remove(&pos);
                 }
+                cx.match_field_regions.pop();
                 let finalized = finalize_refined_body(&body_core, 0, premise_count);
                 wrap_premise_lams_from_full(finalized, &premise_domains)
             }
@@ -3019,6 +3041,18 @@ fn install_index_refinements(
                 }
             };
             for abs_pos in 0..outer_scope_depth {
+                // `abs_pos` is a bottom-relative position (`bottom_pos ==
+                // abs_pos`, established below). A position inside an
+                // enclosing match's own field region is a field THAT match
+                // bound, not a genuine outer (pre-existing) binder -- skip
+                // it. Provenance, not position: `match_field_regions` tracks
+                // membership directly, so a genuine outer binder pushed
+                // above an enclosing match's fields (e.g. across a `let`)
+                // is never caught by this skip (`LANG-CONVOY-MATCH-FIELD-
+                // PROVENANCE`).
+                if cx.match_field_regions.iter().any(|r| r.contains(&abs_pos)) {
+                    continue;
+                }
                 let outer_idx = cx.ctx.len() - 1 - abs_pos;
                 let outer_ty = cx.metas.zonk_term(&weaken(
                     cx.ctx.lookup(outer_idx).expect("outer position in range"),

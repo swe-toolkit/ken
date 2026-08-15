@@ -23,8 +23,41 @@
 //!   here too).
 
 use ken_elaborator::{ElabEnv, ElabError};
+use ken_interp::EvalVal;
 use ken_kernel::KernelError;
 use std::collections::BTreeSet;
+
+/// Structural equality on evaluated `Ctor` values, ignoring the K3 interning
+/// `slot` (which is store-assignment-order-dependent, not content-derived
+/// across two independently-evaluated bodies sharing one store). Two
+/// evaluations of textually distinct but structurally identical terms are
+/// expected to be `EvalVal`-equal in every field EXCEPT `slot`.
+fn vec_nat_structurally_eq(a: &EvalVal, b: &EvalVal) -> bool {
+    match (a, b) {
+        (
+            EvalVal::Ctor {
+                id: id_a,
+                args: args_a,
+                ..
+            },
+            EvalVal::Ctor {
+                id: id_b,
+                args: args_b,
+                ..
+            },
+        ) => {
+            id_a == id_b
+                && args_a.len() == args_b.len()
+                && args_a
+                    .iter()
+                    .zip(args_b.iter())
+                    .all(|(x, y)| vec_nat_structurally_eq(x, y))
+        }
+        (EvalVal::Int(x), EvalVal::Int(y)) => x == y,
+        (EvalVal::BigInt(x), EvalVal::BigInt(y)) => x == y,
+        _ => a == b,
+    }
+}
 
 fn mk_env() -> ElabEnv {
     ElabEnv::new().expect("base env construction failed")
@@ -183,20 +216,139 @@ fn non_indexed_match_stays_unaffected() {
     );
 }
 
-/// `LANG-CONVOY-ENCLOSING-FIELD` D1 -- the two-vector `zip` recursive step
-/// spec `34-data-match.md §3.2`'s Boundary paragraph names as a known gap:
-/// the inner match on the sibling `w` destructures `w` through its own
-/// nested match, and the same branch's body re-uses `xs` -- a field the
-/// ENCLOSING (outer, `v`) match already bound -- in the same expression
-/// (the recursive call). Measured at this node's base (`6275bbc35`): the
-/// recursive call's `xs` argument fails a kernel `TypeMismatch` -- `xs` is
-/// re-typed against the INNER match's own peeled index instead of being
-/// excluded as an enclosing-match field (D2/D3 in the node's handoff). This
-/// node is the fixture only; no remedy is implemented here (`AC-3`).
+/// `LANG-CONVOY-ENCLOSING-FIELD` D1 / `LANG-CONVOY-MATCH-FIELD-PROVENANCE`
+/// D1 + D4 + `AC-1` -- the two-vector `zip` recursive step spec
+/// `34-data-match.md §3.2`'s Boundary paragraph names as a known gap: the
+/// inner match on the sibling `w` destructures `w` through its own nested
+/// match, and the same branch's body re-uses `xs` -- a field the ENCLOSING
+/// (outer, `v`) match already bound -- in the same expression (the
+/// recursive call).
+///
+/// **Before this node's remedy (error shape, kernel-observed).** Measured
+/// at `LANG-CONVOY-ENCLOSING-FIELD`'s base (`6275bbc35`): the declaration
+/// failed a kernel `TypeMismatch` where `expected` and `found` were the
+/// SAME HEAD, differing only in the trailing de Bruijn index
+/// (`((Dg574 Dg67) @9)` vs `((Dg574 Dg67) @4)`) -- not just the bare error
+/// variant, so a regression on an unrelated arm could not have kept a
+/// looser assertion green while reading as "the known gap is unchanged."
+///
+/// **Error location was NOT established by the kernel error itself.** Its
+/// `span` was `0..167`, the entire 167-character declaration; it names no
+/// argument, no sub-expression, no position (Adversary finding, Steward
+/// `evt_zb2660kkzh14`). The `xs`-argument claim below is therefore an
+/// ELABORATOR-SIDE observation, not a kernel-side one: a temporary
+/// `#[cfg(debug_assertions)]` probe at the `RVar` `var_refinements`
+/// consultation site (`elab.rs`, the site `install_index_refinements`
+/// feeds), run at the pre-remedy base and removed before commit, showed
+/// the recursive call `zip m xs ys` forced exactly three bindings through
+/// `var_refinements` -- `w` (bottom_pos 2, the OUTER match's legitimate
+/// sibling-convoy refinement), `ys` (bottom_pos 8, the INNER match's own
+/// legitimate constructor-injectivity field), and `xs` (bottom_pos 5, the
+/// one this node's remedy must skip). Re-running the same probe against
+/// the region-stack remedy showed `xs` alone stopped appearing while `w`
+/// and `ys` continued to fire unchanged and the declaration elaborated --
+/// evidence that `xs`'s retyping, specifically, was both wrong before and
+/// corrected by the fix, though this remains a probe observation, not a
+/// kernel-attributed span.
+///
+/// **The fixture is a conjunction, not a single property.** The inner
+/// `match w { VCons _ b ys |-> … }` has one arm against `Vec`'s two
+/// constructors; it elaborates only because `VNil` is index-impossible at
+/// `Vec Nat (S m)` (`34 §4.3`). The fixture reaches the enclosing-match-
+/// field gap only while that index-impossibility holds -- a regression
+/// there surfaces as `ExhaustivenessError`, a different route than the
+/// `TypeMismatch` this control exercises.
+///
+/// **`AC-1` (post-remedy): elaborates AND evaluates correctly.** "The
+/// `TypeMismatch` is gone" is explicitly NOT this criterion -- an
+/// over-wide skip also makes the error disappear, by refusing to refine
+/// something it should have refined, and a wrong-but-successful
+/// elaboration would pass a vanishing-error test. This fixture's `zip`
+/// ignores `w`'s payload entirely (it only destructures `w` for
+/// exhaustiveness) and reconstructs each level from `v`'s own `m`/`a`, so
+/// its correct result is structurally `v` itself.
+///
+/// **`AC-1`'s HAZARD -- distinguishing a correct refinement from an
+/// over-wide skip -- is WITHDRAWN, not discharged (Architect ruling
+/// `evt_2hfhtcqk3fpn7`, refuting the prior `evt_b4hfddjceg8d` §3 claim
+/// made without running the mutation).** `let_interleaved_outer_binder_
+/// not_skipped_by_convoy`'s `let k = 0` gives `k` no index-dependent type
+/// (`cur_ty` is bare `Nat`), so `try_reindex_cast`'s own no-spurious-
+/// refinement guard (`elab.rs:2830`, `AC8`) makes the loop a no-op at `k`
+/// whether or not the region guard skips it -- QA measured this directly
+/// by replacing the guard with the prohibited positional floor
+/// (`if abs_pos >= 3`) and re-running the file: exit 0, 7 passed, 1
+/// ignored, 0 failed, identical to the region-set run. Reproduced
+/// independently here. **No test in this file currently distinguishes the
+/// ruled region set from the refuted floor.**
+///
+/// A genuinely discriminating fixture needs three constraints together:
+/// (1) position above the enclosing field region (a `let`/`λ` push,
+/// already satisfied by `k`); (2) a type that literally depends on the
+/// index the nested match peels, so `try_reindex_cast` returns `Some`
+/// rather than the AC8 no-op above; (3) consumption where the unrefined
+/// type fails to check. A bounded attempt at (2)+(3) -- binding `k` to a
+/// fresh `Vec Nat n` value (via a small `repl : (n : Nat) -> Vec Nat n`
+/// helper, so `k`'s type is NOT inherited from an already-refined
+/// reference) and consuming it either as a further nested match's
+/// scrutinee or via the recursive call -- hit an apparently unrelated
+/// internal elaborator error (`index refinement: could not classify the
+/// branch goal: TypeMismatch { expected: Dg67, found: ((Dg574 Dg67)
+/// @N) }`, from `refine_branch_goal`, `elab.rs:2913-2917`) in every
+/// variant tried, and a diagnostic probe on `try_reindex_cast`'s own
+/// operands showed `k`'s weakened raw type and the middle match's `b2`
+/// disagreeing on which absolute position they name -- consistent with a
+/// frame/weakening mismatch specific to an intervening `let` between an
+/// outer match's premise computation and a nested match's own field push.
+/// That is a plausible, DIFFERENT, and orthogonal gap from this node's own
+/// remedy; it is reported, not fixed, here (out of scope -- `install_
+/// index_refinements` consumers beyond this node's own fix are explicitly
+/// banned scope). The region-set-vs-floor choice therefore remains
+/// **design-justified but behaviourally unwitnessed at this node**: the
+/// region set is the provenance-correct predicate (a field bound by an
+/// enclosing match is not a genuine outer binder, independent of whether
+/// a program can currently observe the difference), but no surface
+/// program in this file currently exercises the divergence.
+///
+/// **This fixture's evaluation is nonetheless the literal `AC-1` ask, and
+/// it is retained here, real, and IGNORED rather than weakened or
+/// deleted.** It is blocked by an orthogonal, pre-existing `ken-interp`
+/// gap, found while building this control: `zip`'s elaborated body embeds
+/// real `Cast`/`J` terms (capability 1/2/3's proof machinery, `elab.rs`)
+/// at EVERY arm, including the base case (capability 3's goal-cast for
+/// `VNil Nat`). `ken_interp::eval`'s `Term::J` arm does not exist -- the
+/// crate's only `Term::J` match arm is `term_var_free`'s free-variable
+/// walk (`eval.rs:958`), not a reduction; `Term::J` in `eval()` itself
+/// falls through the function's own final catch-all,
+/// `crates/ken-interp/src/eval.rs:1916` (`_ => EvalVal::Neutral`, comment:
+/// "Remaining K2 forms: not reduced in the G1 scope"). `cast_reduce`
+/// (`eval.rs:1144-1156`) requires the equality proof to evaluate to
+/// `EvalVal::ReflVal` to take its one reducing branch (C5 regularity); a
+/// `Neutral` proof always falls to its "(oracle)" branch,
+/// `EvalVal::Unknown` -- declared, not accidental, per that function's own
+/// comment. So ANY dependent-match program that exercises DS-5b's
+/// capability 1/2/3 evaluates to `Unknown` today, for a reason that has
+/// nothing to do with this node's remedy and predates it entirely -- the
+/// SAME machinery backs `sibling_convoy_retypes_outer_binder_through_
+/// nested_match` and `tail_constructor_injectivity_retypes_peeled_
+/// recursive_field` above, neither of which this file has ever evaluated
+/// (both only assert `elab_ok`).
+///
+/// Per the ruling, this is an AUTHORIZED HARD STOP owned by a `ken-interp`
+/// successor (Steward-filed, scope), not a defect in this node and not
+/// something this node repairs. The assertion below is the REAL `AC-1`
+/// expectation (a `vec_nat_structurally_eq` comparison against the
+/// expected value, not an `Unknown` sentinel -- pinning `Unknown` would
+/// freeze `ken-interp`'s declared G1 scope limit as an expectation, and
+/// red the day the capability lands instead of passing). It is registered
+/// in `.github/ignored-test-exemptions.toml` under `blocked-upstream-
+/// relation`, readmission `TermJReduction`, following the
+/// `RT-CLOSURE-BOUNDARY-LANE` row's contract.
 #[test]
+#[ignore = "TermJReduction: the convoy cast's proof is not ReflVal and ken-interp has no Term::J reduction arm, so cast_reduce yields Unknown for the G1 scope; fails at base 7aae5fcc6"]
 fn two_vector_zip_recursive_step_convoy_fixture() {
     let mut env = vec_env();
-    let err = expect_err_val(
+    elab_ok(
         &mut env,
         "fn zip (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
          match v { \
@@ -204,16 +356,88 @@ fn two_vector_zip_recursive_step_convoy_fixture() {
            VCons m a xs |-> match w { VCons _ b ys |-> VCons Nat m a (zip m xs ys) } \
          }",
     );
+    // Numeral literals do not check against `Nat` here (a separate,
+    // orthogonal parser/elaborator gap: bare `Token::Nat` numerals infer
+    // to a default numeric type in synthesis mode but fail `check`-mode
+    // against the `Nat` inductive -- `const n : Nat = 0` itself fails the
+    // same way). `Zero`/`Suc` are the prelude's real Peano constructors and
+    // sidestep it entirely.
+    let result_id = env
+        .elaborate_decl(
+            "const zipResult = \
+             zip (Suc (Suc Zero)) \
+               (VCons Nat (Suc Zero) (Suc Zero) (VCons Nat Zero Zero (VNil Nat))) \
+               (VCons Nat (Suc Zero) Zero (VCons Nat Zero (Suc Zero) (VNil Nat)))",
+        )
+        .expect("zip application must elaborate post-remedy");
+    let expected_id = env
+        .elaborate_decl(
+            "const zipExpected = \
+             VCons Nat (Suc Zero) (Suc Zero) (VCons Nat Zero Zero (VNil Nat))",
+        )
+        .expect("expected value must elaborate");
+
+    let (_, result_body) = env
+        .env
+        .transparent_body(result_id)
+        .expect("const binding must be transparent");
+    let (_, expected_body) = env
+        .env
+        .transparent_body(expected_id)
+        .expect("const binding must be transparent");
+
+    let mut store = ken_interp::EvalStore::new();
+    let result = ken_interp::eval(&[], &result_body, &env.env, &mut store);
+    let expected = ken_interp::eval(&[], &expected_body, &env.env, &mut store);
+
     assert!(
-        matches!(
-            &err,
-            ElabError::KernelRejected {
-                error: KernelError::TypeMismatch { .. },
-                ..
-            }
-        ),
-        "expected the enclosing-match-field wrong-index substitution to \
-         surface as a kernel TypeMismatch on the recursive call's `xs` \
-         argument, got: {err:?}"
+        vec_nat_structurally_eq(&result, &expected),
+        "zip 2 v w must evaluate to v itself (this fixture's zip ignores \
+         w's payload and reconstructs each level from v's own m/a) -- got \
+         {result:?}, expected {expected:?}"
+    );
+}
+
+/// `LANG-CONVOY-MATCH-FIELD-PROVENANCE` D2 -- the let-interleaved
+/// POSITION record (NOT a region-set-vs-floor discriminator -- that claim
+/// was made, then measured false; see the correction below). The Architect
+/// explicitly did NOT build this fixture: he established from
+/// `elab.rs:1143`/`:1132` (`RLet`/`RLam` push `cx.ctx` and elaborate the
+/// body inside that push) that a `let` between the outer match's arm and a
+/// nested inner match strands a genuine outer binder (`k`) ABOVE the
+/// enclosing arm's own field region -- but did not confirm the shape
+/// reaches capability 2 at all. A temporary `#[cfg(debug_assertions)]`
+/// probe at capability 2's loop (`elab.rs`, removed before commit) showed
+/// the shape DOES reach it: `k` sits at `abs_pos=6` with `match_field_
+/// regions=[3..6, 7..10]` (the enclosing arm's `m,a,xs` and the inner
+/// arm's own `_,b,ys`) at the moment the loop reaches it -- `k` is outside
+/// every active range, and the declaration elaborates.
+///
+/// **This does NOT, however, distinguish the region set from a floor --
+/// measured, not merely unclaimed (Architect ruling
+/// `evt_2hfhtcqk3fpn7` §2, refuting his own earlier `evt_b4hfddjceg8d`
+/// §3 claim that "an over-wide skip reds this one").** `k`'s type here is
+/// `Nat` (`let k = 0`), which mentions no index at all, so `try_reindex_
+/// cast`'s own no-spurious-refinement guard (`elab.rs:2830`, `AC8`) makes
+/// capability 2's loop a no-op at `k`'s position REGARDLESS of whether the
+/// region guard skips it. QA confirmed this by replacing the guard with
+/// the prohibited positional floor (`if abs_pos >= 3`) and running the
+/// whole file: exit 0, 7 passed, 1 ignored, 0 failed -- identical to the
+/// region-set run. Independently reproduced here (same result, both
+/// directions). See `two_vector_zip_recursive_step_convoy_fixture`'s doc
+/// comment for the bounded attempt at a genuinely discriminating fixture
+/// and why it was not completed within this node's scope.
+#[test]
+fn let_interleaved_outer_binder_not_skipped_by_convoy() {
+    let mut env = vec_env();
+    elab_ok(
+        &mut env,
+        "fn zipK (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = \
+         match v { \
+           VNil |-> VNil Nat; \
+           VCons m a xs |-> \
+             let k = 0 in \
+             match w { VCons _ b ys |-> VCons Nat m a (zipK m xs ys) } \
+         }",
     );
 }
