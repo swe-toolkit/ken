@@ -235,16 +235,30 @@ boundary should not be reaching `transfer_into_carrier` at all.**
 
 > #### `D5` MEASURED, AND THE TABLE ABOVE IS NOW HISTORY. Steward, 2026-08-15.
 >
-> **Row 2 is ELIMINATED. Rows 1 and 3 are NOT SEPARATED and may not be.**
-> Measured: enabled rows are `(present, reached) = (true, true)`; both suppressed
-> legs are `(false, false)` and return to `StaticWorkerBinding`.
+> **Rows 1 and 3 are NOT SEPARATED and may not be.** Measured: enabled rows are
+> `(present, reached) = (true, true)`; both suppressed legs are `(false, false)`
+> and return to `StaticWorkerBinding`.
 >
-> **Row 2's antecedent required `reached` to be TRUE under suppression. It is
-> false.** ⇒ **the durable-closure branch is dead, and with it the only branch
-> under which these rows could ever have been one defect with
-> [[RT-CLOSURE-BOUNDARY-LANE]].** That is my derivation from the Architect's own
-> pre-committed dispositions, not a sentence he wrote — but rows 1 and 3 both
-> leave that node untouched by their own terms, so it holds either way.
+> > **RETRACTED, same day.** This block previously read **"Row 2 is
+> > ELIMINATED"**, on the ground that *"row 2's antecedent required `reached` to
+> > be TRUE under suppression, and it is false"*, concluding the durable-closure
+> > branch was dead. **That derivation is vacuous and is withdrawn.**
+> >
+> > **Suppression removes the crossing by construction**, so `reached = false` is
+> > guaranteed on every suppressed row **in every possible world** — closure
+> > pre-existing or not. A conjunct that cannot be satisfied under the condition
+> > being tested discriminates nothing.
+> >
+> > **The tell was already in this block, two paragraphs down.** It records that
+> > `closure_child_present: false` on the suppressed rows is *"an artifact of
+> > there being no observation point"*. **Its sibling conjunct `reached` is an
+> > artifact for exactly the same reason**, and I applied the reading to one and
+> > not the other.
+> >
+> > ⇒ **The durable-lane branch is live**, and per the Architect resolving
+> > `dec_6hwh86vdzp2ha`, it is [[RT-CLOSURE-BOUNDARY-LANE]]'s mechanism after
+> > all. The claim that these rows leave that node untouched **"either way"** was
+> > the load-bearing part and it does not hold.
 >
 > **Rows 1 and 3 are not separated, because `closure_path` is computed ONLY at
 > the crossing** (`dec_35e0tfng528d`, `evt_38p42gjq12br`). On the suppressed

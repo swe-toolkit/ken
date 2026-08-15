@@ -43,28 +43,57 @@ origin: Measured at frozen base 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differ
 > node as their owner, and do not treat this node's size as covering them.**
 > Whichever way it goes, the frame this node still owes is unchanged.
 
-> ## RULED. THE RECURSOR ROWS ARE NOT THIS NODE'S. Steward, 2026-08-15.
+> ## RETRACTED. THE SUBSUMPTION IS LIVE AGAIN, AND MY
+> ## EXCLUSION OF IT WAS VACUOUS. Steward, 2026-08-15.
 >
-> **The fork above is settled against subsumption, and this node's scope is
-> unchanged by it.** [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] `D5` measured the
+> **A block here previously read "RULED. THE RECURSOR ROWS ARE NOT THIS NODE'S"
+> and declared the fork settled against subsumption. That ruling was wrong and
+> is withdrawn.** It is restated in full below so the error is legible rather
+> than merely deleted.
+>
+> **What it said.** [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] `D5` measured the
 > enabled rows at `(closure_present, crossing_reached) = (true, true)` and both
-> suppressed legs at `(false, false)`, returning to `StaticWorkerBinding`
-> (`dec_35e0tfng528d`, Architect verdict `evt_38p42gjq12br`).
+> suppressed legs at `(false, false)`. The Architect's dispositions named one
+> branch under which the two populations could be one defect: closure PRESENT
+> under suppression **and the crossing ALSO reached under suppression**. I
+> observed the crossing is not reached under suppression and concluded that
+> branch was excluded by measurement.
 >
-> **The Architect's dispositions named exactly one branch under which the two
-> populations could be one defect: closure PRESENT under suppression AND the
-> crossing ALSO reached under suppression.** The crossing is **not** reached
-> under suppression. ⇒ **That branch is excluded by measurement.**
+> **Why that is vacuous. Suppression removes the crossing by construction — that
+> is what suppressing the required-consumer route DOES.** So
+> `crossing_reached = false` is guaranteed on every suppressed row **in every
+> possible world**, whether or not the closure pre-exists. A conjunct that cannot
+> be satisfied under the condition being tested excludes nothing. **I read a
+> guaranteed reading as a discriminating one**, and the whole elimination rests
+> on that one step.
 >
-> The two branches still live — the realization produces a value that should not
-> be closure-shaped, or the value is legitimately closure-shaped and should never
-> have been **routed** — **both leave this node untouched by their own terms.**
-> The separator between them is [[RT-CROSSING-CALL-SITE-ATTRIBUTION]].
+> **It is the same defect I had flagged twice that morning in others' work** —
+> the census's own `closure_child_present: false` on suppressed rows was already
+> recorded as an artifact of having no observation point. **The second conjunct
+> is an artifact for exactly the same reason, and I did not carry the reading
+> across.**
 >
-> ⇒ **Do not wait on the recursor chain to size this node**, and do not expect a
-> shared repair from it. **The frame this node owes is its own**, over the row it
-> already lists. The shared refusal sentence was totality, as the predecessor
-> block said, and that reading is now measured rather than argued.
+> ⇒ **The durable-lane branch is live and it is this node's mechanism.** The
+> Architect, resolving `dec_6hwh86vdzp2ha` on [[RT-CROSSING-CALLEE-IDENTITY]]:
+> closing branch 3' *"leaves TWO branches, and the survivor is the Steward's
+> ORIGINAL 'correct' branch: (1) the realization produces a closure-shaped value
+> into an intended call-input route ... versus (durable-lane) the source value
+> legitimately carries a closure through a source-authored call and Ken has no
+> lane => **`RT-CLOSURE-BOUNDARY-LANE`'s mechanism after all**."*
+>
+> **So the sizing guidance also reverses.** Do **not** size this node as covering
+> only the row it already lists. Whether the recursor rows are its rows now turns
+> on **closure pre-existence**, which is still open.
+>
+> **Do not try to settle it by suppression a third time.** The Architect's
+> sequencing (`dec_6hwh86vdzp2ha`): *"STOP ASKING THE RUN, ASK THE PLANNER."*
+> Without the projection these rows never build the subgraph, so the question has
+> no observation point on that path — but it has one on the planning side. Ask
+> whether the **planned** occurrence at origin 5 carries a closure-typed field 0
+> **by construction**. Planner says closure ⇒ pre-existing ⇒ durable-lane, and
+> these rows are this node's. Planner says otherwise while lowering produced
+> `Lowered::Closure` ⇒ the realization manufactured the shape ⇒ branch 1, and
+> they are not.
 
 ## Exact signature
 
