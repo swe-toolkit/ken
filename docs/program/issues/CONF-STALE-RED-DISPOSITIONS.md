@@ -76,10 +76,91 @@ matrix meets the flip condition. **If it does, flip it.** If the contract is
 unmet despite the node being `merged`, **that is a finding about the node's
 closure** and it routes to the Steward — do not edit the node.
 
+> ## `D4` RESOLVED 2026-08-15 — THE UNMET BRANCH FIRED, AND IT IS AUTHORIZED
+>
+> **Steward ruling on the spec-leader's fixed-input stop (`evt_6c088h37qbzfc`),
+> author evidence `evt_1wsetx2v2xyr0`. The finding is RECEIVED and correct.
+> Re-read this block, then resume; `D1`-`D3` and `D5` are unchanged.**
+>
+> **`D4` told you to route the finding and did not say what happens to the ROWS
+> in that branch. That is the gap that stopped you, and this is the answer:
+> the rows are reconciled under `D3`, exactly as written.** A row whose fixture
+> still fails *"states the current reason, not the superseded one"* — the unmet
+> branch is not an exception to `D3`, it is the case `D3` was written for.
+>
+> **The live blocker is [[RT-COMPMATCH-TREE-SCRUTINEE]]** — a real, tracked node
+> (`draft`, runtime), not an unowned condition. `RT-NATIVE-FNSPLIT` is a
+> **superseded** reason and `AC-4`'s control already forbids retaining it.
+>
+> **State the two conditions separately — they are not the same fact.** One cell
+> has an executing both-engine arm that is `#[ignore]`d; three have **no
+> executing native arm at all.** *"Blocked"* covers both and distinguishes
+> neither.
+>
+> **Do not flip any of the four green.** The premise was that a landed producer
+> made them runnable; measurement says it did not.
+
+### The stale GREEN row is IN SCOPE — and this is not a widening
+
+**Authorized 2026-08-15.** `banned scope` routes a suspected extra site to the
+Steward for a re-cut rather than forbidding it outright. This is that re-cut,
+and it is **bounded to two sites in the file you are already editing.**
+
+| site | `conformance/behavioral/buffer-io/seed-buffer-io.md` |
+|---|---|
+| the row | `buffer-io/foreign-span-freeze-rejected-absolute` — `status: GREEN — PX8-SPAN-PROV Phase 2, interpreter + native absolute` |
+| **the prose** | the SP-A section paragraph: *"PX8-SPAN-PROV Phase 2 makes the complete SP-A freeze row GREEN on both engines."* |
+
+**Why it is in scope on a stronger ground than adjacency: the row's own engine
+matrix is what refutes it.** It states *"run the complete given/expect pair
+independently on `interpreter` and `native`; neither result is inferred from the
+other"* — and its sole cited evidence is the ignored fixture. **The row asserts
+precisely the independent native run it does not have.** It needs no new
+measurement; the one you already ran settles it.
+
+**And the file cannot ship self-contradicting.** You are correcting four cells
+to *native unwitnessed* on the strength of that fixture being ignored, while a
+row in the same file claims *native absolute* citing the same fixture. Leaving
+it is not conservatism — it is knowingly publishing a seed that refutes itself.
+
+**FIX BOTH SITES. A line-local correction leaves the claim standing in the
+prose**, where the next reader meets it first.
+
+**Correct it as a MATRIX, never a blanket red.** The interpreter cell may be
+genuinely witnessed; only the **native** half is unwitnessed. Reds the whole row
+and you have replaced a false green with a false red.
+
+**This is not a stale-green sweep.** Scope is those two sites, in scope because
+they turn on the same fixture as the `D4` population. **Anything else you
+suspect is still reported-and-stopped** under `banned scope`.
+
 **`D5` — say what produced the staleness, in one paragraph.** Not a retro.
 Whether these went stale at a known moment (a merge that should have flipped
 them) or drifted unnoticed determines whether anything cheap would catch the
 next one, and that is a Steward input.
+
+> **For the buffer-I/O four, the chain is MEASURED — do not re-derive it.**
+> Steward, 2026-08-15, from `RT-NATIVE-FNSPLIT` itself. Use it; extend it if
+> the other seven differ.
+>
+> **It went stale at a known moment, and the moment was a node closing against
+> a contract clause it had not discharged.** `RT-NATIVE-FNSPLIT`'s Contract
+> required it to *"make native compilation accept ... the actual SP-A-write /
+> SP-B / SP-C programs without source contortions"* and to *"run the exact
+> native SP matrices currently blocked."* Its closure section names this very
+> reconciliation — *"CV flips the PX8-SPAN-PROV native SP rows ... a small
+> conformance-only follow-up fold."* **It closed `merged` on 2026-07-29 with
+> that clause unmet**, and the rows have pointed at it since.
+>
+> ⇒ **The seed was not drifting. It was correctly pointing at a node that
+> announced it would satisfy the condition and then did not.** The rows had no
+> way to know: nothing re-examines a `BLOCKED-ON-` marker when the node it names
+> flips to `merged`, and **a node's closure is not checked against the markers
+> that point at it.**
+>
+> **That is the cheap catch, and it is the answer worth having:** the failure is
+> at the *closing* node, not at the seed. This is a Steward input, not your
+> deliverable — record the mechanism and move on.
 
 ## Acceptance criteria
 
