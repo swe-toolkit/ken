@@ -58,13 +58,46 @@ must be made before anything is built.
 > **The shape, which recurs:** the cheapest-looking repair is cheap precisely
 > because it skips the part that needed deciding.
 
+## THIS NODE REMOVES THE FIRST OF TWO GATES THAT ARE MASKING EACH OTHER
+
+**Architect condition on the `D0` ruling, `evt_7r29t8139t4p2`. Read this before
+`D0`, not at `D3`.**
+
+Route FO cannot return `proved` today for **two independent reasons**:
+
+1. **Quotation refuses every real obligation**, so nothing reaches the boundary.
+2. **`23-prover.md §4.4` forbids `proved`** until `embedding_adequacy` and
+   `checker_soundness` are kernel-checked in an approved home — an Architect and
+   operator item, still unsettled.
+
+**Gate 1 is currently doing all the visible work, and gate 2 has never been under
+load.** This node removes gate 1. The moment quotation starts succeeding, **`§4.4`
+becomes the only thing between an accepted certificate and `proved`** — and it
+becomes load-bearing for the first time inside a node whose subject is signature
+matching, reviewed by people reasoning about signatures rather than about theorem
+homes.
+
+⇒ **That is exactly the shape in which a fail-safe gets refactored past by
+someone who does not know it is the last one.**
+
+**Two conditions follow, and they bind:**
+
+- **`D0` must state the `§4.4` interaction explicitly as part of the soundness
+  obligation**, not only the signature-matching rule.
+- **`AC-2`'s mutation must be aimed at the `§4.4` gate, not at quotation.** A
+  discrimination test that only proves quotation started working leaves the
+  second gate untested at the precise moment it becomes the only one.
+
 ## Deliverables
 
 **`D0` — the design question, posed to the Architect before any code.** State
 the candidate rule for matching an obligation to a signature **as an attackable
 claim**, with the soundness obligation it must discharge: what prevents the
 obligation from selecting the predicates its own embedding is computed over.
-**Hand this to the Architect and stop.** `D1` onward is gated on that ruling.
+**And state the `§4.4` interaction explicitly**, per the two-gate section above —
+a `D0` that covers only the signature-matching rule does not meet the Architect's
+stated condition. **Hand this to the Architect and stop.** `D1` onward is gated
+on that ruling.
 
 **`D1` — the discovery mechanism**, built to whatever `D0` rules. Recognition
 must be by a checked structural property, not by ambient state and not by
@@ -93,6 +126,12 @@ authorize. **If the work seems to require deciding it, that is the handback.**
 **`AC-2`.** `D3`'s public-route test fails if the boundary is removed.
 **Demonstrate the discrimination by mutation** — an inert probe is what produced
 this node, and a second one would not be caught by the same reasoning twice.
+
+**Aim the mutation at the `§4.4` gate, not at quotation** (Architect condition,
+`evt_7r29t8139t4p2`). The term under test must be one that **now quotes
+successfully and carries an accepted certificate**, and it must still yield
+`Unknown`. A mutation that only shows quotation started working proves gate 1 and
+leaves gate 2 — by then the only gate — unmeasured.
 
 **`AC-3`.** Route FO does not return `proved`. The `23 §4.4` reservation stands
 until both theorems are kernel-checked in an approved home, and **this node does
