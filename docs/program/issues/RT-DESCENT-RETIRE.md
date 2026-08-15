@@ -103,6 +103,26 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > the `D5` control — but **this control would not notice if the excluded arm
 > changed from refusing to compiling.** One line if you want it; not a defect.
 
+> # DO NOT RULE ON THE FORK: ITS SIZING IS WITHDRAWN AND A SUCCESSOR IS OPEN
+> # Steward, 2026-08-15, second correction of the day, same direction.
+>
+> **The fork's "cover it" option was priced as inventing a cross-unit
+> representation. That was not substantiated and is withdrawn.** The mechanism
+> for a compiler-created aggregate to carry planner authority is production code:
+> `AggregateOccurrenceProducer::SynthesizedUse`
+> (`planning/static_transition.rs:3956`), populated at `:5754`, whose own doc
+> says a synthesized aggregate *"is named by the closed compiler role that builds
+> it."* What is missing is that its vocabulary is host-result-shaped, which is an
+> extension of a closed mechanism rather than an invention.
+>
+> ⇒ **[[RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]] is `ready` and attacks it.** Until
+> it reports, nobody knows whether these rows are repairable, so **"accept the
+> narrowing" is not a decision anyone is in a position to make.**
+>
+> **Two of the Steward's three lane-1 statements today were wrong in the same
+> direction — toward this campaign being more finished than it is.** Treat a
+> claim that lane 1 has no next step as suspect until it carries its measurement.
+
 > # THE PRODUCT FORK IN FRONT OF THIS NODE WAS POSED ON A FALSE PREMISE
 > # Steward, 2026-08-15. Do not act on the fork as previously stated.
 >

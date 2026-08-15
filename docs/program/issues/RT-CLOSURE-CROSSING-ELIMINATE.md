@@ -420,6 +420,37 @@ excluded-variant arm inside the same loop, in the same process, records a
 - **Retiring `RecursiveDescent`.** [[RT-DESCENT-RETIRE]] is downstream and is
   not this node.
 
+> # THE "INVENT A REPRESENTATION" SIZING IS WITHDRAWN
+> # Successor: [[RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]], `ready`
+> # Steward, 2026-08-15, on the operator's challenge to substantiate it.
+>
+> **`D1` refused at an OWNERSHIP-RECORD seam, and this file let that be read as a
+> representation wall.** It is not one. The question `D1` stopped in front of —
+> *can the planner issue an occurrence for an aggregate no source expression
+> produced?* — **was never asked, and the tree already answers yes.**
+>
+> `AggregateOccurrenceProducer` (`planning/static_transition.rs:3956`) has two
+> arms, `Source(StaticOriginId)` and `SynthesizedUse { owner, seat, path, role }`,
+> **both populated in production** (`:5683`, `:5754`). Its own doc: *"A
+> synthesized one has no occurrence to be named by, so it is named by the closed
+> compiler role that builds it."*
+>
+> ⇒ **What is actually missing is narrower: the synthesized vocabulary is
+> host-result-shaped** — two roots, both host-result arms (`:4208`); `Constructor`
+> shape hardcoded at the synthesized push (`:5764`); seats that are `Effect`
+> occurrences. **Extending a closed checked vocabulary is not inventing a
+> representation**, and the successor node attacks exactly that.
+>
+> **Four refuted guesses are evidence about four guesses.** They were compounded
+> into "no dispatchable increment exists" and then into a product fork whose
+> cheapest option was accepting a capability narrowing. **That inference is
+> withdrawn.** The Architect's ruling had already pointed here — the obligation
+> *"does not require inventing a carrier — which is consistent with `D1` having
+> refused at an ownership-record seam"* — and it was read past.
+>
+> **The carrier-word half is NOT retired by this.** Whether passing the ownership
+> seam exposes it is the successor's `D2`, answered as a question.
+
 ## The stop that is NOT a failure, named in advance
 
 **A cross-unit result edge or representation is exactly what the third guess
