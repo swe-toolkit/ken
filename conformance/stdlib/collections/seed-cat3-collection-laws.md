@@ -37,14 +37,14 @@ The **Architect's three fork rulings** (`evt_4c3q1e611va69`), as transcribed in
   setoid-record field renamed lowercase `view` → `project` (KwView collision).
   This seed is byte-aligned to `829c999`.
 
-**Red-until-built posture (CAT-1-Functor precedent).** `map`, `filter`, `sort`,
-`isSorted`, `count`, `mem`, `length`, `min`, and the `view`/`lens` records are
-**absent from `catalog/packages/` on `origin/main`** (self-grepped; `57 §2.1`/`§2.3`).
-Every case whose subject is one of these is **red-until-built** against the
-CAT-3 Language build (held for the GPT window); it flips green when the build
-lands the op + its law. Cases over **only** landed ops (`list_append`, `take`,
-`drop`, `nth`) are **provable-now** (need only the proof authored + built), and
-are tagged distinctly from the deeper **blocked-on-missing-op** reds.
+**Landed CAT-3 posture.** The producer at `72c2315ca` added `map`, `filter`,
+`sort`, `is_sorted`, `count`, `mem`, `length`, `min`, and the concrete
+`View`/`Lens` records to
+`catalog/packages/Data/Collections/Derived.ken.md`. The targeted
+`cat3_collections_package` run at this candidate base passes all eight tests,
+including the five formerly deferred surfaces and their negative controls.
+Historical row ids retain `red-until-built`; their dispositions below are now
+GREEN with the executing evidence that justifies the change.
 
 ## Grounding (content-verified against the landed targets)
 
@@ -54,11 +54,10 @@ are tagged distinctly from the deeper **blocked-on-missing-op** reds.
   anchors: `57 §2.2` (D1), `57 §3.4`/`§3.7` (sort), `57 §4.4` (lens).
 - `catalog/packages/Data/Collections/Derived.ken.md` — **landed**: `list_append`
   (recursing on its **first** argument, so **left unit is definitional**, right
-  unit + assoc inductive), `nth`, `take`, `drop`, `natSub`,
-  `list_eq (eqf : a -> a -> Bool)`, `list_compare`,
-  `data OrdResult = Lt | Eq | Gt`. **NOT landed** (`57 §2.1`): `count`, `map`,
-  `filter`, `sort`, `isSorted`, `mem`, `length`, `min` — hence the
-  red-until-built split.
+  unit + assoc inductive), `nth`, `take`, `drop`, `natSub`, `count`, `map`,
+  `filter`, `sort`, `is_sorted`, `mem`, `length`, `min`, the concrete
+  `View`/`Lens` records, `list_eq (eqf : a -> a -> Bool)`, `list_compare`, and
+  `data OrdResult = Lt | Eq | Gt`.
 - `catalog/packages/Core/Classes/LawfulClasses.ken.md` — the lawful-class pattern and
   **the Fork-A precedent**: `Ord.total` is stated
   `total : (x)(y) → IsTrue (bool_or (leq x y) (leq y x))` — a decidable Bool
@@ -86,7 +85,7 @@ are tagged distinctly from the deeper **blocked-on-missing-op** reds.
   discriminator (the `const Nil` unsound arm is a *stronger* non-permuting sort
   than `57 §3.7`'s dedup — both fail `Perm`; §3.7's dedup is the canonical one).
 
-## Scope — canonical shapes (from `57`), and the provable-now / red split
+## Scope — canonical shapes (from `57`) and landed fixture split
 
 The verified-`sort` cases reference these landed shapes (`57 §3.1`–`§3.5`):
 
@@ -102,9 +101,9 @@ sortBad (a) (le) (xs) : List a = Nil a   -- dedup/drop stub (fails Perm)
 sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
 ```
 
-- **D1 structural laws** (AC5, `57 §2.2`/`§2.3`): `take`/`drop` decomposition #1
-  **provable-now** (landed ops); `length`/`min` decomposition #2, `map`
-  length-preservation, `filter` membership are **red-until-built**.
+- **D1 structural laws** (AC5, `57 §2.2`/`§2.3`): `take`/`drop` decomposition #1,
+  `length`/`min` decomposition #2, `map` length-preservation, and `filter`
+  membership are all landed and exercised by the CAT-3 package suite.
 - **D2 verified `sort`** (AC3/AC4, `57 §3`): the count-equality `Perm` and
   `isSorted` as **two separate law fields**, and the two dual flips (`sortBad`
   fails `Perm`; `sortId` fails `isSorted`), on `List Bool`.
@@ -128,8 +127,10 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
 - expect: **both law fields hold for the honest sort.** Assert the observable:
   the ordering law and the permutation law are **two independently-stated `Ω`
   fields** (not conjuncts of one refinement obligation), both discharged
-  Axiom-free on `List Bool`. **RED-UNTIL-BUILT** on two axes: `sort`/`isSorted`
-  unlanded (op), and full **Perm discharge** is the C5 known-gap
+  Axiom-free on `List Bool`. **GREEN** —
+  `cat3_d2_bool_sort_surfaces_check_against_real_package_defs` passes, while
+  `cat3_d2_bad_sorted_and_bad_perm_witnesses_rejected` passes both independent
+  negative controls
 - why: (soundness) the ACCEPT arm of AC4. It anchors the two REJECT flips below
   — each holds `sort`'s type fixed and breaks exactly one law. The **permutation
   law is independently load-bearing**: an `isSorted`-only contract is
@@ -272,37 +273,36 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   reds are contrasted
 
 ### stdlib/collections/take-length-law-red-until-built (property)
-- spec: `57 §2.2` (decomposition #2, RED), `57 §2.3` (`length` AND `min` both
-  unlanded)
+- spec: `57 §2.2` (decomposition #2), `57 §2.3` (`length` and `min`)
 - given: the length-of-take law
   `Equal Nat (length a (take a n xs)) (min n (length a xs))`
-- expect: **RED-UNTIL-BUILT — blocked on missing ops** (`length` and `min` both
-  absent; only `natSub` is landed, per `57 §2.3`). The law cannot be *stated*
-  without them. Flips green when the build lands `length` + `min` + the proof.
-  Assert: the case is red for a **deeper** reason than decomposition #1 — not
-  "proof unwritten" but "operator unlanded"
+- expect: **GREEN** — `length`, `min`, and `length_take_min` are present in the
+  landed Derived package, and
+  `cat3_d1_positive_surfaces_check_against_real_package_defs` passes the
+  concrete length-of-take proof against those definitions
 - why: (property) AC5 — the provable-now / blocked-red distinction `57 §2.3`
-  sharpens (decomposition #1 provable, #2 blocked). Tagging **which** reds are
-  op-blocked vs proof-pending is the elaboration-time deferred-seam tag
-  ([[layer-dependent-pin-at-unconditional-layer]])
+  sharpens. The historical deferral is now discharged by a real proof over the
+  landed operations, rather than inferred from symbol presence alone
 
 ### stdlib/collections/map-length-preservation-red-until-built (property)
-- spec: `57 §2.2` (`Equal Nat (length b (map a b f xs)) (length a xs)`, RED),
-  CAT-1-Functor red posture
+- spec: `57 §2.2` (`Equal Nat (length b (map a b f xs)) (length a xs)`)
 - given: the `map` length-preservation law (if `map` arrives via `Functor List`,
   a law *about* the instance)
-- expect: **RED-UNTIL-BUILT — blocked** (`map` and `length` both unlanded; no
-  `Functor List` / standalone `map` on `List` in `catalog/packages/`). Flips green when
-  the build lands `map` + `length` + the proof
-- why: (property) AC5 — CAT-1-Functor posture verbatim; the `map` provenance
-  (`Functor List` vs standalone) is an open build sub-decision
+- expect: **GREEN** — standalone `map`, `length`, and `map_length` are present
+  in the landed Derived package, and
+  `cat3_d1_positive_surfaces_check_against_real_package_defs` passes the
+  concrete preservation proof against them
+- why: (property) AC5 — the fixture exercises the settled standalone operation
+  and proof; its result is not inferred from the producer's presence
 
 ### stdlib/collections/filter-membership-red-until-built (property)
-- spec: `57 §2.2` (the `filter` membership `Iff`, RED)
+- spec: `57 §2.2` (the `filter` membership `Iff`)
 - given: the `filter` membership law with `mem`/`Iff` as `Ω`-predicates
-- expect: **RED-UNTIL-BUILT — blocked** (`filter` and `mem` both unlanded). The
-  `Iff` is a two-sided `Ω`-implication (`16 §1.3` mutual `→`, no truncation).
-  Flips green when the build lands `filter` + `mem` + the proof
+- expect: **GREEN** — `filter`, `mem`, and `filter_mem` are present in the
+  landed Derived package, and
+  `cat3_d1_positive_surfaces_check_against_real_package_defs` passes the
+  concrete membership proof. The `Iff` is a two-sided `Ω`-implication
+  (`16 §1.3` mutual `→`, no truncation)
 - why: (property) AC5 — the one D1 law whose statement is a bi-implication
   rather than an equation; pinning it as `Iff`-of-`Ω`-predicates (`16 §1.3`, not
   a `Bool`-equation) keeps it in the value/`Ω` fragment (`57 §2.2`)
@@ -360,8 +360,10 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   (`mkPair (pairFst s) (pairSnd s) ≡ s`, `13 §6`) → `Refl`. Assert: the record
   elaborates, all three proofs close by `Refl`, zero `Axiom`, **no `match` on
   the Σ-pair**
-  (Σ-η, not a case-split). **RED-UNTIL-BUILT** (the `view`/`lens` record is not
-  in `catalog/packages/`)
+  (Σ-η, not a case-split). **GREEN** —
+  `cat3_d3_view_lens_records_and_flavors_check_against_real_package_defs`
+  passes the concrete records and all three laws, while
+  `cat3_d3_wrong_lens_endpoint_rejected` passes the negative endpoint control
 - why: (soundness) AC6 — the ACCEPT arm for the shipped concrete flavor. It is
   ordinary Ken (Fork B: plain `Σ`-record, kernel-untouched). **All three laws
   close by `Refl`** — none by `tt`: the `55 §3.2` "same head → `Top` → `tt`"
@@ -492,8 +494,9 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
   `broken-lens-getset-false-witness-rejected`,
   `view-flavors-mechanism-per-flavor-grounded`,
   `view-family-name-reuses-freed-keyword`
-- **AC7** (green) — the red-until-built posture (cases flip green as the CAT-3
-  build lands each op + law; CI gate)
+- **AC7** (green) — all eight `cat3_collections_package` tests pass at the
+  candidate base; the five historical deferred sites now cite their executing
+  evidence
 
 ## Cross-case consistency sweep
 
@@ -518,10 +521,11 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
 - **Carrier `List Bool` for proved *sort* arms; `Pair Bool Bool` for the lens.**
   No proved sort-arm carries on `List Int` (Axiom-holed); the lens is structural
   over `Pair` (needs no `DecEq`/`Ord`, `57 §4.4`).
-- **Red-until-built vs provable-now is tagged, not blurred.**
-  `take-drop-decomposition-holds` is provable-now (`57 §2.3`);
-  `take-length`/`map`/`filter` are op-blocked reds; the verified-sort ACCEPT arm
-  is discharge-gap red. Distinct red reasons, each named.
+- **The former producer split has been re-adjudicated, not erased.**
+  `take-drop-decomposition-holds` was always provable; the historical
+  `take-length`/`map`/`filter`, verified-sort, and lens deferrals retain their
+  row ids but are GREEN only because the targeted suite now executes their
+  positive surfaces and negative controls.
 - **Fork-C name reconcile pending.** `view-family-name-reuses-freed-keyword` is
   authored on the ruled `view`, RESOLVED at chapter tip `829c999` (`§4.1`/`§90`,
   FOLD-IN 1 in `§4.4`, setoid field → `project`); this seed is byte-aligned.

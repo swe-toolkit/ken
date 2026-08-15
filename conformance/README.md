@@ -434,9 +434,12 @@ claim with no conformance case is a claim no one can rely on
   branches, the reversed `ResourceKindMismatch` pair, deterministic
   `BufferLimitsV1`, one resource-export rebaseline, the unchanged no-acquire
   control, and PX8-SPAN-PROV's acquisition-binding oracles: SP-A freeze is
-  absolute on both engines; write, precedence, and slot-reuse are complete on
-  the interpreter while their native cells remain explicitly
-  `BLOCKED-ON-NATIVE-REACHABILITY` by [[RT-NATIVE-FNSPLIT]].
+  complete on the interpreter; its only both-engine arm is ignored and fails
+  during native object emission under [[RT-COMPMATCH-TREE-SCRUTINEE]] when
+  forced. Write, precedence, and slot-reuse are complete on the interpreter
+  but have no executing native arm; all four native cells remain
+  `BLOCKED-ON-RT-COMPMATCH-TREE-SCRUTINEE`
+  ([[RT-COMPMATCH-TREE-SCRUTINEE]]).
 - `behavioral/agentic/seed-agentic.md` — B4 the agentic boundary (WS-B capstone,
   `74`): assuring an embedded agent's outputs **reduces to the existing seam**
   aimed at a maximally-nondeterministic component (agent = maximal `P`) — **no

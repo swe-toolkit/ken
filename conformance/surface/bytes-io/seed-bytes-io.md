@@ -20,8 +20,13 @@ loose core-operation seam to these exact shapes:
 - `bytes_slice : Bytes → Int(start) → Int(len) → Option Bytes`.
 
 The cases below pin those names, result types, and invalid-input behavior. The
-changed safe-signature outcomes are **RED-UNTIL-BUILT (CP0)** on the exact base;
-they flip green only with the coupled implementation/spec/conformance landing.
+CP0 producer at `6088e0b8a` registers the exact safe operations in
+`crates/ken-elaborator/src/bytes.rs:199-219`, and the targeted `l6_acceptance`
+run at this candidate base passes 14/14. In particular,
+`bytes_index_inbounds_and_oob`, `bytes_slice_inbounds_and_oob`,
+`decode_invalid_utf8_returns_error`, and `decode_valid_utf8_returns_string`
+execute the formerly deferred safe-signature outcomes. Their disposition is
+therefore **GREEN (CP0)** from run evidence, not from producer presence alone.
 
 **CP0 fixture re-anchor.** Retiring the placeholder `send`/`recv` primitives
 removes the repository's sole registered `[Net]` producer. Conformance must not
@@ -406,8 +411,8 @@ case here drives **real** values/signatures through **landed** mechanisms: AC2/
 AC3 route a real I/O signature through the real `36 §1.4` escape check (a real
 untracked call → a real reject, per the QA gate — not a synthetic flag); AC5's
 obligation discharges against the real `20-verification/` pipeline. The
-Language's CP0 build half delivers the safe **operations**
-(`bytes_decode`/`bytes_at`/`bytes_slice`) and their native lowering over the
-landed substrate. The pre-existing `read_bytes` operation-row case stays live;
+Language's landed CP0 build half supplies the safe **operations**
+(`bytes_decode`/`bytes_at`/`bytes_slice`) and their lowering over the landed
+substrate. The pre-existing `read_bytes` operation-row case stays live;
 the retired `send`/`[Net]` case is replaced by the real landed
 `print_line`/`[Console]` producer, never by a synthetic Net declaration.

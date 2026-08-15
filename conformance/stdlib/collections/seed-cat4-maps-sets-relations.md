@@ -32,17 +32,16 @@ numbers, per the `conformance-oracle-grounding-fallback` discipline):**
   `trans`/`cong` "stop-one-step-short" transport bridges. **Zero `Axiom`, zero
   `trusted_base` delta throughout.** Permutation is the one Map law still
   deferred (proof-relevant, C5).
-- **All six D1–D3 ops absent** on `main`
-  (`git grep '^view (delete|union| intersection|difference|keys|values) '`
-  empty) + `glue`/`deleteMin`/`pairVals` absent — every CAT-4 op is net-new
-  (red-until-built). `setInsert`/`setMember`/ `setToList` + `allKeys`/`pairKeys`
-  landed (Set = Map-Unit, `Tree a Unit`).
-- **Two build prerequisites, both ordinary total Ken (kernel-untouched):**
-  `size` (`Tree k v → Nat`, the closure bound `N`, **absent on main**) plus the
-  D0 carrier `leqNat` (`Nat → Nat → Bool`) + its 4 order laws (**absent on
-  main** — `git grep 'Nat -> Nat -> Bool'` empty; `Nat` is inductive so refl/
-  antisym/trans/total are genuinely provable Axiom-free by structural
-  induction).
+- **The LAND-NOW D0–D4 producer is present.** The current Map package contains
+  `leq_nat`, `delete`, `union`, `intersection`, `difference`, `keys`, `values`,
+  `compose`, `converse`, and the relation predicates with their derived proof
+  corpus. The targeted `map_build_acceptance` run passes all 24 tests, including
+  the derived/zero-delta census and executing delete, keyed-merge, projection,
+  and relation controls.
+- **The named closure fast-follow remains deferred:** `size`, bounded
+  `reachableWithin`, and its faithfulness proof are not part of the LAND-NOW
+  producer. The two closure rows below retain that explicit boundary; they are
+  not evidence against the landed D0–D4 result.
 
 **Architect fork rulings (source of truth, `evt_55htg0ss8y1v6` +
 `evt_3z7c592g37rtr`):**
@@ -97,14 +96,14 @@ numbers, per the `conformance-oracle-grounding-fallback` discipline):**
   discriminator (a→b→c ⊬ a→c). The carrier-vacuity guard binds (the CAT-3
   `List Bool` lesson, one carrier up).
 
-**Status — all cases RED-UNTIL-BUILT** (every CAT-4 op is net-new; the build is
-Runtime-owned, held for the GPT window). This is the intended CAT-1-Functor
-posture: the seed is the contract the build codes against; the exact per-branch
-endpoint tokens (delete lookup-side `Refl` vs `tt`; the
-`reachableWithin`/`size`/ `isTransitive` spellings) reconcile with CV at the
-build alongside Architect's AC1/AC5 re-cert. Two soundness/boundary pins ship
-now as **design** assertions (the closure `Ω`-native rep; the set-extensionality
-soundness), assertable ahead of the proofs.
+**Status — LAND-NOW cases GREEN; closure fast-follow deferred.** At this
+candidate base, `map_build_acceptance` passes 24/24. In particular,
+`cat4_new_api_is_derived_and_axiom_free` finds every D0–D4 operation and proof
+transparent with zero trusted-base delta; the four executing CAT-4 tests pass
+the delete, union/intersection/difference, keys/values, and
+compose/converse controls. This run, rather than producer presence alone,
+discharges the stale aggregate red. The bounded-closure representation and
+faithfulness rows retain their already-named design/defer boundary.
 
 ---
 
@@ -188,7 +187,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   former is a plain `Tree K (Set K)` instantiation, no kind extension).
   **`(soundness)`** — a kernel touch or a new `Decl` for any CAT-4 op would grow
   the TCB. Structural (empty kernel diff + admission-kind), not a value.
-  (structural; kernel-untouched; red-until-built.)
+  (structural; kernel-untouched; aggregate suite GREEN.)
 
 ---
 
@@ -212,7 +211,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   directive. **`(soundness)`** — a re-derivation that smuggles an `Axiom` reads
   `proved`-by-default ([[untrusted-layer-backstop-hole-for-omissions]]); the
   delta net is the backstop. Structural (proof-term shape + delta membership).
-  (soundness; structural reuse + zero-delta; red-until-built.)
+  (soundness; structural reuse + zero-delta; aggregate suite GREEN.)
 
 ### stdlib/collections/leqnat-d0-real-axiom-free-carrier (soundness)
 - spec: `58 §2` sub-ruling 2, `51 §6` (Axiom-free order carriers),
@@ -230,7 +229,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   **non-vacuous** — see the standing carrier discriminator below.
   **`(soundness)`** — an `Axiom`-holed `leqNat` would make every proved
   `Map Nat` law's accept-arm vacuous. Structural delta-flip. (soundness;
-  structural zero-delta; red-until-built.)
+  structural zero-delta; aggregate suite GREEN.)
 
 ---
 
@@ -255,7 +254,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   per-branch base-witness pin (`tt` on the `Leaf`/`Equal Bool True True`
   collapse, passthrough on `fromListAcc Nil`, `Refl`/`cong` on neutral steps —
   never uniform [[tt-vs-refl-endpoint-rule-for-inductive-equal-law-bases]]).
-  (soundness; structural; red-until-built; endpoint tokens build-pinned.)
+  (soundness; structural; aggregate suite GREEN; endpoint tokens landed.)
 
 ### stdlib/collections/union-preserves-ordered-f-independent (soundness)
 - spec: `58 §4` D2, Fork A (`f` touches only values).
@@ -272,7 +271,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 - why: AC3 for the merge ops; pins `f`-independence structurally (guards a
   conformance over-claim that threads `f` into the invariant proof).
   **`(soundness)`** — structural (proof does not cite `f`) + zero-delta.
-  (soundness; structural; red-until-built.)
+  (soundness; structural; aggregate suite GREEN.)
 
 ---
 
@@ -289,7 +288,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 - why: D1's headline delete law, made executable (seed-map
   `insert-lookup-roundtrip` twin, delete side). **Drive the real producer:**
   build via real `insert`, delete via real `delete`, read via real `lookup`.
-  (reduces-to value-flip; red-until-built.)
+  (reduces-to value-flip; aggregate suite GREEN.)
 
 ### stdlib/collections/dropkey-drop-first-fails-none-law-dup (soundness)
 - spec: `58 §3` D1, Fork D **build-pin** (`dropKey` = filter, NOT drop-first;
@@ -311,7 +310,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   it; keyed on the **structural** discriminator (duplicate-key survivor). Honest
   note: the input is a non-`Distinct` hand-built tree (not reachable by real
   `insert`), asserting the **robustness** the filter semantics guarantee.
-  (soundness; verdict-flip on `dropKey` semantics; red-until-built.)
+  (soundness; verdict-flip on `dropKey` semantics; aggregate suite GREEN.)
 
 ### stdlib/collections/delete-other-key-law-threads-ordered-distinct
 - spec: `58 §3.2` D1, `54 §5` law 5 (`lookupAssocAgree`, `map.ken:2212`), Fork D
@@ -332,7 +331,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   `lookupAssocAgree` + `fromList` dual + a `dropKey`/`assoc` lemma). The
   discriminator MUST probe an untouched key — the
   [[assert-specific-error-variant-not-is-err]] / non-degenerate-pair rule.
-  (reduces-to value-flip; red-until-built.)
+  (reduces-to value-flip; aggregate suite GREEN.)
 
 ---
 
@@ -352,7 +351,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 - why: D2's headline map law (`§5.2`-analog for merge). The **non-commutative
   `f` + both-present key** is the discriminator: a commutative `f` or a
   one-side-only key would be green-vs-green on the orientation. (reduces-to
-  value-flip; orientation-pinned; red-until-built.)
+  value-flip; orientation-pinned; aggregate suite GREEN.)
 
 ### stdlib/collections/map-union-not-commutative-no-false-law (soundness)
 - spec: `58 §4` D2, Fork A (**maps get NO commutativity law**).
@@ -371,7 +370,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   shipped a map-commutativity law would either `Axiom`-postulate a false
   equation or fail to elaborate; the discriminator is the concrete
   counterexample. Keyed on the non-commutative `f` (a commutative `f` hides it).
-  (soundness; verdict-flip on a false-law claim; red-until-built.)
+  (soundness; verdict-flip on a false-law claim; aggregate suite GREEN.)
 
 ### stdlib/collections/set-union-comm-extensional-not-tree-equal (soundness)
 - spec: `58 §5`/`§9 AC6` sub-ruling 1, `52 §4.4` (Set = Map-Unit), `16 §1.3`
@@ -395,7 +394,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   two formulations, opposite verdicts), keyed on the **structural**
   discriminator (extensional-membership vs Tree-`Equal`). A single (A)-accept
   case is green-vs-green under a build that never tries (B). (soundness;
-  verdict-flip pair on formulation; red-until-built.)
+  verdict-flip pair on formulation; aggregate suite GREEN.)
 
 ---
 
@@ -413,7 +412,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   duplicates/fabricates one flips the agreement.
 - why: D3's coherence law; reuses `pairKeys`/`toList`. Non-degenerate present +
   absent pair (a present-only test is green-vs-green under a "keys returns
-  everything" bug). (reduces-to value-flip; red-until-built.)
+  everything" bug). (reduces-to value-flip; aggregate suite GREEN.)
 
 ### stdlib/collections/keys-ascending-off-tolistordered
 - spec: `58 §6` D3 (keys-ascending coherence), `54 §5` (`toListOrdered`),
@@ -431,7 +430,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   coherence above — reuses the landed `toListOrdered` (the reconcile-surfaced
   gated addition; `values` carry NO such claim, the adjacent case). Insertion
   out of order is the discriminator (a pre-sorted input is green-vs-green).
-  (value-flip on list order; red-until-built.)
+  (value-flip on list order; aggregate suite GREEN.)
 
 ### stdlib/collections/values-no-ordering-coherence-claim
 - spec: `58 §6` D3 (`values` = `pairVals (toList m)`; no ordering claim).
@@ -444,7 +443,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   needn't be ordered).
 - why: pins the `keys`/`values` **asymmetry** honestly — keys inherit the key
   ordering, values do not. Guards a conformance over-claim. (boundary; named
-  scope; red-until-built.)
+  scope; aggregate suite GREEN.)
 
 ---
 
@@ -472,7 +471,8 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   decidable `Bool` `isTransitive` is defined in `58 §7`); its accept-arm proof
   needs the Axiom-free `leqNat`, so a `Map Int` accept-arm goes vacuous and the
   flip degenerates to reject-vs-reject. Non-degenerate pair on the closing edge.
-  (soundness; Ω-predicate proof-flip; ≥3-key carrier-gated; red-until-built.)
+  (soundness; Ω-predicate proof-flip; ≥3-key carrier-gated; aggregate suite
+  GREEN.)
 
 ### stdlib/collections/relation-properties-are-pi-into-omega
 - spec: `58 §7` D4 / Fork C-scope, `16 §1.1` (Π-into-`Ω` is sound — properties
@@ -495,7 +495,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   symmetry/transitivity avoid this (vacuous off the finite live set), which is
   why the chapter's own discriminator is transitivity, not reflexivity. Do NOT
   author a finite-relation `isReflexive`-accept arm. (proof-flip on the
-  Ω-predicate; red-until-built.)
+  Ω-predicate; aggregate suite GREEN.)
 
 ### stdlib/collections/converse-and-compose-membership
 - spec: `58 §7` D4 (LAND-NOW `compose`/`converse` + their laws), `16 §1.1`.
@@ -515,7 +515,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   discriminators — `58 §7` lands them with laws, and a corpus testing only the
   property predicates would leave compose/converse untested (my coverage-gap
   catch at the reconcile). Reuses landed `fold`/`union`/`member`. (value-flip on
-  relation membership; red-until-built.)
+  relation membership; aggregate suite GREEN.)
 
 ### stdlib/collections/transitive-closure-decidable-not-raw-omega (soundness)
 - spec: `58 §7`/`§1 pt 1` Fork B (`evt_55htg0ss8y1v6`), `16 §1.4`+§1.1
@@ -546,7 +546,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   CAT-3 `57 §3.1` ships count-equality `Perm (a)(eqf)…`; closure takes
   **neither**, it takes decidable-bounded (Fork B), for the computability +
   L14-model-check-fit reasons. (soundness; design-rep pin; verdict-independent
-  structural; red-until-built.)
+  structural; named closure fast-follow deferred.)
 
 ### stdlib/collections/closure-faithfulness-and-size-deferred
 - spec: `58 §7` Fork C-scope (DESIGN-NOW/DEFER-BUILD).
@@ -563,7 +563,7 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
 - why: pins the Fork-C-scope split honestly (the
   [[untrusted-layer-backstop-hole-for-omissions]] absent-clause discipline:
   state what defers, so its absence never reads as coverage). (boundary; named
-  deferral; red-until-built.)
+  deferral; closure fast-follow deferred.)
 
 ---
 
@@ -589,7 +589,8 @@ isTransitive (K)(leq)(r : Relation K) : Prop =                    -- Pi-into-Ome
   (exactly CAT-3's `verified-sort-proved-carrier-is-lawful-bool`, one carrier up
   — Nat here because relations need ≥3 keys). **`(soundness)`** —
   verdict-independent structural (which carrier + whether its `Ord` cites an
-  `Axiom`). (soundness; standing carrier discriminator; red-until-built.)
+  `Axiom`). (soundness; standing carrier discriminator; aggregate suite
+  GREEN.)
 
 ---
 
