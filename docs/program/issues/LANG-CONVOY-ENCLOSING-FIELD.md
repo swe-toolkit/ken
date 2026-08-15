@@ -1,15 +1,47 @@
 ---
 id: LANG-CONVOY-ENCLOSING-FIELD
 title: "spec 34 §3.2's Boundary paragraph names the two-vector `zip` recursive step a known gap and a follow-on -- the sibling-convoy re-typing cannot distinguish a genuine outer parameter from a field the enclosing match already bound, because `outer_scope_depth` is a raw context-depth subtraction that includes both -- and the follow-on was never filed"
-status: ready
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: []
-blocks: []
+blocks: [LANG-CONVOY-MATCH-FIELD-PROVENANCE]
 github: null
 origin: "Steward sweep 2026-08-14 at main 96c95586, grepping spec/30-surface/ for deferral phrasing rather than auditing the tracker for gaps. This is the third obligation found that way -- the first two were spec 37's `filter` (produced LANG-PRELUDE-COLLECTIONS) and its `DecEq Char` transport (produced LANG-DECEQ-CHAR-LAWFUL-INSTANCES). Filed `draft` and unsized because the remedy is a design call, not because the gap is uncertain. FLIPPED ready and narrowed to the discriminating fixture ALONE on the Architect ruling evt_1rk8wyak0z7sr (2026-08-14, grounded at main c932e7b4), which refused both options the Steward offered, surfaced a third candidate whose carrier already exists, and authorized cutting the fixture with no ruling needed because it discriminates between remedies that prescribe different fixes."
 ---
+
+> # MERGED 2026-08-15 as squash `00efd1f41`, from base `6275bbc35`.
+>
+> Candidate `db399d12d`, PR #2268. One commit, sole path
+> `crates/ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs`,
+> `+35/-0`. QA `evt_7x34pndbg6kjv`, Architect `evt_1vyfpyv0t6dgj`, Decision
+> `dec_4vw75zd71kj2g`.
+>
+> **`AC-3` — no remedy implemented — is verified on `main`, not merely on the
+> candidate:** `elab.rs` is blob `dc1797a5a` at the declared base and blob
+> `dc1797a5a` on `main` after the merge.
+>
+> **The verdict is the RANGE hypothesis.** `bottom_pos=5`,
+> `already_present=false`, enclosing entry depth `3`, so `5 >= 3` — absent plus
+> above. The Architect confirmed it at the loop: `outer_scope_depth =
+> cx.ctx.len() - n` (`elab.rs:2217`) subtracts only *this* match's fields, so
+> the enclosing match's fields sit inside capability 2's candidate range and
+> are treated as genuine outer binders.
+>
+> **The third outcome — the one that would have refuted the Architect — did not
+> occur, and it was reachable.** The frame required it to be sayable and the
+> ring did not have to say it.
+>
+> **Residual, carried not hidden: the fixture's assertion is weaker than the
+> measurement that produced it.** It accepts any kernel `TypeMismatch` anywhere
+> in the program, while the discriminating fact — same head, differing only in
+> the de Bruijn index — was measured, independently re-derived by QA, and then
+> not pinned. Non-blocking here because the node is fixture-only by `AC-3` and
+> the operands are pinned in two handbacks. **Tightening it is `D1` of
+> [[LANG-CONVOY-MATCH-FIELD-PROVENANCE]]**, deliberately ordered before the
+> remedy so that "the gap closed" can be told apart from "the program moved
+> onto a different error path".
 
 ## What this is
 
