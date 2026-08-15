@@ -1,7 +1,7 @@
 ---
 id: CONF-STALE-RED-DISPOSITIONS
 title: "Eleven conformance sites assert RED-UNTIL-BUILT or BLOCKED-ON against producers that have already landed -- the mirror of the unproducible-fixture defect, and it makes finished work read as outstanding"
-status: ready
+status: active
 owner: spec-enclave
 size: M
 gate: none
