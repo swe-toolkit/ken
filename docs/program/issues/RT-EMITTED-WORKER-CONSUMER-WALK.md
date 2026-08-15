@@ -1,15 +1,26 @@
 ---
 id: RT-EMITTED-WORKER-CONSUMER-WALK
 title: "Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition"
-status: ready
+status: closed
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-LEXICAL-RECURSOR-CONSUMERS]
-blocks: []
+blocks: [RT-SECOND-RECOGNITION-ERASURE, RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE]
 github: null
 origin: "Architect ruling evt_4hs6teqd9yks2, 2026-08-15, on the Steward's question at evt_4x72jp54qwp after two refuted repair attempts. Every symbol cited below was located by name against origin/main 3d69257b5 by the Steward before filing; the ruling's line numbers were not carried. Steward-filed per COORDINATION section 2."
 ---
+
+## CLOSED, NOT MERGED — and the distinction matters to the two successors.
+
+**This node is measurement-only. It produced no candidate and never will**, so
+it can never reach `merged`. Its successors depend on it, and a successor gated
+on a predecessor's `merged` would wait forever.
+
+⇒ **`closed` = resolved-without-landing.** `D0`, `D1`, and `D2` are all
+discharged; the result is the section below, and the disposition went to the
+Architect at `evt_38tt8vj6hnfn0` and was ruled at `evt_3cxm6654d5cjb`.
+**Read the result here; there is no diff to read.**
 
 ## MEASURED at `ac8a73d1b`. `D0` DELIVERED, AND IT REFUTED THIS FRAME'S PREMISE.
 

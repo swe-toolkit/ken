@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 22:45:14Z — from 324 issue file(s) in `docs/program/issues/`.
+2026-08-15 22:46:55Z — from 324 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -253,7 +253,7 @@ the committed file matches the generator's output.
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | draft | runtime | M | none | — |
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
-| `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | ready | runtime | S | none | — |
+| `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
 | `RT-ENTRY-TRAP-254` | public_source_observes_raw_argv_environment_cwd_bytes_in_field_order exits 1 with an explicit entry trap where it expects 254 — branch-introduced, and the only tip failure that is not the byte-span gap | closed | runtime | M | none | — |
 | `RT-ENTRY-TRAP-PX7O` | px7o heterogeneous eliminator frames: native traps at the explicit entry (RuntimeTrap(4), exit 1) where the interpreter returns exit 7 -- the entry-trap family the de Bruijn repair did NOT clear | closed | runtime | TBD | none | — |
 | `RT-ESCAPE` | escaping a second Resource through a bracket fails native lowering | merged | runtime | M | none | PR #911 @ 238a5c5d (origin/main 4ac9141e, CI green) |
@@ -387,7 +387,9 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
+- `RT-SECOND-RECOGNITION-ERASURE` — Erase the second static-worker recognition for row4 depths 2 and 3, whose worker was already emitted and lawfully consumed, without relaxing the ledger's law or borrowing that consumption to transition a second recognition
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
+- `RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE` — Measure whether any lowered consumer reads the static-worker field constructed for row4 depth 1 and row5 after-hole, or whether the recognition is only ever seen by the ledger's close
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 - `V3-FO-CONVERSION-LOAD-MEASURED` — Measure what kernel conversion actually costs when it runs check_cert, on real source programs, before any of it is argued about
@@ -435,11 +437,8 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: draft)
 - `RT-DESCENT-RETIRE` blocked by `RT-RECURSOR-TRANSPORT` (status: active)
 - `RT-DESCENT-RETIRE` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
-- `RT-EMITTED-WORKER-CONSUMER-WALK` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
 - `RT-RECURSOR-TRANSPORT` blocked by `RT-LEXICAL-RECURSOR-CONSUMERS` (status: active)
-- `RT-SECOND-RECOGNITION-ERASURE` blocked by `RT-EMITTED-WORKER-CONSUMER-WALK` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
-- `RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE` blocked by `RT-EMITTED-WORKER-CONSUMER-WALK` (status: ready)
 
 ## Gate progress
 
