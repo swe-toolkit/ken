@@ -496,12 +496,32 @@ fn intervening_let_fresh_binder_fails_invariantly_across_all_three_bases() {
              } \
          }",
     );
-    assert!(
-        matches!(
-            &err,
-            ElabError::Internal(msg) if msg.contains("could not classify the branch goal")
+    match &err {
+        ElabError::Internal(msg) => {
+            assert!(
+                msg.contains("could not classify the branch goal"),
+                "expected the measured `refine_branch_goal` classification \
+                 failure, got a different Internal message: {msg:?}"
+            );
+            assert!(
+                msg.contains("expected: Dg67"),
+                "expected the measured TypeMismatch's `expected` operand \
+                 (bare `Nat`, printed `Dg67`) -- a different expected \
+                 operand means this is NOT the three-way-invariant \
+                 failure this test pins, got: {msg:?}"
+            );
+            assert!(
+                msg.contains("found: ((Dg574 Dg67) @8)"),
+                "expected the measured TypeMismatch's `found` operand \
+                 (`Vec Nat @8`, the same head/index shape as the \
+                 predecessor's own D1 signature) -- a different found \
+                 operand means this is NOT the three-way-invariant \
+                 failure this test pins, got: {msg:?}"
+            );
+        }
+        other => panic!(
+            "expected an `ElabError::Internal` classification failure, \
+             got: {other:?}"
         ),
-        "expected the measured, three-way-invariant `refine_branch_goal` \
-         classification failure, got: {err:?}"
-    );
+    }
 }
