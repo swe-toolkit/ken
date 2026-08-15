@@ -76,9 +76,44 @@ the fork.
    to enter."* The diagnostic is a near-copy of a production traversal and
    diverges from it here.
 
-**Neither affected `D5`'s table.** They matter here because this node adds a
-third field to the same event and reads the same walker, and a diagnostic whose
-field names overstate their scope is how a later reader draws the wrong
+3. **THE `[]` ARM DEGRADES SILENTLY WHILE ITS SIBLING PANICS, AND THAT MAKES
+   HALF THE LANDED TABLE VACUOUS UNDER A STALE KEY.** Adversary hunt
+   `evt_6mpw6frz1h508`, verified on `main`. The probe filters on
+   `format!("{origin:?}") == "StaticOriginId(5)"` — a hardcoded string key — and
+   then matches:
+
+   ```rust
+   match targeted.as_slice() {
+       []          => (None, None, None),                      // silent
+       [(o, k, p)] => (Some(..), Some(..), ..),
+       _           => panic!("origin 5 must identify at most one ..."),  // loud
+   }
+   ```
+
+   `transfer_into_carrier_reached` is `transferred_root_origin.is_some()`, and
+   the expected vector across the four rows is `true, false, true, false`.
+   ⇒ **If origin numbering shifts, the filter matches nothing on all four rows.**
+   The two expecting `true` fail loudly. **The two expecting `false` PASS —
+   because the key went stale, not because no crossing occurred.** Half the
+   census is protected by the shift being loud and half is *satisfied* by it.
+
+   **The repair is symmetric with what the file already does.** The `_ =>
+   panic!` arm shows it knows how to make an unexpected population loud. Prefer
+   the row-independent form: **assert once, outside the loop, that
+   `StaticOriginId(5)` exists in the plan at all**, so a stale key reds
+   regardless of which row expects what. The candidate added hardcoded origin
+   literals for 5, 21, 22, 25 and 26, so one existence check earns its keep
+   immediately.
+
+   **This is a different third state from the queued tri-state convention.**
+   That one is *"the instrument did not observe"*; this one is **"the probe's
+   key no longer names anything."** Do not wait on that convention — it is
+   queued behind the lanes, and this instance is repaired here.
+
+**None of the three affected `D5`'s table as measured.** They matter here
+because this node adds a field to the same event and reads the same walker, and
+a diagnostic whose names overstate their scope — or whose miss is silent on
+exactly the rows expecting a miss — is how a later reader draws the wrong
 conclusion from a correct table.
 
 ## The live stop
@@ -104,9 +139,13 @@ selection fails this.**
 way. That question may be ill-posed on this route and it is not what this node
 measures.
 
-**`AC-4`.** `D3`'s two misreports are both addressed in the tree — a field whose
-name matches its measurement, and a walker divergence either removed or
-documented at the site.
+**`AC-4`.** `D3`'s **three** items are all addressed in the tree: a field whose
+name matches its measurement; a walker divergence either removed or documented
+at the site; and **a stale origin key that reds on every row, demonstrated** —
+change the literal to an origin that does not exist and show the control fails,
+including on the rows that expect `false`. **An existence assertion nobody
+tried to break does not discharge this**, because the defect being repaired is
+precisely a check that passes when it should not.
 
 **`AC-5`.** Any new control declares its **promise class** and says to rewrite
 it on an authorized route change, matching the predecessor's discipline. That
