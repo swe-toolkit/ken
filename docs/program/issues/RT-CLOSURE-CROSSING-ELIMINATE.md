@@ -35,6 +35,75 @@ node working as framed, and the refutation is what this node is built on.
 in the ABI, and carrying a first-class closure across the generated-unit
 boundary requires a **new `(tag, class)` admission**.
 
+> # THAT IS A FACT ABOUT THE TREE, NOT A PROHIBITION — AND THIS FILE READ AS ONE
+> # Steward, 2026-08-15, on the operator's challenge to ground each constraint
+>
+> **The paragraph above is true and stays.** What does not survive is the
+> inference drawn from it downstream — in this file's `AC-2`/`AC-4`, in the
+> handback prose, and in the Steward's own reporting: that **a live-domain
+> closure lane is banned**. The spec says the opposite.
+>
+> `spec/40-runtime/41-values.md:76-83`, the landed callable boundary:
+>
+> > **Live-domain invocation only.** Separately compiled artifacts may exchange
+> > an ordinary closure only within one live runtime domain, while the defining
+> > owner and artifact remain live. The receiver may invoke it at its checked
+> > callable type, but may not inspect, serialize, persist, reconstruct, or use
+> > it as stable identity.
+>
+> and `:116-118`, from the same revision:
+>
+> > This chapter fixes the observable validity boundary, not its
+> > implementation. It requires no particular handle or trampoline,
+> > owner/lifetime encoding, allocation scheme, GC strategy, or memoization
+> > scheme.
+>
+> ⇒ **Cross-artifact live-domain closure exchange is the SANCTIONED shape, and
+> the chapter deliberately declines to constrain its mechanism.** That
+> minimum-constraint clause is not incidental: it exists because a
+> stronger-than-mission constraint, faithfully implemented, produced six
+> consecutive Architect production blocks on `RT-FNSPLIT-B2V` — see
+> [[SPEC-CLOSURE-BOUNDARY]] and the operator directive it quotes.
+>
+> **What IS prohibited is the DURABLE lane, and only that.** `41-values.md:73-76`
+> makes a closure transitively non-persistable, with the mission failure named at
+> `:103`. The retired pair is `(PersistentClosure, Closure)` — **persistent** —
+> and `BOUNDARY_RETIRED_LANES`' own doc states the point is *"a
+> recognition/admission split, not a revived capability."* Reviving that pair
+> stays banned. A live-domain pair is a different pair and a different question.
+>
+> **Two supporting claims also need attribution, because both were restated as
+> law:**
+>
+> - **`BOUNDARY_TAG_CLASS_RELATION` is not the authority.** Its own doc: *"NOT
+>   the authority, and NOT derived — a hand-written Rust MIRROR"*, reconciled in
+>   both directions against the `BoundaryInput → BoundaryOutcome` partition. So
+>   "adding a row to the relation" is not the act; changing the partition is, and
+>   the mirror follows. This is a **mechanism**, not a gate.
+> - **"Do not undo the unit boundary"** is the runtime ring's judgment recorded
+>   in a hard stop, not a ruling. Cite it as that.
+>
+> **The one measured constraint here is narrower than it was quoted as.** The
+> eight-call-site argument under `AC-3` says *do not admit at the shared gate*,
+> because `boundary_transfer_admissibility` (`lowering/mod.rs:6613`) serves eight
+> call sites of which two are classified. **That is an argument about WHERE, not
+> about WHETHER.** It survives unchanged and is the only one of the four that was
+> ever grounded in a measurement.
+>
+> ### THE QUESTION THIS OPENS, WHICH IS THE ARCHITECT'S
+>
+> **Does the generated-unit boundary sit inside "one live runtime domain, while
+> the defining owner and artifact remain live"?** If yes, the spec already
+> licenses this crossing and the work is building the owner/lifetime encoding and
+> the refuse-before-invocation check `:81-83` requires — a real node, but a
+> **specified** one rather than an invention. If no, the crossing is a durable
+> export wearing a live-domain name and today's refusal is correct on the merits.
+>
+> **Resolve this BEFORE the [[RT-DESCENT-RETIRE]] product fork is ruled on.** The
+> fork was put to the operator as *cover it (requires inventing a representation)
+> / accept the narrowing / stop* — and the first option was priced against a
+> prohibition that does not exist.
+
 ## The finding this node is built on — do not restate it as the predecessor's
 
 **Architect, `evt_2nwtjekh4qtnk`.** The predecessor's disposition text says the
@@ -248,6 +317,13 @@ relation is mechanically reconciled in both directions, so this is enforced
 rather than reviewed — but state it, because a candidate that needed to touch it
 has left this node's route.
 
+> **This is a SCOPE BOUNDARY ON THIS NODE, not an architectural prohibition.**
+> Read the clause after the comma: a candidate needing a new admission **has left
+> this node's route**, so the criterion is a handback trigger. It says *"if you
+> need this, stop and hand back"* — it does not say the admission may never
+> exist, and it is not evidence about what the ABI is permitted to grow. The
+> banner above gives the spec position; `AC-2` is silent on it.
+
 **`AC-3`.** **No admission is installed at the shared gate.** This carries
 forward unchanged from the predecessor's `AC-3a` and the reason has not
 weakened: `transfer_into_carrier` has **eight** non-test call sites all funnelling
@@ -261,6 +337,13 @@ than asserting it.
 no revival of the retired durable lane, and no weakening of the refusal or its
 message. If the repair succeeds, the refusal arm still refuses everything it
 refuses today — the crossing is gone, not permitted.
+
+> **Each of the four clauses here is grounded, and NONE of them generalizes to
+> "no live-domain closure lane."** `FrozenClosure` and `StaticCallableRef` are
+> the two explicit separate abstractions `41-values.md:88-96` requires be kept
+> distinct from an ordinary closure; the retired durable lane is the persistent
+> pair the same chapter forbids at `:73-76`. **The generalization was the
+> Steward's and it is withdrawn** — see the banner near the top of this file.
 
 **`AC-5`.** Nothing added to a production build surface that was not there
 before, verified by a targeted control rather than by inspection.
@@ -307,6 +390,15 @@ these rows refused, and would then ship a narrowing.**
 **Whether that narrowing is acceptable is a product call, not a runtime one, and
 it is not this node's to make.** It changes this node's priority and nothing
 about its content, which is why it is recorded here rather than blocking.
+
+> **The fork has a PRIOR question and cannot be ruled on until it is answered.**
+> A narrowing is only a narrowing against what Ken is **specified** to do.
+> `41-values.md:76-83` specifies live-domain cross-artifact closure exchange, so
+> if the generated-unit boundary sits inside one live runtime domain, these rows
+> are refusing something the spec grants and the disposition is a **gap**, not a
+> permitted narrowing. If it does not, the refusal is correct on the merits and
+> the fork is real as posed. **Architect question; route it before the operator
+> is asked to choose.**
 
 ## Provenance
 
