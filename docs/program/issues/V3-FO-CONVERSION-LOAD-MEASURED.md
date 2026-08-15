@@ -1,13 +1,13 @@
 ---
 id: V3-FO-CONVERSION-LOAD-MEASURED
 title: "Establish source-level provenance for FO obligations and measure the Rust reference checker over their certificate trees, recording that the kernel-conversion quantity 23 section 4.4 names is not takeable at this SHA"
-status: ready
+status: merged
 owner: language
 size: M
 gate: none
 depends_on: [V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2363
 origin: "Steward, 2026-08-15, on the operator's posture ruling: 'Nothing ventured, nothing gained. We will only know the cost if we build it and test it on real programs, so we should do that.' Settles the evaluator/TCB posture half of spec/20-verification/23-prover.md section 4.4, which that section assigned to the Architect and operator. Steward-filed per COORDINATION section 2."
 ---
 
