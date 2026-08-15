@@ -1,7 +1,7 @@
 ---
 id: RT-REQUIRED-OCCURRENCE-PROJECTION
 title: "Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -22,8 +22,28 @@ origin: "Architect ruling evt_1y5bfgkg6v5b6 (2026-08-15), answering the Steward'
 > node; the projection belongs to **this successor with its own ACs**, not to a
 > widened frame there.
 
-> # CANDIDATE `e9e980988` PASSED REVIEW AND WENT RED IN CI. THE CANDIDATE IS
-> # NOT THE DEFECT — READ THIS BEFORE AUTHORING THE NEXT ONE.
+> # MERGED 2026-08-15 at `66715f9fb`, PR #2293, exact head `7fbd92e4d`.
+> # `D1`-`D4` ALL DELIVERED. The CI red below is RESOLVED — kept because the
+> # collision it names is the durable lesson, not because anything is open.
+>
+> **Landed after two recuts of the same candidate.** Blob identity MATCH on all
+> five `ken-runtime` paths, enumerated from the declared base `e7fedca4e`. The
+> landed tree `ed554ec6b` equals the merge tree QA computed independently.
+>
+> **`D4`'s measured outcome, which is the deliverable:** row 4 depths 2 and 3
+> **advance to `Closure`**; rows 1, 4-depth-1 and 5 are unchanged. Attributed
+> refusal boundaries, not a closure claim — the frame carried **no closure AC**
+> and did not acquire one.
+>
+> **Two Decisions, and the second carries the merge.** `dec_310crgf5mashb`
+> approved `e9e980988` and is **spent** — it was overtaken by the red.
+> `dec_2vtk7e569tdvn` (resolved 07:02:39Z) approved the recut `d8141ed32`
+> **with one pre-authorized required amendment**, and carried explicitly to any
+> head whose **entire** delta from `d8141ed32` is that amendment. The published
+> head `7fbd92e4d` was checked against exactly that: parent matches, one hunk,
+> five deletions, nothing else.
+>
+> ### The red, and how it was resolved — the part worth keeping
 >
 > **2026-08-15, PR #2293.** `D1` came back **derivable**, so the Architect's
 > pre-authorized fork did not fire and `D2`-`D4` were built to his §4 shape.
@@ -124,6 +144,59 @@ origin: "Architect ruling evt_1y5bfgkg6v5b6 (2026-08-15), answering the Steward'
 > (b) before the per-case table exists. **Post the table with the candidate** —
 > the pre-commitment above is what lets the next candidate need one Architect
 > pass instead of two.
+>
+> ### THE MEASUREMENT CAME BACK, AND IT WAS BRANCH B
+>
+> Per-case, both legs, as `(arrivals, forwards)`:
+>
+> | case | forward enabled | forward suppressed |
+> |---|---|---|
+> | row 1 owned-scope exact | `(1, 1)` | `(1, 0)` |
+> | row 1 owned-scope deleted | `(1, 1)` | `(1, 0)` |
+> | row 4 depth 1 | `(1, 1)` | `(1, 0)` |
+> | **row 4 depth 2** | **`(0, 0)`** | **`(0, 0)`** |
+> | **row 4 depth 3** | **`(0, 0)`** | **`(0, 0)`** |
+>
+> **Depths 2/3 arrive zero times in both legs** — outside D2a's mechanism
+> entirely, exactly the Architect's stated prediction. So option (b) was **not
+> constructible** and the zero-arrival branch applied without a second ruling.
+>
+> **The repair is structural, not a shortened list.** Qualifying membership is
+> `NonZeroUsize::new(*arrivals)` **per case**, so the population is decided by
+> the run — a future routing move re-sorts it automatically instead of silently
+> under-covering. `qualified_cases` must be non-empty; the complement must
+> refuse before the seat; and a **`complement_cases > 0` tripwire** fires if the
+> complement ever disappears, with the message *"re-evaluate whether D2a now
+> reaches every case rather than silently broadening this branch"*.
+>
+> **The free pass is gone.** The old repaired leg's `!contains(R1)` passed for
+> nothing on rows that died earlier; it is replaced by a causal attribution —
+> the complement crosses exactly one real projection route (`applications == 1`)
+> and suppressing it changes the rendering (`assert_ne!`).
+>
+> ### THE AMENDMENT IS THE ARCHITECT CORRECTING HIS OWN RULING
+>
+> His §5 ban on importing another node's boundary **named `Closure` only**, and
+> the identical coupling landed on the **predecessor** boundary instead — D2a
+> asserted `without_projection.contains("StaticWorkerBinding")`. His words:
+> *"My Closure ban had ONE SIGN and the identical coupling landed on the
+> predecessor boundary; that under-specification is mine."*
+>
+> **It was also a promise-class contradiction:** `d2k_1b_i_...` declares that
+> boundary a **transition sentinel** — *"rewritten when any later route advances
+> them"* — while D2a declares itself a **durable invariant**. The amendment
+> deletes the clause; the two surviving clauses already carry the attribution,
+> and **`D4` owns which boundary the route returns to.**
+>
+> ### CARRIED, non-blocking, recorded in `dec_2vtk7e569tdvn`
+>
+> - **The complement re-compile runs outside `run()`'s `Restore` guard**, so a
+>   panic there leaks the selector exclusion to the next test on that thread.
+> - The two aggregate clauses are implied by the per-case assertions and cannot
+>   fail independently; the doc honestly declares them derived.
+>
+> **The Architect read this control and did not run it.** CI on the exact head
+> was that measurement, and it passed.
 >
 > **`dec_310crgf5mashb` is spent.** It approved exact `e9e980988`; the next
 > candidate is a new SHA and needs fresh QA and Architect verdicts.
