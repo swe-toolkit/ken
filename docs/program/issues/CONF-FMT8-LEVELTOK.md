@@ -1,7 +1,7 @@
 ---
 id: CONF-FMT8-LEVELTOK
 title: "FMT8's fixture is unproducible: the row demands a 'genuine level-token fixture' but the lexer has no Level/Label token kind and never will under endpoint (b)"
-status: ready
+status: active
 owner: spec-enclave
 size: S
 gate: none
