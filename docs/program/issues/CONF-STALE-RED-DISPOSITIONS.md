@@ -6,7 +6,7 @@ owner: spec-enclave
 size: M
 gate: none
 depends_on: [CONF-BLOCKER-MARKER-RECONCILE]
-blocks: []
+blocks: [CONF-BLOCKER-OWNER-RESOLVABILITY]
 github: null
 origin: "Produced by CONF-BLOCKER-MARKER-RECONCILE's D4 stop. spec-leader verified at exact base e2c2e6e78 that D4's premise was false -- the CAT-3, bytes-CP0, and CAT-4 producers are landed -- and the conformance-validator independently added the coupled AC-2 finding that the four buffer-I/O markers resolve to merged RT-NATIVE-FNSPLIT, whose closure records no residual build work. Steward ruling evt_bgat447r9s6w removed D4 and filed this. Steward-filed per COORDINATION §2."
 ---
@@ -104,12 +104,23 @@ closure** and it routes to the Steward — do not edit the node.
 
 **Authorized 2026-08-15.** `banned scope` routes a suspected extra site to the
 Steward for a re-cut rather than forbidding it outright. This is that re-cut,
-and it is **bounded to two sites in the file you are already editing.**
+and it is **bounded to three sites: two in the seed you are already editing, and
+the corpus README.**
 
-| site | `conformance/behavioral/buffer-io/seed-buffer-io.md` |
+| # | site |
 |---|---|
-| the row | `buffer-io/foreign-span-freeze-rejected-absolute` — `status: GREEN — PX8-SPAN-PROV Phase 2, interpreter + native absolute` |
-| **the prose** | the SP-A section paragraph: *"PX8-SPAN-PROV Phase 2 makes the complete SP-A freeze row GREEN on both engines."* |
+| 1 | `seed-buffer-io.md` — the row `buffer-io/foreign-span-freeze-rejected-absolute`, `status: GREEN — PX8-SPAN-PROV Phase 2, interpreter + native absolute` |
+| 2 | `seed-buffer-io.md` — **the SP-A section prose**: *"PX8-SPAN-PROV Phase 2 makes the complete SP-A freeze row GREEN on both engines."* |
+| 3 | **`conformance/README.md:439`** — added 2026-08-15 by Steward census; see below |
+
+**Site 3 carries BOTH stale claims at once, at the corpus index.** It reads
+*"SP-A freeze is absolute on both engines; write, precedence, and slot-reuse are
+complete on the interpreter while their native cells remain explicitly
+`BLOCKED-ON-NATIVE-REACHABILITY` by [[RT-NATIVE-FNSPLIT]]."* That is the stale
+GREEN **and** the superseded blocker in one sentence — **and it is the
+highest-visibility statement of both**, since the README is where a reader who
+never opens the seed forms their picture. Correct it with the same matrix
+discipline and the same live blocker.
 
 **Why it is in scope on a stronger ground than adjacency: the row's own engine
 matrix is what refutes it.** It states *"run the complete given/expect pair
@@ -130,9 +141,16 @@ prose**, where the next reader meets it first.
 genuinely witnessed; only the **native** half is unwitnessed. Reds the whole row
 and you have replaced a false green with a false red.
 
-**This is not a stale-green sweep.** Scope is those two sites, in scope because
-they turn on the same fixture as the `D4` population. **Anything else you
-suspect is still reported-and-stopped** under `banned scope`.
+**This is not a stale-green sweep.** Scope is those three sites, in scope
+because they turn on the same fixture as the `D4` population. **Anything else
+you suspect is still reported-and-stopped** under `banned scope`.
+
+**The rest of the corpus-wide population is NOT yours — it is filed
+separately.** A Steward census at `f7459ff9d` found **77 `RED-UNTIL-` /
+`BLOCKED-ON-` occurrences across 13 distinct conditions** in `conformance/`.
+**Only 5 occurrences name a tracker node resolvably, and all 5 are
+`RT-NATIVE-FNSPLIT`** — the ones above. The other 72 name a *condition* with no
+mechanically resolvable owner. **Do not touch them.**
 
 **`D5` — say what produced the staleness, in one paragraph.** Not a retro.
 Whether these went stale at a known moment (a merge that should have flipped
