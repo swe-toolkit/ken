@@ -6937,6 +6937,29 @@ impl<'a> Lowering<'a> {
             let Some(child_shape) = Self::lowered_aggregate_shape(child) else {
                 continue;
             };
+            let Some(child_occurrence) = child.source_aggregate_producer() else {
+                return Err(unsupported(
+                    lowered_value_kind(child),
+                    "an aggregate child reached the carrier with no planner-issued producer \
+                     occurrence, so its producer class cannot be established",
+                ));
+            };
+            // Producer class, not aggregate shape, decides whether a child has
+            // source coordinates to validate. Source-produced children retain
+            // the exact per-position lookup below. A synthesized child has no
+            // source occurrence by construction; its generic ownership record
+            // was already checked above and is checked again when the recursive
+            // preflight visits that child. The source-child certificate control
+            // reaches this arm and still refuses a sibling occurrence, while
+            // the unit-boundary Record reaches the synthesized branch.
+            if self
+                .static_transition_plan
+                .aggregate_record_view(child_occurrence)?
+                .producer_origin()
+                .is_none()
+            {
+                continue;
+            }
             let Some(child_origin) = planned_child.origin else {
                 return Err(unsupported(
                     lowered_value_kind(child),
