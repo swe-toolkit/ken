@@ -115,11 +115,37 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > is concrete: the repair is at the constructor-argument position, not the
 > exact-`Var` callee path.** Read that block, not this one.
 >
-> **A count to re-derive at pickup rather than take:** the block below says
-> *"four expressions have been parked"* and then *"for these five there is no
-> call."* **This file states both numbers and does not reconcile them.** Derive
-> the exact population from the committed `D2k-0` control, which asserts the
-> edge and refusal per expression, rather than from either sentence.
+> **THE COUNT IS FIVE, AND IT IS NOW DERIVED RATHER THAN ASSERTED.** This file
+> said *"four expressions have been parked"* and then *"for these five there is
+> no call"*, reconciling neither. **Runtime derived it from the committed
+> `D2k-0` control on 2026-08-15 (`evt_74d7w6pynb9m2`): exactly five governed
+> expressions — row1 owned-scope, row4 depths 1, 2 and 3, and row5 after-hole.**
+> The control is the authority; both prose sentences are superseded.
+>
+> ### THE CONSTRUCTOR-ARGUMENT GUESS IS REFUTED BY MEASUREMENT. 2026-08-15.
+>
+> **Runtime attempted it at `a447009113a4626d1fcc2096d808a6ca907f644c` and it
+> does not hold.** A test-only panic immediately after
+> `recognized_constructor_worker_fields(args, producer_env)` in the production
+> `Construct` arm **never fired across the exact five-row control** ⇒ that
+> mechanism does not reach the attempted constructor-argument branch for this
+> population. No different `edge` appeared, every existing edge and refusal
+> meaning is unchanged, the probe was reverted, and the targeted controls pass.
+>
+> ⇒ **Both candidate positions are now ruled out by measurement rather than by
+> argument:** section 3's exact-`Var` callee path (there is no call for these
+> five; the static worker is a constructor argument) and the constructor-argument
+> branch (not reached by the recognition mechanism).
+>
+> **This is the operator's *"make the a priori best guess"* ruling working, not
+> a failed attempt.** It cost about twenty minutes and replaced a three-day wait
+> on a disposition nothing records arriving. **Do not read the refutation as a
+> reason to go back to waiting.**
+>
+> **Routed to the Architect at `evt_4x72jp54qwp`** as a component-design
+> question. **Do not guess a third position from this node's prose while that is
+> pending** — and in particular, the *"representation surface that does not
+> exist"* framing was struck as unsubstantiated and is not the ruling's premise.
 >
 > ⇒ **`depends_on` now names [[RT-REQUIRED-OCCURRENCE-PROJECTION]].** That edge
 > was real and lived only in prose across three files. Writing it down makes
