@@ -254,8 +254,10 @@ general first-order solver language.
 ### 4.2 Exact classical Kripke theory
 
 For a quoted signature `Sigma`, `K(Sigma)` is a closed, two-level many-sorted
-classical first-order theory. It contains one nonempty sort `World`, one
-nonempty classical sort `Obj(A)` for each source object sort, and only these
+classical first-order theory. It contains one nonempty sort `World` and one
+possibly empty classical sort `Obj(A)` for each source object sort. Allowing an
+object sort to be empty matches the source carrier: quotation does not require
+a closed rigid Ken type to have an inhabitant. The theory has only these
 relations:
 
 ```
@@ -274,9 +276,6 @@ preorder-reflexive:
 preorder-transitive:
   forall w v u. Le w v and Le v u => Le w u
 
-domain-inhabited-A:
-  forall w. exists x : Obj(A). Dom_A w x
-
 domain-growth-A:
   forall w v x. Le w v and Dom_A w x => Dom_A v x
 
@@ -289,11 +288,16 @@ atom-persistence-P:
     Le w v and Force_P w x1 ... xn => Force_P v x1 ... xn
 ```
 
-`domain-inhabited-A` and `domain-growth-A` occur once for each object sort;
-the two atom axioms occur once for each predicate. For a nullary predicate the
-domain conclusion is `Top`. These are emitted premises of the classical
-formula, not trusted propositions or solver assumptions hidden outside the
-certificate.
+`domain-growth-A` occurs once for each object sort; the two atom axioms occur
+once for each predicate. There is deliberately no domain-inhabitedness axiom:
+neither an empty source carrier nor an empty `Dom_A` entails an existential.
+For a nullary predicate the domain conclusion is `Top`. These are emitted
+premises of the classical formula, not trusted propositions or solver
+assumptions hidden outside the certificate.
+
+In particular, `K(Sigma)` does not entail the translation of
+`exists x : A. Top`: that translation still requires a `Dom_A` witness. This
+is the required empty-carrier control, not an implementation convention.
 
 Write `w |= f` for the following classical formula, with object variables
 interpreted in their declared `Obj` sorts:
@@ -350,8 +354,9 @@ IVar  ::= bound Nat
 
 `Signature` is the finite pair of the `SortId` population and the
 arity-indexed predicate profiles. `Carriers Sigma` is a sort-indexed family of
-the corresponding closed rigid Ken types. `IForm Sigma` admits only identifiers
-and vectors well-formed under that signature.
+the corresponding closed rigid Ken types, including types with no inhabitants.
+`IForm Sigma` admits only identifiers and vectors well-formed under that
+signature.
 
 `Form` is the target classical inductive. A relation carries its complete sort
 profile, so `check_cert` needs no ambient, unchecked signature:
@@ -376,10 +381,12 @@ and consistent use of each identifier. `embed` produces a closed, well-formed
 
 A sequent is a pair of finite multisets of well-formed `Form`s, written
 `Gamma => Delta`; its classical meaning is that the conjunction of `Gamma`
-implies the disjunction of `Delta`. `Cert` is an inductive proof tree whose
-node stores a conclusion sequent, one of these rule tags, its explicit
-principal-formula occurrence, any witness or eigenparameter, and the indicated
-child certificates:
+implies the disjunction of `Delta`. The `world` sort has the nonempty meaning
+fixed in §4.2; each `object` sort has possibly empty meaning. No rule infers an
+object-sort inhabitant. `Cert` is an inductive proof tree whose node stores a
+conclusion sequent, one of these rule tags, its explicit principal-formula
+occurrence, any witness or eigenparameter, and the indicated child
+certificates:
 
 ```
 Sequent ::= sequent (List Form) (List Form)
@@ -415,17 +422,22 @@ respectively the witness or eigenparameter described below.
 | `forall-right` | instantiate a right universal with a fresh same-sorted eigenparameter |
 | `exists-left` | instantiate a left existential with a fresh same-sorted eigenparameter |
 | `exists-right` | instantiate a right existential with a same-sorted quoted term |
-| `weaken-left` / `weaken-right` | add one formula on the named side |
-| `contract-left` / `contract-right` | replace two equal occurrences by one |
+| `weaken-left` | for conclusion `Gamma,A => Delta`, check child `Gamma => Delta` |
+| `weaken-right` | for conclusion `Gamma => Delta,A`, check child `Gamma => Delta` |
+| `contract-left` | for conclusion `Gamma,A => Delta`, check child `Gamma,A,A => Delta` |
+| `contract-right` | for conclusion `Gamma => Delta,A`, check child `Gamma => Delta,A,A` |
 | `cut` | check `Gamma => Delta,p` and `Gamma,p => Delta` for the recorded `p` |
 
-Contexts are canonical multisets, so exchange is representation equality, not
-a rule. Quantifier substitution is capture-avoiding. An eigenparameter is
-fresh when it occurs in neither the conclusion sequent nor any parameter
-recorded above that node. A witness must be well-sorted in the conclusion's
-parameter context. The checker rejects any other child count, context change,
-principal occurrence, substitution, freshness claim, free index, or sort
-mismatch.
+In those four structural rows, the displayed `A` is the selected occurrence
+and `Gamma` or `Delta` is the residual multiset after removing it. Thus the
+table specifies the checker direction from a node's stored conclusion to its
+child, rather than merely naming the conventional forward inference. Contexts
+are canonical multisets, so exchange is representation equality, not a rule.
+Quantifier substitution is capture-avoiding. An eigenparameter is fresh when
+it occurs in neither the conclusion sequent nor any parameter recorded above
+that node. A witness must be well-sorted in the conclusion's parameter
+context. The checker rejects any other child count, context change, principal
+occurrence, substitution, freshness claim, free index, or sort mismatch.
 
 `Derivation(Gamma => Delta) : Type` is the indexed proof-tree family generated
 by exactly the same rules, with each premise represented by a derivation of its
@@ -529,9 +541,9 @@ report. This contract neither specifies nor changes that route.
 
 The smallest coherent first slice has one rigid object sort `A`, one unary
 uninterpreted predicate `P : A -> Omega`, and source forms `Bottom`, atom,
-`or`, `imp`, and `forall`. It retains the complete `World` preorder,
-`Dom_A` nonemptiness and growth, and `Force_P` domain and persistence axioms.
-Its emitted target uses `bottom`, relation, `and`, `or`, `imp`, `forall`, and
+`or`, `imp`, and `forall`. It retains the complete `World` preorder, possibly
+empty `Dom_A` with growth, and the `Force_P` domain and persistence axioms. Its
+emitted target uses `bottom`, relation, `and`, `or`, `imp`, `forall`, and
 `exists`. The positive proof needs exactly the `init`, `imp-right`, and
 `forall-right` certificate rules. The slice theorem restricts `Cert` to that
 constructor subset; the full §4.3 theorem remains owed for the remaining
