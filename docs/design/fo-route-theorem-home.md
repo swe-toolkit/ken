@@ -119,6 +119,30 @@ same computation *outside* the re-checked region. It is the honest statement of
 what the reflective route costs, and it identifies the one thing worth
 measuring.
 
+### SETTLED 2026-08-15 BY THE OPERATOR. Build it and measure it.
+
+> Nothing ventured, nothing gained. We will only know the cost if we build it
+> and test it on real programs, so we should do that.
+
+**The posture this note left open is decided: the new load class is accepted as
+something to measure, not to pre-empt.** `18 §6`'s subject reduction and
+confluence do **not** have to be mechanized before route FO is built and
+exercised.
+
+**Two things this does not clear.** `23 §4.4` still forbids `proved` until both
+theorems are kernel-checked in an approved home — a precondition, not a
+decision, and both are unproved and unstarted. And the cost remains **unmeasured**;
+predicting a blowup is not measuring one.
+
+**The measurement does not need either theorem.** `refl True` at
+`check_cert (embed Sigma f) pi = True` forces exactly the conversion work in
+question; `embedding_adequacy` and `checker_soundness` turn that computation
+into a *discharge* rather than making it expensive. **So the number is
+obtainable well before the metatheory is proved.** Framed as
+`V3-FO-CONVERSION-LOAD-MEASURED`, which depends on
+`V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` because nothing real reaches route FO
+until then.
+
 ### The evidence this should be decided against
 
 `OQ-12` records its own residual risk as *whether the adequacy +
