@@ -11,29 +11,44 @@ github: null
 origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDescent, migrate the remaining residual classes, do not linger half-migrated. Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2). Recut 2026-08-08 per Architect ruling evt_237tbdsacqbk4.
 ---
 
-> # `draft`, NOT unframed — set back 2026-08-13 by the Steward
+> # `ready`, and `D3` IS STILL GATED. Both at once — read the second half.
 >
-> **It was mis-flagged `ready` while two of its five `depends_on`
-> (`RT-LEXICAL-RECURSOR-CONSUMERS`, `RT-LEXICAL-R3-FUSION-EMITTER`) were still
-> `active`.** The frame below already says `D3` is gated on those successors;
-> the frontmatter did not agree with the frame.
+> **CORRECTED 2026-08-15. This banner previously announced `draft` while the
+> frontmatter said `ready`.** A node whose banner and frontmatter disagree is
+> the defect that cost the verify ring a lawful start the same morning: a seat
+> reads the tracked artifact, finds it contradicting what it was told, and
+> correctly refuses to move. **Do not resolve such a disagreement by picking the
+> half you prefer — the answer here is that both are true of different things.**
 >
-> **UPDATED 2026-08-14: one of those two has cleared.**
-> `RT-LEXICAL-R3-FUSION-EMITTER` is **`merged`**. **The single remaining
-> blocker is [[RT-LEXICAL-RECURSOR-CONSUMERS]]**, which is `active` and is the
-> operator's priority lane. The other four `depends_on` are all `merged`.
+> **`ready` is correct, and it is deliberate.** Steward playbook §4e requires
+> every successor of an in-flight node to be `ready` with a shovel-ready frame,
+> so the frontier advances the instant the predecessor lands with no Steward
+> pass in between. `check-issue-schema.sh --strict` permits this — a `ready`
+> node depending on an `active` one **warns**, and only a `draft`/`ready`
+> dependency fails. The warning you will see on this node is that check working,
+> not a defect to repair.
 >
-> ⇒ **The flip condition is now ONE check, not two.** Do not go looking at
-> `R3-FUSION-EMITTER`; it is done.
+> **What the old banner got right and this one keeps: `D3` cannot start yet.**
+> Four of the five `depends_on` are `merged`. The single remaining one is
+> [[RT-LEXICAL-RECURSOR-CONSUMERS]], which is **`active`** — it is a
+> multi-increment node on the operator's priority lane and it stays `active`
+> across its own increments, so **do not wait for it to flip `merged` as a
+> proxy for readiness.** `RT-LEXICAL-R3-FUSION-EMITTER` is done; do not go
+> looking at it.
+>
+> ⇒ **`D0`-`D2` are startable now. `D3` is gated on the consumers node's
+> transport half actually landing** — check the tree, not the node status.
 >
 > **Measured, not inferred.** Runtime's `RT-DESCENT-RETIRE` `D1` census at
 > `c1b9a1e8` found 89 intact residual rows — 74 `LexicalCallArgumentRecursor`
 > and 15 `MatchScrutineeRecursor`, which are precisely this node's two classes.
 > The transport has not happened.
 >
-> **Flip to `ready` when both `active` dependencies are `merged`.** They are
-> where Runtime actually is; this node is downstream of them, not an alternative
-> to them.
+> **Confirm the count yourself at pickup, against the enum and not this line.**
+> `enum RecursiveDescentResidual` at
+> `crates/ken-runtime/src/cranelift_backend/lowering/core.rs:1979` carries
+> exactly the two live variants named above; three classes are retired. The
+> campaign doc's own entries stop at 2026-08-09 and are not the instrument.
 
 > # `D0`-`D2` LANDS; `D3` IS GATED — 2026-08-08, hard stop 4
 >
