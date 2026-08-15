@@ -435,9 +435,19 @@ child, rather than merely naming the conventional forward inference. Contexts
 are canonical multisets, so exchange is representation equality, not a rule.
 Quantifier substitution is capture-avoiding. An eigenparameter is fresh when
 it occurs in neither the conclusion sequent nor any parameter recorded above
-that node. A witness must be well-sorted in the conclusion's parameter
-context. The checker rejects any other child count, context change, principal
-occurrence, substitution, freshness claim, free index, or sort mismatch.
+that node. For conclusion `Gamma,(forall S p) => Delta`, `forall-left` checks
+the sole child `Gamma,p[t] => Delta`; for conclusion
+`Gamma => Delta,(exists S p)`, `exists-right` checks the sole child
+`Gamma => Delta,p[t]`. In both rules, the witness `t` is drawn from, rather
+than merely sort-consistent with, the stored conclusion's parameter context:
+it is well-sorted at `S`, and every free parameter it names is already declared
+in that context. Neither witness rule extends the parameter context; only
+`forall-right` and `exists-left` introduce a fresh eigenparameter. This
+prevents the certificate calculus from inventing an object-sort inhabitant. It
+does not make sort emptiness the free-logic guard: that guard remains the
+`Dom_A` antecedent or conjunct inserted by §4.2. The checker rejects any other
+child count, context change, principal occurrence, substitution, freshness
+claim, free index, or sort mismatch.
 
 `Derivation(Gamma => Delta) : Type` is the indexed proof-tree family generated
 by exactly the same rules, with each premise represented by a derivation of its

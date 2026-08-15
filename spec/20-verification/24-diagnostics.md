@@ -49,9 +49,11 @@ The general invariant, load-bearing for the **cross-case consistency sweep**:
 
 ## 1. Kripke countermodels — the `false`-vs-`unknown` discriminator
 
-When an FO obligation does not go through, the Kripke embedding (`23 §4`) hands
-Z3 the obligation's truth condition `φ#` and, on failure, a **falsifying model
-of `φ#`** — a finite **Kripke countermodel** for `φ`:
+When quotation accepts an FO obligation `φ` as `problem Sigma C rho f` but no
+certificate is obtained, a backend may return an advisory falsifying model for
+`embed(Sigma, f)` (`23 §4.1`–`§4.3`). Interpreting that model with the emitted
+`Le`, `Dom_A`, and `Force_P` relations and the `w |= f` clauses gives a finite
+**Kripke countermodel** for `φ`:
 
 ```
 worlds:   w0 ≤ w1 ≤ …            (stages of knowledge; ≤ = information growth)
@@ -64,8 +66,9 @@ monotone and the model carries more than two truth values across its worlds.
 That extra structure is exactly what separates the two non-`proved` verdicts —
 the discriminator V3 computes (`23 §5`) and V4 renders faithfully:
 
-- **`disproved` → `false`.** Some world forces `¬φ` — i.e. `(¬φ)# := ∀ w' ≥ w.
-  ¬ φ#[w']` holds at the model's root (`23 §4`). There is **positive evidence
+- **`disproved` → `false`.** Some world forces `¬φ`. Because `¬φ` is
+  `φ => Bottom`, this means `forall v. Le w v => ((v |= φ) => Bottom)` at the
+  model's root (`23 §4.2`). There is **positive evidence
   against** `φ`: it is **genuinely refutable** (`¬φ` is provable), region
   `S_{¬φ}` (§3). The canonical witness is `p ∧ ¬p` — `¬(p ∧ ¬p)` is an
   intuitionistic theorem, so `¬φ` holds and a world forces it. *Actionable:* the
