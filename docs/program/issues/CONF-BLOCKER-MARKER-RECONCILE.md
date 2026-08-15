@@ -1,7 +1,7 @@
 ---
 id: CONF-BLOCKER-MARKER-RECONCILE
 title: "Three landed `BLOCKED-ON-` markers say 'no blocker node exists' and two of them are now false, while seven other blocked rows name their blockers in prose that no grep can find -- reconcile the corpus against the tracker and adjudicate the one blocker still unowned"
-status: ready
+status: active
 owner: spec-enclave
 size: S
 gate: none
@@ -34,40 +34,59 @@ origin: "Direct consequence of CONF-FMT8-LEVELTOK (merged 2026-08-15 at 2ed8bbfd
 |---|---|---|
 | `:203` | `BLOCKED-ON-HEX-BYTE-LIST-SURFACE` | **FALSE** — [[LANG-BYTES-HEX-LIST-LITERAL]] exists, `ready` |
 | `:414` | `BLOCKED-ON-USER-FIXITY-SURFACE` | **FALSE** — [[LANG-FIXITY-DECL-SURFACE]] exists, `draft` |
-| `:387` | `BLOCKED-ON-MEMBERSHIP-ASCII-ROLE` | **unadjudicated — this is `D3`** |
-| `:52` | FMT1 aggregate, naming all three, `(no blocker nodes exist)` | **FALSE in two of three** |
+| `:387` | `BLOCKED-ON-MEMBERSHIP-ASCII-ROLE` | **FALSE** — `D3` answered; [[LANG-MEMBERSHIP-OPERATOR-SURFACE]] filed |
+| `:52` | FMT1 aggregate, naming all three, `(no blocker nodes exist)` | **FALSE in all three** |
 
 **The landed convention** is `BLOCKED-ON-<reason> ([[node]])`, used four times
 in `conformance/behavioral/buffer-io/seed-buffer-io.md` (`:684`, `:728`, `:763`,
 `:797`) and documented at `conformance/README.md:439`.
 
 **The seven prose-only blockers** — every `RED-UNTIL-BUILT` occurrence outside
-the formatting seed. **These are a different case and mostly a correct one:**
+the formatting seed — **are OUT OF SCOPE and the reason recorded here was
+wrong.** Retained rather than deleted, because the correction is the useful
+part:
 
-| file | count | what they say |
-|---|---|---|
-| `stdlib/collections/seed-cat3-collection-laws.md` | 5 | `length`/`min`, `map`/`length`, `filter`/`mem` unlanded; the `view`/`lens` record |
-| `stdlib/collections/seed-cat4-maps-sets-relations.md` | 1 | every CAT-4 op is net-new |
-| `surface/bytes-io/seed-bytes-io.md` | 1 | CP0 on the exact base |
+> **What this section originally claimed:** *"These name real, buildable,
+> tracked work, so they are legitimately pending — not the never-producible
+> class."* **False, verified at `e2c2e6e78`.** The producers are **landed** —
+> `prelude.rs:495` carries `fn filter`; the CAT-3 and bytes-CP0 producers are
+> present and ancestral. **Those rows assert pending against work that already
+> exists**, which is the mirror defect, not the benign case.
+>
+> **The evidence I used was the rows' own prose**, which is the weakest
+> available source and the one thing a stale row is guaranteed to get wrong.
+> **Adjudicating a disposition requires reading the producer, not the row.**
 
-⇒ **These name real, buildable, tracked work, so they are legitimately
-pending — not the never-producible class.** `filter` is
-[[LANG-PRELUDE-COLLECTIONS]]'s. **Do not convert them into `BLOCKED-ON-` rows
-as though they were the same defect.** What they lack is only that a grep for
-the convention cannot find them.
+⇒ **They move to [[CONF-STALE-RED-DISPOSITIONS]]**, with the four
+`seed-buffer-io.md` matrices. **Do not touch them here** — see `D4`.
 
 ## Deliverables
 
-**`D1` — correct the two now-false markers**, at `:203` and `:414`, to the
-landed `BLOCKED-ON-<reason> ([[node]])` shape naming the filed node. Update
-FMT1's aggregate at `:52` so it distinguishes which of its three constituents
-are owned and which is not.
+**`D1` — correct the THREE now-false markers**, at `:203`, `:387`, and `:414`,
+to the landed `BLOCKED-ON-<reason> ([[node]])` shape naming the filed node.
+Update FMT1's aggregate at `:52` to name all three nodes.
+
+> **All three constituents are now owned**, so **no `(no blocker node exists)`
+> parenthetical should survive in this seed.** `:387` became the third when
+> `D3` was answered — see the block below it.
 
 **`D2` — re-adjudicate `all-literal-lexemes-are-verbatim` and the fixity row
 for *disposition only*.** Their fixtures remain unproducible **today** — the
 nodes are filed, not landed — so the marker stays and the row stays red. **Do
 not flip either to producible.** State explicitly that a filed blocker is not a
 landed one; that distinction is the entire value of the marker.
+
+> **`D3` IS ANSWERED — by the ring, with the citation `AC-4` demanded.**
+> `31-lexical.md:79` puts ASCII `in` in the notation table as the **membership**
+> spelling, and `:105-112` requires a glyph and its ASCII transliteration to lex
+> to the **identical** token, with ASCII accepted forever. Measured against
+> that: `lexer.rs:997` maps `"in"` to `KwIn`, and there is no membership arm in
+> either spelling. ⇒ **An unowned surface gap, not a keyword-role decision.**
+> The endpoint-(b) reading is **refuted by citation**, not by preference.
+> Filed as [[LANG-MEMBERSHIP-OPERATOR-SURFACE]].
+>
+> ⇒ **`D1` therefore corrects THREE markers plus FMT1's aggregate, and no
+> `(no blocker node exists)` parenthetical survives in the formatting seed.**
 
 **`D3` — adjudicate the membership blocker, and report rather than decide.**
 The row wants membership written with an accepted ASCII alias. Measured: the
@@ -86,10 +105,23 @@ Determine from `spec/30-surface/` **which of these the spec actually requires**:
   That is the endpoint-(b) shape `CONF-FMT8-LEVELTOK` was filed to make visible,
   reached from the other direction.
 
-**`D4` — make the seven prose-only blockers greppable without reclassifying
-them.** Minimum viable: each names its blocking node as a `[[link]]` where one
-exists, so the convention's grep finds them. **If no node exists for one, say
-so in the row** — the same honesty the FMT8 census used.
+**`D4` — REMOVED 2026-08-15 by Steward ruling `evt_bgat447r9s6w`. Do not touch
+the seven rows.** Not to link them, not to correct them.
+
+**Its premise was false and the ring caught it before any edit.** `D4` asserted
+the seven prose-only blockers "name real, buildable, tracked work, so they are
+legitimately pending". Verified at `e2c2e6e78`: **the producers are landed** —
+`prelude.rs:495` carries `fn filter`, the CAT-3 and bytes-CP0 producers are
+present and ancestral, and the base contains CAT-4's named Map operations and
+proofs. **So those rows assert pending against work that already exists**, and
+linking them as pending would contradict their own producers while correcting
+them would contradict `AC-3`.
+
+⇒ **They move to [[CONF-STALE-RED-DISPOSITIONS]]**, together with the four
+`seed-buffer-io.md` matrices, which the conformance-validator showed are the
+same population: their links resolve to `merged` [[RT-NATIVE-FNSPLIT]], whose
+closure records no residual build work and whose contract requires those
+matrices to flip. **Eleven sites asserting pending against landed producers.**
 
 ## Acceptance criteria
 
@@ -97,10 +129,19 @@ so in the row** — the same honesty the FMT8 census used.
 that now has a node. **Control:** grep the phrase; every remaining hit is
 justified in the handback by name.
 
-**`AC-2`.** Every `BLOCKED-ON-` marker either carries a `[[node]]` link or an
-explicit statement that none exists. **Control:** grep `BLOCKED-ON-` corpus-wide
-and show one or the other for each hit, including the four pre-existing
-`seed-buffer-io.md` ones — **verify those still resolve**, do not assume.
+**`AC-2` — NARROWED by the same ruling.** Every `BLOCKED-ON-` marker either
+carries a `[[node]]` link or an explicit statement that none exists.
+**Control:** grep `BLOCKED-ON-` corpus-wide and show one or the other for each
+hit. **Syntactic resolution only.**
+
+> **The original wording told you to verify the four `seed-buffer-io.md`
+> markers "still resolve", on the stated basis that they are the landed
+> precedent this convention comes from. They resolve — and the dispositions
+> behind them are stale.** A frame cannot ground a convention on an example and
+> then keep the instruction when the example fails. **Cite
+> `conformance/README.md:439`, which states the convention directly, not those
+> four rows.** Their staleness is a delivered finding and belongs to
+> [[CONF-STALE-RED-DISPOSITIONS]].
 
 **`AC-3`.** No row is deleted, no row id changes, and no row's
 producible/unproducible disposition flips. **This node changes what the corpus
