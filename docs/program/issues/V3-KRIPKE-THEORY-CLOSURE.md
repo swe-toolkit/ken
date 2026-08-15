@@ -1,15 +1,67 @@
 ---
 id: V3-KRIPKE-THEORY-CLOSURE
 title: "Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes"
-status: ready
+status: merged
 owner: spec-enclave
 size: M
 gate: none
 depends_on: [V3-KRIPKE-DECOMPOSITION]
-blocks: []
-github: null
+blocks: [CONF-PROVER-SEED-KRIPKE-DRIFT]
+github: https://github.com/swe-toolkit/ken/pull/2323
 origin: "Steward, 2026-08-15. V3-KRIPKE-DECOMPOSITION merged its report at docs/program/v3-kripke-decomposition.md with blocks: [] and no successor filed; its D3 verdict names the missing inputs and assigns them to Spec. This node is that successor. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED 2026-08-15 — PR #2323, squash `5f860a003`. THE SPEC GAP IS CLOSED.
+>
+> **Exact `aa9b2454348ed3d28d5f026edfdafd8093ec47b0`, three commits from
+> `d9202e464`, sole path `spec/20-verification/23-prover.md`, `+435/-123`,
+> `crates/` byte-identical.** Blob identity MATCH. Decision `dec_7ydvwwwc8a2jz`
+> read `resolved` from the object; Spec/Fidelity `evt_5ewhzwadxkmhe`, Architect
+> `evt_2wrkjqj5cztxq`.
+>
+> **The declared base was 39 commits stale, and I re-derived that rather than
+> inheriting it: none of the 39 touches `23-prover.md`, and `merge-tree` against
+> current `main` produced zero conflict markers.**
+>
+> **The write-then-attack direction worked, and the evidence is two rejected
+> cuts.** The kickoff said to write the strongest statement believed provable
+> over a minimal fragment and attack it, rather than surveying what the theorems
+> could say. The conformance validator returned **request changes twice**, and
+> both blockers were real defects in stated theorems rather than presentation:
+>
+> 1. **Adequacy was false for a carrier the quotation contract accepts** — with
+>    `C(A) = Empty` and `f = exists x : A. Top` the emitted target was derivable
+>    from its own `domain-inhabited-A` premise while the Ken conclusion had no
+>    inhabitant. Repaired by permitting empty object domains, **not** by
+>    inventing witness metadata.
+> 2. **The structural rules were directionally under-specified**, admitting a
+>    reading that accepts `[] => [P]` from a `P => P` child.
+>
+> A third, on the second cut, was `D5` claiming an emitted `exists` that repair 1
+> had made unreachable. **A survey would have produced none of these**, because
+> each is a defect in a specific committed statement.
+>
+> ## The two strengthenings, recorded because a successor must not undo them
+>
+> **`K(Σ)` moved inside `embed`.** The frame axioms were an assumed
+> `(oracle/standard)` ledger row and are now premises discharged inside the
+> certificate. That retires an assumption **by construction**.
+>
+> **`classically_valid` is proof-theoretic** — derivability in the fixed calculus
+> — which is why `checker_soundness` is purely syntactic and no completeness
+> result is needed on the discharge path.
+>
+> ## What is deliberately NOT settled, and what it left behind
+>
+> Artifact home, evaluator posture, and the trusted-base consequence are
+> surfaced and open for the Architect and the operator. **Until both theorems
+> are kernel-checked in an approved home, FO cannot return `proved`.**
+>
+> ⇒ **This merge makes a conformance seed contradict its normative chapter**,
+> including a row asserting a settled `trusted_base()` outcome that §4.4
+> explicitly reserves. That, plus the one-clause `forall-left`/`exists-right`
+> witness-direction fix, is [[CONF-PROVER-SEED-KRIPKE-DRIFT]] — filed rather
+> than absorbed here, and not a reason to recut this SHA.
 
 > # THE PREDECESSOR PRICED THIS AND GOT "UNSIZEABLE". THIS NODE IS WHY.
 >

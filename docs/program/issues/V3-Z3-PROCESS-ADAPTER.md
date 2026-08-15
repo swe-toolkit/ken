@@ -6,7 +6,7 @@ owner: verify
 size: M
 gate: none
 depends_on: [V3-D-OPEN-GOAL-WITNESS-ROUTE]
-blocks: []
+blocks: [V3-Z3-EMISSION-CONTROL]
 github: null
 origin: "Steward, 2026-08-15, framing the operator's directed z3 round-trip lane. Split from V3-D-OPEN-GOAL-WITNESS-ROUTE so the routing gap and the soundness seam land before any dependency decision. The deferred docs/program/wp/V3-z3-throughput-evaluation.md frame supplies the guardrails; its throughput-measurement half is NOT this node. Steward-filed per COORDINATION section 2."
 ---

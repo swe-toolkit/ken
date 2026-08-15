@@ -1,15 +1,61 @@
 ---
 id: RT-CLOSURE-BOUNDARY-LANE
 title: "Admit the source-authored closure crossing on clause 2's liveness-and-domain predicate, routed through B2F's cross-owner carrier -- attempt the repair, and measure only if it fails"
-status: ready
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-SRCBODY-BIND-ORDER, RT-PLANNED-CLOSURE-PREEXISTENCE]
-blocks: []
-github: null
+blocks: [RT-CLOSURE-CROSSING-ELIMINATE]
+github: https://github.com/swe-toolkit/ken/pull/2322
 origin: Measured at frozen base 21fd46dc by the RT-SRCBODY-BIND-ORDER D10 differential (evt_2jc88hbzfskpm). All 16 CI failures at aa032cc2 fail at the base too -- ZERO bind-order flips -- so this is pre-existing base debt, not a regression. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # MERGED 2026-08-15 — PR #2322, squash `3025b6d0a`. THE GUESS WAS REFUTED,
+> # AND THAT IS THE DELIVERABLE.
+>
+> **Exact `5e8907597446ee524b2e8ab11804f1e1a30488ac`, two commits from
+> `c4e622e93`, four paths, `+195/-23`, blob identity MATCH 4/4.** Decision
+> `dec_650dc1x38n4jh` read `resolved` from the object; QA `evt_2th73cw9fsfgt`,
+> Architect `evt_2nwtjekh4qtnk`. The whole Rust surface is `cfg(test)`, and
+> `mod.rs` is byte-identical to the previously approved object, so the shared
+> gate and its refusal string were never touched.
+>
+> **The frame's constraint 2 turned out UNSATISFIABLE.** The guess was to route
+> the crossing through `B2F`'s existing carrier and design no new one. Grounded
+> at `boundary_value.rs`: `BOUNDARY_TAG_CLASS_RELATION` (`:670`) is mechanically
+> reconciled to the partition-derived relation over the full product in both
+> directions and drift either way reddens, so the language is **enforced-closed**;
+> `BoundaryClass::Closure` has exactly one row, `(PersistentClosure, Closure)` at
+> `:683`; that pair is the sole entry in `BOUNDARY_RETIRED_LANES` (`:723-724`)
+> and `boundary_relation_admits` returns `false` for it before reading the schema
+> at all (`:769+`); `InvocationAggregate` admits exactly `Constructor` and
+> `Record` (`:706-711`).
+>
+> ⇒ **No admitted live-domain lane for `BoundaryClass::Closure` exists anywhere
+> in the ABI**, so carrying a first-class closure requires a new `(tag, class)`
+> admission — the one thing the frame forbade. **The guess was refuted from the
+> inside, by its own second constraint.**
+>
+> **This is the operator's 2026-08-15 ruling working, and the comparison is
+> measurable.** The attempt ran and stopped in roughly an hour. The
+> classification-first structure this node carried for one turn spent a full day
+> across five measurement nodes and removed zero residuals. The Architect
+> grounded the stop independently at the ABI rather than taking the report and
+> called it **stronger than reported**.
+>
+> ### THE DISPOSITION OVER-NARROWS ITS OWN SUCCESSOR. Architect finding.
+>
+> The text says the row remains refused until a successor **carrier** exists.
+> The measurement establishes something narrower: **the closure *value* cannot
+> cross.** It does **not** establish that the *capability* requires a carrier.
+>
+> ⇒ A true measurement does not entail what the sentence built on it claims, and
+> the sentence forecloses in prose a route the measurement leaves open. That
+> route is [[RT-CLOSURE-CROSSING-ELIMINATE]] — carry the environment as an
+> already-admitted `Record`, dispatch statically to a body `D1` measured as
+> statically known, and no `Closure` ever reaches the boundary. **Read the
+> successor before acting on the refusal sentence above.**
 
 > ## FRAMED AND `ready`, 2026-08-15. IT IS A REPAIR ATTEMPT, `size: M`.
 >
@@ -311,6 +357,58 @@ carrier that cannot represent the value, or a boundary that turns out to be
 durable-export, tells us more than the classification would have, and it tells us
 from the inside. **Do not grind: one honest attempt, then the fallback below.**
 
+> # THE GUESS HAS TWO UNSOUND JOINTS. ARCHITECT `evt_69vj8ye0qcdg9`,
+> # RE-VERIFIED BY THE STEWARD. Amend before building.
+>
+> **This is the attack I asked for at review, and it lands. The conclusion
+> survives — the crossing is a call-argument exchange inside a live runtime, not
+> durable publication, and he verified `D1` himself. Two things I asserted around
+> it were not established.**
+>
+> ## 1. DO NOT ADMIT AT THE GATE. The gate is SHARED and mostly unclassified.
+>
+> **Measured independently by the Steward on `main`: `transfer_into_carrier` has
+> exactly EIGHT non-test call sites** — `mod.rs:7086`, `:7660`, `:8231`, and
+> `core.rs:4250`, `:4457`, `:15398`, `:15716`, `:18569` — and **every one of them
+> funnels through the single `boundary_transfer_admissibility` call at
+> `mod.rs:6613`.** `D1` classified **two**.
+>
+> ⇒ **"Admit on clause 2's predicate" AT THE GATE is `refuse less` on six routes
+> nobody has classified**, including any that is in fact a durable-export
+> boundary — which is the one thing clause 1 forbids absolutely. **It breaks this
+> frame's own constraint 1** (*"refuse on the right predicate, never refuse
+> less"*), and it would do so invisibly, because the gate cannot tell which
+> boundary it is standing at.
+>
+> **The real fork the attempt hits, and it is where to look FIRST:**
+>
+> | option | what it costs |
+> |---|---|
+> | **admit per-route, at the call site** | the two classified routes carry the admission; the other six keep today's refusal untouched |
+> | **give the gate a boundary-kind parameter** | the gate learns to discriminate, and every one of the eight callers must supply its kind |
+>
+> **If that discrimination has no home, THAT is the "stop and report what blocked
+> it" case** — and it is a better handback than a carrier built on the wrong
+> seam. **Do not write a carrier before this is settled.**
+>
+> ## 2. "Between separately compiled artifacts" is UNVERIFIED, and it sizes it
+>
+> **My assertion, not a measurement.** Functionization splits a recursor into
+> generated units; whether those are **separately compiled artifacts** or units
+> **within one compilation output** is measured nowhere.
+>
+> ⇒ **If they are intra-artifact, clause 2's *"defining owner and artifact remain
+> live"* is satisfied BY CONSTRUCTION on the argument-crossing shape**, the
+> liveness/domain predicate has no work to do there, and the repair is
+> **materially smaller** than this frame states.
+>
+> **And the two sub-shapes come apart here, which is the deeper error.** I
+> bundled them under one predicate; `D1` measured that they reach the gate by
+> **different routes**. Liveness genuinely bites on the **escape** shape — a
+> captured environment outliving its lexical frame — and may bite on nothing at
+> all in the argument-crossing shape. **Measure the artifact question before
+> sizing the predicate.**
+
 ## Deliverables
 
 **`D1` — the repair, per the guess above.** Both owned rows.
@@ -430,6 +528,16 @@ crosses today. **This is the gate `RT-DESCENT-RETIRE` reads.**
 predicate change; a wrong-domain, expired, or forged representation must still
 refuse before invocation, and the durable-export case must still refuse
 outright.
+
+**`AC-3a`.** **No admission is installed at the shared gate.** The six
+unclassified `transfer_into_carrier` call sites must reach **today's refusal,
+unchanged**, demonstrated rather than asserted. **A candidate that relaxes
+`boundary_transfer_admissibility` itself fails this**, however the predicate is
+written, because the gate cannot tell which boundary it is standing at.
+
+**`AC-3b`.** If the repair needs the gate to discriminate boundary kinds and
+there is no home for that discrimination, **stop and report it** — that is a
+finding about the seam, and it discharges the attempt.
 
 **`AC-4`.** No `FrozenClosure`-class value, and no silent `StaticCallableRef`
 conversion of the zero-capture case. **`D4` is diagnostic-correctness work and
