@@ -582,7 +582,15 @@ pub fn attempt_fo_with_signature(
                 // reserves the kernel-checked home for the two theorems
                 // this discharge needs, and that decision has not been
                 // made. Honest `Unknown`, not `Proved` (`AC-5`).
-                return emit_unknown_hole(env, phi_closed);
+                //
+                // Distinct audit label (`V3-FO-OBLIGATION-SIGNATURE-
+                // DISCOVERY` `D5`): this hole is not "nothing could
+                // establish the goal" -- a certificate WAS found and
+                // accepted. Labelling it identically to an ordinary
+                // unknown hole would erase that distinction from
+                // `trusted_base()`, the one place it is otherwise
+                // recoverable.
+                return emit_unknown_hole_fo_withheld(env, phi_closed);
             }
         }
     }
@@ -748,6 +756,38 @@ fn emit_unknown_hole(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
         phi_closed.clone(),
     )
         .expect("declare_postulate for unknown hole must succeed");
+    Verdict::Unknown { hole_id }
+}
+
+/// Emit an `Unknown` verdict for the FO route's distinct withholding cause
+/// (`V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` `D5`): a slice certificate WAS
+/// found and accepted by `check_cert`, but `23 §4.4` reserves the
+/// kernel-checked home the discharge needs, and that placement decision has
+/// not been made. Without this, this hole is indistinguishable in
+/// `trusted_base()` from [`emit_unknown_hole`]'s ordinary "nothing could
+/// establish the goal" case — two different facts sharing one label, and
+/// only one of them a limitation of Ken's logic.
+///
+/// **This label records PROVENANCE, not STRENGTH (`AC-8`).** The postulate
+/// admitted here is exactly as assumed, on exactly the same faith, as any
+/// other `Unknown` hole — the certificate does not make it a weaker
+/// assumption, because the entire reason it is withheld is that the
+/// theorems licensing that step have no approved home. If they had one,
+/// this would not be a postulate at all. The label names the CAUSE of the
+/// withholding (an unapproved theorem-home placement decision), never the
+/// obligation's status — do not reword this to sound more finished, more
+/// checked, or more "nearly proved" than [`emit_unknown_hole`]'s label; a
+/// reader auditing `trusted_base()` must be able to tell the two states
+/// apart without being invited to discount either one.
+fn emit_unknown_hole_fo_withheld(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
+    let hole_id = declare_postulate(
+        env,
+        "prover unknown goal -- FO: certificate held, theorem-home unapproved (23-prover.md §4.4)"
+            .to_string(),
+        vec![],
+        phi_closed.clone(),
+    )
+        .expect("declare_postulate for FO-withheld unknown hole must succeed");
     Verdict::Unknown { hole_id }
 }
 

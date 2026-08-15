@@ -29,7 +29,7 @@ use ken_elaborator::{
     },
     prover::{attempt_fo_with_signature, Verdict},
 };
-use ken_kernel::{Context, GlobalEnv, Level, Term};
+use ken_kernel::{Context, Decl, GlobalEnv, Level, Term};
 
 /// `D1`/`AC-3`: both controls quote; a form outside the slice is refused
 /// by construction.
@@ -136,5 +136,93 @@ fn attempt_fo_with_signature_returns_unknown_never_proved_for_accepted_slice_cer
         "an accepted slice certificate must still yield Unknown, never \
          Proved, until the theorem-home placement decision is made \
          (23 §4.4) -- got {verdict:?}"
+    );
+}
+
+/// `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` `D5`/`AC-7`: the two
+/// `attempt_fo_with_signature` `Unknown` exits are distinguishable by
+/// inspecting `trusted_base()` output alone -- no knowledge of which route
+/// produced either entry, only the `Decl::Opaque` names recovered via
+/// `env.lookup`.
+///
+/// State (a): a certificate `check_cert` genuinely accepts, withheld only
+/// because `23 §4.4`'s theorem-home placement is unapproved. State (b): the
+/// negative control, which obtains no certificate (`AC-1`, mirrored by
+/// `negative_control_obtains_no_certificate` above) and which the IPC
+/// fallback also cannot discharge (it does not handle `or`), so it reaches
+/// the ordinary "nothing could establish the goal" exit. Per `AC-8`, this
+/// test asserts only that the labels DIFFER and that the ordinary label is
+/// unchanged -- it does not, and must not, assert that either label reads as
+/// a lesser or stronger assumption than the other.
+#[test]
+fn fo_withheld_and_ordinary_unknown_holes_carry_distinct_trusted_base_labels() {
+    let mut env = GlobalEnv::new();
+    let sig = declare_fo_slice_signature(&mut env);
+
+    // State (a): certificate accepted, withheld pending §4.4.
+    let positive = positive_control_term(&sig);
+    let problem = quote_fo(&env, &sig, &positive).expect("positive control quotes");
+    let cert = find_certificate(&problem.f).expect("a positive certificate must be found");
+    let target = embed(&problem.f);
+    assert!(
+        check_cert(&target, &cert),
+        "precondition: the positive certificate must compute True for this \
+         test to be exercising the withheld-certificate exit at all"
+    );
+    let accepted_verdict =
+        attempt_fo_with_signature(&mut env, &Context::new(), &positive, &positive, &sig);
+    let accepted_id = match accepted_verdict {
+        Verdict::Unknown { hole_id } => hole_id,
+        other => panic!("accepted-certificate obligation must yield Unknown, got {other:?}"),
+    };
+
+    // State (b): nothing could establish the goal.
+    let negative = negative_control_term(&env, &sig);
+    assert!(
+        find_certificate(
+            &quote_fo(&env, &sig, &negative).expect("negative control quotes").f
+        )
+        .is_none(),
+        "precondition: the negative control must not obtain a certificate"
+    );
+    let negative_verdict =
+        attempt_fo_with_signature(&mut env, &Context::new(), &negative, &negative, &sig);
+    let ordinary_id = match negative_verdict {
+        Verdict::Unknown { hole_id } => hole_id,
+        other => panic!("unestablishable obligation must yield Unknown, got {other:?}"),
+    };
+
+    assert_ne!(accepted_id, ordinary_id, "the two exits must register distinct postulates");
+
+    let base = env.trusted_base();
+    assert!(
+        base.contains(&accepted_id),
+        "the accepted-but-withheld hole must be in trusted_base()"
+    );
+    assert!(base.contains(&ordinary_id), "the ordinary unknown hole must be in trusted_base()");
+
+    let accepted_name = match env.lookup(accepted_id) {
+        Some(Decl::Opaque { name, .. }) => name.clone(),
+        other => panic!("expected Decl::Opaque, got {other:?}"),
+    };
+    let ordinary_name = match env.lookup(ordinary_id) {
+        Some(Decl::Opaque { name, .. }) => name.clone(),
+        other => panic!("expected Decl::Opaque, got {other:?}"),
+    };
+
+    assert_ne!(
+        accepted_name, ordinary_name,
+        "trusted_base() alone -- Decl::Opaque names, nothing else -- must \
+         distinguish the two causes"
+    );
+    assert_eq!(
+        ordinary_name, "prover unknown goal",
+        "the ordinary unknown-hole label is unchanged by this node"
+    );
+    assert!(
+        accepted_name.contains("theorem-home") && accepted_name.contains("4.4"),
+        "the withheld-certificate label must name the CAUSE (the unapproved \
+         theorem-home placement decision, 23-prover.md §4.4), not the \
+         obligation's status -- got {accepted_name:?}"
     );
 }
