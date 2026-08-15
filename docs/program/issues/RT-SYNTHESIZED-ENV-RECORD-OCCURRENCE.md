@@ -1,15 +1,33 @@
 ---
 id: RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE
 title: "Give the unit-boundary environment record a planner-issued occurrence by extending the synthesized producer arm, so the closure crossing is attempted at the seam that actually refused it"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-CLOSURE-CROSSING-ELIMINATE]
 blocks: []
-github: null
+github: 2352
 origin: "Steward, 2026-08-15, on the operator's challenge to substantiate the claim that covering the refused closure-crossing rows requires inventing a representation. It does not, and the claim is withdrawn. Every fixed input below was measured by the Steward at origin/main 6d56a700c before framing. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED 2026-08-15 at `a1c064d5fa2aac810a83516dffb5b16307f8b0ad`, PR #2352
+>
+> **Candidate exact `4eec77390a84c87db369ea35565d6d2b21e4e8e7`**, three commits
+> from merge-base `de551a4ddebeedfb22a93b7f98c0ebd799405ddd`, exactly three
+> `ken-runtime` paths, `+567/-71`. Decision `dec_17ma5kt7vbsf0` resolved
+> APPROVED (Architect `evt_6ec2r0m9q9jwd`); QA exact approval
+> `evt_4czncdaa9t722`. Verified on `main` by blob identity on all three declared
+> paths, enumerated from the declared merge-base.
+>
+> **`dec_391jjtajxhf33` is `rejected`-as-superseded** and names the blocked
+> `257a9ddcc`. It is not a verdict on this work.
+>
+> **`D0`-`D3` are all delivered.** `D3` reported that the governed rows have no
+> source-level witness, which voided the product fork rather than answering it.
+> `blocks` is empty and no node names this one in `depends_on`, so nothing
+> entered the frontier on this merge; the runtime lane continues on
+> [[RT-RECURSOR-TRANSPORT]] `D0`-`D2`.
 
 > # THE STEWARD'S SIZING WAS WRONG, AND THE CORRECTION IS THE FRAME
 >
