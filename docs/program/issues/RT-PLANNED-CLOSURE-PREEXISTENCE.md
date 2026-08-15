@@ -1,15 +1,68 @@
 ---
 id: RT-PLANNED-CLOSURE-PREEXISTENCE
 title: "Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction?"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-CROSSING-CALLEE-IDENTITY]
-blocks: []
-github: null
+blocks: [RT-CLOSURE-BOUNDARY-LANE]
+github: https://github.com/swe-toolkit/ken/pull/2317
 origin: Architect, 2026-08-15, resolving dec_6hwh86vdzp2ha on RT-CROSSING-CALLEE-IDENTITY. He named the increment and the reason the previous instrument could not work -- "STOP ASKING THE RUN, ASK THE PLANNER". Steward-filed (agents cannot create tracked work per COORDINATION section 2).
 ---
+
+> # MERGED 2026-08-15 — PR #2317, squash `dfdc9c153`. THE FORK IS CLOSED.
+>
+> Exact `1cd9947cf23530b9514eb27f9397a31fcfde41ee` from declared merge-base
+> `ad47054a5`; one non-merge commit, six `ken-runtime` paths, `+429/-24`, no
+> spec/conformance paths. M6 blob identity **6/6 MATCH** from the declared
+> merge-base, path count equal to declared scope. Decision `dec_55a8p5m2f8gzk`
+> resolved APPROVE — Architect `evt_20qbjwdb1aahn`, QA `evt_791d1g6cgd9b9`.
+>
+> **The answer is the one this chain spent four nodes failing to get, and it came
+> from changing the instrument rather than sharpening it.** Both governed plans
+> give field 0 of `StaticOriginId(12)` a **closed** producer set of exactly
+> `[(StaticOriginId(12), LexicalClosure)]`. ⇒ **The source program authored the
+> closure. The realization did not manufacture it. Branch 1 is REFUTED and the
+> durable-lane branch is selected.**
+>
+> **`D1` is trustworthy because it did three things**, and they are worth naming
+> for the next plan-side measurement: it **reused the planner's existing** closed
+> result-producer analysis instead of standing up a parallel one; it **surfaces
+> `closed`**, so a classification cannot silently range over a partial producer
+> set; and it returns the **whole producer vector**, not a verdict. Then it
+> earned the answer — mutating the **real source field** to an integer flips the
+> classification `LexicalClosure → Other`. **Measured discriminating power, not
+> an argued shape.**
+>
+> **The Architect's provisional qualifier is retired in the honest direction.**
+> Had *"branch 1 selected"* stood as written on the predecessor, the next node
+> would have been cut at `realize_required_consumer_locally`'s value production —
+> **and the value was never the defect.**
+>
+> **His "do not fold" is superseded by him, explicitly:** *"That reasoning still
+> holds; the EVIDENCE changed."* The rows now carry a measured positive property,
+> so routing them into [[RT-CLOSURE-BOUNDARY-LANE]] is warranted where it
+> previously was not. **Nobody should read the earlier ruling as still blocking
+> the fold.**
+>
+> **`D3` and `D4` both landed, and `D3` answered the question behind the finding
+> rather than the finding.** A 14-binding census with a stated population
+> predicate: 11 are mutation/control machinery whose refusal **is** the intended
+> behaviour, three were diagnostic-only and repaired, and the five production
+> `child_static_origin(…)?` calls are excluded on a clean criterion.
+> `generated_unit_call_body_callee` now degrades to `MissingBodyChild { entry }`
+> instead of returning early, **proved** by a mutation that preserves the exact
+> `Closure` compile outcome while flipping the tag.
+>
+> ## WHAT THIS DOES NOT ESTABLISH — the receiving node needs it said
+>
+> **It measures these two rows' class. It does not measure the escape rows.** So
+> *"one population"* is still one step ahead of the evidence, and the sub-shapes
+> differ in **how** the closure must survive: the original rows are a closure
+> **outliving its frame**, these are a closure crossing as a **call argument at a
+> unit boundary**. Both need a representable closure, so **pooling them for
+> sizing is right — assuming one mechanism is not.**
 
 > # THE FORK IS DOWN TO TWO BRANCHES AND THIS NODE DECIDES WHICH
 >
