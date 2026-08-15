@@ -254,8 +254,62 @@ Steward cuts it rather than the ring.
 "drop it from the surface" branch is closed -- the six forms are debt to be
 paid, not text to be corrected.
 
+## CARRIED IN 2026-08-15: the nested residual's bound is stated too narrowly
+
+**Folded here on the Architect's routing (`evt_dqfq4m16vv1n`) from the
+Adversary's hunt on `0c6c1747`, because this is where the nested residual
+already lives.** Nothing is live; `LANG-FOREIGN-CTOR-ARM-REJECT` is `merged`
+and correct.
+
+**The filed bound reads safer than its own audit supports.** That node records
+the nested-foreign-subpattern worst case as *"a misleading diagnostic, not a
+crash"*, warranted by `mark_shared_ctor_subsumption` containing no
+`expect`/`unwrap`/`panic`. **That predicate does not cover slice indexing**, and
+the function indexes slices. **Restate the predicate; do not merely re-assert
+the conclusion.**
+
+**Repairing the reported site would discharge the bound and leave the weaker
+pair standing.** Three sites, and the one that was flagged is the *strongest*:
+
+| site | index expression | invariant |
+|---|---|---|
+| `:3302` `subsumed_by[idx]` | `idx` from `arms.iter().enumerate()` **in the same function** | loop variable over the companion slice |
+| `:8182` `arm_used[winner]` | `rows[0].arm_idx` | **carried field**, threaded through the descent |
+| `:8183` `subsumed_by[shadowed.arm_idx]` | `rows[1..].arm_idx` | **carried field**, threaded through the descent |
+
+⇒ **`:8182`/`:8183` are in the nested path — the code this residual is about.**
+Fixing `:3302` alone is repair-the-reported-site rather than
+repair-the-property. The Adversary flagged `:3302` and said so itself.
+
+**The obligation is smaller and more precise than it first looked, because the
+Adversary closed the open question by measurement.** The Architect named
+"can an empty `rows` reach `:8181`'s `rows[0]`/`&rows[1..]`" as explicitly
+unmeasured; the answer is **no, on all four routes** — `build_ctor_buckets` is
+the entry point, not `compile_match_matrix`, and its per-constructor
+`if bucket.is_empty() { return Err(ExhaustivenessError) }` at `:8415` fires
+before the recursive call at `:8442`; the `:8230` IH column passes `rows`
+unchanged and `:8260`'s `all_flat` is a length-preserving 1:1 `map`. Measured
+end-to-end, not read: `match Red { }` returns
+`Err(ExhaustivenessError { missing: … "Red" … })` with no panic.
+
+⇒ **The slice-length relation is discharged by construction** — `arm_used` and
+`subsumed_by` are both `vec![…; arms.len()]` and `arm_idx` is seeded from
+`arms.iter().enumerate()`. **The single remaining unstated invariant is that
+the descent preserves in-bounds `arm_idx`** (`arm_idx: r.arm_idx` at `:8258`).
+That is what a `get(..).expect(<invariant>)` at `:8182` and `:8183` should say
+— and the `expect` string should state *that* invariant, not restate the index.
+
+**Whoever takes this slice owes:** the corrected predicate in the bound, and
+the convention applied at **all three** sites with `:8182`/`:8183` treated as
+the load-bearing pair. **Not the transitive-guard residual** — that is
+[[LANG-LIFT-DISPATCH-SELF-GUARD]], filed separately because its vehicle and its
+control are different.
+
 ## Not this node
 
+- **Not [[LANG-LIFT-DISPATCH-SELF-GUARD]]**, the sibling residual from the same
+  hunt: that one is `check_match_with_lift`'s transitive family guard, repaired
+  by making the dispatch self-guarding.
 - **Not [[LANG-REACHABILITY-SUBSUMING-ARMS]]**, which is the reachability
   *diagnostic payload* and explicitly implements neither feature.
 - **Not [[LANG-CONVOY-ENCLOSING-FIELD]]**, which is nested-match re-typing
