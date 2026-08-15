@@ -44,61 +44,64 @@
 > what found two self-declared-authoritative blocks that were wrong, and a
 > hand-maintained list of 6 preserved refs when origin held 26.)
 
-## LIVE — 2026-08-15 09:30Z
+## LIVE — 2026-08-15 10:40Z
 
-**`main` = `505e9b5cd`.** Tree clean, nothing held, no publisher running.
-Today's PRs: #2298, #2300, #2302, #2303 (mine, doc-only); #2301 (language `D4`,
-code); #2299 closed empty.
+**`main` = `a1b8a244c`.** Tree clean, nothing held, no publisher running.
+Today's code PRs: #2301 (language `D4`), #2305 (runtime census). Doc-only:
+#2298, #2300, #2302, #2303, #2304, #2306, #2308. Closed: #2299 (empty), #2307
+(conflicting — predated the census merge; superseded by #2308).
 
 **TWO LANES AND NOTHING ELSE GETS A RING** (operator, 2026-08-15; `steward.md`
 §0). Runtime retires `RecursiveDescent`; language + verify do the z3 round-trip.
 Finished work still merges, filings queue, and framing for these two lanes is
 lane work.
 
-### LANE 1 — runtime is working, and the chain moved twice this morning
+### LANE 1 — the census merged, and its `D5` killed a branch
 
-**`RT-REQUIRED-OCCURRENCE-PROJECTION` merged at `66715f9fb`** (PR #2293), `D1`
-through `D4` delivered. Its `D4` advanced **row 4 depths 2 and 3** to a `Closure`
-refusal. The full record, including the cross-node population collision that
-reddened it once, is in the node.
+**`RT-REQUIRED-CONSUMER-REACH-CENSUS` merged at `50aff29b4`** (PR #2305), `D1`
+through `D5` delivered. M6 blob identity verified against the **declared**
+merge-base; M7-M9 discharged.
 
-**The successor is [[RT-REQUIRED-CONSUMER-REACH-CENSUS]]** — filed, kicked
-(anchor `evt_37bptmz5tgse5`), and **active**. It exists because settling the
-question in the tree turned up something no artifact recorded:
+**What `D5` established:** the required-consumer route **manufactures the
+closure-bearing CROSSING** at `StaticOriginId(5)` / `Constructor.arg[0].Closure`.
+Enabled rows are `(closure_present, crossing_reached) = (true, true)`; both
+suppressed legs are `(false, false)` and return to `StaticWorkerBinding`.
 
-> **The projection is minted only under `if required != source`**
-> (`static_transition.rs:11683`). Where the two coincide there is **no
-> projection to read** — and they coincide at **row 4 depth 1**. ⇒ **Depth 1 is
-> outside the new surface by construction, not behind its boundary.** A repair
-> cut on "the projection now serves rows 4 and 5" would be cut wrong in exactly
-> the way `D2k-1c` was.
+> **BRANCH 2 IS ELIMINATED, and that is the durable result.** Its antecedent
+> required the crossing to be **reached under suppression**, and it is not. It
+> was the **only** branch under which these rows and [[RT-CLOSURE-BOUNDARY-LANE]]
+> could ever have been one defect ⇒ **the subsumption is dead**, and that node no
+> longer waits on this chain to be sized. My derivation from the Architect's
+> pre-committed table, flagged as such in both nodes.
 
-**`D1` is discharged** (`evt_6qc0vkzj43c0e`): rows 4 depths 2 and 3 both refuse
-at `lowering/mod.rs:11550-11552` — *"a closure cannot cross the boundary: it is
-runtime-local and live-domain only, and it has no durable lane"*. **That is
-[[RT-CLOSURE-BOUNDARY-LANE]]'s exact signature, for a different population.**
+**Branches 1 and 3' are NOT separated, and suppression may not be able to
+separate them at all.** `closure_path` is computed only at the crossing, so
+`closure_child_present: false` on the suppressed rows is an artifact of having no
+observation point — both branches predict it. Without the projection these rows
+never build the subgraph, so *"does the closure pre-exist"* may be **ill-posed**.
+**Do not re-run the differential.** `D5`'s `CLAIMED` line was amended (Architect
+`evt_38p42gjq12br`) to stop carrying a branch label it did not establish.
 
-**Do not fold the two nodes.** The site is the closure arm of
-`boundary_transfer_admissibility`, a **total** graph walk — every
-closure-carrying graph refuses there, so a shared sentence is evidence the gate
-is total, not of a shared root. The Architect sharpened it: the function carries
-a **second** closure arm for `ComputationalRecursorClosure`, and these rows are
-**not** hitting it, so the offending child is a general closure value the
-function itself distinguishes one arm away.
+**The successor is [[RT-CROSSING-CALL-SITE-ATTRIBUTION]]** — `ready`, `S`, kicked
+at `evt_18awbed73jy7a` (**new thread**). The separator is the **call site**, not
+another differential: is `transfer_into_carrier` invoked on origin 5's
+constructor from the **realization's return path** (⇒ 3', keep it local) or from
+a path that **would have run regardless** (⇒ 1, repair the value production)?
 
-**`D5` is released and carries three pre-committed branches**
-(`evt_3q0742egf06dg`, released `evt_686me47k2edj2`). The third — closure present
-under suppression but the **crossing not reached** — is the one my own two-way
-fork was missing, and a two-way measurement would misattribute it. `AC-8` exists
-to force the separation.
+**Its `D3` carries three latent misreports in the same diagnostic**, the third
+from Adversary hunt `evt_6mpw6frz1h508` and verified on `main`: the probe's `[]`
+arm returns silently while its sibling panics, so **a stale
+`StaticOriginId(5)` key would leave the two rows expecting `false` green**. Half
+the census is protected by a shift being loud and half is *satisfied* by it.
+`AC-4` requires the fix be **demonstrated**, not just written.
 
-**The one live stop:** if the row reaches no transfer under either setting, the
-attribution is misaddressed — say so rather than forcing a branch.
+**No further successor is framable until `D2` selects a branch. That is not
+framing debt.**
 
-**Chain:** `PROJECTION` (merged) → `CENSUS` (active) → ? → `TRANSPORT` →
-`DESCENT-RETIRE`. `RT-RECURSOR-TRANSPORT`'s `D3` gate is keyed on the **tree**
-(`enum RecursiveDescentResidual`, `core.rs:1979`, two live variants), never on
-node status. **Do not "fix" that wording.**
+**Chain:** `PROJECTION` (merged) → `CENSUS` (merged) → `CALL-SITE` (ready) →
+repair → `TRANSPORT` → `DESCENT-RETIRE`. `RT-RECURSOR-TRANSPORT`'s `D3` gate is
+keyed on the **tree** (`enum RecursiveDescentResidual`, `core.rs:1979`, two live
+variants), never on node status. **Do not "fix" that wording.**
 
 ### LANE 2 — language's `D4` merged, `D2` widened, verify between work
 
