@@ -1,13 +1,13 @@
 ---
 id: RT-CROSSING-CALL-SITE-ATTRIBUTION
 title: "The suppression differential cannot separate branch 1 from branch 3' -- the separator is the CALL SITE, so record which invocation of transfer_into_carrier the origin-5 crossing comes from"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-REQUIRED-CONSUMER-REACH-CENSUS]
-blocks: []
-github: null
+blocks: [RT-CROSSING-CALLEE-IDENTITY]
+github: https://github.com/swe-toolkit/ken/pull/2310
 origin: Architect, 2026-08-15, resolving dec_35e0tfng528d on RT-REQUIRED-CONSUMER-REACH-CENSUS D5 (evt_38p42gjq12br). He named this increment in the resolution -- "adding the invoking site is the cheap next increment, and it is the one I would frame." Steward-filed (agents cannot create tracked work per COORDINATION section 2).
 ---
 
@@ -172,3 +172,30 @@ an existing event decides it.
 **This is lane 1.** It sits on the `RecursiveDescent` retirement path:
 `PROJECTION` (merged) → `CENSUS` (merged) → **this** → repair → `TRANSPORT`
 → `DESCENT-RETIRE`.
+
+> ## MERGED at `637781f41` (PR #2310), `D1`-`D3` delivered. Steward, 2026-08-15.
+>
+> **`D1`/`D2` measured both enabled rows entering the origin-5 crossing with
+> `invoking_site = GeneratedUnitCallInput`** — the tag on `carry_call_input`,
+> and **not** the required-consumer realization's return surface. The
+> construction is sound: the thread-local's default is `Direct`, so observing the
+> **non-default** value is real evidence the crossing happened dynamically inside
+> that helper.
+>
+> **Branch 1 is selected PROVISIONALLY, and the qualifier is load-bearing.** The
+> tag sits on a **shared helper with six callers**, so the measurement
+> establishes *"a generated-unit call input was being carried"* — **not whose
+> call**. That is precisely what separates the branches, and the successor
+> [[RT-CROSSING-CALLEE-IDENTITY]] exists to close it. **No repair node may be cut
+> before it measures** (Architect, `dec_5m10b60wam0rz` / `evt_752hfn288jrcs`).
+>
+> **`D3` closed all three latent misreports**, including the stale-origin-key
+> check, which now fires **before** the four-row table and was demonstrated by
+> mutation (`usize::MAX` reds it, including on rows expecting `false`).
+>
+> **One thing this node's own supporting claim does not cover, recorded so it is
+> not re-derived:** `realize_required_consumer_locally` does end at
+> `RoutedAnswer::composed_answer(...)` and carries nothing, so the crossing is
+> genuinely not on its **return** surface. **Ruling out the return surface does
+> not rule out the realization emitting a CALL** — different exits, and only one
+> was checked.
