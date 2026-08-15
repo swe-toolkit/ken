@@ -77,7 +77,7 @@ to that same declaration, including its qualifications.
 | `10-kernel/README.md` | `K2 elaborated` | Normative WS-K contract and WS-V re-checking target. |
 | `20-verification/21-spec-syntax.md` | `V1 elaborated; implementation-ready` | Normative for verification forms, meaning, elaboration, and status model; concrete spelling is cross-referenced. |
 | `20-verification/22-obligations.md` | `V2 elaborated; implementation-ready` | Normative for obligations and their extraction algorithm. |
-| `20-verification/23-prover.md` | `V3 elaborated; implementation-ready` | Normative for the prover contract, verdicts, classifier, and certificate route; named frame axioms remain `(oracle/standard)`. |
+| `20-verification/23-prover.md` | `V3 specified` | Normative for the prover contract, verdicts, classifier, and certificate route; the route-(a) theorem statements are required, while their artifact placement and resulting evaluator/TCB boundary remain an Architect/operator decision. |
 | `20-verification/24-diagnostics.md` | `V4 elaborated; implementation-ready` | Normative for diagnostic mechanisms and meaning; serialization belongs to `25-protocol.md`. |
 | `20-verification/25-protocol.md` | `T1 elaborated; implementation-ready` | Normative for message shape, verdict cross-walk, and stability; exact JSON names remain a finalization surface. |
 | `20-verification/README.md` | `DRAFT v0` | Normative for the verification interface and soundness obligations; named prover internals remain team work. |

@@ -162,23 +162,25 @@ against `23` + `trusted_base()`.
   sum (`16 §1.3`), not a primitive.
 
 ### verify/prover/kripke-embedding-cert-rechecks-FO
-- spec: `23 §4` (route (a) + the proved-vs-assumed ledger); `16 §9`; `18 §4.5`
-- given: a first-order **intuitionistic** obligation `φ` routed to the Kripke
-  embedding (§4); Z3 decides the translation `φ#` valid
-- expect: the discharge is the **reified term** `sound φ π (refl true)`, where
-  the reflective `check_cert (embed φ) π` reduces to `true` (canonicity,
-  `16 §9`); the **kernel** `check`s that discharge term (`18 §4.5`) →
-  **proved**. Because the embedding-adequacy lemma `classically_valid(φ#) → φ`
-  **and** the checker-soundness lemma `check_cert (embed φ) π = true → φ` are
-  **PROVED** kernel defs (the §4 ledger), **nothing is added to
-  `trusted_base()`** — the FO `proved` is fully kernel-grounded. (The Kripke
-  frame axioms are external `(oracle/standard)`, shaping `φ#` — the classical
-  theory handed to Z3 — only; they are not Ken terms.)
-- why: §4 — the classical solver is used **soundly** via the embedding; what is
-  trusted is the **re-checked reified term**, not Z3's "valid". **Structural
-  output:** the discharge term `sound φ π (refl true)` that `check`s, and the
-  **empty** `trusted_base()` delta (adequacy is proved, not assumed). Pairs with
-  the no-`π` flip below.
+- spec: `23 §4.1`–`§4.4`; `16 §9`; `18 §4.5`
+- given: quotation accepts a first-order **intuitionistic** obligation as
+  `problem Sigma C rho f`, and an adapter supplies `pi` for which
+  `check_cert (embed Sigma f) pi` reduces to `True` (canonicity, `16 §9`)
+- expect: the required `checker_soundness` statement yields
+  `classically_valid (embed Sigma f)`; the separate `embedding_adequacy`
+  statement then yields `denote C rho f`, which quotation preservation
+  identifies with the original obligation. Their specified composition
+  `sound Sigma C rho f pi (refl True)` is the discharge term. Once both
+  statements are kernel-checked in an approved home, the ordinary kernel
+  `check`s that term (`18 §4.5`) → **proved**; until then route FO cannot return
+  **proved**.
+- why: §4.2 puts `K(Sigma)` inside `embed`, so the certificate discharges the
+  frame, domain, and forcing premises rather than treating them as external
+  `(oracle/standard)` assumptions. The solver's verdict has no authority by
+  itself. The artifact home, evaluator posture, and resulting trusted-base
+  account remain the Architect/operator placement question in §4.4; this row
+  records no trusted-base outcome in either direction. Pairs with the no-`pi`
+  flip below.
 
 ### verify/prover/bare-unsat-no-cert-is-unknown-not-proved (soundness)
 - spec: `23 §4` (ledger row: Z3 "unsat" assumes nothing), `§1.2`/§1.5
