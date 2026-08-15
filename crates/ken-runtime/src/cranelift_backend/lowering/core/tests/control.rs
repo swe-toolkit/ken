@@ -6194,10 +6194,20 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// unit-result transfer. Both rows then return to the downstream
 /// `StaticWorkerBinding` refusal.
 ///
+/// MEASURED (2026-08-15, exact
+/// `257a9ddcc78c1a4fcebccac7048dc8a049efa301`): the existing non-ignored
+/// source-compilation paths exercised by
+/// `scripts/ken-cargo test -p ken-cli --tests -- --nocapture --test-threads=1`
+/// returned `unit_boundary_environment_fields={}` on all 81 completed returns
+/// across 15 processes; the plans contained 7 through 301 source occurrences.
+/// This is a scoped corpus measurement, not a universal property of Ken
+/// programs.
+///
 /// CLAIMED: these hand-authored rows pin the lowering's internal IR contract:
 /// a planner-issued unit-boundary environment Record is transferable and does
-/// not change the later static-worker disposition. They do not establish a
-/// source-language capability; no compiler input produces this IR shape.
+/// not change the later static-worker disposition. These two row4 controls are
+/// the only current exercise of this complete mechanism and establish no
+/// source-language capability.
 /// GAP: this internal transition does not repair the later static-worker wall.
 #[test]
 fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
