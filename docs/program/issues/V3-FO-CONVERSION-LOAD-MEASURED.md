@@ -100,13 +100,40 @@ breaking a test.
 
 ## Deliverables
 
-**`D0` — pin conjunct 3's discriminating power, before measuring anything.**
-An obligation where discovery **succeeds** and returns a signature whose
-`denote` does **not** convert back to `phi_closed`, asserted to fall through to
-ordinary IPC. **It must reach conjunct 3** — a case refused by conjuncts 1 or 2
-does not test this and is the failure mode to avoid. The control goes red the
-day the proof-irrelevance shortcut starts firing here, which no existing test
-would notice.
+**`D0` — pin conjunct 3's NON-VACUITY, before measuring anything.** Assert that
+`convert` **distinguishes** two different propositions at `phi_ty`. In the
+existing acceptance test, after `phi_ty = infer(phi_closed)`:
+
+```rust
+assert!(!convert(env, &ctx, &phi_ty, &denote(env, &sig, &other_f), phi_closed));
+```
+
+⇒ **That converts "a property of the kernel, not of this file" into a property
+this file checks.** Same move as the `shift` round-trip oracle in
+[[V3-FO-GUARD-SHIFT-DIFFERENTIAL]], for the same reason: **a cross-crate
+dependency that nothing local asserts is one somebody else can retire without
+ever seeing this code.**
+
+> ### `D0` WAS FRAMED AS A REFUSAL CONTROL. THAT AIMED AT THE WRONG PROPERTY.
+>
+> **Adversary `evt_11cr9qyqympq5`, and the correction is the Steward's to
+> take.** The Steward's original `D0` demanded an obligation where discovery
+> **succeeds** and conjunct 3 then **refuses**. Two separate problems with that:
+>
+> 1. **It may not be constructible.** Conjuncts 1 and 2 are strong, and the
+>    Adversary could not build an obligation that passes both and fails 3. **An
+>    AC nobody can satisfy is not a strict AC, it is an unusable one.**
+> 2. **It targets a different property than the stated risk.** The risk named
+>    below is that conjunct 3 silently starts returning `true` for *everything*.
+>    **That is vacuity, not a missing refusal.** Observing a refusal is the hard
+>    property; showing `convert` discriminates is the cheap one — **and it is
+>    precisely the thing that would flip** if the proof-irrelevance guard
+>    widened.
+>
+> ⇒ **Non-vacuity is both cheaper and closer to the risk. It is `D0`.** A
+> refusal control is kept only **if** a passing-1-and-2-failing-3 obligation
+> turns out to exist; **finding that none does is itself a reportable result**
+> and discharges the question.
 
 **`D1` — the corpus.** A set of Ken source programs whose compilation produces
 first-order obligations route FO can quote. **State how many were found and
@@ -133,12 +160,12 @@ than worked around.
 **`AC-1`.** Every measured obligation traces to a named Ken source program.
 **Demonstrate the provenance**, do not assert it.
 
-**`AC-1a`.** `D0`'s control **demonstrably reaches conjunct 3** — show that the
-input it uses passes conjuncts 1 and 2, so the refusal it observes is
-preservation refusing and not declaration validation refusing. **Demonstrate it
-against the mechanism, not by assertion.** A control that never reaches the
-check it names is the failure this deliverable exists to prevent, and it looks
-identical to a control that works.
+**`AC-1a`.** `D0`'s assertion **fails if `convert` is made to return `true`
+unconditionally at that call.** Demonstrate it by mutation, not by argument —
+that is the exact failure mode the deliverable exists to catch, and an assertion
+that would pass under it is testing nothing. **The two propositions compared
+must be genuinely different at `phi_ty`**; showing that is the whole content of
+the control.
 
 **`AC-2`.** The measurement is of kernel conversion, not of the solver. z3's
 wall-clock is out of scope — it runs outside the kernel and carries no
@@ -167,11 +194,11 @@ no real obligation reaches route FO at all, so there is nothing to measure.
 inputs to start earlier; that substitution is exactly what `AC-1` forbids.
 
 **`D0` runs first and does not wait on the corpus.** It is a control on the
-predecessor's mechanism, not a measurement, and it needs no source program. If
-it cannot be made to fail against a signature that does not denote back, that is
-a finding about conjunct 3 and it is worth more than the timing table — **report
-it and stop rather than proceeding to measure a workload whose provenance the
-control could not establish.**
+predecessor's mechanism, not a measurement, and it needs no source program. **If
+`convert` turns out not to discriminate at `phi_ty`, stop and report** — that
+would mean conjunct 3 is already vacuous, which is a finding about the FO route
+worth far more than the timing table, and it makes every obligation this node
+would otherwise measure the wrong one.
 
 ## Provenance
 
