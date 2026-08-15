@@ -1,15 +1,41 @@
 ---
 id: RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE
 title: "Measure whether any lowered consumer reads the static-worker field constructed for row4 depth 1 and row5 after-hole, or whether the recognition is only ever seen by the ledger's close"
-status: ready
+status: closed
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-EMITTED-WORKER-CONSUMER-WALK]
-blocks: []
+blocks: [RT-MINT-SITE-STATIC-DISCRIMINATOR]
 github: null
 origin: "Architect ruling evt_3cxm6654d5cjb, 2026-08-15, which split the RT-EMITTED-WORKER-CONSUMER-WALK D0 population and explicitly declined to rule on this half. Every symbol below was located by name against origin/main ac8a73d1b by the Steward before filing. Steward-filed per COORDINATION section 2."
 ---
+
+## CLOSED, NOT MERGED — measurement-only, and `D0` IS DELIVERED
+
+**This node produced no candidate and never will**, so it can never reach
+`merged`; a successor gated on that would wait forever. **`closed` =
+resolved-without-landing.**
+
+**`D0` result, measured at `30ee4dbf1`: `not needed`, both rows.**
+row4-depth-1 (recognition 0, field 25, owner 26) and row5-after-hole
+(recognition 0, field 21, owner 22) reach their `StaticWorkerFieldLedger::close`
+refusal **with no lowered field-reader tag. The field values are never read.**
+
+**The zero is DISCRIMINATING and the ring proved it** — a synthetic
+ledger-minted positive control reached `specialized_at`, and test-only
+observation readers were covered alongside the lowered ones. **Zero means no
+reader, not a blind instrument.** Row1 and depth-2/3 were expressly excluded.
+
+**The fork did NOT resolve to a repair.** The Architect ruled at
+`evt_3czp0t9gnnz61` that the Steward's two options *"are not the two branches"*:
+they differ in the **scope** of the erasure, not the standard of evidence, and
+the deciding fact is whether the measured population is **statically
+identifiable at the mint**. ⇒ [[RT-MINT-SITE-STATIC-DISCRIMINATOR]].
+
+> **"Measure more rows" closes nothing and must not be framed.** The gap is not
+> that two rows are too few — **a runtime observation over occurrences is the
+> wrong KIND of fact for a static site.**
 
 ## The Architect declined to rule here, and the reason is the node
 
