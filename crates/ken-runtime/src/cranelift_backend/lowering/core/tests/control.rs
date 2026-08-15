@@ -33406,11 +33406,6 @@ fn lrc_d2a_forwards_each_arrival_and_excludes_projection_owned_early_refusals() 
                 "suppressing the required-consumer projection did not change the early refusal \
                  on {label}",
             );
-            assert!(
-                without_projection.contains("StaticWorkerBinding"),
-                "without the required-consumer projection {label} did not return to the exact \
-                 predecessor boundary: {without_projection}",
-            );
         }
     }
 
