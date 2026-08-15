@@ -1,15 +1,52 @@
 ---
 id: V3-FO-KRIPKE-SLICE
 title: "Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls"
-status: ready
+status: active
 owner: language
 size: L
 gate: none
 depends_on: [V3-KRIPKE-THEORY-CLOSURE, CONF-PROVER-SEED-KRIPKE-DRIFT]
-blocks: []
+blocks: [V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]
 github: null
 origin: "Steward, 2026-08-15. V3-KRIPKE-DECOMPOSITION merged its plan with blocks: [] and no successor filed, so the implementation node has been unwritten since. The theory (V3-KRIPKE-THEORY-CLOSURE) and the conformance seed (CONF-PROVER-SEED-KRIPKE-DRIFT) are both merged, so nothing blocks a start. Every fixed input below was read from spec/20-verification/23-prover.md and crates/ at origin/main 7626e32ce by the Steward. Steward-filed per COORDINATION section 2."
 ---
+
+## STEWARD SCOPE DISPOSITION, 2026-08-15: `D5` IS CUT BACK TO THE HELPER
+
+**QA's block on `e0474679c` is upheld. `D5`'s premise as I wrote it is false,
+the defect is mine, and the repair is out of bounds for this node.** Architect
+disposition `evt_30mehjtecaazy`; the technical finding there is the input and I
+re-derived its load-bearing mechanism before ruling.
+
+**The mechanism.** `attempt_fo` calls `declare_fo_slice_signature(env)`, which
+calls `declare_postulate`/`declare_inductive` — **these mint fresh `GlobalId`s on
+every call and are not idempotent, not even on the same `env`.** So the signature
+`attempt_fo` quotes against is unreachable by any caller, and **no
+externally-constructed term can ever pass `quote_fo` on the public route.** It
+falls through to the unchanged IPC fallback every time.
+
+⇒ **A public-route probe returns `Unknown` by quotation refusal, not by the
+theorem-home boundary.** Those are different verdicts that print the same, so the
+probe is inert: it would pass identically with the whole slice absent. **An inert
+instrument is a stop, not a pass**, and the correct reading is *"`AC-5` is
+unmeasured on the public route"*, never *"no evidence of a problem."*
+
+**I am not authorizing the repair.** Having `attempt_fo` adopt the signature
+implied by the incoming term's `GlobalId`s is not a narrower thing beside the
+deferred work — **it is obligation signature discovery, entered from the other
+side.** It also lets the obligation choose the predicates `embed` is computed
+over, which sits upstream of everything the embedding's soundness argument
+assumes. That is a surface to be designed deliberately with its own review, and
+it must not be introduced as test-enablement.
+
+**What is cut, stated as a cut and not as a wording fix.** Qualifying an AC to
+match what was measured *is* a scope reduction. `D5` and `AC-5` no longer reach
+`attempt_fo`; they are now claims about `attempt_fo_with_signature`. **The
+fail-safe itself is not weakened** — an accepted certificate must still yield
+`Unknown` and never `Proved` — only the route on which it is claimed.
+
+**The residual has a home so it cannot be lost by being true-but-elsewhere:**
+[[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]] inherits the public-route gap.
 
 ## The gap, stated as a fact about the tree
 
@@ -120,16 +157,27 @@ theorem boundary and stops there with an honest verdict. **The negative control
 returns not-proved and is a complete, closed deliverable** — it does not wait on
 anything.
 
-**`D5` — the honest verdict at the boundary.** `attempt_fo` returns `Unknown`
-(never `Proved`) for a goal whose certificate is accepted but whose theorems are
-not kernel-checked in an approved home. **Write the reason at the site**, so the
-next reader does not mistake a reserved decision for an unimplemented branch.
+**`D5` — the honest verdict at the boundary.** **AMENDED, see the disposition
+banner.** `attempt_fo_with_signature` returns `Unknown` (never `Proved`) for a
+goal whose certificate is genuinely accepted but whose theorems are not
+kernel-checked in an approved home. **Write two things at the site**: the reason
+for the `Unknown`, so the next reader does not mistake a reserved decision for an
+unimplemented branch; and **the reason the public `attempt_fo` cannot reach this
+branch at all**, so the next reader does not mistake an unreachable route for a
+working one.
+
+**`D5` no longer claims anything about `attempt_fo`.** That claim moved to
+[[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]].
 
 ## Acceptance criteria
 
 **`AC-1`.** The negative control does not obtain an accepted certificate or a
 `proved` verdict. **Demonstrate it by running it**, not by arguing the calculus
 cannot derive it.
+
+**Run it against the slice's own `quote_fo`/`find_certificate` with an explicit
+signature.** A negative demonstrated through the public `attempt_fo` is inert for
+the reason in the disposition banner — it would pass with the slice absent.
 
 **`AC-2`.** The positive control's certificate computes to `True` under `D3`'s
 `check_cert`, shown as a computation.
@@ -141,8 +189,19 @@ the refusal is by construction rather than by a fallthrough that happens to fail
 premise is emitted as an external oracle assumption** — that is the exact drift
 the conformance seed was corrected for today.
 
-**`AC-5`.** No new kernel primitive and no trusted axiom, per `§4.4`. `proved` is
-not returned for FO under any path in this node.
+**`AC-5`.** **AMENDED, see the disposition banner — this AC is qualified to the
+route it was measured on.** No new kernel primitive and no trusted axiom, per
+`§4.4`. `proved` is not returned for FO under any path in this node.
+
+The fail-safe is demonstrated **at `attempt_fo_with_signature`**: a goal whose
+certificate `check_cert` genuinely accepts still yields `Unknown`. **The test
+must assert that acceptance as a precondition** — without it the test passes via
+the IPC fallback and proves nothing about the boundary.
+
+**This AC does not claim the public `attempt_fo` route, and a candidate may not
+claim it.** Reaching the boundary through `attempt_fo` requires obligation
+signature discovery, which is [[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]] and is
+banned scope here.
 
 **`AC-6`.** No placement, artifact-home, evaluator-posture, or trusted-base
 decision is made here. **If the work seems to require one, that is the handback**
@@ -153,6 +212,10 @@ decision is made here. **If the work seems to require one, that is the handback*
 ## Banned scope
 
 - **Deciding the theorem home.** `AC-6`. Hand back instead.
+- **Obligation signature discovery, under any name.** Including the cheap form —
+  having `attempt_fo` adopt the signature implied by the incoming term's
+  `GlobalId`s. **Do not build it to satisfy an acceptance criterion.**
+  [[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]].
 - **Widening the slice.** More sorts, more predicates, more connectives, or more
   `Cert` constructors are a later node. `§4.5` says the full `§4.3` theorem
   "remains owed for the remaining constructors and is not implied by this slice."
@@ -164,6 +227,13 @@ decision is made here. **If the work seems to require one, that is the handback*
 **It does not make route FO return `proved`.** It builds everything up to the
 reserved boundary and stops honestly. Whether the remaining step is one node or
 several depends on the placement decision, which is not this ring's.
+
+**It does not make route FO do anything in production, and this is the sentence
+most likely to be lost.** Because `attempt_fo` mints an unreachable signature,
+every real obligation refuses quotation and falls to the IPC fallback. **The
+slice is built, checked, and currently unreachable.** Do not read "the FO Kripke
+slice merged" as "route FO now behaves differently" — it does not, and it will
+not until [[V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]] lands.
 
 **The slice is a first slice, not the contract.** `§4.3`'s theorem for the full
 constructor set stays owed, and `§4.5` says so explicitly.
