@@ -6389,11 +6389,19 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
 /// `RT-CLOSURE-BOUNDARY-LANE` D0: the RecursiveDescent baseline does not
 /// perform the closure-bearing boundary crossing introduced by functionization.
 ///
-/// MEASURED: row 4 depths 2 and 3 both compile on RecursiveDescent and record
-/// zero `BoundaryTransferEntered` events. CLAIMED: retiring RecursiveDescent
-/// before the live-domain lane covers these rows would remove a compiling
-/// capability. THE GAP: this does not choose the lane mechanism; retirement may
-/// instead carry an explicit recorded narrowing.
+/// MEASURED: in one process and for each of row 4 depths 2 and 3, excluding the
+/// lexical-recursion selector records at least one `BoundaryTransferEntered`
+/// event, while the unexcluded RecursiveDescent compile succeeds and records
+/// none. CLAIMED: the empty RecursiveDescent observation is live evidence, not
+/// a dead recorder, so retiring that route before the live-domain lane covers
+/// these rows would remove a compiling capability. THE GAP: sibling compiles
+/// establish recorder liveness rather than observing both routes inside one
+/// compile; this does not choose the lane mechanism, and retirement may instead
+/// carry an explicit recorded narrowing.
+///
+/// Promise class: transition sentinel. Retirement or an authorized boundary
+/// repair must rewrite this route comparison rather than preserve its current
+/// exact outcomes.
 #[test]
 fn recursive_descent_recursors_compile_without_a_boundary_crossing() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
@@ -6406,12 +6414,33 @@ fn recursive_descent_recursors_compile_without_a_boundary_crossing() {
         }
     }
 
-    set_selector_variant_exclusion(None);
     let _restore = Restore;
     for depth in [2, 3] {
+        set_selector_variant_exclusion(Some(
+            RecursiveDescentResidual::LexicalCallArgumentRecursor,
+        ));
         let _ = d2k_owner_trace_take();
         let expression =
             host_result_closure_match(px8j_scope_chain_observation_result(depth, 0));
+        let (_excluded_result, _trace) = px8j_capture_source_trace(
+            &expression,
+            false,
+            &format!("ken_closure_boundary_lane_d0_excluded_depth{depth}"),
+        );
+        let excluded_crossings = d2k_owner_trace_take()
+            .into_iter()
+            .filter(|event| {
+                matches!(event, D2kOwnerEvent::BoundaryTransferEntered { .. })
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            !excluded_crossings.is_empty(),
+            "row 4 depth {depth} must prove the boundary-crossing recorder is live \
+             when the lexical-recursion selector is excluded",
+        );
+
+        set_selector_variant_exclusion(None);
+        let _ = d2k_owner_trace_take();
         let (result, _trace) = px8j_capture_source_trace(
             &expression,
             false,
