@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-15 19:38:15Z — from 317 issue file(s) in `docs/program/issues/`.
+2026-08-15 20:30:50Z — from 318 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -77,6 +77,7 @@ the committed file matches the generator's output.
 | `CONF-VERIFY-OLD-ROW-UNSATISFIABLE` | The seed's only unclaimed row states expect: accepts against a landed elaborator that rejects unconditionally, and the Coverage map rolls it up as a satisfied family | merged | spec-enclave | S | none | — |
 | `CONF-VERIFY-SPEC-SYNTAX-PHANTOM-CLAIMS` | Four v1_acceptance tests claim verify/spec-syntax conformance rows that were never authored -- invisible until the row-claim checker's namespace widening, and now a mechanical merge blocker for CI-ROW-CLAIM-NAMESPACE | merged | spec-enclave | S | none | — |
 | `CORE-AUDIT-LABELS-ARE-ARTIFACT-IDENTITY` | Every postulate audit label is a canonical artifact-identity input: decide whether a semantic hash should encode label prose, and if not, migrate | draft | language | L | none | — |
+| `CORE-FO-CHECK-TREE-SORT-VALIDATION` | Make check_cert's own domain honest: validate sorts in check_tree instead of relying on every caller to pass embed's image | draft | language | M | none | — |
 | `DOC-AGENT-CITE` | agent core modules name normative authorities as a reading list rather than binding them to claim classes, so seven of seven cold runs made material claims without citing the sources D2 requires | merged | doc | M | none | — |
 | `DOC-ASBUILT-AGENTS` | As-built slice 6 — reconcile the thirteen-page agents corpus against its 7 shared drifted sources; it is instructions machines follow, not prose people skim | merged | doc | M | none | — |
 | `DOC-ASBUILT-AUDIT` | As-built reconciliation — 28 cited sources have drifted from their attestations, so the library's currency claim is unbacked corpus-wide | merged | doc | L | none | — |
@@ -402,6 +403,7 @@ is itself not yet `merged`/`closed`:
 - `ABI-S4` blocked by `ABI-M1` (status: draft)
 - `ABI-S5` blocked by `PX9` (status: draft)
 - `ABI-S6` blocked by `ABI-S1` (status: draft)
+- `CORE-FO-CHECK-TREE-SORT-VALIDATION` blocked by `V3-FO-QUOTE-GUARD-FAIL-CLOSED` (status: ready)
 - `DS-9` blocked by `KERNEL-NESTED-IND` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `KERNEL-NESTED-IND` blocked by `RT-NESTED-IH-NATIVE-REALIZATION` (status: active)

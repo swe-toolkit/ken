@@ -211,6 +211,46 @@ nothing.
 fragment is refused by `quote_fo` as before. Discovery must not widen what
 quotes.
 
+> ### A BINDING CONSTRAINT ON `D1`-`D3`, FROM OUTSIDE THIS NODE
+>
+> **Architect ruling `evt_71g1xf5vkf1ek`, 2026-08-15, dispositioning a
+> `V3-FO-QUOTE-GUARD-FAIL-CLOSED` QA block. Recorded here because it constrains
+> this node's deliverables and would otherwise live only in that node's thread.**
+>
+> **`check_cert`'s sort discipline is a property of its CALLER, not of
+> `check_cert`.** Language QA built a literal checker probe —
+> `ForallWorld (ForcingP Bound(0) Bound(0) -> ForcingP Bound(0) Bound(0))` with
+> `ForallRight { eigen: Parameter(0) }`, then `ImpRight`, then `Init` — and
+> **`check_cert` returned `true`** on a formula whose world eigenparameter sits
+> in an object slot. `Form` and `QTerm` carry no sort tag and `check_tree`
+> validates none.
+>
+> **This is not a soundness hole in route FO, and the reason is structural:**
+> `check_cert` is total over `Form`, `Form` is strictly larger than the image of
+> `embed` on `IForm Sigma`, and that probe lives in the excess. `quote_iform`
+> refuses anything that is not an in-scope object `Var` of the declared sort
+> (`FoBoundary::IllScopedOrIllSorted`), so `IForm` has no world variables at all
+> — worlds do not exist until `embed` introduces them. **The discharge
+> composition only ever evaluates `check_cert (embed Sigma f) pi` for
+> `f : IForm Sigma`.**
+>
+> ⇒ **`D1`-`D3` must not introduce a call to `check_cert` on a `Form` obtained
+> any way other than `embed Sigma f`.** Such a caller loses the guarantee
+> entirely **and gets no diagnostic** — the checker accepts and says nothing.
+> This binds adapter work equally.
+>
+> **It does not force a spec change and no node should be spent on one.**
+> `checker_soundness` is stated over all of `Form` and `23 §4.3` generates
+> `Derivation` from the same rules, so an ill-sorted `q` that `check_cert`
+> accepts is one the untyped calculus derives; the theorem stands as stated. The
+> burden sits in `embedding_adequacy`, quantified over `f : IForm Sigma` — the
+> well-sorted family. **The layering already puts the obligation where the
+> discipline exists.**
+>
+> A sort-validating `check_tree` is legitimate future hardening, is **not**
+> required for the route's soundness, and is **not** to be taken here — it is
+> filed separately as [[CORE-FO-CHECK-TREE-SORT-VALIDATION]].
+
 **`D5` — the distinguishing audit label. NOT GATED ON `D0`; start here.**
 Today both exits converge on `emit_unknown_hole`, which declares a postulate
 labelled `"prover unknown goal"` (`prover.rs:743-752`) carrying nothing else. So
@@ -354,6 +394,13 @@ until both theorems are kernel-checked in an approved home, and **this node does
 not discharge it.**
 
 **`AC-4`.** No new kernel primitive and no trusted axiom.
+
+**`AC-4a`.** **Every `check_cert` call this node lands takes a `Form` produced by
+`embed Sigma f` for some `f : IForm Sigma`.** Enumerate the call sites the
+candidate adds or moves and name the `IForm` each one's argument descends from.
+**Demonstrate it against the diff, not by assertion** — a caller that violates
+this gets no diagnostic, so nothing downstream will catch it. Basis: the
+`D1`-`D3` constraint block above (Architect `evt_71g1xf5vkf1ek`).
 
 **`AC-5`.** The slice fragment is not widened. More sorts, predicates,
 connectives, or `Cert` constructors remain a later node.
