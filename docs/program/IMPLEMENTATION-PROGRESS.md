@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 01:00:44Z — from 329 issue file(s) in `docs/program/issues/`.
+2026-08-16 01:12:42Z — from 330 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -359,6 +359,7 @@ the committed file matches the generator's output.
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | merged | language | L | none | 2353 |
 | `V3-FO-QUOTE-GUARD-FAIL-CLOSED` | Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true | merged | language | S | none | 2346 |
 | `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` | Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report | ready | language | S | none | — |
+| `V3-FO-SUBST-DEPTH-CONTROL` | Give subst_form_at a control that can see its binder-depth discipline, and name the call-site correspondence the shift oracle silently depends on | ready | language | S | none | — |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
 | `V3-KRIPKE-THEORY-CLOSURE` | Spec 23 section 4 labels its own domain and monotonicity axioms (oracle / standard) and never fixes the reflective Form/Cert language, so the adequacy and checker-soundness theorems have no statements -- the decomposition report's hard stop is a spec gap, and no prover increment exists until it closes | merged | spec-enclave | M | none | https://github.com/swe-toolkit/ken/pull/2323 |
 | `V3-RESIDUAL` | V3's suite has FOUR assertion-free placeholder tests carrying ordinary names — `disproved_carries_countermodel` asserts nothing, passes, and reads in cargo output exactly like a real pin | merged | verify | L | G2-G3 | https://github.com/swe-toolkit/ken/pull/1103 |
@@ -396,6 +397,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 - `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` — Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report
+- `V3-FO-SUBST-DEPTH-CONTROL` — Give subst_form_at a control that can see its binder-depth discipline, and name the call-site correspondence the shift oracle silently depends on
 
 ## Blockers
 
