@@ -97,6 +97,30 @@ program that was chosen? Answer from the rules, not from more programs.
 bar names this node; a result not written there leaves the capstone barred
 regardless of what was measured.
 
+## OPERATOR DIRECTIVE, 2026-08-16 — read this BEFORE the outcome list
+
+> Prior art indicates that retiring `RecursiveDescent` is possible and observed
+> resource usage by that implementation makes it desirable. If outcome 2 or 3 is
+> returned by `runtime-implementer`, that is a clear signal to refer the matter
+> to research for guidance.
+
+**Two things change, and neither is what this node measures.**
+
+1. **The objective is not in question.** The Steward escalated that lane 1 may
+   not be achievable as scoped and offered partial retirement as the fallback.
+   **The operator declined that fork**: retirement is held possible on prior art
+   and desirable on resource usage. **Do not soften a finding to protect the
+   objective, and do not read outcome 2 as ending the campaign.**
+2. **Outcomes 2 and 3 hand off to the research seat, not to a re-scope.** The
+   ring still stops and hands back; the Steward routes onward. **A witness or an
+   honest "cannot settle" is a complete, useful delivery under this directive** —
+   it is what triggers the referral, and prior art is readable only in a seat
+   with reference access (`CLEAN-ROOM.md`), which no build seat has.
+
+⇒ **The measurement itself is unchanged.** Report what the rules say. The
+routing of the answer is the Steward's problem, and it is now settled in advance
+for all three answers.
+
 ## THREE outcomes are authorized. Do not force a fit into two.
 
 **This frame's predecessor authorized two outcomes and the true answer was a
@@ -107,14 +131,18 @@ force it. All three below are complete, releasable answers:
    Report it sized; **`D3-delete` then needs a fresh Architect ruling** before
    any deletion. **Do not delete on your own finding.**
 2. **REACHABLE, with a witness** — one `.ken` file in the difference.
-   `MatchScrutineeRecursor` is then **permanently** load-bearing, and
-   `RecursiveDescent` cannot be retired as scoped. **Stop and hand back. The
-   re-scope is the Steward's and the operator's, not the ring's.**
+   `MatchScrutineeRecursor` is then load-bearing **on Ken's present rules**.
+   **Stop and hand back; the Steward refers it to research** per the directive
+   above. **Not permanently load-bearing** — that was this frame's earlier
+   wording and the operator's prior-art ground supersedes it. A witness says the
+   shape is reachable **today**, not that no implementation has ever closed it.
 3. **NOT SETTLED within the bound** — the rules do not decide it and no witness
    was found. **This is a legitimate outcome, not a failure**, provided the
    report states *which* rules were consulted and *where* the argument runs out.
    **An honest "cannot settle" beats a gate argument that does not hold**, and
-   the campaign has now paid twice for the difference between them.
+   the campaign has now paid twice for the difference between them. **Stop and
+   hand back; this also routes to research**, and `AC-5`'s "where the argument
+   runs out" is precisely the input that referral needs.
 
 ## Acceptance criteria
 
@@ -147,7 +175,9 @@ only. **This node may land no production change at all.**
   act.
 - **Re-narrowing or otherwise editing the retention guard.** It landed at
   PR #2458 and is behaviour-preserving; this node measures, it does not repair.
-- **Re-scoping the retirement** on outcome 2. Hand it back.
+- **Re-scoping the retirement** on any outcome. Hand it back — and note that
+  under the 2026-08-16 directive a re-scope is not the disposition anyway; the
+  referral to research is.
 - **The `RecursiveDescent`-as-oracle framing** (operator, 2026-08-15). What a
   program does under `RecursiveDescent` is not evidence that it should compile.
 
@@ -164,7 +194,8 @@ node the capstone's graph would read fully unblocked while its own text bars it
 from deleting anything.** This node is what makes the generated views agree with
 the record.
 
-**Lane 1 under the operator's two-lane directive.** The Steward has flagged to
-the operator that lane 1's objective may not be achievable as stated; **that
-does not gate this node** — its result is exactly what the operator needs to
-decide.
+**Lane 1 under the operator's two-lane directive.** The Steward flagged that
+lane 1's objective may not be achievable as stated; **the operator answered on
+2026-08-16 that it is** — see the directive block above. The objective stands,
+the fallback the Steward offered was declined, and **this node's result is now a
+routing input rather than a re-scope trigger.**
