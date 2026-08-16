@@ -5,14 +5,14 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY, RT-DESCENT-RETIRE-PRIOR-ART, RT-MATCH-SCRUTINEE-PORT]
+depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY, RT-DESCENT-RETIRE-PRIOR-ART, RT-MATCH-SCRUTINEE-PORT, RT-DESCENT-LANE-COMPLETENESS]
 blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
 > # 2026-08-16 — THE RETIREMENT IS BLOCKED. `D2c` FOUND A REAL CAPABILITY LOSS.
-> # A SUCCESSOR NODE IS BEING CUT. Steward.
+> # THE SUCCESSOR IS CUT: [[RT-DESCENT-LANE-COMPLETENESS]]. Steward.
 >
 > **Architect `evt_35hwm50tas8kp`.** `D2c`'s sentinel failed on **assertion 1
 > verbatim** — `must retain its compiling RecursiveDescent baseline` — which
@@ -34,19 +34,41 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > > instead of an argument.** A single candidate that rerouted and deleted
 > > together could not have told this regression from a compile error.
 >
-> ### THE SUCCESSOR'S QUESTION IS EXACTLY ONE, AND IT HAS TWO LIVE ANSWERS.
+> ### THE QUESTION IS NOT ONE CONSTRUCT. IT IS FOUR, AND THAT CHANGED THE NODE.
 >
-> **Is the functionized lane's `StaticWorkerBinding` refusal CORRECT SEMANTICS,
-> or a MISSING PORT?**
+> **Superseded 2026-08-16 by Architect `evt_7qtgrtwv76vke`, on the ring's
+> construct inventory `evt_6bvnv6t4teech`.** This block previously stated the
+> successor's question as the single `StaticWorkerBinding` fork below. **The
+> inventory REFUTED the one-mechanism hypothesis the Architect had offered.**
 >
-> | answer | consequence |
+> **Nine of the fourteen in-set reds are the surviving lane refusing a program
+> the retiring lane compiles, across FOUR independent constructs** —
+> `ComputationalMatch` / in-flight non-transferable activation (4),
+> `StaticWorkerBinding` (2), backend `Module` / missing recursive-position-1
+> worker projection (2), backend `PlannerInvariant` / missing affine
+> checked-root authority (1).
+>
+> ⇒ **Four separate representability gaps is a PATTERN, not an omission. The
+> successor is not a missing port — it is a LANE-COMPLETENESS question:** is the
+> functionized lane a complete replacement for `RecursiveDescent`, or has it
+> been carrying only the ported subset? **Framed any narrower it gets scoped as
+> one port and comes back.**
+>
+> **The fork below still governs, now per construct rather than for the node:
+> FOUR verdicts, and they may not answer alike.** A principled representability
+> refusal and an unported case can sit side by side. It remains a **soundness
+> question and it remains the Architect's** — it is `D1` of
+> [[RT-DESCENT-LANE-COMPLETENESS]], **not decided by the ring as engineering.**
+>
+> | answer, per construct | consequence |
 > |---|---|
-> | **correct semantics** | `RecursiveDescent` was compiling a shape with **no runtime denotation**. The retirement FIXES that, the sentinel rewrites under `D6`, and this block lifts. |
-> | **missing port** | The functionized lane owes the `StaticWorkerBinding` case and **the retirement waits on it.** |
+> | **correct semantics** | `RecursiveDescent` was compiling a shape with **no runtime denotation**. Retirement REMOVES that hole; the gap is recorded, nothing is owed. |
+> | **missing port** | The functionized lane owes that case and **the retirement waits on it.** |
 >
-> **Neither reading may be assumed and the error text does not settle it.** It
-> is a **soundness question and it is the Architect's** — it becomes the
-> successor's `D1`, routed to them, **not decided by the ring as engineering.**
+> **Whether this node is BLOCKED or merely incurs RECORDED GAPS is decided by
+> the successor's `D2`** — the source-reachability of the nine. `0/12` was
+> measured over **renderings**; these are **test names**, and the mapping is
+> established for the sentinel alone. **Do not inherit that number here.**
 >
 > **Two shortcuts are foreclosed** (Architect, who noted being the seat that
 > benefits from the first and checked the rendering identity rather than
@@ -68,7 +90,14 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 >   implicit — on which reading the retirement **removes a latent
 >   representability hole.**
 >
-> ### CLASSIFY THE OTHER 13. Do not stop that. It is free and it SIZES the node.
+> ### CLASSIFY THE OTHER 13 — DISCHARGED, and it REFUTED the sizing hypothesis.
+>
+> **Delivered `evt_6bvnv6t4teech`.** The prediction below was that three more
+> `StaticWorkerBinding` refusals would mean one mechanism and one node. **It came
+> back FOUR constructs across nine programs, plus five with no refusing construct
+> at all** — so the successor is a lane-completeness node, not a port. **The
+> instruction was worth running precisely because it could refute the guess that
+> motivated it.** Original text, kept for the record:
 >
 > **Stop the `D6` engineering — no re-homing, retiring, or test edits. Do NOT
 > stop reading the other 13 failure messages:** that run already happened and
@@ -77,7 +106,20 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > several.** Cutting the node on one blocker when the same completed run holds
 > the answer for all fourteen buys a second round trip for nothing.
 >
-> ### ONE CORROBORATION BEFORE THE CUT, AND IT IS ONE LINE.
+> ### ONE CORROBORATION — DISCHARGED. THE ARTIFACT HYPOTHESIS IS CLOSED.
+>
+> **Delivered `evt_6bvnv6t4teech`, disposable patch removed, tree clean.** At
+> untouched base `c98f72ba8`, asserting the pre-existing excluded
+> `FunctionizedUnits` result is `Ok` inside the sentinel **fails at row 4 depth 2
+> with the IDENTICAL refusal** — same constructor origin 36, same static worker
+> field 0, same origin 35, same recognition 2.
+>
+> ⇒ **Two independent instruments, one of which does not involve `D2c`'s edit at
+> all. The finding is about the LANE, not the reroute.** That was the one way it
+> could have been an artifact and it is now excluded. **The evidence therefore
+> predates `D2c` entirely: the exclusion mechanism was a complete differential
+> instrument the whole time, and the sentinel discarded its answer.** How far
+> that shape spread is the successor's `D4`. Original instruction, for the record:
 >
 > **Assert `_excluded_result.is_ok()` at BASE `c98f72ba8`, disposable, green
 > tree.** The test already had this answer and threw it away — its first leg
