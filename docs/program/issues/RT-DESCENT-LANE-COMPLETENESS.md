@@ -255,3 +255,24 @@ the input and declining the ownership call was the right boundary.
 - **Two shortcuts are foreclosed** — *"fixture-only so it doesn't count"* and
   *"`RecursiveDescent` compiled it, so port it."* Both are argued in the frame,
   section 6; neither may be assumed from the error text.
+
+## THIS NODE CAN NEVER REACH `merged`. ITS TERMINAL STATE IS `closed`.
+
+**It authorizes no Runtime implementation, so it will never produce a candidate
+to publish.** Every one of its outputs — `D1`'s four verdicts, `D2`/`D3`/`D4`'s
+readings, `D5`'s census and probe — lands as a **record**, in this node and its
+frame, through the Steward's doc publishes. There is no code candidate coming.
+
+**[[RT-DESCENT-RETIRE]]'s `depends_on` names this node.** Waiting for a
+`merged` that cannot happen would gate the retirement forever on a landing
+nobody can produce.
+
+⇒ **When `D1` and `D5` are both answered and recorded, flip this node to
+`closed`, not `merged`.** `scripts/check-issue-schema.sh` treats the two
+identically for dependency satisfaction — *"`merged` and `closed` both satisfy a
+dependency: closed means resolved-without-landing, so there is nothing left to
+wait for."* **`closed` is the accurate one here**, and it unblocks the
+retirement exactly as a merge would.
+
+**Do not read `closed` as abandoned.** For this node it means *resolved by
+record*, which is the only way a measurement-and-adjudication node can resolve.
