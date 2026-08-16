@@ -68,9 +68,24 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > advertise a ring working this node while the ring works its children. **It
 > returns to `active` when both children merge.**
 >
-> **Still not ruled: whether the lexical port is worth building.** That is scope,
-> the Steward's and the operator's, decided after the triage says how many of the
-> twelve are production-reachable at all.
+> ## `LexicalCallArgumentRecursor` disposition — measured, no port owed
+>
+> [[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]] `D1` measured all twelve fixed
+> lexical renderings as fixture-only under the current production source path:
+> **zero of twelve renderings and zero of 27 measured compiles are
+> source-reachable**. Kernel definition admission rejects the required
+> immediate `Application(Lambda, ...)` before native preparation or Runtime
+> lowering. This is a **measured conclusion, not a capability decision**: there
+> is no source-reachable population for a lexical port to serve, so no port is
+> owed and `LexicalCallArgumentRecursor` is re-described as fixture-only with
+> the retained lane for this retirement.
+>
+> The result is conditional on the measured gate. The rejection is a current
+> kernel incompleteness: a future completeness change that admits or normalizes
+> the ascribed `App(Lam, ...)` shape must re-open the twelve-row disposition
+> before this retirement gate can rely on it. This record does not retire the
+> lane itself, and it says nothing about `MatchScrutineeRecursor`; that variant
+> remains governed only by [[RT-MATCH-SCRUTINEE-DISPOSITION]].
 
 > # 2026-08-16 — `D1` HARD-STOPPED. THE LANE IS NOT DEAD. DO NOT DELETE ANYTHING.
 >

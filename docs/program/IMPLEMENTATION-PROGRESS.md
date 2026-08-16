@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 15:28:00Z — from 351 issue file(s) in `docs/program/issues/`.
+2026-08-16 16:13:11Z — from 351 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -285,7 +285,7 @@ the committed file matches the generator's output.
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
 | `RT-JOIN-ORIGIN-ATTRIBUTION` | A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong | merged | runtime | S | none | — |
 | `RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT` | Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned | closed | runtime | M | none | — |
-| `RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT` | LexicalCallArgumentRecursor retains twelve exact renderings and its port was never built -- triage each as fixture or source-reachable, then decide whether the port is owed | active | runtime | M | none | — |
+| `RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT` | LexicalCallArgumentRecursor's twelve fixed renderings are fixture-only -- no port is owed and the variant is re-described with the retained lane | active | runtime | M | none | — |
 | `RT-LEXICAL-R3-FUSION-EMITTER` | Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge | merged | runtime | M | none | — |
 | `RT-LEXICAL-RECURSOR-CONSUMERS` | Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam | merged | runtime | M | none | — |
 | `RT-LEXICAL-ROW2-MISSING-MINT` | Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2 | merged | runtime | S | none | — |
