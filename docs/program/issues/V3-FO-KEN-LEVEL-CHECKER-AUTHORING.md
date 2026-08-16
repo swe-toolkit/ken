@@ -1,7 +1,7 @@
 ---
 id: V3-FO-KEN-LEVEL-CHECKER-AUTHORING
 title: "Author the Ken-level check_cert, embed, Form and Cert so the conversion cost 23 section 4.4 names becomes measurable at all, and take that measurement"
-status: ready
+status: active
 owner: language
 size: L
 gate: none
