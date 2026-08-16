@@ -1,31 +1,31 @@
 STEWARD WATCHDOG TICK. Run in order; stop as soon as one produces an action.
 
-THIS FILE IS THE ARMING SOURCE AND MUST STAY UNDER 4096 CHARS -- `set_interval` rejects more. `wc -c` before arming; never grow a step without trimming another.
+ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` before arming; never grow a step without trimming another.
 
-0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `cd /workspaces/ken && moot compact steward`. Announcing it is not doing it.
+0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward` from /workspaces/ken. Announcing is not doing.
 
-1. PRIORITY LANES ARE THE ONLY LANES (operator, 2026-08-15). Lane 1 = runtime, retire RecursiveDescent. Lane 2 = language+verify, z3 round-trip and FO Kripke embedding. No third lane gets a ring however idle or well-framed. Finished work still merges; filings queue.
+1. PRIORITY LANES ARE THE ONLY LANES (operator). Lane 1 = runtime, retire RecursiveDescent. Lane 2 = language+verify, z3 round-trip and FO Kripke embedding. No third lane gets a ring however idle. Finished work still merges; filings queue.
 
-2. ARE THE LANES' CRATES MOVING? ANCHOR THE PATHSPEC: `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l` plus `git log -1 --pretty='%ci %h %s' origin/main -- ':/crates/'`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so after any `cd` it matches nothing and git reports 0 WITHOUT erroring. Measured: 0 reported twice while the truth was 10. A false 0 looks exactly like a stalled lane.
+2. ARE THE LANES' CRATES MOVING? ANCHOR THE PATHSPEC: `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l` plus `git log -1 --pretty='%ci %h %s' origin/main -- ':/crates/'`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so after any `cd` it silently reports 0 without erroring. Measured: 0 twice while the truth was 10.
 
-2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE 1 MASKS A DEAD LANE 2. Check each `status: active` node separately: is its ring working its next deliverable? Read the NODE, never a seat's status line -- a status is written once and decays silently, in the direction that HIDES unblocked work. Measured 2026-08-15/16: three rings sat idle on work that had ALREADY LANDED while their statuses read "queued"/"awaiting review"/"publisher handoff, branch frozen" and step 2 stayed green. Confirm a landing by BLOB IDENTITY (`git rev-parse origin/main:<path>` vs `<SHA>:<path>`), never ancestry -- the publisher squashes, so a merged SHA reads as not-an-ancestor forever.
+2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE 1 MASKS A DEAD LANE 2. Check each `status: active` node separately: is its ring working its next deliverable? Read the NODE, never a seat's status line -- it decays silently, in the direction that HIDES unblocked work. Measured: three rings sat idle on ALREADY-LANDED work while their statuses read "queued"/"awaiting review"/"branch frozen", step 2 green throughout. Confirm a landing by BLOB IDENTITY (`git rev-parse origin/main:<path>` vs `<SHA>:<path>`), never ancestry -- the publisher squashes, so a merged SHA reads as not-an-ancestor forever.
 
-2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release, flip it `active`. A ring being awake is not the record.
+2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release flip it `active`. A ring being awake is not the record.
 
-3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file; do not work from memory. Check none is running first: `pgrep -af 'scripted-pr[-]automerge'` (bracket it or it matches your own command line). Never fetch or commit while one holds its window, and never pipe the publisher through tail/grep -- it block-buffers; poll `gh pr view <N>`.
+3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file. Check none runs first: `pgrep -af 'scripted-pr[-]automerge'` (bracket it or it matches your own cmdline). Never fetch or commit while one holds its window; never pipe it through tail/grep -- it block-buffers, poll `gh pr view <N>`. M1 needs a RESOLVED Decision read fresh over HTTP; the API IGNORES `limit`, so save to a file and filter.
 
-4. WIP AUDIT, 60 MINUTES -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: Architect ruling, QA verdict, candidate handoff, leader routing, my own kick. Read the thread first with get_recent_context(detail="standard"). A reset event you never looked for cannot reset a clock.
+4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: Architect ruling, QA verdict, handoff, leader routing, my own kick. Read the thread first. A reset you never looked for cannot reset a clock.
 
-5. ONE RELEASE AHEAD. Grep other nodes' `depends_on` for the in-flight id (not its `blocks` edge -- they disagree and gen-progress.sh reads depends_on). Successors must be `ready` with a shovel-ready frame. A MEASUREMENT-ONLY node never reaches `merged` -- close it, or successors gate on a landing that cannot happen.
+5. ONE RELEASE AHEAD. Grep other nodes' `depends_on` for the in-flight id (not `blocks` -- they disagree; gen-progress.sh reads depends_on). Successors must be `ready` and shovel-ready. A MEASUREMENT-ONLY node never reaches `merged` -- close it, or successors gate on a landing that cannot happen.
 
-6. ADVERSARY REPORTS APPEAR in get_recent_context(detail="standard"); poll with since_event_id from the last tick. The threads-endpoint selector was inert.
+5b. A KICK MUST CARRY THE ANCHOR SENTENCE VERBATIM: "This message is the thread anchor for <WP-ID>. Reply with parent_event_id set to this event's id; thereafter use its thread_id." A kick CANNOT quote the thread it opens -- the first reply mints it. Naming the obligation without the mechanism left a WP with no spine, its review in a MERGED WP's closed thread.
 
-7. RESOLVE ACTOR IDS BEFORE COMPOSING MENTIONS: `scripts/moot-actor-id.sh <role>`. A remembered id wakes the wrong seat or nobody, silently.
+6. RESOLVE ACTOR IDS BEFORE COMPOSING MENTIONS: `scripts/moot-actor-id.sh <role>`. A remembered id wakes the wrong seat or nobody, silently.
 
-8. A CITED COORDINATE IS NOT A VERIFIED ONE, INCLUDING THE ARCHITECT'S. Locate the symbol yourself before framing on it. Repeatedly this campaign a cited site named a function that did not do what was attributed to it; twice the citation came from a ruling.
+7. A CITED COORDINATE IS NOT A VERIFIED ONE, INCLUDING THE ARCHITECT'S. Locate the symbol yourself before framing on it. Repeatedly a cited site named a function that did not do what was attributed to it.
 
-9. AFTER A DISPOSITION IS REFUTED, SWEEP THE FRAME BY PHRASE -- title, lede, deliverables, ACs. A reader consults the title INSTEAD of the ACs. Five dispositions died on one node in one arc and the frame asserted every one. Grep the dead phrase; prove zero live occurrences.
+8. AFTER A DISPOSITION IS REFUTED, SWEEP THE FRAME BY PHRASE -- title, lede, deliverables, ACs. A reader consults the title INSTEAD of the ACs. Five died on one node in one arc and the frame asserted every one. Grep the dead phrase; prove zero live hits.
 
-10. NEVER call get_transcript. Use get_recent_context / get_mentions with detail="standard".
+9. NEVER call get_transcript. Use get_recent_context/get_mentions with detail="standard"; poll adversary reports with since_event_id from the last tick.
 
 If nothing above produces an action, post nothing and stop. A quiet tick is a correct tick.

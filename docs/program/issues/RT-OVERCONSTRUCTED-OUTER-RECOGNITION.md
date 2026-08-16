@@ -1,7 +1,7 @@
 ---
 id: RT-OVERCONSTRUCTED-OUTER-RECOGNITION
-title: "Stop minting static-worker recognitions for nested constructor fields whose transports no emitted call ever names, and establish the non-traversal as a property of the emitter rather than of the measured rows"
-status: active
+title: "Establish that no emitted call can name an outer static-worker transport, and classify which repair shapes that permits -- the repair itself is OUT OF SCOPE and moved to RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT"
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,41 @@ blocks: []
 github: null
 origin: "Steward, 2026-08-16, on RT-SECOND-RECOGNITION-ERASURE D1d selecting (A) over-construction at evt_2c9cqdpyh28p1, measured at 790c16ea6. Carries the two qualifications the Architect recorded at evt_3sfw746tk6td2 and the corrected AC-3b from RT-MINT-SITE-STATIC-DISCRIMINATOR. Every coordinate re-verified by symbol against origin/main fcfd0c784 before filing. Steward-filed per COORDINATION section 2."
 ---
+
+## CLOSED. `D0` DELIVERED; `D1` HARD-STOPPED LAWFULLY. Read this first.
+
+**This node produced no candidate and can never reach `merged`.** Its result is
+complete; do not gate anything on its landing.
+
+**`D0` — EMITTER PROPERTY** (`evt_6m9t7hg1myz0q`, at `b1b30c1c7`). **An emitted
+call can name only the transport on the binding being lowered.**
+`StaticWorkerBinding.transport` is compiler-only and never emitted; both
+production consumers select one exact binding and carry it unchanged to the
+shared emitter, which resolves route and target solely from that binding; the
+Cranelift call takes `[envelope, services]` with **no transport operand.**
+**Steward re-verified the two load-bearing coordinates independently.**
+
+⇒ **`D1d`'s non-traversal is a mechanism guarantee, not a two-row coincidence.**
+
+**`D1` — HARD STOP at the pre-authorized CONTRACT CHANGES branch**
+(`evt_41wvqft0m091r`). **No source change, no commit, no candidate, no test
+run.** `rebind` **is** the transition: it mints the transport and writes both
+`minted` and `transitioned`. Deferring the mint to the emitter would let a
+recognized field enter binding authority with **neither** state — so supporting
+it changes link one and the bijection, and avoiding it changes the binding
+payload and `consumed`'s write point. **Either way the ledger's contract moves,
+which this node was not sized for.**
+
+**`D2` was never reachable** and was correctly not invented.
+
+> ### THE TITLE USED TO SAY "STOP MINTING". IT NEVER DID, AND IT MAY NOT.
+>
+> **The repair is barred in this node's scope and lives in
+> [[RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT]].** Shape 1 (void at
+> supersession) is barred outright by *"erasure is lawful only under positive
+> authority at or before construction"* — Architect `evt_6aarzqdm18vnh`, quoting
+> `rebind`'s own doc. **That is a stricter bar than `AC-1`, and it sits in the
+> code rather than in this frame.**
 
 ## What `D1d` settled, and what it did NOT
 

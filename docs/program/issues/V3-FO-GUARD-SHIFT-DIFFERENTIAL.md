@@ -1,13 +1,13 @@
 ---
 id: V3-FO-GUARD-SHIFT-DIFFERENTIAL
 title: "Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: [V3-FO-QUOTE-GUARD-FAIL-CLOSED]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2371
 origin: "Steward, 2026-08-15, dispositioning Adversary hunt evt_4vnyb89s5ameq on the merged range 8fe2264c7...4674fe840. Closes the residual the Architect named in evt_1y00bx8za2532 and declined to require in that candidate. Steward-filed per COORDINATION section 2."
 ---
 
