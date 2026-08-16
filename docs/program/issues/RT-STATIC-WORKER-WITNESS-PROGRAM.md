@@ -1,7 +1,7 @@
 ---
 id: RT-STATIC-WORKER-WITNESS-PROGRAM
 title: "Write a Ken PROGRAM that reaches the static-worker conservation refusal -- the incidence question the operator's narrowing decision rests on, which every existing demonstration answers only for hand-built fixtures"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
