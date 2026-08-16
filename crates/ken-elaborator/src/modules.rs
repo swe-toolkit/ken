@@ -1003,6 +1003,7 @@ fn rewrite_rexpr(
             resolve_attached_ref(scope, exports, &subject, &proof_name, &span)?,
             span,
         ),
+        RExpr::RTrunc(e, s) => RExpr::RTrunc(Box::new(rewrite_rexpr(scope, exports, *e)?), s),
     })
 }
 

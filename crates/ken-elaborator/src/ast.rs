@@ -675,6 +675,11 @@ pub enum Expr {
         operand_span: Span,
         span: Span,
     },
+    /// `‖A‖` / `||A||` — propositional-truncation formation (`16 §6`,
+    /// LANG-TRUNCATION-SURFACE-SYNTAX D1). Elaborates to the kernel's
+    /// existing `Term::Trunc`; both delimiter spellings parse to this one
+    /// node (the lexer collapses them to one token, `Token::TruncBar`).
+    ETrunc(Box<Expr>, Span),
 }
 
 impl Expr {
@@ -702,7 +707,8 @@ impl Expr {
             | Expr::EPair(_, s)
             | Expr::ERecord { span: s, .. }
             | Expr::EProj(_, _, s)
-            | Expr::EPosProj(_, _, s) => s,
+            | Expr::EPosProj(_, _, s)
+            | Expr::ETrunc(_, s) => s,
             Expr::EMatch { span, .. } => span,
         }
     }

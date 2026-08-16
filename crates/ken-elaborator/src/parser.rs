@@ -2605,6 +2605,7 @@ impl Parser {
                         Expr::EPosProj(e, index, _) => Expr::EPosProj(e, index, span),
                         Expr::EPi(x, a, b, _) => Expr::EPi(x, a, b, span),
                         Expr::EArrow(a, b, _) => Expr::EArrow(a, b, span),
+                        Expr::ETrunc(e, _) => Expr::ETrunc(e, span),
                         Expr::EAttachedProofRef {
                             subject,
                             proof_name,
@@ -2627,6 +2628,17 @@ impl Parser {
                         },
                     },
                 })
+            }
+            // `‖A‖` / `||A||` — propositional-truncation formation (`16 §6`,
+            // LANG-TRUNCATION-SURFACE-SYNTAX D1). Same token both sides, so
+            // parsing is symmetric with `(e)`: consume the opener, parse a
+            // full expression, require the matching closer.
+            Token::TruncBar => {
+                self.advance();
+                let inner = self.parse_expr()?;
+                self.expect(&Token::TruncBar)?;
+                let end = self.tokens[self.pos - 1].1.end;
+                Ok(Expr::ETrunc(Box::new(inner), Span::new(start, end)))
             }
             other => Err(ElabError::ParseError {
                 msg: format!("expected an expression, found {:?}", other),

@@ -28,8 +28,8 @@ use crate::error::{ArmDeadCause, ElabError, MissingPatternWitness, RecursiveResu
 use crate::numbers::{AddEntry, BinOpEntry, NumericEnv, NumericLitVal};
 use crate::resolve::{
     RClassField, RDecl, RDeclKind, RExpr, RInstanceConstraint, RMatchArm, RPatKind, RPattern,
-    RPropIntro, RRecordField, RSpaceDecl, RType, SUGAR_ABSURD, SUGAR_AXIOM, SUGAR_EQ, SUGAR_J,
-    SUGAR_REFL,
+    RPropIntro, RRecordField, RSpaceDecl, RType, SUGAR_ABSURD, SUGAR_AXIOM, SUGAR_ELIM_TRUNC,
+    SUGAR_EQ, SUGAR_J, SUGAR_REFL, SUGAR_TRUNC_INTRO,
 };
 
 // ----- obligation model -----
@@ -1135,6 +1135,20 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                 Box::new(expected.clone()),
                 Box::new(proof_core),
             ))
+        }
+        // `trunc_intro a` — propositional-truncation INTRODUCTION (`16 §6`,
+        // LANG-TRUNCATION-SURFACE-SYNTAX D2). The kernel's own `Debug`
+        // spelling `|a|` is unavailable (`|` is already `Pipe`, the match-arm
+        // separator), so this is a checked-mode arity-1 sugar identifier —
+        // same shape as `absurd` above, including its `RESERVED_SUGAR`
+        // membership (`resolve.rs`) so a user-declared `trunc_intro` is a
+        // hard collision error rather than a silent shadow. Checked, never
+        // inferred (`TruncProj` is one of `check.rs::infer`'s explicitly
+        // non-inferable introduction forms, `16 §6`) — the expected type
+        // supplies `A`; see the dedicated `infer`-mode arm above for the
+        // actionable remedy when no expected type is available.
+        RExpr::RApp(f, arg, rspan) if matches!(f.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) => {
+            check_trunc_intro(cx, arg, expected, rspan)
         }
         RExpr::RLam(_, body, lam_span) => {
             let exp_wh = whnf(cx.env, &cx.ctx, expected);
@@ -3518,6 +3532,34 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             infer_eq(cx, args[0], args[1], args[2], expr.span())
         }
 
+        // `elim_trunc P f t` — the `16 §6` truncation eliminator
+        // (LANG-TRUNCATION-SURFACE-SYNTAX D2), elaborated directly to a
+        // `Term::QuotElim` over a `Trunc` scrutinee. Infer-mode, arity-3,
+        // mirroring `J`'s shape exactly (`peel_named_app`, not the
+        // single-arg checked-sugar idiom `absurd`/`trunc_intro` use): the
+        // target proposition `P` is user-written, not recovered from a
+        // checked goal.
+        RExpr::RApp(..) if peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).is_some() => {
+            let args = peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).expect("checked by guard");
+            infer_elim_trunc(cx, args[0], args[1], args[2], expr.span())
+        }
+
+        // `trunc_intro a` reached in INFER position (no expected type in
+        // scope) — the introduction form is checked-only (see the `check`
+        // arm below); give the actionable remedy rather than letting this
+        // fall through to the generic `RApp` arm and report an unrelated
+        // "unresolved identifier 'trunc_intro'" (AC-4).
+        RExpr::RApp(f, _, rspan) if matches!(f.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) => {
+            Err(ElabError::TypeMismatch {
+                span: rspan.clone(),
+                reason: "trunc_intro (‖A‖ introduction) cannot be inferred — it needs an \
+                         expected type; add an ascription `(trunc_intro a : ‖A‖)` or place \
+                         it where the expected type is already known (e.g. a declaration's \
+                         declared type)"
+                    .into(),
+            })
+        }
+
         RExpr::RApp(f, a, span) => {
             // A structural self-call on a child exposed by a generated `All`
             // match consumes the exact motive instance paired with that child.
@@ -3625,6 +3667,8 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         RExpr::RPi(_, a, b, span) => infer_pi(cx, a, b, span),
 
         RExpr::RArrow(a, b, span) => infer_arrow(cx, a, b, span),
+
+        RExpr::RTrunc(inner, span) => infer_trunc(cx, inner, span),
 
         RExpr::RAttachedProofRef {
             subject,
@@ -3764,6 +3808,168 @@ fn infer_arrow(
             span: span.clone(),
         })?;
     Ok((pi, sort))
+}
+
+/// `trunc_intro a` — propositional-truncation INTRODUCTION, checked mode
+/// (`16 §6`, LANG-TRUNCATION-SURFACE-SYNTAX D2). Split out of `check`'s own
+/// match per that function's FRAME BUDGET note (a new arm's locals are paid
+/// by every checked expression in every compile; keep new arm bodies a call
+/// to a separate, `#[inline(never)]` function).
+#[inline(never)]
+fn check_trunc_intro(
+    cx: &mut ElabCtx,
+    arg: &RExpr,
+    expected: &Term,
+    rspan: &Span,
+) -> Result<Term, ElabError> {
+    match whnf(cx.env, &cx.ctx, expected) {
+        Term::Trunc(a_ty) => {
+            let a_core = check(cx, arg, &a_ty, rspan)?;
+            Ok(Term::TruncProj(Box::new(a_core)))
+        }
+        _ => Err(ElabError::TypeMismatch {
+            span: rspan.clone(),
+            reason: "trunc_intro expects a ‖A‖-shaped goal".into(),
+        }),
+    }
+}
+
+/// `‖A‖` / `||A||` — propositional-truncation FORMATION (`16 §6`,
+/// LANG-TRUNCATION-SURFACE-SYNTAX D1). `A` is an ordinary expr (types are
+/// terms, `11 §1` — the same precedent `infer_arrow` above already relies
+/// on); elaborates directly to the kernel's existing `Term::Trunc`, already
+/// kernel-typed (`check.rs`'s `Term::Trunc(a)` infer arm: `‖A‖ : Ω_l` for
+/// `A : Type l`). No new kernel node — `kernel_infer` is the sole authority
+/// on the resulting sort, mirroring `infer_arrow`/`infer_pi` exactly rather
+/// than re-deriving the level here.
+fn infer_trunc(cx: &mut ElabCtx, inner: &RExpr, span: &Span) -> Result<(Term, Term), ElabError> {
+    let (a_core, _a_ty) = infer(cx, inner)?;
+    let a_core = cx.metas.zonk_term(&a_core);
+    let trunc = Term::Trunc(Box::new(a_core));
+
+    let zonked_ctx = Context {
+        types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
+    };
+    let zonked_trunc = cx.metas.zonk_term(&trunc);
+    let sort = kernel_infer(cx.env, &zonked_ctx, &zonked_trunc).map_err(|e| {
+        ElabError::KernelRejected {
+            error: e,
+            span: span.clone(),
+        }
+    })?;
+    Ok((trunc, sort))
+}
+
+/// `elim_trunc P f t` — the `16 §6` truncation ELIMINATOR
+/// (LANG-TRUNCATION-SURFACE-SYNTAX D2). There is no `TruncElim` kernel
+/// node — the kernel implements this through the EXISTING quotient
+/// eliminator, `Term::QuotElim`, whose scrutinee match already admits a
+/// `Trunc` (`check.rs::infer_quot_elim`, the `Term::Trunc(a) => (*a, None)`
+/// arm — no relation, so the Type-target respect schema is refused via its
+/// own `opt_rel` check and only an Ω target is admitted, exactly `16 §6`'s
+/// defining restriction — preserved here, not re-implemented). `P` doesn't
+/// depend on the truncated element (the spec's `elim_trunc` signature is
+/// non-dependent), so the motive is the CONSTANT function `λ_:‖A‖. P` —
+/// ascripted at `(‖A‖) -> Ω_l` so it is itself kernel-INFERABLE (a bare
+/// `Term::Lam` is check-only; the same `Ascript`-wrapped-motive technique
+/// `infer_j` above and `ken-kernel/src/inductive.rs`'s `host_motive` both
+/// already use, so this is a precedented shape, not a new one). `respect`
+/// is unused by both reduction and admission at an Ω target
+/// (`check.rs::infer_quot_elim`: `raw_well_formed` only, no schema check) —
+/// `P` itself is a convenient, always well-scoped placeholder.
+fn infer_elim_trunc(
+    cx: &mut ElabCtx,
+    p_expr: &RExpr,
+    f_expr: &RExpr,
+    t_expr: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    // t : ‖A‖ — recover A and build the scrutinee core term.
+    //
+    // `trunc_intro a` is checked-only (see the `check` arm above), so it
+    // cannot be `infer`'d by the general fallback below. Special-case it
+    // exactly the way the spec states truncation's OWN computation rule
+    // (`elim_trunc P f |a| ≡ f a`, `16 §6`) -- this is the only way a
+    // FRESHLY built truncation reaches an eliminator within this WP's
+    // delivered surface, since `D1`-`D3` add no type-annotation-position
+    // spelling for `‖A‖` (out of scope), so no OTHER surface path can
+    // produce a named value whose OWN inferred type is structurally
+    // `Trunc(_)`. An already-bound `‖A‖`-typed value (e.g. a parameter of
+    // some future caller) still works through the ordinary `infer`
+    // fallback, unchanged.
+    let (a_ty, t_core) = match t_expr {
+        RExpr::RApp(head, arg, _) if matches!(head.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) =>
+        {
+            let (arg_core, arg_ty) = infer(cx, arg)?;
+            let arg_ty = cx.metas.zonk_term(&arg_ty);
+            let proj = Term::TruncProj(Box::new(cx.metas.zonk_term(&arg_core)));
+            // `TruncProj` is check-only at the KERNEL level too
+            // (`check.rs::infer`'s explicit non-inferable list) -- the
+            // final whole-result `kernel_check` re-verifies this term
+            // independently via `infer_quot_elim`, whose first step
+            // `infer`s the scrutinee, so a bare `TruncProj` here would pass
+            // elaboration and then fail admission. `Ascript` makes it
+            // inferable, exactly like `motive` below.
+            let ascripted = Term::Ascript(
+                Box::new(proj),
+                Box::new(Term::Trunc(Box::new(arg_ty.clone()))),
+            );
+            (arg_ty, ascripted)
+        }
+        _ => {
+            let (t_core, t_ty) = infer(cx, t_expr)?;
+            let t_core = cx.metas.zonk_term(&t_core);
+            let t_ty = cx.metas.zonk_term(&t_ty);
+            match whnf(cx.env, &cx.ctx, &t_ty) {
+                Term::Trunc(a) => (*a, t_core),
+                other => {
+                    return Err(ElabError::TypeMismatch {
+                        span: t_expr.span().clone(),
+                        reason: format!(
+                            "elim_trunc's third argument must have a truncation (‖A‖) type, \
+                             found {other:?}"
+                        ),
+                    })
+                }
+            }
+        }
+    };
+
+    // P : Omega_l — recover l.
+    let (p_core, p_ty) = infer(cx, p_expr)?;
+    let p_core = cx.metas.zonk_term(&p_core);
+    let p_ty = cx.metas.zonk_term(&p_ty);
+    let level = match whnf(cx.env, &cx.ctx, &p_ty) {
+        Term::Omega(l) => l,
+        other => {
+            return Err(ElabError::TypeMismatch {
+                span: p_expr.span().clone(),
+                reason: format!(
+                    "elim_trunc's first argument must be an Ω-classified proposition, \
+                     found a term of type {other:?}"
+                ),
+            })
+        }
+    };
+
+    // f : A -> P.
+    let f_expected_ty = Term::pi(a_ty.clone(), weaken(&p_core, 1));
+    let f_core = check(cx, f_expr, &f_expected_ty, span)?;
+
+    // motive := (λ_:‖A‖. P) ascripted at (‖A‖) -> Ω_l — constant, ignores
+    // the scrutinee, matching the spec's non-dependent `elim_trunc`.
+    let scrut_ty = Term::Trunc(Box::new(a_ty));
+    let motive_lam = Term::lam(scrut_ty.clone(), weaken(&p_core, 1));
+    let motive_ty = Term::pi(scrut_ty, Term::Omega(level));
+    let motive_core = Term::Ascript(Box::new(motive_lam), Box::new(motive_ty));
+
+    let elim = Term::QuotElim {
+        motive: Box::new(motive_core),
+        method: Box::new(f_core),
+        respect: Box::new(p_core.clone()),
+        scrut: Box::new(t_core),
+    };
+    Ok((elim, p_core))
 }
 
 /// `J motive base eq` — elaborates directly to the kernel's existing
@@ -5056,9 +5262,10 @@ fn infer_expr_row_type(
         | RExpr::RByteStr(_, _) => crate::effects::RowType::empty(),
         RExpr::RApp(f, a, _) => infer_expr_row_type(f, effect_rows, projection_ctx)
             .join(infer_expr_row_type(a, effect_rows, projection_ctx)),
-        RExpr::RLam(_, _, _) | RExpr::RPi(_, _, _, _) | RExpr::RArrow(_, _, _) => {
-            crate::effects::RowType::empty()
-        }
+        RExpr::RLam(_, _, _)
+        | RExpr::RPi(_, _, _, _)
+        | RExpr::RArrow(_, _, _)
+        | RExpr::RTrunc(_, _) => crate::effects::RowType::empty(),
         RExpr::RAttachedProofRef {
             subject,
             proof_name,
@@ -7265,6 +7472,7 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RPi(_, _, b, _) => rexpr_mentions_name(b, name),
         RExpr::RArrow(a, b, _) => rexpr_mentions_name(a, name) || rexpr_mentions_name(b, name),
         RExpr::RAttachedProofRef { .. } => false,
+        RExpr::RTrunc(e, _) => rexpr_mentions_name(e, name),
     }
 }
 
