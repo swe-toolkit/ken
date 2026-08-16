@@ -1054,17 +1054,42 @@ mod tests {
     /// exhaustive match (`V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D1`) only guards
     /// against for a NEW variant, at compile time.
     ///
-    /// **`D2`: this test's own soundness depends on `shift`'s underflow
-    /// guard leaving `Var(0)` unchanged at `d = -1, cutoff = 0`**
+    /// **`D2`: this test's own soundness depends on TWO `shift` mechanisms,
+    /// not one** (Architect finding `evt_338k1ecwkfhwj` -- naming only the
+    /// first left the second unstated, and a future break in cutoff
+    /// arithmetic alone would then be a surprise this comment promised
+    /// would not happen).
+    ///
+    /// **Mechanism 1, governs the DEPTH-0 rows** (a free `Var(0)` at the
+    /// term's own top level, e.g. `Type`/`Const`/`App` cases and the direct
+    /// `a`/domain position of each binder): `shift`'s underflow guard
+    /// leaves `Var(0)` unchanged at `d = -1, cutoff = 0`
     /// (`subst.rs`, documented there by `V3-FO-QUOTE-GUARD-FAIL-CLOSED`
     /// `D3`). Down-shift: a free `Var(0)` hits that guard and stays
     /// `Var(0)`; every other free `Var(i)` becomes `Var(i-1)`. Up-shift:
     /// each `Var(i-1)` returns to `Var(i)`, but the stayed `Var(0)` becomes
-    /// `Var(1)`. So the round trip is the identity IFF no free `Var(0)`
-    /// occurs -- exactly `mentions_var0`'s own question. **If that guard's
-    /// semantics ever change (panic, wrap, or a different placeholder),
-    /// this test is EXPECTED to break, by design** -- that is the
-    /// dependency surfacing, not a regression to chase.
+    /// `Var(1)`. Round trip differs -- and differs correctly -- iff a free
+    /// `Var(0)` was present.
+    ///
+    /// **Mechanism 2, governs every BINDER row** (e.g. `Pi.b (outer ref)`,
+    /// and the depth-2 nested cases below): ordinary CUTOFF ARITHMETIC, not
+    /// the underflow guard at all. Confirmed against `subst.rs` at point of
+    /// use, worked for `pi(leaf, Var(1))`: down-shift recurses into `b` at
+    /// `cutoff + 1 = 1`, so `Var(1)` takes the ordinary `new_i = i + d >= 0`
+    /// path (`i=1 >= cutoff=1`) to `Var(0)` -- the underflow guard is never
+    /// reached. Up-shift then recurses into the down-shifted `b` at
+    /// `cutoff + 1 = 1` again, and `Var(0)` is now BELOW that cutoff
+    /// (`0 < 1`), so the ordinary "leave indices below cutoff unchanged"
+    /// rule skips it -- it does not return to `Var(1)`. The round trip
+    /// differs from the original for a reason that has nothing to do with
+    /// underflow: an outer reference gets shifted down across the binder,
+    /// then the raised cutoff hides it from the compensating up-shift.
+    ///
+    /// **If EITHER mechanism's semantics ever change independently of the
+    /// other** (the underflow guard starts panicking/wrapping, or cutoff
+    /// propagation on any binder arm changes), **this test is EXPECTED to
+    /// break, by design** -- that is the dependency surfacing on the axis
+    /// it actually lives on, not a regression to chase.
     ///
     /// Confirmed at the point of use against `subst.rs` (not merely cited):
     /// `shift`'s only `cutoff + 1` arms are `Pi.b`, `Lam.t`, `Sigma.b`,
@@ -1134,6 +1159,36 @@ mod tests {
             "Let.body (own var)",
             Term::Let { ty: Box::new(leaf()), val: Box::new(leaf()), body: Box::new(Term::Var(0)) },
         );
+
+        // ── Depth 2: the PER-BINDER INCREMENT itself, which no single-binder
+        // row above can distinguish from "set to 1 under a binder" -- a
+        // mutant that replaces `depth + 1` with a hardcoded `1` passes every
+        // row above (Architect finding `evt_338k1ecwkfhwj`). Nesting two
+        // binders is the non-degenerate triple that forces the increment to
+        // actually accumulate.
+        check(
+            "Pi/Pi Var(2) (outer var0, two binders out)",
+            Term::pi(leaf(), Term::pi(leaf(), Term::Var(2))),
+        );
+        check(
+            "Pi/Pi Var(1) (the OUTER binder's own var)",
+            Term::pi(leaf(), Term::pi(leaf(), Term::Var(1))),
+        );
+        check(
+            "Pi/Pi Var(0) (the INNER binder's own var)",
+            Term::pi(leaf(), Term::pi(leaf(), Term::Var(0))),
+        );
+        // Mixed binder kinds: the per-arm increments must COMPOSE across
+        // different constructors, not merely hold within one.
+        check(
+            "Let.body/Lam.t Var(2)",
+            Term::Let {
+                ty: Box::new(leaf()),
+                val: Box::new(leaf()),
+                body: Box::new(Term::lam(leaf(), Term::Var(2))),
+            },
+        );
+        check("Sigma.b/Lam.t Var(2)", Term::sigma(leaf(), Term::lam(leaf(), Term::Var(2))));
 
         // ── The parent mistake, isolated: Pair vs Sigma on the SAME
         // b=Var(0) input. Sigma is a binder (b at depth+1): Var(0) there is
