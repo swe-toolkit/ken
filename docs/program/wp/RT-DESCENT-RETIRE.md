@@ -223,6 +223,37 @@ the proof is unavailable and any argument for it is circular.
   code-size distribution across the measured programs, against
   `RT-DECL-CLOSURE-PORT.AC-6`'s opening figures.
 
+- **`D8` — RE-DESCRIBE THE FIVE REFUSAL CONTROLS. Do not repair them and do not
+  retire them.** Absorbed into this node 2026-08-16 when
+  [[RT-RECURSOR-TRANSPORT]] closed at PR #2443/#2444.
+
+  **The governing text is the `2026-08-16` banner at the head of
+  `docs/program/issues/RT-DESCENT-RETIRE.md`.** Read it before opening this
+  deliverable; it is not restated here, so that there is one authority and not
+  two that can drift.
+
+  What it fixes, in one sentence each:
+
+  - **Repair is foreclosed** (Architect `evt_5h7vzc27mc11j`). None of the five
+    failures is a capability gap — they are a conservation law, a planner
+    invariant, a semantic impossibility, and a structural absence. **Row 1's
+    refusal IS the invariant [[RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT]] landed
+    at PR #2440**, so repairing it would undo a ratified disposition.
+  - **The new expected values are already measured** — the per-category first
+    outcomes in `docs/program/wp/RT-RECURSOR-TRANSPORT.md` at PR #2443.
+    **Do not re-measure them.** The re-description is specified by measurement,
+    not by assertion.
+  - **Write each pin as unobserved-by-construction, not as rejected-forever.**
+    An expectation change is not a repair, and the five rows are
+    internal-contract pins on the emitter's refusal — they cannot observe
+    frontend reachability. Labelling one a reachability tripwire would be worse
+    than leaving it unlabelled; that gap is filed separately as
+    [[RT-FRONTEND-REACHABILITY-TRIPWIRE]] and is **not** yours here.
+  - **Two dispositions are open and this node settles them**, rather than
+    inheriting them silently: the two-sibling rows, and corrected row 2.
+    **`d8d` is a COUNT DIVERGENCE, not a refusal** — different owner, and it is
+    never partitioned into a refusal bucket.
+
 ## 5. Acceptance criteria
 
 - **`AC-1`.** The whole test corpus **compiles and passes** with the lane
@@ -251,6 +282,13 @@ the proof is unavailable and any argument for it is circular.
   to route, not a failure of this AC** — the AC fails when the question is left
   unanswered, not when the answer is unwelcome.
 
+- **`AC-6`.** Each of the five refusal controls carries a re-description whose
+  expected value cites the measured first outcome in
+  `docs/program/wp/RT-RECURSOR-TRANSPORT.md`, and the two open dispositions are
+  settled explicitly in this node's record. **A control left with its old
+  expectation, or re-described from reasoning rather than from that
+  measurement, does not discharge this.**
+
 ## 6. Banned scope
 
 - **Starting before all five gating nodes merge** — the four migration nodes
@@ -262,11 +300,24 @@ the proof is unavailable and any argument for it is circular.
   not finished and the missing class is a node, not a retained fallback.
 - **Deleting a test that asserts a property still reachable** on the
   surviving lane.
+- **Repairing or retiring the five refusal controls.** `D8` re-describes them.
+  Added 2026-08-16 — repair is foreclosed by Architect `evt_5h7vzc27mc11j`, and
+  retiring them would delete the only pins on refusals that a ratified
+  disposition rests on.
 
 ## 7. Hard stop
 
 Stop and report if `D1` finds any residual still firing, if `D2`'s positive
 control fails to flip the authority, or if the deletion cannot complete without
-retaining a `RecursiveDescent` branch. **Any of those means the campaign is
+retaining a `RecursiveDescent` branch.
+
+> **A CERTIFIED REFUSAL IS NOT A RESIDUAL STILL FIRING. Do not hard-stop on
+> one.** Added 2026-08-16. The five rows [[RT-RECURSOR-TRANSPORT]] leaves behind
+> are shapes the emitter **refuses**; a residual firing is a program that
+> **selects** the `RecursiveDescent` lane. Those are different measurements, and
+> `D1`'s enumeration is over the second. The five were dispositioned as internal
+> compiler invariants at PR #2440 and their disposition is `D8`'s subject, not
+> this gate's. **If `D1` does surface a program that selects the authority, the
+> hard stop applies in full** — that is a surviving class and it is a node. **Any of those means the campaign is
 not done, and the honest outcome is to name the surviving class and hand it back
 to the Steward as a node** — not to delete around it.
