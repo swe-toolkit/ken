@@ -1,7 +1,7 @@
 ---
 id: RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT
 title: "For every refusal still holding the RecursiveDescent retirement, exhibit a Ken source program that reaches it or establish that none exists -- and record the ones with none as compiler invariants"
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
