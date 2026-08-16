@@ -427,17 +427,81 @@ around.**
 > from the same thing. **Treat the shape as recurring rather than the instances
 > as unlucky.**
 >
-> **2. The serializer's field order is exercised INCIDENTALLY, not by design.**
-> No control pins it. What protects it is that the **population happens to be
-> asymmetric**: `Rule::Init { left: 1, right: 0 }` has `left != right`, and
-> eleven cases carry an empty `gamma` against a non-empty `delta`, so a
-> transposition is grossly visible.
+> **2. The serializer is unprotected on TWO of its THREE axes. MEASURED, and it
+> corrects this node's own earlier claim.**
 >
-> ⇒ **If a future increment normalizes those pairs to symmetric sequents, that
-> protection disappears silently** — no control reds, and the same-typed-adjacent
-> field swap this node has now produced twice relocates into the serializer.
-> **A property held by a population's accident is not a property the suite
-> enforces.**
+> **Adversary `evt_10dxqtbsf4tcw` mutated all three axes rather than reasoning
+> about them:**
+>
+> | mutation | result |
+> |---|---|
+> | `sequent_source`: `gamma`/`delta` swapped | **RED** — protected |
+> | `rule_source`: `FokInit` `left`/`right` swapped | **9 passed — NOT protected** |
+> | `qterm_source`: `FokQBound`/`FokQParameter` swapped | **9 passed — NOT protected** |
+>
+> ⚠ **This node previously stated that `Init { left: 1, right: 0 }` protects the
+> `rule_source` axis because `left != right`. THAT IS FALSE.** The argument is
+> plausible and the measurement refutes it: swapping the serializer's two `Init`
+> indices passes every test. **It was offered here as measured when it was
+> reasoned.** The `gamma`/`delta` protection is real and did red.
+>
+> ⚠ **The third axis is not a field order at all, and nobody named it.**
+> `qterm_source` can emit `FokQParameter` where the Rust held `Bound` — a
+> **semantic class confusion in the shared component**, not a transposition.
+>
+> **Why it survives is the part worth having.** A **uniform** relabeling is a
+> structure-preserving bijection, and `fok_form_eq`/`fok_qterm_eq` are purely
+> **structural** — so every equality is preserved and the Ken side checks a
+> *different formula* to the same verdict. ⇒ **The one function that should catch
+> it is `fok_sequent_mentions_parameter`, which is NOT structural** — it looks
+> specifically for `Parameter`. **That it still passes means the corpus's
+> freshness cases do not discriminate a bound variable from an eigenparameter.**
+>
+> ### SEVERITY IS CONTROL-VALIDITY, NOT SOUNDNESS — AND `D4` IS WHERE IT BITES
+>
+> `FoKripke.ken` is untouched and correct. **What is weakened is the
+> differential's own claim:** *"Ken and Rust agree on these 18 cases"* becomes a
+> statement about a **different** 18 cases if the serializer is wrong — and
+> **`D4` would measure conversion cost on the wrong input for the same reason.**
+>
+> **TWO PINS CLOSE ALL THREE AXES, and both are cheaper than auditing the
+> population for asymmetry. `D4` OWES THEM BEFORE IT MEASURES:**
+>
+> 1. **one `Init` case with `left == right`** on sequents where the two readings
+>    disagree — kills the `left`/`right` swap **without relying on the corpus
+>    staying asymmetric**;
+> 2. **one `ForallRight` freshness case whose eigenparameter number collides
+>    with a live `Bound` index** — a uniform `Bound`/`Parameter` relabel then
+>    changes the freshness verdict, which is **the only place the distinction is
+>    semantic**.
+>
+> ⇒ **Pin the property; do not preserve the accident.** The earlier remedy here
+> was *"do not normalize the population to symmetric sequents"*, which asks every
+> future increment to protect an invariant nothing states. **These two pins make
+> the population's shape stop mattering.**
+>
+> ### THE SHAPE HAS NOW OCCURRED FOUR TIMES ON THIS NODE. DESIGN `D4` AGAINST IT.
+>
+> **One shape, four instances — a property that holds because of what the corpus
+> happens to contain, with nothing making it hold:**
+>
+> | # | instance | how it was found |
+> |---|---|---|
+> | 1 | two doubly-malformed rejection cases rejected by two guards each | Architect, reading |
+> | 2 | `fok_form_eq` arms droppable with the suite green | Adversary, mutation |
+> | 3 | `placeholder_child` inert only because no traversal reaches it | Architect, reading |
+> | 4 | serializer axes held by an asymmetric population | Adversary, mutation |
+>
+> **Note which column found which.** Instances 1 and 3 are visible by reading —
+> a reviewer can see a case is over-determined. **Instances 2 and 4 were invisible
+> to three readers and fell immediately to a mutation**, and in both the reasoned
+> argument for safety was *wrong*, not merely unproven. **`Init { left: 1, right:
+> 0 }` was reasoned safe by the Architect, carried by the Steward, and refuted by
+> one swap.**
+>
+> ⇒ **For `D4`, treat "this control is discriminating" as a MEASUREMENT and never
+> a reading.** The node's own history says a reading of a control's power is
+> unreliable on exactly the cases where it matters most.
 
 ## Acceptance criteria
 
