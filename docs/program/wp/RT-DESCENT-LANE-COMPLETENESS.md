@@ -472,6 +472,27 @@ their assertions rest on aborted compilations. `AC-7` and `AC-8` **hold**: no
 candidate or instrumentation remains, `D2c` untouched. `AC-1` and `AC-3` remain
 open on `D1`.
 
+**AC-13. `D5` REPORTS A DISTRIBUTION AND AN ATTRIBUTION, NOT A VERDICT.**
+
+The census in `D5` measurement 1 reports, per `ken-cli` native-build call site,
+**which `BodyEmissionAuthority` was selected** — the distribution over the
+corpus, not a summary sentence. **A report naming only the conclusion
+("none select `RecursiveDescent`") does not discharge this**; the whole
+point is that the earlier census's population was invisible in its summary.
+
+The probe in `D5` measurement 2 reports **either** that the guard was reached
+**or** that it was not, **and in the failure case names which of the two causes
+applies** — the tree shape, or the harness (`NEEDS_COLLECTIONS` prelude, or the
+checked `Program I main` requirement). **An unattributed refusal does not
+discharge this criterion**, and it is the criterion most likely to be
+accidentally satisfied by a red that means nothing.
+
+**Control:** `AC-13` fails if the report contains a refusal whose cause is not
+named, or a census whose per-site results are not given.
+
+**This AC does NOT gate `D1`.** `D5` moves reachability only; `AC-1` and `AC-3`
+are unaffected by its outcome.
+
 ## 6. Two foreclosed shortcuts. Do not take either.
 
 - **"Fixture-only, so it doesn't count."** `0/12` bounds the **blast radius**,
