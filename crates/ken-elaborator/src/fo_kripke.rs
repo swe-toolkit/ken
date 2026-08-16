@@ -230,16 +230,35 @@ fn discover_fo_slice_signature(env: &GlobalEnv, phi_closed: &Term) -> Option<FoS
 /// recurses into the shapes a slice-fragment-shaped obligation can plausibly
 /// use and stops at the rest.
 ///
-/// **`bottom_id` is excluded from sort candidates, specifically and only
-/// because `quote_iform` already reads it as `IForm::Bottom`** (a bare
-/// `Const` distinct from any object sort). Without this exclusion, `⊥` in
-/// an obligation's antecedent (e.g. `forall x:A. bottom -> ...`) is itself a
+/// **`V3-FO-SUBST-DEPTH-CONTROL` `D2`: the sort-candidate exclusion is
+/// stated as a CRITERION, not as a named constant.** The rule this walk
+/// applies: exclude any `Const` that `quote_iform` recognizes as a formula
+/// in its own right -- **currently exactly `bottom_id`**, because
+/// `quote_iform` already reads it as `IForm::Bottom` (a bare `Const`
+/// distinct from any object sort). Without this exclusion, `⊥` in an
+/// obligation's antecedent (e.g. `forall x:A. bottom -> ...`) is itself a
 /// bare-`Const` `Pi`-domain and registers as a SECOND sort candidate
 /// alongside the genuine object sort `A` -- an over-collection that makes
 /// conjunct 1 refuse a constructible, slice-provable obligation as
-/// ambiguous. No other `Const` is excluded here: `bottom_id` is checkable
-/// against `quote_iform`'s own recognition, not a "skip suspicious
-/// constants" heuristic.
+/// ambiguous.
+///
+/// **This premise is CONTINGENT, and its successor is already named in
+/// this file.** `env.top_id()` exists and `⊤` is a bare `Const` too; it is
+/// NOT excluded here, and does not need to be, only because this slice's
+/// `IForm` has no `Top` -- `quote_iform` refuses `⊤` (`UnsupportedTermShape`)
+/// and both the collector and the quoter refuse together, so there is no
+/// disagreement to over-collect into. That omission is the entire reason
+/// the exclusion list has exactly one entry today. **When `IForm::Top`
+/// lands, `quote_iform` gains a second bare-`Const` arm and `⊤ -> q`
+/// reproduces this exact over-collection, on a different constant** -- the
+/// criterion above is what forces the collector update at that moment,
+/// because it names the coupling instead of the instance. Do NOT exclude
+/// `top_id` now: with no quoter arm behind it, that fits a future tree
+/// rather than this one.
+///
+/// No other `Const` is excluded here beyond what the criterion names:
+/// checkable against `quote_iform`'s own recognition, never a "skip
+/// suspicious constants" heuristic.
 fn collect_signature_candidates(
     env: &GlobalEnv,
     term: &Term,
@@ -1422,6 +1441,19 @@ mod tests {
     /// `ForallObj`/`ForallObj`, `ForallWorld`/`ForallWorld`, and a MIXED
     /// `ForallWorld`/`ForallObj` nesting, so the per-arm increments are
     /// shown composing across constructors, not merely holding within one.
+    ///
+    /// **`V3-FO-SUBST-DEPTH-CONTROL` `D3`: the BINDER axis above and the
+    /// INDEX axis are different dimensions, and `D0` only pinned the
+    /// binder one.** Every `D0` row's leaf index equals its binder count
+    /// (`leaf(1)` under one binder, `leaf(2)` under two), so every row hits
+    /// only `subst_qterm_at`'s `i == depth` arm -- the OTHER two arms,
+    /// `i > depth => Bound(i - 1)` (the decrement that keeps an outer
+    /// reference correct once the quantifier is consumed) and the
+    /// catch-all `i < depth => unchanged` (what protects an inner binder's
+    /// own variable from an outer substitution), were exercised by
+    /// NOTHING here. `subst0_form`'s own two-caller argument above applies
+    /// unchanged to these two arms: the direct oracle is the only
+    /// instrument that could ever see them.
     #[test]
     fn subst_form_at_matches_hand_written_expectations_at_binder_depth() {
         fn check(label: &str, actual: Form, expected: Form) {
@@ -1472,6 +1504,39 @@ mod tests {
                 &p,
             ),
             Form::ForallWorld(Box::new(Form::ForallObj(Box::new(Form::DomainA(p, p))))),
+        );
+
+        // `D3`, INDEX axis: pins `i > depth => Bound(i - 1)`, the decrement
+        // arm. One binder (depth 1 inside), leaf index 3 (> 1): correct
+        // decrements to Bound(2). If this arm silently stopped
+        // decrementing, an outer reference would keep the WRONG index
+        // after a quantifier is consumed -- invisible to every `D0` row,
+        // since none has an index exceeding its own binder count.
+        check(
+            "ForallObj(Bound(3)) -- pins the decrement arm (i > depth)",
+            subst_form_at(&Form::ForallObj(Box::new(leaf(3))), 0, &p),
+            Form::ForallObj(Box::new(Form::DomainA(QTerm::Bound(2), QTerm::Bound(2)))),
+        );
+
+        // `D3`, INDEX axis: pins `i < depth => unchanged`, the inner-binder
+        // arm. Two binders (depth 2 inside), leaf index 0 (< 2, the
+        // INNERMOST binder's own variable): correct leaves it untouched --
+        // the whole form round-trips to itself. If this arm silently
+        // substituted instead, an inner binder's own variable would be
+        // corrupted by an outer substitution meant for something else --
+        // also invisible to every `D0` row, since none has an index below
+        // its own binder count.
+        check(
+            "ForallObj/ForallObj(Bound(0)) -- pins the inner-binder arm (i < depth)",
+            subst_form_at(
+                &Form::ForallObj(Box::new(Form::ForallObj(Box::new(leaf(0))))),
+                0,
+                &p,
+            ),
+            Form::ForallObj(Box::new(Form::ForallObj(Box::new(Form::DomainA(
+                QTerm::Bound(0),
+                QTerm::Bound(0),
+            ))))),
         );
     }
 
