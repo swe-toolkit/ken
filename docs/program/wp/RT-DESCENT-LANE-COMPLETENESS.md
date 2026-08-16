@@ -99,7 +99,12 @@ nine. None may be touched while this node is open.**
 
 ## 4. Deliverables
 
-> ### `D2`, `D3` AND `D4` WERE DELIVERED PRE-FRAME. `D1` IS THE ONLY OPEN ONE.
+> ### ALL FIVE DELIVERABLES ARE NOW DELIVERED. NOTHING IS OPEN ON THE RING.
+>
+> **`D2`, `D3`, `D4` pre-frame; `D1` by the Architect (`evt_5cxzxp4b6q31v`,
+> four verdicts, recorded in the node); `D5` by the runtime ring
+> (`evt_6tveatdhcz72y`). The heading here previously read *"`D1` IS THE ONLY
+> OPEN ONE"* and was stale from the moment `D1` landed.**
 >
 > **runtime-leader `evt_2fmjv69z5bg2g`, measured at exact
 > `3c9b8bbd5fae09859d6e330f8ac0a17b40fe1f68`** — note that is a **different SHA
@@ -205,7 +210,10 @@ something that should not be representable. Hence the ordering, and hence
 > the predecessor two hours earlier, and **it binds the exit as much as the
 > entry.**
 
-### D1 — ARCHITECT, soundness. FOUR verdicts, not one. THE ONLY OPEN DELIVERABLE.
+### D1 — ARCHITECT, soundness. FOUR verdicts, not one. DELIVERED.
+
+**Delivered `evt_5cxzxp4b6q31v`: two CORRECT SEMANTICS, two MISSING PORT. The
+verdict table is in the node. Nothing below is outstanding.**
 
 **For each of the four constructs in section 3: is the functionized lane's
 refusal CORRECT SEMANTICS, or a MISSING PORT?**
@@ -334,9 +342,14 @@ which **takes real Ken source text**, into
 `emit_bound_process_program_object_with_cranelift` (`:937`), which holds the
 sole production call of `select_body_emission_authority`.
 
-**`build_native_program` is called from 18 test files and 36 call sites under
-`crates/ken-cli/tests/`.** Every one is **outside `-p ken-runtime --lib`**, the
-scope `D1`'s 805 arrivals and `D2c`'s 943/0/4 were measured over.
+**`build_native_program` has 35 executable call expressions across 17 files
+under `crates/ken-cli/tests/`**, plus child `ken native-build` routes in an
+18th. Every one is **outside `-p ken-runtime --lib`**, the scope `D1`'s 805
+arrivals and `D2c`'s 943/0/4 were measured over.
+
+**Corrected from "18 test files and 36 call sites", which was a textual grep
+reported as a call census** — 37 hits on 37 lines across 18 files, two of them
+comments. **A textual census is not a call census.**
 
 **Two measurements, in this order.**
 
