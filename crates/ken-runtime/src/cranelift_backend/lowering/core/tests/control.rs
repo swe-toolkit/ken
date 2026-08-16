@@ -6888,7 +6888,7 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
                 "row4-depth-1",
                 Some((
                     "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(26) transports a static worker in field 0 (field origin StaticOriginId(25), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer; the recognition is neither consumed nor erased".to_string(),
+                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(26) transports a static worker in field 0 (field origin StaticOriginId(25), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
                 )),
                 "outside-surface",
             ),
@@ -6896,7 +6896,7 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
                 "row4-depth-2",
                 Some((
                     "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(36) transports a static worker in field 0 (field origin StaticOriginId(35), recognition StaticWorkerRecognitionId(2)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer; the recognition is neither consumed nor erased".to_string(),
+                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(36) transports a static worker in field 0 (field origin StaticOriginId(35), recognition StaticWorkerRecognitionId(2)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
                 )),
                 "behind-boundary",
             ),
@@ -6904,7 +6904,7 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
                 "row4-depth-3",
                 Some((
                     "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(46) transports a static worker in field 0 (field origin StaticOriginId(45), recognition StaticWorkerRecognitionId(3)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer; the recognition is neither consumed nor erased".to_string(),
+                    "constructor ctor:fixture::PX8JScopeTree::Node at origin StaticOriginId(46) transports a static worker in field 0 (field origin StaticOriginId(45), recognition StaticWorkerRecognitionId(3)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
                 )),
                 "behind-boundary",
             ),
@@ -6912,7 +6912,7 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
                 "row5-after-hole",
                 Some((
                     "StaticWorkerBinding".to_string(),
-                    "constructor ctor:fixture::PX8JHoleOutput::Node at origin StaticOriginId(22) transports a static worker in field 0 (field origin StaticOriginId(21), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer; the recognition is neither consumed nor erased".to_string(),
+                    "constructor ctor:fixture::PX8JHoleOutput::Node at origin StaticOriginId(22) transports a static worker in field 0 (field origin StaticOriginId(21), recognition StaticWorkerRecognitionId(0)) that no static elimination rebinds, so this recognition's own transport never reaches a consumer at an exact-Var call and is not erased; a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation".to_string(),
                 )),
                 "outside-surface",
             ),
