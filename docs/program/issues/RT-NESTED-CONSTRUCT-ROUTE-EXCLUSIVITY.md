@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY
-title: "Decide whether routing nested composed recursive-case Construct occurrences through the source machine alone is a usable PRECONDITION for a not-construct -- exclusivity relocates the construction rather than removing it, and this node does not authorize the repair"
-status: active
+title: "CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition"
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -11,7 +11,59 @@ github: null
 origin: "Steward, 2026-08-16, on the Architect's D1 hard-stop disposition at evt_29ar2vfvxf414 refuting shape (iv) on two grounds and naming the route change as the one surviving direction, explicitly unreleased and owed its own D0. Measured at ec2b4a1eb. Both cited builder docs (mod.rs:3130-3140 and mod.rs:3201) verified verbatim by the Steward before filing. Steward-filed per COORDINATION section 2."
 ---
 
-## Why this exists: four shapes are dead and this is the only direction left
+## CLOSED. `D0` RETURNED NO, AND THE NODE DIED AT A READ AS DESIGNED.
+
+**Runtime `evt_292ve8cdq1mmx` at `a8688cf89`, no candidate, no probe, no source
+diff, no test run. Architect concurred in full at `evt_1dtf5g1xjw8z4`, verifying
+the three load-bearing reads himself. No build was ever authorized and none is
+now.**
+
+| question | answer | consequence |
+|---|---|---|
+| **`Q1`** — what removes the construction, at which site | YES at the source-machine caller | the node survived question 1 |
+| **`Q2`** — is the exclusion statable at the DISPATCH | **NO** | `OwnedUnitEmission` (`units.rs:5599-5611`) carries `function`, `body_occurrence`, `definition`, `header`, `slots`, `offsets`, `frame_bytes` — **no `SourceControl`, cursor, pending suffix, or eliminator ownership.** The direct traversal cannot tell the population apart |
+| **`Q4`** — is the machine behavior-complete for these | **NO, and this is the stronger finding** | the machine forces every argument through `value.specialized_at(...)` (`core.rs:8215-8220`); the direct arm preserves a carried run via `transfer_constructor_operands` (`core.rs:17677-17688`). **Re-routing an ordinary non-worker `Construct` turns a valid carried construction into a refusal** |
+| **`Q5`** — failure direction | concurred | under-inclusion is a fail-closed bookkeeping red; over-inclusion is a **miscompile**. False negative is the safe side, and any future predicate on this axis inherits that orientation |
+
+> ### `Q4` IS WHY THIS IS "CLOSED" AND NOT "NOT TODAY".
+>
+> **`Q2` is a statement about available CONTEXT — contingent.** Widen the
+> surfaces and it could change. **`Q4` is a statement about the DESTINATION and
+> it is not contingent.** Even granted a perfect predicate, the place you would
+> unify onto is behavior-incomplete.
+>
+> ⇒ **The precondition has a precondition.** This node was framed as a
+> precondition for a not-construct; `Q4` shows it is itself gated on the machine
+> first acquiring the direct arm's carried-argument handling.
+
+**Both escapes are closed by PRIOR rulings, which is what makes this
+complete.** A new caller/plan relation is the banned static-plan-export
+widening; template-side outer classification is the refuted mint-site shape
+(`RT-MINT-SITE-STATIC-DISCRIMINATOR` `D0`). **Same structure as Ground B: the
+shape is defeated by rulings already in the corpus, not by a fresh judgment
+call.** A successor cannot re-propose either without first overturning one.
+
+### WHAT REMAINS IS A THREE-ACT CHAIN, AND NONE OF THE ACTS IS AUTHORIZED
+
+**Stated as a chain because a three-act path reads like a one-node path when
+only its first act is named** (Architect, `evt_1dtf5g1xjw8z4`):
+
+1. **Factor the machine terminal to delegate its immediate pair to the
+   producer-side path** (`core.rs:5007-5123` already holds the broader
+   machinery; the terminal does not delegate to it) — this is `Q4`'s blocker.
+2. **Then** route exclusivity becomes safe to attempt — but still needs `Q2`'s
+   discriminator, which today requires a banned or refuted mechanism.
+3. **Then** a terminal-keyed not-construct could finally be total — the
+   original (iv).
+
+**What the whole chain buys at the end: a bookkeeping red cleared, and valid
+programs at depth 2 and 3 compiling. That is the whole of the prize.**
+
+⇒ **Whether that is worth three acts is a SCOPE call, not a design call. It is
+reserved for the operator, and this ring does not measure toward it.** Runtime
+retains no candidate and does not open act 1.
+
+## Why this existed: four shapes were dead and this was the only direction left
 
 **`RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT` closed with a complete negative
 result.** (i), (ii) and (iii) BARRED by the Architect's `D0` ruling
@@ -37,13 +89,14 @@ a disposable probe and observing correct execution and exit `0`.
 > predecessor opened. A shared-callee doc settles it; a route enumeration costs
 > a probe to reach the same place.
 
-## What this node is, and the one reason to believe it can work
+## What this node WAS, and the reason it was believed to be attemptable
 
-> **Read the amendment two sections down BEFORE acting on this one.**
-> Exclusivity **relocates** the construction; it does not remove it. This
-> section describes the change, **not a repair.**
+> **HISTORICAL. `Q2` and `Q4` both returned NO — see the closing block at the
+> top.** This section records the hypothesis as it stood at release, because
+> the warrant for killing it is only legible against what was proposed. **It
+> describes a direction that is now dead; do not read it as live.**
 
-**The surviving direction is a DISPATCH change, not a not-construct: route
+**The surviving direction was a DISPATCH change, not a not-construct: route
 nested composed recursive-case `Construct` occurrences so the machine's
 terminal is their only entry, and the direct arm is unreachable for them.**
 
@@ -80,12 +133,15 @@ the same point relative to recognition, as the direct arm.
 ⇒ **Route exclusivity relocates which dispatch entry constructs. It removes
 nothing by itself.**
 
-**What it genuinely buys:** with a single entry, *"every route installs the
+**What it was thought to buy:** with a single entry, *"every route installs the
 terminal with the exact pending suffix"* could finally be **true**, so leg 1's
-totality — structurally unachievable last node — becomes achievable. **That is
-a real thing to buy and it is why the node is alive.** It is a **precondition
-for a repair, not the repair**, and the not-construct is a separate subsequent
-act this node does not authorize.
+totality — structurally unachievable last node — becomes achievable.
+
+> **`Q4` REFUTED THIS, and the refutation is the node's most durable output.**
+> The unification target is behavior-incomplete: the machine forces every
+> argument through `specialized_at`, so re-routing an ordinary non-worker
+> construction **regresses a valid carried construction into a refusal**.
+> ⇒ **The precondition has a precondition** — act 1 of the chain at the top.
 
 ## `D0` — a READ, not a build. QUESTION 1 CAN KILL THE NODE CHEAPEST.
 
@@ -128,7 +184,21 @@ field NOT constructed that should be is a miscompile.** The predecessor's
 **Hand `D0` back alone with no candidate**, whatever it returns. `D1`/`D2` are
 released by the Steward on the Architect's ruling.
 
-## Acceptance criteria
+## Acceptance criteria — ALL SPENT UNMET, because no build was authorized
+
+> **`AC-1` through `AC-7` governed a candidate that was never released.** They
+> are not failures and not outstanding work: `D0` returned NO before any build,
+> which is the outcome the node was shaped to produce cheaply. **Do not carry
+> them into a successor as owed criteria.**
+>
+> **`AC-8` is the exception — it was DISCHARGED, and by the strongest route.**
+> It said a landed exclusivity change is not the defect closed. **Nothing
+> landed**, so nothing can be cited as closing the depth-2/3 compile failure.
+> The criterion held without ever being tested against a candidate.
+>
+> **`AC-5`'s two-directional mutation requirement survives as guidance for any
+> future predicate on this axis**, together with `Q5`'s orientation: a green
+> "the leak is gone" tests neither direction.
 
 **`AC-1`. No mint-time discriminator is required.** The exclusion is evaluated
 where the routing decision is already made. **A predicate that needs the
@@ -184,13 +254,17 @@ node `merged` on that reading.**
 
 ## Sequencing
 
-**Lane 1 (operator priority). `D0` is releasable immediately** — the
-predecessor closed and this node needs nothing further from it.
+**SPENT. `D0` ran and returned NO; the Architect ruled it; no `D1`/`D2` was
+ever released.**
 
-> **The predecessor closes with NO CANDIDATE and can never reach `merged`.**
-> Do not gate this node on that landing.
+> **This node closes with NO CANDIDATE and can never reach `merged`.** Do not
+> gate any successor on its landing. `closed` here means resolved-without-
+> landing, which is exactly what a complete negative result is.
 
-**TCB-adjacent: the Architect rules `D0` before any build is released**, and he
-has said he will. **If `D0` returns NO on question 1, that is a complete result
-and the campaign's option space is exhausted** — at which point the disposition
-is a scope call for the operator, not more measurement by this ring.
+**The campaign's option space is exhausted at this node.** Five dispositions are
+dead with warrants (conditional transition, binding-payload/`consumed` move,
+not recognizing the outer field, not-construct at the template, and route
+exclusivity). **The remaining disposition — whether depth-2/3 compile failure
+stands as a known limitation, or the three-act chain is funded — is a SCOPE
+call the Steward carries to the operator.** It is not more measurement by this
+ring, and no seat should open act 1 on its own authority.

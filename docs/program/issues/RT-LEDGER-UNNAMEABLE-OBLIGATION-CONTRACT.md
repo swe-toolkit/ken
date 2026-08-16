@@ -54,11 +54,17 @@ none exists.** That closes it with no forcing measurement at all.
 > ⇒ **When a disposition is about whether something gets BUILT, read the
 > BUILDER's doc before enumerating the callers' routes.**
 
-**The one surviving direction — re-route so the machine's terminal is the only
-entry — is NOT this node's and was NOT authorized here.** It is a dispatch
-change whose population is the general `RuntimeExpr::Construct` arm, far wider
-than the defect. It is filed as
-[[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] with its own `D0`.
+**The direction that survived this node — re-route so the machine's terminal is
+the only entry — was NOT this node's and was NOT authorized here.** It was filed
+as [[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] with its own `D0`.
+
+> **THAT SUCCESSOR IS ALSO CLOSED NOW, on its own `D0`, `evt_1dtf5g1xjw8z4`.**
+> `Q2` NO — the exclusion is not statable at the dispatch, because the direct
+> traversal's `OwnedUnitEmission` carries no `SourceControl`. **`Q4` NO and
+> stronger** — the machine it would unify onto is behavior-incomplete for
+> carried arguments, so unification regresses valid constructions.
+> ⇒ **Five dispositions are dead, not four. The option space is exhausted and
+> what remains is a three-act chain reserved for the operator as a scope call.**
 
 **`D2` was never authored, correctly.** No candidate, no QA route, no retained
 branch.
@@ -87,8 +93,16 @@ three bars without qualification and **released (iv) conditioned on one thing
 >
 > **That property is not what failed.** (iv) failed on WHERE it was keyed — a
 > shared mint site with no context, and one caller's terminal.
-> **[[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] keeps the property and changes
-> the keying**, which is the whole reason it is worth a node.
+> **[[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] kept the property and changed
+> the keying**, which is why it was worth a node.
+>
+> **It then died too, and NOT on the keying** — the re-keying was sound as far
+> as it went (`Q1` YES). It died because the context needed to state the
+> exclusion is absent from the direct traversal (`Q2`), and because the
+> destination is behavior-incomplete (`Q4`). ⇒ **The property is still not what
+> failed, and it is still worth carrying** — but nothing in the current option
+> space can key it anywhere reachable. **Carrying it now means holding it for
+> the three-act chain, not filing another successor.**
 
 **(iv) was the shape this frame called cheapest if it holds and likeliest to be
 wrong. It was the latter.** The `45/35/25` distinctness objection never reached
@@ -324,16 +338,24 @@ row5-after-hole are behaviourally unchanged.
 delivered the classification, `D1` ran and hard-stopped at `AC-7` with no
 candidate, `D2` was correctly never authored.
 
-**The successor is [[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]]**, `ready`, with
-its own `D0`. **It is not gated on this node's landing, which cannot happen.**
+**The successor was [[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]], and it is now
+`closed` too** — `D0` returned NO on `Q2` and `Q4`, no candidate, no build ever
+authorized. **There is no third node in this chain.** The remaining direction is
+a three-act chain (factor the machine terminal, then exclusivity, then the
+not-construct) whose funding is an **operator scope call**, carried by the
+Steward and not measured toward by this ring.
 
 > ### WHAT THIS NODE BOUGHT, SO THE NEGATIVE RESULT IS NOT MISREAD AS WASTE
 >
-> **It forecloses a shape rather than deferring it.** Four dispositions are now
-> dead with warrants — three by ruling, one by measurement and by a prior
-> ruling reached independently. **A successor cannot re-propose any of them
-> without meeting a stated ground**, and the one surviving direction is named
-> with its blast radius identified before anyone builds it.
+> **It forecloses a shape rather than deferring it.** Four dispositions died
+> here with warrants — three by ruling, one by measurement and by a prior
+> ruling reached independently — **and the fifth died in the successor, on a
+> read, with no build.** A successor cannot re-propose any of them without
+> meeting a stated ground.
+>
+> **The successor's cost is the number worth remembering: one `D0` read, no
+> probe, no diff, no test run.** That is what framing a direction as a
+> precondition with a question that can kill it first buys.
 >
 > **`AC-7` is why this cost one reverted probe instead of a miscompile.** The
 > ring took the expensive branch twice in consecutive turns and was right both
