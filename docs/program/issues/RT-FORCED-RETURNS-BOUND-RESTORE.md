@@ -1,7 +1,7 @@
 ---
 id: RT-FORCED-RETURNS-BOUND-RESTORE
 title: "One clause: the six ignored tests' eighteen empty returns are FORCED by the refusal, not observed -- the measurement the Architect barred from this comment came back one repair later, and it now sits one sentence above the 81-return tally a reader will add it to"
-status: active
+status: merged
 owner: runtime
 size: XS
 gate: none
