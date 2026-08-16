@@ -1,6 +1,6 @@
 ---
 id: RT-DESCENT-RETIRE-PRIOR-ART
-title: "Prior art admits the shape and carries no second descent lane -- retirement is supported, but only after a stated and enforced pre-classifier IR invariant, never by source unreachability"
+title: "Prior art admits the shape and carries no second descent lane -- retirement is supported and never by source unreachability -- this node's proposed pre-classifier IR invariant was DECLINED by the Architect in favour of uniform lowering, so the retirement is NOT gated on it and this row is not an unmet bar"
 status: merged
 owner: research
 size: M

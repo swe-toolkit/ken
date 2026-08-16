@@ -108,6 +108,38 @@ the proof is unavailable and any argument for it is circular.
   **flips to `RecursiveDescent`**. Restore byte-identically.
   **Without this, `D1` is a negative check that passes for any reason** —
   including a broken instrument.
+- **`D2c` — STEP 1 OF THE RETIREMENT: ROUTE TO NOTHING, DELETE NOTHING.**
+  Architect `evt_5f4jvs4f6pbdt`, 2026-08-16. Make
+  `select_body_emission_authority` **never return
+  `BodyEmissionAuthority::RecursiveDescent`**, leaving the lane, the residual
+  enum, the authority variant and the emission code **entirely in place**. One
+  revertible change. Then the **full workspace suite plus conformance, in CI**
+  (`COORDINATION §12` — CI, never the laptop).
+
+  **This is the measurement, and it is the largest differential available
+  anywhere in this campaign: every program in the corpus becomes a differential
+  row.** [[RT-MATCH-SCRUTINEE-PORT]] settled the semantics over **five
+  hand-built `RuntimeExpr` with no kernel `Term` preimage**; the retirement acts
+  on **every program the narrowed guard retains.** Those are not the same set.
+  **No census is owed** — green here settles the population question over the
+  whole corpus instead of over five fixtures.
+
+  **If step 1 reds anywhere, that red IS the capability the five rows could not
+  see**, and it arrives as a concrete failing program rather than as an
+  argument. Hand it back as a node; do not delete around it.
+
+  **`D2c` LANDS AS ITS OWN CANDIDATE, AHEAD OF ANY DELETION.** Partial-WP merge
+  is standing policy (`COORDINATION §10⁻`); here it is load-bearing rather than
+  convenient, because a revert of step 1 must restore production routing in a
+  single commit.
+
+> ### `D3` THROUGH `D8` ARE STEP 2, GATED ON `D2c` GREEN IN CI.
+>
+> **DO NOT COLLAPSE THE TWO STEPS.** Architect `evt_5f4jvs4f6pbdt`: a single
+> commit that reroutes **and** deletes cannot tell a routing regression from a
+> compile error, and the evidence is destroyed either way it goes. **Step 1 is
+> the measurement; step 2 is bookkeeping over provably dead code.**
+
 - **`D3` — Delete the classifiers**: `recursive_descent_residual`,
   `declaration_recursive_descent_residual`, `RecursiveDescentResidual`, and
   `select_body_emission_authority`.
@@ -289,6 +321,12 @@ the proof is unavailable and any argument for it is circular.
   expectation, or re-described from reasoning rather than from that
   measurement, does not discharge this.**
 
+- **`AC-7` — the two steps are SEPARATE CANDIDATES.** `D2c` merged, with the
+  full workspace suite and conformance green in CI, **before any deletion
+  lands**. A single candidate that both reroutes and deletes **fails this AC
+  however green it is** — the point is that its red, had it been red, would
+  have been uninterpretable.
+
 ## 6. Banned scope
 
 - **Starting before all five gating nodes merge** — the four migration nodes
@@ -308,8 +346,9 @@ the proof is unavailable and any argument for it is circular.
 ## 7. Hard stop
 
 Stop and report if `D1` finds any residual still firing, if `D2`'s positive
-control fails to flip the authority, or if the deletion cannot complete without
-retaining a `RecursiveDescent` branch. **Any of those means the campaign is
+control fails to flip the authority, **if `D2c` reds anywhere in CI**, or if the
+deletion cannot complete without retaining a `RecursiveDescent` branch.
+**Any of those means the campaign is
 not done, and the honest outcome is to name the surviving class and hand it back
 to the Steward as a node** — not to delete around it.
 

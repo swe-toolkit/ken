@@ -1,6 +1,6 @@
 ---
 id: RT-MATCH-SCRUTINEE-DISPOSITION
-title: "MatchScrutineeRecursor's retention guard was broader than the capability boundary it stood in for -- NARROWED to retain exactly when the ordinary producer route declines; the difference is non-empty, so the variant survives load-bearing"
+title: "MatchScrutineeRecursor's retention guard was broader than the capability boundary it stood in for -- NARROWED to retain exactly when the ordinary producer route declines; the difference is non-empty, so the variant survives load-bearing FOR ROUTING -- and RT-MATCH-SCRUTINEE-PORT later measured that same difference to cost no observable behaviour, so this title is a routing claim and never a reason to retain the variant"
 status: merged
 owner: runtime
 size: M
