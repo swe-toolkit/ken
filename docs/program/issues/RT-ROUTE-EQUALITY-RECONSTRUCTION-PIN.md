@@ -130,6 +130,22 @@ assertions, the rows and the observation domain all stay exactly as they landed.
 on exactly that, because the person doing the tidy-up is reading the crate.
 
 **It blocked nothing**, and the mechanism it protects worked the whole time —
-the risk was a future edit, not a present defect. **The detector is now
-documented at the point of edit and the `C`-arrival red is on record**, so a
-later reader does not have to re-derive that it works.
+the risk was a future edit, not a present defect. **The `C`-arrival red is on
+record**, so a later reader does not have to re-derive that it works.
+
+> ### THE ADDRESS WAS WRONG. Successor: [[RT-ROUTE-EQUALITY-PIN-AT-THE-BINDINGS]].
+>
+> Adversary hunt on the landed squash (`evt_4j3d7523jxh61`): **the clause landed
+> on the assertions, and the duplication a tidy-up targets is the BINDINGS** 13
+> and 17 lines above. A shared helper introduced at `:16528-16529` leaves
+> `vec![ordinary_route]` reading identically ⇒ **the refactor that kills the
+> sentinel completes without the warning entering view.**
+>
+> **`AC-1` here is satisfied as written and that is the point** — *"a reader
+> editing either assertion"* is true; **the dangerous edit is not an assertion
+> edit.** The clause protects the **use** while the refactor targets the
+> **definition**. **The specification was the Adversary's and the Adversary
+> caught it.**
+>
+> **`D2` is untouched by this.** The mutation moves the population, not the
+> detector, and the arrival capability is exercised rather than argued.

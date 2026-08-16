@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 20:30:28Z — from 356 issue file(s) in `docs/program/issues/`.
+2026-08-16 20:35:04Z — from 357 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -315,6 +315,7 @@ the committed file matches the generator's output.
 | `RT-ROOT-AUTHORITY-BLAME-DOMAIN` | The three root-authority guards report a compiler-owned invariant failure through the unsupported-construct channel, which reverses the fault domain -- and the correct arm, BackendFailure::PlannerInvariant, already exists with 40 producers in the same crate | merged | runtime | M | none | — |
 | `RT-ROOT-AUTHORITY-REACHABILITY-WITNESS` | ANSWERED, bounded negative on all three guards: three Ken-source programs attacking absence-at-consumption, wrong-outer-cursor and duplication all built and exited 0, so no language restriction is triggered -- three stress shapes are a search, not a proof of unreachability | closed | runtime | M | none | — |
 | `RT-ROUTE-EQUALITY-CONTROL-B-ROW` | The route-equality control now observes its second disjunct true -- a transparent-declaration Call row records (subject_guard, A, B, route) = (false, false, true, true), and the mutation claim it carried is no longer unexercised | merged | runtime | S | none | — |
+| `RT-ROUTE-EQUALITY-PIN-AT-THE-BINDINGS` | The anti-factoring warning sits on the assertions while the duplication a tidy-up targets is the bindings 13 to 17 lines above -- put the clause where the dangerous edit happens | draft | runtime | S | none | — |
 | `RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN` | The route-equality controls' duplicated hand-built reconstruction is the mechanism that detects an added routing disjunct -- record that at both assertion sites and retain the C-arrival mutation, because a routine tidy-up deletes it silently | merged | runtime | S | none | — |
 | `RT-SCALE-A` | Boundary A — re-derive the planner census for n=3..7 against the COMPLETED factored representation, superseding the provisional outer-planner numbers | merged | runtime | M | none | — |
 | `RT-SCALE-B` | Boundary B — the full n=3..7 emission measurement, the research-grounded analytical model, and the operator scaling verdict that gates RT-NATIVE-FNSPLIT's merge | merged | runtime | L | none | — |
