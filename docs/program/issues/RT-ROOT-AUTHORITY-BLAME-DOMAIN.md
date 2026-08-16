@@ -73,6 +73,29 @@ once by a `.take()` at result emission.
 ⇒ A Ken user shown *"NativeJoinPlanV1 is unsupported"* is told **their program**
 is the problem and asked to change it. There is no change they can make.
 
+> ### THE WARRANT IS STRONGER THAN DIAGNOSIS, AND THE SECOND HALF
+> ### IS THE LOAD-BEARING ONE
+>
+> **Architect `evt_7f3216zdn03yy`, added at their direction.** The frame above
+> rests the case on **diagnosis** — a user told "unsupported" has no change to
+> make. **True, and sufficient. It is also not the worst consequence.**
+>
+> `differential_error_report` and `runtime_ir_comparison_error_report`
+> (`artifact/api.rs:1062`, `:1092`) map `Unsupported` to verdict `Unsupported`
+> and `Backend` to verdict `BackendFailure`.
+>
+> ⇒ **While these three guards were `Unsupported`, a planner invariant firing
+> under differential testing rendered as a SKIP** — the example silently dropped
+> from the comparison, **indistinguishable from a genuine capability gap.**
+>
+> `45 §4` BE-Differential nets only what it actually compares, and `45 §2` puts
+> the backend outside the TCB **on the strength of that net**. **So the
+> misclassification was not only telling the user the wrong thing — it was
+> removing the failure from the mechanism that substitutes for trust.**
+>
+> **This candidate converts three silent skips into loud failures. That is a
+> soundness-adjacent gain, not a wording preference.**
+
 ## The prior art is uniform, and one of the sources is Cranelift itself
 
 Research surveyed rustc, GHC, MLIR, LLVM, Lean 4, and Cranelift. **Once source
@@ -122,10 +145,42 @@ re-derive blame here.
 **`D1` — move the guards to the correct arm.** `BackendFailure::PlannerInvariant`
 with the existing message text. Follow the 40 existing producers' shape.
 
-**`D2` — update the two test pins.** `control.rs:978` and `:995` match on
+**`D2` — update the test pins.** `control.rs:978` and `:995` match on
 `reason ==`, and `:6888` constructs the string. These assert the **wrong**
 classification today, so they must move with it — **a green test pinning the
 defect is not evidence the behaviour is right.**
+
+> ### THOSE THREE ARE A STARTING POINT, NOT THE CENSUS. MEASURED THE HARD WAY.
+>
+> **`D0`-`D2` at `de6cc12c1` went red in CI on a FOURTH pin** the frame never
+> named: `d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane`, assertion
+> `control.rs:35922`, expected value `:35936`, still expecting
+> `Some("NativeJoinPlanV1")` for `row1-owned-scope`.
+>
+> **`row1-owned-scope` occurs 15 times in `control.rs`**, and 21
+> `NativeJoinPlanV1` mentions survive at the candidate. **Most are correct** —
+> other `NativeJoinPlanV1` refusals that genuinely stay `Unsupported` — so this
+> is an attribution job, never a bulk replace.
+>
+> ⇒ **Run a census over the file and state the command and its count in the
+> handback.** Do not enumerate from this frame's list. **That list was mine and
+> it was wrong.**
+>
+> **The run also cancelled 3 tests still executing**, so a red list from a
+> cancelled run is a lower bound. Re-run to completion before handing back.
+
+> ### THREE CENSUS MISSES ON THIS ONE NODE. THE PATTERN IS THE LESSON.
+>
+> | miss | whose | what it measured instead |
+> |---|---|---|
+> | `AC-3` written as a universal | Steward | a line-local grep, blind to the multi-line calls that ARE its subject |
+> | the `63` in the `D0`-`D2` handback | ring, unchecked by QA | no population at all — not 32, not 53, not 114 (Architect `evt_7f3216zdn03yy`) |
+> | `D2`'s three-pin list | Steward | three of at least four live pins |
+>
+> **The `AC-3` amendment exists specifically to teach that a census can fail to
+> see its own subject, and the failure then recurred twice inside its own
+> discharge.** State the command and the number, so the next reader re-runs it
+> rather than trusting it.
 
 ## Acceptance criteria
 
@@ -184,6 +239,32 @@ runtime-leader `evt_78ahsj1ge0npp` and confirmed verbatim by the Steward.**
 > **Recorded so it is not lost, deliberately not filed.** It is a third-lane
 > filing under the operator's 2026-08-15 two-lane directive and it queues.
 > **Do not let it grow this node** — `AC-1` through `AC-6` are unchanged.
+>
+> #### CORRECTED: the carve-out assumes each site sits in ONE domain.
+> #### At least one does not.
+>
+> **Architect `evt_7f3216zdn03yy`.** The wording *"some may be misclassified,
+> others genuinely `Unsupported`"* presumes a site can be sorted whole. **The
+> mismatch guard at `mod.rs:18369` is a single refusal over a disjunction
+> spanning both domains:**
+>
+> | program-shape conjuncts | compiler-state conjuncts |
+> |---|---|
+> | `!self.process_object` | `authority.outer_cursor.is_some()` |
+> | frame fingerprint | `self.source_control_root.is_some()` |
+> | `answer_kind != ExitCode` | `active_oriented_semantic_regions != 0` |
+> | result-type fingerprint | `active_subcontinuation_frame.is_some()` |
+> | | `active_join_site.is_some()`, `!consumed_join_sites.contains(...)` |
+>
+> ⇒ **It cannot be reclassified wholesale in either direction. It has to be
+> split**, or **it lands in whichever domain the sweeper noticed first** — and
+> nothing about a wholesale reclassification would look wrong at the time.
+>
+> **An open question, stated as one:** its neighbour at `:18351`, *"terminal
+> answer authority names a missing checked-root site"*, also names a
+> compiler-minted `site_id` and looks condemned by this node's own test. The
+> Architect **did not** establish whether a `native_join_plan` of `None` can
+> reach it from a source program, and neither have I. **Not a verdict.**
 
 **`AC-4`. Do not fold in the static-worker refusal.** That one is a genuine
 statement about Ken programs, is in tension with `45 §3`, and is

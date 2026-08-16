@@ -34,8 +34,10 @@ origin: "Operator, 2026-08-16, on the Steward's relay of research advisory evt_n
 >
 > ⇒ **No enclave language restriction is triggered.** The operator's conditional
 > — *if* a program is found, make it inexpressible — **did not fire.** The
-> guards stand as assertions over a state nothing has been shown to reach, which
-> is the healthy outcome on this ladder.
+> guards stand as assertions over a state **no Ken source program has been
+> shown to reach**. **CORRECTED 2026-08-16 — this clause originally read
+> "a state nothing has been shown to reach", and a `RuntimeExpr` fixture does
+> reach it. See the correction block below.**
 >
 > **What this does NOT establish:** that the state is unreachable. Three shapes
 > is a search, not a proof, and the deeper reading — whether the affine protocol
@@ -60,7 +62,7 @@ origin: "Operator, 2026-08-16, on the Steward's relay of research advisory evt_n
 >
 > | outcome | what it means | what follows |
 > |---|---|---|
-> | **no program found** | the guard is an assertion over a state nothing reaches | healthy; transport is [[RT-ROOT-AUTHORITY-BLAME-DOMAIN]]'s question, not a capability question |
+> | **no program found** | no *Ken source* program reaches it. **NOT "nothing reaches it" — corrected 2026-08-16, a `RuntimeExpr` fixture does** | transport is [[RT-ROOT-AUTHORITY-BLAME-DOMAIN]]'s question, not a capability question |
 > | **a program IS found** | **the language admits a program whose lowering has no valid terminal** | **make that program inexpressible.** Not: represent it, not: support it |
 >
 > ⇒ **A positive result here is bad news about the LANGUAGE, not a feature
@@ -87,8 +89,49 @@ violated by hand.** It says **nothing** about whether anything can violate it.
 
 ⇒ **This is a weaker starting position than the static-worker case had.** There,
 at least, the fixtures built `RuntimeExpr`s. Here the only demonstrations set
-struct fields directly. **The guard has never been shown to fire on input of
-any kind.**
+struct fields directly.
+
+> # CORRECTED 2026-08-16. A `RuntimeExpr` FIXTURE REACHES THE
+> # GUARD, AND DID ALL ALONG.
+>
+> **This paragraph used to end *"the guard has never been shown to fire on input
+> of any kind."* That sentence was false when written.**
+>
+> **Surfaced by CI on `RT-ROOT-AUTHORITY-BLAME-DOMAIN` `D0`-`D2`** (PR #2409,
+> red at `de6cc12c1`). `d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane`
+> (`control.rs:35922`) pins `row1-owned-scope` —
+> `px8j_layered_recursive_result(1, 1)` — to a refusal, and the reclassification
+> candidate's own updated pin renders that refusal as
+>
+> ```
+> Backend(PlannerInvariant("terminal answer has no affine checked-root authority"))
+> ```
+>
+> ⇒ **That is the `:18340` absence-at-consumption guard, fired by a
+> `RuntimeExpr` fixture.** Not hand-set struct fields — a built expression.
+>
+> **What this does NOT touch: the bounded negative.** `D0`/`D1` were scoped to
+> **Ken source through `ken native-build`**, and a `RuntimeExpr` fixture is not
+> that. Runtime's result (`evt_26zesecxs7ndt`) stands exactly as stated, and its
+> closure is unaffected.
+>
+> **What it changes is the shape of what remains open.** The guard is **not** an
+> assertion over a state nothing reaches — the disposition table below reads
+> *"the guard is an assertion over a state nothing reaches"* on the
+> no-program-found branch, and **that gloss is now wrong**; only the
+> Ken-source-specific claim survives. The live question is narrower and better
+> posed: **can Ken source produce this `RuntimeExpr`?**
+>
+> **`px8j_layered_recursive_result` is a far better starting point for that than
+> the three shapes chosen blind**, and it is already a lane-1 campaign fixture.
+> **This is recorded, not filed** — a successor is a third lane under the
+> 2026-08-15 directive and queues.
+>
+> **How it was missed:** `AC-1` barred the `control.rs:958` struct-manipulation
+> route and directed the search at Ken source. Nobody swept `control.rs` for
+> *other* fixtures already reaching the guard, because the frame treated that
+> file as the thing to get past rather than as evidence. **A file excluded as a
+> weak route was never read as a witness corpus.**
 
 ## `D0` — attempt to reach the state from Ken source
 
