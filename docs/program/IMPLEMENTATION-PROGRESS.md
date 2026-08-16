@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 16:23:35Z — from 351 issue file(s) in `docs/program/issues/`.
+2026-08-16 16:45:15Z — from 351 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -291,7 +291,7 @@ the committed file matches the generator's output.
 | `RT-LEXICAL-ROW2-MISSING-MINT` | Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2 | merged | runtime | S | none | — |
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
 | `RT-MATCH-RECURSOR-CONSUMERS` | Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population | merged | runtime | M | none | — |
-| `RT-MATCH-SCRUTINEE-DISPOSITION` | MatchScrutineeRecursor retains three renderings and the tree records no reason -- establish why the functionized lane does not take it before dispositioning it | active | runtime | S | none | — |
+| `RT-MATCH-SCRUTINEE-DISPOSITION` | MatchScrutineeRecursor's retention guard is broader than the capability boundary it stood in for -- measure the difference between retention and routing, then narrow or delete on the result | active | runtime | M | none | — |
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY` | CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition | closed | runtime | M | none | — |
