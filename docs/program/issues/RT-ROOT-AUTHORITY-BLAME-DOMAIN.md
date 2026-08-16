@@ -137,9 +137,53 @@ makes any of the three stop refusing fails outright.
 description of the invariant that exists; the spec has none. Reclassify the
 carrier, not the content.
 
-**`AC-3`. `NativeJoinPlanV1` stops appearing as an `unsupported` construct
-tag.** Verify by grep that no `unsupported(` call site names it, and
-**attribute every hit to its cfg profile before counting it.**
+**`AC-3` (AMENDED 2026-08-16 — the original was a universal the Steward never
+measured; see the block below). The three named root-authority messages no
+longer use an `unsupported("NativeJoinPlanV1", ...)` carrier**, and **every
+remaining hit is attributed as outside the root-authority guard set.**
+Attribute each hit to its cfg profile before counting it. **Wording supplied by
+runtime-leader `evt_78ahsj1ge0npp` and confirmed verbatim by the Steward.**
+
+> ### THE ORIGINAL `AC-3` DEMANDED ~33 SITES. `D1`/`D2` SCOPE THREE.
+>
+> It read *"verify by grep that no `unsupported(` call site names it."*
+> **Discharging that literally would have reclassified the complete
+> `NativeJoinPlanV1` protocol** — far outside the three messages and two test
+> pins this node frames. Runtime-leader caught it before widening and asked
+> rather than guessing. **That was the correct move and the scope stays where
+> `D1`/`D2` put it.**
+>
+> **Steward's own re-census, 2026-08-16, `origin/main`** — `unsupported(`
+> called with `"NativeJoinPlanV1"` as the construct tag:
+>
+> | file | sites | profile |
+> |---|---|---|
+> | `lowering/mod.rs` | 19 | production — the `cfg(test)` blocks begin at `:22241`, after every hit |
+> | `lowering/core.rs` | 13 | production |
+> | `planning.rs` | 2 | `:170` production; `:336` is a test assertion under the `cfg(test)` block at `:219` |
+>
+> ⇒ **~33 production sites carry the tag. Exactly three are this node's.**
+>
+> **How the AC got written: a line-local grep.** The three guards span the
+> `unsupported(` call across multiple lines, so a single-line
+> `grep 'unsupported("NativeJoinPlanV1"'` returns **one** hit — `planning.rs:170`,
+> which is not one of them. **The census that produced "no call site names it"
+> could not see its own subject.** A multi-line-aware grep returns 34.
+>
+> **The tag is therefore not a discriminator for the root-authority guards**,
+> and any future AC keyed on it must name the guards, never the tag.
+
+> ### THE OTHER ~30 SITES ARE A QUESTION, AND THEY ARE NOT THIS NODE'S
+>
+> The same fault-domain test that condemns these three — *"who had the last
+> valid chance to satisfy the condition?"* — has **not** been applied to the
+> rest of the protocol, and some of them may be equally misclassified. **Others
+> will be genuine `Unsupported`**, since `NativeJoinPlanV1` decode failure on
+> client-supplied metadata (`planning.rs:170`) is a real external-input case.
+>
+> **Recorded so it is not lost, deliberately not filed.** It is a third-lane
+> filing under the operator's 2026-08-15 two-lane directive and it queues.
+> **Do not let it grow this node** — `AC-1` through `AC-6` are unchanged.
 
 **`AC-4`. Do not fold in the static-worker refusal.** That one is a genuine
 statement about Ken programs, is in tension with `45 §3`, and is
