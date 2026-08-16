@@ -1,13 +1,13 @@
 ---
 id: RT-SECOND-RECOGNITION-ERASURE
 title: "Determine whether the depth-2/3 static-worker rebind is a succession of one obligation or two distinct ones, and select the disposition on that fact -- erasure is REFUTED and is no longer this node's deliverable"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-EMITTED-WORKER-CONSUMER-WALK]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2377
 origin: "Architect ruling evt_3cxm6654d5cjb, 2026-08-15, splitting the population measured by RT-EMITTED-WORKER-CONSUMER-WALK D0. Every symbol below was located by name against origin/main ac8a73d1b by the Steward before filing, and the ruling's mechanism attribution is corrected here on that basis. Steward-filed per COORDINATION section 2."
 ---
 

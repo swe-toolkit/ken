@@ -90,6 +90,35 @@ ambiguity and refuses. **Both fail closed, and saying so is the repair.**
 reason. **A general "skip suspicious constants" heuristic is out of scope and
 would be a guess.**
 
+> ### POST-MERGE, ON `AC-2`. TWO CORRECTIONS THAT DO NOT REOPEN THE NODE.
+>
+> **From Adversary `evt_44194ewx0dxa`, hunting `1a4a1f723..a92364e2e`.
+> Recorded here so the next reader of `AC-2` sees them, not sent back as work.**
+>
+> **1. `AC-2` IS FORCED, and it is forced BY A SCOPE BOUND.** The uniqueness
+> holds and was re-derived independently: for a bare `Const` in a `Pi` domain
+> the quoter either quotes the sort as a binder, reads `bottom_id` as
+> `IForm::Bottom`, or fails `Err(UnsupportedTermShape)` — **so `bottom_id` is
+> the unique constant on which the quoter SUCCEEDS with a non-sort reading.**
+>
+> **But `env.top_id()` exists** (`ken-kernel/src/env.rs:327`, beside
+> `bottom_id` at `:334`) and is not excluded **only because this slice's
+> `IForm` has no `Top`.** The module doc names that widening twice (`:9`,
+> `:347`). ⇒ **When `IForm::Top` lands, `⊤ -> q` reproduces this exact
+> over-collection.** **The DERIVATION is durable; the LIST is not.** The repair
+> — state the criterion rather than the constant — is `D2` of
+> [[V3-FO-SUBST-DEPTH-CONTROL]]. **Do not exclude `top_id` now:** with no
+> quoter arm behind it that would fit a future tree, which this `AC-2` forbids.
+>
+> **2. The discriminating pair pins the ENDPOINTS, not the INTERVAL.** Dropping
+> the predicate reds the new test; widening it to every `Const` reds the
+> positive-route test. **But an intermediate — `*id != bottom_id && *id !=
+> top_id` — leaves `A` untouched and passes both.** ⚠ **And that specific
+> intermediate is the one that will eventually be correct**, so the pair cannot
+> distinguish a premature-but-eventually-right widening from a heuristic one.
+> **Not a defect: it does what it claims for the two directions available
+> today. Do not cite it as pinning the predicate exactly.**
+
 **`AC-3`.** No FO `Proved`, no slice widening, no new kernel primitive or
 trusted axiom, no change to `quote_iform`, `check_tree`, or `check_cert`.
 
