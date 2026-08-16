@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 03:49:18Z — from 336 issue file(s) in `docs/program/issues/`.
+2026-08-16 04:09:40Z — from 337 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -273,9 +273,10 @@ the committed file matches the generator's output.
 | `RT-FNSPLIT-C3-ACTIVATION` | the opaque activation owner — one Rust representation authority in ken-runtime that constructs, publishes and tears down per-invocation boundary storage, with the deployment-supplied capacity profile and the one-argument public adapter seam | merged | runtime | L | none | 1181 |
 | `RT-FNSPLIT-RECUR-PORT` | emission-port completion — the governed nested-bracket family (recursive ComputationalMatch + trap arms) must select FunctionizedUnits, so RT-SCALE-B can measure the completed population | merged | runtime | XL | none | — |
 | `RT-FNUNIT-RESULT-TOKEN` | Broad starter shapes fail the result-token table on the FunctionizedUnits lane — pre-existing, unmasked by retiring SeedClosureCall | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1892 |
+| `RT-FORCED-RETURNS-BOUND-RESTORE` | One clause: the six ignored tests' eighteen empty returns are FORCED by the refusal, not observed -- the measurement the Architect barred from this comment came back one repair later, and it now sits one sentence above the 81-return tally a reader will add it to | active | runtime | XS | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |
 | `RT-GROUNDVALUE-RECURSIVE-DROP` | `RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a deeply nested value overflows the stack in its own `drop`, reproducible without the decoder, and the depth at which that happens is UNMEASURED: the two numbers in the source report are an observed abort and a deliberately-safe control, not a bisected threshold | draft | runtime | unknown | none | — |
-| `RT-IGNORED-CORPUS-MEMBERSHIP-RULE` | State the measurement corpus's exclusion by its membership rule -- all 33 ignored tests -- rather than by the six whose stated reason matched, which re-selects by reason at one scale down from the defect just repaired | active | runtime | XS | none | — |
+| `RT-IGNORED-CORPUS-MEMBERSHIP-RULE` | State the measurement corpus's exclusion by its membership rule -- all 33 ignored tests -- rather than by the six whose stated reason matched, which re-selects by reason at one scale down from the defect just repaired | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/2389 |
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
 | `RT-JOIN-ORIGIN-ATTRIBUTION` | A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong | merged | runtime | S | none | — |
 | `RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT` | Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned | closed | runtime | M | none | — |
@@ -296,7 +297,7 @@ the committed file matches the generator's output.
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | active | runtime | M | none | — |
-| `RT-REFUSAL-CONSEQUENCE-RESTORE` | Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed | active | runtime | S | none | — |
+| `RT-REFUSAL-CONSEQUENCE-RESTORE` | Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2390 |
 | `RT-REQUIRED-CONSUMER-REACH-CENSUS` | The projection mints an entry only where required differs from source, so row 4 depth 1 is excluded from the new surface BY CONSTRUCTION -- census which rows the surface reaches, and attribute by SENTENCE the Closure refusal depths 2 and 3 now sit at | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2305 |
 | `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | merged | runtime | M | none | — |
 | `RT-SCALE-A` | Boundary A — re-derive the planner census for n=3..7 against the COMPLETED factored representation, superseding the provisional outer-planner numbers | merged | runtime | M | none | — |

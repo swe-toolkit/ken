@@ -95,6 +95,24 @@ required fields available** — stable lane, target symbol, construct, reason.
 If no caller has all four, that is the finding and it is a hand-back, not a
 licence to synthesize a placeholder.
 
+> ### `D0` MUST ANSWER PER SITE-CLASS, NOT ONCE. Adversary `evt_3t1vb90y5yxwj`.
+>
+> **"All four sites share the shape" is true for the negative result and may be
+> false for the repair.** The four split two and two:
+>
+> | site | constructs |
+> |---|---|
+> | `api.rs:370`, `api.rs:417` | `CraneliftObjectArtifact` |
+> | `api.rs:879`, `api.rs:945` | `CraneliftRunReport` |
+>
+> ⇒ **`48 §5.4`'s obligation is a NATIVE-ARTIFACT binding.** The two
+> run-report sites may fall outside it entirely, or may need a different
+> treatment. **`D0` must say which**, because a single answer covering all four
+> would either over-scope the repair onto run reports or silently skip them.
+>
+> **This distinction was absent from the node as first filed** and is a sizing
+> input, not a detail.
+
 **`D1` — emit the `unsupported` binding on the refusal path**, with
 `ExecutableUnsupportedLane::RuntimeIrConstruct` as the lane and the refusal's
 own stable reason. `D0`'s answer determines the site.

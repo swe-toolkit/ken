@@ -1,13 +1,13 @@
 ---
 id: RT-IGNORED-CORPUS-MEMBERSHIP-RULE
 title: "State the measurement corpus's exclusion by its membership rule -- all 33 ignored tests -- rather than by the six whose stated reason matched, which re-selects by reason at one scale down from the defect just repaired"
-status: active
+status: merged
 owner: runtime
 size: XS
 gate: none
 depends_on: [RT-BOUNDARY-IGNORED-CORPUS-MEASURE]
 blocks: []
-github: null
+github: "https://github.com/swe-toolkit/ken/pull/2389"
 origin: "Steward, 2026-08-16, on Adversary hunt evt_6d81evnk2nyfn against the merged range 2b4ad0faa..c88a5e423 (PR #2381). The 33/161 census and the per-node breakdown were re-counted against the tree by the Steward before filing. Steward-filed per COORDINATION section 2."
 ---
 
