@@ -1,15 +1,49 @@
 ---
 id: RT-MATCH-SCRUTINEE-DISPOSITION
-title: "MatchScrutineeRecursor's retention guard is broader than the capability boundary it stood in for -- measure the difference between retention and routing, then narrow or delete on the result"
-status: active
+title: "MatchScrutineeRecursor's retention guard was broader than the capability boundary it stood in for -- NARROWED to retain exactly when the ordinary producer route declines; the difference is non-empty, so the variant survives load-bearing"
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: []
 blocks: [RT-DESCENT-RETIRE]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2458
 origin: "Architect ruling evt_620806vfy5kwm (2026-08-16) on RT-DESCENT-RETIRE's D1 hard stop, verbatim: 'MatchScrutineeRecursor is UNMEASURED, and symmetry is not an argument for it. Its entire doc is one line. No reason is recorded. Nothing in the tree says whether it is an unbuilt port or a shape the functionized lane would correctly refuse. I will not rule it by analogy to its neighbour.' Population fixed by runtime measurement A/B at exact 3523868afe7cd84b47c7b07281ff7df7c3202d61 (runtime-implementer evt_4v0frfza70d2m). RECUT 2026-08-16 on Architect ruling evt_29rrwtbh48n8z: D1 returned a third disposition that neither authorized outcome covers; deliverables re-split to measure-the-difference then narrow-or-delete. Steward-filed per COORDINATION section 2."
 ---
+
+> # MERGED at PR #2458. THE OUTCOME, so nobody reads the deliverables as open.
+>
+> **`D1`** returned a third disposition — the port is not missing and the rule is
+> not a correct refusal; the guard was simply broader than the boundary it stood
+> in for.
+>
+> **`D2a`** constructed an expression **in the difference**: a one-case
+> `ComputationalMatch` with `recursive_positions=[0]` whose scalar body fails
+> `produces_deforestable_aggregate_with_ih`. Retained today; with the residual
+> excluded it reaches the ordinary route's exact *"scrutinee is not a constructor
+> value"* refusal. **The difference is non-empty.**
+>
+> **`D2b`** attempted source-reachability and **honestly stopped short** — the
+> program normalized before the runtime classifier, and a failed search is not
+> the method gate's argument. **No unreachability or deletion claim was made**,
+> and that restraint is what kept the record sound.
+>
+> **`D3-narrow`** landed: one shared predicate drives both the selector and the
+> enumerator, retaining exactly when the ordinary producer route declines.
+> Behaviour-preserving — the three intersection renderings left the residual set
+> and still compile, and the executable row still returns
+> `Returned(Int(Small(7)))`. The Architect additionally required a **differential
+> equality control** against a constructed `Lowering`, which reds on `A` drift,
+> `B` drift, **and a future third routing disjunct** — a `B == false` pin would
+> not have.
+>
+> ## `D3-delete` WAS NOT TAKEN, and it is no longer this node's
+>
+> **`MatchScrutineeRecursor` survives in reduced, load-bearing form**, so
+> [[RT-DESCENT-RETIRE]] may delete nothing on present evidence. **The discharge
+> moved to [[RT-MATCH-DIFFERENCE-REACHABILITY]]**, filed because a bar that cites
+> an un-taken branch of a *merged* node names no owner and no dispatchable work.
+> **Route any future source-reachable finding there, not against this node.**
 
 ## What this node is
 
@@ -87,7 +121,8 @@ retention guard's subject is an *immediate* `ComputationalMatch`, never a
 and a different subject — per-case positions versus per-case bodies. An
 existential over one property cannot imply a universal over another.** The two
 guards can coincide only *contingently*, if the difference happens to be
-unreachable. That is the measurement this node now owes.
+unreachable. **That measurement was attempted at `D2b`, did not settle, and is
+now [[RT-MATCH-DIFFERENCE-REACHABILITY]]'s.**
 
 ### The difference, stated exactly
 
@@ -163,6 +198,12 @@ unchanged across the whole campaign.
 > selector**, including when constructing the witness below.
 
 ## Deliverables
+
+> **ALL DISCHARGED — this section is the record of what was ASKED, in the
+> imperative it was written in. The answers are in the outcome block at the top.**
+> `D1` answered, `D2a` proved the difference non-empty, `D2b` stopped short
+> without a claim, `D3-narrow` landed and `D3-delete` was not taken. **Nothing
+> below is open work.**
 
 **`D1` — ANSWERED. Do not re-run it.** The mechanism question is settled: the
 functionized lane *does* take all three renderings, and the disposition is the
@@ -273,15 +314,19 @@ only.
 
 ## Sequencing
 
-**`active`, `depends_on: []`.** The population is fixed by hash and nothing gates
-this node.
+**`merged` at PR #2458.** Published from exact
+`b7bb88c6dab8b4b65886b59159943aa07d3cc9aa`, base `d44482f06`, two non-merge
+commits, three paths, `+346/-157`. QA `evt_5j2pbqncf7pxd`, Decision
+`dec_1g7ef2t0ddd7k` resolved by the Architect on that exact SHA.
 
-**It is the LAST remaining condition on [[RT-DESCENT-RETIRE]].**
-[[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]] is `merged`; the capstone stays `draft`
-until this lands, and `draft` there means blocked, not unframed.
+**It was NOT the last remaining condition on [[RT-DESCENT-RETIRE]], though it
+was filed as one.** The narrowing left the variant load-bearing, so the capstone
+is still barred — now by [[RT-MATCH-DIFFERENCE-REACHABILITY]], which carries the
+sole discharge. **The capstone stays `draft`, and `draft` there means blocked,
+not unframed** — but the reason changed from *"a dependency has not landed"* to
+*"the retained difference is unmeasured for source-reachability."*
 
-**This node may now touch `crates/`** — `D3-narrow` is a classifier change. That
-makes the eventual candidate subject to the Adversary pass at merge, which the
-lexical node never owed. Size raised `S` to `M` on the recut.
+**This node touched `crates/`** — the classifier change — so its merge took the
+full Adversary pass, which the lexical node never owed.
 
 **Lane 1 under the operator's 2026-08-15 two-lane directive.**
