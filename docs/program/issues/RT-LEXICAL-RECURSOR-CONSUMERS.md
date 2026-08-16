@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER, RT-CONTKEY-CONSUMING-OCCURRENCE, RT-CONTKEY-CONSUMER-DESCENT-CARRY, RT-CONTKEY-ROUTE-CLOSURE-PROBE, RT-REQUIRED-OCCURRENCE-PROJECTION]
+depends_on: [RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-R3-FUSION-EMITTER, RT-CONTKEY-CONSUMING-OCCURRENCE, RT-CONTKEY-CONSUMER-DESCENT-CARRY, RT-CONTKEY-ROUTE-CLOSURE-PROBE, RT-REQUIRED-OCCURRENCE-PROJECTION, RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT]
 blocks: [RT-RECURSOR-TRANSPORT]
 github: null
 origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT hard stop 4, narrowed to rows 1-5 by the re-rule evt_3r4j14fv1jtj2 on the nine-expression census evt_16cmej481q7ns. Campaign docs/program/16-recursive-descent-retirement.md node #6d. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -56,8 +56,11 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > ### THE ROUTE QUESTION IS [[RT-CONSUMING-OCCURRENCE-ROUTE-WIRE]]
 >
 > **UPDATED 2026-08-15 — that node is `merged`, and so are the two after it.**
-> The live successor is now [[RT-CROSSING-CALL-SITE-ATTRIBUTION]] (`ready`,
-> `S`); [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] merged with `D1`-`D5` delivered.
+> The route question's successor was [[RT-CROSSING-CALL-SITE-ATTRIBUTION]];
+> **it has since merged, and it did NOT carry this node's remaining
+> dispositions — see the 2026-08-16 correction below, which names
+> [[RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT]] as the live one.**
+> [[RT-REQUIRED-CONSUMER-REACH-CENSUS]] merged with `D1`-`D5` delivered.
 > Route-wire measured the depth-2+ boundary to be a representation problem;
 > [[RT-REQUIRED-OCCURRENCE-PROJECTION]] built the lawful surface and advanced
 > **row 4 depths 2 and 3** to a `Closure` refusal at `66715f9fb`. **Row 4 depth 1
@@ -570,6 +573,43 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > recorded** — repaired, or refused with the spec clause and the pre-retirement
 > behaviour accounted for. **Compile-green does not close this node** and never
 > did.
+
+> # CORRECTION 2026-08-16 — "the successor" ABOVE NAMES A NODE THAT MERGED
+> # WITHOUT CARRYING THE WORK. The live successor is
+> # [[RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT]].
+>
+> **Steward. The two paragraphs directly above are the defect, not a pointer.**
+> They delegate this node's remaining population to
+> [[RT-CROSSING-CALL-SITE-ATTRIBUTION]] — *"it is now `D2b` of the successor"*,
+> *"its remaining population is dispositioned in the successor"*. **That node
+> merged carrying no `D2b` and no row-1 content.** The delegation outlived its
+> target, so for a day this node advertised work as owned elsewhere while
+> **nobody owned it** — which is why no seat was idle *waiting* and the campaign
+> read from outside as blocked on a decision.
+>
+> **A defect spanning two nodes has a half owned by nobody.** Neither node was
+> individually wrong at the moment it was written; the edge between them is
+> where the work fell.
+>
+> ## The three expressions this node still owns, and where they now live
+>
+> | expression | wall | now dispositioned in |
+> |---|---|---|
+> | `row 4 depth 1` | `StaticWorkerBinding` conservation | `D1` of the live successor |
+> | `row 5 after-hole` | `StaticWorkerBinding` conservation | `D1` of the live successor |
+> | `row 1 owned-scope` | `NativeJoinPlanV1` | `D2` of the live successor |
+>
+> **The closure criterion above is unchanged and still binds** — repaired, or
+> refused with the account. What the successor adds is the operator's 2026-08-16
+> third option: a refusal no Ken source program can reach is **a proper compiler
+> assert/invariant**, recorded as such with its control retained and re-described
+> as pinning the lowering's internal contract. That is a disposition, and it
+> closes a row.
+>
+> **The dependency edge is now in this node's `depends_on`**, not only in the
+> successor's `blocks`. `scripts/gen-progress.sh` reads `depends_on` and nothing
+> else, so the `blocks` edge the successor declared at filing was invisible to
+> every generated view — the same class of gap as the prose delegation above.
 
 > # R3 MERGED. THE BLOCKER IS DISCHARGED AND THE STATUS IS NOW `ready`.
 > # Steward, 2026-08-14. Nothing was un-landed and nothing is re-ranked.
