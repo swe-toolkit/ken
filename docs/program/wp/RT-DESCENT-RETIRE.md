@@ -1,9 +1,19 @@
 # RT-DESCENT-RETIRE — delete the selector, the enum, the authority, and the lane
 
-**With all five residual classes retired, the migration selector still exists,
-still evaluates on every compilation, and the `RecursiveDescent` emission lane is
-still compiled in — dead. This node deletes it. That residue is the tech debt the
-directive names, so this is a required node, not a tidy-up.**
+**Four residual classes were retired by porting and two were DISPOSITIONED —
+`LexicalCallArgumentRecursor` as fixture-only and `MatchScrutineeRecursor` as
+capability-inert — so the migration selector still exists, still evaluates on
+every compilation, and the `RecursiveDescent` emission lane is still compiled
+in and still selected by 28 fixture entries. This node deletes it. That residue
+is the tech debt the directive names, so this is a required node, not a
+tidy-up.**
+
+> **The lede used to read *"with all five residual classes retired ... the lane
+> is dead."* `D1` measured 28 live selections at `97b963ac4` and it is corrected
+> above rather than left to mislead.** The lane is **not** dead; it is
+> **dispositioned**, which is a different claim and the one this node acts on.
+> Both dispositions defer the variant's actual retirement to this node. See
+> `D1`, `D2b` and the re-aimed hard stop in section 7.
 
 **Owner:** Team Runtime. **Branch:** `wp/RT-DESCENT-RETIRE`. **Size:** M.
 **Risk:** medium — a wide deletion across five production files, with a
@@ -99,10 +109,86 @@ the proof is unavailable and any argument for it is circular.
 ## 4. Deliverables
 
 - **`D1` — Capture the spent-oracle evidence, BEFORE any deletion.** On the
-  pre-deletion tree, with all five classes retired: run the full-residual
-  enumeration over every measured program and the whole test corpus, and record
-  that **no residual fires anywhere** and **no program selects
-  `BodyEmissionAuthority::RecursiveDescent`**. Post this before `D2`.
+  pre-deletion tree: run the full-residual enumeration over every measured
+  program and the whole test corpus, and **record every residual that fires and
+  every program that selects `BodyEmissionAuthority::RecursiveDescent`.** Post
+  this before `D2`.
+
+  > ### `D1`'s ZERO-SELECTION EXPECTATION WAS NEVER REACHABLE. Corrected 2026-08-16.
+  >
+  > **This deliverable used to require *"no residual fires anywhere"* and *"no
+  > program selects `RecursiveDescent`"*, conditioned on *"all five classes
+  > retired."*** It ran at `97b963ac4` and returned **28 selections across 18
+  > tests — 27 lexical-call-argument, 1 match-scrutinee.**
+  >
+  > **Zero was unreachable by construction.** The campaign retired four variants
+  > by porting and **dispositioned** two; "no port owed" was never "no selections
+  > remain." [[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]]'s ratified disposition says
+  > the variant *"is re-described as fixture-only with the retained lane and
+  > **retires when `RT-DESCENT-RETIRE` removes that lane.**"* ⇒ **The variant
+  > cannot stop selecting until this node acts, and the old text forbade this
+  > node from acting until it stopped selecting.**
+  >
+  > **The corrected expectation** (Architect `evt_98zg6sbqh7ej`): *the surviving
+  > selections are the two dispositioned populations, pinned by test name and
+  > rendering at `97b963ac4`.*
+  >
+  > **The warrant is a differential across two SHAs, not an arithmetic
+  > partition.** An earlier `D1` found **31 selections across 20 tests = 27 L +
+  > 4 M**; today's found **28 across 18 = 27 L + 1 M**. The lexical population
+  > was predicted stable by its own node's `AC-5` and is stable, 27 to 27; the
+  > match population was predicted to shrink under the
+  > [[RT-MATCH-SCRUTINEE-DISPOSITION]] narrowing and shrank, 4 to 1. **Two
+  > populations moved independently, each exactly as its own node predicted.**
+  >
+  > **Do NOT rest this on `27 + 1 = 28`.** `RecursiveDescentResidual` has
+  > exactly two live variants at `97b963ac4` (`lowering/core.rs:2015-2025`;
+  > `TransparentDeclarationClosure` was retired by `RT-DECL-CLOSURE-PORT` `D6`),
+  > so every selection is necessarily one of the two. **"No third class" is true
+  > by construction and carries no information** — it is a property of the enum,
+  > not evidence about the sites.
+
+- **`D2b` — THE PINNED POPULATION. TRANSCRIBED BELOW BY THE STEWARD; nothing is
+  owed for it.** Architect `evt_98zg6sbqh7ej` required this before `D2c` is
+  entered; `D1` produced the names (runtime-leader `evt_6tn48svtnnc4s`) and this
+  is transcription, not measurement.
+
+  **THE PIN — 28 selections across 18 tests, at exact `97b963ac4`.** Selection
+  count in parentheses. **Every entry is `LexicalCallArgumentRecursor` except
+  the one marked `M`.**
+
+  | # | test | sel | rendering |
+  |---|---|---|---|
+  | 1 | `recursive_computational_aggregate_traverses_ordinary_frame` | 1 | L |
+  | 2 | `recursive_computational_host_result_keeps_established_dynamic_lane` | 1 | L |
+  | 3 | `d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin` | 1 | L |
+  | 4 | `d0_row2_functionized_lane_never_reaches_the_source_machine_mint` | 1 | L |
+  | 5 | `d2e_ac9_layout_agrees_with_the_prefix_production_assembled` | 1 | L |
+  | 6 | `d2f_0_the_applied_root_production_path_gate` | 1 | L |
+  | 7 | `d2f_a_production_compile_builds_the_fusion_identity_plane` | 1 | L |
+  | 8 | `d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed` | 5 | L |
+  | 9 | `d8_every_required_join_plan_is_consumed_exactly_once` | 2 | L |
+  | 10 | `msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference` | 1 | **M** |
+  | 11 | `px8j_all_three_producer_paths_reach_real_consumers` | 1 | L |
+  | 12 | `px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind` | 3 | L |
+  | 13 | `px8j_owned_scope_deletion_fails_closed_before_another_frame_is_emitted` | 2 | L |
+  | 14 | `px8j_selected_scope_partitions_differ_across_the_real_return_hole` | 2 | L |
+  | 15 | `px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin` | 1 | L |
+  | 16 | `recursive_descent_recursors_compile_without_a_boundary_crossing` | 2 | L |
+  | 17 | `row2_functionized_lane_installs_and_consumes_the_recursive_ih` | 1 | L |
+  | 18 | `rt_d1_the_exact_position_b_witness_carries_without_a_port` | 1 | L |
+
+  **27 L + 1 M = 28. Sum verified against the per-test counts, not assumed.**
+
+  **The single `M` is row 10, and it is the natural one:** that test is
+  [[RT-MATCH-SCRUTINEE-DISPOSITION]]'s own `D2a` control — the one asserting the
+  retention and routing guards have a concrete difference. It is the surviving
+  `M` selection because it is the test built to exhibit exactly that.
+
+  > **This set is FROZEN. It is what makes the expected-red clause falsifiable.**
+  > `D2c` licenses a red on these 18 as an expected shape, and **an expected set
+  > defined after the run by whatever actually reds is a null oracle.** Do not
+  > widen it after seeing CI. Widening it is the finding, not the fix.
 - **`D2` — A positive control on `D1`'s instrument.** Reintroduce one residual
   temporarily and confirm the enumeration **reports it** and the authority
   **flips to `RecursiveDescent`**. Restore byte-identically.
@@ -132,6 +218,31 @@ the proof is unavailable and any argument for it is circular.
   is standing policy (`COORDINATION §10⁻`); here it is load-bearing rather than
   convenient, because a revert of step 1 must restore production routing in a
   single commit.
+
+  > ### HOW TO READ A RED. Three conditions, Architect `evt_98zg6sbqh7ej`.
+  >
+  > **1. A red from a program NOT in `D2b`'s pinned set is the HARD STOP, in
+  > full.** That is exactly the surviving-class case section 7's carve-out was
+  > written for, and `D2c` is what surfaces it as a concrete failing program
+  > instead of an argument. **The stop is re-aimed, not retired.**
+  >
+  > **2. A red INSIDE the set is adjudicated PER TEST, never excused per set.**
+  > Each one individually: a test asserting a property **of the retiring lane**
+  > retires or is re-homed under `D6`; a test asserting a **semantic property
+  > reachable on the surviving lane** means the lane is capability-load-bearing
+  > after all and **the retirement is blocked.** ⇒ **"Expected shape" licenses
+  > WHICH tests may red. It never licenses what a red MEANS.**
+  >
+  > **3. Fixture-only does not make a fixture safe to delete.** `0/12` source
+  > reachability bounds what a red costs in **user-facing capability**; it does
+  > not make the fixture worthless, because **a fixture can be the only witness
+  > for a shape.** That is the `nc22` reasoning this node's own release gate
+  > turned on — retiring the witness alongside the capability removes both in
+  > one commit. Most of the twelve will legitimately retire with the lane they
+  > exercise; **the one to watch is a fixture that incidentally witnesses
+  > something on the SURVIVING lane.** `AC-5` and `D6` cover it, and it is
+  > stated here because the pressure under a line reading *"expected shape,
+  > route it"* runs toward deletion.
 
 > ### `D3` THROUGH `D8` ARE STEP 2, GATED ON `D2c` GREEN IN CI.
 >
@@ -321,6 +432,17 @@ the proof is unavailable and any argument for it is circular.
   expectation, or re-described from reasoning rather than from that
   measurement, does not discharge this.**
 
+- **`AC-8` — the expected-red set was FROZEN BEFORE the run.** `D2b`'s pinned
+  18 tests / 28 selections landed on `main` ahead of the `D2c` candidate, and
+  the set used to classify CI results is that one, unwidened. **A set enlarged
+  after seeing which tests actually red does not discharge this** — it is a null
+  oracle, and the enlargement is itself the finding to route.
+
+- **`AC-9` — every red inside the set is adjudicated INDIVIDUALLY**, each
+  recorded as either lane-specific (retire or re-home under `D6`) or a semantic
+  property reachable on the surviving lane (**the retirement is blocked**). A
+  per-set disposition does not discharge this, and neither does a count.
+
 - **`AC-7` — the two steps are SEPARATE CANDIDATES.** `D2c` merged, with the
   full workspace suite and conformance green in CI, **before any deletion
   lands**. A single candidate that both reroutes and deletes **fails this AC
@@ -360,3 +482,48 @@ to the Steward as a node** — not to delete around it.
 > compiler invariants at PR #2440 and their disposition is `D8`'s subject, not
 > this gate's. **If `D1` does surface a program that selects the authority, the
 > hard stop applies in full** — that is a surviving class and it is a node.
+
+> ### THAT CARVE-OUT FIRED ON 2026-08-16 AND WAS RULED AGAINST ON SUBSTANCE.
+> ### IT IS RE-AIMED AT DELETION, NOT RETIRED. Architect `evt_98zg6sbqh7ej`.
+>
+> **`D1` surfaced 28 selections. The clause above is literal, post-dates both
+> dispositions, and fired.** It does not block `D2c`. Three legs, each
+> independently sufficient:
+>
+> **1. The stop already fired on THIS population and the remedy was already
+> performed — twice.** [[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]] opens:
+> *"`RT-DESCENT-RETIRE`'s `D1` found this variant live only in fixtures.
+> Production selects `BodyEmissionAuthority::RecursiveDescent` 31 times across 20
+> tests, and 27 of those selections carry `LexicalCallArgumentRecursor`."*
+> **That node exists BECAUSE this stop fired.** The campaign named the surviving
+> class and handed it back as node work; both nodes were built and both merged.
+> And that node's ratified disposition says the variant *"is re-described as
+> fixture-only with the retained lane and **retires when `RT-DESCENT-RETIRE`
+> removes that lane.**"* ⇒ **The 27 surviving lexical selections are the ratified
+> expectation of a merged node, not a discovery. Firing the stop again is double
+> jeopardy on a discharged stop.**
+>
+> **2. Gating on zero selections permits `D2c` only when it is VACUOUS.** With
+> zero, the reroute is a no-op, CI is trivially green, and nothing is learned.
+> `D2c` carries evidentiary weight in exact proportion to the live selection
+> count. **The defect is not that the two requirements contradict** — in a
+> zero-selection world `D1` passes and `D2c` is merely unnecessary. **It is that
+> the stop routes the NON-zero world to "halt" when the campaign has already
+> built the instrument for exactly that world.**
+>
+> **3. `D2c` cannot realize the harm the stop exists to prevent.** The stop
+> guards against deleting a lane something still uses. **`D2c` deletes nothing**,
+> is one revertible change, and surfaces any dependent program as a concrete
+> failing CI row. Its premise is *"you are about to delete."* `D2c` is not
+> deleting.
+>
+> **Leg 3 holds even if the 28 were wholly unattributed** — an unexplained
+> population would make `D2c` MORE urgent, not less, since it is the only
+> instrument that names such programs concretely rather than by argument. ⇒
+> **The attribution recorded under `D1` is corroboration and must not be
+> load-bearing.**
+>
+> ⇒ **The stop's live form is `D2c`'s condition 1: a red from a program OUTSIDE
+> `D2b`'s pinned set.** A live selection is not a surviving class **while nothing
+> is being deleted**; it becomes one the moment deletion is on the table without
+> the differential — which is why `D3`-`D8` stay gated on `D2c` green.
