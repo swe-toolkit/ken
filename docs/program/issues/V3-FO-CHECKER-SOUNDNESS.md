@@ -80,8 +80,10 @@ would buy, and it would put a load-bearing metatheorem into the trusted base.
 
 ⇒ **The last two rows are why `D0` exists and why it may hard-stop.**
 Everything this node needs is specified and kernel-supported; whether it is
-*writable in a `.ken` file today* is an unanswered question, and it is answered
-by elaborating a file, not by reading the kernel.
+*writable in a `.ken` file today* is an unanswered question. **A YES is answered
+by elaborating a file. A NO is answered by the grammar** — see the closeout;
+this sentence originally prescribed elaboration for both, and that is wrong in
+the direction that matters, because the NO is the answer this node got.
 
 > **`D0` ANSWERED THE TRUNCATION ROW AND IT IS A NO — read the closeout below
 > before acting on the row above.** The row stands as written because it records
@@ -147,8 +149,10 @@ is a defect.**
 
 **Candidate `c367ceb13`, PR #2424, Decision `dec_2dvn8t1xxhwdh`.** QA
 `evt_z2p3b0zkn1ga`, Architect `evt_38f22rwkq90ry`. One new test file, `+232/-0`,
-purely additive. All three parts established by elaborating `.ken`, not by
-reading the kernel, and reported separately as `AC-5` required.
+purely additive. All three parts were **probed** by elaborating `.ken` and
+reported separately as `AC-5` required. **Parts (1) and (3) are established by
+that probe. Part (2) — the hard stop — is not, and is established by the grammar
+instead; see below before citing it.**
 
 | part | result |
 |---|---|
