@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 00:01:33Z — from 327 issue file(s) in `docs/program/issues/`.
+2026-08-16 00:05:42Z — from 327 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -282,7 +282,7 @@ the committed file matches the generator's output.
 | `RT-LEXICAL-ROW2-MISSING-MINT` | Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2 | merged | runtime | S | none | — |
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
 | `RT-MATCH-RECURSOR-CONSUMERS` | Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population | merged | runtime | M | none | — |
-| `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | ready | runtime | S | none | — |
+| `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NESTED-IH-NATIVE-REALIZATION` | Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3 | active | runtime | L | none | — |
 | `RT-PARITY` | interpreter/native parity erratum (adversary F5 + F6) | closed | runtime | M | none | — |
@@ -389,7 +389,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-MINT-SITE-STATIC-DISCRIMINATOR` — Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SECOND-RECOGNITION-ERASURE` — Determine whether the depth-2/3 static-worker rebind is a succession of one obligation or two distinct ones, and select the disposition on that fact -- erasure is REFUTED and is no longer this node's deliverable
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
