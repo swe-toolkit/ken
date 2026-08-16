@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 16:13:11Z — from 351 issue file(s) in `docs/program/issues/`.
+2026-08-16 16:23:35Z — from 351 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -285,13 +285,13 @@ the committed file matches the generator's output.
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
 | `RT-JOIN-ORIGIN-ATTRIBUTION` | A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong | merged | runtime | S | none | — |
 | `RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT` | Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned | closed | runtime | M | none | — |
-| `RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT` | LexicalCallArgumentRecursor's twelve fixed renderings are fixture-only -- no port is owed and the variant is re-described with the retained lane | active | runtime | M | none | — |
+| `RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT` | LexicalCallArgumentRecursor's twelve fixed renderings are fixture-only -- no port is owed and the variant is re-described with the retained lane | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2454 |
 | `RT-LEXICAL-R3-FUSION-EMITTER` | Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge | merged | runtime | M | none | — |
 | `RT-LEXICAL-RECURSOR-CONSUMERS` | Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam | merged | runtime | M | none | — |
 | `RT-LEXICAL-ROW2-MISSING-MINT` | Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2 | merged | runtime | S | none | — |
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
 | `RT-MATCH-RECURSOR-CONSUMERS` | Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population | merged | runtime | M | none | — |
-| `RT-MATCH-SCRUTINEE-DISPOSITION` | MatchScrutineeRecursor retains three renderings and the tree records no reason -- establish why the functionized lane does not take it before dispositioning it | ready | runtime | S | none | — |
+| `RT-MATCH-SCRUTINEE-DISPOSITION` | MatchScrutineeRecursor retains three renderings and the tree records no reason -- establish why the functionized lane does not take it before dispositioning it | active | runtime | S | none | — |
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY` | CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition | closed | runtime | M | none | — |
@@ -413,7 +413,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-MATCH-SCRUTINEE-DISPOSITION` — MatchScrutineeRecursor retains three renderings and the tree records no reason -- establish why the functionized lane does not take it before dispositioning it
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
 - `RT-UNSUPPORTED-BINDING-ON-REFUSAL` — A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers
@@ -463,8 +462,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CENSUS-CAVEAT-GUARD` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
-- `RT-DESCENT-RETIRE` blocked by `RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT` (status: active)
-- `RT-DESCENT-RETIRE` blocked by `RT-MATCH-SCRUTINEE-DISPOSITION` (status: ready)
+- `RT-DESCENT-RETIRE` blocked by `RT-MATCH-SCRUTINEE-DISPOSITION` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
