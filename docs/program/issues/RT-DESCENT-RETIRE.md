@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-RETIRE
 title: "Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -12,7 +12,7 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 ---
 
 > # 2026-08-16 — RELEASED. TWELVE OF TWELVE DEPENDENCIES DISCHARGED; THE BAR IS
-> # LIFTED AND THIS NODE IS `ready`. Steward.
+> # LIFTED AND THIS NODE IS DISPATCHED. Steward.
 >
 > **Do the retirement in TWO STEPS and do not collapse them** — `D2c` reroutes
 > without deleting and lets the whole corpus in CI be the differential; `D3`
