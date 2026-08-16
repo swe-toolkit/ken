@@ -1,4 +1,7 @@
-# RT-DESCENT-LANE-COMPLETENESS — is the functionized lane a complete replacement for `RecursiveDescent`, or has it been carrying only the ported subset?
+# RT-DESCENT-LANE-COMPLETENESS
+
+**Is the functionized lane a complete replacement for `RecursiveDescent`, or has
+it been carrying only the ported subset?**
 
 Frame. Steward-authored 2026-08-16, on the Architect's ruling
 `evt_7qtgrtwv76vke`. Successor to [[RT-DESCENT-RETIRE]], which is `active` and
@@ -96,11 +99,113 @@ nine. None may be touched while this node is open.**
 
 ## 4. Deliverables
 
-**Run `D3` FIRST.** Its outcome can change who owns this node, and the
-Architect's ruling asked for that check before the cut. It is sequenced first
-rather than treated as a precondition so nothing stalls; see section 7.
+> ### `D2`, `D3` AND `D4` WERE DELIVERED PRE-FRAME. `D1` IS THE ONLY OPEN ONE.
+>
+> **runtime-leader `evt_2fmjv69z5bg2g`, measured at exact
+> `3c9b8bbd5fae09859d6e330f8ac0a17b40fe1f68`** — note that is a **different SHA
+> from this frame's base `c98f72ba8`**; no candidate or instrumentation remains
+> and `D2c` is untouched. Results are in section 4a. **The ring awaits explicit
+> release and no Runtime implementation is authorized.**
+>
+> ### AND MY `D3`-FIRST SEQUENCING WAS WRONG. Corrected here.
+>
+> I sequenced `D3` first behind a hard stop, on the assumption that an
+> overlap with a merged node's claimed population is decidable **independently
+> of `D1`**. It is not, and the evidence shows it twice over:
+>
+> - **The hit is universal.** All nine overlap an explicitly claimed merged-node
+>   population. A hard stop on *any* hit would have fired on everything and
+>   stalled the node.
+> - **Whether an overlap is an ERRATUM is exactly `D1`'s verdict.** Those
+>   records' dispositions are *source-unreachable compiler asserts/invariants*
+>   or *a preserved refusal*. A preserved-refusal disposition is **accurate** if
+>   that construct's refusal is correct semantics, and **false** if it is a
+>   missing port. Same fact, opposite readings, decided by `D1`.
+>
+> ⇒ **`D3` is not an independent gate. It is a CONSEQUENCE of `D1`, per
+> construct.** `AC-5`'s hard stop is withdrawn accordingly and `AC-4` is
+> discharged as input. The ring was right to supply the input and decline the
+> ownership call.
 
-### D1 — ARCHITECT, soundness. FOUR verdicts, not one.
+### 4a. What `D2`, `D3` and `D4` returned
+
+**All three at `3c9b8bbd5`, runtime-leader `evt_2fmjv69z5bg2g`.**
+
+**`D2` — every one of the nine maps BYTE-FOR-BYTE to a hash-tagged lexical
+fixture rendering, and all are fixture-only** under merged
+[[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]]:
+
+| rendering | hash | tests |
+|---|---|---|
+| row 5 before-hole | `25c3d81c8054e552` | 4 |
+| row 4 depth 1 | `a26749baed91331f` | 1 |
+| row 4 depth 2 | `de31e8ed184a5754` | 1 (the sentinel) |
+| row 3 two-sibling | `23fad2ab9d295856` | 2 |
+| row 1 owned-scope | `7433055269044ce8` | 1 |
+
+⇒ **Zero source-reachable programs**, by that node's definition-admission
+argument. **This is RECORDED-GAP INPUT, not a soundness verdict** — the ring
+said so explicitly and that is the correct boundary. The mapping caveat this
+frame raised is **discharged**: it was established for all nine, not inherited
+from the sentinel.
+
+**`D3` — every one of the nine overlaps an explicitly claimed merged-node
+population**: four R3 fusion-emitter row-5 claims, then lexical-recursors row 4
+depth 1, row 4 depth 2, row 3, and row 1. **Those records do not claim complete
+`FunctionizedUnits` emission**; their present dispositions are
+source-unreachable compiler asserts/invariants, or a preserved refusal.
+**Erratum input established, ownership undecided** — see the correction above
+for why that is the right stopping point.
+
+**`D4` — both helpers are INVALID as completed-compile evidence, and it is not
+marginal.** `owner` and `multiplicity` each run five expressions and **every
+functionized compile aborts** — row 1 `PlannerInvariant`, rows 4 and 5
+`StaticWorkerBinding` — **while their trace-event assertions stay green. Zero
+completed functionized runs.** Their evidence is partial trace harvested from
+aborted compilations.
+
+### 4b. The Architect ADJUDICATED all three. `evt_3bkkjpps1bcpe`.
+
+**`D2` = RECORDED GAP, not blocked — verified, not accepted.** All five hashes
+check against the merged node's own table: `7433055269044ce8`,
+`23fad2ab9d295856`, `a26749baed91331f`, `de31e8ed184a5754`, `25c3d81c8054e552`.
+Nine tests, five renderings, all within the twelve, **zero source-reachable.**
+⇒ **The retirement loses no user-facing capability. It is no longer
+capability-blocked.** The finding settles **cost, not correctness**.
+
+**`D3` = NEGATIVE, independently corroborated.** The Architect spot-checked the
+node carrying the largest exposure, `RT-LEXICAL-R3-FUSION-EMITTER` (four of the
+nine), *"because this campaign has form"* — two merged titles in this arc had
+already asserted bars their bodies no longer supported. **It records refusals as
+refusals**: *"Preserve it as a refusal; never relabel it plane `0`"*, and
+elsewhere that something **"still refuses"** naming `ComputationalMatch` /
+in-flight — **the same construct as the largest class in the inventory.**
+
+⇒ **No merged completeness claim is falsified. No erratum. Ownership of this
+node does not move.**
+
+**A `D1` input, explicitly not a verdict:** at least the `ComputationalMatch`
+construct was **already a documented, ratified refusal in a merged node**.
+`D2c` **rediscovered** it; it did not surface it. That is evidence toward the
+correct-semantics arm **for that construct only** — the other three are not
+shortcut from it.
+
+### 4c. `D1` PRECEDES THE RECORD, not the deletion. And the record needs PINS.
+
+After `D3`-`D8` the lane is gone and these tests are retired or rewritten.
+**The record is all that remains of four known representability facts.**
+
+**And *"a gap the lane must someday close"* is the WRONG record if the refusal
+is correct semantics** — it would misdirect every future reader into porting
+something that should not be representable. Hence the ordering, and hence
+`AC-9`.
+
+> **This is the `nc22` reasoning applied FORWARD: do not retire a fact and its
+> only detector in the same commit.** That was this node's own release gate on
+> the predecessor two hours earlier, and **it binds the exit as much as the
+> entry.**
+
+### D1 — ARCHITECT, soundness. FOUR verdicts, not one. THE ONLY OPEN DELIVERABLE.
 
 **For each of the four constructs in section 3: is the functionized lane's
 refusal CORRECT SEMANTICS, or a MISSING PORT?**
@@ -195,8 +300,12 @@ the node's blocked-versus-recorded-gap disposition follows from it mechanically.
 population it falls in or that it falls in none — with the claim quoted from
 that node, not paraphrased.
 
-**AC-5.** On a `D3` hit, the increment **stops and hands back** with no `D2`
-work performed after the hit. The erratum is not adjudicated inside this node.
+**AC-5. WITHDRAWN 2026-08-16, and the withdrawal is a frame amendment I own.**
+It required the increment to stop and hand back on any `D3` hit. The hit is
+universal and the erratum verdict is downstream of `D1`, so the stop was
+unsatisfiable and would have stalled the node. **Replaced by: the erratum is
+not adjudicated inside this node, and its per-construct disposition follows
+`D1` mechanically.**
 
 **AC-6.** `D4` names the callers of both helpers, the expressions they pass, and
 whether any refuses — and states explicitly whether any landed assertion rests
@@ -207,6 +316,33 @@ unpublished and unrebased, when this node closes. No production code under
 `crates/` is modified by this node.
 
 **AC-8.** The five programs in section 3a are untouched.
+
+**AC-9. EACH CONSTRUCT LEAVES A PIN, NOT PROSE.** Architect `evt_3bkkjpps1bcpe`.
+For each of the four, `D1`'s verdict lands as a checkable artifact before any
+`D6` deletion touches the tests that currently carry the fact:
+
+| verdict | the pin it owes |
+|---|---|
+| **correct semantics** | an **asserted-refusal pin** that reds if the behaviour changes |
+| **missing port** | a **recorded obligation with a NAMED OWNER** |
+
+**Prose in a retired test's place does not discharge this.** `D6` deletes the
+last trace otherwise, and a wrong record is worse than none: *"a gap the lane
+must someday close"* against a correct-semantics refusal misdirects every future
+reader into porting what should not be representable.
+
+**AC-10.** The helper-evidence defect is **NOT** repaired inside this node. It
+is [[RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE]], cut separately, and folding it
+here would make a live `main` defect ride a gated node.
+
+**Discharge state at `3c9b8bbd5` (runtime-leader `evt_2fmjv69z5bg2g`):** `AC-2`
+**discharged** — per-program mapping established for all nine, none reported as
+unestablished. `AC-4` **discharged as input** — per-program overlap reported
+with each record's present disposition. `AC-6` **discharged** — both helpers'
+callers, expressions and abort constructs named, with the explicit finding that
+their assertions rest on aborted compilations. `AC-7` and `AC-8` **hold**: no
+candidate or instrumentation remains, `D2c` untouched. `AC-1` and `AC-3` remain
+open on `D1`.
 
 ## 6. Two foreclosed shortcuts. Do not take either.
 

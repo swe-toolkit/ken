@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-LANE-COMPLETENESS
 title: "Is the functionized lane a complete replacement for RecursiveDescent, or has it been carrying only the ported subset? D2c refused NINE programs the retiring lane compiles, across FOUR independent constructs -- a pattern, not a missing case, so this is a lane-completeness question and not a port"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -57,14 +57,32 @@ Exact test names are in the frame, section 3. A further **five** reds assert the
 retiring lane's own control, lifecycle or route state with no program refusing;
 those are `D6` rewrites in the predecessor and **stay gated behind the nine**.
 
-## Deliverables
+## Deliverables — THREE OF FOUR ARE ALREADY IN
 
-| id | owner | what |
+**`D2`, `D3` and `D4` were delivered pre-frame** by runtime-leader
+(`evt_2fmjv69z5bg2g`) at exact
+`3c9b8bbd5fae09859d6e330f8ac0a17b40fe1f68` — a **different SHA from this node's
+base `c98f72ba8`**. No candidate or instrumentation remains; `D2c` untouched.
+
+| id | owner | state |
 |---|---|---|
-| **`D3`** | runtime ring | **RUN FIRST.** Does any of the nine fall inside a **merged** port node's claimed population? A hit makes that node's completeness claim false on `main` — an **erratum**, which re-homes the successor. **Hard stop and hand back on any hit.** |
-| **`D1`** | **Architect** | Per construct: is the refusal **correct semantics** or a **missing port**? **Four verdicts, not one** — they may not answer alike. Soundness question; the ring does not decide it as engineering. |
-| **`D2`** | runtime ring | Source-reachability of the nine. **Decides BLOCKED versus RECORDED GAP.** Do not inherit `0/12` — it was measured over renderings, and the mapping to test names is established for the sentinel only. |
-| **`D4`** | runtime ring | Bounded sweep of the two trace helpers that run a functionized compile purely to harvest events and never confirm it succeeded. Same defect shape that concealed this finding for the campaign. |
+| **`D1`** | **Architect** | **OPEN — the only one.** Per construct: is the refusal **correct semantics** or a **missing port**? **Four verdicts, not one**; they may not answer alike. Soundness question, not decided by the ring as engineering. |
+| **`D2`** | runtime ring | **DELIVERED.** All nine map byte-for-byte to five hash-tagged lexical fixture renderings, all fixture-only under merged [[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]] ⇒ **zero source-reachable**. Recorded-gap input, **not** a soundness verdict. The mapping was established for all nine, not inherited from the sentinel. |
+| **`D3`** | runtime ring | **DELIVERED as input.** **All nine** overlap an explicitly claimed merged-node population, but those records **do not claim complete `FunctionizedUnits` emission** — their dispositions are source-unreachable asserts/invariants or a preserved refusal. Ownership correctly left undecided. |
+| **`D4`** | runtime ring | **DELIVERED, and it is not marginal.** `owner` and `multiplicity` each run five expressions and **every functionized compile aborts** (row 1 `PlannerInvariant`; rows 4/5 `StaticWorkerBinding`) **while their trace assertions stay green. Zero completed functionized runs.** |
+
+### My `D3`-FIRST SEQUENCING WAS WRONG, and the frame is amended
+
+I put `D3` first behind a hard stop on any hit, assuming an overlap is decidable
+**independently of `D1`**. It is not. **The hit is universal — nine of nine — so
+the stop would have fired on everything and stalled the node.** And whether an
+overlap is an **erratum** is exactly `D1`'s verdict: a *preserved refusal*
+disposition is **accurate** if that construct's refusal is correct semantics and
+**false** if it is a missing port.
+
+⇒ **`D3` is not an independent gate; it is a CONSEQUENCE of `D1`, per
+construct.** `AC-5`'s hard stop is withdrawn in the frame. The ring supplying
+the input and declining the ownership call was the right boundary.
 
 ## Standing
 
