@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 00:53:01Z — from 329 issue file(s) in `docs/program/issues/`.
+2026-08-16 00:57:29Z — from 329 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -353,7 +353,7 @@ the committed file matches the generator's output.
 | `V3-D-OPEN-GOAL-WITNESS-ROUTE` | The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver | merged | verify | S | none | — |
 | `V3-FO-CONVERSION-LOAD-MEASURED` | Establish source-level provenance for FO obligations and measure the Rust reference checker over their certificate trees, recording that the kernel-conversion quantity 23 section 4.4 names is not takeable at this SHA | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/2363 |
 | `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` | Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect | ready | language | S | none | — |
-| `V3-FO-GUARD-SHIFT-DIFFERENTIAL` | Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently | active | language | S | none | — |
+| `V3-FO-GUARD-SHIFT-DIFFERENTIAL` | Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2371 |
 | `V3-FO-KEN-LEVEL-CHECKER-AUTHORING` | Author the Ken-level check_cert, embed, Form and Cert so the conversion cost 23 section 4.4 names becomes measurable at all, and take that measurement | draft | language | L | none | — |
 | `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | merged | language | L | none | — |
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | merged | language | L | none | 2353 |
