@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT
 title: "LexicalCallArgumentRecursor retains twelve exact renderings and its port was never built -- triage each as fixture or source-reachable, then decide whether the port is owed"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
