@@ -4730,10 +4730,8 @@ impl StaticWorkerFieldLedger {
                     format!(
                         "constructor {} at origin {:?} transports a static worker in field {} \
                          (field origin {:?}, recognition {recognition:?}) that no static \
-                         elimination rebinds, so the field is neither consumed at an exact-Var \
-                         call nor erased before construction; a constructor carrying an \
-                         unconsumed static worker denotes a value containing the callable and \
-                         has no runtime representation",
+                         elimination rebinds, so this recognition's own transport never reaches \
+                         a consumer; the recognition is neither consumed nor erased",
                         recognized.constructor,
                         recognized.owner,
                         recognized.position,
