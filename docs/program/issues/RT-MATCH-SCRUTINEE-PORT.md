@@ -20,13 +20,29 @@ Four of the six original residual variants were retired by porting to uniform
 lowering. `MatchScrutineeRecursor` is the survivor, and after two measurements
 and a prior-art survey the ruling is that it goes the same way.
 
+> ### THE TITLE SAYS "PORT". NOT YET SETTLED — read `D1b` before acting on it.
+>
+> `D1` returned **non-total**, and the Architect ruled that a third arm is live:
+> **the scalar-selected cells may be ill-formed, in which case this node is a
+> DISPOSITION and not a port at all.** The title, the lede and `D2` are all
+> written for the port reading because it was the only one on the table when
+> they were written. **`D1b` decides which node this is, and the recut is the
+> Steward's once it returns.**
+
 > ### THE ROUTE IS SETTLED. Do not re-derive it, and do not re-open what it closed.
 >
-> **Source-unreachability is dead from both directions.**
+> **Source-unreachability is dead FOR THE OUTER SHAPE, from both directions.**
 > [[RT-MATCH-DIFFERENCE-REACHABILITY]] found no grammar, admission or kernel
-> rule that refuses the shape; [[RT-DESCENT-RETIRE-PRIOR-ART]] found that Lean
-> and Agda **both admit it**, each with a passing regression case. **No further
-> program-writing or rule-reading changes this.**
+> rule that refuses an ordinary `Match` over an active computational scrutinee;
+> [[RT-DESCENT-RETIRE-PRIOR-ART]] found that Lean and Agda **both admit it**,
+> each with a passing regression case. **No further program-writing or
+> rule-reading reopens THAT question.**
+>
+> **IT DOES NOT EXTEND TO THE SCALAR-SELECTED CELLS, and reading it as though it
+> does is the live error** (Architect, `evt_7yrhr0xs81hfc`). Whether a member
+> whose **selected case body is a bare scalar** is admissible **was never the
+> proposition measured.** ⇒ Those cells are unmeasured on **both** axes — not
+> shown well-formed, and not shown source-reachable. **That gap is `D1b`.**
 >
 > **The global-IR-invariant family was declined as the primary route**
 > (Architect, `evt_nb12nmhd2zzk`). It survives only as a fallback, boundary-
@@ -98,9 +114,18 @@ exclusion assertion held.
 > splits it on the selected body, so it is a **named refusal about a specific
 > shape** — the second arm of `AC-3`, not the silent outcome it bars.
 >
-> **And the scalar cells compile today through the retained lane.** Leaving them
-> refusing is the capability regression `AC-3` names. **The refusal is a finding,
-> not an acceptable resting state.**
+> **The refusal is a finding, not an acceptable resting state** — but see the
+> next paragraph for what that does NOT license.
+>
+> **`AC-3` calls a refusal here a capability regression on the ground that the
+> scalar cells compile today through the retained lane. THAT PREMISE DOES NOT
+> HOLD.** Under the operator's 2026-08-15 oracle ruling — **the interpreter, not
+> `RecursiveDescent`** — what the retained lane accepts is **not evidence a
+> program is well-formed.** `D1` executed only the three aggregate rows.
+>
+> ⇒ **The regression claim is UNVERIFIED. Do not lean on it**, and do not cite
+> `AC-3` as though it settles that the scalar cells must be made to compile.
+> **That is exactly what `D1b` measures.**
 
 **What the site is, verified by the Steward at `main` = `70fd2b69f`.**
 `core.rs:17959` is the **terminal fallthrough of a `Lowered`-shape dispatch
@@ -123,6 +148,52 @@ measured. `AC-3`'s stop-and-hand-back arm is conditioned on a refusal that
 ⇒ **The family-A fallback stays out of scope.** It is reached on an *uncloseable*
 refusal plus a fresh ruling, and neither exists.
 
+## THE MECHANISM RULING: none yet, and that is the ruling (`evt_7yrhr0xs81hfc`)
+
+**The Architect declined to pick between "closeable" and "uncloseable", because
+a third arm is live and neither of the others is answerable until it is
+excluded.** Read at `70fd2b69f`.
+
+> ### ARM 2: THE REFUSAL MAY BE CORRECT AND THE SCALAR CELLS ILL-FORMED.
+>
+> **`produces_deforestable_aggregate_with_ih` (`mod.rs:16667+`) matches only on
+> `RuntimeExpr` structure and NEVER CONSULTS A TYPE.** The five rows were
+> hand-built `RuntimeExpr` values in a disposable control, so nothing
+> type-checked them either.
+>
+> ⇒ **A quotient defined by that predicate can contain type-incoherent members
+> by construction.** *"Non-total over the predicate quotient"* and *"non-total
+> over the well-formed population"* are different claims, **and only the second
+> is the port's obligation.**
+
+**The site agrees with that reading.** The chain's arms at
+`core.rs:17756-17960` are `Carried`, `BorrowedNativeValue`, `BorrowedOption`,
+`BoundedNat`, `StructuralNat`, `HostResult`, `DynamicConstructor`, `Bool`, then
+the terminal `Lowered::Constructor` requirement. **Every arm carries constructor
+identity in some form**, and the outer `Match` eliminates by constructor **name**
+(`case.constructor == constructor`). A scrutinee that lowered to a scalar with no
+constructor identity **has nothing to match against**.
+
+⇒ **That is the shape of an ill-typed elimination, not of a missing capability.**
+And it rules out the near miss: **Ken's scalar-represented data types already
+have arms**, so *"it is a scalar"* is not by itself why it refuses.
+
+**A gap that is easy to think is already closed.**
+[[RT-MATCH-DIFFERENCE-REACHABILITY]] established that the **outer shape** is
+source-admissible. **It says nothing about a member whose selected case body is a
+bare scalar** — that was never its proposition. ⇒ **The scalar cells are
+unmeasured on both axes: not shown well-formed, and not shown source-reachable.**
+
+> ### IF ARM 2 HOLDS IT IS THE DISCHARGE, NOT A CONSOLATION. Not a defeat.
+>
+> Rows 2, 4 and 5 lower and execute. **If the scalar rows are ill-formed, the
+> port is TOTAL over the well-formed difference and the retirement's obligation
+> is MET.** Deleting the retained lane would then remove an **over-acceptance** —
+> a lane silently compiling what the type discipline does not admit — rather than
+> a capability. **`AC-3`'s regression premise dissolves: there is no capability
+> to regress.** On present evidence this is the likeliest route to closing the
+> campaign.
+
 ## Deliverables
 
 **`D1` — activation measurement. Independently releasable, and size the turn
@@ -131,6 +202,14 @@ With the exclusion probe set for `MatchScrutineeRecursor`, take the
 heterogeneous-case-body population through the ordinary route and report, per
 shape: **lawful lowering, or a refusal quoted in full with its emitting site.**
 This is the deliverable that decides whether `D2` is a port or a hard stop.
+
+**`D1b` — THE ARM-DECIDING MEASUREMENT. Run the two scalar rows through the
+interpreter.** This is the next dispatchable increment and it gates `D2`
+entirely. Its own criteria are `AC-7` through `AC-10`.
+
+**Budget the reconstruction.** The five-row control was fully reverted, so **the
+fixtures do not exist** — `D1b` has to rebuild the two scalar rows before it can
+run anything. Size the turn with that in it rather than discovering it.
 
 **`D2` — close what `D1` opens, inside the ordinary route.** Whatever the
 ordinary path lacks for this population, supply it there. **Not a new lane, not
@@ -163,12 +242,18 @@ that criterion.
 
 **`AC-3`. TOTALITY OR A NAMED REFUSAL — and a conservative fail-closed arm is
 NOT an acceptable silent outcome.** The prior ports shipped three such arms on
-`ProducerMatchCall` alone (`core.rs:2058-2064`). Fail-closed is the right
-direction in general, and **for this variant it is a capability regression**:
-the difference population compiles today via the retained lane, so a refusal
-takes away something that works. **If the refusal cannot be closed within the
-port, stop and hand back.** That is a complete outcome and it routes to the
-Steward.
+`ProducerMatchCall` alone (`core.rs:2058-2064`). **If the refusal cannot be
+closed within the port, stop and hand back.** That is a complete outcome and it
+routes to the Steward.
+
+> **THIS AC ORIGINALLY ARGUED that a refusal here is a capability regression
+> *because the difference population compiles today via the retained lane*.
+> THAT WARRANT IS WITHDRAWN** — the operator's 2026-08-15 oracle ruling makes
+> the interpreter the oracle, so **what the retained lane accepts is not
+> evidence of well-formedness.** The rest of the AC stands: a **silent**
+> conservative arm is still barred, and the outcome is still totality or a
+> **named** refusal. **Whether a refusal costs a real capability is `D1b`'s
+> question, not an assumption of this AC.**
 
 **`AC-4`. No deletion, and the capstone stays barred by this node's own
 result.** Deleting the enum, selector, authority or lane is
@@ -181,6 +266,56 @@ is behaviour-preserving; `!A` in production is lawful (Architect,
 
 **`AC-6`. No-regression, in CI** (`COORDINATION §12`). Targeted local validation
 only.
+
+### `D1b`'s criteria
+
+**`AC-7`. THREE outcomes, and they must be told apart — two of them look alike
+in a log.**
+
+| the interpreter… | means | routes to |
+|---|---|---|
+| **evaluates them to a value** | meaningful programs; the backend refusal is a genuine capability gap | **arm 1** — `D2` proceeds under the pre-authorized bound |
+| **rejects them as ill-formed** — type error, pattern-match failure against a non-constructor, stuck term | the refusal is correct | **arm 2** — recut this node as a disposition |
+| **also reports "unsupported"** | **NOTHING. This settles nothing.** | neither |
+
+**`AC-8`. AN INTERPRETER "UNSUPPORTED" IS NOT A WELL-FORMEDNESS VERDICT, and
+must not be recorded as arm 2.** It is an interpreter capability gap. **This is
+stated as its own criterion because a refusal reads as a verdict** — it is
+exactly the place a negative check passes for the wrong reason.
+
+**`AC-9`. The source-program shortcut is POSITIVE-ONLY.** If anyone can write a
+**Ken source program** that lowers to a scalar cell, that settles **arm 1**
+immediately and no interpreter argument is needed. ⇒ **A failed search settles
+NOTHING.** `AC-2`'s discipline carries forward unchanged, and **a fruitless
+attempt may not be written up as evidence for arm 2.** This campaign has paid
+twice for that distinction.
+
+**`AC-10`. The reconstructed rows are the same rows.** They are rebuilt from
+`D1`'s recorded predicate coverage, not re-derived by taste — a row that is not
+the one that refused measures nothing.
+
+### `D2`'s bound — PRE-AUTHORIZED for arm 1, so the ring waits on no second ruling
+
+**Given now by the Architect at `evt_7yrhr0xs81hfc`. It is live only if `D1b`
+returns arm 1.**
+
+- **The chain gains a NAMED arm for the observed operand shape. No wildcard, and
+  no widening of the terminal `Err`** — that refusal is the chain's fail-closed
+  default and **must survive the change**. A `_ =>` here would silently absorb
+  every future shape.
+- **The producer route, the residual predicate and the retention guard are all
+  out of scope.** This node ports; it does not re-narrow.
+- **Each added arm carries a positive control PLUS the mutation showing that arm
+  is what carries it** — arm removed, the named row reds; restored, green; **both
+  exit codes reported. Not an argued red.**
+- **A conservative fail-closed arm is not an acceptable substitute for the
+  port.** If the shape cannot be lowered, **that is arm 3, not a third
+  disposition invented inside `D2`.**
+
+**Arm 3 comes back to the Architect** for the boundary-scoped family-A ruling
+`evt_nb12nmhd2zzk` reserved. **Do not attempt family A inside this node, and do
+not treat one failed arm as uncloseability** — those are the two claims this
+handback correctly kept apart.
 
 ## Banned scope
 
@@ -199,12 +334,22 @@ only.
 `5c5ee5b6c37dfc0017afa547f83cd0b9aa5f5111`. No candidate — see the result
 section.
 
-**`D2` is HELD on a mechanism ruling, routed to the Architect.** The question is
-whether the scalar-selected refusal is closeable inside uniform lowering — a
-component-design call, and the Steward's to route rather than to answer. **The
-ring is not blocked on me for anything else and does not wait idle:**
-[[RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN]] is released in the meantime, which is
-exactly the between-increments window that node was queued for.
+**`D1b` IS THE NEXT DISPATCHABLE INCREMENT, and it gates `D2` entirely.** The
+Architect ruled (`evt_7yrhr0xs81hfc`) that the mechanism question **is not yet
+answerable**: arm 2 is live, and neither "closeable" nor "uncloseable" can be
+ruled on until it is excluded. **No mechanism was chosen. One measurement was
+named.**
+
+**`D2` needs no further ruling if `D1b` returns arm 1** — its bound is
+pre-authorized above.
+
+**The ring is on [[RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN]]** (kicked
+`evt_6bb28ktkzstyn`), released into the window `D1`'s handback opened. **`D1b`
+is queued behind it and is lane 1's critical path** — the leader sequences the
+handover.
+
+**The capstone is unchanged and still barred.** Nothing in the ruling authorizes
+a deletion.
 
 **It blocks [[RT-DESCENT-RETIRE]] and becomes that node's twelfth dependency.**
 The other eleven are `merged` and the capstone is still barred — every named
