@@ -275,7 +275,21 @@ the proof is unavailable and any argument for it is circular.
   convenient, because a revert of step 1 must restore production routing in a
   single commit.
 
-  > ### `D2c` RAN AND THE RETIREMENT IS BLOCKED. Architect `evt_35hwm50tas8kp`.
+  > ### `D2c` RAN. NOT CAPABILITY-BLOCKED — the RECORD is the gate.
+  >
+  > **Final disposition, Architect `evt_3bkkjpps1bcpe`.** The nine refusing
+  > programs are **zero source-reachable** (five hash-tagged lexical fixture
+  > renderings, all within the twelve, hashes re-checked against the merged
+  > node's own table), and `D3` is **negative** — no merged completeness claim
+  > falsified, no erratum. ⇒ **No user-facing capability is lost.**
+  >
+  > **What gates `D3`-`D8` now is the RECORD**, not capability: after deletion
+  > the record is all that survives of four representability facts, so the
+  > successor's `D1` must land **one verdict per construct** and **each leaves a
+  > PIN, not prose**. The earlier BLOCKED reading is kept below as the record of
+  > what one adjudicated row supported before the other eight were mapped.
+  >
+  > ### SUPERSEDED: `D2c` RAN AND THE RETIREMENT IS BLOCKED. `evt_35hwm50tas8kp`.
   >
   > **The sentinel failed on assertion 1 verbatim — `must retain its compiling
   > RecursiveDescent baseline`.** `RecursiveDescent` compiled row 4 depth 2 at
@@ -535,7 +549,7 @@ the proof is unavailable and any argument for it is circular.
   | first failure | disposition |
   |---|---|
   | *"must not gain a `RecursiveDescent` boundary crossing"* | **The sentinel fired as designed. No capability loss** — under `D2c` the unexcluded leg IS the functionized route, so the route comparison collapses, which is exactly what its declared promise class anticipates: *"transition sentinel. Retirement or an authorized boundary repair must rewrite this route comparison rather than preserve its current exact outcomes."* **Rewrite under `D6`.** And assertion 1 having passed is **affirmative evidence the functionized route compiles row 4 at depths 2 and 3** — the measurement its `CLAIMED` line asserted and its body never made. `D2c` supplies it free. |
-  | *"must retain its compiling `RecursiveDescent` baseline"* | **The functionized route does not compile these rows. REAL CAPABILITY LOSS, the retirement is BLOCKED, and it is the first genuine one in this campaign.** Hand it back as a node; **do not adjudicate it inside `D6`.** |
+  | *"must retain its compiling `RecursiveDescent` baseline"* | **The functionized route does not compile these rows.** Handed back as [[RT-DESCENT-LANE-COMPLETENESS]]; **not adjudicated inside `D6`.** **AMENDED 2026-08-16 (`evt_3bkkjpps1bcpe`): this row is NOT a capability loss.** All nine such programs are **zero source-reachable**, so the retirement incurs **recorded representability gaps**, not lost capability. The row still blocks `D6` — but on the RECORD (a pin per construct, after the successor's `D1`), never on capability. |
 
   **Neither branch may be taken by argument.** Architect `evt_38c0px3312y62`.
 
@@ -547,8 +561,16 @@ the proof is unavailable and any argument for it is circular.
 
 - **`AC-9` — every red inside the set is adjudicated INDIVIDUALLY**, each
   recorded as either lane-specific (retire or re-home under `D6`) or a semantic
-  property reachable on the surviving lane (**the retirement is blocked**). A
-  per-set disposition does not discharge this, and neither does a count.
+  property the surviving lane refuses. A per-set disposition does not discharge
+  this, and neither does a count.
+
+  > **AMENDED 2026-08-16, `evt_3bkkjpps1bcpe`.** This AC used to say the second
+  > arm means *"the retirement is blocked"*. **It does not, and that reading was
+  > too strong.** A refused property blocks only if it is **source-reachable**;
+  > the nine measured here are zero-reachable and therefore **recorded gaps**.
+  > **The arm's real obligation is a PIN per construct after the successor's
+  > `D1`** — correct semantics leaves an asserted-refusal pin, a missing port
+  > leaves an owned obligation.
 
 - **`AC-7` — the two steps are SEPARATE CANDIDATES.** `D2c` merged, with the
   full workspace suite and conformance green in CI, **before any deletion

@@ -11,8 +11,34 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # 2026-08-16 — THE RETIREMENT IS BLOCKED. `D2c` FOUND A REAL CAPABILITY LOSS.
-> # THE SUCCESSOR IS CUT: [[RT-DESCENT-LANE-COMPLETENESS]]. Steward.
+> # 2026-08-16 — NO LONGER CAPABILITY-BLOCKED. THE RECORD IS NOW THE GATE.
+> # Successor [[RT-DESCENT-LANE-COMPLETENESS]] cut; its `D1` is outstanding.
+>
+> **Architect `evt_3bkkjpps1bcpe` supersedes the BLOCKED disposition below.**
+> All nine refusing programs map to five hash-tagged lexical fixture renderings,
+> **all within the twelve, ZERO source-reachable** — hashes independently
+> re-checked against the merged node's own table. ⇒ **The retirement loses no
+> user-facing capability. `D2` settles COST, not CORRECTNESS.**
+>
+> **`D3` is NEGATIVE:** no merged completeness claim is falsified, no erratum,
+> ownership does not move. The Architect spot-checked the largest exposure
+> itself *"because this campaign has form"* — and found it **records refusals as
+> refusals.**
+>
+> **What now gates `D3`-`D8` is not capability. It is the RECORD.** After
+> deletion the lane is gone and these tests are retired or rewritten, so **the
+> record is all that remains of four known representability facts** — and *"a gap
+> the lane must someday close"* is the **wrong** record for a refusal that is
+> correct semantics. ⇒ **`D1` precedes the RECORD, and each construct leaves a
+> PIN, not prose** (successor `AC-9`). **This is the `nc22` reasoning applied
+> forward: do not retire a fact and its only detector in the same commit.**
+>
+> **The helper-evidence defect is NOT this node's** — it is live on `main` and
+> cut separately as [[RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE]].
+>
+> ---
+>
+> # SUPERSEDED: THE RETIREMENT IS BLOCKED, `D2c` FOUND A REAL CAPABILITY LOSS.
 >
 > **Architect `evt_35hwm50tas8kp`.** `D2c`'s sentinel failed on **assertion 1
 > verbatim** — `must retain its compiling RecursiveDescent baseline` — which
