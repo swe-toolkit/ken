@@ -1,7 +1,7 @@
 ---
 id: RT-SECOND-RECOGNITION-ERASURE
 title: "Determine whether the depth-2/3 static-worker rebind is a succession of one obligation or two distinct ones, and select the disposition on that fact -- erasure is REFUTED and is no longer this node's deliverable"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none

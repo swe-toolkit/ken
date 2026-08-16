@@ -1,7 +1,7 @@
 ---
 id: V3-FO-GUARD-SHIFT-DIFFERENTIAL
 title: "Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently"
-status: ready
+status: active
 owner: language
 size: S
 gate: none

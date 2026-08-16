@@ -42,14 +42,48 @@ relation** proving **both**:
 
 > ### DO NOT FRAME THAT RELATION YET -- `D1d` decides whether it is wanted
 >
-> Under **(A) over-construction** the relation is the right next build. Under
-> **(B) under-consumption** the repair is in the consumer and erasure is
-> **wrong**. Under **(C) under-recorded consumption** erasing these recognitions
-> is a **miscompile**.
+> Under **(A) over-construction** the relation is *a* candidate next build, at
+> the size stated below. Under **(B) under-consumption** the repair is in the
+> consumer and erasure is **wrong**. Under **(C) under-recorded consumption**
+> erasing these recognitions is a **miscompile**.
 >
 > **Two of the three make this relation useless or harmful.** Building it now
 > would pick the branch by construction — the same error as framing the
 > successor before `D1d` reports.
+
+### `D0`'s NO SIZES this relation. Read the two together, not apart.
+
+**`D0` did not find the predicate hard to state — it found the static plan
+exports nothing that supports one.** So under (A) the successor is **not**
+*"specify the predicate `D0` could not"*; it is **extend what the static plan
+exports, and then specify it.** Those are different sizes of build.
+
+> **A reader arriving here from the node id sizes the work from this section,
+> which is the one place the `NO` is not in front of them.** Stated by the
+> Architect at `evt_3sfw746tk6td2` after verifying the frame at `790c16ea6`.
+
+### (A) does NOT force a mint-time repair
+
+**And the alternative has a wrong-ground rejection waiting for it.**
+
+**The rebind site is a second vantage, and it already observes the
+supersession.** A repair keyed there needs **no total mint-time relation at
+all** — precisely the thing `D0` ruled cannot be had. Its soundness rides on
+**column 2**: it is available only if the outer transports are **not**
+traversed, which is exactly the (A) leg.
+
+> **It must not be mistaken for `transfer`, which `D1c` refuted — and the
+> resemblance is close enough that it will be.** `transfer` claimed
+> **succession**: T0's obligation carried forward, discharged by T1's
+> consumption. A rebind-site repair under (A) claims something else entirely:
+> **the obligation is void because the field is never read.** Different claim,
+> different soundness condition. **`D1c` refuted only the first.** Rejecting
+> this by pattern-match against the refuted lean would kill a live option on a
+> ground that does not reach it — the same failure guarded against for (C),
+> arriving from the other side.
+
+**Neither qualification changes `D1d`.** Column 2 still decides, and it decides
+both of these along with the branch. Under (B) and (C) this section is moot.
 
 ## The fork was false and this is the question it was hiding
 
