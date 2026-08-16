@@ -1,7 +1,7 @@
 ---
 id: V3-FO-CHECKER-SOUNDNESS
 title: "Author FokDerivation, fok_derives and fok_classically_valid, and prove checker_soundness in Ken over the check_cert that now exists -- the first of the two theorems 23 section 4.4 requires before route FO may return proved"
-status: ready
+status: active
 owner: language
 size: L
 gate: none
