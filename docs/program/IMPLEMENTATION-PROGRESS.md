@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 04:52:35Z — from 339 issue file(s) in `docs/program/issues/`.
+2026-08-16 04:54:01Z — from 339 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -313,7 +313,7 @@ the committed file matches the generator's output.
 | `RT-SRCBODY-BIND-ORDER` | Functionized source-body units install the parameter run in ABI order where the body reads de Bruijn-nearest-first, so every multi-parameter source body binds its parameters permuted | merged | runtime | M | none | — |
 | `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` | Arm static-worker recognition on the source-machine Construct arm, which never dispatches the classifier, after a bounded check that every eligible-field state can enter the template | merged | runtime | M | none | — |
 | `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` | Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see | ready | runtime | S | none | — |
-| `RT-STATIC-WORKER-WITNESS-PROGRAM` | Write a Ken PROGRAM that reaches the static-worker conservation refusal -- the incidence question the operator's narrowing decision rests on, which every existing demonstration answers only for hand-built fixtures | closed | runtime | M | none | — |
+| `RT-STATIC-WORKER-WITNESS-PROGRAM` | ANSWERED, bounded negative: no reasonable Ken source program was found that reaches the static-worker conservation refusal -- every attempt that keeps the constructor live in the executable closure also supplies a lawful disposition, and that is a search bound, not a universal proof | closed | runtime | M | none | — |
 | `RT-SYMLINK-LANE` | SymlinkPolicy is honoured by the interpreter lane and unreachable in the native lane — FollowWithinScope has no native behaviour | draft | runtime | TBD | none | — |
 | `RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE` | Give the unit-boundary environment record a planner-issued occurrence by extending the synthesized producer arm, so the closure crossing is attempted at the seam that actually refused it | merged | runtime | M | none | 2352 |
 | `RT-TERMINAL-ALL-ELIM-AUTHORITY` | Issue the typed terminal-All structured-IH elimination authority upstream in checked erasure/planning, and let only that issued relation license the source-machine Match seat to consume a ComputationalRecursorClosure | draft | runtime | M | none | — |

@@ -1,6 +1,6 @@
 ---
 id: RT-STATIC-WORKER-WITNESS-PROGRAM
-title: "Write a Ken PROGRAM that reaches the static-worker conservation refusal -- the incidence question the operator's narrowing decision rests on, which every existing demonstration answers only for hand-built fixtures"
+title: "ANSWERED, bounded negative: no reasonable Ken source program was found that reaches the static-worker conservation refusal -- every attempt that keeps the constructor live in the executable closure also supplies a lawful disposition, and that is a search bound, not a universal proof"
 status: closed
 owner: runtime
 size: M
@@ -97,6 +97,11 @@ origin: "Operator request, 2026-08-16, on the Steward's capability-loss brief: t
 > authoring a witness — a witness modelled only on the `control.rs` family may
 > be answering the narrower question.
 >
+> **ANSWERED BY `D0`: they are NOT a second family.** The eight are lexeme
+> occurrences across three lower-level hand-built harness shapes, not eight
+> end-to-end refusal outcomes. **`control.rs`'s 32 are the only family.** The
+> `40` above is therefore not 40 comparable things.
+>
 > ### The premise's STRONGEST form is now measured rather than asserted
 >
 > **Zero occurrences in `ken-cli`, `ken-elaborator`, `ken-verify`, `ken-host`,
@@ -104,7 +109,8 @@ origin: "Operator request, 2026-08-16, on the Steward's capability-loss brief: t
 > ever expected this refusal.**
 >
 > ⇒ **A witness, if one exists, would be the first `ken-cli`-level program to
-> reach it.** That is a sharper statement of the target than *"not a fixture"*,
+> reach it.** **`D0` looked and did not find one — see the closure block at the
+> top of this file.** That is a sharper statement of the target than *"not a fixture"*,
 > and it gives `AC-1` an objective tell: the witness lives where none of the 40
 > does.
 
