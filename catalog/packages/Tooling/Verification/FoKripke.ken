@@ -197,3 +197,455 @@ fn fok_w_forces (world : Nat) (object_env : List Nat) (f : FokIForm) : FokForm =
 -- emitted outside `fok_embed`'s own `FokForm` -- mirrors `fo_kripke::embed`.
 fn fok_embed (f : FokIForm) : FokForm =
   FokImp fok_k_sigma (FokForallWorld (fok_w_forces Zero (Nil Nat) f))
+
+-- === D2: check_cert -- computable (23 section 4.3) ===
+--
+-- Mirrors `fo_kripke::check_tree`'s GUARDED discipline exactly
+-- (`evt_5fc6hsgcn9exq`, Architect ruling): the Rust reference has zero
+-- `unwrap`/`expect`/`panic!`/`unreachable!` in this range, and its two bare
+-- index writes are each on a `clone()` of the very `Vec` whose `.get()` at
+-- the same index returned `Some` immediately above -- so it is total in
+-- BEHAVIOUR, not merely `-> bool` in signature. Every lookup below returns
+-- `Option` LOCALLY and every `None` maps to `False`, exactly what Rust's
+-- `let Some(x) = ... else { return false }` does; the `Option` never
+-- surfaces as the verdict's own shape. `Form`/`QTerm` stay untyped and no
+-- arm here performs sort validation -- an ill-sorted hand-built target still
+-- closes on syntactic `FokForm` equality alone, exactly as the Rust
+-- reference does (`Form`-excess property, preserved by construction: this
+-- checker introduces no rejection the Rust reference does not already make).
+
+-- `Nat` equality, structural.
+fn fok_nat_eq (a : Nat) (b : Nat) : Bool =
+  match a {
+    Zero ↦
+      match b {
+        Zero ↦ True;
+        Suc j ↦ False
+      };
+    Suc i ↦
+      match b {
+        Zero ↦ False;
+        Suc j ↦ fok_nat_eq i j
+      }
+  }
+
+-- `a < b`, structural.
+fn fok_nat_lt (a : Nat) (b : Nat) : Bool =
+  match a {
+    Zero ↦
+      match b {
+        Zero ↦ False;
+        Suc j ↦ True
+      };
+    Suc i ↦
+      match b {
+        Zero ↦ False;
+        Suc j ↦ fok_nat_lt i j
+      }
+  }
+
+-- Predecessor, `Zero` at `Zero` (never reached at any call site below: it is
+-- only ever applied where `fok_nat_lt depth i` already established `i > 0`).
+fn fok_nat_pred (a : Nat) : Nat =
+  match a {
+    Zero ↦ Zero;
+    Suc i ↦ i
+  }
+
+-- Short-circuit boolean or.
+fn fok_or (a : Bool) (b : Bool) : Bool =
+  match a {
+    True ↦ True;
+    False ↦ b
+  }
+
+-- Short-circuit boolean and.
+fn fok_and (a : Bool) (b : Bool) : Bool =
+  match a {
+    True ↦ b;
+    False ↦ False
+  }
+
+-- Total lookup into a `FokForm`-valued `List` at a `Nat` index, `None` out of
+-- range -- mirrors `Vec::get`, used everywhere `check_tree` writes
+-- `.get(*right)`/`.get(*left)`.
+fn fok_nth_form (xs : List FokForm) (i : Nat) : Option FokForm =
+  match xs {
+    Nil ↦ None FokForm;
+    Cons x rest ↦
+      match i {
+        Zero ↦ Some FokForm x;
+        Suc j ↦ fok_nth_form rest j
+      }
+  }
+
+-- Replace the element at `i` with `v`. Out-of-range is a structural no-op
+-- (returns `xs` unchanged past where it runs out) -- unreachable at every
+-- call site below, each of which only calls this after a `fok_nth_form`
+-- lookup at the SAME index already returned `Some`, exactly as Rust's
+-- `expected_delta[*right] = ...` is only reached after `.get(*right)`
+-- returned `Some` two lines above it.
+fn fok_list_form_set_nth (xs : List FokForm) (i : Nat) (v : FokForm) : List FokForm =
+  match xs {
+    Nil ↦ Nil FokForm;
+    Cons x rest ↦
+      match i {
+        Zero ↦ Cons FokForm v rest;
+        Suc j ↦ Cons FokForm x (fok_list_form_set_nth rest j v)
+      }
+  }
+
+-- Append one element at the end -- mirrors `expected_gamma.push(...)`.
+fn fok_list_form_append_one (xs : List FokForm) (v : FokForm) : List FokForm =
+  match xs {
+    Nil ↦ Cons FokForm v (Nil FokForm);
+    Cons x rest ↦ Cons FokForm x (fok_list_form_append_one rest v)
+  }
+
+-- The "exactly one child" guard (Rust's slice pattern `let [child] =
+-- node.children.as_slice() else { return false }`) is inlined directly at
+-- each of its two call sites below, as a `Cons child (Nil ...)` match,
+-- rather than factored through a `List FokCert -> Option FokCert` helper:
+-- the kernel's termination checker traces a structural decrease only through
+-- a DIRECT pattern match feeding a recursive call in the same function, not
+-- through an intervening non-recursive helper's return value (confirmed
+-- empirically -- factoring it out reds `SCT: idempotent self-loop has no
+-- strictly-decreasing parameter` on this mutual-recursion clique).
+
+-- `FokQTerm` equality, structural -- every constructor pair named explicitly
+-- (no wildcard arm), so a future `FokQTerm` variant is a compile error here
+-- rather than a silent fall-through.
+fn fok_qterm_eq (a : FokQTerm) (b : FokQTerm) : Bool =
+  match a {
+    FokQBound i ↦
+      match b {
+        FokQBound j ↦ fok_nat_eq i j;
+        FokQParameter j ↦ False
+      };
+    FokQParameter i ↦
+      match b {
+        FokQBound j ↦ False;
+        FokQParameter j ↦ fok_nat_eq i j
+      }
+  }
+
+-- `FokForm` equality, structural over all nine slice constructors -- every
+-- pair named explicitly, matching the `bool_expr_eq`-style precedent
+-- (`Capability/Parsing/Parsing.ken.md`) rather than a wildcard arm.
+fn fok_form_eq (a : FokForm) (b : FokForm) : Bool =
+  match a {
+    FokBottom ↦
+      match b {
+        FokBottom ↦ True;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ False
+      };
+    FokAccess a1 a2 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ fok_and (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2);
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ False
+      };
+    FokDomainA a1 a2 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ fok_and (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2);
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ False
+      };
+    FokForcingP a1 a2 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ fok_and (fok_qterm_eq a1 b1) (fok_qterm_eq a2 b2);
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ False
+      };
+    FokAnd a1 a2 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ fok_and (fok_form_eq a1 b1) (fok_form_eq a2 b2);
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ False
+      };
+    FokOr a1 a2 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ fok_and (fok_form_eq a1 b1) (fok_form_eq a2 b2);
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ False
+      };
+    FokImp a1 a2 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ fok_and (fok_form_eq a1 b1) (fok_form_eq a2 b2);
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ False
+      };
+    FokForallWorld a1 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ fok_form_eq a1 b1;
+        FokForallObj b1 ↦ False
+      };
+    FokForallObj a1 ↦
+      match b {
+        FokBottom ↦ False;
+        FokAccess b1 b2 ↦ False;
+        FokDomainA b1 b2 ↦ False;
+        FokForcingP b1 b2 ↦ False;
+        FokAnd b1 b2 ↦ False;
+        FokOr b1 b2 ↦ False;
+        FokImp b1 b2 ↦ False;
+        FokForallWorld b1 ↦ False;
+        FokForallObj b1 ↦ fok_form_eq a1 b1
+      }
+  }
+
+-- Element-wise `List FokForm` equality (length and every position).
+fn fok_list_form_eq (xs : List FokForm) (ys : List FokForm) : Bool =
+  match xs {
+    Nil ↦
+      match ys {
+        Nil ↦ True;
+        Cons y ys2 ↦ False
+      };
+    Cons x xs2 ↦
+      match ys {
+        Nil ↦ False;
+        Cons y ys2 ↦
+          match fok_form_eq x y {
+            True ↦ fok_list_form_eq xs2 ys2;
+            False ↦ False
+          }
+      }
+  }
+
+-- `FokSequent` equality: both sides, `gamma` then `delta`.
+fn fok_sequent_eq (a : FokSequent) (b : FokSequent) : Bool =
+  match a {
+    FokMkSequent ga da ↦
+      match b {
+        FokMkSequent gb db ↦
+          match fok_list_form_eq ga gb {
+            True ↦ fok_list_form_eq da db;
+            False ↦ False
+          }
+      }
+  }
+
+-- Does `target` occur anywhere in `form`?
+fn fok_form_mentions_parameter (form : FokForm) (target : FokQTerm) : Bool =
+  match form {
+    FokBottom ↦ False;
+    FokAccess a b ↦ fok_or (fok_qterm_eq a target) (fok_qterm_eq b target);
+    FokDomainA a b ↦ fok_or (fok_qterm_eq a target) (fok_qterm_eq b target);
+    FokForcingP a b ↦ fok_or (fok_qterm_eq a target) (fok_qterm_eq b target);
+    FokAnd p q ↦ fok_or (fok_form_mentions_parameter p target) (fok_form_mentions_parameter q target);
+    FokOr p q ↦ fok_or (fok_form_mentions_parameter p target) (fok_form_mentions_parameter q target);
+    FokImp p q ↦ fok_or (fok_form_mentions_parameter p target) (fok_form_mentions_parameter q target);
+    FokForallWorld b ↦ fok_form_mentions_parameter b target;
+    FokForallObj b ↦ fok_form_mentions_parameter b target
+  }
+
+fn fok_list_form_any_mentions (xs : List FokForm) (target : FokQTerm) : Bool =
+  match xs {
+    Nil ↦ False;
+    Cons x rest ↦
+      fok_or (fok_form_mentions_parameter x target) (fok_list_form_any_mentions rest target)
+  }
+
+-- Does `target` occur anywhere in `sequent` (either side)?
+fn fok_sequent_mentions_parameter (sequent : FokSequent) (target : FokQTerm) : Bool =
+  match sequent {
+    FokMkSequent gamma delta ↦
+      fok_or (fok_list_form_any_mentions gamma target) (fok_list_form_any_mentions delta target)
+  }
+
+-- Substitute the outermost bound `QTerm` variable (index `0`, relative to
+-- `depth`) with `replacement`, shrinking every strictly-higher bound index
+-- by one -- the `subst0` convention, restated at `FokQTerm`.
+fn fok_subst_qterm_at (q : FokQTerm) (depth : Nat) (replacement : FokQTerm) : FokQTerm =
+  match q {
+    FokQBound i ↦
+      match fok_nat_eq i depth {
+        True ↦ replacement;
+        False ↦
+          match fok_nat_lt depth i {
+            True ↦ FokQBound (fok_nat_pred i);
+            False ↦ FokQBound i
+          }
+      };
+    FokQParameter p ↦ FokQParameter p
+  }
+
+fn fok_subst_form_at (form : FokForm) (depth : Nat) (replacement : FokQTerm) : FokForm =
+  match form {
+    FokBottom ↦ FokBottom;
+    FokAccess a b ↦
+      FokAccess (fok_subst_qterm_at a depth replacement) (fok_subst_qterm_at b depth replacement);
+    FokDomainA a b ↦
+      FokDomainA (fok_subst_qterm_at a depth replacement) (fok_subst_qterm_at b depth replacement);
+    FokForcingP a b ↦
+      FokForcingP (fok_subst_qterm_at a depth replacement) (fok_subst_qterm_at b depth replacement);
+    FokAnd p q ↦
+      FokAnd (fok_subst_form_at p depth replacement) (fok_subst_form_at q depth replacement);
+    FokOr p q ↦
+      FokOr (fok_subst_form_at p depth replacement) (fok_subst_form_at q depth replacement);
+    FokImp p q ↦
+      FokImp (fok_subst_form_at p depth replacement) (fok_subst_form_at q depth replacement);
+    FokForallWorld b ↦ FokForallWorld (fok_subst_form_at b (Suc depth) replacement);
+    FokForallObj b ↦ FokForallObj (fok_subst_form_at b (Suc depth) replacement)
+  }
+
+fn fok_subst0_form (form : FokForm) (replacement : FokQTerm) : FokForm =
+  fok_subst_form_at form Zero replacement
+
+-- The `ForallRight` guard: shared by both `FokForallWorld`/`FokForallObj`
+-- targets (Rust's single `Form::ForallWorld(b) | Form::ForallObj(b) => b`
+-- arm) -- freshness, then exactly-one-child, then recurse on the
+-- instantiated child sequent.
+fn fok_check_forall_right
+      (conclusion : FokSequent) (gamma : List FokForm) (delta : List FokForm)
+      (right : Nat) (eigen : FokQTerm) (body : FokForm) (children : List FokCert)
+    : Bool =
+  match fok_sequent_mentions_parameter conclusion eigen {
+    True ↦ False;
+    False ↦
+      match children {
+        Nil ↦ False;
+        Cons child rest ↦
+          match rest {
+            Cons c2 rest2 ↦ False;
+            Nil ↦
+              fok_check_tree
+                (FokMkSequent gamma (fok_list_form_set_nth delta right (fok_subst0_form body eigen)))
+                child
+          }
+      }
+  }
+
+-- Dispatch on the certificate's rule, given its (already conclusion-matched)
+-- `gamma`/`delta` and `children`.
+fn fok_check_rule (gamma : List FokForm) (delta : List FokForm) (rule : FokRule) (children : List FokCert) : Bool =
+  match rule {
+    FokInit left right ↦
+      match children {
+        Cons c rest ↦ False;
+        Nil ↦
+          match fok_nth_form gamma left {
+            None ↦ False;
+            Some g ↦
+              match fok_nth_form delta right {
+                None ↦ False;
+                Some d ↦ fok_form_eq g d
+              }
+          }
+      };
+    FokImpRight right ↦
+      match fok_nth_form delta right {
+        None ↦ False;
+        Some target ↦
+          match target {
+            FokBottom ↦ False;
+            FokAccess a b ↦ False;
+            FokDomainA a b ↦ False;
+            FokForcingP a b ↦ False;
+            FokAnd p q ↦ False;
+            FokOr p q ↦ False;
+            FokImp p q ↦
+              match children {
+                Nil ↦ False;
+                Cons child rest ↦
+                  match rest {
+                    Cons c2 rest2 ↦ False;
+                    Nil ↦
+                      fok_check_tree
+                        (FokMkSequent (fok_list_form_append_one gamma p) (fok_list_form_set_nth delta right q))
+                        child
+                  }
+              };
+            FokForallWorld b ↦ False;
+            FokForallObj b ↦ False
+          }
+      };
+    FokForallRight right eigen ↦
+      match fok_nth_form delta right {
+        None ↦ False;
+        Some target ↦
+          match target {
+            FokBottom ↦ False;
+            FokAccess a b ↦ False;
+            FokDomainA a b ↦ False;
+            FokForcingP a b ↦ False;
+            FokAnd p q ↦ False;
+            FokOr p q ↦ False;
+            FokImp p q ↦ False;
+            FokForallWorld body ↦
+              fok_check_forall_right (FokMkSequent gamma delta) gamma delta right eigen body children;
+            FokForallObj body ↦
+              fok_check_forall_right (FokMkSequent gamma delta) gamma delta right eigen body children
+          }
+      }
+  }
+
+fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
+  match node {
+    FokMkCert conclusion rule children ↦
+      match fok_sequent_eq conclusion expected_conclusion {
+        False ↦ False;
+        True ↦
+          match conclusion {
+            FokMkSequent gamma delta ↦ fok_check_rule gamma delta rule children
+          }
+      }
+  }
+
+-- `check_cert : FokForm -> FokCert -> Bool` (23 section 4.3), restricted to
+-- the slice's three rules -- an ordinary kernel-checked total function,
+-- distinct from the kernel API `check` (`seed-prover.md:49-50`). Mirrors
+-- `fo_kripke::check_cert`.
+fn fok_check_cert (q : FokForm) (pi : FokCert) : Bool =
+  fok_check_tree (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm))) pi
