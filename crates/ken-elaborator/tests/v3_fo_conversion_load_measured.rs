@@ -294,6 +294,10 @@ fn measure_rust_reference_checker_load_on_real_source_programs() {
 
         eprintln!("\n=== V3-FO-CONVERSION-LOAD-MEASURED: D1-D4 report ===");
         eprintln!(
+            "measured: the elaborator's Rust reference check_cert, NOT kernel \
+             conversion -- see this file's module doc for the AC-2 correction"
+        );
+        eprintln!(
             "{:<20} {:>14} {:>16} {:>16} {:>20}",
             "label", "formula_depth", "cert_nodes", "wall_clock_us", "outcome"
         );

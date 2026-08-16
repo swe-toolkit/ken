@@ -989,6 +989,32 @@ pub fn find_certificate(f: &IForm) -> Option<Cert> {
     let target = embed(f);
     let root = Sequent { gamma: vec![], delta: vec![target] };
     let mut next_param = 0usize;
+    // `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` `D0`/`D1`: `fuel` bounds `search`'s
+    // own Rust recursion depth one-for-one (each `ImpRight`/`ForallRight`
+    // step is exactly one recursive call at `fuel - 1`), so it is a direct
+    // proxy for how deep this call descends the Rust stack -- and that is
+    // what must not exceed what the stack `search` actually runs on can
+    // survive, or the designed refusal (`fuel == 0` -> `None` -> IPC
+    // fallthrough) is pre-empted by an abort instead.
+    //
+    // MEASURED (2026-08-16, this exact tree): on the `--release` profile
+    // (the profile production ships; CI/`cargo build --release` owns it) and
+    // an 8 MiB thread stack -- matching `ulimit -s` on this box, the OS
+    // default main-thread stack `ken-cli`'s `main()` runs `dispatch()` on
+    // directly, with no thread spawn in between -- `search` SURVIVES a
+    // hand-built `Imp`-chain recursion of depth 12000 and ABORTS (stack
+    // overflow, SIGABRT, not a graceful refusal) by depth 15000. The exact
+    // boundary was not narrowed further inside that bracket; `--release`
+    // per-level cost is dominated by `Vec` clones on `gamma`/`delta`, so
+    // probing near the boundary is itself slow (minutes per attempt at
+    // these depths).
+    //
+    // `fuel = 200` sits roughly 60x below the measured survival floor
+    // (12000), so fuel exhaustion is reached with very large margin before
+    // any stack risk -- no change to this constant is warranted by this
+    // measurement. If a future change ever needs to raise it, re-measure
+    // this relationship first; a raised fuel with no fresh measurement
+    // reopens exactly the gap this comment records having closed.
     search(&root, &mut next_param, 200)
 }
 
