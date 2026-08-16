@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 04:11:49Z — from 337 issue file(s) in `docs/program/issues/`.
+2026-08-16 04:31:37Z — from 338 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -313,6 +313,7 @@ the committed file matches the generator's output.
 | `RT-SRCBODY-BIND-ORDER` | Functionized source-body units install the parameter run in ABI order where the body reads de Bruijn-nearest-first, so every multi-parameter source body binds its parameters permuted | merged | runtime | M | none | — |
 | `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` | Arm static-worker recognition on the source-machine Construct arm, which never dispatches the classifier, after a bounded check that every eligible-field state can enter the template | merged | runtime | M | none | — |
 | `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` | Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see | ready | runtime | S | none | — |
+| `RT-STATIC-WORKER-WITNESS-PROGRAM` | Write a Ken PROGRAM that reaches the static-worker conservation refusal -- the incidence question the operator's narrowing decision rests on, which every existing demonstration answers only for hand-built fixtures | ready | runtime | M | none | — |
 | `RT-SYMLINK-LANE` | SymlinkPolicy is honoured by the interpreter lane and unreachable in the native lane — FollowWithinScope has no native behaviour | draft | runtime | TBD | none | — |
 | `RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE` | Give the unit-boundary environment record a planner-issued occurrence by extending the synthesized producer arm, so the closure crossing is attempted at the seam that actually refused it | merged | runtime | M | none | 2352 |
 | `RT-TERMINAL-ALL-ELIM-AUTHORITY` | Issue the typed terminal-All structured-IH elimination authority upstream in checked erasure/planning, and let only that issued relation license the source-machine Match seat to consume a ComputationalRecursorClosure | draft | runtime | M | none | — |
@@ -364,7 +365,7 @@ the committed file matches the generator's output.
 | `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | merged | language | L | none | — |
 | `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` | Decide and build how an incoming obligation is matched to an FO slice signature, so route FO's public entry point can reach the embedding at all | merged | language | L | none | 2353 |
 | `V3-FO-QUOTE-GUARD-FAIL-CLOSED` | Make quote_fo's pre-quotation guards fail closed: Pair is not a binder, and a proof-variable-occurrence test must default to true | merged | language | S | none | 2346 |
-| `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` | Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report | active | language | S | none | — |
+| `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` | Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report | merged | language | S | none | — |
 | `V3-FO-SUBST-DEPTH-CONTROL` | Give subst_form_at a control that can see its binder-depth discipline, and state the two premises fo_kripke.rs relies on without naming where the next editor will look -- the shift call-site correspondence and the bottom_id exclusion criterion | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2382 |
 | `V3-FO-TOP-REFUSAL-ENFORCEMENT` | Give the sort-candidate criterion an enforcement: a test asserting quote_iform refuses top_id with UnsupportedTermShape, so an IForm::Top arm reds at the same moment the collector needs updating -- and soften the D2 claim that the criterion forces that update | merged | language | XS | none | https://github.com/swe-toolkit/ken/pull/2388 |
 | `V3-KRIPKE-DECOMPOSITION` | The FO Kripke embedding is the DAG's V3 headline and has never had a tracker node -- only V3-RESIDUAL and V4-RESIDUAL exist, both merged, and what they produced is the single Int-literal refutation arm; establish what the embedding requires and how it decomposes into one-hour increments, because an L-sized node cannot be released and the adequacy lemma is kernel-facing rather than prover-facing | merged | verify | M | none | — |
@@ -400,6 +401,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
+- `RT-STATIC-WORKER-WITNESS-PROGRAM` — Write a Ken PROGRAM that reaches the static-worker conservation refusal -- the incidence question the operator's narrowing decision rests on, which every existing demonstration answers only for hand-built fixtures
 - `RT-UNSUPPORTED-BINDING-ON-REFUSAL` — A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken

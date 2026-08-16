@@ -1,0 +1,139 @@
+---
+id: RT-STATIC-WORKER-WITNESS-PROGRAM
+title: "Write a Ken PROGRAM that reaches the static-worker conservation refusal -- the incidence question the operator's narrowing decision rests on, which every existing demonstration answers only for hand-built fixtures"
+status: ready
+owner: runtime
+size: M
+gate: none
+depends_on: []
+blocks: []
+github: null
+origin: "Operator request, 2026-08-16, on the Steward's capability-loss brief: the refusal's cost SHAPE is known and its MAGNITUDE is not. The operator asked for a Ken program demonstrating the refusal and proposed the Adversary; the Steward's routing is runtime authors, Adversary attacks -- rationale in Sequencing. Steward-filed per COORDINATION section 2."
+---
+
+> # THE QUESTION IS *"DOES A PROGRAM HIT THIS"*, NOT *"CAN THE REFUSAL FIRE"*.
+>
+> **The second is already answered and is not worth re-answering.** Five
+> instrumented compiles reached it in `RT-UNSUPPORTED-LANE-REFUSAL-REACH` `D0`.
+>
+> **Every construct that has ever reached this refusal is a hand-authored
+> fixture** — `ctor:fixture::PX8JScopeTree::Node` and
+> `ctor:fixture::PX8JHoleOutput::Node`
+> — and both live in exactly one file, `control.rs`. **A witness authored to
+> exhibit a shape proves the shape is expressible, not that anyone writes it.**
+
+## Why this node exists: an operator decision rests on the missing number
+
+The operator is being asked to accept two recorded capability narrowings as the
+price of retiring `RecursiveDescent`. The Steward's brief stated the cost as
+**known in shape, unknown in magnitude**, and this node is the magnitude.
+
+**The refusal** (`lowering/mod.rs:4726-4740`):
+
+> *"a constructor carrying an unconsumed static worker denotes a value
+> containing the callable and has no runtime representation"*
+
+It fires when a constructor transports a static worker in a field and the
+recognition is **neither consumed nor erased** — nothing statically rebinds it,
+and its transport reaches no consumer.
+
+**In source terms, the shape to write is:** store a function value in a
+constructor field, and do not call or discard it at any statically visible
+site.
+
+## `D0` — a Ken program, compiled through the real path
+
+**Write it in Ken source** and compile it the way a user's program is compiled.
+**A hand-built `RuntimeExpr` does not discharge this** — that is what the
+existing fixtures already are, and it is the exact gap the node exists to close.
+
+**Report, whichever way it goes:**
+
+- **If it refuses:** the source, the refusal text as emitted, and **how natural
+  the program is** — would someone write this to solve a problem, or only to
+  trip the refusal?
+- **If it does NOT refuse:** that is the more valuable result and it must not be
+  buried. It would mean the shape is reachable in fixtures and not in source,
+  which bounds the operator's cost at or near zero and **changes the
+  recommendation.**
+
+## `D1` — say which way the difficulty ran
+
+**`D0` is a search, and how hard the search was IS the finding.** Record
+whether the program fell out naturally or had to be contrived, and what had to
+be true for the recognition to go unconsumed. **"I had to work to trip it" and
+"it happened on my second try" are different answers to the operator's
+question**, and only the author knows which occurred.
+
+## Acceptance criteria
+
+**`AC-1`. The witness is Ken source compiled through the production path.**
+Not a `RuntimeExpr` literal, not a `cfg(test)` fixture constructor. **Name the
+compilation entry point used** so a reader can tell it apart from the existing
+fixture route.
+
+**`AC-2`. The naturalness assessment is explicit and is allowed to be
+unflattering.** A sentence such as *"this program has no reason to exist except
+to trip the refusal"* is a **complete and valuable** discharge of this AC. **Do
+not manufacture plausibility.**
+
+**`AC-3`. A negative result is reported as a result, not as a failed turn.**
+If no reasonable source program reaches the refusal, say so and hand back.
+**That outcome makes the operator's decision easier, not harder**, and a turn
+that produces it has succeeded.
+
+**`AC-4`. Row 1 is OUT OF SCOPE.** `NativeJoinPlanV1`'s *"terminal answer has
+no affine checked-root authority"* is a **different kind of thing** — an affine
+proof token internal to the lowering machine (`RootTerminalAnswerAuthority`,
+minted once at the root, moved not copied, consumed by `.take()` at
+`emit_result`), not a statement about Ken programs. **Do not fold it into this
+count.** If it needs an incidence question it gets its own node.
+
+**`AC-5`. No repair.** Do not make the refusal go away, do not widen the lane,
+do not touch `RecursiveDescent`. **This node measures.**
+
+**`AC-6`.** No-regression, in CI (`COORDINATION §12`). Local validation
+targeted only — `-p ken-runtime` / `-p ken-cli`, never `--workspace`.
+
+## Banned scope
+
+- **Repairing or narrowing the refusal.** See `AC-5`.
+- **Reopening the five dead ledger dispositions** — see
+  [[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] and
+  [[RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT]].
+- **Row 1 / `NativeJoinPlanV1`** — see `AC-4`.
+- **Adding the witness to the ignored corpus.** If it becomes a test it is a
+  live one; an `#[ignore]`d witness answers nothing and re-creates the exclusion
+  problem [[RT-IGNORED-CORPUS-MEMBERSHIP-RULE]] just repaired.
+
+## Sequencing
+
+**Ahead of the operator's ruling if the operator wants magnitude first;
+otherwise alongside.** The Steward recommended accepting the narrowings without
+waiting on this, so it is not a hard gate — but it is the one measurement that
+would change the recommendation.
+
+> ### RUNTIME AUTHORS. THE ADVERSARY ATTACKS. Not the other way round.
+>
+> The operator proposed the Adversary. **The construction needs the lowering's
+> own vocabulary** — recognition, static elimination, transport — which is
+> runtime's.
+>
+> **The Adversary's question is the one that decides whether this node
+> succeeded: is the witness a fixture in disguise?** That is the same
+> distinction it has enforced three times in one arc — the barred per-test
+> measurement, forced-versus-observed returns, six-versus-thirty-three corpus
+> membership. **Give it the finished witness and let it ask whether the program
+> is real.**
+>
+> It also keeps the Adversary **report-only** (`COORDINATION §10⁻a`) rather
+> than turning it into an author, which is not a posture change to make
+> casually.
+
+## Provenance
+
+Operator request in session, 2026-08-16, following the Steward's capability-loss
+brief. The unmeasured-incidence gap it closes was first surfaced by Adversary
+`evt_6d81evnk2nyfn` — *"the population that would test the claim is still
+unmeasured; both the original 81 and the new 18 are drawn from programs that
+cannot"* — and has survived three repairs without being measured.
