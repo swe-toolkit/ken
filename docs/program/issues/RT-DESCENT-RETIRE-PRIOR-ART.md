@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-RETIRE-PRIOR-ART
 title: "The retirement's discharge is now a research referral -- Ken's own rules cannot settle source-reachability of the retained difference, so ask how other implementations closed the same shape and what that says about retiring the lane"
-status: ready
+status: active
 owner: research
 size: M
 gate: none
@@ -150,6 +150,8 @@ question.** Inherited from the predecessor's method gate.
   transcribed into a lowering.
 
 ## Sequencing
+
+**`active`. Released to the research seat at `evt_1nphjvhzs39e0`, `main` = `483d740eb`.**
 
 **Blocks [[RT-DESCENT-RETIRE]], and it is that node's eleventh dependency and
 its sole live discharge.** The other ten are `merged`; the capstone is barred by
