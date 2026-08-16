@@ -1,7 +1,7 @@
 ---
 id: RT-BOUNDARY-IGNORED-CORPUS-MEASURE
 title: "Read unit_boundary_environment_fields on the six ignored closure-at-boundary tests, the population the merged measurement's own selection rule excluded"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
