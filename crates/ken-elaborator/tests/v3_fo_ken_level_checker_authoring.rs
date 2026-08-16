@@ -628,7 +628,18 @@ fn fok_check_cert_totally_rejects_malformed_certificates() {
             (FokImpRight Zero) \
             (Cons FokCert {init_child} (Nil FokCert)))"
     );
-    let placeholder_child =
+    // This certificate is ITSELF rejecting -- `Init` indexing into two empty
+    // lists. Named for what it IS, not where it goes (Architect
+    // `evt_2jrv6bkbf541t`, on the merged D3): every use site below is
+    // verified inert because the traversal rejects before recursing into
+    // children (wrong-shaped target, or wrong child count) -- this value's
+    // own invalidity is never evaluated. If a future case ever reaches a
+    // position where it WOULD be recursed into, that row becomes rejected
+    // by two independent mechanisms and proves only that rejection
+    // happened -- the exact `D2` over-determination this node has already
+    // repaired twice. Do not reuse this value anywhere reachable; build a
+    // genuine derivation instead.
+    let rejecting_child_never_reached =
         "(FokMkCert (FokMkSequent (Nil FokForm) (Nil FokForm)) (FokInit Zero Zero) (Nil FokCert))";
 
     let cases: Vec<(&str, String)> = vec![
@@ -675,7 +686,7 @@ fn fok_check_cert_totally_rejects_malformed_certificates() {
                    (FokMkSequent (Nil FokForm) (Cons FokForm FokBottom (Nil FokForm))) \
                    (FokMkCert \
                      (FokMkSequent (Nil FokForm) (Cons FokForm FokBottom (Nil FokForm))) \
-                     (FokImpRight Zero) (Cons FokCert {placeholder_child} (Nil FokCert)))"
+                     (FokImpRight Zero) (Cons FokCert {rejecting_child_never_reached} (Nil FokCert)))"
             ),
         ),
         (
@@ -696,7 +707,7 @@ fn fok_check_cert_totally_rejects_malformed_certificates() {
                    (FokMkCert \
                      (FokMkSequent (Nil FokForm) (Cons FokForm {imp_bottom_bottom} (Nil FokForm))) \
                      (FokImpRight Zero) \
-                     (Cons FokCert {placeholder_child} (Cons FokCert {placeholder_child} (Nil FokCert))))"
+                     (Cons FokCert {rejecting_child_never_reached} (Cons FokCert {rejecting_child_never_reached} (Nil FokCert))))"
             ),
         ),
         (
@@ -706,7 +717,7 @@ fn fok_check_cert_totally_rejects_malformed_certificates() {
                    (FokMkSequent (Nil FokForm) (Cons FokForm FokBottom (Nil FokForm))) \
                    (FokMkCert \
                      (FokMkSequent (Nil FokForm) (Cons FokForm FokBottom (Nil FokForm))) \
-                     (FokForallRight Zero (FokQParameter Zero)) (Cons FokCert {placeholder_child} (Nil FokCert)))"
+                     (FokForallRight Zero (FokQParameter Zero)) (Cons FokCert {rejecting_child_never_reached} (Nil FokCert)))"
             ),
         ),
         (
@@ -1233,4 +1244,186 @@ fn fok_form_eq_agrees_with_rust_partial_eq_field_level() {
              Rust={rust_verdict}, Ken={ken_verdict}, a={a:?}, b={b:?}"
         );
     }
+}
+
+/// Serializer pin 1 (`language-leader`, `evt_54ferr7wzetfa`, on Adversary
+/// `evt_10dxqtbsf4tcw`): `rule_source`'s `FokInit` field order was measured
+/// UNPROTECTED -- swapping `left`/`right` in the serializer passed all nine
+/// prior tests, because every existing `Init` case either has `left ==
+/// right` (a swap is textually invisible) or has both orderings land
+/// out-of-range (my earlier `init_out_of_range_reject` pair: gamma and
+/// delta are each length 1, so index `1` is out of range on EITHER side).
+///
+/// This pin needs `left != right` AND a construction where the two
+/// ORDERINGS genuinely disagree. `check_cert`'s public entry always wraps
+/// the root as `delta = [q]` (length 1, `ImpRight`/`ForallRight` never grow
+/// it), so `right` can only ever be `0` through the reachable API; `left`
+/// can be driven above `0` by chaining `ImpRight` steps (each appends one
+/// element to `gamma`). Two `ImpRight` steps give `gamma` length 2 and
+/// `delta` length 1 (always), so `Init { left: 1, right: 0 }` genuinely
+/// checks `gamma[1] == delta[0]` -- and under a `left`/`right` SERIALIZER
+/// swap, Ken would instead check `gamma[0]` against `delta[1]`, and
+/// `delta[1]` is OUT OF RANGE (`delta` has length 1), so the swapped
+/// reading rejects regardless of content. Choosing `gamma[1]` to equal
+/// `delta[0]` makes the correct reading ACCEPT while the swapped reading
+/// REJECTS -- a genuine disagreement, not a coincidence of population
+/// asymmetry.
+#[test]
+fn fok_check_cert_serializer_discriminates_init_left_right_swap() {
+    let mut env = ElabEnv::new().expect("prelude construction");
+    env.elaborate_file(FOK_SOURCE)
+        .expect("FoKripke.ken failed to elaborate/kernel-check");
+    let ids = FokIds::resolve(&env);
+
+    // gamma ends up [p1, p2] with p2 == target; delta ends up [target].
+    // Init { left: 1, right: 0 } checks gamma[1] == delta[0], i.e. p2 ==
+    // target -- true by construction.
+    let p1 = Form::Access(QTerm::Bound(0), QTerm::Bound(0));
+    let target = Form::Bottom;
+    let q = Form::Imp(
+        Box::new(p1),
+        Box::new(Form::Imp(
+            Box::new(target.clone()),
+            Box::new(target.clone()),
+        )),
+    );
+
+    let init_node = Cert {
+        conclusion: Sequent {
+            gamma: vec![
+                Form::Access(QTerm::Bound(0), QTerm::Bound(0)),
+                target.clone(),
+            ],
+            delta: vec![target.clone()],
+        },
+        rule: Rule::Init { left: 1, right: 0 },
+        children: vec![],
+    };
+    let inner_imp = Cert {
+        conclusion: Sequent {
+            gamma: vec![Form::Access(QTerm::Bound(0), QTerm::Bound(0))],
+            delta: vec![Form::Imp(
+                Box::new(target.clone()),
+                Box::new(target.clone()),
+            )],
+        },
+        rule: Rule::ImpRight { right: 0 },
+        children: vec![init_node],
+    };
+    let pi = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![q.clone()],
+        },
+        rule: Rule::ImpRight { right: 0 },
+        children: vec![inner_imp],
+    };
+
+    let (rust_verdict, ken_verdict) = differential_check_cert(
+        &mut env,
+        &ids,
+        "fok_case_serializer_pin_init_left_right",
+        &q,
+        &pi,
+    );
+    assert!(
+        rust_verdict,
+        "construction error: this derivation must be genuinely valid (gamma[1] == delta[0] by construction)"
+    );
+    assert_eq!(
+        ken_verdict, rust_verdict,
+        "Ken fok_check_cert disagrees with Rust check_cert on the Init left/right swap pin"
+    );
+}
+
+/// Serializer pin 2 (`language-leader`, `evt_54ferr7wzetfa`, on Adversary
+/// `evt_10dxqtbsf4tcw`): `qterm_source` was measured to survive a
+/// `FokQBound`/`FokQParameter` mutation -- but that mutation was a UNIFORM
+/// bijective swap, which preserves every relative structural relationship
+/// (`fok_form_eq`/`fok_qterm_eq` are purely structural, so a consistent
+/// relabeling still agrees with itself). The one function that is NOT
+/// structural is `fok_sequent_mentions_parameter`: it asks specifically
+/// whether a given `Parameter` occurs, not whether "the same thing as
+/// eigen" occurs. A serializer bug that maps `QTerm::Bound` to
+/// `FokQParameter` (a single-arm error, not a bijective swap) makes a bound
+/// variable indistinguishable from a live eigenparameter of the SAME
+/// number.
+///
+/// This pin's certificate has a genuine `Bound(0)` inside the quantified
+/// body (harmless: it is bound BY that very quantifier, and the freshness
+/// check inspects the OUTER sequent before substitution, where `Bound(0)`
+/// and `Parameter(0)` are different constructors and do not collide) --
+/// and the certificate is otherwise a real, valid derivation (`forall w.
+/// Force_P w w -> Force_P w w`, closed by `forall-right` + `imp-right` +
+/// `init`). Under the single-arm `Bound -> FokQParameter` serializer bug,
+/// this `Bound(0)` becomes `FokQParameter 0` on the Ken side -- the exact
+/// number of the real eigenparameter -- and `fok_sequent_mentions_parameter`
+/// then reports a SPURIOUS freshness violation, flipping the verdict from
+/// accept to reject.
+#[test]
+fn fok_check_cert_serializer_discriminates_qterm_bound_parameter_collision() {
+    let mut env = ElabEnv::new().expect("prelude construction");
+    env.elaborate_file(FOK_SOURCE)
+        .expect("FoKripke.ken failed to elaborate/kernel-check");
+    let ids = FokIds::resolve(&env);
+
+    // body = Force_P(Bound 0, Bound 0) -> Force_P(Bound 0, Bound 0), a
+    // trivial self-implication whose antecedent/consequent both mention
+    // Bound(0) -- the world the ForallWorld itself binds.
+    let atom = Form::ForcingP(QTerm::Bound(0), QTerm::Bound(0));
+    let body = Form::Imp(Box::new(atom.clone()), Box::new(atom.clone()));
+    let q = Form::ForallWorld(Box::new(body));
+
+    // After ForallRight (eigen = Parameter(0)): instantiated = Force_P(Param
+    // 0, Param 0) -> Force_P(Param 0, Param 0).
+    let instantiated_atom = Form::ForcingP(QTerm::Parameter(0), QTerm::Parameter(0));
+    let instantiated = Form::Imp(
+        Box::new(instantiated_atom.clone()),
+        Box::new(instantiated_atom.clone()),
+    );
+
+    let init_node = Cert {
+        conclusion: Sequent {
+            gamma: vec![instantiated_atom.clone()],
+            delta: vec![instantiated_atom.clone()],
+        },
+        rule: Rule::Init { left: 0, right: 0 },
+        children: vec![],
+    };
+    let imp_right_node = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![instantiated],
+        },
+        rule: Rule::ImpRight { right: 0 },
+        children: vec![init_node],
+    };
+    let pi = Cert {
+        conclusion: Sequent {
+            gamma: vec![],
+            delta: vec![q.clone()],
+        },
+        rule: Rule::ForallRight {
+            right: 0,
+            eigen: QTerm::Parameter(0),
+        },
+        children: vec![imp_right_node],
+    };
+
+    let (rust_verdict, ken_verdict) = differential_check_cert(
+        &mut env,
+        &ids,
+        "fok_case_serializer_pin_qterm_collision",
+        &q,
+        &pi,
+    );
+    assert!(
+        rust_verdict,
+        "construction error: this derivation must be genuinely valid \
+         (Bound(0) in q is bound by its own quantifier and does not collide with eigen=Parameter(0))"
+    );
+    assert_eq!(
+        ken_verdict, rust_verdict,
+        "Ken fok_check_cert disagrees with Rust check_cert on the QTerm Bound/Parameter collision pin"
+    );
 }
