@@ -1115,6 +1115,25 @@ mod tests {
     /// break, by design** -- that is the dependency surfacing on the axis
     /// it actually lives on, not a regression to chase.
     ///
+    /// **`V3-FO-SUBST-DEPTH-CONTROL` `D1`: a THIRD premise, and it is not a
+    /// property of `shift` at all.** Mechanisms 1 and 2 above are both
+    /// properties of `shift` itself -- break either and this differential
+    /// reds. This oracle's RELEVANCE to route FO instead rests on a premise
+    /// about the CALLER: that `quote_iform` performs exactly
+    /// `shift(codomain, -1, 0)` (`fo_kripke.rs`, the `Pi` arm's
+    /// proof-hypothesis-erasure branch) to erase a crossed proof-hypothesis
+    /// binder, and that `denote`'s `Imp` arm performs exactly the inverse
+    /// `shift(&denote(env, sig, q), 1, 0)` to reintroduce it. **Change
+    /// either call site** -- a different cutoff, a `subst_var`, a local
+    /// helper -- **and this differential test keeps passing while `shift`'s
+    /// guard no longer describes the operation `quote_iform`/`denote`
+    /// actually perform.** That is the one illegible break: mechanisms 1
+    /// and 2 are self-alarming, this correspondence is not, so it is
+    /// recorded here instead. (A third `shift(&px, 1, 0)` exists in
+    /// `positive_control_term`, a FIXTURE builder rather than part of this
+    /// convention -- deliberately not named here, since folding it in would
+    /// make this premise vaguer, not stronger.)
+    ///
     /// Confirmed at the point of use against `subst.rs` (not merely cited):
     /// `shift`'s only `cutoff + 1` arms are `Pi.b`, `Lam.t`, `Sigma.b`,
     /// `Let.body` -- covered explicitly below, each with both an
@@ -1368,6 +1387,91 @@ mod tests {
                 indices: vec![],
                 scrut: Box::new(Term::Var(0)),
             },
+        );
+    }
+
+    /// `V3-FO-SUBST-DEPTH-CONTROL` `D0`/`AC-1`/`AC-2`/`AC-3`: a DIRECT
+    /// oracle on `subst_form_at`'s binder-depth discipline, with
+    /// hand-written expected `Form`s -- never computed by calling
+    /// `subst_form_at`/`subst0_form` itself, and never routed through
+    /// `search`/`find_certificate`/`check_cert` (`AC-2`). `subst0_form`'s
+    /// only two callers are `check_tree`'s `ForallRight` arm (validates a
+    /// certificate) and `search`'s `ForallRight` arm (constructs one) -- a
+    /// depth error there is applied IDENTICALLY on both sides, so an
+    /// end-to-end "discovery succeeds, a certificate is found and accepted"
+    /// test is structurally incapable of detecting it at any depth. This
+    /// test is the control that can see the discipline an end-to-end route
+    /// cannot.
+    ///
+    /// `Form::DomainA(QTerm, QTerm)` is used as the leaf carrying a bound
+    /// index at each row, with both slots holding the SAME `QTerm` so the
+    /// leaf's transformation is unambiguous to read.
+    ///
+    /// **The shallow row (`AC-3`) is present and passes under both the
+    /// correct arm and the mutant below** -- `ForallObj(Bound(1))` at
+    /// depth 0 only ever crosses ONE binder, so `depth + 1` (correct) and a
+    /// hardcoded `1` (mutant) compute the SAME recursion depth there. This
+    /// is the boundary the two-binder rows below exist to get past, on the
+    /// record rather than omitted as uninteresting.
+    ///
+    /// **The discriminating rows need exactly two binders**, the minimum at
+    /// which `depth + 1` (correct, reaching `2`) and a hardcoded `1`
+    /// (mutant, staying at `1`) diverge: at depth `2`, `Bound(2)` IS the
+    /// substitution target and resolves to `replacement`; at depth `1`,
+    /// `Bound(2) > 1` merely decrements to `Bound(1)`. Covered across
+    /// `ForallObj`/`ForallObj`, `ForallWorld`/`ForallWorld`, and a MIXED
+    /// `ForallWorld`/`ForallObj` nesting, so the per-arm increments are
+    /// shown composing across constructors, not merely holding within one.
+    #[test]
+    fn subst_form_at_matches_hand_written_expectations_at_binder_depth() {
+        fn check(label: &str, actual: Form, expected: Form) {
+            assert_eq!(actual, expected, "{label}: subst_form_at must match the hand-written expectation");
+        }
+
+        let p = QTerm::Parameter(7);
+        let leaf = |i: usize| Form::DomainA(QTerm::Bound(i), QTerm::Bound(i));
+
+        // Shallow: one binder only. depth+1 and hardcoded 1 coincide here --
+        // present so the non-discriminating boundary is on the record.
+        check(
+            "ForallObj(Bound(1)), shallow -- passes under both arms",
+            subst_form_at(&Form::ForallObj(Box::new(leaf(1))), 0, &p),
+            Form::ForallObj(Box::new(Form::DomainA(p, p))),
+        );
+
+        // Discriminating: ForallObj/ForallObj, two binders deep.
+        check(
+            "ForallObj/ForallObj(Bound(2)) -- discriminates",
+            subst_form_at(
+                &Form::ForallObj(Box::new(Form::ForallObj(Box::new(leaf(2))))),
+                0,
+                &p,
+            ),
+            Form::ForallObj(Box::new(Form::ForallObj(Box::new(Form::DomainA(p, p))))),
+        );
+
+        // Discriminating: ForallWorld/ForallWorld, two binders deep.
+        check(
+            "ForallWorld/ForallWorld(Bound(2)) -- discriminates",
+            subst_form_at(
+                &Form::ForallWorld(Box::new(Form::ForallWorld(Box::new(leaf(2))))),
+                0,
+                &p,
+            ),
+            Form::ForallWorld(Box::new(Form::ForallWorld(Box::new(Form::DomainA(p, p))))),
+        );
+
+        // Discriminating: MIXED nesting (ForallWorld outer, ForallObj
+        // inner) -- the per-arm increments must compose across
+        // constructors, not merely hold within one.
+        check(
+            "ForallWorld/ForallObj(Bound(2)), mixed -- discriminates",
+            subst_form_at(
+                &Form::ForallWorld(Box::new(Form::ForallObj(Box::new(leaf(2))))),
+                0,
+                &p,
+            ),
+            Form::ForallWorld(Box::new(Form::ForallObj(Box::new(Form::DomainA(p, p))))),
         );
     }
 
