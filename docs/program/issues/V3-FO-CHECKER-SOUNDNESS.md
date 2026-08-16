@@ -156,6 +156,30 @@ reading the kernel, and reported separately as `AC-5` required.
 | (2) `‖A‖` writable in `.ken` | **FAIL — the hard stop.** `‖…‖` dies in the lexer, `||…||` in the parser at `Pipe`, bare `Trunc (…)` at name resolution |
 | (3) `Equal Bool b True` elimination | **PASS in one form only** — the hypothesis must sit in the return type's Pi-chain. The naive pre-bound form is kernel-rejected: `34 §3.3`'s per-branch refinement covers the branch's *result type*, not other context bindings |
 
+### Part (2)'s conclusion is right and its stated method cannot reach it
+
+**The node required each part to be established *"by actual `.ken` elaboration,
+not by reading the kernel or elaborator source."* That is correct for parts (1)
+and (3) and backwards for part (2)** (Adversary `evt_5m089b44vzr32`, re-run by
+the Steward).
+
+Parts (1) and (3) are **positive** existence claims: elaborating the thing
+proves it is writable, and reading source could not. **Part (2) is a negative
+one**, and no number of failed spellings establishes it — the probe tried two,
+and two failures are consistent with a third succeeding. **It is also the hard
+stop, the result the entire node turns on.**
+
+What does establish it is the grammar: `lexer.rs` contains no occurrence of
+`trunc` in any form, `parser.rs`'s only hits are the English words in two
+unrelated doc comments, and all six `Trunc` references in `elab.rs` are
+structural traversals with no surface-form mapping.
+
+⇒ **A method adopted because it is stronger than reading source is weaker than
+reading source for the one claim that is negative — and the file applied it
+uniformly to all three.** The verdict stands; the grounding moved.
+[[LANG-TRUNCATION-SURFACE-SYNTAX]] carries the grammar reads, because its whole
+premise is that negative.
+
 ### The blocker, in the form that routes it
 
 > **`Term::Trunc` exists and is kernel-typed; no surface syntax or elaboration

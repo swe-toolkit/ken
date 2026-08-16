@@ -35,6 +35,28 @@ new former, no trusted-base entry.
 against the landed code, say so and escalate — do not quietly build around it.**
 Line numbers are anchors to re-find, never values to check.
 
+### This node's premise is a NEGATIVE, and `D0`'s probes do not establish it
+
+**The premise is "there is no surface syntax."** `D0` reached that conclusion by
+elaborating two spellings and watching both fail. **Two failed spellings are
+consistent with a third succeeding**, so the probes are not what grounds this
+node. Its method was chosen because elaborating is stronger than reading source
+— which is true for a positive existence claim and backwards for a negative one.
+
+**The grammar is what settles it, in three reads** (Adversary
+`evt_5m089b44vzr32`, each re-run by the Steward):
+
+| read | result |
+|---|---|
+| `trunc` in `lexer.rs` | **zero occurrences of any kind** |
+| `trunc` in `parser.rs` | two hits, both the English words *"truncating"*/*"truncation"* in unrelated doc comments — no production |
+| `Trunc` in `elab.rs` | six hits, **all structural traversals** — `zonk`, `subst_term_generalize`, the depth walk. No surface-form-to-`Term::Trunc` mapping |
+
+⇒ **There is no entry path from surface syntax, established by absence in the
+grammar rather than by failure to guess.** That is the sentence this node is
+built on. If a later reader wants to challenge the premise, this table is what
+they must overturn — not the two probe spellings.
+
 ### The kernel side is complete. All three judgments already exist.
 
 | judgment | where | what it says |
@@ -85,6 +107,18 @@ builds.
 > **The Architect's census named one construction site. There are three.** The
 > two extra ones are in route FO itself, which is the caller this node exists to
 > unblock — so the count is not incidental to the framing.
+>
+> **"Three" is a count under a PREDICATE, and it is irreproducible without
+> it.** The predicate is *originating constructions in `ken-elaborator`,
+> excluding structural rebuilds and tests*. A naive
+> `grep -r 'Term::Trunc(Box::new' crates/` returns **14** — those three plus
+> eight traversal rebuilds across `elab.rs`, `conv.rs` and `subst.rs`, two
+> `fo_kripke.rs` tests, and a kernel acceptance test.
+>
+> ⇒ **State base, tip, count, AND predicate.** The three-field discipline this
+> program adopted after the 21-versus-25 census episode is one field short: two
+> readings of the same tree at the same SHA differ by more than four times here,
+> and neither is wrong.
 
 ### The lexer already speaks this dialect. This is one more arm.
 
