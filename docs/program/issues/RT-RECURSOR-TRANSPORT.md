@@ -1,15 +1,42 @@
 ---
 id: RT-RECURSOR-TRANSPORT
 title: "Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: [RT-CONTSPEC-WITNESS, RT-MATCH-RECURSOR-CONSUMERS, RT-LEXICAL-RECURSOR-CONSUMERS, RT-LEXICAL-ROW2-MISSING-MINT, RT-LEXICAL-R3-FUSION-EMITTER]
 blocks: [RT-DESCENT-RETIRE]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2443
 origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDescent, migrate the remaining residual classes, do not linger half-migrated. Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2). Recut 2026-08-08 per Architect ruling evt_237tbdsacqbk4.
 ---
+
+> # CLOSED 2026-08-16, PR #2443. EVERY BANNER BELOW IS SUPERSEDED.
+>
+> **`D0`/`D1` delivered a measured negative** — a disposable retirement at
+> `3f95967b8` gave **920 passed / 12 failed / 4 ignored**, reverted, with a
+> per-category first-outcome map. The landed continuation machinery closes
+> neither residual class for free.
+>
+> **`D2` is DISCHARGED ON AN EMPTY PREMISE.** No class in the governed
+> population requires a consumer-port authority; every failure examined is a
+> correct refusal. *"Only for X, do Y"* with no X is satisfied by doing nothing.
+> **Discharged, not voided** — the answer was measured to be zero. An
+> empty-premise obligation cannot be failed, so it is restated, never confirmed.
+>
+> **`D3`'s GATE IS MET.** Its condition is *"only after both executable
+> positions are green"*, and **both passed**. The retirement was stopped by the
+> broader governed population, which the gate never named. **`D3` was
+> under-specified, not unsatisfiable — the path is open.** Do not conflate this
+> with the unsatisfiable-gate defect corrected in #2442: that one's repair is to
+> delete the gate, this one's is to name the full population. Architect
+> `evt_13fw3q7j0jma0`.
+>
+> **The two residual variants and the control re-description are now
+> [[RT-DESCENT-RETIRE]]'s**, folded there rather than cut as a successor: a new
+> node in front of the capstone lengthens the critical path and the constraint
+> demanding one is not real. Ruling `evt_5h7vzc27mc11j`.
+
 
 > # RELEASED 2026-08-15 — `D0`-`D2` ONLY. `D3` IS STILL GATED. Read both halves.
 >
