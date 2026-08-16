@@ -972,10 +972,8 @@ fn distinguished_root_authority_is_checked_affine_and_cursor_bound() {
     };
     assert!(matches!(
         repeated,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "NativeJoinPlanV1",
-            reason,
-        }) if reason == "terminal answer has no affine checked-root authority"
+        CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason))
+            if reason == "terminal answer has no affine checked-root authority"
     ));
 
     let mut lowering = root_authority_test_lowering(&seed_env);
@@ -989,10 +987,30 @@ fn distinguished_root_authority_is_checked_affine_and_cursor_bound() {
         .expect_err("a root token cannot cross the wrong source cursor");
     assert!(matches!(
         transplanted,
-        CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "NativeJoinPlanV1",
-            reason,
-        }) if reason == "checked root answer authority returned through the wrong outer cursor"
+        CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason))
+            if reason == "checked root answer authority returned through the wrong outer cursor"
+    ));
+
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    let mut authority = lowering
+        .take_distinguished_root_answer_authority()
+        .unwrap()
+        .unwrap();
+    let duplicate = RootTerminalAnswerAuthority {
+        site_id: authority.site_id,
+        checked_result_type_fingerprint: authority.checked_result_type_fingerprint,
+        occurrence_binding_fingerprint: authority.occurrence_binding_fingerprint,
+        outer_cursor: None,
+    };
+    lowering.root_terminal_authority = Some(duplicate);
+    authority.outer_cursor = Some(ContinuationCursorId(9));
+    let duplicated = lowering
+        .restore_root_terminal_authority(Some(authority), ContinuationCursorId(9))
+        .expect_err("a root token cannot duplicate across source control");
+    assert!(matches!(
+        duplicated,
+        CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(reason))
+            if reason == "checked root answer authority was duplicated across source control"
     ));
 }
 
@@ -6884,8 +6902,9 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
             (
                 "row1-owned-scope",
                 Some((
-                    "NativeJoinPlanV1".to_string(),
-                    "terminal answer has no affine checked-root authority".to_string(),
+                    "<not-unsupported>".to_string(),
+                    "Backend(PlannerInvariant(\"terminal answer has no affine checked-root authority\"))"
+                        .to_string(),
                 )),
                 "outside-surface",
             ),
@@ -6953,7 +6972,7 @@ fn d2k_0_the_five_no_longer_reach_a_static_worker_value_read() {
             // the A/B's informative side rather than an inconvenience: without
             // a row that moves for a different reason, "the five all refuse"
             // is equally consistent with the arming having done nothing.
-            ("row1-owned-scope", Some("NativeJoinPlanV1".to_string())),
+            ("row1-owned-scope", Some("<not-unsupported>".to_string())),
             ("row4-depth-1", conservation.clone()),
             ("row4-depth-2", conservation.clone()),
             ("row4-depth-3", conservation.clone()),

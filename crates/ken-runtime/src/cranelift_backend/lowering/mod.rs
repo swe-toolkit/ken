@@ -18291,10 +18291,10 @@ impl<'a> Lowering<'a> {
             return Ok(());
         };
         if authority.outer_cursor != Some(expected_outer) {
-            return Err(unsupported(
-                "NativeJoinPlanV1",
-                "checked root answer authority returned through the wrong outer cursor",
-            ));
+            return Err(backend(BackendFailure::PlannerInvariant(
+                "checked root answer authority returned through the wrong outer cursor"
+                    .to_string(),
+            )));
         }
         // The exact source-machine delimiter consumes this cursor binding.
         // A later source-machine episode may bind the same affine root token
@@ -18302,10 +18302,9 @@ impl<'a> Lowering<'a> {
         // lawful sequential episode into an apparent transplant.
         authority.outer_cursor = None;
         if self.root_terminal_authority.replace(authority).is_some() {
-            return Err(unsupported(
-                "NativeJoinPlanV1",
-                "checked root answer authority was duplicated across source control",
-            ));
+            return Err(backend(BackendFailure::PlannerInvariant(
+                "checked root answer authority was duplicated across source control".to_string(),
+            )));
         }
         Ok(())
     }
@@ -18335,10 +18334,9 @@ impl<'a> Lowering<'a> {
             "source-control ownership and diagnostic depth must agree"
         );
         let authority = self.root_terminal_authority.take().ok_or_else(|| {
-            unsupported(
-                "NativeJoinPlanV1",
-                "terminal answer has no affine checked-root authority",
-            )
+            backend(BackendFailure::PlannerInvariant(
+                "terminal answer has no affine checked-root authority".to_string(),
+            ))
         })?;
         let site = self
             .native_join_plan
