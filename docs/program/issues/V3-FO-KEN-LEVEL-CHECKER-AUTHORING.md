@@ -229,6 +229,15 @@ certificate the predecessor's corpus produced, the Ken `check_cert` and the Rust
 `check_cert` must agree. **A disagreement is the most valuable result this node
 can produce and is reported as one.**
 
+> **The predecessor's corpus is the FLOOR of `D3`'s input, not its extent.** Two
+> further populations are required, neither derivable from it: the **rule-shape
+> near-miss pairs** and the **equality-field near-misses**, both specified below.
+>
+> ⚠ **Stated because this deliverable and `AC-3` were keyed to the predecessor's
+> corpus ALONE**, so a candidate could run the differential over it, agree, and
+> **build no pair at all** while satisfying both as written. The near-miss
+> requirement lived only in the blockquotes. `AC-3` now enforces all three.
+
 > ### `D1`'s BLIND SPOT WAS FORCED. `D3`'s WOULD BE A CHOICE.
 >
 > **Architect `evt_5fc6hsgcn9exq`.** `D1`'s `cases()` excluded ill-scoped inputs
@@ -268,7 +277,13 @@ can produce and is reported as one.**
 > ### FIRST TASK OF `D3`: TWO OF `D2`'s TEN REJECTION CASES ARE DOUBLY MALFORMED
 >
 > **Architect `evt_2ee9qfch79vgg`, on the merged `D2`. Non-blocking there,
-> load-bearing here, because the pairs above get BUILT from those ten cases.**
+> load-bearing here, because the RULE-SHAPE pairs above get BUILT from those ten
+> cases.**
+>
+> **Only the rule-shape ones.** The equality-field pairs required by the block
+> two below are **not** derivable from this population — see *"EQUALITY-FIELD
+> NEAR-MISSES ARE A SECOND AXIS."* Repairing these ten is necessary and **not
+> sufficient**, and this sentence said otherwise until the Adversary measured it.
 >
 > `imp_right_target_not_imp` and `forall_right_target_not_quantifier` each supply
 > `(Nil FokCert)` — **zero children** — alongside the wrong-shaped target. Each
@@ -395,9 +410,24 @@ message filed the fact under a different criterion where it read as a virtue.
 **`AC-2`.** The Ken `check_cert` is **kernel-checked**, with no new primitive,
 no trusted axiom, and no addition to `trusted_base()`.
 
-**`AC-3`.** `D3` agrees with the Rust checker on the predecessor's full corpus,
-**or the disagreement is reported rather than reconciled by changing either
-side to match.**
+**`AC-3`.** `D3` agrees with the Rust checker **on all three populations** — the
+predecessor's full corpus, the rule-shape near-miss pairs, and the
+equality-field near-misses — **or the disagreement is reported rather than
+reconciled by changing either side to match.**
+
+**The two near-miss populations must EXIST, and that is part of this AC.** They
+are not derivable from the predecessor's corpus, so agreement on that corpus
+alone discharges nothing.
+
+> **Each rule-shape arm needs its ACCEPTING half**, which is what proves the
+> traversal reached the arm; agreement on `false` never shows it.
+>
+> **The equality-field population needs a same-constructor pair differing in one
+> field, per multi-field arm.** The `PartialEq` oracle satisfies this for all
+> eight at once and is the preferred form. **A candidate that adds one row for
+> the measured `FokForcingP` mutation and stops has closed the instance and left
+> the class open** — seven other multi-field arms stay unprobed, and the two
+> mutations that survived were found by testing, not by reading.
 
 **`AC-4`.** No FO `Proved` verdict. `23 §4.4`'s reservation is untouched.
 
