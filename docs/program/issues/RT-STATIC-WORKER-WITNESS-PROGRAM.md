@@ -17,10 +17,41 @@ origin: "Operator request, 2026-08-16, on the Steward's capability-loss brief: t
 > instrumented compiles reached it in `RT-UNSUPPORTED-LANE-REFUSAL-REACH` `D0`.
 >
 > **Every construct that has ever reached this refusal is a hand-authored
-> fixture** — `ctor:fixture::PX8JScopeTree::Node` and
-> `ctor:fixture::PX8JHoleOutput::Node`
-> — and both live in exactly one file, `control.rs`. **A witness authored to
-> exhibit a shape proves the shape is expressible, not that anyone writes it.**
+> fixture** — `ctor:fixture::PX8JScopeTree::Node`,
+> `ctor:fixture::PX8JHoleOutput::Node`, and their siblings. **A witness authored
+> to exhibit a shape proves the shape is expressible, not that anyone writes
+> it.**
+
+> ### CORRECTED: the expected outcomes are TWO test files, not one. 40, not 32.
+>
+> **As first filed this node said the fixtures *"both live in exactly one file,
+> `control.rs`"*.** That was false. Adversary `evt_10mrp6jyykm7z`; the Steward
+> re-ran the census against the tree at `3f56561ed` and it reproduces exactly:
+>
+> | file | `StaticWorkerBinding` | role |
+> |---|---|---|
+> | `lowering/mod.rs` | 29 | production, raises it |
+> | `lowering/core.rs` | 28 | production, raises it |
+> | `planning/static_transition.rs` | 1 | production |
+> | `lowering/core/tests/control.rs` | **32** | expected outcomes |
+> | `lowering/core/tests/constructors.rs` | **8** | expected outcomes |
+>
+> ⇒ **`D0`'s baseline census must cover both test files.** If
+> `constructors.rs`'s eight are driven differently from `control.rs`'s
+> thirty-two, **they are a second fixture family** and must be looked at before
+> authoring a witness — a witness modelled only on the `control.rs` family may
+> be answering the narrower question.
+>
+> ### The premise's STRONGEST form is now measured rather than asserted
+>
+> **Zero occurrences in `ken-cli`, `ken-elaborator`, `ken-verify`, `ken-host`,
+> `ken-interp`.** All 98 are inside `ken-runtime`. **No end-to-end layer has
+> ever expected this refusal.**
+>
+> ⇒ **A witness, if one exists, would be the first `ken-cli`-level program to
+> reach it.** That is a sharper statement of the target than *"not a fixture"*,
+> and it gives `AC-1` an objective tell: the witness lives where none of the 40
+> does.
 
 ## Why this node exists: an operator decision rests on the missing number
 
@@ -46,6 +77,12 @@ site.
 **Write it in Ken source** and compile it the way a user's program is compiled.
 **A hand-built `RuntimeExpr` does not discharge this** — that is what the
 existing fixtures already are, and it is the exact gap the node exists to close.
+
+**Baseline the existing families first, across both test files.** Thirty-two
+expected outcomes in `control.rs` and eight in `constructors.rs`; say whether
+the eight are driven the same way as the thirty-two. **If they are a second
+family, a witness modelled only on the first answers a narrower question than
+the one asked.**
 
 **Report, whichever way it goes:**
 
@@ -125,6 +162,19 @@ would change the recommendation.
 > measurement, forced-versus-observed returns, six-versus-thirty-three corpus
 > membership. **Give it the finished witness and let it ask whether the program
 > is real.**
+>
+> **It has stated the test in advance so you can aim at it rather than discover
+> it** (`evt_10mrp6jyykm7z`):
+>
+> > **Does the construct arise from what the program is trying to compute, or
+> > from an arrangement chosen because it reaches this refusal?** A witness that
+> > only differs from the existing 40 by living in a different file is a fixture
+> > that moved.
+>
+> **This is not a fourth gate and it does not change `AC-2`.** A witness that
+> fails this test is still a valid `D0` outcome — it is reported as *"contrived"*
+> under `AC-2`, which explicitly permits the unflattering answer. The test tells
+> you what to *record*, not what to *achieve*.
 >
 > It also keeps the Adversary **report-only** (`COORDINATION §10⁻a`) rather
 > than turning it into an author, which is not a posture change to make
