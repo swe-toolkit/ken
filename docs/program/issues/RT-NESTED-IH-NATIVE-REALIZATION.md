@@ -5,7 +5,7 @@ status: active
 owner: runtime
 size: L
 gate: none
-depends_on: [RT-DYNAMIC-ARM-SCALAR-MERGE]
+depends_on: [RT-DYNAMIC-ARM-SCALAR-MERGE, RT-CHECKED-IH-REALIZATION-AUTHORITY]
 blocks: [KERNEL-NESTED-IND]
 github: null
 origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statement of c2's AC-K12 relationship, evt_77pege8j5cv14, requested at evt_6pmftb5fpxrkm. Discharges the second Steward condition on the c1/c2 cut (evt_6z7wf6dw94cym), which required c2 to state that relationship before assignment.
@@ -55,6 +55,16 @@ origin: Steward-filed 2026-08-12 (COORDINATION §2) on runtime-leader's statemen
 > was framable immediately. Runtime's nested-IH arc is a live critical path, not
 > a parked one.** `RT-TERMINAL-ALL-ELIM-AUTHORITY` stays `draft`, held on
 > Kernel, untouched.
+>
+> **The gating edge is now IN `depends_on`, 2026-08-16 (Steward).** It was
+> stated only in this prose, and `scripts/gen-progress.sh` reads `depends_on`
+> and nothing else — so every generated view showed this node `active` with its
+> single dependency **merged**, i.e. fully unblocked and in progress, while
+> [[RT-CHECKED-IH-REALIZATION-AUTHORITY]] carried `blocks: []` and read as a
+> startable node with no consumer. **Both halves of one edge were invisible, and
+> the direction of the error was the dangerous one: it advertised gated
+> deliverables as dispatchable.** Nothing about the scope or the ruling below
+> changed; only the graph now says what this paragraph already said.
 >
 > **`D3`-`D5` of THIS node are gated on that successor landing.** They are
 > outcomes — native execution, interpreter agreement at `Nat 3`, the carried
