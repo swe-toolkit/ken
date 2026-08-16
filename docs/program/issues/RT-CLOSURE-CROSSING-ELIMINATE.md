@@ -486,6 +486,69 @@ about its content, which is why it is recorded here rather than blocking.
 > the fork is real as posed. **Architect question; route it before the operator
 > is asked to choose.**
 
+> # THE FORK ABOVE IS MALFORMED. ANSWERED 2026-08-16, Architect `evt_7wzkzpjmttbht`.
+> # Routed by the Steward at `evt_71jgtxcsy1b20`. Read this, not the box above.
+>
+> **The literal answer is YES — and the YES branch does NOT carry the
+> consequence the fork attached to it.** The boundary sits inside one live
+> runtime domain, and more tightly than asked: **inside one compiled module.**
+> Every unit is `Linkage::Local` (`units.rs:940/967/983/1005`), forward-declared
+> as one bundle into a single `CompiledModule` (`compiled.rs:19-30`) — functions
+> in one compilation, not separately compiled artifacts. Both ABI regions are
+> live in-process (`boundary_value.rs:28-40`).
+>
+> ### `41 §2.1` CLAUSE 3 IS A BOUND, NOT A GRANT. That is what breaks the fork.
+>
+> It reads *"Separately compiled artifacts **may** exchange an ordinary closure
+> **only** within one live runtime domain."* **The operative word is "only".**
+> It restricts where exchange may occur and nowhere says exchange must be
+> available anywhere inside that bound — it removes a prohibition and creates no
+> obligation. The chapter says so of itself at `:116`: *"This chapter fixes the
+> observable validity boundary, not its implementation."*
+>
+> ⇒ **Both branches of the fork presupposed that `41 §2.1` is where the
+> capability obligation lives. It is not**, so YES or NO on the domain question
+> **could not have decided the thing it was asked to decide.**
+>
+> ### THE RECORDED "CLAUSE-2 REFUSAL" RESTS ON A VOCABULARY COLLISION
+>
+> **`BoundaryTag::PersistentClosure` names a LIFETIME BAND** — store-lifetime
+> within one live process — **not durability.** Clause 2 governs *durable
+> publication*: canonical bytes, content digest, storage identity (`:57-60`,
+> `:72-75`). **This seam produces none of those.** The disposition may still be
+> the right call, **but not for the reason recorded**, and a recorded
+> disposition citing the wrong clause is what a future reader builds on.
+>
+> ### WHERE THE OBLIGATION ACTUALLY LIVES — and `D2` must cite THIS
+>
+> Not `41`. **`45 §3` BE-Model** (lowering preserves the interpreter's
+> observable value) and **`45 §4` BE-Differential** (quantified over any closed
+> core term) — and the part that settles it, **`48:210`**: the artifact contract
+> carries a **normative `unsupported` lane**, *"for targets or constructs that
+> must fail before native execution"*, requiring a stable lane, target symbol,
+> construct, and reason (`48:175`), with `48:213` forbidding a consumer from
+> reinterpreting it.
+>
+> ⇒ **Ken is SPECIFIED to have a way to not support a construct.** Refusing is a
+> sanctioned outcome **provided it is recorded in that lane and fails loudly
+> before native execution**, rather than being an unrecorded compile failure.
+>
+> ### THE DISPOSITION: PERMITTED NARROWING, CONDITIONALLY
+>
+> **Not a spec violation, and not a free narrowing.** The condition is that each
+> refused construct lands in the `48` `unsupported` lane with its stable reason.
+> **If they fail without reaching that lane, THAT is the gap — a `48` gap
+> repairable by RECORDING, not a `41` gap requiring the crossing to be built.**
+>
+> **`D2`'s disposition text says "refused with its spec clause cited". The
+> citable clause is `48`'s lane, not `41 §2.1` clause 2.**
+>
+> **Explicitly NOT measured by the Architect:** whether these refusals currently
+> reach that lane. The mechanism is real and wired (`compiled.rs:29`, surfaced
+> through `artifact/api.rs:370/417/879/945`, reconciled at `api.rs:454`), but
+> **whether the recursor rows or the depth-2/3 failures populate it is
+> unmeasured.** ⇒ [[RT-UNSUPPORTED-LANE-REFUSAL-REACH]].
+
 ## Provenance
 
 Architect verdict and finding: `evt_2nwtjekh4qtnk`, `dec_650dc1x38n4jh`

@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 02:22:44Z — from 332 issue file(s) in `docs/program/issues/`.
+2026-08-16 02:25:26Z — from 333 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -316,6 +316,7 @@ the committed file matches the generator's output.
 | `RT-TERMINAL-ALL-ELIM-AUTHORITY` | Issue the typed terminal-All structured-IH elimination authority upstream in checked erasure/planning, and let only that issued relation license the source-machine Match seat to consume a ComputationalRecursorClosure | draft | runtime | M | none | — |
 | `RT-TEST-SCRATCH-RAII` | Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition | merged | runtime | M | none | — |
 | `RT-UNIT-CLOSURE-CONVERT` | Activate function-unit closure conversion for predeclared units — a retained nested body's free de Bruijn references become declared typed capture slots, reconstructed at unit entry from exact caller operands | closed | runtime | TBD | none | — |
+| `RT-UNSUPPORTED-LANE-REFUSAL-REACH` | Measure whether the refused recursor rows and the depth-2/3 static-worker constructs reach the 48 unsupported lane, the one fact that separates a conditionally-permitted narrowing from a recordable spec gap | ready | runtime | S | none | — |
 | `RT-UNTRANSITIONED-FIELD-CONSUMER-PROBE` | Measure whether any lowered consumer reads the static-worker field constructed for row4 depth 1 and row5 after-hole, or whether the recognition is only ever seen by the ledger's close | closed | runtime | S | none | — |
 | `RT-VALUE-TOTALITY` | Make every total traversal of Value non-recursive in the host stack, and remove the closure capabilities the landed closure boundary forbids | merged | runtime | L | none | — |
 | `RT-WORKER-BIND` | compiler-only static-worker binding and transport substrate — lowering cannot bind a worker's carried capture operands into a selected semantic body, and continuation specialization cannot emit a target without it | merged | runtime | L | none | — |
@@ -396,6 +397,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-REFUSAL-CONSEQUENCE-RESTORE` — Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
+- `RT-UNSUPPORTED-LANE-REFUSAL-REACH` — Measure whether the refused recursor rows and the depth-2/3 static-worker constructs reach the 48 unsupported lane, the one fact that separates a conditionally-permitted narrowing from a recordable spec gap
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 - `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` — Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report
