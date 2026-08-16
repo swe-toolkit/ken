@@ -285,7 +285,25 @@ the proof is unavailable and any argument for it is circular.
   >
   > **No `D6` re-home is lawful. `D3`-`D8` gated. `D2c` stays UNPUBLISHED** —
   > one revertible commit that never landed, which is `AC-7` earning its keep.
-  > **The full record and the successor's question are in the node.**
+  >
+  > **AND IT IS NOT ONE CONSTRUCT.** Architect `evt_7qtgrtwv76vke` on the ring's
+  > inventory `evt_6bvnv6t4teech`: **nine of the fourteen in-set reds are the
+  > surviving lane refusing a program the retiring lane compiles, across FOUR
+  > independent constructs** — `ComputationalMatch` in-flight non-transferable
+  > activation (4), `StaticWorkerBinding` (2), backend `Module` missing
+  > recursive-position-1 worker projection (2), backend `PlannerInvariant`
+  > missing affine checked-root authority (1). **A pattern, not an omission.**
+  >
+  > **The artifact hypothesis is CLOSED:** the identical refusal reproduces at
+  > untouched base `c98f72ba8` through the **pre-existing** exclusion mechanism,
+  > touching no production code. **The finding is about the lane, not `D2c`'s
+  > edit.**
+  >
+  > ⇒ **The successor is [[RT-DESCENT-LANE-COMPLETENESS]], framed as a
+  > lane-completeness question rather than a port.** Whether this node is
+  > BLOCKED or merely incurs recorded representability gaps is decided by that
+  > node's `D2` — the source-reachability of the nine. **The full record is in
+  > the successor's frame.**
 
   > ### HOW TO READ A RED. Three conditions, Architect `evt_98zg6sbqh7ej`.
   >
