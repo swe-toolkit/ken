@@ -180,10 +180,29 @@ this site."** If it does, the answer is `D0`-with-dependency-reported, not a
 specified predicate. **Architect constraint, and it is an acceptance criterion
 because a premise is invisible once a predicate is written down.**
 
-**`AC-3b`.** **The predicate does not erase a recognition that is a link in a
-rebind chain, even when that link's own field is never read.** Field-readership
-and transport-consumption are independent, per `D1b`. **A discriminator that
-cannot distinguish them is reported as the finding, not narrowed until it can.**
+**`AC-3b`.** **RESTATED `evt_5sqzthmqnz4va` after `D1c`. The earlier wording
+keyed on "a link in a rebind chain"; `D1c` refuted succession, so that phrase
+named nothing — and an acceptance criterion with an empty premise CANNOT BE
+FAILED, so it reads as a live guard while checking nothing.**
+
+> **The predicate may not erase a recognition whose TRANSPORT is traversed or
+> rebound by a later read**, even when that recognition's own field is never read
+> directly.
+
+**Field-unreadness and transport-liveness are independent.** `D1b` is the
+separating example, and `D1c` shows the transports at successive nesting levels
+belong to **different obligations over different source fields** — so *"its
+field is unread"* **cannot be used as a proxy for** *"its transport is dead."*
+
+**If the read cannot establish transport-liveness, report that dependency as the
+finding. Do not narrow the predicate to the rows that can be seen.** Same shape
+as `AC-3a`, and it fails closed for the same reason.
+
+> **Why this is not a formality: the three live dispositions disagree about it.**
+> Under **(A) over-construction**, erasing the outer recognitions is precisely
+> the **correct** repair. Under **(C) under-recorded consumption**, their
+> transports are traversed by the innermost read and erasing them **is a
+> miscompile.** **This node cannot assume either, and it is starting now.**
 
 **`AC-4`.** No production logic change; probes reverted, `git diff --stat`
 clean.

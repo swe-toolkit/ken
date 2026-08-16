@@ -286,6 +286,61 @@ were built on the wrong phrasing:
 | same recognition id | succession — one obligation, rebound, consumed once | make `rebind` **transfer** the obligation |
 | **distinct — MEASURED** | two constructed workers | **T0 is a genuine leak and `transfer` is REFUTED.** Retiring T0 into T1 would discharge an obligation never consumed, re-introducing the silent drop the keying exists to prevent |
 
+**`D1d` — THE DECIDING READ, and it is this node's only open measurement.**
+Architect `evt_5sqzthmqnz4va`. **`D1c` established that the outer recognitions
+exist and are unconsumed; it is SILENT on why they exist at all**, and every
+remaining disposition turns on that.
+
+**THREE DISPOSITIONS. They share no code and land in different files.**
+
+| | reading | repair site | note |
+|---|---|---|---|
+| **(A)** | **over-construction** — each level mints a worker for its own field, only the innermost is needed; the outer transports are dead | **the mint** | leak is bookkeeping, not behaviour; subject becomes [[RT-MINT-SITE-STATIC-DISCRIMINATOR]] |
+| **(B)** | **under-consumption** — fields 45 and 35 are genuinely required and the emitted code reads only 25 | the composed lowering's **consumer** | **a MISCOMPILE that `close` caught. Highest severity, and it OUTRANKS this node if true** |
+| **(C)** | **under-recorded consumption** — the innermost read physically traverses 45 to 35 to 25, so all three discharge at runtime, and `note_consuming_call` observes where only the final transport is visible | **where consumption is RECORDED** | not an exemption; see below |
+
+> **(C) IS NOT THE EXEMPTION `AC-1` BARS.** The law is unchanged and still
+> refuses a genuinely unconsumed obligation; what moves is the **observation
+> point**, not the strength of the check. **Do not reject it by pattern-match
+> against the exemption refused earlier — and do not let anything that IS an
+> exemption enter dressed as (C).**
+>
+> **(A) must not be assumed because it is the cheapest.** It is also the one
+> that quietly authorizes erasure at the mint, which is what `AC-3b` exists to
+> prevent.
+>
+> **(C) is a READING, not a measurement — the Architect labels it as his own.**
+> It rests on `D1b`'s phrase *"consumes only the newest transport"*, which is
+> consistent with a call site crediting one transport while the read traverses
+> three. **It is on the list because it is live, not because it is supported.**
+
+**These programs do not compile today, so there is no execution witness.** The
+probe needs the refusal **suppressed in-probe only** — an instrument, not a
+relaxation, **reverted exactly as `D1a`/`D1b`/`D1c` were.**
+
+**TWO COLUMNS, and the second is the one that will get dropped:**
+
+1. **Execution.** With the refusal suppressed, do the depth-2 and depth-3
+   programs compute the **correct result**? **Wrong or crashing ⇒ (B), and STOP
+   THERE** — it outranks this node and gets its own escalation. **Correct ⇒ (A)
+   or (C).**
+2. **Emission.** Does the emitted read of field 25 **traverse** the transports
+   bound for 45 and 35, or reach 25 by another route? **Traverses ⇒ (C). Does
+   not ⇒ (A).**
+
+> ### COLUMN 1 ALONE SELECTS NOTHING between (A) and (C)
+>
+> **They prescribe opposite repairs in different files.** A handback that stops
+> at *"it runs correctly"* has measured the easy column and left the fork open.
+> **If column 2 cannot be read with this instrument, REPORT THAT** rather than
+> narrowing to what column 1 can see.
+
+**Positive control — fourth probe, and that discipline is the only reason the
+first three were usable.** Show the harness **would have reported a wrong
+answer**: perturb one field's value and demonstrate the mismatch is caught. **A
+"correct result" from an oracle that cannot see an incorrect one is a silence —
+and this time the silence would select (A) by default.**
+
 **`D2` — the refusal message, and `D1c` UNBLOCKED it by answering `distinct`.**
 `close` link one says the field is *"neither consumed at an exact-`Var` call nor
 erased before construction"* and that a constructor carrying it *"has no runtime
