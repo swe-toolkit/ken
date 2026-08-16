@@ -632,14 +632,31 @@ is untouched. The successor is [[V3-FO-CHECKER-SOUNDNESS]].
 > ⇒ **The discharge shape is sound; the spec's spelling of it is not.** Recorded
 > here and carried into the successor. Correcting `23 §4.4` is the enclave's.
 
-**Rider 1 — `sequent_source`'s `gamma`/`delta` field order is UNMEASURED.** The
-Architect's `D3` review claimed eleven empty-`gamma` cases protect it. That
-claim was made by the same read-the-field-values method by which the parallel
-`Init` claim was refuted, and the Architect withdrew it as unmeasured
-(`evt_2v5t7ekqzhqee`). Two pins landed at `D4` — `rule_source` and
-`qterm_source`, each mutation-proved. **No pin covers `sequent_source`. It is an
-open question, not a discharged one**, and anything reusing the serializer
-inherits it.
+**Rider 1 — `sequent_source`'s `gamma`/`delta` field order IS measured, and it
+reds. Corrected 2026-08-16 on Adversary `evt_5mbtyzs2qrj2r`.**
+
+**This node, the merge notification, and the Architect's resolution all recorded
+it as UNMEASURED. That was wrong, and the measurement predated every one of
+those statements** — Adversary `evt_10dxqtbsf4tcw` reported `gamma`/`delta` as
+the one axis of three that **did** red, in the same report that refuted the
+other two. Re-run at `04af417d2`, the swap reds **three** tests, including both
+pins added for the other axes.
+
+> ### THE WITHDRAWAL WAS RIGHT IN METHOD AND WRONG IN CONCLUSION
+>
+> The Architect's `D3` claim — eleven empty-`gamma` cases protect it — was
+> discarded because it shared provenance with the `Init` claim the Adversary had
+> just refuted. **The correct response to "one of two claims from this source was
+> wrong" is to CHECK the other, not to drop both.** The check had already been
+> run and reported; dropping it discarded a real measurement.
+>
+> ⇒ **Shared provenance is grounds for re-checking, never for concluding.**
+
+⚠ **The axis is protected but not safely so.** The protection comes from two
+pins built for **different** axes — over-determined by accident, which is the
+**fifth** instance on this node of a property holding because of what the corpus
+happens to contain. **A dedicated pin is still warranted. A re-measurement is
+not.**
 
 **Rider 2 — the durable `D5` report omits the BUILD PROFILE.** The file writes
 the fuel down on the predecessor's *a measurement's parameters must be written
@@ -651,7 +668,31 @@ durable record. **The headline four-to-five-orders comparison against the
 predecessor's 265 microseconds is unanchored at both ends if the profiles
 differ.** The `D5` conclusion survives either way, which is why it did not block.
 
-> ### THE SHAPE THIS NODE PRODUCED FOUR TIMES, KEPT BECAUSE IT IS THE LESSON
+> **Sharpened by the Adversary, `evt_5mbtyzs2qrj2r`: the emitted report writes
+> down TWO of the three re-takeability parameters and drops the third.** It
+> prints the fuel (*"`find_certificate`'s fixed production constant, 200"*) and
+> the stack (*"1 GiB test thread"*). **The same commit demonstrates the
+> discipline twice and omits it once** — and omits the one that matters most,
+> because fuel and stack move the number by a factor while debug-versus-release
+> moves this workload by orders of magnitude, **and the headline is stated in
+> orders of magnitude.** A reader who re-takes in release gets a number that
+> cannot be compared to the one they were given.
+
+**Rider 3 — the `D4` control is sound BY CONSTRUCTION, and the load-bearing half
+is the baseline, not the forced side.** The forced declaration is
+`Equal Bool (fok_check_cert (fok_embed f) pi) True = Proved`, and `Proved` is
+`Top`-introduction, so it typechecks only if the kernel reduces the application
+to WHNF. The baseline is `const ..._baseline : Bool = fok_check_cert (fok_embed
+f) pi`, which typechecks from the signature **without reducing the body**.
+
+⇒ **The timed interval is `elaborate_decl`, which includes parsing and
+elaborating a source string that GROWS WITH DEPTH.** Forced time alone would
+conflate conversion cost with input size. Both declarations embed the same
+`f_src`/`pi_src`, so the reported difference cancels it. **That is what makes
+the growth figures mean conversion**, and it is a structural argument rather
+than a reading (Adversary `evt_5mbtyzs2qrj2r`).
+
+> ### THE SHAPE THIS NODE PRODUCED FIVE TIMES, KEPT BECAUSE IT IS THE LESSON
 >
 > **A property that holds because of what the corpus happens to contain, with
 > nothing making it hold.**
@@ -662,9 +703,17 @@ differ.** The `D5` conclusion survives either way, which is why it did not block
 > | 2 | `fok_form_eq` arms droppable, suite green | **mutation** |
 > | 3 | `placeholder_child` inert only because unreached | reading |
 > | 4 | serializer axes held by an asymmetric population | **mutation** |
+> | 5 | `gamma`/`delta` protected only by pins aimed at the OTHER two axes | **mutation** |
 >
-> **The two found by mutation were invisible to three readers, and in both the
+> **The three found by mutation were invisible to every reader, and in each the
 > reasoned safety argument was WRONG rather than merely unproven.** Instance 3
 > was closed by naming rather than by inertness — `rejecting_child_never_reached`
 > — which is the durable form. **A control's discriminating power is a
 > measurement, never a reading.**
+>
+> ⚠ **Instance 5 is the one to study, because the repair for instance 4 CREATED
+> it.** Two pins built for `rule_source` and `qterm_source` happen to also red on
+> a `gamma`/`delta` swap. **A fix that lands protection it was not aiming at
+> leaves that protection undeclared**, so the next edit to the serializer can
+> keep both pins green and silently unprotect the third axis. **Over-determined
+> is not the same as protected.**

@@ -1,7 +1,7 @@
 ---
 id: V3-FO-CHECKER-SOUNDNESS
 title: "Author FokDerivation, fok_derives and fok_classically_valid, and prove checker_soundness in Ken over the check_cert that now exists -- the first of the two theorems 23 section 4.4 requires before route FO may return proved"
-status: ready
+status: active
 owner: language
 size: L
 gate: none
@@ -203,12 +203,22 @@ orders of magnitude above the Rust reference, super-linear, capped at
 evaluate `fok_check_cert` on anything. **Do not size this node off `D5`'s
 numbers, and do not report a slow proof as confirming them.**
 
-**3. `sequent_source`'s `gamma`/`delta` field order is UNMEASURED.** The
-Architect's `D3` claim that eleven empty-`gamma` cases protect it was made by
-the same read-the-values method that the `Init` claim was refuted by, and the
-Architect withdrew it as unmeasured (`evt_2v5t7ekqzhqee`). Two pins landed
-(`rule_source`, `qterm_source`); **no pin covers `sequent_source`.** Any work
-here that reuses the test serializer inherits an open axis.
+**3. The test serializer is protected on all three axes, and ONE of the three is
+protected only by accident.** `rule_source` and `qterm_source` have dedicated
+pins from `D4`. `sequent_source`'s `gamma`/`delta` order **is measured and does
+red** (Adversary `evt_10dxqtbsf4tcw`, re-run at `04af417d2`) — **but the
+protection comes from the two pins built for the other axes**, not from anything
+aimed at it.
+
+⇒ **If you touch the serializer, a change that keeps both other pins green can
+still silently unprotect `gamma`/`delta`.** A dedicated pin is warranted; a
+re-measurement is not.
+
+> **The predecessor recorded this axis as UNMEASURED for several hours, in the
+> node, in the merge notification, and in the Architect's own resolution, while
+> the measurement already existed.** The claim about it was discarded for sharing
+> provenance with a refuted sibling. **Shared provenance is grounds for
+> re-checking, never for concluding** — and the re-check had already been run.
 
 **4. The SCT checker will bite this proof.** It traces a structural decrease
 only through a direct pattern match feeding the recursive call, not through an
