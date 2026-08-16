@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 21:06:46Z — from 357 issue file(s) in `docs/program/issues/`.
+2026-08-16 21:11:18Z — from 357 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -255,7 +255,7 @@ the committed file matches the generator's output.
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
 | `RT-DEPTH2-VAR-PARENT-DERIVATION` | Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one | closed | runtime | S | none | — |
 | `RT-DESCENT-RETIRE-PRIOR-ART` | Prior art admits the shape and carries no second descent lane -- retirement is supported and never by source unreachability -- this node's proposed pre-classifier IR invariant was DECLINED by the Architect in favour of uniform lowering, so the retirement is NOT gated on it and this row is not an unmet bar | merged | research | M | none | — |
-| `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | ready | runtime | M | none | — |
+| `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | active | runtime | M | none | — |
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
@@ -417,7 +417,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CHECKED-IH-REALIZATION-AUTHORITY` — Mint the checked-IH realization authority -- pending marker, oriented plan, call template, slot and parent -- so the ComputationalRecursorClosure capsule is realizable IN PLACE at the source-machine Match seat, without widening the ordinary-Match selector and without any terminal-All licensing
 - `RT-CONTKEY-REFUSAL-PROFILE-SPLIT` — the consuming-occurrence validator refusal has four defects that must land together: the production string sits in a cfg arm no test compiles; under cfg(test) the production arm is ABSENT rather than dead so a dropped return makes the validator silently ACCEPT a mismatched occurrence; and the classifier has two messages for FIVE causes, with the body arm a catch-all over an eliminator-kind defect, an identity-match failure and an ambiguity; and the sibling function 55 lines up has the same defect over four more causes, one of which the D2k probe only just measured
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
-- `RT-DESCENT-RETIRE` — Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
@@ -463,9 +462,9 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: ready)
+- `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: active)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
-- `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: ready)
+- `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: active)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CENSUS-CAVEAT-GUARD` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
