@@ -1,7 +1,7 @@
 ---
 id: RT-MATCH-SCRUTINEE-PORT
 title: "Port the MatchScrutineeRecursor difference onto uniform lowering -- for the heterogeneous-case-body population the ordinary route must terminate in a lawful lowering, or the refusal is named and handed back"
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
@@ -141,8 +141,10 @@ only.
 
 ## Sequencing
 
-**`ready`.** Its two dependencies are `merged` and its inputs are the fixed
-statements above; nothing else gates it.
+**`active`. `D1` assigned to the runtime ring at `evt_38he57edb7bpm`, on
+`wp/RT-MATCH-SCRUTINEE-PORT` at exact `origin/main` =
+`5c5ee5b6c37dfc0017afa547f83cd0b9aa5f5111`.** Both dependencies are `merged` and
+the inputs are the fixed statements above; nothing else gates it.
 
 **It blocks [[RT-DESCENT-RETIRE]] and becomes that node's twelfth dependency.**
 The other eleven are `merged` and the capstone is still barred — every named
