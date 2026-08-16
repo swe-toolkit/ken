@@ -13,8 +13,9 @@ origin: "Successor to RT-MATCH-SCRUTINEE-DISPOSITION D2b, which attempted this m
 
 ## What this node is
 
-**The one measurement standing between the federation and retiring
-`RecursiveDescent`.** Everything else in the campaign is done.
+**The one rules question standing between the federation and retiring
+`RecursiveDescent`.** D1 has now returned outcome 3, and the measured rule gap
+is the input owed to research. Everything else in the campaign is done.
 
 [[RT-MATCH-SCRUTINEE-DISPOSITION]] narrowed the retention guard so
 `MatchScrutineeRecursor` is retained **if and only if** the ordinary producer
@@ -23,9 +24,10 @@ behaviour-preserving by construction and needed no reachability claim — which 
 exactly why the reachability question is still open.
 
 **`D2a` proved the difference is non-empty as a backend-IR shape.** So the
-variant is load-bearing on *something*. **Whether that something can be written
-by a user is unmeasured**, and [[RT-DESCENT-RETIRE]] may delete nothing until it
-is settled.
+variant is load-bearing on *something*. **D1 did not settle whether that exact
+shape can be written by a user under the method gate**, and
+[[RT-DESCENT-RETIRE]] may delete nothing while the question is referred to
+research.
 
 > ### DELIVERED AND MERGED (PR #2463). THE DISCHARGE HAS MOVED — do not read this node as the live gate.
 >
@@ -102,6 +104,82 @@ program that was chosen? Answer from the rules, not from more programs.
 **`D2` — record the outcome where [[RT-DESCENT-RETIRE]]'s bar reads it.** The
 bar names this node; a result not written there leaves the capstone barred
 regardless of what was measured.
+
+## D1 outcome — NOT SETTLED within the method gate
+
+**Normalization is not total over the relevant source shapes.** The native
+driver makes selected recursive declarations opaque before normalization
+(`compiler_driver.rs:2179-2247`), but the kernel reduces an eliminator only
+when its weak-head scrutinee is constructor-headed. A neutral scrutinee is
+rebuilt as a stuck `Term::Elim` (`ken-kernel/src/conv.rs:104-137`), and full
+normalization preserves that eliminator (`conv.rs:250-266`). `D2b` therefore
+normalized because of the program it chose, not because grammar, elaboration,
+or the kernel requires every candidate shape to normalize away.
+
+**The first observed elaborator refusal has an escape route and is not the
+gate.** An un-ascribed inner match in the outer match's scrutinee refused at
+elaboration with the complete diagnostic
+`StructuralResultOutOfScope at 500-527 for binding at 477-481`. The selector
+lookup that emits it is `elab.rs:3363-3375`, and its complete rendering is
+`error.rs:375-381`; the diagnostic itself offers no workaround. However,
+`RAsc` checks its expression against the stated type (`elab.rs:3593-3596`),
+and that checked-match path (`elab.rs:1197-1249`) lawfully admits the same
+recursive-result selectors. An ascription therefore closes the refusal, so it
+cannot establish source unreachability.
+
+**The discriminating source compile reached Runtime IR, but present native
+erasure changed the exact subject before the classifier.** The source used a
+neutral `ProcessInput`, a generated lifted recursive match with a non-empty
+recursive-position case, an ascribed inner match, and a zero-recursive-position
+case whose body was a bound `Nat`. The Runtime IR contained the expected
+`ComputationalMatch`, including recursive positions `[2, 3]` and the bound
+scalar body, but its immediate parent was
+`CheckedSubcontinuationFrame { frame_id: 0, ... }`. The enclosing ordinary
+`Match` therefore did not have an immediate `ComputationalMatch` scrutinee.
+The cross-crate census invokes the same non-short-circuiting
+`enumerate_recursive_descent_residuals` producer that feeds
+`observed_recursive_descent_residuals()`; the selector was not read. It
+recorded exactly:
+
+```text
+residuals=[] admitted=true selector=true authority=Some("FunctionizedUnits")
+```
+
+Object emission later refused for the separate closure-boundary reason
+`unsupported runtime-IR lowering: Closure: a closure cannot cross the
+boundary: it is runtime-local and live-domain only, and it has no durable
+lane`. That is an object-emission refusal after the exhaustive classifier, not
+a source-admission gate and not evidence for either reachability direction.
+
+**The wrapper is a present compiler-path invariant, not the required
+source-language gate.** Native checked-value erasure threads its plan through
+every expression form that can contain a computational eliminator
+(`erasure.rs:2250-2266`). A match classified computational at
+`erasure.rs:2605-2619` necessarily has
+`computational_recursive_hypotheses == true`: the shared classifier returns
+false before inspecting occurrences when that bit is false
+(`checked_core.rs:1498-1525`). `begin_match` therefore mints a pending frame
+(`erasure.rs:1235-1264`), and the match is wrapped at
+`erasure.rs:2753-2758` before any enclosing match receives it.
+
+That observation explains every current production result, but it does not
+satisfy the method gate for outcome 1. No surface grammar rule, elaborator
+admission rule, or kernel gate refuses the shape; those layers admit and
+preserve it. Generic non-plan erasure can also emit a bare
+`RuntimeExpr::ComputationalMatch` (`erasure.rs:5444-5556`), so the wrapper is
+not a language or kernel theorem. Elevating one current native-erasure route
+to source unreachability would repeat the exact compiler-failure-as-language-
+invariant mistake the method gate forbids.
+
+**Disposition: outcome 3.** Ken's own admissibility rules do not establish
+unreachability, while the current production representation prevents an exact
+witness from reaching the defined difference. The unavailable rule is a
+grammar, elaborator, or kernel proposition requiring every admitted
+computational scrutinee to carry the native oriented-frame wrapper. No such
+rule exists in the consulted layers. Per the 2026-08-16 operator directive,
+this result hands back to the Steward for referral to research; it does not
+authorize deletion, re-narrowing, retirement re-scope, or any production
+change.
 
 ## OPERATOR DIRECTIVE, 2026-08-16 — read this BEFORE the outcome list
 
@@ -189,8 +267,9 @@ only. **This node may land no production change at all.**
 
 ## Sequencing
 
-**`active`, `depends_on: []`.** Released to the runtime ring at `evt_4y1rq71vbg6zd`; nothing gates it; the difference is defined above
-and the narrowing has landed.
+**`active`, `depends_on: []`.** Released to the runtime ring at
+`evt_4y1rq71vbg6zd`; nothing gates it; the difference is defined above and the
+narrowing has landed.
 
 **It blocks [[RT-DESCENT-RETIRE]], and it is that node's SOLE remaining
 dependency that is not `merged`.** Eight of the capstone's nine original

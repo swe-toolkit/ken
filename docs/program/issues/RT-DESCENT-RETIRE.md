@@ -194,6 +194,20 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > Architect ruling. Until then the capstone is barred pending that named
 > measurement, not permanently.
 >
+> **The named measurement returned outcome 3 on 2026-08-16: NOT SETTLED within
+> the method gate.** [[RT-MATCH-DIFFERENCE-REACHABILITY]] established that
+> normalization is not total: neutral eliminators survive kernel normalization,
+> and an ascription admits the recursive-result spelling that the first
+> inference-mode attempt refused. Present native erasure then wraps every such
+> computational match in a `CheckedSubcontinuationFrame`, so the exact backend
+> difference receives no source witness today. That wrapper is a current
+> compiler-path invariant, not a surface grammar, elaborator-admission, or
+> kernel refusal; generic non-plan erasure can emit the bare shape. The method
+> gate therefore does not permit a source-unreachability claim. **This capstone
+> remains barred.** No deletion, re-narrowing, or retirement re-scope follows;
+> the Steward refers the measured rule gap to research under the operator's
+> 2026-08-16 directive.
+>
 > **A measurement that comes back the other way does NOT close this node.**
 > Operator, 2026-08-16: *"Prior art indicates that retiring `RecursiveDescent` is
 > possible and observed resource usage by that implementation makes it
