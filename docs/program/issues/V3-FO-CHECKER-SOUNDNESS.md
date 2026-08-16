@@ -121,6 +121,11 @@ same rule set, same premise counts, same freshness side conditions.
 >   a constructor premise applying a recursive function to a telescope-bound
 >   variable**, which every `FokDerivation` constructor needs in order to
 >   transcribe `fok_check_rule`'s guards. Measured at `D1a` (`8d6d7d545`).
+>   **The frame was subsequently located in `ken-kernel` — the strict-positivity
+>   check normalizes every constructor argument to a full normal form before
+>   testing it (`inductive.rs:97`). This blocker is kernel-owned and
+>   TCB-resident, and unblocking it is an operator ring decision, not this
+>   ring's.** Details and epistemic status in the linked node.
 > - **`D1b` — `fok_derives` and `fok_classically_valid`. BLOCKED** on
 >   [[LANG-TRUNCATION-SURFACE-SYNTAX]]. `fok_derives s := ‖ FokDerivation s ‖`
 >   is the only line in this node that needs the missing spelling, and
@@ -227,7 +232,8 @@ written in, so `D2` is derisked rather than blocked.
 
 > **This paragraph originally read *"`D1a` and `D2` are both dispatchable"*, and
 > `D1a` was dispatched on it. It hard-stopped**: authoring `FokDerivation`
-> diverges the elaborator ([[LANG-CTOR-PREMISE-ELABORATION-DIVERGES]]).
+> diverges during elaboration, in the kernel's strict-positivity check
+> ([[LANG-CTOR-PREMISE-ELABORATION-DIVERGES]]).
 >
 > **The claim was correct on the evidence and the evidence was insufficient.**
 > `D0` part (1) established that an *indexed family over a user-defined index*
