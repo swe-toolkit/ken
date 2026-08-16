@@ -16538,6 +16538,8 @@ fn msd_d2a_residual_equals_subject_guard_and_route_complement() {
             }
         }
         let observed_routes = take_match_scrutinee_producer_route_decisions();
+        // Deliberately hand-built: routing this expected value through a shared or
+        // production helper would stop it detecting an added routing disjunct.
         assert_eq!(
             observed_routes,
             vec![ordinary_route],
@@ -16585,6 +16587,8 @@ fn msd_d2a_residual_equals_subject_guard_and_route_complement() {
         None,
     );
     let observed_routes = take_match_scrutinee_producer_route_decisions();
+    // Deliberately hand-built: routing this expected value through a shared or
+    // production helper would stop it detecting an added routing disjunct.
     assert_eq!(
         observed_routes,
         vec![route_a || route_b],
