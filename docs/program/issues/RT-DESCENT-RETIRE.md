@@ -212,13 +212,30 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > the Steward refers the measured rule gap to research under the operator's
 > 2026-08-16 directive.
 >
-> **THE DISCHARGE MOVED AGAIN, AND THIS IS THE CURRENT ONE:
-> [[RT-DESCENT-RETIRE-PRIOR-ART]]** — the referral, filed and owned, carrying
-> `D1`'s rule gap as its fixed input. **The paragraph above about
-> `RT-MATCH-DIFFERENCE-REACHABILITY` describes a dependency that reached `merged`
-> without lifting the bar**, which that node authorized in advance as outcome 3,
-> not a miss. Ten of this capstone's eleven dependencies are `merged`; the
-> eleventh is the referral, and it is the only live gate.
+> **THE REFERRAL RETURNED THE SAME EVENING (PR #2467), AND IT CLOSED THE
+> UNREACHABILITY ROUTE FOR GOOD.** [[RT-DESCENT-RETIRE-PRIOR-ART]] found that
+> **Lean and Agda both admit the exact shape**, each with a passing regression
+> case, so no argument from outside Ken supplies the negative either. **What it
+> also found is that no surveyed system carries a second whole-function descent
+> lane for this shape** — GHC lowers an expression-valued case scrutinee through
+> the ordinary expression translator. **The objective survives; the argument for
+> it changes from a proof about source to an enforced invariant about IR.**
+>
+> **ELEVEN OF ELEVEN DEPENDENCIES ARE NOW `merged` AND THIS NODE IS STILL
+> BARRED. The current discharge is an Architect ruling, routed at
+> `evt_v7w99zp81cqm`** — which argument family the retirement is built on (an
+> enforced pre-classifier IR invariant, of the kind Lean's LCNF and Agda's
+> Treeless maintain, versus GHC-style uniform lowering), and whether the
+> advisory's statement of that invariant is right for Ken. **On the invariant
+> route, deletion additionally waits on a demonstrated closure over every
+> producer of the relevant IR** — Ken has the wrapper on the checked route and a
+> generic non-plan escape, so it has the fact and not the invariant.
+>
+> **THE GRAPH NOW READS FULLY UNBLOCKED AND THE TEXT STILL BARS DELETION. That
+> is not a bookkeeping lag** — it is what happens when every named measurement
+> returns and none of them licenses the act. The next dependency edge appears
+> when the Architect names the route; **do not read an empty blocker list as
+> permission.**
 >
 > **A measurement that comes back the other way does NOT close this node.**
 > Operator, 2026-08-16: *"Prior art indicates that retiring `RecursiveDescent` is

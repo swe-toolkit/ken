@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-RETIRE-PRIOR-ART
-title: "The retirement's discharge is now a research referral -- Ken's own rules cannot settle source-reachability of the retained difference, so ask how other implementations closed the same shape and what that says about retiring the lane"
-status: active
+title: "Prior art admits the shape and carries no second descent lane -- retirement is supported, but only after a stated and enforced pre-classifier IR invariant, never by source unreachability"
+status: merged
 owner: research
 size: M
 gate: none
@@ -11,10 +11,33 @@ github: null
 origin: "Operator directive 2026-08-16, verbatim: 'Prior art indicates that retiring RecursiveDescent is possible and observed resource usage by that implementation makes it desirable. If outcome 2 or 3 is returned by runtime-implementer, that is a clear signal to refer the matter to research for guidance.' RT-MATCH-DIFFERENCE-REACHABILITY D1 returned outcome 3 (PR #2463, Architect dec_5chyprtg9bn7c). Steward-filed per COORDINATION section 2 so the capstone's bar cites an owned node rather than a message."
 ---
 
-## What this node is
+## DELIVERED AND MERGED (PR #2467). The advisory is `docs/program/17-descent-retirement-prior-art.md`.
 
-**The referral the operator directed in advance, now triggered.** It is the
-only thing between the federation and retiring `RecursiveDescent`.
+**The result, in the order that matters:**
+
+1. **Lean and Agda both admit the exact shape**, each with a passing regression
+   case. **The source-unreachability route is now closed from outside Ken as
+   well as inside it** — a plain negative finding against the direction the
+   campaign wanted.
+2. **No surveyed system carries a second whole-function descent lane for this
+   shape.** GHC keeps expression-valued case scrutinees and lowers them through
+   the ordinary expression translator. **The objective stands; the argument for
+   it changes.**
+3. **The transferable route is an enforced pre-classifier IR invariant**, of the
+   kind Lean's LCNF and Agda's Treeless maintain — Agda's substitution repairs a
+   would-be violation rather than assuming its absence. That is the principled
+   version of `CheckedSubcontinuationFrame`: Ken has the wrapper on one route
+   and a generic non-plan escape, so it has the fact and not the invariant.
+
+⇒ **The discharge moved to an Architect ruling**, routed at `evt_v7w99zp81cqm`:
+which argument family the retirement is built on — the enforced invariant, or
+GHC-style uniform lowering — and whether the advisory's statement of the
+invariant is the correct one for Ken. **Deletion is licensed by neither until
+that ruling and, on the invariant route, a demonstrated producer closure.**
+
+## What this node was
+
+**The referral the operator directed in advance, triggered by outcome 3.**
 
 **Ken's own rules have been asked and cannot answer.**
 [[RT-MATCH-DIFFERENCE-REACHABILITY]] settled that much: the runtime ring
