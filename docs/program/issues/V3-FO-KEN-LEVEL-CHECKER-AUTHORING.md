@@ -257,7 +257,7 @@ can produce and is reported as one.**
 >
 > | arm | rejecting case | accepting near-miss |
 > |---|---|---|
-> | `Init` | `left`/`right` in range, naming unequal formulas | in range and equal |
+> | `Init` | `left`/`right` in range, formulas differing **in one field of a shared constructor** — not merely unequal | in range and equal |
 > | `Init` | `left` or `right` out of range | in range |
 > | `ImpRight` | `delta[right]` present but not an `Imp` | an `Imp` |
 > | `ImpRight` / `ForallRight` | zero children, and two children | exactly one |
@@ -290,6 +290,69 @@ can produce and is reported as one.**
 > accidental near-miss pairs against the acceptance test, differing from the
 > accepted `cert1` only in child count — the shape this section asks for, arrived
 > at by accident. **Keep them and say so; do not rebuild them.**
+>
+> ### EQUALITY-FIELD NEAR-MISSES ARE A SECOND AXIS. THE SEVEN PAIRS MISS IT.
+>
+> **Adversary `evt_4zatk7s32e74k`, measured on the merged `D2` by mutation.
+> Two arms of `fok_form_eq` were killed with all seven tests GREEN:**
+>
+> | mutation | suite |
+> |---|---|
+> | `FokForcingP b1 b2 ↦ fok_qterm_eq a1 b1` — drop the **object** slot | **7 passed** |
+> | `FokImp b1 b2 ↦ fok_form_eq a1 b1` — drop the **consequent** | **7 passed** |
+>
+> ⚠ **This is the soundness direction at the one place it matters.** `FokInit`
+> closes on `fok_form_eq g d`. Under the first mutation `Γ, Force_P w x ⊢ Δ,
+> Force_P w y` **closes by `Init`** for any `x ≠ y` — an invalid sequent
+> accepted. **The code as landed is correct; the controls cannot tell that it is.**
+>
+> **Why the `D2` population is blind, precisely:** the ten malformed cases
+> exercise `False` by giving a rule the **wrong-shaped target**, and
+> `accepts_genuine_derivations` exercises a **genuinely valid** certificate.
+> Nothing exercises one that is **nearly valid in the equality dimension**.
+>
+> ⇒ ***The seven pairs above are RULE-SHAPE near-misses and this is not one.***
+> An equality-field near-miss is not derivable from the malformed-case
+> population, so `D3` as originally framed would **not** have closed it. **The
+> Steward's row 1 said only "unequal formulas"**, which any cross-constructor
+> pair satisfies — and `fok_form_eq` is fully enumerated 9x9 with every
+> cross-constructor arm a literal `False`, so those are the arms that cannot be
+> wrong. **Over-acceptance can only come from a same-constructor arm ignoring a
+> field**, which is why row 1 is now qualified.
+>
+> **PREFER THE ORACLE OVER ONE ROW PER ARM.** A single row killing the
+> `FokForcingP` mutation is cheap and insufficient. **The durable form is
+> already `D3`'s shape:** have the differential compare `fok_form_eq a b`
+> against **Rust's derived `PartialEq`** over pairs that include field-level
+> near-misses. `fok_form_eq` is hand-authored exactly where Rust *derives*, so
+> the derivation is a real oracle — the same relationship `shift` had to
+> `mentions_var0` — and **it covers all eight multi-field arms at once instead
+> of one row each.** An oracle built from the thing the hand-written code
+> mirrors cannot drift from it.
+>
+> ### `D2`'s TOTALITY CLAIM: ONE HALF VERIFIED, ONE HALF WAS NEVER TRUE
+>
+> The `D2` handback stated that `fok_list_form_set_nth` and
+> `fok_list_form_append_one` are *"total, documented no-op out of range,
+> unreachable at every call site since each is gated by a prior `fok_nth_form`
+> success at the same index."* **The Steward repeated that grouping in the merge
+> notification without opening either function.**
+>
+> **`set_nth` holds** — Adversary-checked at both call sites rather than from the
+> comment: `FokImpRight` under `match fok_nth_form delta right { Some (FokImp p
+> q) ↦ … }`, and `FokForallRight` under the same gate with `right` threaded into
+> `fok_check_forall_right`. Same index both times.
+>
+> **`append_one` has no out-of-range case at all.** It takes **no index**, and
+> its `Nil` arm is `Cons v (Nil)` — a correct append. So *"gated at the same
+> index"* is not merely unverified for it, it is **meaningless**, and a reader
+> auditing *"the out-of-range no-ops"* would go looking for a second one that
+> does not exist.
+>
+> ⇒ **The defect is that two functions were described by one sentence.** Neither
+> the ring, the Architect, nor the Steward opened `append_one`, because the
+> sentence read as a single verified claim. **Same shape as the census: a claim
+> reproduced rather than derived.**
 >
 > ### A KNOWN VERDICT-EQUIVALENT DIVERGENCE — DO NOT REPORT IT AS A DISAGREEMENT
 >
