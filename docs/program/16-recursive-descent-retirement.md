@@ -38,9 +38,13 @@ linger in a half-migrated state. That just carries tech debt for no benefit."*
 > `RecursiveDescent`" may not be achievable as scoped* and named partial
 > retirement — everything except the narrowed `MatchScrutineeRecursor` — as the
 > operator's call. **The operator did not take that fork.** The objective is
-> unchanged, on two grounds the campaign did not previously have on record:
-> **prior art says it is possible**, and **the resource usage of the
-> implementation that did it says it is desirable.**
+> unchanged, on two grounds: **prior art says it is possible**, and **observed
+> resource usage says it is desirable.** (The directive's *"that implementation"*
+> is not disambiguated here on purpose — it reads either as the prior-art
+> implementation's measured cost or as `RecursiveDescent`'s own, and the
+> campaign's 2026-07-29 efficiency ground fits the second. **Nothing routed off
+> this document turns on which**, so the quote stands and the gloss does not
+> pick.)
 >
 > ⇒ **A "cannot settle" or a witness is not the end of the line, it is a
 > handoff.** The three outcomes of
