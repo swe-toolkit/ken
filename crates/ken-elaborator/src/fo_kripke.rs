@@ -244,17 +244,28 @@ fn discover_fo_slice_signature(env: &GlobalEnv, phi_closed: &Term) -> Option<FoS
 ///
 /// **This premise is CONTINGENT, and its successor is already named in
 /// this file.** `env.top_id()` exists and `⊤` is a bare `Const` too; it is
-/// NOT excluded here, and does not need to be, only because this slice's
-/// `IForm` has no `Top` -- `quote_iform` refuses `⊤` (`UnsupportedTermShape`)
-/// and both the collector and the quoter refuse together, so there is no
-/// disagreement to over-collect into. That omission is the entire reason
-/// the exclusion list has exactly one entry today. **When `IForm::Top`
-/// lands, `quote_iform` gains a second bare-`Const` arm and `⊤ -> q`
-/// reproduces this exact over-collection, on a different constant** -- the
-/// criterion above is what forces the collector update at that moment,
-/// because it names the coupling instead of the instance. Do NOT exclude
-/// `top_id` now: with no quoter arm behind it, that fits a future tree
-/// rather than this one.
+/// NOT excluded here. **`V3-FO-TOP-REFUSAL-ENFORCEMENT` `D1`/`AC-2a`
+/// correction:** this does NOT mean the collector and the quoter "refuse
+/// together" -- that claim was checked against the guard below and found
+/// false. The guard is `*id != env.bottom_id()` alone, so `⊤` **IS**
+/// collected here, as a spurious sort candidate, exactly as `⊥` once was --
+/// and it still refuses, via conjunct 1's own ambiguity check, the SAME
+/// over-collection path `⊥` used to take. **It costs nothing today only
+/// because `quote_iform` refuses `⊤` with `UnsupportedTermShape` anyway, so
+/// no QUOTABLE obligation is ever lost by that path.** `⊥` was quotable
+/// (`IForm::Bottom`); that is the entire difference, not an absence of
+/// over-collection.
+///
+/// **When `IForm::Top` lands, `quote_iform` gains a second bare-`Const` arm
+/// and `⊤ -> q` stops costing nothing** -- a quotable obligation is then
+/// lost to the same over-collection `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT`
+/// repaired, on a different constant. **The criterion above NAMES that
+/// coupling; it does not force anything by itself.** What enforces it is
+/// [`quote_iform_refuses_top_id_enforcing_the_collector_criterion`] in this
+/// file's own test module: that test reds the moment an `IForm::Top` arm is
+/// added, at exactly the moment this collector needs updating. Do NOT
+/// exclude `top_id` now: with no quoter arm behind it, that fits a future
+/// tree rather than this one.
 ///
 /// No other `Const` is excluded here beyond what the criterion names:
 /// checkable against `quote_iform`'s own recognition, never a "skip
@@ -1537,6 +1548,42 @@ mod tests {
                 QTerm::Bound(0),
                 QTerm::Bound(0),
             ))))),
+        );
+    }
+
+    /// `V3-FO-TOP-REFUSAL-ENFORCEMENT` `D0`/`AC-1`/`AC-2`/`AC-4`: `quote_iform`
+    /// must refuse `top_id` (`⊤`) with `UnsupportedTermShape` -- TODAY. This
+    /// is the enforcement `collect_signature_candidates`'s own doc comment
+    /// (`D2`'s criterion, on [`collect_signature_candidates`] above) depends
+    /// on: that comment's premise -- that `⊤`'s over-collection costs
+    /// nothing because `quote_iform` refuses it anyway -- is a property of
+    /// `quote_iform` asserted NOWHERE ELSE. The moment an `IForm::Top` arm is
+    /// added to `quote_iform`, THIS test reds -- at exactly the same moment
+    /// `collect_signature_candidates` needs updating under `D2`'s criterion,
+    /// in the same file. Read this test's own failure message when it reds,
+    /// not merely the assertion: the message is the enforcement (`AC-2`).
+    #[test]
+    fn quote_iform_refuses_top_id_enforcing_the_collector_criterion() {
+        let mut env = GlobalEnv::new();
+        let sig = declare_fo_slice_signature(&mut env);
+        let top_term = Term::const_(env.top_id(), vec![]);
+
+        assert_eq!(
+            quote_iform(&env, &sig, &top_term),
+            Err(FoBoundary::UnsupportedTermShape),
+            "quote_iform must still refuse top_id (\u{22A4}) today. If this \
+             assertion is failing because you just added an IForm::Top arm \
+             to quote_iform: STOP before touching this test. That arm makes \
+             collect_signature_candidates's bare-Const sort-candidate \
+             collector (fo_kripke.rs, guarded only by \
+             `*id != env.bottom_id()`) over-collect top_id as a spurious \
+             sort candidate -- exactly what it once did to bottom_id before \
+             V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT repaired it, except this \
+             time a quotable obligation is actually lost to the ambiguity \
+             refusal. You must exclude top_id in collect_signature_candidates \
+             under D2's criterion (exclude any Const quote_iform recognizes \
+             as a formula in its own right) BEFORE this test is allowed to \
+             go green again."
         );
     }
 
