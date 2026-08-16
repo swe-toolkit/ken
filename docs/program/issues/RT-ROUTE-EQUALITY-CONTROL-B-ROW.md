@@ -1,7 +1,7 @@
 ---
 id: RT-ROUTE-EQUALITY-CONTROL-B-ROW
 title: "The route-equality control's population never makes B fire, so on the shipped rows it reduces to the formula it replaced -- add the transparent-declaration Call row that exercises the second disjunct"
-status: draft
+status: active
 owner: runtime
 size: S
 gate: none
@@ -94,11 +94,13 @@ only.
 
 ## Sequencing
 
-**`draft`, and `draft` here means QUEUED, not unframed.** The frame is complete
-and dispatchable on sight. Under the operator's two-lane directive filings queue
-behind the lane, and lane 1 is
-[[RT-MATCH-DIFFERENCE-REACHABILITY]] — the retirement's only remaining
-discharge. **This node blocks nothing and is not on the critical path.**
+**`active`. Released to the runtime ring at `evt_7zd0ebefbgxy0`, `main` =
+`6df61eafc`.** The queue condition fired on 2026-08-16: it said to release when
+the ring is between lane-1 increments **or** when the retirement resolves either
+way, and both happened. [[RT-MATCH-DIFFERENCE-REACHABILITY]] merged with outcome
+3, and the retirement's only live gate is now
+[[RT-DESCENT-RETIRE-PRIOR-ART]] — a research referral the runtime ring does not
+wait on.
 
-**Flip it `ready` when the runtime ring is between lane-1 increments**, or when
-the retirement resolves either way.
+**This node still blocks nothing and is not on the critical path.** It is
+coverage the ring can land while the referral runs.
