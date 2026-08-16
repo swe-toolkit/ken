@@ -1,7 +1,7 @@
 ---
 id: RT-MINT-SITE-STATIC-DISCRIMINATOR
 title: "Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it"
-status: ready
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,46 @@ blocks: []
 github: null
 origin: "Architect ruling evt_3czp0t9gnnz61, 2026-08-15, refusing the Steward's fork at evt_5etykb2px44w4 as a false binary. The mint site's in-scope values below were enumerated by the Steward from core.rs:15545-15590 at origin/main 30ee4dbf1 before filing. Amended after release with the Architect's shared-transport constraint, evt_4reh9tgp36cmm, verified by the Steward against control.rs at origin/main e46cd4959. Steward-filed per COORDINATION section 2."
 ---
+
+## CLOSED. `D0` RETURNED `NO` AT `0a19e3714`. Measurement-only, never `merged`.
+
+**Runtime-leader `evt_5rdvrkf80c5j6`.** **No principled static discriminator
+exists at the mint, and the reasons are structural rather than a sampling
+limit:**
+
+| candidate | why it fails |
+|---|---|
+| the `child_occurrence`/`lower_expr` skip | **does not entail no later reader** — `rebind` and possible field use are selected **downstream** of the mint |
+| transport | **temporal provenance, not a field-use predicate** |
+| `constructor` / `position` | **do not discriminate** — governed-unread and later-read share the same constructor and field 0 |
+| origin constants | **would fit rows, not state law** — exactly what `AC-1` banned |
+
+⇒ **The static plan exports no total mint-to-every-`Match`-binder-reader
+relation**, so the predicate cannot be specified, let alone discharged.
+
+**`AC-1` and `AC-3a` both held under pressure.** The ring declined to fit a
+predicate to the observed rows, and declined to substitute `AC-3a`'s unexercised
+shared-transport absence for the missing relation. **A surface absence was not
+turned into a repair.**
+
+## `D2` — what the deliverable becomes
+
+**A lawful erasure successor needs a NEW static total per-recognition/field
+relation** proving **both**:
+
+1. **no future binder consumer**, and
+2. **no later transport traversal or rebind** — the corrected `AC-3b`.
+
+> ### DO NOT FRAME THAT RELATION YET -- `D1d` decides whether it is wanted
+>
+> Under **(A) over-construction** the relation is the right next build. Under
+> **(B) under-consumption** the repair is in the consumer and erasure is
+> **wrong**. Under **(C) under-recorded consumption** erasing these recognitions
+> is a **miscompile**.
+>
+> **Two of the three make this relation useless or harmful.** Building it now
+> would pick the branch by construction — the same error as framing the
+> successor before `D1d` reports.
 
 ## The fork was false and this is the question it was hiding
 
