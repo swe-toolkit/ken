@@ -1,25 +1,31 @@
-STEWARD WATCHDOG TICK. Run these in order; stop as soon as one produces an action.
+STEWARD WATCHDOG TICK. Run in order; stop as soon as one produces an action.
 
-0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then run `cd /workspaces/ken && moot compact steward`. Announcing it is not doing it.
+THIS FILE IS THE ARMING SOURCE AND MUST STAY UNDER 4096 CHARS -- `set_interval` rejects more. `wc -c` before arming; never grow a step without trimming another.
+
+0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `cd /workspaces/ken && moot compact steward`. Announcing it is not doing it.
 
 1. PRIORITY LANES ARE THE ONLY LANES (operator, 2026-08-15). Lane 1 = runtime, retire RecursiveDescent. Lane 2 = language+verify, z3 round-trip and FO Kripke embedding. No third lane gets a ring however idle or well-framed. Finished work still merges; filings queue.
 
-2. ARE THE LANES' CRATES MOVING? ANCHOR THE PATHSPEC TO THE REPO ROOT -- `git log -1 --pretty='%ci %h %s' origin/main -- ':/crates/'` and `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l`. A BARE `-- crates/` RESOLVES RELATIVE TO cwd, and the Bash tool's cwd PERSISTS across calls: after any earlier `cd crates/...`, the filter silently becomes `<subdir>/crates/`, matches nothing, and git reports 0 WITHOUT erroring. Measured 2026-08-15: reported 0 twice while the true count was 10. A false 0 reads exactly like a stalled lane and halts framing. If crates genuinely have not moved, find out why before framing anything.
+2. ARE THE LANES' CRATES MOVING? ANCHOR THE PATHSPEC: `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l` plus `git log -1 --pretty='%ci %h %s' origin/main -- ':/crates/'`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so after any `cd` it matches nothing and git reports 0 WITHOUT erroring. Measured: 0 reported twice while the truth was 10. A false 0 looks exactly like a stalled lane.
 
-2b. STEP 2 IS AN AGGREGATE AND A MOVING LANE 1 MASKS A DEAD LANE 2. Check each `status: active` node separately: is its ring working its next deliverable? Read the NODE, never the seat's status line -- a status is written once and goes stale silently, in the direction that HIDES unblocked work. Measured 2026-08-15: V3-Z3-EMISSION-CONTROL D1 landed 14:32 while verify's seats still read "approved and queued" / "idle-awaiting-review"; the ring sat idle NINE HOURS on a required, framed, unblocked D2a while step 2 stayed green. Confirm a candidate landed by BLOB IDENTITY (`git rev-parse origin/main:<path>` vs `<SHA>:<path>`), never ancestry -- the publisher squashes, so a merged SHA reads as not-an-ancestor forever.
+2b. STEP 2 IS AN AGGREGATE -- A MOVING LANE 1 MASKS A DEAD LANE 2. Check each `status: active` node separately: is its ring working its next deliverable? Read the NODE, never a seat's status line -- a status is written once and decays silently, in the direction that HIDES unblocked work. Measured 2026-08-15/16: three rings sat idle on work that had ALREADY LANDED while their statuses read "queued"/"awaiting review"/"publisher handoff, branch frozen" and step 2 stayed green. Confirm a landing by BLOB IDENTITY (`git rev-parse origin/main:<path>` vs `<SHA>:<path>`), never ancestry -- the publisher squashes, so a merged SHA reads as not-an-ancestor forever.
 
-3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file; do not work from memory.
+2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release, flip it `active`. A ring being awake is not the record.
 
-4. WIP AUDIT, 60 MINUTES -- AND VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: Architect audit/ruling, QA verdict, candidate handoff, leader routing, my own kick. READ THE THREAD FIRST with get_recent_context(detail="standard"). A reset event you never looked for cannot reset a clock. Measuring elapsed time from your own dispatch alone has fired a false audit.
+3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file; do not work from memory. Check none is running first: `pgrep -af 'scripted-pr[-]automerge'` (bracket it or it matches your own command line). Never fetch or commit while one holds its window, and never pipe the publisher through tail/grep -- it block-buffers; poll `gh pr view <N>`.
 
-5. ONE RELEASE AHEAD. For the in-flight node, grep other nodes' `depends_on` for its id (not its `blocks` edge -- they disagree and gen-progress.sh reads depends_on). Every successor must be `status: ready` with a shovel-ready frame. A MEASUREMENT-ONLY node never reaches `merged` -- close it, or its successors sit gated on a landing that cannot happen.
+4. WIP AUDIT, 60 MINUTES -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: Architect ruling, QA verdict, candidate handoff, leader routing, my own kick. Read the thread first with get_recent_context(detail="standard"). A reset event you never looked for cannot reset a clock.
 
-6. ADVERSARY REPORTS DO APPEAR in get_recent_context(detail="standard") -- verified 2026-08-15 on evt_11cr9qyqympq5. The old threads-endpoint step was INERT: all 20 threads read unread_count_for_actor > 0, including ones read minutes earlier, so a selector on it selected nothing. Poll with since_event_id from the last tick.
+5. ONE RELEASE AHEAD. Grep other nodes' `depends_on` for the in-flight id (not its `blocks` edge -- they disagree and gen-progress.sh reads depends_on). Successors must be `ready` with a shovel-ready frame. A MEASUREMENT-ONLY node never reaches `merged` -- close it, or successors gate on a landing that cannot happen.
 
-7. RESOLVE ACTOR IDS BEFORE COMPOSING A MENTIONS ARRAY, never after posting: `scripts/moot-actor-id.sh <role>`. A typed-from-memory id either wakes the wrong seat or wakes nobody, silently.
+6. ADVERSARY REPORTS APPEAR in get_recent_context(detail="standard"); poll with since_event_id from the last tick. The threads-endpoint selector was inert.
 
-8. A CITED COORDINATE IS NOT A VERIFIED ONE. Before framing on a line number from a ruling or a report, locate the symbol yourself. Three times this campaign a cited site named a function that did not perform the operation attributed to it.
+7. RESOLVE ACTOR IDS BEFORE COMPOSING MENTIONS: `scripts/moot-actor-id.sh <role>`. A remembered id wakes the wrong seat or nobody, silently.
 
-9. NEVER call get_transcript. Use get_recent_context / get_mentions with detail="standard".
+8. A CITED COORDINATE IS NOT A VERIFIED ONE, INCLUDING THE ARCHITECT'S. Locate the symbol yourself before framing on it. Repeatedly this campaign a cited site named a function that did not do what was attributed to it; twice the citation came from a ruling.
+
+9. AFTER A DISPOSITION IS REFUTED, SWEEP THE FRAME BY PHRASE -- title, lede, deliverables, ACs. A reader consults the title INSTEAD of the ACs. Five dispositions died on one node in one arc and the frame asserted every one. Grep the dead phrase; prove zero live occurrences.
+
+10. NEVER call get_transcript. Use get_recent_context / get_mentions with detail="standard".
 
 If nothing above produces an action, post nothing and stop. A quiet tick is a correct tick.
