@@ -128,8 +128,21 @@ those are `D6` rewrites in the predecessor and **stay gated behind the nine**.
 > mattered. **The `native-build` corpus does, and it is excluded by the same
 > scoping.**
 >
-> **Measured by the Steward, not cited:** `build_native_program` is called from
-> **18 test files and 36 call sites under `crates/ken-cli/tests/`** — among them
+> **CORRECTED — my first count was a TEXTUAL census reported as a CALL
+> census, and the runtime ring caught it.** The accurate figures, re-verified
+> at `331db0a73`: **35 executable `build_native_program(` call expressions
+> across 17 files**, plus child `ken native-build` routes in an **18th**
+> (`mrc_4a1_child_transport.rs`). The textual grep returns **37 hits on 37
+> lines across 18 files**, and **two of those are comments** — the MRC module
+> comment and a historical comment in `rt_escape_second_resource_native.rs`.
+>
+> **I published "36 call sites in 18 test files". Both numbers were wrong**: 36
+> was an arithmetic slip on a per-file line count, and "call sites" was the
+> wrong label for what a name-keyed grep returns. **A textual census is not a
+> call census** — the conclusion below is unaffected, the precision claimed for
+> it was not earned.
+>
+> Among the calling files:
 > `px4b_native_production` (11 calls), `px7l_checked_host_recursive_bind`,
 > `px7o_heterogeneous_eliminator_frames`, `px7p_constructor_field_composition`,
 > `px8ta_oriented_subcontinuation`, `px8l_recursive_decl_native`,
@@ -137,7 +150,7 @@ those are `D6` rewrites in the predecessor and **stay gated behind the nine**.
 > the seven files the ruling names.**
 >
 > ⇒ **`D1`'s 805 selector arrivals and `D2c`'s 943/0/4 were measured over `-p
-> ken-runtime --lib`. Every one of those 36 call sites is OUTSIDE it.** The
+> ken-runtime --lib`. Every one of those 35 calls is OUTSIDE it.** The
 > census that concluded "28 arrivals, all fixture-only" was taken over a
 > population that structurally excludes **the real-source corpus that actually
 > reaches the selector.**
@@ -276,3 +289,82 @@ retirement exactly as a merge would.
 
 **Do not read `closed` as abandoned.** For this node it means *resolved by
 record*, which is the only way a measurement-and-adjudication node can resolve.
+
+## `D5` DELIVERED. THE CENSUS IS DECISIVE; THE PROBE IS NOT, AND THE REASON MATTERS.
+
+**runtime-implementer `evt_6tveatdhcz72y`, runtime-leader `evt_1jtpkrzmav0a4`,
+at exact `331db0a73`. Readings only, no candidate, all instrumentation removed.
+Counts and failure site re-verified by the Steward.**
+
+### Measurement 1 — the census: ZERO `RecursiveDescent`
+
+**This settles the retirement's cost question.**
+
+**62 native-build attempts: 60 selector arrivals, all `FunctionizedUnits`, zero
+`RecursiveDescent`, plus 2 pre-selector returns** (`px4b-mismatch`,
+`px8l-nondecreasing-cycle`). Default 27, ignored 33 — **ignored native tests
+were run separately rather than skipped**, so the census is not silently
+truncated by a red.
+
+The ring stated its predicate and its exclusions, which is what `AC-13`
+demanded: every direct `build_native_program(` expression plus every child `ken
+native-build` invocation, comments excluded, `mrc_4a1_feature_gate_artifact.rs`
+excluded as artifact-inspection data performing no compile.
+
+⇒ **No real-source program in the closed native corpus selects the retiring
+lane.** Retiring `RecursiveDescent` removes an authority that **nothing
+reachable selects**. The recorded-gap disposition survives contact with the
+real-source population — which is exactly what the earlier census could not
+show, because its population excluded all 35 of these calls.
+
+### Measurement 2 — the probe did NOT reach the guard
+
+**And not because the shape is absent.**
+
+**The positive harness control is what makes this readable.** Same prelude,
+checked `Program I main`, declaring
+`data D5Tree = D5Leaf | D5Node D5Tree Nat D5Tree` — **two recursive positions**
+— **built successfully and selected `FunctionizedUnits`.** So the prelude, the
+checked main, and the two-recursive-position declaration are all admitted.
+
+**The actual traversal failed before any selector observation:**
+
+```
+Driver(MissingClosureMetadata {
+  section: "checked computational IH authoritative runtime body",
+  symbol: ... ["d5-two-recursive-position", "inorder"] })
+```
+
+**Located by the Steward, and it is upstream of everything this node is about:**
+that error is raised in **`crates/ken-elaborator/src/compiler_driver.rs:2015`**,
+where `checked_core_declaration_body_view(...)` fails for the recursive
+declaration. **The elaborator, not `ken-runtime`.** The program never reaches
+cranelift lowering at all, so it reaches neither the selector nor the
+`units.rs` no-worker guard.
+
+> #### ⇒ CONSTRUCT 3's SOURCE-REACHABILITY IS UNDETERMINED, NOT DISPROVED.
+>
+> **"The guard was not reached" and "the guard is unreachable" are different
+> facts, and only the first is established.** The traversal was **intercepted**
+> by a prior elaborator gap, not turned away for lacking the shape — the
+> control proves the shape is admitted.
+>
+> **Do not record construct 3 as fixture-only-by-nature.** If the elaborator
+> gap were closed, an ordinary binary-tree fold would proceed further, and
+> whether it then meets the no-worker guard is **untested**. Recording this as
+> a settled gap would misdirect the next reader exactly the way the Architect
+> warned a wrong record would.
+
+### What `D5` changes, and what it does not
+
+| question | disposition |
+|---|---|
+| does retiring `RecursiveDescent` break a real-source program? | **NO** — decisive, 60/60 arrivals select `FunctionizedUnits` |
+| is construct 3 reachable from real source? | **UNDETERMINED** — blocked behind an elaborator gap, not shown absent |
+| `D1`'s four verdicts | **UNCHANGED.** `D5` moves reachability, never correctness |
+
+**A distinct finding fell out of the probe and is NOT this node's:** an ordinary
+recursive traversal over a binary tree fails in the elaborator at checked
+computational-IH body preparation. **Routed to the Architect** — it is a
+capability question about the native path, independent of whether the retiring
+lane is ever deleted.
