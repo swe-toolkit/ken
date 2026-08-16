@@ -142,10 +142,128 @@ the Rust `embed` computes on the same inputs.
 per `seed-prover.md:49-50`. **Not a primitive, not an axiom, not a kernel API
 call.**
 
+> ### THE FAILURE ENCODING IS RULED. DO NOT RE-OPEN IT.
+>
+> **Architect `evt_5fc6hsgcn9exq`**, ruling on a fork the Steward routed
+> (`evt_2g2j03b29wbq9`). **The answer is neither arm that was offered.**
+>
+> > **Ken `check_cert` is a total `Bool` mirroring the Rust's guarded
+> > structure.** No `Maybe`/`Either` verdict wrapper, and **no change to the
+> > Rust reference.** Where Rust writes `delta.get(i)` returning `Option`, Ken
+> > writes a lookup returning `Maybe FokForm` **internally**, and every
+> > `Nothing` maps to `False` — exactly what `else { return false }` does. **The
+> > `Maybe` is a local detail of the lookup, never the shape of the verdict.**
+>
+> **The premise that made this look hard was withdrawn by its own author.**
+> `check_cert` does **not** inherit `w_forces`'s partiality — it was written to
+> the opposite discipline and already is in the tree. **Steward-verified:**
+> `check_tree` contains **zero** `unwrap`/`expect`/`panic!`/`unreachable!`, and
+> its only two bare index writes (`expected_delta[*right]`, in `ImpRight` and
+> `ForallRight`) sit on a `clone()` of the very `Vec` whose `.get(*right)`
+> returned `Some` two lines above — **cannot be out of range.**
+>
+> ⇒ **`check_cert` is total in BEHAVIOUR, not merely `-> bool` in signature.
+> Mirror its structure and totality comes for free.**
+>
+> **`w_forces` remains the single documented exception and stays as it is.**
+> Making the Rust side total would be the barred kind of reference change and
+> would **lose information** — that panic marks a caller bug, with
+> `quote_iform` as the real safety mechanism, and a defaulted `Zero`
+> substitutes a silently wrong answer for a loud one. **Document the domain; do
+> not force agreement.**
+>
+> **`search` shares the guarded discipline** — Steward-checked, since the
+> Architect flagged it as unaudited: no panics, and its `delta[j]` writes take
+> `j` from `enumerate()`, in range by construction. Relevant to `D4`.
+
+> ### TWO CONSTRUCTORS CAN BE SWAPPED SILENTLY, AND `D2` IS WHERE THEY ARE FIRST READ
+>
+> **Adversary hunt on increment 1, `evt_2z1b5v3k0d8yr`.** This is the specific
+> form of Architect finding 3's *"well-formed and correctly-sized, not shown
+> right."*
+>
+> | constructor | shape | swap detectable? |
+> |---|---|---|
+> | `FokMkSequent (List FokForm) (List FokForm)` | two same-typed | **NO** |
+> | `FokInit Nat Nat` | two same-typed | **NO** |
+> | `FokForallRight Nat FokQTerm` | different types | yes — will not type-check |
+> | `FokMkCert FokSequent FokRule (List FokCert)` | all distinct | yes |
+> | `FokAccess` / `FokDomainA` / `FokForcingP` | two same-typed | yes — **`embed` constructs them**, so `D1` already compares them positionally |
+>
+> ⇒ **Exactly two constructors are BOTH same-typed-adjacent AND outside
+> `embed`'s image.** A `gamma`/`delta` or `left`/`right` swap **elaborates,
+> kernel-checks, passes both arity tests, and is invisible to the differential**
+> — because the differential only ever sees what `embed` produces, and `embed`
+> produces neither.
+>
+> **The mechanism is the positional mirror of a named Rust struct.** Rust's
+> `{ gamma, delta }` and `{ left, right }` make a swap a **compile error**;
+> Ken's positional constructors make it a **silent** one. And `Init` closing on
+> `gamma[left] == delta[right]` is symmetric-looking enough that a swapped
+> checker **can still accept the positive control.**
+>
+> **Required in `D2`, cheapest form:** one differential row that constructs a
+> `FokMkSequent` and a `FokInit` with **distinguishable** contents and decodes
+> them back, **pinning field order before anything reads it.**
+
+> ### DO NOT SPEND A PASS ON `cases()`'s MISSING NESTING ORDER — IT IS REDUNDANT
+>
+> **Adversary measured this so nobody repeats it.** `cases()` has
+> `Forall`-in-`Forall` and `Imp`-in-`Forall` but **nothing with `Forall` inside
+> `Imp`** — visibly the one absent composition. They added
+> `Forall(Imp(Bottom, Forall(Atom(IVar 1))))`, and it passes.
+>
+> Then they tested whether it **discriminates**, by mutating the `Forall` arm's
+> recursive world (`Suc Zero` → `Suc world`): **an existing case
+> (`forall_nested_inner_ref`) catches that mutation and the new row does not** —
+> under an `Imp` the world is already `0`, so `Suc world` and `Suc Zero`
+> coincide there.
+>
+> ⇒ **The proposed row is strictly weaker on the world axis and equal on the env
+> axis. The population is better than its enumeration looks.** The gap is
+> visible from reading `cases()`; **the redundancy is not**, which is exactly why
+> it is recorded here.
+
 **`D3` — a differential control against the Rust checker.** For every
 certificate the predecessor's corpus produced, the Ken `check_cert` and the Rust
 `check_cert` must agree. **A disagreement is the most valuable result this node
 can produce and is reported as one.**
+
+> ### `D1`'s BLIND SPOT WAS FORCED. `D3`'s WOULD BE A CHOICE.
+>
+> **Architect `evt_5fc6hsgcn9exq`.** `D1`'s `cases()` excluded ill-scoped inputs
+> **because the Rust `w_forces` would panic on them** — the exclusion was not a
+> judgment call, it was the only option.
+>
+> **No such pressure exists for `check_cert`.** The Rust returns `false` on
+> every malformed certificate, so malformed inputs are **perfectly comparable**.
+> ⇒ **If `D3` ends up blind at the rejection boundary, that is a decision
+> someone made, and it must be defended rather than inherited from `D1`.**
+>
+> ### AGREEMENT ON `false` IS WEAK EVIDENCE BY DEFAULT
+>
+> **Two implementations can agree on `false` while rejecting for different
+> reasons.** A corpus of malformed certificates can therefore report **full
+> agreement while neither side ever reaches the arm under test** — a control
+> that looks strongest exactly where it is emptiest.
+>
+> **The remedy is a NEAR-MISS PAIR per rejection arm:** one certificate the arm
+> rejects, and a **minimally different** one it accepts. **The accepting half is
+> the load-bearing one** — it proves the traversal reached the arm at all, which
+> agreement on `false` never shows.
+>
+> **These seven are the FLOOR, not the ceiling** (Architect's list, carried
+> verbatim in substance):
+>
+> | arm | rejecting case | accepting near-miss |
+> |---|---|---|
+> | `Init` | `left`/`right` in range, naming unequal formulas | in range and equal |
+> | `Init` | `left` or `right` out of range | in range |
+> | `ImpRight` | `delta[right]` present but not an `Imp` | an `Imp` |
+> | `ImpRight` / `ForallRight` | zero children, and two children | exactly one |
+> | `ForallRight` | target neither `ForallWorld` nor `ForallObj` | a quantifier |
+> | `ForallRight` | eigenparameter already mentioned in the conclusion | fresh |
+> | root | conclusion sequent unequal to `[] => [q]` | equal |
 
 **`D4` — the measurement `AC-2` originally named.** Wall-clock and, where
 obtainable, reduction-step count that **kernel conversion** spends on
