@@ -6203,7 +6203,9 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// `c88a5e423bb61669ab8a1f3421bdcb610ba992f9`, that was 33 exclusions. Of
 /// those, the six closure-at-boundary tests were measured individually: each
 /// produced three completed returns with `unit_boundary_environment_fields={}`
-/// before its expected `Closure` refusal. The selected non-ignored paths
+/// before its expected `Closure` refusal — an outcome that refusal makes forced
+/// rather than observed. Six assumed behaviours became six measured ones; the
+/// shape-bearing population remains unmeasured. The selected non-ignored paths
 /// returned `unit_boundary_environment_fields={}` on all 81 completed returns
 /// across 15 processes; the plans contained 7 through 301 source occurrences.
 /// This is a scoped corpus measurement, not a universal property of Ken
