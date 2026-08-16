@@ -11,7 +11,9 @@ github: null
 origin: "Operator directive 2026-08-16, verbatim: 'Prior art indicates that retiring RecursiveDescent is possible and observed resource usage by that implementation makes it desirable. If outcome 2 or 3 is returned by runtime-implementer, that is a clear signal to refer the matter to research for guidance.' RT-MATCH-DIFFERENCE-REACHABILITY D1 returned outcome 3 (PR #2463, Architect dec_5chyprtg9bn7c). Steward-filed per COORDINATION section 2 so the capstone's bar cites an owned node rather than a message."
 ---
 
-## DELIVERED AND MERGED (PR #2467). The advisory is `docs/program/17-descent-retirement-prior-art.md`.
+## DELIVERED AND MERGED (PR #2467)
+
+**The advisory is `docs/program/17-descent-retirement-prior-art.md`.**
 
 **The result, in the order that matters:**
 
@@ -174,7 +176,8 @@ question.** Inherited from the predecessor's method gate.
 
 ## Sequencing
 
-**`active`. Released to the research seat at `evt_1nphjvhzs39e0`, `main` = `483d740eb`.**
+**Released to the research seat at `evt_1nphjvhzs39e0`, `main` = `483d740eb`;
+delivered and `merged` the same evening at PR #2467.**
 
 **Blocks [[RT-DESCENT-RETIRE]], and it is that node's eleventh dependency and
 its sole live discharge.** The other ten are `merged`; the capstone is barred by
