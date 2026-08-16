@@ -1,7 +1,7 @@
 ---
 id: RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE
 title: "Two control.rs trace helpers assert over ABORTED compiles -- owner and multiplicity each run five expressions, EVERY functionized compile aborts, and their trace-event assertions stay green, so zero completed functionized runs back any claim built on them; live on main today and independent of the retirement"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
