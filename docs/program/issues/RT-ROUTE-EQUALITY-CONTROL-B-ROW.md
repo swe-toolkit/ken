@@ -31,6 +31,19 @@ an assertion about an unexercised capability.
 to also include `Call`. The routing predicate remains a single evaluated
 `A || B` binding and the observation records that same value.
 
+> ### THE ADVERSARY'S FOLLOW-UP HUNT FOUND SOMETHING THIS NODE DID NOT ADDRESS
+>
+> `evt_2xxr83djrtepq`, on the merged candidate. **The two directions are caught
+> by two different assertions**: the 4-tuple catches `B` **leaving** (which the
+> shipped mutation exercises), and `assert_eq!(observed_routes, vec![route_a ||
+> route_b])` catches a disjunct `C` **arriving** (which is what the control is
+> usually cited for). **The mechanism for arrival is the hand-built
+> reconstruction's ignorance of a future disjunct** — so factoring the two
+> reconstructions into a shared helper would delete the detector silently.
+>
+> **Filed as [[RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN]], queued.** Nothing
+> regresses meanwhile; the mechanism works today and the risk is a future tidy.
+
 ## What this node was
 
 **A one-row addition to a control that shipped sound and under-exercised.**
