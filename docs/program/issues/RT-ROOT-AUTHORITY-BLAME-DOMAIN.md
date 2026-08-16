@@ -356,6 +356,59 @@ at the error surface, not closure-boundary or `RecursiveDescent` work.
 > count. **Measuring row 1's incidence as though it were a capability would
 > have produced a number that means nothing.**
 
+## Post-merge: the Adversary challenged the reclassification and it was ruled
+
+**Adversary `evt_3x1r2e6b0fzh5`, Steward routing `evt_4d60jszj7jvwf`, Architect
+ruling `evt_2n4d1pheyw3se`. Recorded here because a ruling that lives only in a
+thread is invisible to whoever reopens this node.**
+
+**The challenge:** `Unsupported` was cause-**neutral** — *"this construct is not
+supported"* is true whether the cause is a compiler defect or a capability gap.
+`PlannerInvariant` renders *"please report this compiler bug"*, which **asserts**
+the cause, and everything shown to reach these three guards is a hand-built
+`RuntimeExpr` fixture. The messages occur only in `mod.rs` and `control.rs` —
+nowhere a Ken source program is compiled.
+
+**Ruled: it does not hold, and no recut is asked for.**
+
+> **`PlannerInvariant` is not a description of evidence. It is a causal category
+> this codebase defined before this node** — `static_transition.rs:12753`:
+> *"ambiguity here is a compiler bug rather than a program the backend cannot
+> handle — so it is a `PlannerInvariant`, not a capacity refusal."*
+
+⇒ The string does not **assert** a cause from fixture evidence; it **renders a
+category whose membership criterion is itself causal.** The only question this
+node had to answer is whether the three guards belong in that category, and the
+mint boundary answers it structurally. **The instruction clause is licensed:
+its sole precondition is fault, and fault is what the category establishes.** It
+would be unlicensed only if the category admitted non-compiler causes, which
+`12753` denies for the category and the mint boundary denies for these three.
+
+⇒ **A population test was applied to a claim that is not a population claim.** A
+guard that never fires is neither more nor less compiler-owned than one that
+fires hourly. The measurement is accurate and bears on **how often a user meets
+the message, not on whether it is true when they do.**
+
+**The census cause is now closed too.** The Adversary ruled out the metric
+explanation and reported cause unknown; it is the ref. `de6cc12c1` — the first,
+CI-red cut — is what yields 21. **State the base, the tip, and the count as
+three fields**; the Architect published a wrong figure within the hour by
+measuring against a worktree branch tree rather than an explicit `origin/main`
+ref, which is this discipline failing in its own author's hands.
+
+> ### BUT THE SAME STRING CARRIES A FALSE CLAUSE, AND IT IS NOT THIS ONE
+>
+> Neither the Adversary nor the Steward named it. The message reads *"**native
+> static transition planner** invariant failed; please report this compiler bug:
+> {msg}"* — and **16 direct producers are resident in lowering** (`core.rs` 13,
+> `mod.rs` 3, including the three this node moved). For those it names a
+> subsystem the failure did not occur in.
+>
+> **This node INHERITED that defect rather than creating it** — it has been wrong
+> for the 13 `core.rs` producers since before the node existed, which is also why
+> reviewing the diff could not have caught it. **This node is correct and stays
+> merged.** The repair is [[RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION]].
+
 ## Provenance
 
 Research advisory `evt_nw85nh58a7dd`, on the Steward's request `evt_65nfvahn43hhe`,

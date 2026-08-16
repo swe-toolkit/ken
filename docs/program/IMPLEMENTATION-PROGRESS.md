@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 06:44:16Z — from 341 issue file(s) in `docs/program/issues/`.
+2026-08-16 07:01:57Z — from 343 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -155,6 +155,7 @@ the committed file matches the generator's output.
 | `LANG-REACHABILITY-SUBSUMING-ARMS` | `ReachabilityError` carries only a span, so a redundant-arm diagnostic cannot say WHICH earlier arms subsume the dead arm -- the mirror of the gap `LANG-EXHAUSTIVENESS-WITNESS-PAYLOAD` closed on the exhaustiveness side, except `34 §4.2` does NOT mandate it, so this is ergonomics and must not be filed or read as a conformance obligation | merged | language | M | none | — |
 | `LANG-RECORD-STACK-OVERFLOW` | The record-literal surface work aborts a real `ken-cli` native compilation with a stack overflow -- `mrc_4a_cross_crate_census_and_its_controls` SIGABRTs at every SHA of the arc including the one carrying the 143-line stack rework, so the rework is not the repair; the arc's own depth fixture never detected it because it builds match arms with `=>`, which is not a Ken token | merged | language | M | none | — |
 | `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` | The doc comment justifying LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT's -3120 saving says the pow10 cascade's arms are all bare literals, which the generator refutes -- only the True arms are, every False arm is the next nested match, and the innermost is an application; the conclusion survives, the recorded reason does not, and it misleads in both directions | merged | language | S | none | 2195 |
+| `LANG-SCT-OPAQUE-THROUGH-HELPER-RETURN` | Ken's SCT termination checker traces a structural decrease only through a direct pattern match feeding the recursive call, so factoring a shared guard into a non-recursive helper reds NotTerminating -- forcing duplication at exactly the sites a checker wants one guard | draft | language | S | none | — |
 | `LANG-SELECTOR-CLASSIFIER-RESIDUAL-DIAGNOSTIC` | The selector's non-universe classifier arm reports the elaborator's own refusal as KernelRejected and fabricates a Type(?0) expectation that Omega would equally satisfy | merged | language | S | none | — |
 | `LANG-SELECTOR-SORT-SPLIT-ELAB` | Implement the sort-split recursive-result selector in the elaborator -- parse `recursive result for x` and `induction hypothesis for x`, classify the selected hidden result by sort, and remove `structural result of x` from the crates | merged | language | L | none | — |
 | `LANG-SORT-META-CAPABILITY` | Rule whether a term/sort metavariable representation is authorized -- the elaborator cannot today leave a selected result undecided between Type and Omega, so the spec's conditional ambiguity clause has an unreachable antecedent | draft | spec-enclave | S | none | — |
@@ -294,6 +295,7 @@ the committed file matches the generator's output.
 | `RT-PLANNED-CLOSURE-PREEXISTENCE` | Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction? | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2317 |
 | `RT-PLANNER-ATTRIB-K` | Boundary A planner: fixed K is a design invariant — move the K-exceeded rejection off the capacity channel | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/935 |
 | `RT-PLANNER-DIAGNOSTIC-K` | Boundary A planner: report planner-invariant failures as planner defects, and assert fixed_k CONSTANT rather than merely affine | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/929 |
+| `RT-PLANNER-INVARIANT-MESSAGE-LOCALIZATION` | The PlannerInvariant rendering localizes every failure to the static transition planner, and 16 of its direct producers are resident in lowering -- the same false-localization defect this file already ruled on for its neighbour variant | draft | runtime | S | none | — |
 | `RT-PROCESS-EXIT-STATUS` | ProcessExitStatus refusal in the escape lane (rt_escape r2_cross_buffer_freeze_fails_closed_with_invalid_bounds) | draft | runtime | TBD | none | — |
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | active | runtime | M | none | — |

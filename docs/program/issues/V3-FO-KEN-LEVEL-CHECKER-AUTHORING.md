@@ -264,6 +264,43 @@ can produce and is reported as one.**
 > | `ForallRight` | target neither `ForallWorld` nor `ForallObj` | a quantifier |
 > | `ForallRight` | eigenparameter already mentioned in the conclusion | fresh |
 > | root | conclusion sequent unequal to `[] => [q]` | equal |
+>
+> ### FIRST TASK OF `D3`: TWO OF `D2`'s TEN REJECTION CASES ARE DOUBLY MALFORMED
+>
+> **Architect `evt_2ee9qfch79vgg`, on the merged `D2`. Non-blocking there,
+> load-bearing here, because the pairs above get BUILT from those ten cases.**
+>
+> `imp_right_target_not_imp` and `forall_right_target_not_quantifier` each supply
+> `(Nil FokCert)` — **zero children** — alongside the wrong-shaped target. Each
+> is therefore rejected by **two independent guards**, so the row proves the
+> certificate is rejected and **not that the named guard is what rejected it**.
+>
+> **The fix is one token each: give both a single well-formed child.** Do it
+> before deriving any pair from them.
+>
+> ⇒ **A pair derived from a doubly-malformed base inherits the ambiguity**, and
+> the failure is self-concealing: the arm that then looks best-covered is the one
+> whose coverage is weakest. That is the same defect this section already warns
+> about one level up — agreement on `false` proving nothing about which arm was
+> reached — arriving through the base case instead of through the corpus.
+>
+> **The other eight isolate cleanly.** `init_nonempty_children` is the best of
+> the set: its indices would otherwise pass, so the children guard is the sole
+> difference. `imp_right_zero_children` and `imp_right_two_children` are already
+> accidental near-miss pairs against the acceptance test, differing from the
+> accepted `cert1` only in child count — the shape this section asks for, arrived
+> at by accident. **Keep them and say so; do not rebuild them.**
+>
+> ### A KNOWN VERDICT-EQUIVALENT DIVERGENCE — DO NOT REPORT IT AS A DISAGREEMENT
+>
+> **Ken checks `ForallRight` freshness BEFORE the exactly-one-child guard; Rust
+> checks the child count first.** Both are total and side-effect-free, so the
+> verdict is identical on every input.
+>
+> Recorded here because `AC-3` makes a disagreement the most valuable result this
+> node can produce, which is exactly the reading under which a reviewer flags an
+> ordering difference as one. **It is a deliberate divergence, reviewed and
+> accepted** (Architect, same event, arm-by-arm against `fo_kripke.rs`).
 
 **`D4` — the measurement `AC-2` originally named.** Wall-clock and, where
 obtainable, reduction-step count that **kernel conversion** spends on
