@@ -252,10 +252,48 @@ written in, so `D2` is derisked rather than blocked.
 > correct set is derived from where the checker consumes them. **`D3`/`D4`
 > should state which polarity each lemma they invoke is consumed at.**
 >
-> Non-blocking, for whichever candidate next touches `FoKripke.ken`:
-> `:662-664` cites `:328` as a seventh `fok_and` site when a complete census
-> gives exactly six (`:352 :365 :378 :391 :404 :417`), and the five controls
-> assert `is_err()` rather than the specific refinement failure.
+> ### NEXT CANDIDATE TOUCHING `FoKripke.ken`. Item 3 is a `D3`/`D4` trap.
+>
+> Architect's two follow-ups, then the Adversary's third census
+> (`evt_2b22rbq03rcsz`) which sharpened them into something consequential.
+> **All three re-verified by the Steward against `main`.**
+>
+> **1. `:663-664` cites SEVEN `fok_and` sites; there are six.** The complete
+> census is `:352 :365 :378 :391 :404 :417`, **all inside `fok_form_eq`.** The
+> seventh citation, `:328`, sits inside `fok_qterm_eq` (`:318-:331`) — **which
+> contains no `fok_and` at all**, only `fok_nat_eq i j` and `False`.
+>
+> **2. The call direction is inverted.** The comment names `fok_qterm_eq` as a
+> **route through which** `fok_and` reaches acceptance. It is the opposite: a
+> **leaf that `fok_form_eq`'s `fok_and` arms call.**
+>
+> **3. ⇒ The stated gap is MIS-SCOPED, and this is the one that costs.** The
+> block names an `and = False` eliminator as *"needed to descend into
+> `fok_qterm_eq`/`fok_form_eq` under a freshness mismatch."* **Since
+> `fok_qterm_eq` contains no `fok_and`, descending into it needs a `fok_nat_eq`
+> fact, not an `and` fact.** A proof that hits a freshness mismatch and goes
+> looking for the named-but-undelivered lemma will be looking for the wrong one.
+>
+> **This is the dual-polarity error one level up**, and it is the second time on
+> this node that a claim about *which operand fact is needed* was derived from
+> the shape of the connective rather than from the call path. **`D3`/`D4`:
+> derive the fact you need from the route, then check the route exists.**
+>
+> **4. The five controls assert `is_err()`, and it hides a 3/2 split.** Measured
+> from the controls' own printed output (Adversary, `--nocapture`): **the worst
+> case does not occur** — all five fail with a type mismatch, none with a parse
+> error or unknown name, which bounds the Architect's concern. **But three show
+> an unreduced `fok_and`/`fok_or` application against a refined-motive
+> expectation — the actual signature of "refinement did not reach the pre-bound
+> hypothesis" — while the two `or = False` controls expect a bare `g0`**,
+> because their naive bodies use `absurd h`, so the failure surfaces at
+> `absurd`'s argument type instead of at the branch return type.
+>
+> ⇒ **Those two evidence that the naive form fails, not that it fails at the
+> refinement site the restructuring exists to work around.** The assertion that
+> would fix all five: **pin that the *found* side contains the unreduced
+> `fok_and`/`fok_or` application.** It holds for all five and is already in the
+> string each control prints.
 
 > **This paragraph originally read *"`D1a` and `D2` are both dispatchable"*, and
 > `D1a` was dispatched on it. It hard-stopped**: authoring `FokDerivation`
