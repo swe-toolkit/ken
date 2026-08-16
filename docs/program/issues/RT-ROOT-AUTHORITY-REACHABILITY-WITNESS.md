@@ -1,7 +1,7 @@
 ---
 id: RT-ROOT-AUTHORITY-REACHABILITY-WITNESS
 title: "Can a Ken PROGRAM drive the lowering into the undischarged root-authority state -- and if one can, the remedy is to make that program inexpressible, because the state the compiler arrives at is genuinely invalid"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
