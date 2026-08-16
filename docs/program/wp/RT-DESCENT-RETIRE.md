@@ -189,6 +189,62 @@ the proof is unavailable and any argument for it is circular.
   > `D2c` licenses a red on these 18 as an expected shape, and **an expected set
   > defined after the run by whatever actually reds is a null oracle.** Do not
   > widen it after seeing CI. Widening it is the finding, not the fix.
+
+  ### `D2b` HAS TWO CATEGORIES. The domain was under-specified; corrected 2026-08-16.
+
+  **Category A above pinned 28 PROGRAM ARRIVALS and nothing else.** `D2c` reded
+  three tests that **call `select_body_emission_authority` directly**, compile no
+  program and assert no value — a disjoint category the pin never enumerated.
+  **The Steward froze the set `D1` produced without asking what else could red.**
+
+  > ### MEMBERS versus CATEGORIES. This is the rule, and it binds next time.
+  >
+  > **You may NOT add MEMBERS to an expected set because they reded.** That is
+  > unfalsifiable and it is what `AC-8` forbids. **You MAY enumerate a CATEGORY
+  > whose membership predicate is decidable without the experiment's result.**
+  >
+  > **The test is one question: could the set have been computed BEFORE the
+  > run?** A grep at the base SHA — yes, and it returns the same answer today as
+  > it would have yesterday. *"It reded"* — no, never. ⇒ **This was a PROCESS
+  > failure, not an evidentiary one**, and that distinction is the whole content
+  > of `AC-8`. Architect ruling `evt_38c0px3312y62`.
+
+  **CATEGORY B — every direct caller of `select_body_emission_authority`,
+  enumerated by grep at base `c98f72ba8`.** Architect census, **re-verified
+  independently by the Steward**: 28 mentions in `control.rs`, of which
+  `:17644` is a doc comment ⇒ **27 real call sites**, plus the definition
+  (`core.rs:2406`) and the single production call (`core.rs:2650`). Every site
+  classified by the authority asserted within four lines; **all 27 resolved,
+  none unclassified.**
+
+  | sites | asserts | `D2c` outcome |
+  |---|---|---|
+  | `:10153`, `:10171`, `:10213` (`the_body_authority_selector_narrows_only_completed_ports_and_stays_fail_closed`) | `RecursiveDescent` | **red** |
+  | `:10290` (`retained_authority_residual_is_the_typed_selector_accounting`) | `RecursiveDescent` | **red** |
+  | `:18216` (`d5_c3_a_second_residual_retains_recursive_descent`) | `RecursiveDescent` | **red** |
+  | `:16428` (`msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference`) | `RecursiveDescent` | **red**, and also in category A |
+  | the remaining 21 | `FunctionizedUnits` | **green** |
+
+  ⇒ **Every direct caller asserting `RecursiveDescent` reded. Not one stayed
+  green. Zero unaccounted.** And **the 21 green ones are a real control**: the
+  reroute did not blanket-break selector callers, it broke exactly those pinning
+  the retiring return value and nothing else. **That is the non-degenerate pair
+  this campaign needed, and it already existed.**
+
+  **`:16428` sits in BOTH categories** — it calls the selector directly *and*
+  compiles programs, and it reded as an arrival. **The categories overlap; they
+  do not conflict.**
+
+  > ### THREE THINGS THAT WOULD HAVE MADE THE STOP STAND — none occurred. Keep them.
+  >
+  > 1. **Any red from a program not in the 28.**
+  > 2. **A red from a direct caller asserting `FunctionizedUnits`** — the reroute
+  >    breaking something it should not.
+  > 3. **A `RecursiveDescent`-asserting direct caller that stayed GREEN.** ⇒ the
+  >    reroute did not take effect everywhere and **`D2c` is invalid as a
+  >    measurement.** **Keep this one especially: it validates the INSTRUMENT
+  >    rather than the result**, and it is the only one of the three that fails
+  >    the run rather than the retirement.
 - **`D2` — A positive control on `D1`'s instrument.** Reintroduce one residual
   temporarily and confirm the enumeration **reports it** and the authority
   **flips to `RecursiveDescent`**. Restore byte-identically.
@@ -431,6 +487,27 @@ the proof is unavailable and any argument for it is circular.
   settled explicitly in this node's record. **A control left with its old
   expectation, or re-described from reasoning rather than from that
   measurement, does not discharge this.**
+
+- **`AC-10` — the sentinel is dispositioned on WHICH ASSERTION FAILED, never on
+  reasoning.** `recursive_descent_recursors_compile_without_a_boundary_crossing`
+  is the one red of the 14 whose own doc comment claims **in terms** that
+  *"retiring that route before the live-domain lane covers these rows would
+  remove a compiling capability."* **Its body never measures that** — the
+  functionized leg captures `_excluded_result` and **discards it**, so the
+  `CLAIMED` line asserts something the code does not execute.
+
+  **Its unexcluded leg carries exactly two assertions, in order:** (1)
+  `result.is_ok()` — *"must retain its compiling `RecursiveDescent` baseline"*;
+  (2) `crossings.is_empty()` — *"must not gain a `RecursiveDescent` boundary
+  crossing"*. **Assertion 1 precedes 2, so the FIRST failure message is fully
+  discriminating**, and it is one line of output the run already produced.
+
+  | first failure | disposition |
+  |---|---|
+  | *"must not gain a `RecursiveDescent` boundary crossing"* | **The sentinel fired as designed. No capability loss** — under `D2c` the unexcluded leg IS the functionized route, so the route comparison collapses, which is exactly what its declared promise class anticipates: *"transition sentinel. Retirement or an authorized boundary repair must rewrite this route comparison rather than preserve its current exact outcomes."* **Rewrite under `D6`.** And assertion 1 having passed is **affirmative evidence the functionized route compiles row 4 at depths 2 and 3** — the measurement its `CLAIMED` line asserted and its body never made. `D2c` supplies it free. |
+  | *"must retain its compiling `RecursiveDescent` baseline"* | **The functionized route does not compile these rows. REAL CAPABILITY LOSS, the retirement is BLOCKED, and it is the first genuine one in this campaign.** Hand it back as a node; **do not adjudicate it inside `D6`.** |
+
+  **Neither branch may be taken by argument.** Architect `evt_38c0px3312y62`.
 
 - **`AC-8` — the expected-red set was FROZEN BEFORE the run.** `D2b`'s pinned
   18 tests / 28 selections landed on `main` ahead of the `D2c` candidate, and
