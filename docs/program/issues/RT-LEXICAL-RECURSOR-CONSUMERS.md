@@ -1,7 +1,7 @@
 ---
 id: RT-LEXICAL-RECURSOR-CONSUMERS
 title: "Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -580,16 +580,34 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 >
 > **Steward. The two paragraphs directly above are the defect, not a pointer.**
 > They delegate this node's remaining population to
-> [[RT-CROSSING-CALL-SITE-ATTRIBUTION]] — *"it is now `D2b` of the successor"*,
+> [[RT-CLOSURE-CROSSING-ELIMINATE]] — *"it is now `D2b` of the successor"*,
 > *"its remaining population is dispositioned in the successor"*. **That node
-> merged carrying no `D2b` and no row-1 content.** The delegation outlived its
-> target, so for a day this node advertised work as owned elsewhere while
-> **nobody owned it** — which is why no seat was idle *waiting* and the campaign
-> read from outside as blocked on a decision.
+> merged with `D2a` and `D2b` unaddressed**, carrying exactly these rows in its
+> own headings. The delegation outlived its target, so for a day this node
+> advertised work as owned elsewhere while **nobody owned it** — which is why no
+> seat was idle *waiting* and the campaign read from outside as blocked on a
+> decision.
 >
 > **A defect spanning two nodes has a half owned by nobody.** Neither node was
 > individually wrong at the moment it was written; the edge between them is
 > where the work fell.
+>
+> ### The first version of this correction named the wrong node, and the referent is worth stating
+>
+> It named [[RT-CROSSING-CALL-SITE-ATTRIBUTION]], which appears 500 lines above
+> at the route question and carries **no** `D2b`, `row 1`, `owned-scope`, or
+> `NativeJoinPlanV1` content. The actual referent of *"the successor"* is
+> `RT-CLOSURE-CROSSING-ELIMINATE`, named ten lines above the sentence that uses
+> the word. **Architect `evt_2jpta1cv7j4a4` caught it; the referent is corrected
+> here.**
+>
+> **The conclusion never depended on which one it was.** Both are merged nodes
+> that did not carry these rows, so the population was unowned on either
+> reading. What the miss cost was precision about *where* to look — and a
+> correction written to repair an attribution defect reproduced one. **A
+> correction inherits the blind spot of the census beneath it:** this block was
+> written from the enumeration in the paragraph it corrects, not from a sweep of
+> this file's own live cross-node references.
 >
 > ## The four dispositions, closed where the criterion reads them
 >
