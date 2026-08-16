@@ -128,6 +128,30 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 >   neighbour**; each of the four retired variants got a node that built the port
 >   first.
 >
+> > **SUPERSEDED 2026-08-16 — the bullet above is the record of what was ruled
+> > then, and its present tense is no longer true.**
+> > [[RT-MATCH-SCRUTINEE-DISPOSITION]] `D1` measured the variant at exact
+> > `f24ad5242`, and the answer is **neither** of the two outcomes that bullet
+> > poses. All three governed renderings compile on the functionized lane, so the
+> > port is **not** missing; and the retention rule is not a correct refusal
+> > either. Architect, `evt_29rrwtbh48n8z`, naming a **third** class: *"a
+> > retention guard whose condition is broader than the capability boundary it
+> > was standing in for."* Retention is **existential** over per-case
+> > `recursive_positions` (`lowering/core.rs:2104-2118`); the ordinary route is
+> > **universal** over case bodies (`lowering/mod.rs:16688-16697`). **The two
+> > cannot coincide by construction**, only contingently.
+> >
+> > ⇒ **THE RETIREMENT SHOULD STOP EXPECTING ONLY TWO ANSWERS.** A variant can
+> > also be one whose guard was never load-bearing across its full extent —
+> > *"build the port, then delete the variant"* is not the only shape a
+> > retirement takes. **The lawful repair here may be a NARROWING, in which case
+> > `MatchScrutineeRecursor` survives in reduced form** and this node's premise
+> > of deleting the enum outright does not hold as written.
+> >
+> > **This marker is not the disposition.** The child's `D3` records the settled
+> > outcome here, and it is the authority; this exists so a reader between now
+> > and then is not told the variant is unmeasured.
+>
 > **`evt_5h7vzc27mc11j` DOES NOT CARRY HERE, and the reason is stronger than
 > selections-versus-refusals.** That ruling was about `FunctionizedUnits`
 > refusals grounded in conservation laws, an invariant, a semantic impossibility
