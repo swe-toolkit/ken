@@ -17734,7 +17734,10 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 let producer_route = requires_heterogeneous_deforestation(scrutinee)
                     || self.declaration_call_produces_deforestable_aggregate(scrutinee);
                 #[cfg(test)]
-                if matches!(scrutinee.as_ref(), RuntimeExpr::ComputationalMatch { .. }) {
+                if matches!(
+                    scrutinee.as_ref(),
+                    RuntimeExpr::ComputationalMatch { .. } | RuntimeExpr::Call { .. }
+                ) {
                     MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS
                         .with(|decisions| decisions.borrow_mut().push(producer_route));
                 }

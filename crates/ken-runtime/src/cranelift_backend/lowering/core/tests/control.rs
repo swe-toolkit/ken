@@ -16303,6 +16303,46 @@ fn rt_match_over_nonrecursive_computational_match() -> RuntimeExpr {
     }
 }
 
+/// An ordinary `Match` whose scrutinee reaches the producer route solely
+/// through its transparent declaration call.
+#[cfg(test)]
+fn rt_match_over_recursive_aggregate_declaration_call() -> (RuntimeExpr, RuntimeDeclaration) {
+    let symbol = "decl:fixture::msd::wrap".to_string();
+    let declaration = RuntimeDeclaration {
+        symbol: symbol.clone(),
+        kind: RuntimeDeclarationKind::Transparent {
+            body: RuntimeExpr::Closure {
+                captures: Vec::new(),
+                params: vec!["x".to_string()],
+                body: Box::new(RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::msd::Wrap".to_string(),
+                    args: vec![RuntimeExpr::Var(0)],
+                }),
+            },
+        },
+        metadata: RuntimeSymbolMetadata {
+            lowerability: Some(RuntimeLowerabilityStatus::Supported),
+            ..RuntimeSymbolMetadata::empty()
+        },
+    };
+    let expression = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef { symbol }),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
+        }),
+        cases: vec![RuntimeMatchCase {
+            constructor: "ctor:fixture::msd::Wrap".to_string(),
+            binders: 1,
+            body: RuntimeExpr::Var(0),
+        }],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "msd declaration-call producer fixture is total".to_string(),
+        },
+    };
+    (expression, declaration)
+}
+
 /// **`RT-MATCH-SCRUTINEE-DISPOSITION` `AC-6` — the exact executable
 /// intersection witness now selects `FunctionizedUnits` unaided.**
 ///
@@ -16436,14 +16476,16 @@ fn msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference() {
 /// **Promise class: transition sentinel.** This equality intentionally turns
 /// red if either side of the coupling changes: the heterogeneous-deforestation
 /// decision changes, the declaration-call disjunct becomes live for an
-/// immediate `ComputationalMatch`, or another routing disjunct is added. Such a
-/// divergence would conservatively miss a migration onto the ordinary route;
-/// it would leave the program on a retained lane that handles it today, not
-/// miscompile it.
+/// immediate `ComputationalMatch`, or another routing disjunct becomes live for
+/// a represented row. Such a divergence would conservatively miss a migration
+/// onto the ordinary route; it would leave the program on a retained lane that
+/// handles it today, not miscompile it.
 ///
-/// **MEASURED:** the difference, handled-intersection, and non-recursive
-/// scrutinees agree across the production residual predicate and a `Lowering`
-/// evaluating the routing site's complete `A || B` decision.
+/// **MEASURED:** the difference, handled-intersection, non-recursive, and
+/// transparent-declaration-call scrutinees agree across the production residual
+/// predicate and a `Lowering` evaluating the routing site's complete `A || B`
+/// decision. The declaration-call row independently records `A = false`,
+/// `B = true`, and the actual routing decision as true.
 ///
 /// **CLAIMED:** the narrowed residual remains precisely the active-recursion
 /// population that ordinary Match lowering does not route to the producer.
@@ -16510,6 +16552,57 @@ fn msd_d2a_residual_equals_subject_guard_and_route_complement() {
              complement of ordinary Match lowering's complete producer-route decision"
         );
     }
+
+    let (declaration_call, declaration) =
+        rt_match_over_recursive_aggregate_declaration_call();
+    let scrutinee = match_scrutinee(&declaration_call);
+    let declarations = BTreeMap::from([(declaration.symbol.as_str(), &declaration)]);
+    let seed_env = NativeSeedEnvironment::empty();
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    lowering.declarations = declarations.clone();
+    let subject_guard = matches!(
+        scrutinee,
+        RuntimeExpr::ComputationalMatch { cases, .. }
+            if cases
+                .iter()
+                .any(|case| !case.recursive_positions.is_empty())
+    );
+    let route_a = requires_heterogeneous_deforestation(scrutinee);
+    let route_b = lowering.declaration_call_produces_deforestable_aggregate(scrutinee);
+
+    reset_match_scrutinee_producer_route_decisions();
+    let compiled = compile_expr_into_module(
+        new_jit_module().expect("jit module"),
+        "msd_route_equality_b_row",
+        Linkage::Local,
+        &declaration_call,
+        &seed_env,
+        declarations,
+        None,
+        false,
+        None,
+        None,
+        None,
+    );
+    let observed_routes = take_match_scrutinee_producer_route_decisions();
+    assert_eq!(
+        observed_routes,
+        vec![route_a || route_b],
+        "declaration-call: the constructed Lowering's complete A || B decision must equal the \
+         decision observed at the actual ordinary-Match routing site"
+    );
+    assert_eq!(
+        match_scrutinee_requires_recursive_descent(scrutinee),
+        subject_guard && !observed_routes[0],
+        "declaration-call: residual retention must equal the active-recursion subject guard and \
+         the complement of ordinary Match lowering's complete producer-route decision"
+    );
+    assert_eq!(
+        (subject_guard, route_a, route_b, observed_routes[0]),
+        (false, false, true, true),
+        "declaration-call: the new cell must exercise B alone at the actual routing decision"
+    );
+    compiled.expect("the transparent-declaration-call fixture compiles");
 }
 
 /// **`D2` controls 3 and 4 after `D3-narrow` — exact functionized arrival,
