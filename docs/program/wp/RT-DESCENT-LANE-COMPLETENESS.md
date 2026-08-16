@@ -283,6 +283,35 @@ concealed the present finding for the whole campaign.**
 **Three of eighteen is narrow, not systemic.** The Architect censused it
 precisely so nobody has to assume either way. Do not widen the sweep.
 
+> #### THAT BOUND WAS A COUNT WITHOUT ITS PREDICATE
+>
+> **A bound nobody can re-take is not a bound. Stating the predicate.**
+>
+> **Adversary `evt_7ar8w31nr88wh`; every number below re-measured by the
+> Steward.** *"Discards the compile result"* has **two distinct mechanisms**,
+> and the count did not say which it used:
+>
+> | predicate | base `e2e15f8e1` | merged `8b78b48cd` |
+> |---|---|---|
+> | `set_selector_variant_exclusion(Some(...))` sites | 18 | 16 |
+> | `let _ = rt_run*` — outcome discarded at the call | 2 | 2 |
+> | helper that never returns an outcome (`owner`, `multiplicity`) + the sentinel | 3 | 1 (sentinel) |
+>
+> ⇒ **"Three of eighteen" counted the second mechanism. By the first there are
+> two, both in the route-equality control, and the repair left them
+> byte-unchanged** — the deleted helpers discarded their results *inside*
+> themselves, so they never appeared under a `let _ =` census at all.
+>
+> **The claim is true on the metric that produced it and was not checkable as
+> written.** The reason an independent census could not be taken is that the
+> predicate was missing, not that nobody tried. **Record base, tip, count, AND
+> predicate.**
+>
+> The surviving `let _ =` pair carries its own non-vacuity anchor and its own
+> bound; both are recorded at
+> [[RT-ROUTE-EQUALITY-PIN-AT-THE-BINDINGS]]. **That does not widen this
+> node's sweep** — it is filed where the control lives.
+
 ### D5 — RUNTIME RING, measurement
 
 **Does any REAL SOURCE program select `RecursiveDescent`?**
