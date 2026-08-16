@@ -160,14 +160,22 @@ searched source corpus. One compiler/kernel gate governs all twelve hashes:
 2. The direct structural route is an immediate checked-core `Application`
    whose function is a `Lambda`: plan-aware erasure maps those two arms to
    `Call` and `LexicalClosure` (`erasure.rs:2505-2535`).
-3. A source-written lambda cannot occupy that application head. Kernel
-   application inference first infers the function (`check.rs:251-256`), while
-   a lambda is deliberately not inferable (`check.rs:358-365`). Surface
-   ascription does not bypass the gate: elaboration checks it, then returns the
-   underlying term rather than a retained `Term::Ascript`
-   (`elab.rs:3593-3596`). The discriminating spelling
-   `((\value. Success) : Nat -> ExitCode) Zero` therefore receives that exact
-   kernel refusal.
+3. A bare source-written lambda cannot occupy that application head: both the
+   elaborator and kernel require an expected type for a lambda. Ascription does
+   let surface elaboration construct the checked-core `Application(Lambda,
+   ...)`; it is not the refusal. The exact spelling
+   `((\value. Success) : Nat -> ExitCode) Zero`, embedded as `host_exit`'s
+   argument in an otherwise ordinary `fn main`, was run through `ken
+   native-build`. Native build refused it during kernel definition admission as
+   `elaboration failed: KernelRejected` with the kernel's non-inferable-lambda
+   message. `elaborate_v0` produces the checked body before calling
+   `declare_def` (`elab.rs:7087-7117`); `declare_def` re-checks that body
+   (`check.rs:1082-1111`), where application inference first infers its function
+   and the immediate `Lambda` is deliberately non-inferable
+   (`check.rs:251-256`, `:358-365`). This is after surface elaboration and before
+   native preparation or Runtime lowering. No Runtime compilation row exists,
+   so the observed triple is `residuals=<not reached>`, `selector=<not
+   reached>`, `authority=<not reached>`.
 4. The only apparent indirect route is an application whose function is a
    direct declaration call that erasure could inline to a lambda. Naming the
    lambda does not preserve that route. Before checked-core selection, native
@@ -187,17 +195,17 @@ existence claim.
 
 | row | hash | D1 disposition | governing gate |
 |---:|---|---|---|
-| 1 | `7433055269044ce8` | fixture | immediate lambda-call head is source-unreachable |
-| 2 | `c1294e143381564e` | fixture | immediate lambda-call head is source-unreachable |
-| 3 | `23fad2ab9d295856` | fixture | immediate lambda-call head is source-unreachable |
-| 4 | `a26749baed91331f` | fixture | immediate lambda-call head is source-unreachable |
-| 5 | `de31e8ed184a5754` | fixture | immediate lambda-call head is source-unreachable |
-| 6 | `e365f91d10c12a7c` | fixture | immediate lambda-call head is source-unreachable |
-| 7 | `25c3d81c8054e552` | fixture | immediate lambda-call head is source-unreachable |
-| 8 | `3db7ba503cbf472e` | fixture | immediate lambda-call head is source-unreachable |
-| 9 | `e8da0476e3b56008` | fixture | immediate lambda-call head is source-unreachable |
-| 10 | `4dc485d6d0951b49` | fixture | immediate lambda-call head is source-unreachable |
-| 11 | `aa5333756917f356` | fixture | immediate lambda-call head is source-unreachable |
+| 1 | `7433055269044ce8` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 2 | `c1294e143381564e` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 3 | `23fad2ab9d295856` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 4 | `a26749baed91331f` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 5 | `de31e8ed184a5754` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 6 | `e365f91d10c12a7c` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 7 | `25c3d81c8054e552` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 8 | `3db7ba503cbf472e` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 9 | `e8da0476e3b56008` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 10 | `4dc485d6d0951b49` | fixture | kernel definition admission rejects `App(Lam, ...)` |
+| 11 | `aa5333756917f356` | fixture | kernel definition admission rejects `App(Lam, ...)` |
 | 12 | `b6d242da59f49ca2` | fixture | same gate; additionally authored under `#[cfg(test)]` |
 
 The source-reachable D1 population is therefore zero of twelve exact
