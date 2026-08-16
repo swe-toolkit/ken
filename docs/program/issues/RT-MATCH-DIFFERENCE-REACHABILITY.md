@@ -1,7 +1,7 @@
 ---
 id: RT-MATCH-DIFFERENCE-REACHABILITY
 title: "The narrowed MatchScrutineeRecursor difference is what now blocks the retirement -- settle whether it is source-reachable under the method gate, because it is the capstone's only discharge"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -153,7 +153,7 @@ only. **This node may land no production change at all.**
 
 ## Sequencing
 
-**`ready`, `depends_on: []`.** Nothing gates it; the difference is defined above
+**`active`, `depends_on: []`.** Released to the runtime ring at `evt_4y1rq71vbg6zd`; nothing gates it; the difference is defined above
 and the narrowing has landed.
 
 **It blocks [[RT-DESCENT-RETIRE]], and it is that node's SOLE remaining
