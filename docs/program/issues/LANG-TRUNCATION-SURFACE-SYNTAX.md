@@ -1,7 +1,7 @@
 ---
 id: LANG-TRUNCATION-SURFACE-SYNTAX
 title: "Give propositional truncation a surface spelling and an elaboration rule -- the kernel already types Trunc and TruncProj, and no .ken file can reach them"
-status: active
+status: merged
 owner: language
 size: M
 gate: none
