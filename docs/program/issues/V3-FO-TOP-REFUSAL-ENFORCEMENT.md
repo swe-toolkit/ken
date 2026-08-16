@@ -1,7 +1,7 @@
 ---
 id: V3-FO-TOP-REFUSAL-ENFORCEMENT
 title: "Give the sort-candidate criterion an enforcement: a test asserting quote_iform refuses top_id with UnsupportedTermShape, so an IForm::Top arm reds at the same moment the collector needs updating -- and soften the D2 claim that the criterion forces that update"
-status: ready
+status: active
 owner: language
 size: XS
 gate: none
