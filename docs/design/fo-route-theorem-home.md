@@ -8,10 +8,13 @@ split was right and what evidence the posture should be decided against.
 
 **Both halves of `§4.4` are now closed.** The operator settled the posture the
 same day — *build it and measure it* — and §4 carries that ruling and what it
-does and does not clear. **`§4.4` has no open decision left.** What remains is a
-**precondition**, not a decision: `§4.4` still forbids `proved` until both
-theorems are kernel-checked in the home ruled below, and neither is proved or
-started.
+does and does not clear. **`§4.4` has no open decision left.** What remains are
+**preconditions**, not decisions, and there are two. `§4.4` still forbids
+`proved` until both theorems are kernel-checked in the home ruled below, and
+neither is proved or started. And **the definitions those theorems are about do
+not exist either** — no Ken-level `check_cert`, `embed`, `Form` or `Cert` is in
+this tree, so the home ruled in §1 is empty. §4 carries the measurement that
+established that.
 
 This ruling does not reopen `OQ-12`. Reflective route (a) is decided, on
 intrinsic merits, and everything here assumes it.
@@ -141,10 +144,12 @@ something to measure, not to pre-empt.** `18 §6`'s subject reduction and
 confluence do **not** have to be mechanized before route FO is built and
 exercised.
 
-**Two things this does not clear.** `23 §4.4` still forbids `proved` until both
-theorems are kernel-checked in an approved home — a precondition, not a
-decision, and both are unproved and unstarted. And the cost remains **unmeasured**;
-predicting a blowup is not measuring one.
+**Three things this does not clear.** `23 §4.4` still forbids `proved` until
+both theorems are kernel-checked in an approved home — a precondition, not a
+decision, and both are unproved and unstarted. The cost remains **unmeasured**;
+predicting a blowup is not measuring one. And **the definitions the theorems are
+about have not been authored either**, which is what makes the cost untakeable
+rather than merely untaken — see the subsection below.
 
 **The measurement does not need either theorem.** `refl True` at
 `check_cert (embed Sigma f) pi = True` forces exactly the conversion work in
@@ -154,6 +159,48 @@ obtainable well before the metatheory is proved.** Framed as
 `V3-FO-CONVERSION-LOAD-MEASURED`, which depends on
 `V3-FO-OBLIGATION-SIGNATURE-DISCOVERY` because nothing real reaches route FO
 until then.
+
+### MEASURED — and it corrected the paragraph above
+
+**That paragraph cleared the right blocker and it was not the binding one.**
+*"Requires neither theorem"* is true. What makes the number untakeable is that
+**the artifacts §1 rules on do not exist in this tree**: there is no Ken-level
+`check_cert`, `embed`, `Form` or `Cert` for conversion to reduce, so `refl True`
+has nothing to force. Verified at `origin/main`
+`ed43d39a778050ed7d5765cd0db782ff4494b429` — `git grep check_cert -- library/
+catalog/` is empty, and the only `fn check_cert` anywhere is
+`ken_elaborator::fo_kripke::check_cert` (`fo_kripke.rs:807`), native Rust
+recursing through a Rust `check_tree` over Rust `Form`/`Cert` structs.
+
+**So `V3-FO-CONVERSION-LOAD-MEASURED` did not measure kernel conversion, and its
+`AC-2` was amended to report that gap as the result.** What it took is the
+**Rust reference checker** over the same certificate trees a Ken-level checker
+would receive — a lower bound of unknown tightness that says nothing about
+termination under kernel reduction, which is the argued-but-not-mechanized half
+of `18 §6` this section names as the actual open question. **Those numbers must
+never be cited as "the cost of route (a)".** Authoring the Ken-level checker,
+and only then taking the measurement `§4.4`'s cost model calls for, is
+`V3-FO-KEN-LEVEL-CHECKER-AUTHORING`.
+
+### `D1`: no program in this repository would exercise route FO
+
+**The settlement says measure it *on real programs*, and `D1` measured the
+supply of those programs: there are none.** No Ken source in this repository —
+`conformance/`, `library/`, or anywhere else — produces a first-order obligation
+route FO can quote, so the node's 13-program corpus **had to be authored for the
+measurement**. If route FO worked today, nothing in this codebase would exercise
+it.
+
+**What that does and does not license.** It is evidence about *this corpus*, not
+about the programs Ken's users would write, and it is **not** an argument
+against route (a) — the shape is scarce here because the capability is new. What
+it does is sharpen the demand-side question the next subsection raises. The
+withheld count there (`emit_unknown_hole_fo_withheld`, `prover.rs:800`) is the
+instrument for *how often route FO would discharge real work*; `D1` says that
+instrument reads **zero against this repository**, so any real count has to come
+from user programs rather than from the corpus in tree. **An instrument with an
+empty population reports the same zero as a capability nobody wants** — do not
+read the one as the other.
 
 ### The evidence it was decided against
 
