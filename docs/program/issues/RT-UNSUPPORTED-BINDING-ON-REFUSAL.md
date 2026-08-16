@@ -121,6 +121,18 @@ own stable reason. `D0`'s answer determines the site.
 actually refuses. The five populations measured by
 [[RT-UNSUPPORTED-LANE-REFUSAL-REACH]] are available as inputs.
 
+> **That input list is stale by one, 2026-08-16. Check before you key a control
+> on it.** [[RT-ROOT-AUTHORITY-BLAME-DOMAIN]] moved the three root-authority
+> guards from `Unsupported` to `BackendFailure::PlannerInvariant`, so **row 1 is
+> no longer an unsupported construct and no longer owes this binding** — that
+> node's `AC-5` states the consequence and this is where it lands.
+>
+> **This node's SCOPE is unaffected**, and the distinction matters: the lede
+> binds the obligation to **any** unsupported construct, explicitly *"not for
+> the five."* **A control keyed on row 1 would now be keyed on a construct that
+> does not refuse in this channel at all** — it would fail for a reason that has
+> nothing to do with the defect this node repairs.
+
 ## Acceptance criteria
 
 **`AC-1`. No artifact is produced for a compile that failed.** The binding is

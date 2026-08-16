@@ -11,6 +11,24 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
+> # PARKED 2026-08-16, NOT STALLED. `active` OVERSTATES THIS NODE.
+>
+> **`D4` merged 2026-08-15; `D2` has real remaining work. Nobody is on it**, and
+> that is correct: the language ring is on
+> [[V3-FO-KEN-LEVEL-CHECKER-AUTHORING]], which is lane 2 under the operator's
+> 2026-08-15 two-lane directive. **This node is a third lane and does not get a
+> ring, however ready its next increment is.**
+>
+> **Deliberately NOT flipped to `ready`.** `ready` means unstarted and
+> dispatchable; this node has **landed partials**, and demoting it would erase
+> that from the tracker. **The status is accurate about the work and misleading
+> about the activity**, so the correction is this note rather than a state
+> change.
+>
+> ⇒ **A reader auditing `active` nodes for in-flight work should skip this one.**
+> The trigger to resume is the operator retiring or widening the two-lane
+> directive — **not** an idle-team measurement, which will keep finding it.
+
 > # `D1` IS A REGRESSION CHECK ON A JUST-MERGED NODE. RUN IT FIRST, ALONE.
 >
 > The Architect approved [[LANG-CONVOY-MATCH-FIELD-PROVENANCE]] at

@@ -1,7 +1,7 @@
 ---
 id: RT-ROOT-AUTHORITY-BLAME-DOMAIN
 title: "The three root-authority guards report a compiler-owned invariant failure through the unsupported-construct channel, which reverses the fault domain -- and the correct arm, BackendFailure::PlannerInvariant, already exists with 40 producers in the same crate"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -240,31 +240,53 @@ runtime-leader `evt_78ahsj1ge0npp` and confirmed verbatim by the Steward.**
 > filing under the operator's 2026-08-15 two-lane directive and it queues.
 > **Do not let it grow this node** — `AC-1` through `AC-6` are unchanged.
 >
-> #### CORRECTED: the carve-out assumes each site sits in ONE domain.
-> #### At least one does not.
+> #### SUPERSEDED TWICE. THE ANSWER IS A DECISION PROCEDURE, NOT A SURVEY.
 >
-> **Architect `evt_7f3216zdn03yy`.** The wording *"some may be misclassified,
-> others genuinely `Unsupported`"* presumes a site can be sorted whole. **The
-> mismatch guard at `mod.rs:18369` is a single refusal over a disjunction
-> spanning both domains:**
+> **This block has been wrong in two different directions and the history is
+> kept because the second correction is easy to mistake for the first.**
 >
-> | program-shape conjuncts | compiler-state conjuncts |
-> |---|---|
-> | `!self.process_object` | `authority.outer_cursor.is_some()` |
-> | frame fingerprint | `self.source_control_root.is_some()` |
-> | `answer_kind != ExitCode` | `active_oriented_semantic_regions != 0` |
-> | result-type fingerprint | `active_subcontinuation_frame.is_some()` |
-> | | `active_join_site.is_some()`, `!consumed_join_sites.contains(...)` |
+> **v1 (mine):** *"some may be misclassified, others genuinely `Unsupported`."*
+> Assumed each site sorts whole.
+> **v2 (Architect `evt_7f3216zdn03yy`):** `mod.rs:18369` is **mixed-blame** —
+> one refusal over a disjunction spanning both domains, so it must be split.
+> **v3 (Architect `evt_4t0k30t0yet13`) — CURRENT. v2 IS WITHDRAWN BY ITS OWN
+> AUTHOR.**
 >
-> ⇒ **It cannot be reclassified wholesale in either direction. It has to be
-> split**, or **it lands in whichever domain the sweeper noticed first** — and
-> nothing about a wholesale reclassification would look wrong at the time.
+> ### THE LINE IS THE MINT
 >
-> **An open question, stated as one:** its neighbour at `:18351`, *"terminal
-> answer authority names a missing checked-root site"*, also names a
-> compiler-minted `site_id` and looks condemned by this node's own test. The
-> Architect **did not** establish whether a `native_join_plan` of `None` can
-> reach it from a source program, and neither have I. **Not a verdict.**
+> `:7797`'s guard lives in `take_distinguished_root_answer_authority`
+> (`mod.rs:18649-18677`) and fires when **the checked package's own metadata**
+> supplies no qualifying distinguished-root site. **That is input-determined, so
+> `Unsupported` is correct for it** — and for its sibling, *"multiple
+> distinguished root join sites"*.
+>
+> ⇒ **Before the mint, the authority's existence depends on the input artifact.
+> After the mint, only the compiler can lose, misroute, or duplicate the token.**
+>
+> **Why that settles `:18369` rather than splitting it.** The mint-time filter
+> has **already established every one of its input conjuncts** for the site the
+> authority names — `runtime_frame_fingerprint`, `checked_occurrence_path`,
+> `answer_kind`, `process_object`, and `occurrence_binding_fingerprint` against
+> a compiler-computed value. **So a POST-MINT failure of an input conjunct means
+> the plan changed under the compiler, or the authority names a different site.
+> Compiler bug either way.**
+>
+> ⇒ **`:18369` is FULLY compiler-owned, not mixed. So is `:18351`**, which v2
+> left as an open question. Both are `PlannerInvariant` candidates on the same
+> reasoning as the three that moved in this node.
+>
+> ### WHAT THE QUEUED THIRD-LANE NODE SHOULD SAY
+>
+> **Not "survey ~30 sites case by case." One question:**
+>
+> > **Is the guard upstream or downstream of the mint?** Downstream is
+> > compiler-owned, **because the input facts were validated upstream.**
+>
+> **This is the shape the Architect explicitly asked the Steward to carry**
+> (`evt_4t0k30t0yet13`), and it is worth more than any number of individual
+> findings: it converts an open-ended audit into a test. **It is scoped to this
+> token** — do not assume it generalizes to other refusal families without
+> re-deriving the boundary for each.
 
 **`AC-4`. Do not fold in the static-worker refusal.** That one is a genuine
 statement about Ken programs, is in tension with `45 §3`, and is
@@ -277,6 +299,29 @@ channel between them is what erased the blame distinction in the first place**
 refused constructs. **If row 1 stops being an `unsupported` construct, it stops
 owing that binding** — state that consequence explicitly. **Do not implement it
 here**; that node owns it.
+
+> **Discharged, and the consequence is carried.** Row 1 no longer owes the
+> binding. [[RT-UNSUPPORTED-BINDING-ON-REFUSAL]]'s **scope is unaffected** — its
+> lede binds the obligation to **any** unsupported construct, explicitly *"not
+> for the five that `RT-UNSUPPORTED-LANE-REFUSAL-REACH` measured"*. **What is
+> stale is its `D1` input list**, which offers those five populations as
+> starting material. One of them has left the set. A line there, not a reframe.
+
+> ### THE NEW EXPECTATION IS LINE-SPLIT, AND A FUTURE AUDIT WILL NOT SEE IT
+>
+> **Architect `evt_4t0k30t0yet13`, non-blocking, recorded rather than recut.**
+> The recut's expectation splits the message across a `\` continuation
+> (`control.rs:35107-35109`), so a whole-message grep misses it.
+>
+> **Measured at the recut:** `affine checked-root authority` occurs **6** times
+> in `control.rs`; a whole-message grep finds **2**. **Four are invisible to
+> the obvious probe**, and the result comes back clean rather than empty —
+> the failure direction that reads as success.
+>
+> ⇒ **Same hazard class as the line-local grep that produced the `AC-3`
+> amendment at the top of this node.** The difference is that this one is
+> **recorded before it bites** instead of after a red CI run. Any future audit
+> of this message must be multi-line-aware.
 
 **`AC-6`.** No-regression, in CI (`COORDINATION §12`). Local validation targeted
 only — `-p ken-runtime`, never `--workspace`.
