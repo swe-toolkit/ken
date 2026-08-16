@@ -175,15 +175,46 @@ is an operator call, not the ring's.
 > forcing an absolute path today buys nothing and makes the disabled baseline
 > harder to run.
 
-### (b) The FO direction of D-route displacement — CLOSED STRUCTURALLY
+### (b) The FO direction of D-route displacement — SUPERSEDED FOR FO
 
-**Not owed, and it must not be re-filed.** The argument is total over the code
-path and is written out in full in the merged predecessor
+> ### THE ARGUMENT'S PREMISE WAS TRUE WHEN WRITTEN AND THE TREE HAS MOVED.
+>
+> **Corrected by the Steward, 2026-08-16, at `b1b30c1c7`.** The disposition
+> below said *"`attempt_fo` and `attempt_ho` are `attempt_ipc` verbatim"* and
+> instructed that it **must not be re-filed**. **That instruction would be
+> obeyed, so the staleness has to be fixed here rather than noted elsewhere.**
+>
+> **`attempt_ho` is still `attempt_ipc` verbatim (`prover.rs:615`) and (b)
+> stands for HO unchanged.** **`attempt_fo` is not** (`:550`): on a successful
+> discovery it routes to `attempt_fo_with_signature`, which — when `quote_fo`,
+> `find_certificate` and `check_cert` all accept — returns
+> `emit_unknown_hole_fo_withheld` and **never reaches `attempt_ipc` at all.**
+>
+> **What survives, and it is the half that matters: the SOUNDNESS direction.**
+> The FO route still has no `Proved` of its own; every FO `Proved` is
+> `attempt_ipc`'s `try_ipc_cert`. **No verdict escapes the kernel check.**
+>
+> **What does not survive is the EQUIVALENCE.** An obligation that is both
+> FO-quotable **and** IPC-provable now yields FO `Unknown` (withheld) where D
+> yields `Proved`. ⇒ **FO is strictly WEAKER than D, not equal to it.** That is
+> the safe direction — a completeness gap, never an unsound accept — and the
+> fail-safe is deliberate: `embedding_adequacy`/`checker_soundness` have no
+> approved kernel-checked home, so `Proved` is withheld on purpose.
+>
+> **Not urgent, and this is why:** `V3-FO-CONVERSION-LOAD-MEASURED` `D1`
+> measured that **no Ken program in this repository produces an FO-quotable
+> obligation**, so the diverging population is **empty today**. **Do not file a
+> node on it.** File one when the population becomes non-empty — and note that
+> `emit_unknown_hole_fo_withheld` is the instrument that would show it.
+
+**Not owed for HO, and the HO half must not be re-filed.** The argument is
+total over the code path and is written out in full in the merged predecessor
 [[V3-D-OPEN-GOAL-WITNESS-ROUTE]] — read it there. In short: `ctx` is built
-before the match so all three arms take identical arguments; `attempt_fo` and
-`attempt_ho` are `attempt_ipc` verbatim; `attempt_ipc`'s only `Proved` is
+before the match so all three arms take identical arguments; `attempt_ho` is
+`attempt_ipc` verbatim; `attempt_ipc`'s only `Proved` is
 `try_ipc_cert(..) == Some`; and `attempt_d` opens with that identical call.
-⇒ FO/HO `Proved` ⟺ D `Proved`, for every obligation.
+⇒ HO `Proved` ⟺ D `Proved`, for every obligation, **and FO `Proved` ⟹ D
+`Proved` but not conversely.**
 
 **The one gap in the Steward's original version — that a dispatcher doing
 something extra on one path would break step 1 — was closed by reading**
