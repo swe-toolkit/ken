@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY, RT-DESCENT-RETIRE-PRIOR-ART]
+depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY, RT-DESCENT-RETIRE-PRIOR-ART, RT-MATCH-SCRUTINEE-PORT]
 blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -79,9 +79,11 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > tenth dependency to carry that discharge. **It merged on 2026-08-16 having
 > settled the question in the one direction that lifts nothing** — outcome 3, not
 > settled under the method gate — so the discharge passed to the eleventh
-> dependency, [[RT-DESCENT-RETIRE-PRIOR-ART]]. **This node returns to `active`
-> when the referral resolves, and the shape of that resolution is the operator's
-> or the Architect's to state, not this node's to assume.**
+> dependency, [[RT-DESCENT-RETIRE-PRIOR-ART]]. **That referral merged the same
+> evening and did not lift the bar either** — it closed the unreachability route
+> from outside Ken and returned conditional support. **The Architect then ruled
+> the route (`evt_nb12nmhd2zzk`), and this node returns to `active` when
+> [[RT-MATCH-SCRUTINEE-PORT]] supplies the uniform-lowering evidence.**
 >
 > ## `LexicalCallArgumentRecursor` disposition — measured, no port owed
 >
@@ -231,11 +233,25 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > producer of the relevant IR** — Ken has the wrapper on the checked route and a
 > generic non-plan escape, so it has the fact and not the invariant.
 >
-> **THE GRAPH NOW READS FULLY UNBLOCKED AND THE TEXT STILL BARS DELETION. That
-> is not a bookkeeping lag** — it is what happens when every named measurement
-> returns and none of them licenses the act. The next dependency edge appears
-> when the Architect names the route; **do not read an empty blocker list as
-> permission.**
+> **THE ARCHITECT RULED THE SAME EVENING (`evt_nb12nmhd2zzk`): build the
+> retirement on UNIFORM LOWERING (family B), declining the advisory's global IR
+> invariant as the primary route.** The decisive fact is on the Ken side and not
+> in the prior art — **Ken's ordinary `Match` lowering already has the GHC
+> shape** at `core.rs:17734-17756`, and the scrutinee form has a general arm in
+> the same translator. **So family B is a totality question about code that
+> exists, and family A would be a new permanent invariant over a public IR built
+> to retire a selector the code itself calls temporary.** The invariant survives
+> as a fallback only, boundary-scoped, on an uncloseable refusal plus a fresh
+> ruling.
+>
+> ⇒ **[[RT-MATCH-SCRUTINEE-PORT]] is the twelfth dependency and the first link in
+> this chain whose SUCCESS would license deletion** — every predecessor could
+> only fail to. Its bar is **totality or a named refusal**: the difference
+> population compiles today via the retained lane, so a conservative fail-closed
+> arm would be a capability regression rather than mere over-strictness.
+>
+> **Until that evidence exists this node stays barred, and an empty blocker list
+> is not permission.**
 >
 > **A measurement that comes back the other way does NOT close this node.**
 > Operator, 2026-08-16: *"Prior art indicates that retiring `RecursiveDescent` is

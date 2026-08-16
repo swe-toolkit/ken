@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 19:16:30Z — from 354 issue file(s) in `docs/program/issues/`.
+2026-08-16 19:23:07Z — from 355 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -294,6 +294,7 @@ the committed file matches the generator's output.
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
 | `RT-MATCH-RECURSOR-CONSUMERS` | Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population | merged | runtime | M | none | — |
 | `RT-MATCH-SCRUTINEE-DISPOSITION` | MatchScrutineeRecursor's retention guard was broader than the capability boundary it stood in for -- NARROWED to retain exactly when the ordinary producer route declines; the difference is non-empty, so the variant survives load-bearing | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2458 |
+| `RT-MATCH-SCRUTINEE-PORT` | Port the MatchScrutineeRecursor difference onto uniform lowering -- for the heterogeneous-case-body population the ordinary route must terminate in a lawful lowering, or the refusal is named and handed back | ready | runtime | L | none | — |
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY` | CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition | closed | runtime | M | none | — |
@@ -416,6 +417,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
+- `RT-MATCH-SCRUTINEE-PORT` — Port the MatchScrutineeRecursor difference onto uniform lowering -- for the heterogeneous-case-body population the ordinary route must terminate in a lawful lowering, or the refusal is named and handed back
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
 - `RT-UNSUPPORTED-BINDING-ON-REFUSAL` — A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers
@@ -465,6 +467,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CENSUS-CAVEAT-GUARD` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
+- `RT-DESCENT-RETIRE` blocked by `RT-MATCH-SCRUTINEE-PORT` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
