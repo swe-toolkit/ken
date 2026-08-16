@@ -57,6 +57,62 @@ Exact test names are in the frame, section 3. A further **five** reds assert the
 retiring lane's own control, lifecycle or route state with no program refusing;
 those are `D6` rewrites in the predecessor and **stay gated behind the nine**.
 
+> # `D5` ANSWERED: **YES** — AND IT EXPOSES A POPULATION DEFECT IN `D1`/`D2b`/`D2c`.
+>
+> **Architect `evt_74f5ppk3tnh1q`. Every coordinate below re-verified by the
+> Steward in the tree before this was written, not transcribed.**
+>
+> **A two-recursive-position constructor is source-admissible, and two are IN
+> THIS REPOSITORY, RUNNING IN CI TODAY:**
+>
+> | file | declaration | recursive positions |
+> |---|---|---|
+> | `examples/rosetta/tree-traversal/tree-traversal.ken` | `data Tree = Leaf \| Node Tree Char Tree` | **`[0, 2]`** |
+> | `examples/rosetta/letter-frequency/letter-frequency.ken` | `data Tree k v = Leaf \| Node (Tree k v) k v (Tree k v)` | **`[0, 3]`** |
+>
+> **A binary tree. The most ordinary inductive type there is.** Neither is a
+> fixture and neither is skipped: `crates/ken-cli/tests/rosetta.rs` runs each
+> example through the **real `ken` binary as a subprocess** (`CARGO_BIN_EXE_ken`,
+> `Command::new(ken_bin())`); `tree-traversal` is in `NEEDS_COLLECTIONS`; and
+> `oracle_for` requires every dir to declare exactly one oracle — `expected` or
+> `KNOWN-GAP.md`, **never a silent skip. Both dirs carry `expected`**, so each is
+> asserted to compile *and* produce output.
+>
+> ⇒ **The declaration shape construct 3 cannot build an IH prefix for is
+> source-admissible, in-tree, and exercised. `0/12` does not reach it.**
+>
+> ### THE POPULATION DEFECT, and it is the part that matters most
+>
+> **`D1`'s 805 selector arrivals and `D2c`'s 943/0/4 were measured over
+> `-p ken-runtime --lib`. The rosetta corpus lives in `crates/ken-cli/tests/`
+> and runs a separate binary.** ⇒ **The census that concluded "28 arrivals, all
+> fixture-only" was taken over a population that STRUCTURALLY EXCLUDES the
+> example programs — and the examples are where the ordinary source shapes
+> live.**
+>
+> **This is not a criticism of the ring: the frame scoped it that way.** It is
+> the reason a fixture-only conclusion could coexist with a binary tree sitting
+> in `examples/`.
+>
+> ### NOT YET BLOCKED. Two outcomes, opposite consequences, and NOBODY MAY GUESS.
+>
+> **These programs are green today**, so exactly one of these holds:
+>
+> | if `tree-traversal` selects | then |
+> |---|---|
+> | **`RecursiveDescent`** | the retirement **breaks a program that runs in CI today**. **BLOCKED**, and construct 3's port is owed **before `D3`**. **And `D2c`'s green is over the WRONG POPULATION** — the whole evidentiary base needs restating over a corpus that includes `ken-cli`. |
+> | **`FunctionizedUnits`, passing** | the two-recursive-position case is already handled on another path and `units.rs:1252` is **narrower than the general shape**. Construct 3 stays a missing port; **the gap is smaller than the declaration suggests.** |
+>
+> **The Architect declined to guess between them and so do I.** `D5`'s remaining
+> half is a **runtime-ring measurement** under this node: compile both examples
+> through the real path, record **which `BodyEmissionAuthority` each selects**
+> and whether either reaches the `units.rs` no-worker error, **then re-run under
+> `D2c`'s reroute.**
+>
+> **`D1`'s verdicts are UNCHANGED.** Construct 3 remains **missing port**. What
+> `D5` moves is whether the gap is **reachable** — the blocked-versus-recorded-gap
+> question, not the correctness one.
+
 ## `D1` DELIVERED. THE HEADLINE QUESTION HAS AN ANSWER, AND IT IS "NO".
 
 **Architect `evt_5cxzxp4b6q31v`, grounded at base `c98f72ba8`** (no `crates/`
