@@ -1,7 +1,7 @@
 ---
 id: V3-FO-SUBST-DEPTH-CONTROL
-title: "Give subst_form_at a control that can see its binder-depth discipline, and name the call-site correspondence the shift oracle silently depends on"
-status: ready
+title: "Give subst_form_at a control that can see its binder-depth discipline, and state the two premises fo_kripke.rs relies on without naming where the next editor will look -- the shift call-site correspondence and the bottom_id exclusion criterion"
+status: active
 owner: language
 size: S
 gate: none
@@ -137,6 +137,53 @@ premise is enough, because legibility is what `D2` is for.
 > **Do not fold it into the clause**; naming it would make the premise vaguer,
 > not stronger.
 
+## `D2` — state the bottom_id exclusion as a CRITERION, not as a constant
+
+**Folded in from Adversary `evt_44194ewx0dxa`, hunting the merge that closed
+`V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT`. It is a doc clause in the same file as
+`D1`, which is why it is here rather than in a node of its own.**
+
+**The uniqueness claim that `AC-2` rests on HOLDS — he re-derived it
+independently.** For a bare `Const` in a `Pi` domain, `quote_iform`'s outcomes
+are exhaustive: the sort quotes as an object binder and both sides agree;
+`bottom_id` quotes as `IForm::Bottom` and only the collector calls it a sort;
+**everything else fails `Err(UnsupportedTermShape)` and both refuse together.**
+
+⇒ **`bottom_id` is the unique constant where the quoter SUCCEEDS with a
+non-sort reading.** Derived, not a heuristic. **Confirmed, not in dispute.**
+
+> ### THE PREMISE IS CONTINGENT, AND ITS SUCCESSOR IS ALREADY NAMED IN THIS FILE
+>
+> **`env.top_id()` exists** (`ken-kernel/src/env.rs:327`, immediately beside
+> `bottom_id` at `:334`) and `⊤` is a bare `Const`. **It is not excluded and
+> does not need to be — only because this slice's `IForm` has no `Top`**, so
+> `quote_iform` refuses it and both sides refuse together.
+>
+> **That omission is the entire reason the exclusion list has one entry**, and
+> the module doc names the widening twice: `:9` (*"`top`/`and`/`exists` on the
+> source side"*) and `:347` (*"the general `§4.3` `IForm` also has
+> `top`/`and`/`exists`"*).
+>
+> ⇒ **When `IForm::Top` lands, `quote_iform` gains a second bare-`Const` arm
+> and `⊤ -> q` becomes exactly this over-collection again** — the same defect,
+> on a different constant, in a node already closed.
+
+**`AC-2`'s derivation is durable. Its LIST is not.**
+
+**Deliverable: one clause stating the criterion.** The comment already reasons
+correctly — *"specifically and only because `quote_iform` already reads it as
+`IForm::Bottom`"*. **State it as the rule rather than the instance:** exclude
+any `Const` that `quote_iform` recognizes as a formula in its own right,
+**currently exactly `bottom_id`.**
+
+**That makes it self-maintaining**: adding `IForm::Top` forces the collector
+update at the same moment, because the criterion names the coupling. **A
+sentence, and a scheduled recurrence removed.**
+
+**Do NOT exclude `top_id` now.** It would be an exclusion with no quoter arm
+behind it — fitting a future tree rather than this one, and `AC-2` of the
+merged node forbids it today.
+
 ## Acceptance criteria
 
 **`AC-1`.** **The `D0` rows discriminate, demonstrated by mutation.** Apply the
@@ -152,8 +199,17 @@ is the finding; a control that inherits it is not a control.**
 **`AC-3`.** **The shallow row is present and passes under both arms**, recorded
 as the boundary rather than omitted as uninteresting.
 
-**`AC-4`.** **`D1` is a doc clause only.** No change to `mentions_var0`,
-`quote_iform`, `denote`, `shift`, `check_tree`, `check_cert`, or conjunct 3.
+**`AC-4`.** **`D1` and `D2` are doc clauses only.** No change to
+`mentions_var0`, `quote_iform`, `denote`, `shift`, `check_tree`, `check_cert`,
+conjunct 3, or `collect_signature_candidates`'s **behaviour** — `D2` changes
+only how its exclusion is explained.
+
+**`AC-7`. `D2` states a CRITERION, and excludes no new constant.** The clause
+must name the coupling — *any `Const` `quote_iform` recognizes as a formula in
+its own right, currently exactly `bottom_id`* — so that adding `IForm::Top`
+forces the collector update at the same moment. **Excluding `top_id` now fails
+this**: with no quoter arm behind it, that fits a future tree rather than this
+one, and the merged predecessor's `AC-2` forbids it.
 
 **`AC-5`.** **No FO `Proved`, no slice widening, no primitive, no trusted
 axiom.** The withhold stays exactly as it is — **this node does not lift it and

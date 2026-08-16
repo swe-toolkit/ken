@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY
-title: "Decide whether nested composed recursive-case Construct occurrences can be routed so the source machine's terminal is their only entry, and rule on the blast radius that carries"
-status: ready
+title: "Decide whether routing nested composed recursive-case Construct occurrences through the source machine alone is a usable PRECONDITION for a not-construct -- exclusivity relocates the construction rather than removing it, and this node does not authorize the repair"
+status: active
 owner: runtime
 size: M
 gate: none
@@ -39,6 +39,10 @@ a disposable probe and observing correct execution and exit `0`.
 
 ## What this node is, and the one reason to believe it can work
 
+> **Read the amendment two sections down BEFORE acting on this one.**
+> Exclusivity **relocates** the construction; it does not remove it. This
+> section describes the change, **not a repair.**
+
 **The surviving direction is a DISPATCH change, not a not-construct: route
 nested composed recursive-case `Construct` occurrences so the machine's
 terminal is their only entry, and the direct arm is unreachable for them.**
@@ -61,28 +65,62 @@ terminal is their only entry, and the direct arm is unreachable for them.**
 is the general `RuntimeExpr::Construct` dispatch — **far wider than the
 defect** — and the blast radius is the whole thing to rule on.
 
-## `D0` — characterize the change and its blast radius. A READ, not a build.
+## THIS NODE IS A PRECONDITION, NOT A REPAIR. Amended 2026-08-16.
 
-**Answer all four. The Architect rules on the answer before any build is
-released.**
+**As first framed, `D0` could return YES on every question and the
+over-construction would still be there.** The Architect caught it before the
+ring spent a turn (`evt_6eeqd3ad6ween`); the amendment is the Steward's
+(`evt_3emw0kkedtpdc`).
 
-**1. Is the exclusion statable at the DISPATCH, from context the caller already
+**Verified at `core.rs:7517-7540`:** the source machine's **own** `Construct`
+arm calls `static_worker_constructor_template` **unconditionally once
+`recognized_constructor_worker_fields` answers** — the same sole builder, at
+the same point relative to recognition, as the direct arm.
+
+⇒ **Route exclusivity relocates which dispatch entry constructs. It removes
+nothing by itself.**
+
+**What it genuinely buys:** with a single entry, *"every route installs the
+terminal with the exact pending suffix"* could finally be **true**, so leg 1's
+totality — structurally unachievable last node — becomes achievable. **That is
+a real thing to buy and it is why the node is alive.** It is a **precondition
+for a repair, not the repair**, and the not-construct is a separate subsequent
+act this node does not authorize.
+
+## `D0` — a READ, not a build. QUESTION 1 CAN KILL THE NODE CHEAPEST.
+
+**Answer question 1 FIRST and hand it back alone if it is NO.** Questions 2-5
+are worth answering **only if** question 1 says something removes the
+construction — **measuring the blast radius of a change that fixes nothing is a
+wasted turn.**
+
+**1. After the routes are exclusive, WHAT removes the construction, and AT
+WHICH SITE?** Concretely: **does the machine's terminal own the immediate
+constructor/eliminator pair BEFORE its `Construct` arm reaches the template,
+and is that ownership statable there without the template knowing which
+occurrence is outer?**
+
+> **If the answer is still "the template would have to know", this node dies
+> exactly where (iv) died — and it dies HERE, at a read, before any blast
+> radius is paid.** That is a complete result and the cheapest one available.
+
+**2. Is the exclusion statable at the DISPATCH, from context the caller already
 has?** Name the predicate and say where it is evaluated. **If stating it
-requires knowing at the template which occurrence is outer, this direction dies
-exactly where (iv) died and the answer is NO — report that and stop.**
+requires knowing at the template which occurrence is outer, the answer is NO —
+report that and stop.**
 
-**2. What currently reaches the direct arm, and what would change?** The
+**3. What currently reaches the direct arm, and what would change?** The
 occurrences to be re-routed are one population; **the general
 `RuntimeExpr::Construct` arm serves many more.** Give the split. **A count of
 "how many sites" is not the answer — the answer is which behaviours change.**
 
-**3. Does the machine's terminal handle everything the direct arm did for these
+**4. Does the machine's terminal handle everything the direct arm did for these
 occurrences?** The direct arm lowers args and builds ordinary specialized
 fields when the classifier answers "not a worker". **If re-routing changes what
 happens to a NON-worker construction, the blast radius includes the ordinary
 path and that must be stated, not discovered.**
 
-**4. What is the failure direction if the predicate is wrong?** State it
+**5. What is the failure direction if the predicate is wrong?** State it
 explicitly. **A field constructed that should not be is a bookkeeping red; a
 field NOT constructed that should be is a miscompile.** The predecessor's
 `AC-7` exists because that asymmetry was nearly crossed.
@@ -117,6 +155,18 @@ are behaviourally unchanged.
 
 **`AC-7`.** No-regression, in CI (`COORDINATION §12`). Local validation
 targeted only — `-p ken-runtime`, never `--workspace`.
+
+**`AC-8`. A LANDED EXCLUSIVITY CHANGE IS NOT THE DEFECT CLOSED.** The
+over-construction persists until a separate not-construct lands, **and that act
+is not authorized by this node.** Nothing here may be reported, flipped, or
+cited as closing the depth-2/3 compile failure. **The Steward will not flip any
+node `merged` on that reading.**
+
+> **Why this is an AC and not a note.** A dispatch change with a blast radius
+> over the general `RuntimeExpr::Construct` population, landing with the defect
+> unmoved, is the worst trade available in this campaign — **question 5's
+> asymmetry says the failure direction of getting it wrong is a miscompile.**
+> The frame permitted exactly that reading until `evt_6eeqd3ad6ween`.
 
 ## Banned scope
 
