@@ -16162,6 +16162,46 @@ fn rt_match_scrutinee_recursor_executable() -> RuntimeExpr {
     }
 }
 
+/// A `MatchScrutineeRecursor` member outside the ordinary producer route.
+///
+/// The computational case has a recursive position, so the residual walk
+/// retains the enclosing ordinary match. Its scalar body is not a deforestable
+/// aggregate under the case's induction-hypothesis set, so the ordinary match
+/// route declines the same scrutinee.
+#[cfg(test)]
+fn rt_match_scrutinee_guard_difference() -> RuntimeExpr {
+    RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: "ctor:fixture::rt::Node".to_string(),
+                args: vec![RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::rt::Leaf".to_string(),
+                    args: Vec::new(),
+                }],
+            }),
+            cases: vec![crate::RuntimeComputationalMatchCase {
+                constructor: "ctor:fixture::rt::Node".to_string(),
+                argument_binders: 1,
+                recursive_positions: vec![0],
+                body: RuntimeExpr::Value(RuntimeValue::Int(3.into())),
+            }],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "rt match-scrutinee guard difference inner".to_string(),
+            },
+        }),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: "ctor:fixture::rt::Leaf".to_string(),
+            binders: 0,
+            body: RuntimeExpr::Value(RuntimeValue::Int(7.into())),
+        }],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "rt match-scrutinee guard difference outer".to_string(),
+        },
+    }
+}
+
 /// `D1` position B: a lexical unit call whose argument is an active recursor.
 #[cfg(test)]
 fn rt_lexical_call_argument_recursor_executable() -> RuntimeExpr {
@@ -16263,59 +16303,32 @@ fn rt_match_over_nonrecursive_computational_match() -> RuntimeExpr {
     }
 }
 
-/// **`RT-RECURSOR-TRANSPORT` `D2` control 1 — THE EXACT `D1` POSITION-A WITNESS
-/// executes on both lanes and agrees, after the repair at the exact
-/// `resume_active_continuation` seat.**
+/// **`RT-MATCH-SCRUTINEE-DISPOSITION` `AC-6` — the exact executable
+/// intersection witness now selects `FunctionizedUnits` unaided.**
 ///
-/// ⛔⛔ **THE SUBJECT IS THIS WITNESS, NOT THE POSITION.** This doc and this
-/// control's name previously said *"position A now EXECUTES on the functionized
-/// lane and agrees with the retained lane"* — a claim about the whole
-/// `MatchScrutineeRecursor` class. **That claim is false and is withdrawn.**
+/// `RT-RECURSOR-TRANSPORT` established this witness's functionized result with
+/// a selector exclusion. `D3-narrow` removes the need for that exclusion
+/// because the ordinary producer route already accepts this scrutinee. The
+/// empty residual set and exact executed result are the transition sentinel.
 ///
-/// The counterexample is on this same object. `d8d_the_composed_binding_site_-`
-/// `is_live_and_neither_landed_population_installs_a_target` builds an
-/// A-population program — its complete residual set is exactly
-/// `{MatchScrutineeRecursor}` — and under an A-only selector exclusion it
-/// reaches `FunctionizedUnits` and **refuses**, with
-/// `Unsupported(RecursiveBackedge, "protocol machinery is never a source value
-/// at a boundary")`. That is measurable here, at `D2`, with this repair active.
-///
-/// ⇒ **`D2` is a safe PARTIAL position-A increment, not completion of position
-/// A.** It closes the exact `D1` witness at the exact repaired seat. The rest of
-/// the A population is **still open**, and `RT-MATCH-RECURSOR-CONSUMERS` owns
-/// closing it. Read a green run here as *"this witness, this seat"* and nothing
-/// wider.
-///
-/// ⭐ The third assertion is the same discriminator `D1` used and it is kept:
-/// the non-recursive same-shape control was never a residual and executes
-/// unaided, so this row's subject remains the recursive position rather than
-/// the shape.
-///
-/// **Promise class: durable invariant.** The subject is that **this witness's**
-/// two lanes agree on its executed answer. Every extension preserving the
-/// backedge protocol keeps it green.
+/// **Promise class: durable invariant.** This intersection witness remains on
+/// the ordinary route and executes to the same decoded result.
 #[test]
-fn rt_d2_the_exact_position_a_witness_executes_on_both_lanes_and_agrees() {
+fn msd_d3_the_exact_intersection_witness_executes_unaided() {
     let empty: BTreeMap<&str, &RuntimeDeclaration> = BTreeMap::new();
     let witness = rt_match_scrutinee_recursor_executable();
 
     assert_eq!(
         enumerate_recursive_descent_residuals(&witness, &empty),
-        BTreeSet::from([RecursiveDescentResidual::MatchScrutineeRecursor]),
-        "single-variant witness: the exclusion removes one member, so a second variant would \
-         leave the program retained and the probe would measure nothing"
+        BTreeSet::new(),
+        "D3-narrow: an intersection witness must no longer be retained"
     );
 
-    let retained = rt_run(&witness);
-    assert_eq!(retained, "OK Returned(Int(Small(7)))", "retained lane");
-    let functionized =
-        rt_run_functionized(&witness, RecursiveDescentResidual::MatchScrutineeRecursor);
+    let functionized = rt_run(&witness);
     assert_eq!(
-        functionized, retained,
-        "D2, FOR THIS WITNESS ONLY: the functionized lane must EXECUTE and agree with the \
-         retained lane; a compile-time refusal here means the repair regressed. This does NOT \
-         say position A is closed -- d8d is an A-population counterexample on this same object, \
-         and RT-MATCH-RECURSOR-CONSUMERS owns the rest of the population"
+        functionized,
+        "OK Returned(Int(Small(7)))",
+        "D3-narrow: this intersection witness must execute unaided on FunctionizedUnits"
     );
 
     let control = rt_match_over_nonrecursive_computational_match();
@@ -16330,16 +16343,181 @@ fn rt_d2_the_exact_position_a_witness_executes_on_both_lanes_and_agrees() {
     );
 }
 
-/// **`D2` controls 3 and 4 — exact arrival, match and propagation counts, and
-/// an A/B whose mutated side is measured rather than assumed.**
+/// `RT-MATCH-SCRUTINEE-DISPOSITION` `D2a`: the residual and routing guards
+/// have a concrete non-empty difference.
 ///
-/// ⛔ **The denominator is not uniform, and saying so is the point.** Two
-/// different zeros appear below and they mean different things:
-/// - position A retained *arrives* at the seat and the guard declines — a
-///   measured decline, paired with a positive arrival count;
-/// - position B and the non-recursive control **never arrive** (arrivals `0`),
-///   so their zero propagations are *scope* evidence and say nothing about the
-///   guard's behaviour.
+/// **MEASURED:** the production residual observation reports exactly
+/// `MatchScrutineeRecursor` on both compilations. The production retention
+/// predicate accepts the expression, while the ordinary producer-route
+/// predicate rejects its immediate computational scrutinee. Excluding the
+/// residual therefore sends the same expression through ordinary match
+/// lowering and reproduces that path's exact constructor-value refusal.
+///
+/// **CLAIMED:** this expression is retained solely because it is in the
+/// existential-versus-universal guard difference, not because it also belongs
+/// to the already-measured intersection.
+///
+/// **THE GAP:** this hand-built `RuntimeExpr` proves the difference exists in
+/// the backend IR. It does not prove that Ken source can elaborate to the same
+/// shape; the cross-crate source witness owns that separate reachability claim.
+#[test]
+fn msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference() {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_selector_variant_exclusion(None);
+        }
+    }
+    let _restore = Restore;
+    let witness = rt_match_scrutinee_guard_difference();
+    let declarations = BTreeMap::new();
+    let RuntimeExpr::Match { scrutinee, .. } = &witness else {
+        unreachable!("the witness is an ordinary Match")
+    };
+
+    assert_eq!(
+        recursive_descent_residual(&witness),
+        Some(RecursiveDescentResidual::MatchScrutineeRecursor),
+        "the existential retention guard must accept the witness"
+    );
+    assert!(
+        !requires_heterogeneous_deforestation(scrutinee),
+        "the ordinary producer route must decline the same immediate scrutinee"
+    );
+    assert_eq!(
+        select_body_emission_authority(&witness, &declarations),
+        BodyEmissionAuthority::RecursiveDescent,
+        "the production selector must retain the difference witness"
+    );
+
+    reset_observed_recursive_descent_residuals();
+    let retained = rt_run(&witness);
+    assert_eq!(
+        observed_recursive_descent_residuals(),
+        Some(BTreeSet::from([
+            RecursiveDescentResidual::MatchScrutineeRecursor
+        ])),
+        "the retained compilation must observe the complete residual set"
+    );
+
+    reset_observed_recursive_descent_residuals();
+    set_selector_variant_exclusion(Some(
+        RecursiveDescentResidual::MatchScrutineeRecursor,
+    ));
+    assert_eq!(
+        select_body_emission_authority(&witness, &declarations),
+        BodyEmissionAuthority::FunctionizedUnits,
+        "removing the residual must expose the ordinary functionized route"
+    );
+    let functionized = rt_run(&witness);
+    assert_eq!(
+        observed_recursive_descent_residuals(),
+        Some(BTreeSet::from([
+            RecursiveDescentResidual::MatchScrutineeRecursor
+        ])),
+        "removing the selector reason must not change what the expression carries"
+    );
+
+    println!("MSD-D2A-RETAINED\t{retained}");
+    println!("MSD-D2A-FUNCTIONIZED\t{functionized}");
+    assert_eq!(
+        functionized,
+        "COMPILE-ERR Unsupported(UnsupportedLowering { construct: \"Match\", reason: \
+\"scrutinee is not a constructor value\" })",
+        "once the residual is removed, the declined producer route must reach the ordinary \
+         match chain rather than another retained lane or an earlier refusal"
+    );
+}
+
+/// `RT-MATCH-SCRUTINEE-DISPOSITION` `D2a`: the narrowed residual predicate is
+/// exactly the active-recursion subject guard intersected with the complement
+/// of ordinary Match lowering's complete producer-route decision.
+///
+/// **Promise class: transition sentinel.** This equality intentionally turns
+/// red if either side of the coupling changes: the heterogeneous-deforestation
+/// decision changes, the declaration-call disjunct becomes live for an
+/// immediate `ComputationalMatch`, or another routing disjunct is added. Such a
+/// divergence would conservatively miss a migration onto the ordinary route;
+/// it would leave the program on a retained lane that handles it today, not
+/// miscompile it.
+///
+/// **MEASURED:** the difference, handled-intersection, and non-recursive
+/// scrutinees agree across the production residual predicate and a `Lowering`
+/// evaluating the routing site's complete `A || B` decision.
+///
+/// **CLAIMED:** the narrowed residual remains precisely the active-recursion
+/// population that ordinary Match lowering does not route to the producer.
+///
+/// **THE GAP:** this is a representative relation control, not an exhaustive
+/// enumeration of every `ComputationalMatch`; a future routing change that
+/// intentionally changes the equality must retire or revise this sentinel.
+#[test]
+fn msd_d2a_residual_equals_subject_guard_and_route_complement() {
+    fn match_scrutinee(expr: &RuntimeExpr) -> &RuntimeExpr {
+        let RuntimeExpr::Match { scrutinee, .. } = expr else {
+            unreachable!("the fixture is an ordinary Match")
+        };
+        scrutinee
+    }
+
+    let difference = rt_match_scrutinee_guard_difference();
+    let intersection = rt_match_scrutinee_recursor_executable();
+    let non_recursive = rt_match_over_nonrecursive_computational_match();
+    let seed_env = NativeSeedEnvironment::empty();
+    let lowering = root_authority_test_lowering(&seed_env);
+
+    for (label, expression, excluded) in [
+        (
+            "difference",
+            &difference,
+            Some(RecursiveDescentResidual::MatchScrutineeRecursor),
+        ),
+        ("handled-intersection", &intersection, None),
+        ("non-recursive", &non_recursive, None),
+    ] {
+        let scrutinee = match_scrutinee(expression);
+        let subject_guard = matches!(
+            scrutinee,
+            RuntimeExpr::ComputationalMatch { cases, .. }
+                if cases
+                    .iter()
+                    .any(|case| !case.recursive_positions.is_empty())
+        );
+        let ordinary_route = requires_heterogeneous_deforestation(scrutinee)
+            || lowering.declaration_call_produces_deforestable_aggregate(scrutinee);
+
+        reset_match_scrutinee_producer_route_decisions();
+        match excluded {
+            Some(excluded) => {
+                let _ = rt_run_functionized(expression, excluded);
+            }
+            None => {
+                let _ = rt_run(expression);
+            }
+        }
+        let observed_routes = take_match_scrutinee_producer_route_decisions();
+        assert_eq!(
+            observed_routes,
+            vec![ordinary_route],
+            "{label}: the constructed Lowering's complete A || B decision must equal the decision \
+             observed at the actual ordinary-Match routing site"
+        );
+
+        assert_eq!(
+            match_scrutinee_requires_recursive_descent(scrutinee),
+            subject_guard && !observed_routes[0],
+            "{label}: residual retention must equal the active-recursion subject guard and the \
+             complement of ordinary Match lowering's complete producer-route decision"
+        );
+    }
+}
+
+/// **`D2` controls 3 and 4 after `D3-narrow` — exact functionized arrival,
+/// match and propagation counts, and a measured A/B.**
+///
+/// Position A now reaches this seat through production's ordinary route.
+/// Position B and the non-recursive control still never arrive, so their zero
+/// propagations remain scope evidence rather than evidence about the guard.
 ///
 /// ⛔ **Why the suppressed run counts MATCHES and not just propagations.** The
 /// production guard is `!suppress && matches!(..)` and short-circuits, so under
@@ -16370,22 +16548,12 @@ fn rt_d2_exact_counts_and_the_suppression_ab() {
     // a duplicated seat consumption would still satisfy `> 0` while the record
     // claims one.
     reset_rt_d2_backedge_propagations();
-    let functionized =
-        rt_run_functionized(&witness, RecursiveDescentResidual::MatchScrutineeRecursor);
+    let functionized = rt_run(&witness);
     assert_eq!(functionized, "OK Returned(Int(Small(7)))");
     assert_eq!(
         (rt_d2_seat_with_pending(), rt_d2_backedge_matches(), rt_d2_backedge_propagations()),
         (1, 1, 1),
         "functionized position A: one arrival, one backedge match, one propagation"
-    );
-
-    reset_rt_d2_backedge_propagations();
-    assert_eq!(rt_run(&witness), "OK Returned(Int(Small(7)))");
-    assert_eq!(
-        (rt_d2_seat_with_pending(), rt_d2_backedge_matches(), rt_d2_backedge_propagations()),
-        (1, 0, 0),
-        "retained position A ARRIVES and the guard declines: a measured decline, not an \
-         unvisited seat"
     );
 
     for (label, expr, excluded) in [
@@ -16417,8 +16585,7 @@ fn rt_d2_exact_counts_and_the_suppression_ab() {
     reset_d5a_trace();
     set_rt_d2_suppress_propagation(true);
     let _restore = Restore;
-    let suppressed =
-        rt_run_functionized(&witness, RecursiveDescentResidual::MatchScrutineeRecursor);
+    let suppressed = rt_run(&witness);
     let trace = take_d5a_trace();
     assert_eq!(
         (rt_d2_seat_with_pending(), rt_d2_backedge_matches(), rt_d2_backedge_propagations()),
@@ -16568,8 +16735,7 @@ fn rt_d2_trace_shows_the_marker_propagated_and_never_reaching_the_composed_consu
 
     reset_d5a_trace();
     reset_rt_d2_backedge_propagations();
-    let functionized =
-        rt_run_functionized(&witness, RecursiveDescentResidual::MatchScrutineeRecursor);
+    let functionized = rt_run(&witness);
     let trace = take_d5a_trace();
 
     assert_eq!(functionized, "OK Returned(Int(Small(7)))", "the repaired run must execute");
@@ -23242,20 +23408,21 @@ fn d8a_one_emission_owner_answers_one_composed_source_coordinate() {
 }
 
 
-/// **`RT-CONTSRC-PRODUCER-LOCAL` `D8d` — the target-derived binding is built,
-/// and measurably not installed by EITHER of the two populations `D8d` landed
-/// with.**
+/// **`RT-MATCH-SCRUTINEE-DISPOSITION` `AC-6` — the first hash-pinned
+/// intersection fixture moves to `FunctionizedUnits` and installs its planned
+/// bindings.**
 ///
-/// ⚠ **`D8e` retired this row's original claim, and the retirement is recorded
-/// here rather than in a handoff.** As landed, this said the two preconditions
-/// "do not coincide anywhere in this suite". They now do:
-/// `d8e_the_composed_binding_is_installed_consumed_and_clears_its_own_causal_edge`
-/// is the witness that combines them, and it installs and consumes. What
-/// survives — and what this row is now scoped to — is the narrower, still-live
-/// fact about the two populations `D8d` was measured against: neither of them
-/// crosses over, which is why the witness had to be BUILT rather than found.
-/// ⛔ Do not restore the wider wording; it is false, and its falsity is the
-/// only reason `D8e` has a positive route at all.
+/// `RT-CONTSRC-PRODUCER-LOCAL` `D8d` originally pinned the opposite route: the
+/// deferred fixture reached the composed recursive site under
+/// `RecursiveDescent`, so it had no defining emission owner and installed no
+/// target-derived binding. `D3-narrow` deliberately changes that premise. The
+/// ordinary producer route accepts this intersection fixture, so its two
+/// reached recursive positions now each install their planned binding.
+///
+/// This is not a new consumption claim. The fixture still consumes none of
+/// those bindings; `D8e`'s separate witness remains the positive consumer. The
+/// `D5a` population still carries targets without reaching this site, which is
+/// the independent no-site control.
 ///
 /// The binding is `D8d`'s whole deliverable and it is deliberately unreadable
 /// until `D8e` supplies its consumer. That makes it indistinguishable, from the
@@ -23265,42 +23432,23 @@ fn d8a_one_emission_owner_answers_one_composed_source_coordinate() {
 ///
 /// ## What is measured
 ///
-/// 1. The composed deferred-constructor site **is reached at a real recursive
-///    position** by `px8j_deferred_recursive_field_fixture`, through a real
-///    object emission. The path is live; the binding is not sitting behind dead
-///    code.
-/// 2. **No binding is installed there**, because that lowering has no defining
-///    emission owner — it is not the functionized-units authority — so there is
-///    no `D8a` selector to key a target on, and the position keeps its existing
-///    `Value` binding.
-/// 3. The one plan population that **does** carry composed-call targets, the
-///    `D5a` witness, **never reaches the composed site at all**.
+/// 1. The composed deferred-constructor site is reached exactly twice through
+///    a real object emission.
+/// 2. Exactly two target-derived bindings are installed, one per reached site,
+///    proving this intersection fixture took the narrowed ordinary route.
+/// 3. Neither binding is consumed by this fixture.
+/// 4. The `D5a` witness never reaches the composed site.
 ///
-/// ⇒ Over these two populations the preconditions — a reached composed
-/// recursive position, and an open unit-definition pass over a plan that
-/// interned a target at that exact selector — **do not coincide**. That is not
-/// a defect in the binding; it is a statement about these two fixtures, and it
-/// is what made `D8e`'s witness a construction problem rather than a lookup.
-///
-/// ## Why this is a pin and not a note
-///
-/// Written down in a handoff, this decays. As a row it reds the moment either
-/// half changes for these fixtures — the moment one of them reaches the site
-/// under a defining owner, clause 2 flips and someone must look. That is
-/// exactly the review that should happen when the gap closes.
-///
-/// **Promise class: durable invariant, over a named pair.** It is no longer a
-/// sentinel: the event that would have retired it has happened, and the row was
-/// re-scoped to what it still measures rather than deleted, because clauses 1
-/// and 3 remain the only proof that `D8e`'s witness reaches a live site by
-/// construction and not by inheriting one of these two.
+/// **Promise class: durable transition sentinel.** The exact tuple records the
+/// route change that `D3-narrow` is supposed to make while keeping `D8e`'s
+/// distinct positive-consumer population honest.
 #[test]
-fn d8d_the_composed_binding_site_is_live_and_neither_landed_population_installs_a_target() {
+fn d8d_the_composed_binding_site_tracks_the_narrowed_intersection_route() {
     use crate::cranelift_backend::lowering::{
         d8d_bindings, d8d_recursive_sites, d8e_consumptions, reset_d8d_bindings,
     };
 
-    // (1) and (2) — the site is live, and installs nothing.
+    // (1), (2), and (3) — both live sites install, but neither consumes.
     reset_d8d_bindings();
     let deferred = RuntimeExpr::Match {
         scrutinee: Box::new(px8j_deferred_recursive_field_fixture()),
@@ -23325,27 +23473,14 @@ fn d8d_the_composed_binding_site_is_live_and_neither_landed_population_installs_
     result.expect("the deferred-constructor producer path lowers");
     let (sites, bindings) = (d8d_recursive_sites(), d8d_bindings());
     assert_eq!(
-        d8e_consumptions(),
-        0,
-        "and with no binding installed there is nothing for D8e's consumer to consume; a \
-         non-zero count here without a binding would mean the consumer fired on something it \
-         did not resolve from the environment"
-    );
-    assert!(
-        sites > 0,
-        "the composed site must be REACHED at a recursive position, or this row is measuring \
-         dead code and clause 2 below is vacuous"
-    );
-    assert_eq!(
-        bindings, 0,
-        "no binding can be installed on THIS fixture: its lowering has no defining emission \
-         owner, so there is no D8a selector to key a target on. D8e's own witness installs one -- \
-         that is not this clause. A non-zero count here means px8j itself has moved onto the \
-         functionized lane, which changes what every other px8j row measures -- look, do not \
-         silence"
+        (sites, bindings, d8e_consumptions()),
+        (2, 2, 0),
+        "D3-narrow must move this intersection fixture onto FunctionizedUnits: each reached \
+         composed site installs its target-derived binding, while D8e's distinct consumer stays \
+         absent"
     );
 
-    // (3) — and the population that HAS targets never reaches the site.
+    // (4) — the independent target-bearing population never reaches the site.
     reset_d8d_bindings();
     crate::cranelift_backend::test_objects::emit_px8tr_nested_post_effect_object(
         "ken_d8d_witness_site",
@@ -23384,10 +23519,11 @@ fn d8d_the_composed_binding_site_is_live_and_neither_landed_population_installs_
 //     value-environment walk starts BELOW its own continuation and the planner
 //     refuses with "computational continuation is outside its source owner
 //     subtree". The `Let` wrapper is what puts the walk above it.
-//   - The wrapper may not be a `Match`. `Match { scrutinee: ComputationalMatch
-//     with recursive positions }` is the `MatchScrutineeRecursor` residual, which
-//     selects `RecursiveDescent` -- and that lane defines no units at all, so
-//     fact 3 fails silently and the composed site is reached with no owner.
+//   - The wrapper may not be a `Match` whose computational scrutinee the
+//     ordinary producer route declines. That is the narrowed
+//     `MatchScrutineeRecursor` residual, which selects `RecursiveDescent` -- and
+//     that lane defines no units at all, so fact 3 fails silently and the
+//     composed site is reached with no owner.
 //   - The selected field's arms must be statically selectable. A field whose
 //     arms merge at runtime materializes a source join whose planned
 //     representation is derived from the field's OWN arms (specialized
@@ -32145,7 +32281,6 @@ fn ccr_d3_the_active_carried_route_is_taken_and_the_continuation_refusal_is_gone
     let run = |label: &'static str| -> String {
         let _restore = Restore;
         reset_ccr_d2_counts();
-        set_selector_variant_exclusion(Some(RecursiveDescentResidual::MatchScrutineeRecursor));
         let (result, _trace) = px8j_capture_source_trace(&witness, false, label);
         match result.map(|_| ()) {
             Ok(()) => "Ok".to_string(),
@@ -32274,7 +32409,6 @@ fn coc_d3_the_trailing_suffix_is_continued_and_the_mutation_restores_the_refusal
     let run = |label: &'static str| -> String {
         let _restore = Restore;
         reset_coc_d2_counts();
-        set_selector_variant_exclusion(Some(RecursiveDescentResidual::MatchScrutineeRecursor));
         let (result, _trace) = px8j_capture_source_trace(&witness, false, label);
         match result.map(|_| ()) {
             Ok(()) => "Ok".to_string(),
@@ -32402,7 +32536,6 @@ fn sar_d3_the_ordinary_live_cell_is_routed_to_the_resume_and_the_mutation_restor
     let run = |label: &'static str| -> String {
         let _restore = Restore;
         reset_sar_d2_counts();
-        set_selector_variant_exclusion(Some(RecursiveDescentResidual::MatchScrutineeRecursor));
         let (result, _trace) = px8j_capture_source_trace(&witness, false, label);
         match result.map(|_| ()) {
             Ok(()) => "Ok".to_string(),
@@ -32541,7 +32674,6 @@ fn ced_d2_the_inline_candidate_settles_after_the_bridge_and_is_not_a_call_obliga
 
     reset_d1_dispositions();
     reset_d8d_bindings();
-    set_selector_variant_exclusion(Some(RecursiveDescentResidual::MatchScrutineeRecursor));
     let (result, _trace) = px8j_capture_source_trace(&witness, false, "ken_ced_d1_ac7_witness");
     let outcome = match result.map(|_| ()) {
         Ok(()) => "Ok".to_string(),

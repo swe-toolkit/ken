@@ -32,7 +32,8 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 >
 > **Do not read that as vindicating the selector.** It was the wrong instrument
 > and the number happened to be tight. **The set-valued observation is the
-> established currency**, and `d3_the_exact_set_control_still_reds_under_short_circuiting`
+> established currency**, and
+> `d3_the_exact_set_control_still_reds_under_short_circuiting`
 > (`lowering/core/tests/control.rs:16959`) exists to keep it that way. A future
 > measurement reaching for the selector repeats the defect whatever this one's
 > outcome was.
@@ -151,6 +152,37 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > > **This marker is not the disposition.** The child's `D3` records the settled
 > > outcome here, and it is the authority; this exists so a reader between now
 > > and then is not told the variant is unmeasured.
+>
+> **`RT-MATCH-SCRUTINEE-DISPOSITION` `D2`/`D3-narrow` settles the gate:** a
+> concrete backend-IR expression occupies the difference. Its immediate,
+> non-empty `ComputationalMatch` has a recursive case whose scalar body fails
+> `produces_deforestable_aggregate_with_ih`; the residual selector retains it,
+> while the ordinary producer route declines it and reaches the exact
+> `"scrutinee is not a constructor value"` refusal. Inverting the shared route
+> operand makes the difference control red, so the control is sensitive to the
+> routing contract rather than only to the syntactic shape.
+>
+> The bounded source attempt does **not** establish source unreachability. A
+> natural nested recursive Ken program normalized before the runtime classifier
+> and arrived with residuals `[]` and authority `FunctionizedUnits`; failed
+> search is not the required grammar/admission/kernel argument. The
+> pre-authorized narrowing therefore applies: `MatchScrutineeRecursor` is
+> retained **if and only if** the ordinary producer route declines its immediate
+> computational scrutinee. The three measured intersection renderings leave the
+> residual set and still compile; the executable row remains
+> `Returned(Int(Small(7)))`.
+>
+> **Retirement consequence:** `MatchScrutineeRecursor` survives in reduced,
+> load-bearing form. This capstone may not delete the residual enum, selector,
+> `RecursiveDescent` authority, or emission lane on the present evidence. `D2a`
+> proves that the retained difference is non-empty as a backend-IR shape, so
+> emptiness is not the discharge condition; `D2b` stopped short and made no
+> source-unreachability claim. The bar lifts only through
+> `RT-MATCH-SCRUTINEE-DISPOSITION` `D3-delete`: a source-unreachability argument
+> for the difference satisfying the method gate — surface grammar, elaborator
+> admission, and kernel gates, not failed-attempt sampling — and accepted by a
+> fresh Architect ruling. Until then the capstone is barred pending that named
+> measurement, not permanently.
 >
 > **`evt_5h7vzc27mc11j` DOES NOT CARRY HERE, and the reason is stronger than
 > selections-versus-refusals.** That ruling was about `FunctionizedUnits`
