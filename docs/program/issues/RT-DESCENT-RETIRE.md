@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION]
+depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY]
 blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -66,8 +66,18 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > schema has for a framed node whose dependencies have not landed** — `ready`
 > makes `check-issue-schema` warn that *"a team pulling this node will find its
 > premise false"*, which is exactly right, and leaving it `active` would
-> advertise a ring working this node while the ring works its children. **It
-> returns to `active` when both children merge.**
+> advertise a ring working this node while the ring works its children.
+>
+> **The sentence that used to sit here — *"it returns to `active` when both
+> children merge"* — IS NOW FALSE, and it was removed rather than left to
+> mislead.** Both children merged (PRs #2454 and #2458) and **all nine original
+> `depends_on` entries are `merged`**, yet this node is still barred: the
+> narrowing left `MatchScrutineeRecursor` load-bearing on a difference whose
+> source-reachability is unmeasured. **A graph reading "every dependency landed"
+> would have advertised this capstone as dispatchable while its own text forbids
+> it to delete anything.** [[RT-MATCH-DIFFERENCE-REACHABILITY]] is the tenth
+> dependency and carries the sole discharge; this node returns to `active` when
+> **that** node settles the question, not when the children merged.
 >
 > ## `LexicalCallArgumentRecursor` disposition — measured, no port owed
 >
@@ -178,11 +188,19 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > proves that the retained difference is non-empty as a backend-IR shape, so
 > emptiness is not the discharge condition; `D2b` stopped short and made no
 > source-unreachability claim. The bar lifts only through
-> `RT-MATCH-SCRUTINEE-DISPOSITION` `D3-delete`: a source-unreachability argument
-> for the difference satisfying the method gate — surface grammar, elaborator
-> admission, and kernel gates, not failed-attempt sampling — and accepted by a
-> fresh Architect ruling. Until then the capstone is barred pending that named
+> [[RT-MATCH-DIFFERENCE-REACHABILITY]]: a source-unreachability argument for the
+> difference satisfying the method gate — surface grammar, elaborator admission,
+> and kernel gates, not failed-attempt sampling — and accepted by a fresh
+> Architect ruling. Until then the capstone is barred pending that named
 > measurement, not permanently.
+>
+> **The discharge MOVED, 2026-08-16 (Steward), and the move is the point.** It
+> was written as `RT-MATCH-SCRUTINEE-DISPOSITION` `D3-delete` while that node was
+> live. **That node merged at PR #2458 without taking the delete branch**, so the
+> bar would have cited an un-taken deliverable of a closed node — **no owner, no
+> dispatchable increment, and a gate that reads as pending forever.** The
+> successor is filed, `ready`, and in this node's `depends_on`, so
+> `gen-progress.sh` shows the block.
 >
 > **`evt_5h7vzc27mc11j` DOES NOT CARRY HERE, and the reason is stronger than
 > selections-versus-refusals.** That ruling was about `FunctionizedUnits`
