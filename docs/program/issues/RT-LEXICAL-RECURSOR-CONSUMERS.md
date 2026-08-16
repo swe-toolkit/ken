@@ -551,12 +551,12 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > are the same unit boundary reported from opposite sides.** All three guesses
 > assumed the repair lives on the compiler-side traversal **inside one unit**.
 >
-> => **The two conservation rows are routed to
-> [[RT-CLOSURE-CROSSING-ELIMINATE]] as a CANDIDATE co-population**, because that
-> node's whole route is a cross-unit representation. **Routed for sizing, not
-> merged into one mechanism** — `D2a` there answers whether one carrier serves
-> both shapes, and a recorded "no" is a complete answer. **This node does not
-> claim them closed.**
+> => **The candidate co-population route to
+> [[RT-CLOSURE-CROSSING-ELIMINATE]] is closed.** That node is merged; its own
+> `D2a` heading carries the row-4-depth-1/row-5 co-population question and its
+> `D2b` heading carries row 1's disposition. The source-unreachability result
+> below makes the co-population question moot and records all four rows as
+> compiler invariants. **No deliverable remains delegated to that merged node.**
 >
 > ## Row 1 goes with them, and it is the one at risk of going quiet
 >
@@ -591,20 +591,85 @@ origin: Architect ruling evt_5w09dcwbf7k70 (2026-08-08) on RT-RECURSOR-TRANSPORT
 > individually wrong at the moment it was written; the edge between them is
 > where the work fell.
 >
-> ## The three expressions this node still owns, and where they now live
+> ## The four dispositions, closed where the criterion reads them
 >
-> | expression | wall | now dispositioned in |
+> | expression | current internal stop | disposition |
 > |---|---|---|
-> | `row 4 depth 1` | `StaticWorkerBinding` conservation | `D1` of the live successor |
-> | `row 5 after-hole` | `StaticWorkerBinding` conservation | `D1` of the live successor |
-> | `row 1 owned-scope` | `NativeJoinPlanV1` | `D2` of the live successor |
+> | `row 4 depth 1` | `StaticWorkerBinding` conservation | **compiler assert/invariant**, established by [[RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT]] `D1` |
+> | `row 5 after-hole` | `StaticWorkerBinding` conservation | **compiler assert/invariant**, established independently by the same `D1` gate |
+> | `row 1 owned-scope` | `Backend(PlannerInvariant("terminal answer has no affine checked-root authority"))` | **compiler assert/invariant**, established by `D2`; `NativeJoinPlanV1` was its pre-reclassification label, not its current transport |
+> | `row 4 depths 2 and 3 child arm` | `Closure` in the landed row measurement | **compiler assert/invariant**, with the corpus caveat closed by `D3` |
 >
-> **The closure criterion above is unchanged and still binds** — repaired, or
-> refused with the account. What the successor adds is the operator's 2026-08-16
-> third option: a refusal no Ken source program can reach is **a proper compiler
-> assert/invariant**, recorded as such with its control retained and re-described
-> as pinning the lowering's internal contract. That is a disposition, and it
-> closes a row.
+> **`D1` and `D2` are corpus-independent over every program admitted by the
+> current grammar, elaborator, and kernel.** Their exact fixtures are
+> hand-authored `RuntimeExpr::ComputationalMatch` values whose W-style case body
+> places the hidden recursive-method result directly in a constructor field.
+> Surface Ken can name that result only with `recursive result for <binding>`
+> (or its proof-sort twin, `parser.rs:2448-2473`).
+> `selected_recursive_result` admits it only through a validated nested
+> structural-result association (`elab.rs:421-439`), and otherwise returns
+> `StructuralResultOutOfScope` from `infer`'s `RRecursiveResult` arm (read at
+> `83967e3c1`). `34 section 3.1.1` closes
+> the alternatives: direct and W-style fields receive no such association,
+> ordinary fields retain their declared source types, and an owner self-call is
+> not reinterpreted as the hidden result. Recomputing it by owner self-call is
+> rejected independently by kernel SCT as `NotTerminating`. Thus neither
+> conservation row nor the row-1 affine-root state is source-expressible.
+>
+> **That source-unreachability is the normative bridge required by the closure
+> criterion.** `45 §3`'s BE-Model defines native lowering over admitted core
+> syntax, and `45 §4`'s BE-Differential governs closed core terms
+> that reach the backend. `48:210` reserves the pre-native `unsupported` lane
+> for targets or constructs that must fail, while `48:175` requires its record
+> to name a stable lane, target symbol, construct, and reason. Because no
+> admitted source program can produce any of these four native
+> constructs/bindings, there is no construct to record in that lane. Retaining
+> their refusals as compiler asserts/invariants therefore satisfies the
+> criterion; it does not evade an owed `unsupported` disposition.
+>
+> **`D3` closes the landed measurement's corpus caveat by a different,
+> corpus-independent gate.** The disputed child arm is populated only after
+> `unit_boundary_environment_fields` selects a `RuntimeExpr::Call` whose callee
+> is directly `RuntimeExpr::LexicalClosure` and whose closed argument producer
+> is a constructor with an empty lexical-closure field
+> (`planning/static_transition.rs:5640-5709`). A source application infers its
+> function in `infer`'s `RApp` arm; an ascribed lambda is checked and returned
+> as a bare lambda by that function's `RAsc` arm (both read at `83967e3c1`), so
+> the declaration's independent kernel recheck still sees
+> `App(Lam, argument)`. Kernel inference rejects that introduction
+> form (`ken-kernel/check.rs:358-366`) before checked erasure can emit the
+> required direct call. A generated `Ascript(Lam, ...)` cannot bypass that
+> source gate: the checked-core application decoder gives its function no
+> expected type, and `CheckedCoreBodyTerm` has no ascription variant
+> (`checked_core.rs:448-485`, `:3190-3218`). Between `49e020607` and
+> `83967e3c1`, `elab.rs` gained two new `Term::Ascript` producers without
+> changing this conjunct: it rests on the sealed `CheckedCoreBodyTerm` enum,
+> not on a census of frontend ascription producers. Fully applied declaration
+> calls do not bypass it either: production erasure lowers them to argument
+> `Let` bindings (`erasure.rs:2367-2431`), not a call with a direct
+> lexical-closure callee. The same child arm therefore has no source-reachable
+> member in the current language; this conclusion does not depend on the
+> earlier corpus or re-run its row-4 depth-2/3 measurement.
+>
+> **The retained controls now pin an internal lowering contract.** The `D2k-0`
+> control and its redness twin intentionally retain hand-authored runtime IR so
+> malformed or future compiler-generated input cannot silently read, drop, or
+> misroute a hidden static worker. They do not claim that supported Ken source
+> reaches these walls. The W-style `StructuralResultOutOfScope` control pins
+> the source-admission half separately. RecursiveDescent accepts these
+> hand-authored states today while the functionized lane fails closed; removing
+> that fixture-only success retires no source capability.
+>
+> **No deliverable is delegated.**
+> [[RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT]] carries all four dispositions in
+> `D1`-`D4`; the original delegation is closed at its source above and is not
+> repeated. The separate
+> [[SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION]] node still owns the specification
+> question for ordinary source-expressible closure graphs, but it carries no
+> deliverable from these four rows and does not gate their disposition. A future
+> frontend or checked-erasure change that makes either excluded source shape
+> expressible must replace the corresponding internal-contract expectation with
+> a supported `.ken` witness before changing this conclusion.
 >
 > **The dependency edge is now in this node's `depends_on`**, not only in the
 > successor's `blocks`. `scripts/gen-progress.sh` reads `depends_on` and nothing
