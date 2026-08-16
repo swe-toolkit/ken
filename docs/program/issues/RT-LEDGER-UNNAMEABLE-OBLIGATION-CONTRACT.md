@@ -1,7 +1,7 @@
 ---
 id: RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT
 title: "Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned"
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -11,7 +11,59 @@ github: null
 origin: "Steward, 2026-08-16, on RT-OVERCONSTRUCTED-OUTER-RECOGNITION D1 reaching its pre-authorized CONTRACT CHANGES hard stop at evt_41wvqft0m091r, measured at b1b30c1c7. Carries the Architect's at-or-before-construction ruling from evt_6aarzqdm18vnh. TCB-adjacent: filed as its own node rather than absorbed into a deliverable sized as bookkeeping. Steward-filed per COORDINATION section 2."
 ---
 
-## `D0` DELIVERED. Shape (iv) SELECTED, and `D1`/`D2` ARE RELEASED.
+## CLOSED. ALL FOUR SHAPES ARE DEAD. Read this before anything below it.
+
+**This node produced no candidate and can never reach `merged`.** Its result is
+a **complete negative** one: **the classified option space is exhausted.** Do
+not gate anything on its landing.
+
+**`D1` hard-stopped at `AC-7` with no candidate** (`evt_6gs1h1x6r3xbr`,
+`evt_4hp0d5r8r22a7`), and the Architect **REFUTED shape (iv) on two independent
+grounds** (`evt_29ar2vfvxf414`):
+
+**GROUND A — the route.** Leg 1 is false, measured. The same nested composed
+recursive-case occurrences reach construction by **two** entries: the composed
+routes through `lower_source_machine`, which installs `Terminal::ResumeOuter`
+with the exact pending suffix, and **the direct `lower_expr` `Construct` arm
+(`core.rs:17609-17639`), which has no `SourceControl` and calls the template
+immediately.** A not-construct keyed to `ResumeOuter` removes only the
+source-machine copies while the direct dispatch constructs the same fields.
+
+**GROUND B — the mint site, and it needed no probe.**
+`static_worker_constructor_template` has **exactly two call sites**
+(`core.rs:7534`, `core.rs:17631`), and `mod.rs:3201` calls it **"the sole
+builder of the worker arm."** Both entries ask the same classifier before
+either lowers a field.
+
+⇒ **The construction is a property of ONE SHARED CALLEE's population, not of
+either caller's terminal.** So the mint-site reading of (iv) needs a mint-time
+discriminator, **and `RT-MINT-SITE-STATIC-DISCRIMINATOR` `D0` already ruled
+none exists.** That closes it with no forcing measurement at all.
+
+> ### THE KEYING ERROR, RECORDED SO THE SUCCESSOR DOES NOT INHERIT IT
+>
+> **`AC-7` asked whether every route installs `Terminal::ResumeOuter`. That
+> keys totality on a property of the CALLER, while the construction happens in
+> a CALLEE SHARED BY TWO CALLERS.** A disposition keyed to one caller's
+> terminal was **structurally incapable of being total.** The Architect owns
+> the phrasing (`evt_29ar2vfvxf414`); the ring did not get it wrong.
+>
+> **And the cheap version was in the tree before this node opened.**
+> `mod.rs:3130-3140` already said the arm is *"reached from both the
+> direct-descent and source-machine `RuntimeExpr::Construct` arms."*
+> ⇒ **When a disposition is about whether something gets BUILT, read the
+> BUILDER's doc before enumerating the callers' routes.**
+
+**The one surviving direction — re-route so the machine's terminal is the only
+entry — is NOT this node's and was NOT authorized here.** It is a dispatch
+change whose population is the general `RuntimeExpr::Construct` arm, far wider
+than the defect. It is filed as
+[[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] with its own `D0`.
+
+**`D2` was never authored, correctly.** No candidate, no QA route, no retained
+branch.
+
+## `D0` DELIVERED. Shape (iv) was SELECTED here, and is now REFUTED above.
 
 **`D0` came back at `1a4a1f723` with no candidate** (`evt_37p25sg8v56nx`):
 **(i), (ii) and (iii) BARRED, (iv) LAWFUL.** The Architect concurred with the
@@ -23,22 +75,25 @@ three bars without qualification and **released (iv) conditioned on one thing
 | (i) conditional transition | **BARRED** | loses `dom(transitioned) = dom(recognized)`; the omitted recognition is the forbidden fourth state reached **by subtraction rather than by erasure** |
 | (ii) payload + `consumed` write point | **BARRED as repair-capable** | moving the write inward preserves the meaning and **still cannot disposition a binding no call reaches**; every repair-capable form collapses into a second meaning or into (i) |
 | (iii) do not recognize the outer field | **BARRED** | EMITTER PROPERTY adds **no mint-time fact**; emission is downstream of the mint, so which transport a call NAMES supplies no rule for which recognition to SKIP |
-| **(iv) do not CONSTRUCT the outer binding** | **LAWFUL, selected** | it disposes of nothing, so *"positive authority at or before construction"* is **never engaged** and `AC-3` cannot be violated — **there is no write to make** |
+| **(iv) do not CONSTRUCT the outer binding** | **REFUTED (was LAWFUL at `D0`)** | it disposes of nothing, so *"positive authority at or before construction"* is **never engaged** and `AC-3` cannot be violated — **there is no write to make** |
 
-> ### WHY (iv) IS THE RIGHT ANSWER AND NOT MERELY THE SURVIVING ONE
+> ### THE PROPERTY THAT MADE (iv) ATTRACTIVE SURVIVES ITS REFUTATION. CARRY IT.
 >
-> **Of the five dispositions this campaign considered, (iv) is the only one
-> under which the red goes away because the POPULATION changes rather than the
-> CHECK.** Today's law — every transitioned obligation consumed, no exemption —
-> keeps exactly its present strength, **and it is the law that caught this.**
-> The Architect refused to weaken it three times; **(iv) is the disposition that
-> never asks.** Architect, `evt_1njg9qsfa3kak`.
+> **(iv) was the only disposition considered here under which the red goes away
+> because the POPULATION changes rather than the CHECK.** Today's law — every
+> transitioned obligation consumed, no exemption — keeps its present strength,
+> **and it is the law that caught this.** The Architect refused to weaken it
+> three times (`evt_1njg9qsfa3kak`).
+>
+> **That property is not what failed.** (iv) failed on WHERE it was keyed — a
+> shared mint site with no context, and one caller's terminal.
+> **[[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] keeps the property and changes
+> the keying**, which is the whole reason it is worth a node.
 
-**(iv) was the shape the frame called cheapest if it holds and likeliest to be
-wrong, and it was answered from the lowering rather than from the ledger, as
-`D0` required.** The `45/35/25` distinctness objection does not reach it: **the
-outer recognition never exists**, so nothing is transferred between distinct
-recognitions.
+**(iv) was the shape this frame called cheapest if it holds and likeliest to be
+wrong. It was the latter.** The `45/35/25` distinctness objection never reached
+it — but Ground B did, and Ground B was available in `mod.rs:3130-3140` from the
+start.
 
 ## The defect is real and it is not cosmetic
 
@@ -125,9 +180,13 @@ satisfied trivially, because there is no construction.
 **Hand `D0` back on its own.** The Steward releases the build on the answer,
 and the Architect rules any shape reported UNKNOWN.
 
-## `D1` — build shape (iv). THE WARRANT IS THE DELIVERABLE, NOT THE DIFF.
+## `D1` — WAS a build of (iv). RAN, HARD-STOPPED AT `AC-7`, NO CANDIDATE.
 
-**`D1` builds (iv): consume the immediate constructor/eliminator pair directly,
+**Kept as authored because `AC-7` is the reason this node ended in a stop
+rather than a miscompile. Nothing below is live work.**
+
+**`D1` was to build (iv): consume the immediate constructor/eliminator pair
+directly,
 preserving the field's source position and case-binder arity, and never
 construct the intermediate `ConstructorField::StaticWorker`.** The innermost
 layer — whose binding is the one actually lowered and called — is unchanged.
@@ -175,7 +234,11 @@ on legs 1 and 2, which are not.**
 forcing — STOP with no candidate and hand back.** That is the same call this
 ring already made once tonight, and it was the right one.
 
-## `D2` — the control. THE SECOND DIRECTION IS NOW THE PRIMARY ONE.
+## `D2` — NEVER AUTHORED, correctly. `D1` stopped before it was reachable.
+
+**Kept because its two directions carry forward to
+[[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]] `AC-5` in re-keyed form.** Nothing
+here is live work.
 
 **Two directions, mutation-proven, not argued.**
 
@@ -216,6 +279,13 @@ of the four dispositions from source. Kept for the record, not live.
 > thing. **If a candidate for (iv) touches `consumed` at all, that is the
 > finding** — it means the build drifted into (ii).
 
+> ### `AC-7`-`AC-9` ARE SPENT. `AC-7` FIRED AND IS WHY THIS NODE HAS NO CANDIDATE.
+>
+> **`AC-7` was measured FALSE** (`evt_6gs1h1x6r3xbr`) and the ring stopped
+> rather than extending the repair to the direct arm. **`AC-8` and `AC-9` were
+> never reached.** The keying error in `AC-7`'s own phrasing is recorded at the
+> top of this file.
+
 **`AC-7`. Leg 1 is warranted from the DISPATCH.** The claim *"every route by
 which a nested composed recursive case reaches the `Construct` arm installs
 `Terminal::ResumeOuter` with the exact pending suffix"* is established by
@@ -250,21 +320,21 @@ row5-after-hole are behaviourally unchanged.
 
 ## Sequencing
 
-**Lane 1 (operator priority). `D0` is releasable immediately** — the
-predecessor's `D0` and `D1` are complete, and this node needs nothing further
-from it.
+**CLOSED 2026-08-16. Nothing here is releasable and nothing is owed.** `D0`
+delivered the classification, `D1` ran and hard-stopped at `AC-7` with no
+candidate, `D2` was correctly never authored.
 
-> **The predecessor closes without a candidate.** Its `D0` returned EMITTER
-> PROPERTY and its `D1` reached a lawful pre-authorized hard stop, so it can
-> never reach `merged`. **Do not gate this node on that landing.**
+**The successor is [[RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY]]**, `ready`, with
+its own `D0`. **It is not gated on this node's landing, which cannot happen.**
 
-**`D1`/`D2` RELEASED 2026-08-16 on the Architect's `D0` ruling**
-(`evt_1njg9qsfa3kak`). **The condition on (iv) is an acceptance criterion
-(`AC-7`), not a hold** — it says what the deliverable must warrant, not that the
-ring must wait.
-
-**TCB-adjacent: the Architect reviews the candidate.** A ledger-contract change
-absorbed into a deliverable sized as bookkeeping is how a small repair becomes
-an unreviewed structural one. **Under (iv) the ledger's contract does not move
-at all**, which is why the build was releasable on a ruling rather than on a
-re-scope.
+> ### WHAT THIS NODE BOUGHT, SO THE NEGATIVE RESULT IS NOT MISREAD AS WASTE
+>
+> **It forecloses a shape rather than deferring it.** Four dispositions are now
+> dead with warrants — three by ruling, one by measurement and by a prior
+> ruling reached independently. **A successor cannot re-propose any of them
+> without meeting a stated ground**, and the one surviving direction is named
+> with its blast radius identified before anyone builds it.
+>
+> **`AC-7` is why this cost one reverted probe instead of a miscompile.** The
+> ring took the expensive branch twice in consecutive turns and was right both
+> times.
