@@ -11,6 +11,75 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # 2026-08-16 — THIS NODE NOW ABSORBS THE TWO RESIDUAL VARIANTS AND THE
+> # CONTROL RE-DESCRIPTION. `RT-RECURSOR-TRANSPORT` IS CLOSED. Steward.
+>
+> **`RT-RECURSOR-TRANSPORT` merged at PR #2443 and is `merged`.** Its contract
+> resolved as follows, and the wording matters because a future reader will
+> otherwise mis-read the retirement as blocked:
+>
+> - **`D0`/`D1` — delivered, a measured negative.** A disposable retirement at
+>   `3f95967b8` produced **920 passed / 12 failed / 4 ignored**, reverted. The
+>   landed continuation machinery does **not** close either residual class for
+>   free.
+> - **`D2` — DISCHARGED ON A MEASURED EMPTY PREMISE.** Its text is *"only for a
+>   class that does not close for free, add the narrow consumer-port authority
+>   its failure proves necessary."* **No class in the governed population
+>   requires one** — every failure examined is a correct refusal by a
+>   conservation law, an invariant, a semantic impossibility or a structural
+>   absence. *"Only for X, do Y"* with no X is satisfied by doing nothing.
+>   **This is discharged, not voided** — we asked and the answer was zero, which
+>   is the result `D0`/`D1` paid for. An empty-premise obligation cannot be
+>   *failed*, so it is **restated**, never marked confirmed.
+> - **`D3` — ITS GATE IS MET, NOT UNSATISFIABLE.** The condition is *"only after
+>   both executable positions are green."* **The record says both passed**, as
+>   did the propagation-disable negative and corrected row 2. **The retirement
+>   was stopped by the broader governed population, which `D3`'s gate never
+>   named** — so `D3` was **under-specified**, not impossible.
+>
+> > **Do not file `D3` as another instance of the unsatisfiable-gate defect
+> > corrected in #2442.** That one named a condition nothing could satisfy and
+> > its repair is *delete the gate*. **This one named two witnesses when the
+> > governed population was larger, and its repair is *name the full
+> > population*.** Recording them as one pattern would put a false regularity in
+> > the corpus and teach the wrong repair. (Architect `evt_13fw3q7j0jma0`.)
+>
+> ⇒ **THE PATH IS OPEN.** The residual blocker is dispositioned as a control
+> **re-description**, and this node owns it.
+>
+> ## What this node must now do, beyond deleting the lane
+>
+> **Re-describe the controls for the two established categories** — the
+> `StaticWorkerBinding` conservation group and row 1 owned-scope. Architect
+> ruling `evt_5h7vzc27mc11j`: **do not repair, do not retire.**
+>
+> - **Repair is foreclosed and not on cost grounds.** None of these is a
+>   capability gap. "Repairing" would mean weakening a conservation law or a
+>   planner invariant so it admits inputs violating its own premise — growing
+>   the TCB and removing a check in one motion, for a population no source
+>   program produces. Row 1's refusal **is** the invariant `RT-REFUSAL-SOURCE-
+>   WITNESS-OR-INVARIANT` landed at `f39bdb9ad`; repairing it would undo a
+>   disposition ratified the same day.
+> - **The new expected values are already measured** — the reverted attempt's
+>   per-category first outcomes, in `docs/program/wp/RT-RECURSOR-TRANSPORT.md`.
+>   The re-description is specified by measurement, not assertion.
+> - **Write the pin as unobserved-by-construction, not as rejected forever.** A
+>   pinned refusal can freeze a design defect; if a later node decides one of
+>   these shapes *should* lower, the pin must read as a fact about today's
+>   reachable population rather than a commitment.
+> - **State that it is an expectation change, not a repair**, so the next reader
+>   does not read it as a regression papered over.
+>
+> **Two dispositions are OPEN and this node must settle them** — they were
+> deliberately not selected by the record that measured them: **the two-sibling
+> rows** (planner structures, one layer farther from source than the direct
+> emitter rows) and **corrected row 2**. Do not inherit them silently.
+>
+> **`d8d` is outside all of this.** The functionized binding site observing two
+> installs against the retained lane's zero is a **count divergence, not a
+> refusal**. It has a different owner and must not be partitioned into a refusal
+> bucket.
+
 > # `draft`, NOT unframed — the frame is written and the premise is not yet true
 >
 > **Set back to `draft` 2026-08-13 by the Steward. It was mis-flagged `ready`
