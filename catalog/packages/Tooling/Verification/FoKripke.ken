@@ -649,3 +649,113 @@ fn fok_check_tree (expected_conclusion : FokSequent) (node : FokCert) : Bool =
 -- `fo_kripke::check_cert`.
 fn fok_check_cert (q : FokForm) (pi : FokCert) : Bool =
   fok_check_tree (FokMkSequent (Nil FokForm) (Cons FokForm q (Nil FokForm))) pi
+
+-- === D2: Bool-inversion infrastructure (23 section 4.3) ===
+--
+-- `checker_soundness`'s proof needs to invert the Bool verdicts
+-- `fok_check_rule` accepts on back into operand-level facts. Neither
+-- `fok_and` nor `fok_or` is called directly by `fok_check_rule`
+-- (`:572`-`:633`) -- the polarity census below traces the ACTUAL routes,
+-- corrected from this section's own first draft, which claimed a direct
+-- call that a full read of `fok_check_rule`'s span does not support.
+--
+-- `fok_and` reaches checker acceptance through `fok_form_eq`/`fok_qterm_eq`
+-- (`:352`, `:365`, `:378`, `:391`, `:404`, `:417`, `:328`), which
+-- `FokInit`'s guard (`:583`) consumes AT `= True`: `fok_form_eq g d`. Hence
+-- `fok_and_left`/`fok_and_right` below invert the `= True` case.
+--
+-- `fok_or` reaches the checker only through `fok_form_mentions_parameter`
+-- (`:480`), `fok_list_form_any_mentions` (`:493`), and
+-- `fok_sequent_mentions_parameter` (`:501`) -- the freshness chain -- whose
+-- sole external consumer is `fok_check_forall_right`'s guard (`:554`):
+-- `match fok_sequent_mentions_parameter conclusion eigen { True -> False;
+-- False -> ... }`. On every path where the checker ACCEPTS a `ForallRight`
+-- step, that `or`-built chain is `False`, not `True`. Hence
+-- `fok_or_left_false`/`fok_or_right_false` below invert the `= False` case
+-- -- the polarity the checker actually produces.
+--
+-- Not delivered, and named so their absence is a stated gap rather than a
+-- silent one: an `and = False` eliminator (would be needed to descend into
+-- `fok_qterm_eq`/`fok_form_eq` under a freshness mismatch) and an
+-- `or = True` eliminator's dual consumer (none exists in the checker).
+-- Whether the former is needed is a claim about a proof not yet written.
+--
+-- Every lemma case-splits on exactly the variable `fok_and`/`fok_or`'s own
+-- definitions scrutinize (`a`), with its equality hypothesis relegated to
+-- the RETURN type's `Pi`-chain -- the only signature shape that elaborates
+-- (`D0` part (3), re-confirmed below by the naive pre-bound counterexample
+-- for each lemma).
+
+-- `Equal Bool (fok_and a b) True -> Equal Bool a True`. True branch:
+-- `fok_and True b` reduces to `b`, so the goal is
+-- `Equal Bool b True -> Equal Bool True True` and `h` is unused -- `a = True`
+-- is already the conclusion. False branch: `fok_and False b` reduces to
+-- `False`, so the goal is `Equal Bool False True -> Equal Bool False True`,
+-- the hypothesis IS the conclusion.
+theorem fok_and_left (a : Bool) (b : Bool)
+    : Equal Bool (fok_and a b) True -> Equal Bool a True =
+  match a {
+    True ↦ λh. Proved;
+    False ↦ λh. h
+  }
+
+-- `Equal Bool (fok_and a b) True -> Equal Bool b True`, the partner
+-- projection. True branch: `fok_and True b` reduces to `b`, so the goal is
+-- `Equal Bool b True -> Equal Bool b True` -- the hypothesis IS the
+-- conclusion. False branch: `fok_and False b` reduces to `False`, so `h` has
+-- the absurd type `Equal Bool False True`, discharging any target.
+theorem fok_and_right (a : Bool) (b : Bool)
+    : Equal Bool (fok_and a b) True -> Equal Bool b True =
+  match a {
+    True ↦ λh. h;
+    False ↦ λh. absurd h
+  }
+
+-- `Equal Bool (fok_or a b) False -> Equal Bool a False` -- the polarity
+-- `fok_check_forall_right` actually produces on acceptance. True branch:
+-- `fok_or True b` reduces to `True`, so `h` has the absurd type
+-- `Equal Bool True False`, discharging any target (here, coincidentally,
+-- the same shape the goal already has -- `absurd h` is used regardless, so
+-- this case reads as impossible rather than as an accidental identity).
+-- False branch: `fok_or False b` reduces to `b`, so the goal
+-- `Equal Bool b False -> Equal Bool False False` holds by `Proved`
+-- independent of `h`.
+theorem fok_or_left_false (a : Bool) (b : Bool)
+    : Equal Bool (fok_or a b) False -> Equal Bool a False =
+  match a {
+    True ↦ λh. absurd h;
+    False ↦ λh. Proved
+  }
+
+-- `Equal Bool (fok_or a b) False -> Equal Bool b False`, the partner
+-- projection. True branch: `fok_or True b` reduces to `True`, so `h` is
+-- again the absurd `Equal Bool True False`, discharging any target. False
+-- branch: `fok_or False b` reduces to `b`, so the goal
+-- `Equal Bool b False -> Equal Bool b False` is the hypothesis itself.
+theorem fok_or_right_false (a : Bool) (b : Bool)
+    : Equal Bool (fok_or a b) False -> Equal Bool b False =
+  match a {
+    True ↦ λh. absurd h;
+    False ↦ λh. h
+  }
+
+-- `fok_or`'s `= True` disjunction eliminator: a continuation-passing case
+-- analysis into an arbitrary Type-sorted result `target` (proof-relevant,
+-- so `fn`, not `theorem` -- the overall Pi ends in the bound
+-- `target : Type`, not in an `Omega`-classified `Equal`). A true,
+-- kernel-checked lemma kept for completeness -- NOT because the checker
+-- consumes an `or = True` hypothesis anywhere (it does not; see the
+-- polarity census above). Only `a` (the case-split variable) is pre-bound
+-- alongside `b`/`target`, which the match does not refine; the hypothesis
+-- and both continuations mention `a`/`b` and sit in the return type's
+-- `Pi`-chain, exactly like the `theorem`s above. True branch: `fok_or True
+-- b` reduces to `True`, so `h : Equal Bool True True` feeds `ka` directly.
+-- False branch: `fok_or False b` reduces to `b`, so `h : Equal Bool b True`
+-- feeds `kb` directly.
+fn fok_or_elim (a : Bool) (b : Bool) (target : Type)
+    : Equal Bool (fok_or a b) True ->
+      (Equal Bool a True -> target) -> (Equal Bool b True -> target) -> target =
+  match a {
+    True ↦ λh. λka. λkb. ka h;
+    False ↦ λh. λka. λkb. kb h
+  }
