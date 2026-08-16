@@ -1,7 +1,7 @@
 ---
 id: V3-FO-SEARCH-FUEL-STACK-AGREEMENT
 title: "Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report"
-status: ready
+status: active
 owner: language
 size: S
 gate: none

@@ -1,13 +1,13 @@
 ---
 id: RT-REFUSAL-CONSEQUENCE-RESTORE
 title: "Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-SECOND-RECOGNITION-ERASURE]
 blocks: []
-github: null
+github: "https://github.com/swe-toolkit/ken/pull/2390"
 origin: "Steward, 2026-08-16, dispositioning Adversary hunt evt_6ssfztvwhxjpz on the merged range ec2b4a1eb..e23a18aee (PR #2377). The hunt confirms D2's fix landed on its criterion and isolates two clauses removed by an edit scoped to the sentence rather than by the finding. Steward-filed per COORDINATION section 2."
 ---
 
