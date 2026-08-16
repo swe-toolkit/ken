@@ -1,7 +1,7 @@
 ---
 id: RT-OVERCONSTRUCTED-OUTER-RECOGNITION
 title: "Stop minting static-worker recognitions for nested constructor fields whose transports no emitted call ever names, and establish the non-traversal as a property of the emitter rather than of the measured rows"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
