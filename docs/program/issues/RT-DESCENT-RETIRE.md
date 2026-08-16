@@ -26,6 +26,31 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > lane supported is live rather than suppressed. **Verified by the Steward at
 > release, not inherited from the node's status.**
 >
+> ## `D1` RAN AND FIRED THE HARD STOP: 28 LIVE SELECTIONS. RULED THROUGH.
+>
+> **At exact `97b963ac4`, `D1` found 28 selector arrivals choosing
+> `RecursiveDescent` — 27 lexical-call-argument, 1 match-scrutinee, across 18
+> named tests** (runtime-leader `evt_10v6y6m8jq49a`). Section 7's carve-out
+> *"if `D1` does surface a program that selects the authority, the hard stop
+> applies in full"* is literal, post-dates both dispositions, and fired.
+>
+> **Architect ruled against it on substance, `evt_98zg6sbqh7ej`: `D2c` PROCEEDS.
+> No node is cut ahead of it. The stop is RE-AIMED at deletion, not retired.**
+> Its live form is now *"a red from a program outside the pinned set."*
+>
+> **The decisive leg is not staleness — it is that the stop already fired on
+> this exact population and its remedy was already performed.**
+> [[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]] exists **because** an earlier `D1`
+> found 31 selections across 20 tests; the campaign named the class and handed
+> it back, the node was built, and its ratified disposition says the variant
+> **"retires when `RT-DESCENT-RETIRE` removes that lane."** ⇒ **Zero selections
+> was never reachable before this node acts.** Firing again is double jeopardy.
+>
+> **The 18 test names and 28 sites are PINNED in the frame as `D2b`**, frozen
+> before the `D2c` run so the expected-red set is falsifiable. `AC-8` and `AC-9`
+> enforce it: **a set widened after seeing CI is a null oracle, and every red
+> inside the set is adjudicated per test, never excused per set.**
+>
 > **Everything below this block is the historical record of how the bar rose and
 > fell.** It is retained because the campaign paid for it; it is not live work.
 >
