@@ -321,3 +321,12 @@ retaining a `RecursiveDescent` branch.
 > hard stop applies in full** — that is a surviving class and it is a node. **Any of those means the campaign is
 not done, and the honest outcome is to name the surviving class and hand it back
 to the Steward as a node** — not to delete around it.
+
+> **A CERTIFIED REFUSAL IS NOT A RESIDUAL STILL FIRING. Do not hard-stop on
+> one.** Added 2026-08-16. The five rows [[RT-RECURSOR-TRANSPORT]] leaves behind
+> are shapes the emitter **refuses**; a residual firing is a program that
+> **selects** the `RecursiveDescent` lane. Those are different measurements, and
+> `D1`'s enumeration is over the second. The five were dispositioned as internal
+> compiler invariants at PR #2440 and their disposition is `D8`'s subject, not
+> this gate's. **If `D1` does surface a program that selects the authority, the
+> hard stop applies in full** — that is a surviving class and it is a node.
