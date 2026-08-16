@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 22:13:34Z — from 359 issue file(s) in `docs/program/issues/`.
+2026-08-16 22:30:04Z — from 361 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -278,6 +278,8 @@ the committed file matches the generator's output.
 | `RT-FNSPLIT-C2-SYNTH-ID` | closed synthesized-constructor-role identity capability, with the DynamicConstructor producer that consumes it — the identity source compiler-synthesized effect payloads have no occurrence to ask for | merged | runtime | M | none | 1186 |
 | `RT-FNSPLIT-C3-ACTIVATION` | the opaque activation owner — one Rust representation authority in ken-runtime that constructs, publishes and tears down per-invocation boundary storage, with the deployment-supplied capacity profile and the one-argument public adapter seam | merged | runtime | L | none | 1181 |
 | `RT-FNSPLIT-RECUR-PORT` | emission-port completion — the governed nested-bracket family (recursive ComputationalMatch + trap arms) must select FunctionizedUnits, so RT-SCALE-B can measure the completed population | merged | runtime | XL | none | — |
+| `RT-FNUNIT-CHECKED-ROOT-AUTHORITY-ROUTING` | RECORDED OBLIGATION: the functionized lane owes routing the affine checked-root authority to whichever generated unit emits the terminal answer -- descent mints it unconditionally, functionized mints it only in the root unit, so a terminal answer emitted while defining a non-root unit finds None | draft | runtime | S | none | — |
+| `RT-FNUNIT-MULTI-WORKER-CONTINUATION` | RECORDED OBLIGATION: the functionized lane owes multi-worker continuation specialization -- a match case with two recursive positions (a binary-tree fold) fails because the specialization projects exactly one worker, and the code says D6a deliberately does not generalize | draft | runtime | M | none | — |
 | `RT-FNUNIT-RESULT-TOKEN` | Broad starter shapes fail the result-token table on the FunctionizedUnits lane — pre-existing, unmasked by retiring SeedClosureCall | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1892 |
 | `RT-FORCED-RETURNS-BOUND-RESTORE` | One clause: the six ignored tests' eighteen empty returns are FORCED by the refusal, not observed -- the measurement the Architect barred from this comment came back one repair later, and it now sits one sentence above the 81-return tally a reader will add it to | merged | runtime | XS | none | — |
 | `RT-FRAME-MARKER-ONCE` | Checked Runtime frame marker is consumed more than once under a nested computational eliminator | draft | runtime | TBD | none | — |

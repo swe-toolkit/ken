@@ -11,8 +11,38 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # 2026-08-16 — NO LONGER CAPABILITY-BLOCKED. THE RECORD IS NOW THE GATE.
-> # Successor [[RT-DESCENT-LANE-COMPLETENESS]] cut; its `D1` is outstanding.
+> # 2026-08-16 — `D1` IS IN: TWO CORRECT SEMANTICS, TWO MISSING PORTS.
+> # The functionized lane is NOT a complete replacement. One question remains.
+>
+> **Architect `evt_5cxzxp4b6q31v`.** The four constructs **do not answer alike.**
+> The discriminator was **denotation versus the compiler's own bookkeeping**, not
+> the severity of the message.
+>
+> | # | construct | verdict |
+> |---|---|---|
+> | 1 | `ComputationalMatch` in-flight activation (4) | **CORRECT SEMANTICS** — control state live only for that activation |
+> | 2 | `StaticWorkerBinding` (2) | **CORRECT SEMANTICS** — same law, second callable kind. **Porting it would give closures a durable lane: a semantic change to Ken, not a port.** |
+> | 3 | Backend `Module`, no recursive-position-1 worker (2) | **MISSING PORT** ⇒ [[RT-FNUNIT-MULTI-WORKER-CONTINUATION]] |
+> | 4 | `PlannerInvariant`, no checked-root authority (1) | **MISSING PORT** ⇒ [[RT-FNUNIT-CHECKED-ROOT-AUTHORITY-ROUTING]] |
+>
+> **`D6` MUST RE-HOME THE REFUSAL PIN, NOT CITE IT.**
+> `d2k_0_the_five_no_longer_reach_a_static_worker_value_read` pins constructs 1
+> and 2 **through `set_selector_variant_exclusion(Some(RecursiveDescentResidual::…))`
+> — and `D3` DELETES `RecursiveDescentResidual`.** The pin rides the mechanism
+> this node removes. **`nc22` reasoning, third occurrence in one node: check what
+> a pin is built ON, not just what it asserts.**
+>
+> **STILL OPEN — successor `D5`, routed to the Architect.** `0/12` does **not**
+> bound construct 3: that measurement was over the twelve
+> `LexicalCallArgumentRecursor` renderings, and construct 3's mechanism is a
+> different shape — a `ComputationalMatch` case with **two recursive positions**,
+> i.e. a binary-tree fold. **Whether any source-admissible program has one was
+> never asked, and it is the one input that could still flip this node from
+> recorded-gap to BLOCKED.**
+>
+> ---
+>
+> # PRIOR: NO LONGER CAPABILITY-BLOCKED. THE RECORD IS THE GATE.
 >
 > **Architect `evt_3bkkjpps1bcpe` supersedes the BLOCKED disposition below.**
 > All nine refusing programs map to five hash-tagged lexical fixture renderings,

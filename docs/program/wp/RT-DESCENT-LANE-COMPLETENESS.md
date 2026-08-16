@@ -335,6 +335,29 @@ reader into porting what should not be representable.
 is [[RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE]], cut separately, and folding it
 here would make a live `main` defect ride a gated node.
 
+**AC-11. THE EXISTING REFUSAL PIN CANNOT BE THE SURVIVING PIN — RE-HOME IT.**
+Architect `evt_5cxzxp4b6q31v`. The pin
+`d2k_0_the_five_no_longer_reach_a_static_worker_value_read`
+pins the exact refusal sentences for constructs 1 and 2 — **but it does so
+through `set_selector_variant_exclusion(Some(RecursiveDescentResidual::…))`,
+and `D3` of the retirement DELETES `RecursiveDescentResidual` itself.**
+
+⇒ **The pin rides the mechanism the retirement removes.** `AC-9` is **not**
+discharged by citing it. It must be **re-homed onto the surviving lane** so the
+refusal is asserted without reference to the retiring enum.
+
+> **This is the `nc22` reasoning a third time in one node: do not retire a fact
+> and its only detector in the same commit.** It caught the capstone's release
+> gate, it set the record requirement, and here it catches the record's own
+> instrument. **Check what a pin is built ON, not just what it asserts.**
+
+**AC-12. Constructs 3 and 4 owe a RECORDED OBLIGATION with a named owner, and
+the record must outlive `D6`.** Discharged by tracked nodes
+[[RT-FNUNIT-MULTI-WORKER-CONTINUATION]] and
+[[RT-FNUNIT-CHECKED-ROOT-AUTHORITY-ROUTING]], both owner `runtime`. **Prose in a
+deleted test's place does not discharge this** — that is why they are nodes and
+not paragraphs.
+
 **Discharge state at `3c9b8bbd5` (runtime-leader `evt_2fmjv69z5bg2g`):** `AC-2`
 **discharged** — per-program mapping established for all nine, none reported as
 unestablished. `AC-4` **discharged as input** — per-program overlap reported
