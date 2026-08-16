@@ -278,6 +278,22 @@ in a log.**
 | **rejects them as ill-formed** — type error, pattern-match failure against a non-constructor, stuck term | the refusal is correct | **arm 2** — recut this node as a disposition |
 | **also reports "unsupported"** | **NOTHING. This settles nothing.** | neither |
 
+> ### `D1b` INHERITS A RULED PRECEDENT. It is not inventing a method.
+>
+> [[RT-DESCENT-RETIRE]] already carries this exact decision procedure, ruled and
+> landed, for a **different** population — the governed rows — with the same
+> oracle and the same two resolutions:
+>
+> | interpreter | resolution |
+> |---|---|
+> | **runs the rows** | the other backend must too — the refusal is a compiler defect and repairing it is convergence |
+> | **refuses them** | **`RecursiveDescent` was over-accepting; its behaviour is a bug to drop, not a capability to preserve** |
+>
+> ⇒ **Arm 1 and arm 2 are that table's two rows.** The campaign has already
+> ratified what an arm-2 result *means*, so a `D1b` that lands there is applying
+> a settled consequence, **not proposing a new one.** Read `AC-7` as this table
+> instantiated at the scalar-selected cells.
+
 **`AC-8`. AN INTERPRETER "UNSUPPORTED" IS NOT A WELL-FORMEDNESS VERDICT, and
 must not be recorded as arm 2.** It is an interpreter capability gap. **This is
 stated as its own criterion because a refusal reads as a verdict** — it is

@@ -1,7 +1,7 @@
 ---
 id: RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN
 title: "The route-equality controls' duplicated hand-built reconstruction is the mechanism that detects an added routing disjunct -- record that at both assertion sites and retain the C-arrival mutation, because a routine tidy-up deletes it silently"
-status: ready
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -120,12 +120,16 @@ assertions, the rows and the observation domain all stay exactly as they landed.
 
 ## Sequencing
 
-**`ready`, and RELEASED — the between-increments window it was queued for
-arrived.** [[RT-MATCH-SCRUTINEE-PORT]] `D1` handed back non-total with a named
-refusal, and its `D2` is held on an Architect mechanism ruling. **The ring is
-free and this node is the work in front of it.**
+**`merged` at PR #2476**, landed squash `b4524ea4c`, candidate exact
+`efe867483` on base `19e0c69a7`. One commit, two paths, `+25/-0`. Decision
+`dec_87qh5g2zptd` resolved, Architect-approved at the exact SHA
+(`evt_301h56fz7scq8`); QA `evt_2t92ftckc7pjx`.
 
-**It still blocks nothing**, and the mechanism it protects works today — the
-risk is a future edit, not a present defect. ⇒ **If the `D2` ruling lands
-mid-flight, the port takes priority and this node goes back in the queue at
-whatever increment it has reached.**
+**Both deliverables discharged where they had to be.** `D1`'s clauses are in
+`control.rs` at each assertion, not in this file — `AC-1` was written to insist
+on exactly that, because the person doing the tidy-up is reading the crate.
+
+**It blocked nothing**, and the mechanism it protects worked the whole time —
+the risk was a future edit, not a present defect. **The detector is now
+documented at the point of edit and the `C`-arrival red is on record**, so a
+later reader does not have to re-derive that it works.
