@@ -76,6 +76,27 @@ the crate already uses for mutation evidence. It is the same shape as the
 mutation already run for `B`-leaving: add a third disjunct to the production
 binding, observe the reconstruction-versus-record assertion red, revert.
 
+### D2 mutation record
+
+Reproduced at exact base
+`19e0c69a7fed1df3d286cb166eefed109ec498b0`. The population-side mutation added
+`matches!(scrutinee.as_ref(), RuntimeExpr::ComputationalMatch { .. })` as a
+third disjunct only to the production `producer_route` binding. Both hand-built
+`A || B` reconstructions remained unchanged. The targeted invocation
+
+```sh
+scripts/ken-cargo test -p ken-runtime \
+  msd_d2a_residual_equals_subject_guard_and_route_complement -- \
+  --nocapture --test-threads=1
+```
+
+executed one selected test and failed at the first
+reconstruction-versus-record assertion on the `difference` row: the recorded
+route was `[true]` while the hand-built route remained `[false]`. The production
+mutation was then reverted byte-for-byte. This moves the production population,
+not the detector, and records the exact boundary at which a future disjunct is
+caught.
+
 ## Acceptance criteria
 
 **`AC-1`. A reader editing either assertion meets the warning without leaving
