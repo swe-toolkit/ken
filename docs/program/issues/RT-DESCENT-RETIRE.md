@@ -83,7 +83,9 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > evening and did not lift the bar either** — it closed the unreachability route
 > from outside Ken and returned conditional support. **The Architect then ruled
 > the route (`evt_nb12nmhd2zzk`), and this node returns to `active` when
-> [[RT-MATCH-SCRUTINEE-PORT]] supplies the uniform-lowering evidence.**
+> [[RT-MATCH-SCRUTINEE-PORT]] supplies its evidence** — which, after that node's
+> `D1` came back non-total, may be a **disposition** rather than a port. See the
+> bar below.
 >
 > ## `LexicalCallArgumentRecursor` disposition — measured, no port owed
 >
@@ -246,9 +248,29 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 >
 > ⇒ **[[RT-MATCH-SCRUTINEE-PORT]] is the twelfth dependency and the first link in
 > this chain whose SUCCESS would license deletion** — every predecessor could
-> only fail to. Its bar is **totality or a named refusal**: the difference
-> population compiles today via the retained lane, so a conservative fail-closed
-> arm would be a capability regression rather than mere over-strictness.
+> only fail to. Its bar is **totality or a named refusal**, and a **silent**
+> conservative fail-closed arm is barred.
+>
+> ### THAT BLOCKER'S ID NAMES A HYPOTHESIS, NOT A SETTLED DISPOSITION.
+>
+> **An ID cannot carry a disjunction.** `RT-MATCH-SCRUTINEE-PORT` asserts
+> "port", and it travels un-qualified through `depends_on`, this bar, commit
+> subjects and every cross-reference — while the node's own title carries the
+> alternative and its `D1b` decides **whether it is a port at all.**
+>
+> `D1` returned **non-total with a named refusal**, and the Architect ruled
+> (`evt_7yrhr0xs81hfc`) that a third arm is live: **the refusing cells may be
+> ill-formed**, in which case that node is a **disposition** and deleting the
+> retained lane removes an **over-acceptance rather than a capability.** ⇒ On
+> present evidence **that is the likeliest route to closing this capstone**, and
+> reading the blocker's ID as a promise of a port is the error to avoid.
+>
+> **The earlier warrant here — *"the difference population compiles today via
+> the retained lane, so a fail-closed arm is a capability regression"* — is
+> WITHDRAWN.** The operator's 2026-08-15 oracle ruling makes the interpreter the
+> oracle, so **what the retained lane accepts is not evidence of
+> well-formedness.** Whether a refusal costs a real capability is `D1b`'s
+> question.
 >
 > **Until that evidence exists this node stays barred, and an empty blocker list
 > is not permission.**
