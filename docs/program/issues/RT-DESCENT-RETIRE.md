@@ -1,15 +1,76 @@
 ---
 id: RT-DESCENT-RETIRE
 title: "Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane"
-status: active
+status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE]
+depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION]
 blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # 2026-08-16 — MEASUREMENTS `A`/`B` RETURNED. BOTH VARIANTS ARE NOW FILED, AND
+> # THIS NODE IS BLOCKED BEHIND THEM. Steward.
+>
+> **The two read-only measurements the Architect required are complete**
+> (runtime-implementer `evt_4v0frfza70d2m`, runtime-leader `evt_1d5wb0t98jadx`),
+> at exact `3523868afe7cd84b47c7b07281ff7df7c3202d61` — a base whose complete
+> `crates/ken-runtime` tree is identical to `dc98f6f84` at
+> `17246cb8615e04fd520d646eed60079ea28d06f0`, so the result is current. Suite
+> 941 passed / 0 failed / 4 ignored; probe reverted; `core.rs` blob preserved.
+>
+> **`A`: the original `D1` probe DID read the short-circuiting selector — the
+> hazard was real — and the 27/4 split survives it anyway.** The probe printed
+> after `select_body_emission_authority` returned, and production selection
+> (`core.rs:2409-2415`) short-circuits. The re-read against
+> `enumerate_recursive_descent_residuals` found **zero dual-retained
+> renderings**: removing `L` leaves exactly the three `M` renderings, removing
+> `M` leaves exactly the twelve `L` renderings. **So 27/4 is a true partition and
+> 27 is not a lower bound. The population did not move.**
+>
+> **Do not read that as vindicating the selector.** It was the wrong instrument
+> and the number happened to be tight. **The set-valued observation is the
+> established currency**, and `d3_the_exact_set_control_still_reds_under_short_circuiting`
+> (`lowering/core/tests/control.rs:16959`) exists to keep it that way. A future
+> measurement reaching for the selector repeats the defect whatever this one's
+> outcome was.
+>
+> **`B`: all fifteen renderings are SINGLY retained**, so each exclusion result
+> is **sole-retainer evidence** — closing the silent blindness in the probe's
+> `debug_assert`, which checked only that the excluded variant was *present*.
+> **Sole-retention is necessary and NOT sufficient**: an exclusion returning
+> `FunctionizedUnits` says the classifier no longer retains the program, not that
+> the lane can emit it. **It is not capability evidence.**
+>
+> ## The two nodes, filed. This is also the `#6d` gate repair.
+>
+> | node | variant | population |
+> |---|---|---|
+> | [[RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT]] | `LexicalCallArgumentRecursor` | 12 renderings, 27 compiles |
+> | [[RT-MATCH-SCRUTINEE-DISPOSITION]] | `MatchScrutineeRecursor` | 3 renderings, 4 compiles |
+>
+> **Both are now in this node's `depends_on`, and that edge IS the repair of the
+> under-specified gate.** The retirement previously gated on `#6d` closure, which
+> is a **rows-1-5** claim, to retire a **variant**. **It now gates on the
+> variant's measured population, named by hash in the two frames.** The edge is
+> on `depends_on` rather than only on the children's `blocks` because
+> `scripts/gen-progress.sh` reads `depends_on` and nothing else.
+>
+> **Status flipped `active` → `draft`, and `draft` here means BLOCKED, not
+> unframed.** The frame is complete, was released once, and its section 7 hard
+> stop did its job. Nothing was lost and no work was withdrawn: `D1` delivered
+> and `D2`-`D8` were correctly never entered. **`draft` is the only status the
+> schema has for a framed node whose dependencies have not landed** — `ready`
+> makes `check-issue-schema` warn that *"a team pulling this node will find its
+> premise false"*, which is exactly right, and leaving it `active` would
+> advertise a ring working this node while the ring works its children. **It
+> returns to `active` when both children merge.**
+>
+> **Still not ruled: whether the lexical port is worth building.** That is scope,
+> the Steward's and the operator's, decided after the triage says how many of the
+> twelve are production-reachable at all.
 
 > # 2026-08-16 — `D1` HARD-STOPPED. THE LANE IS NOT DEAD. DO NOT DELETE ANYTHING.
 >
