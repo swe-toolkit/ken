@@ -1,13 +1,13 @@
 ---
 id: RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT
 title: "LexicalCallArgumentRecursor's twelve fixed renderings are fixture-only -- no port is owed and the variant is re-described with the retained lane"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
 depends_on: []
 blocks: [RT-DESCENT-RETIRE]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2454
 origin: "Architect ruling evt_620806vfy5kwm (2026-08-16) on RT-DESCENT-RETIRE's D1 hard stop: the disposition axis is the RecursiveDescentResidual variant, not the expression; LexicalCallArgumentRecursor is an incomplete port with capability owed; the cut is one node keyed on the variant whose first deliverable is a per-expression fixture-or-production triage. Population fixed by runtime measurement A/B at exact 3523868afe7cd84b47c7b07281ff7df7c3202d61 (runtime-implementer evt_4v0frfza70d2m, runtime-leader evt_1d5wb0t98jadx). Steward-filed per COORDINATION section 2."
 ---
 

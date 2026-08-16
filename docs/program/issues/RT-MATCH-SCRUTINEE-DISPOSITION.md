@@ -1,7 +1,7 @@
 ---
 id: RT-MATCH-SCRUTINEE-DISPOSITION
 title: "MatchScrutineeRecursor retains three renderings and the tree records no reason -- establish why the functionized lane does not take it before dispositioning it"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
