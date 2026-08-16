@@ -2,13 +2,13 @@
 id: LANG-CTOR-PREMISE-ELABORATION-DIVERGES
 title: "A data constructor whose premise applies a recursive function to a telescope-bound variable diverges during elaboration -- proof-carrying inductive families are unavailable in Ken"
 status: ready
-owner: language
+owner: kernel
 size: L
 gate: none
 depends_on: []
 blocks: [V3-FO-CHECKER-SOUNDNESS]
 github: null
-origin: "Steward, 2026-08-16, on the merge of V3-FO-CHECKER-SOUNDNESS D1a (PR #2428). D1a hard-stopped with a bounded finding: FokDerivation cannot be authored because every constructor it needs diverges the elaborator. Architect dec_47g7jtcrb5rhv records the architectural reading and the liveness-not-soundness severity. Steward-filed per COORDINATION section 2."
+origin: "Steward, 2026-08-16, on the merge of V3-FO-CHECKER-SOUNDNESS D1a (PR #2428). D1a hard-stopped with a bounded finding: FokDerivation cannot be authored because every constructor it needs diverges. Architect dec_47g7jtcrb5rhv records the architectural reading and the liveness-not-soundness severity. Steward-filed per COORDINATION section 2. Filed owner:language on the received disposition; changed to owner:kernel 2026-08-16 when the frame was located at ken-kernel/src/inductive.rs:97 (adversary evt_30vg7q07ypktj, coordinates Steward-verified). The LANG- id prefix is historical."
 ---
 
 ## What is broken
@@ -57,63 +57,122 @@ the entire suite by construction: every existing inductive family is either
 premise-free or carries a nullary proof marker, never a computed `Equal`
 hypothesis. `FokDerivation` is the first program anyone tried to write this way.
 
-**Severity is liveness, not soundness** (Architect, `dec_47g7jtcrb5rhv`). The
-elaborator fails to terminate; it does not emit a wrong term, and the kernel
-re-checks whatever it does produce. **Do not escalate this to the Kernel ring as
-a soundness matter** — but see the ownership fork below, which is a different
-question.
+**Severity is liveness, not soundness** (Architect, `dec_47g7jtcrb5rhv`), and
+**that half of the disposition survived the frame being located.** A
+non-terminating positivity check admits nothing — it hangs. No wrong term is
+emitted and no declaration is wrongly accepted.
 
-## The guess to attack, and the fork it turns on
+⇒ **This is kernel-owned and TCB-resident, and it is still not a soundness
+escalation.** Those are three separate facts and the second does not imply the
+third. Route it as a liveness defect in the admission gate.
 
-Per the framing rule, this is the a-priori best guess and discovery is expected
-inside the attempt. **If it is wrong, that is a result — report what you found.**
+## The frame, located — and the ownership fork closed against the filing
 
-**Guess: something on the constructor path reduces a term containing a recursive
-function applied to a stuck variable, and unfolds the recursive definition
-without a guard for the stuck match.** A recursive function applied to a
-telescope-bound variable cannot reduce — its match scrutinee is stuck — so a
-reducer that unfolds the definition anyway re-enters itself forever. That
-matches every measured cell: the `fn`/`theorem` path does not perform this
-reduction, and a non-recursive function unfolds once and terminates.
+**The ownership fork this node was filed to resolve is answered, and it inverts
+the received disposition.** Adversary, `evt_30vg7q07ypktj`, hunting
+`c67201f2f..8d6d7d545`. **Every coordinate below was re-verified by the Steward
+against the tree at `f97ffb87a`** — see the epistemic status at the end of this
+section for what is measured and what is not.
 
-**Candidate sites, each an anchor to re-find rather than a value to check:**
+**The path, entry to suspect frame, each link confirmed:**
 
-- `ken-elaborator/src/data.rs`, `elab_data_decl` — the constructor-telescope
-  entry point, and the one `whnf(env, ctx, &infer(...))` call in that file;
-- `ken-kernel/src/inductive.rs`, `check_positivity` /
-  `derive_parameter_polarities_inner`, reached through `declare_inductive`;
-- the constructor-universe check, which `check.rs` documents as re-checking
-  signatures, strict positivity, and constructor universes.
+| site | what it does |
+|---|---|
+| `ken-elaborator/src/data.rs:61` | `elab_data_decl` calls `declare_inductive` — the surface `data` entry |
+| `ken-kernel/src/check.rs:921` | `declare_inductive` → `check_positivity` |
+| `ken-kernel/src/inductive.rs:396` | `check_positivity` → `check_positivity_inner` (`:404`) |
+| `ken-kernel/src/inductive.rs:442` | **per constructor argument, UNGATED:** `check_pos_arg(env, d, Pol::Plus, a, ..)` |
+| `ken-kernel/src/inductive.rs:97` | **`let normalized = normalize(env, &Context::new(), a);`** — a FULL normal form, before anything is inspected |
 
-> ### THE OWNERSHIP FORK. Attribute before you assume the owner.
->
-> **The received disposition is "Language/elaborator track, no TCB contact."
-> That is a conclusion about the owner drawn before the diverging frame was
-> located.** Two of the three candidate sites above are in `ken-kernel`.
->
-> ⇒ **If the divergence is in `check_positivity` or the constructor-universe
-> check, this is kernel code and the owner and the TCB question both change.**
-> Establish which frame actually spins — a stack sample or an instrumented
-> unfold counter — **before** deciding whose repair it is. Report the answer
-> either way; it is a deliverable, not a preliminary.
->
-> This node exists because `D0` on the predecessor recorded a conclusion whose
-> stated method could not reach it. **The same shape is available here**: "the
-> elaborator diverges" is a true statement about an observed symptom and not yet
-> a statement about which component contains the loop.
+**`check_pos_arg_normalized` recurses back into `check_pos_arg`** at `:110`,
+`:111`, `:114`, `:115`, `:118` and `:149` — **so it re-normalizes at every
+node**, not once at the root.
+
+**`normalize` is not `whnf`.** `ken-kernel/src/conv.rs:225` is whnf-then-
+structural: it recurses under `Pi`, `Lam`, `Sigma`, `Pair`, `App`, `Proj`,
+`Elim`, materializing the whole normal form.
+
+### It explains all five isolating facts
+
+| measured observation | explanation |
+|---|---|
+| `fn`/`theorem` parameter is instant | Pi-binder checking goes through whnf-based `classify`/`convert` and **never calls `check_pos_arg`** |
+| the `data` constructor telescope diverges | **only that path runs positivity** |
+| **the non-indexed, non-self-referential minimal repro diverges identically** | **`normalize` runs BEFORE any occurrence test** — there is no `occurs(d, a)` gate at `:442` |
+| recursive fn required, non-recursive fine | fully normalizing a **stuck recursor** is what fails to terminate; a non-recursive definition unfolds once |
+| a 1 GiB big stack does not help | **heap** growth building an ever-larger normal form, not stack depth |
+
+⇒ **The third row is the diagnostic one, and it is the row `D1a`'s bisection
+went out of its way to establish.** Excluding indexing and self-reference is
+what *points at* this frame: positivity normalizes first and looks for
+occurrences second, so a declaration with nothing to find still pays the full
+normalization.
+
+**The contrast is visible inside the same function.** `check_positivity_inner`
+tests the index telescope and the constructor target indices with a bare
+`occurs(d, ix)` and **no normalization at all** (`:435`, `:449`). Only the
+constructor-argument loop normalizes.
+
+### The disposition inverts on two of three points
+
+| received | status |
+|---|---|
+| **owner: Language/elaborator track** | **REFUTED — `check_pos_arg` is `ken-kernel/src/inductive.rs`** |
+| **"no TCB contact"** | **REFUTED — strict positivity is the admission gate for inductive declarations** |
+| **"liveness, not soundness"** (Architect, `dec_47g7jtcrb5rhv`) | **HOLDS.** A non-terminating positivity check admits nothing; it hangs |
+
+**The node id's `LANG-` prefix is historical**, from the filing that assumed the
+elaborator. `owner:` is authoritative; the id is not being churned mid-flight.
+
+### A second, independent observation at the same line
+
+`normalize(env, &Context::new(), a)` normalizes under an **empty context**,
+while `a` is a constructor-telescope-bound type whose free de Bruijn indices
+refer to earlier telescope entries. **That is an open term normalized under an
+empty context.** Whether it contributes to the divergence or merely renders
+those variables neutral, it is a mismatch `D1` names separately.
+
+### Epistemic status — read this before treating the frame as settled
+
+**The coordinates are verified; the causal attribution is not.** The Steward
+re-read every line cited above and the call chain is exactly as stated. **What
+nobody has run is the diverging case with the frame instrumented** — the
+Adversary explicitly did not reproduce it (`COORDINATION §12`), and neither did
+the Steward.
+
+⇒ **This is a very strong read, not a measurement.** It is recorded here so
+`D1` confirms a named frame instead of re-searching for one — which is worth a
+turn — and `D1` is not discharged by citing it.
 
 ## Deliverables
 
-**`D1` — locate the diverging frame and name the owner.** Which component, which
-function, what is unbounded. The reproduction exists; this is instrumentation,
-not re-derivation. **A stack sample under an external bound is sufficient and is
-the cheap instrument** — QA already showed the row reaches stack overflow at the
-default stack and allocator failure under a 2.5 GiB cap.
+**`D1` — CONFIRM the located frame. Do not re-search for it.** Instrument entry
+to `inductive.rs:97` with a counter and re-run the diverging case under the
+external bound QA already used. **If entry count and RSS climb together, the
+frame is located.** That is one counter and a run that is already tooled — QA
+showed the row reaches stack overflow at the default stack and allocator failure
+under a 2.5 GiB cap.
 
-**`D2` — the repair, in the component `D1` named.** The expected shape is a
-stuck-recursion guard on whatever reduces the constructor premise. **If the
-repair lands in `ken-kernel`, stop and hand back before editing** — that routes
-to the Architect and the operator, not to this ring's discretion.
+**`D1` is not discharged by citing the section above.** It carries three
+outputs: the confirmation (or its refutation, which is equally a result), the
+disposition of the empty-context mismatch, and **the owner, stated as a
+measured fact rather than an inherited one.**
+
+**`D2` — the repair, in the component `D1` confirms.**
+
+> ### `D2` IS EXPECTED TO BE A KERNEL EDIT. IT IS NOT THIS RING'S TO MAKE.
+>
+> On the located frame, the repair is in `ken-kernel/src/inductive.rs`. **Stop
+> and hand back before editing it.** That routes to the Architect and the
+> operator — see Sequencing.
+
+**The repair direction the frame suggests:** positivity asks a **syntactic**
+question — does `d` occur, and at what polarity. **Full normalization is far
+stronger than that needs.** whnf-on-demand while walking would answer it without
+ever materializing a normal form, and the same function already answers the
+index-telescope half of the question with a bare `occurs` and no reduction at
+all. **This is a direction to attack, not a design ruling** — the Architect owns
+the call once `D1` confirms the frame.
 
 **`D3` — the capability, demonstrated on the shape that motivated it.** A
 `data` declaration with a constructor carrying `Equal (Option FokForm)
@@ -136,11 +195,23 @@ over-broad fix that disables the reduction entirely.
 liveness repair adds no trust surface. **If the fix requires one, that is the
 signal it is the wrong fix.**
 
-**`AC-4`. No weakening of strict positivity or the constructor-universe check.**
-The repair must terminate the reduction, not skip the check that performs it.
-**State explicitly which check still runs on the repaired path**, with a
-negative control: a genuinely positivity-violating declaration must still be
-rejected.
+**`AC-4`. No weakening of strict positivity.** The repair must terminate the
+reduction, not skip the check that performs it. **State explicitly which check
+still runs on the repaired path**, with **two** negative controls:
+
+1. **A plainly negative occurrence** — `D` to the left of an arrow in a
+   constructor argument — still yields `PositivityViolation`.
+2. **An occurrence that is only visible AFTER reduction** — `D` appearing in a
+   constructor argument written through a definition that must be unfolded to
+   see it — **still yields `PositivityViolation`.**
+
+**The second control is the one that matters and the one an over-broad fix
+breaks.** Reduction is at `:97` for a reason: a syntactic scan of the unreduced
+term would miss an occurrence hidden behind a definition, and that is a
+soundness hole, not a liveness one. **A repair that deletes the normalization
+outright passes `AC-1` and `AC-2` and fails here.** Whatever replaces it must
+still reduce enough to expose hidden occurrences — which is why the direction
+under `D2` is whnf-on-demand while walking, not no-reduction.
 
 **`AC-5`. A hard stop is a complete result**, as it was at `D0` and `D1a`.
 
@@ -172,9 +243,22 @@ what `§12` forbids and it is why the Architect declined to reproduce it.
 It is ordinary `fn`/`theorem` work, which the control cells show elaborates
 fine, and `D0` fixed the signature shape its lemmas must take.
 
-**Lane 2 under the operator's 2026-08-15 directive.** It is the FO Kripke
-embedding's blocker, not a third lane.
-
 **Priority against the truncation node: this one first.** It blocks a broader
-capability, its reproduction already exists, and the truncation node's premise
-is settled while this one's owner is not.
+capability and its reproduction already exists.
+
+> ### THE RING QUESTION IS THE OPERATOR'S, AND IT IS OPEN. Do not dispatch `D2`.
+>
+> **This is lane 2's blocker by objective and kernel-owned by location, and the
+> kernel ring is not one of the two lanes** (operator, 2026-08-15: no third lane
+> gets a ring, however well-framed and however idle the team). **The Steward
+> does not resolve that against a standing directive.** Briefed to the operator
+> 2026-08-16.
+>
+> **`D1` does not wait on the answer.** It is instrumentation of a landed
+> reproduction with no kernel edit, it fits inside the language ring, and it is
+> what makes the operator's decision an informed one. **`D2` is the edit and
+> `D2` is what is gated.**
+>
+> ⇒ **Dispatching `D1` is not a decision that the kernel ring is open.** Keep
+> the two apart; conflating them is how a directive gets defeated by a chain of
+> individually reasonable steps.
