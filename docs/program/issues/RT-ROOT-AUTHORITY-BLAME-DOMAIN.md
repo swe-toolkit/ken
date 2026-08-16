@@ -1,7 +1,7 @@
 ---
 id: RT-ROOT-AUTHORITY-BLAME-DOMAIN
 title: "The three root-authority guards report a compiler-owned invariant failure through the unsupported-construct channel, which reverses the fault domain -- and the correct arm, BackendFailure::PlannerInvariant, already exists with 40 producers in the same crate"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
