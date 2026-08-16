@@ -34991,9 +34991,10 @@ fn d2e_ac9_layout_agrees_with_the_prefix_production_assembled() {
 ///   separately validated required-consumer projection, install two and three
 ///   exact worker binders respectively, transfer their synthesized environment,
 ///   and return to `StaticWorkerBinding`. Depth 1 and row 5 also refuse there;
-///   row 1 is excluded and
-///   remains at `NativeJoinPlanV1`. These are measured boundaries, not closure
-///   claims, and the table is rewritten when any later route advances them.
+///   row 1 is excluded and remains at `BackendFailure::PlannerInvariant` for
+///   missing affine checked-root authority. These are measured boundaries, not
+///   closure claims, and the table is rewritten when any later route advances
+///   them.
 #[test]
 fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
     use crate::cranelift_backend::lowering::core::set_selector_variant_exclusion;
@@ -35103,6 +35104,10 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
     let scope = vec!["ctor:fixture::PX8JScopeTree::Node".to_string()];
     let hole = vec!["ctor:fixture::PX8JHoleOutput::Node".to_string()];
     let refused_worker = "refused:StaticWorkerBinding".to_string();
+    let refused_root_authority = "refused-other:Cranelift backend failure: native static \
+        transition planner invariant failed; please report this compiler bug: terminal answer \
+        has no affine checked-root authority"
+        .to_string();
     assert_eq!(
         rows,
         [
@@ -35113,7 +35118,7 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
             // equally consistent with the arming having done nothing.
             (
                 "row1-owned-scope",
-                (tree1, 0, 0, 0, "refused:NativeJoinPlanV1".to_string())
+                (tree1, 0, 0, 0, refused_root_authority)
             ),
             (
                 "row4-depth-1",
@@ -35132,8 +35137,8 @@ fn d2k_1b_i_every_recognized_static_worker_reaches_a_disposition() {
         "RT-REQUIRED-OCCURRENCE-PROJECTION D4: every row remains attributed separately. \
          Depth 2 and depth 3 take the one depth-2+ consumer, rebind at each traversed level, \
          and return to the downstream StaticWorkerBinding refusal after the environment transfer. \
-         Depth 1 and row 5 remain at StaticWorkerBinding, while excluded row 1 remains at \
-         NativeJoinPlanV1. \
+         Depth 1 and row 5 remain at StaticWorkerBinding, while excluded row 1 reaches the \
+         PlannerInvariant for missing affine checked-root authority. \
          None of these refusals is a closure claim."
     );
 }
@@ -35858,9 +35863,9 @@ fn d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
 /// recognizing the binding ahead of the value read.
 ///
 /// **Row 1 sits at a different wall and that is kept, not smoothed.** It reaches
-/// `NativeJoinPlanV1` before this increment's conservation close. A uniform
-/// expectation across the five would go green under a uniform move, which is
-/// exactly the case worth catching.
+/// the planner invariant for missing affine checked-root authority before this
+/// increment's conservation close. A uniform expectation across the five would
+/// go green under a uniform move, which is exactly the case worth catching.
 ///
 /// **This test claims NOTHING about fusion working.** The positive that gives
 /// a resolved plane its meaning is the checked twin, on a different fixture
@@ -35933,7 +35938,7 @@ fn d2k_1b_unmarked_seeds_refuse_and_resolve_no_fusion_plane() {
         [
             (
                 "row1-owned-scope",
-                Some("NativeJoinPlanV1".to_string()),
+                Some("<not-unsupported>".to_string()),
                 absent.clone(),
             ),
             ("row4-depth-1", conservation.clone(), absent.clone()),
