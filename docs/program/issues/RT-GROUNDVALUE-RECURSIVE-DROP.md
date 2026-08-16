@@ -11,6 +11,31 @@ github: null
 origin: Surfaced by runtime-implementer at evt_2tbfhha1tyerh, 2026-08-11, while discharging RT-FNUNIT-RESULT-TOKEN D3 under the Architect's ruling evt_78ynjwzj0gpa8. Filed by the Steward rather than left in the thread, because that node merges and its thread closes. Not measured further by the Steward; the numbers below are the implementer's.
 ---
 
+> # HELD UNTIL AFTER THE BACKEND SPLIT — operator ruling, 2026-08-16
+>
+> **This node was considered for sequencing ahead of
+> [[RT-BACKEND-SPLIT-CENSUS]] and deliberately excluded.** Three campaign
+> spinouts were sequenced in front of the census; this is one of the two that
+> were not, and the exclusion is a decision rather than an oversight.
+>
+> **The discriminator was file contention.** The split's scope is
+> `crates/ken-runtime/src/cranelift_backend/` plus `boundary_value_clif.rs`.
+> This node's subject is `RuntimeGroundValue` decode and drop -- **outside that scope**, so it does not
+> contend with the split and there is no rebase cost to avoid.
+>
+> **Gating the phase on it would hold
+> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]]**, which is the architectural release
+> point for [[NATIVE-HANDLE-CARRIER]] and the **nineteen transitive dependents**
+> that make up the rest of the Linux ABI completion program. That trade is
+> badly lopsided against work that does not contend.
+>
+> It also carries `size: unknown`, which is a gate of its own -- its first
+> deliverable is the bisection that finds the depth threshold, and an unsized
+> node cannot be sequenced against anything.
+>
+> **Do not add this node to the census's `depends_on`.** Nothing here is a
+> judgement about its merit; only about what it must run before.
+
 ## The finding
 
 The Architect's `D3` ruling required that **deep valid data use no recursive

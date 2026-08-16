@@ -11,6 +11,31 @@ github: null
 origin: "Architect evt_5h7vzc27mc11j, correcting a Steward claim in the RT-RECURSOR-TRANSPORT Trap-2 fork. Filed draft and NOT released -- this is not lane 1 and the second lane is quiet. Filed at all because an acknowledged gap with no node is indistinguishable from a gap nobody noticed, and this is precisely the gap a future reader would assume the existing fixtures cover."
 ---
 
+> # HELD UNTIL AFTER THE BACKEND SPLIT — operator ruling, 2026-08-16
+>
+> **This node was considered for sequencing ahead of
+> [[RT-BACKEND-SPLIT-CENSUS]] and deliberately excluded.** Three campaign
+> spinouts were sequenced in front of the census; this is one of the two that
+> were not, and the exclusion is a decision rather than an oversight.
+>
+> **The discriminator was file contention.** The split's scope is
+> `crates/ken-runtime/src/cranelift_backend/` plus `boundary_value_clif.rs`.
+> This node's subject is a grammar and elaborator instrument by construction -- **outside that scope**, so it does not
+> contend with the split and there is no rebase cost to avoid.
+>
+> **Gating the phase on it would hold
+> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]]**, which is the architectural release
+> point for [[NATIVE-HANDLE-CARRIER]] and the **nineteen transitive dependents**
+> that make up the rest of the Linux ABI completion program. That trade is
+> badly lopsided against work that does not contend.
+>
+> Its `D0` may well conclude that no sound instrument exists, which this node
+> already records as a complete and acceptable result -- so it may cost nothing
+> downstream at all.
+>
+> **Do not add this node to the census's `depends_on`.** Nothing here is a
+> judgement about its merit; only about what it must run before.
+
 ## The gap
 
 `RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT` (PR #2440) established four refusals

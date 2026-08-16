@@ -6,10 +6,28 @@ owner: runtime
 size: S
 gate: none
 depends_on: []
-blocks: []
+blocks: [RT-BACKEND-SPLIT-CENSUS]
 github: null
 origin: Adversary report evt_1gtad2keqngcq (2026-08-09) on merged 1f706520, the RT-BODY-OCCURRENCE-PROVENANCE accepted partial at exact 876450ab. Steward-triaged as a confirmed latent defect and filed per COORDINATION §2. NOT folded into RT-CANDIDATE-LEDGER-RESIDUALS: that node's leading claim is "neither is a defect", and this one is.
 ---
+
+> # SEQUENCED AHEAD OF [[RT-BACKEND-SPLIT-CENSUS]] — operator ruling, 2026-08-16
+>
+> **This node lands before the backend-split census**, whose `depends_on` now
+> names it. The edge lives there rather than only here, because
+> `scripts/gen-progress.sh` reads `depends_on` and nothing else — a `blocks`
+> edge alone would be invisible to every generated view.
+>
+> **Why: it edits `planning/static_transition.rs`, inside the split's own scope**
+> (`crates/ken-runtime/src/cranelift_backend/` plus `boundary_value_clif.rs`).
+> A split cannot run concurrently with semantic work on the files it partitions
+> (campaign §4 ground 3), so this is pure ordering and landing first costs one
+> rebase instead of a re-home followed by a fix.
+>
+> **Nothing about this node's own content changes.** It was `ready` before the
+> ruling and is `ready` after; only its position moved. **It is not released
+> yet** — lane 1 is on [[RT-DESCENT-RETIRE]], which hard-stopped on `D1` with
+> two surviving classes still selecting the lane.
 
 > # `D1` — OWED AND FRAMED, **NOT** SEQUENCED IN FRONT OF THE CAMPAIGN
 >

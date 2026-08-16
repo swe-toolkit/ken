@@ -6,10 +6,28 @@ owner: runtime
 size: S
 gate: none
 depends_on: []
-blocks: []
+blocks: [RT-BACKEND-SPLIT-CENSUS]
 github: null
 origin: Reported by runtime-implementer during RT-RECURSOR-TRANSPORT D3 (evt_16cmej481q7ns family) as an incidental finding; Architect scoped it OUT of the hard-stop-4 repair nodes at evt_3r4j14fv1jtj2 as pre-existing prose debt. Steward-filed (agents cannot create tracked work per COORDINATION §2), and re-derived by the Steward at main 5d4c623e rather than inherited.
 ---
+
+> # SEQUENCED AHEAD OF [[RT-BACKEND-SPLIT-CENSUS]] — operator ruling, 2026-08-16
+>
+> **This node lands before the backend-split census**, whose `depends_on` now
+> names it. The edge lives there rather than only here, because
+> `scripts/gen-progress.sh` reads `depends_on` and nothing else — a `blocks`
+> edge alone would be invisible to every generated view.
+>
+> **Why: it edits `lowering/core/tests/control.rs`, inside the split's own scope**
+> (`crates/ken-runtime/src/cranelift_backend/` plus `boundary_value_clif.rs`).
+> A split cannot run concurrently with semantic work on the files it partitions
+> (campaign §4 ground 3), so this is pure ordering and landing first costs one
+> rebase instead of a re-home followed by a fix.
+>
+> **Nothing about this node's own content changes.** It was `ready` before the
+> ruling and is `ready` after; only its position moved. **It is not released
+> yet** — lane 1 is on [[RT-DESCENT-RETIRE]], which hard-stopped on `D1` with
+> two surviving classes still selecting the lane.
 
 > ## THE `draft` FLIP WAS WRONG AND IS REVERTED — 2026-08-08, Steward
 >
