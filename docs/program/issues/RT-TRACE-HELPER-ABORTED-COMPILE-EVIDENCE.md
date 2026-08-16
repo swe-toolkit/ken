@@ -59,3 +59,39 @@ sweep.**
   actually establish once an aborted compile can no longer pass silently.
 - **Out:** the sentinel (owned by [[RT-DESCENT-RETIRE]]'s `D6`), the other
   fifteen exclusion sites, and any change to the functionized lane's behaviour.
+
+## D1-D3 disposition
+
+Caller census at exact base `c9cbd1f5a58b29e4c619fd4574ee777b1f6ce983`
+found five calls to each file-local helper and no other calls. The unrelated
+`capture.owner()` method call is not a call to `owner(...)`.
+
+The compile-result precondition was applied before either helper read
+`d2k_owner_trace_take()`. Every call red before its caller's trace assertion:
+
+| expression | `owner(...)` | `multiplicity(...)` | compile outcome |
+|---|---|---|---|
+| row 1 owned scope | red | red | `PlannerInvariant`: no affine checked-root authority |
+| row 4 depth 1 | red | red | `StaticWorkerBinding` refusal |
+| row 4 depth 2 | red | red | `StaticWorkerBinding` refusal |
+| row 4 depth 3 | red | red | `StaticWorkerBinding` refusal |
+| row 5 after-hole | red | red | `StaticWorkerBinding` refusal |
+
+There are zero green calls. Both callers select the second disposition in the
+frame's table:
+
+- `d2k_1a_the_five_static_workers_are_recognized_at_their_construct_owners`
+  asserted FunctionizedUnits owner structure. Re-running the same expressions
+  on the production RecursiveDescent lane completed, but produced no owner
+  events, so the assertion cannot be re-homed there. The unsupported assertion
+  and its helper are removed. Its named mechanism owner remains
+  [[RT-LEXICAL-RECURSOR-CONSUMERS]].
+- `d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile`
+  asserted FunctionizedUnits recognition multiplicity. The production-lane
+  rerun completed but produced no repeated recognition, so this assertion also
+  cannot be re-homed. The unsupported assertion and its helper are removed. Its
+  named mechanism owner remains [[RT-LEXICAL-RECURSOR-CONSUMERS]].
+
+**D3: no claim that the FunctionizedUnits lane produces owner or recognition
+structure survives this repair.** The removed observations were prefixes of
+aborted compiles, not evidence about a completed FunctionizedUnits artifact.
