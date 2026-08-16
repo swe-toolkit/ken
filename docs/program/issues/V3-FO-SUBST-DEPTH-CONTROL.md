@@ -1,13 +1,13 @@
 ---
 id: V3-FO-SUBST-DEPTH-CONTROL
 title: "Give subst_form_at a control that can see its binder-depth discipline, and state the two premises fo_kripke.rs relies on without naming where the next editor will look -- the shift call-site correspondence and the bottom_id exclusion criterion"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: [V3-FO-GUARD-SHIFT-DIFFERENTIAL]
 blocks: []
-github: https://github.com/swe-toolkit/ken/pull/2379
+github: https://github.com/swe-toolkit/ken/pull/2382
 origin: "Steward, 2026-08-16, dispositioning Adversary hunt evt_d1wy8d6kytpw on the merged range 790c16ea6..197374712. The hunt answered a question the Steward handed it on V3-FO-GUARD-SHIFT-DIFFERENTIAL's merge -- whether the depth<=1 refutation shape generalizes -- and it does. Every coordinate re-verified by symbol against origin/main b03c1084b before filing. Steward-filed per COORDINATION section 2."
 ---
 
@@ -145,13 +145,39 @@ premise is enough, because legibility is what `D2` is for.
 > blob `1d899658` is the one on `main`, and differs from the base's
 > `aaaba760`. QA `evt_43bszaytky8g1`; Architect `evt_400nejhbde4kp`.
 >
-> **THE NODE STAYS `active`. `D2` below and `AC-7` are OUTSTANDING.**
+> **~~THE NODE STAYS `active`.~~ SUPERSEDED — `D2`-`D3` MERGED as PR #2382,
+> 2026-08-16, and the node is COMPLETE.** Candidate
+> `2c47f4b2d5e289d5e7e189d8cb5a2a1ae4adc8e5`, base `2b4ad0faa` (the genuine
+> merge-base), sole path `crates/ken-elaborator/src/fo_kripke.rs`, `+72/-7`.
+> Blob identity verified from the declared base: candidate blob `dfd8653c` is
+> the one on `main`; base was `1d899658`. QA `evt_7m7w1406fe3t7`; Architect
+> `evt_5cx1zg24kb8df`. **No Decision exists or is required** under the exact-
+> object gate — verified across 944 records with a positive control.
 >
-> **`D2` was folded into this node AFTER it was released to the ring**, from a
-> later Adversary hunt (`evt_44194ewx0dxa`). **It was never asked of them and
-> its absence from the candidate is not a shortfall on their part** — that is
-> the Steward's sequencing, told to the ring at `evt_11echdf4h73de`. Do not
-> read the partial as an incomplete delivery.
+> **`D2` landed the criterion** (*exclude any `Const` `quote_iform` recognizes
+> as a formula in its own right*) and **correctly did NOT exclude `top_id`.**
+> **`D3` landed both index-axis rows**, pinning the decrement arm and the
+> inner-binder arm separately.
+>
+> > **ONE OVERCLAIM SHIPPED AND HAS ITS OWN SUCCESSOR.** `D2`'s comment says
+> > the criterion *"forces"* the collector update when `IForm::Top` lands. **It
+> > does not — it informs a future editor and nothing reds.** The Architect
+> > approved the candidate unchanged and named the successor:
+> > [[V3-FO-TOP-REFUSAL-ENFORCEMENT]], a test asserting `quote_iform` refuses
+> > `top_id` with `UnsupportedTermShape`, plus softening the word. **Do not
+> > read the landed "forces" as an enforcement that exists.**
+>
+> **BOTH were folded into this node AFTER it was released to the ring**, from
+> later Adversary hunts — `D2` from `evt_44194ewx0dxa`, `D3` from
+> `evt_3tya2nmzc0qtf` (which hunted this very candidate). **Neither was asked
+> of them and neither absence is a shortfall on their part** — that is the
+> Steward's sequencing, told to the ring at `evt_11echdf4h73de`. Do not read
+> the partial as an incomplete delivery.
+>
+> **The `D0` oracle was re-run against the original mutation by the Adversary
+> and KILLS it**, with the first discriminating row producing the exact
+> expected diff. **What landed works.** `D3` is a second dimension the same
+> instrument does not reach, not a defect in what shipped.
 
 ## `D2` — state the bottom_id exclusion as a CRITERION, not as a constant
 
@@ -200,6 +226,56 @@ sentence, and a scheduled recurrence removed.**
 behind it — fitting a future tree rather than this one, and `AC-2` of the
 merged node forbids it today.
 
+## `D3` — the INDEX axis, which `D0` left open. Folded 2026-08-16.
+
+**From Adversary `evt_3tya2nmzc0qtf`, hunting the merged `D0`-`D1` range.
+The `D0` oracle was re-run against the original mutation and kills it — the
+finding is not that `D0` failed, but that it pins ONE of two dimensions.**
+
+**Verified verbatim by the Steward at `fo_kripke.rs:950-957`:**
+
+```rust
+QTerm::Bound(i) if *i == depth => *replacement,        // exercised by D0
+QTerm::Bound(i) if *i > depth  => QTerm::Bound(i - 1), // NOT exercised
+QTerm::Bound(i)                => QTerm::Bound(*i),    // NOT exercised
+```
+
+**Every `D0` row's leaf index equals its binder count** — `leaf(1)` under one
+binder, `leaf(2)` under two — **so `i == depth` fires on all of them.** The
+Adversary mutated the other two arms and both survived: dropping the decrement
+left **21 green** (9 unit + 6 + 6 acceptance); making the `i < depth` arm return
+the replacement left **9 unit green**.
+
+> ### THIS NODE'S OWN BLINDNESS ARGUMENT APPLIES UNCHANGED TO THESE TWO ARMS.
+>
+> `D0`'s warrant is that `subst0_form`'s only callers are `search` and
+> `check_tree`, so a depth error is applied identically by producer and checker
+> and **every end-to-end test is structurally blind at any depth, forever.**
+>
+> ⇒ **That argument does not weaken for the index axis.** The direct oracle is
+> the only instrument that could ever see these two arms, **and it does not
+> reach them.** This is not a gap a deeper corpus would close.
+
+**Two rows in the existing `check(...)` harness close it:**
+
+1. `subst_form_at(ForallObj(leaf(3)), 0, p)` — depth 1, `Bound(3) > 1`, expect
+   `ForallObj(DomainA(Bound(2), Bound(2)))`. **Pins the decrement**, the
+   standard de Bruijn shift-down that keeps **outer** references correct once
+   the quantifier is consumed.
+2. `subst_form_at(ForallObj(ForallObj(leaf(0))), 0, p)` — depth 2,
+   `Bound(0) < 2`, expect the leaf **unchanged**. **Pins the inner binder.**
+
+**Either defect mis-instantiates a certificate body**, which is the same class
+of consequence `D0` was built for.
+
+> **`AC-3` already does exactly this for the DEPTH axis** — the shallow row is
+> included *"so the boundary is on the record rather than merely absent."*
+> **The index axis has the same boundary and it is not on the record.** `D3` is
+> that same discipline, one dimension over — not a new kind of obligation.
+
+**Take `D3` together with `D2`.** Both are folded-after-release additions from
+Adversary hunts; neither was asked of the ring in the original kick.
+
 ## Acceptance criteria
 
 **`AC-1`.** **The `D0` rows discriminate, demonstrated by mutation.** Apply the
@@ -219,6 +295,21 @@ as the boundary rather than omitted as uninteresting.
 `mentions_var0`, `quote_iform`, `denote`, `shift`, `check_tree`, `check_cert`,
 conjunct 3, or `collect_signature_candidates`'s **behaviour** — `D2` changes
 only how its exclusion is explained.
+
+**`AC-8`. `D3`'s two rows are mutation-proven, one arm each.** Drop the
+decrement (`i > depth => Bound(*i)`) and row 1 must red; make the `i < depth`
+arm return `*replacement` and row 2 must red. **Both demonstrated and reverted,
+separately** — a single mutation that reds both rows has not shown they pin
+different arms, which is the entire content of `D3`.
+
+> **The Adversary measured 21 green and 9 green against these two mutations on
+> the tree as it stands.** Those are the numbers the new rows have to move; if a
+> mutation still leaves them green, the row is not reaching the arm.
+
+**`AC-9`. No `D3` row routes through `search` or `check_cert`**, and no expected
+`Form` is computed by calling `subst_form_at`. **Same standard as `AC-2`, for
+the same reason** — the callers-agree blindness is exactly why a direct oracle
+is the only instrument here.
 
 **`AC-7`. `D2` states a CRITERION, and excludes no new constant.** The clause
 must name the coupling — *any `Const` `quote_iform` recognizes as a formula in

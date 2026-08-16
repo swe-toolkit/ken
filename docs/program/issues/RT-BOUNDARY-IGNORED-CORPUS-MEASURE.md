@@ -1,13 +1,13 @@
 ---
 id: RT-BOUNDARY-IGNORED-CORPUS-MEASURE
 title: "Read unit_boundary_environment_fields on the six ignored closure-at-boundary tests, the population the merged measurement's own selection rule excluded"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
 depends_on: [RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2381
 origin: "Steward, 2026-08-15, on Adversary hunt evt_71wmpee00vt3j against the merged range de551a4dd..4eec77390 (PR #2352, squash a1c064d5f). The six #[ignore] attributes and the 33-attribute total were verified against the tree by the Steward before filing. Steward-filed per COORDINATION section 2."
 ---
 
@@ -65,6 +65,113 @@ construction, not observed.**
   say is that the excluded set is precisely the population of interest.**
 - [[RT-CLOSURE-BOUNDARY-LANE]] is `merged` (PR #2322) and owns those six tests.
   It is not a fold target — this is a measurement its closure did not take.
+
+> # MERGED 2026-08-16 as PR #2381. `D0`-`D2` COMPLETE.
+>
+> **Candidate `c88a5e423bb61669ab8a1f3421bdcb610ba992f9`, base `2b4ad0faa`
+> (current `main` at request time), sole path
+> `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/control.rs`,
+> `+3/-0`.** Blob identity verified from the declared base: candidate blob
+> `61ff1133` is the one on `main`; base was `532f51b2`. Decision
+> `dec_4ypcc3yykgvp6` resolved, Architect verdict `evt_29828sqq22195`, QA
+> `evt_5ybnmbbm8pwth`.
+>
+> **Production is byte-identical structurally, not by inspection:**
+> `core.rs:11-12` gates the subtree `#[cfg(test)] mod tests;`, and the delta is
+> three doc-comment lines inside it.
+>
+> ### `D0`'s PER-TEST RESULT, RECORDED HERE BECAUSE IT IS BARRED FROM THE COMMENT
+>
+> **All six were driven individually with `--ignored`. Each returned three
+> completed returns, an empty observed `unit_boundary_environment_fields`, then
+> the expected `Closure` refusal.** All six agreed; `AC-1` exists because one
+> test disagreeing with five is the interesting case, and the agreement is a
+> measured result rather than an assumption.
+>
+> | test site | result |
+> |---|---|
+> | `px8l_recursive_decl_native.rs:196` | 3 completed returns, empty, `Closure` refusal |
+> | `px8l_recursive_decl_native.rs:215` | 3 completed returns, empty, `Closure` refusal |
+> | `px8ta_oriented_subcontinuation.rs:279` | 3 completed returns, empty, `Closure` refusal |
+> | `rt_escape_second_resource_native.rs:628` | 3 completed returns, empty, `Closure` refusal |
+> | `rt_escape_second_resource_native.rs:685` | 3 completed returns, empty, `Closure` refusal |
+> | `rt_parity_native.rs:643` | 3 completed returns, empty, `Closure` refusal |
+>
+> **The six sites and their verbatim `#[ignore]` reason were re-verified by the
+> Steward against the tree before publishing**, per the standing rule that a
+> cited coordinate is not a verified one.
+>
+> ⇒ **`D1` resolves to the first row: empty on all six.**
+>
+> > ### THE CONCLUSION I FIRST WROTE HERE WAS TOO STRONG. Adversary `evt_6d81evnk2nyfn`.
+> >
+> > **It read: *"the emptiness claim survives a corpus that can actually
+> > contain the shape."* THAT DOES NOT FOLLOW, and the reason is the
+> > Architect's own ruling one box down.**
+> >
+> > If those three returns structurally **cannot** populate the field, then
+> > **"all six agreed" is FORCED, not OBSERVED.** These six cannot contain the
+> > shape either — **that is precisely why they are ignored.** I used the
+> > ruling to bar the returns from the comment and then, in the same breath,
+> > drew a conclusion that only holds if those returns were capable of
+> > disagreeing.
+> >
+> > **The honest reading of `D0`, which is still worth having:** the six were
+> > **measured individually rather than argued**, and each refuses before the
+> > crossing exactly as its `#[ignore]` reason claims. **That converts six
+> > assumed behaviours into six measured ones.** It is **not** evidence that
+> > the emptiness claim survives a shape-bearing corpus.
+> >
+> > ⇒ **The population that would actually test the claim remains UNMEASURED:
+> > a program that REACHES the crossing and completes.** Both the original 81
+> > returns and these 18 are drawn from programs that cannot.
+>
+> > ### WHY THIS TABLE MUST NOT BE FOLDED INTO THE LANDED COMMENT
+> >
+> > **Architect, `evt_29828sqq22195`, and it is a reusable rule.** Those three
+> > returns **precede the attempted crossing, and the crossing that would
+> > populate the field is exactly what gets refused.** Folding them in would
+> > **raise the tally while weakening what it means** — the vacuous-control
+> > shape [[RT-CLOSURE-CROSSING-ELIMINATE]] `D0` exists to repair. **A larger
+> > N drawn from returns that cannot exhibit the shape is worse evidence than a
+> > smaller N that can.**
+>
+> ### MY "PERISHABLE" CALL WAS INVERTED. Adversary `evt_6d81evnk2nyfn`.
+>
+> I recorded that the paraphrase dropping *"fails at base 21fd46dc"* left the
+> base pin as the perishable part, worth restoring. **That is backwards.
+> Dropping the SHA makes the paraphrase MORE durable — the reason outlives the
+> SHA.**
+>
+> **The perishable clause is the one that was ADDED.** *"each is marked
+> `#[ignore]`"* is a **present-tense claim about the tree** that becomes false
+> exactly when `RT-CLOSURE-BOUNDARY-LANE` succeeds — **which is the entire
+> point of that node.** The comment's opening SHA pin bounds it, so this is a
+> note and not a defect. **Do not "restore" the base pin on the strength of my
+> original note.**
+
+> ### THE NAMED EXCLUSION IS SIX. THE CORPUS EXCLUDES 33. -> Successor.
+>
+> **Censused by the Steward at the merge SHA:** `crates/ken-cli/tests` carries
+> **161 `#[test]` and 33 `#[ignore]`** — `RT-CARRIER-BYTESPAN-OBSERVE` 20,
+> `RT-CLOSURE-BOUNDARY-LANE` **6 (the ones named)**,
+> `RT-CARRIED-RESOURCE-SCALAR` 3, `RT-FRAME-MARKER-ONCE` 2,
+> `RT-PROCESS-EXIT-STATUS` 1, `RT-COMPMATCH-TREE-SCRUTINEE` 1.
+>
+> **An ignored test contributes zero returns regardless of WHY it is ignored.**
+> The corpus's membership rule is `#[ignore]`, **not `#[ignore] for closures`**
+> ⇒ **naming six re-selects by stated reason, which is the very reasoning the
+> original finding was about, one scale down.**
+>
+> **And the largest excluded block is not remote from the mechanism.** The 20
+> `RT-CARRIER-BYTESPAN-OBSERVE` ignores concern **synthesized-aggregate carrier
+> transport — the same subsystem being measured.** Whether any of the other 27
+> can populate the field is neither measured nor argued.
+>
+> ⇒ [[RT-IGNORED-CORPUS-MEMBERSHIP-RULE]], a one-clause repair: **say the
+> corpus excludes all 33 ignored tests, of which the six closure-at-boundary
+> ones were measured individually.** That states the membership rule and keeps
+> the credit for the six.
 
 ## Deliverables
 
