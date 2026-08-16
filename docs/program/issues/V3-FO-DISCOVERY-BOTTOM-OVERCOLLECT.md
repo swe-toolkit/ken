@@ -1,7 +1,7 @@
 ---
 id: V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT
 title: "Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect"
-status: ready
+status: active
 owner: language
 size: S
 gate: none
