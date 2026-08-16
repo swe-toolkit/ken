@@ -1,12 +1,12 @@
 ---
 id: V3-FO-KEN-LEVEL-CHECKER-AUTHORING
 title: "Author the Ken-level check_cert, embed, Form and Cert so the conversion cost 23 section 4.4 names becomes measurable at all, and take that measurement"
-status: active
+status: merged
 owner: language
 size: L
 gate: none
 depends_on: [V3-FO-CONVERSION-LOAD-MEASURED]
-blocks: []
+blocks: [V3-FO-CHECKER-SOUNDNESS]
 github: null
 origin: "Steward scope call evt_6m3q3tsvg09pz, 2026-08-15, on Architect review evt_7cmys9wyp7k8c of V3-FO-CONVERSION-LOAD-MEASURED at b52d160c8. The absence of check_cert from library/ and catalog/ was verified by the Steward against the tree at origin/main 30ee4dbf1 before filing. Steward-filed per COORDINATION section 2."
 ---
@@ -543,7 +543,10 @@ is exactly what the predecessor's `D4` had to be corrected for.
 
 ## Banned scope
 
-- **Proving `embedding_adequacy` or `checker_soundness`.** Unfiled successors.
+- **Proving `embedding_adequacy` or `checker_soundness`.** `checker_soundness`
+  is now [[V3-FO-CHECKER-SOUNDNESS]], filed `ready` on this node's merge.
+  `embedding_adequacy` remains unfiled — it needs `denote`, which does not
+  exist, and it is that node's successor rather than this one's.
 - **Emitting `proved` for FO**, on any basis.
 - **Widening the slice** beyond `23 §4.5`.
 - **Changing the Rust checker to make `D3` agree.** It is the reference.
@@ -595,3 +598,73 @@ or with verify's [[V3-Z3-EMISSION-CONTROL]].
 
 **Not a prerequisite for anything, and nothing waits on it.** A hard stop or a
 pathological measurement is a complete result; see `D5`.
+
+## Closed 2026-08-16. Two items ride past it, and neither is owed by this node.
+
+**All six deliverables landed.** `D0`-`D1` `41b49d94a`, `D2` `261483836`,
+`D3` `996ffbb93`, `D4`+`D5` PR #2421 — Architect approval `evt_63v4a4yyr4vte`,
+Decision `dec_4kd13xyfwd5c6` resolved on exact `04af417d2`.
+
+**`D4`/`D5` result:** kernel conversion of `fok_check_cert` is **four to five
+orders of magnitude** more expensive than the Rust reference checker at matching
+depths, with super-linear rather than the reference's roughly-quadratic growth.
+The corpus is capped at `imp_chain` depth 8 and `forall_chain` depth 4 against
+the predecessor's depth 64, and **that cap is reported as the `D5` reach result**
+rather than worked around. Seven cases, all terminating and accepted, fixed
+production fuel 200, 1 GiB thread.
+
+`AC-4` holds: **no FO `Proved` verdict on any basis.** `23 §4.4`'s reservation
+is untouched. The successor is [[V3-FO-CHECKER-SOUNDNESS]].
+
+> ### `refl True` IS WRONG IN THE SPEC, AND `D4` IS WHERE IT WAS MEASURED
+>
+> This node's own framing, `23 §4.4:531`, and `fo-route-theorem-home.md:110` all
+> write the discharge as `sound Sigma C rho f pi (refl True)`. **This kernel
+> rejects `Equal Bool True True = Refl`** — *"Refl expects an Eq-shaped goal"* —
+> because equality at an inductive type reduces observationally past the `Eq`
+> shape before `Refl`'s check runs.
+>
+> **`Proved` is the correct term** (`prelude.rs:899`, `Proved : Top`), it is the
+> prelude's own established idiom, and it forces the *identical* conversion:
+> the reduction of `fok_check_cert (...)` happens inside `eq_at_inductive`'s
+> `whnf` calls on the goal **type**, before either proof term is considered.
+>
+> ⇒ **The discharge shape is sound; the spec's spelling of it is not.** Recorded
+> here and carried into the successor. Correcting `23 §4.4` is the enclave's.
+
+**Rider 1 — `sequent_source`'s `gamma`/`delta` field order is UNMEASURED.** The
+Architect's `D3` review claimed eleven empty-`gamma` cases protect it. That
+claim was made by the same read-the-field-values method by which the parallel
+`Init` claim was refuted, and the Architect withdrew it as unmeasured
+(`evt_2v5t7ekqzhqee`). Two pins landed at `D4` — `rule_source` and
+`qterm_source`, each mutation-proved. **No pin covers `sequent_source`. It is an
+open question, not a discharged one**, and anything reusing the serializer
+inherits it.
+
+**Rider 2 — the durable `D5` report omits the BUILD PROFILE.** The file writes
+the fuel down on the predecessor's *a measurement's parameters must be written
+down to be re-takeable* argument, and the identical argument applies to profile,
+which moves this workload more than fuel does. The routing message said
+*"release/build profile"*; the artifact's only profile word is `"debug profile"`
+at line 92, attached to hand-probes the file explicitly excludes from the
+durable record. **The headline four-to-five-orders comparison against the
+predecessor's 265 microseconds is unanchored at both ends if the profiles
+differ.** The `D5` conclusion survives either way, which is why it did not block.
+
+> ### THE SHAPE THIS NODE PRODUCED FOUR TIMES, KEPT BECAUSE IT IS THE LESSON
+>
+> **A property that holds because of what the corpus happens to contain, with
+> nothing making it hold.**
+>
+> | # | instance | found by |
+> |---|---|---|
+> | 1 | two rejection cases rejected by two guards each | reading |
+> | 2 | `fok_form_eq` arms droppable, suite green | **mutation** |
+> | 3 | `placeholder_child` inert only because unreached | reading |
+> | 4 | serializer axes held by an asymmetric population | **mutation** |
+>
+> **The two found by mutation were invisible to three readers, and in both the
+> reasoned safety argument was WRONG rather than merely unproven.** Instance 3
+> was closed by naming rather than by inertness — `rejecting_child_never_reached`
+> — which is the durable form. **A control's discriminating power is a
+> measurement, never a reading.**
