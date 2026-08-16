@@ -160,6 +160,29 @@ failure loop. **The four-places sharded-matrix discipline at `ci.yml:192-205`
 does not apply** — the matrix runs this crate's lib tests with default features,
 so a feature-on run is a distinct configuration, not a binary exclusion.
 
+> ### `D2a` HAS LANDED, and its M7 was never recorded
+>
+> **So the gate below reads as unmet when it is not.**
+>
+> **Verified by blob, not by ancestry:** `.github/workflows/ci.yml` at candidate
+> `17dd097b5812646f94a16b0e4e0e4229db93ff58` is **identical** to the file on
+> `origin/main`, and `z3-emission-control` appears there. Decision
+> `dec_4y9mg19kem5mr` is `resolved`, APPROVED by the Architect at that exact
+> SHA. Shape matched its declaration: one non-merge commit, `ci.yml` only,
+> `+13/-0`, purely additive.
+>
+> **What this does NOT say:** that `AC-7` is discharged. `AC-7` asks for a CI
+> run on the PR showing `D1` actually running, which is evidence the verify ring
+> supplies — landing the job and the job selecting a new target are different
+> facts, and conflating them is the exact failure `D2a` exists to prevent.
+>
+> **What it does say:** the *"only after `D2a` is green on `main`"* condition
+> below is no longer waiting on a publish. **A seat status line reading
+> "awaiting publish" for this candidate is stale.**
+>
+> This node stays `active` with `D2b` undelivered, which is the correct record
+> for a quiet lane — not a stall.
+
 **`D2b` — only after `D2a` is green on `main`.** Make the round-trip test skip
 when `z3` is absent rather than asserting unconditionally, and take the
 `z3-process-adapter` job out of the required aggregate. **State in the commit
