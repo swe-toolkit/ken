@@ -251,6 +251,24 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > only fail to. Its bar is **totality or a named refusal**, and a **silent**
 > conservative fail-closed arm is barred.
 >
+> ### `D1c` ANSWERED IT, AND NOT WITH A PORT. The bar moved; it did not lift.
+>
+> **`evt_1e5wbj4af4xbc`, exact `b7f65ad0c`.** For both scalar-selected rows, the
+> **production** run and the **excluded** run returned the **identical**
+> refusal, with pre-exclusion residual exactly `{MatchScrutineeRecursor}` and
+> the `debug_assert!(was_present)` in force. ⇒ **Retiring the variant changes
+> nothing for those rows. There is no capability there to lose.**
+>
+> **A regression is a DIFFERENCE, and the measured difference is zero.** The
+> premise this bar carried — *"the population compiles today via the retained
+> lane"* — is not merely unwarranted, it is **FALSE for the scalar rows**.
+>
+> **THE BAR IS NOT LIFTED. The differential covers 2 of the 5 rows.** Rows 2, 4
+> and 5 execute under **exclusion**; **nobody has run them under retention to
+> confirm the same decoded value.** A silent value change is exactly what a lane
+> swap causes and exactly what "it compiles and runs" does not detect. **`D1d`
+> is that measurement, and deletion waits on it plus a ruling.**
+
 > ### THAT BLOCKER'S ID NAMES A HYPOTHESIS, NOT A SETTLED DISPOSITION.
 >
 > **An ID cannot carry a disjunction.** `RT-MATCH-SCRUTINEE-PORT` asserts
