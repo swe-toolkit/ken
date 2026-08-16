@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 00:33:03Z — from 328 issue file(s) in `docs/program/issues/`.
+2026-08-16 00:35:03Z — from 328 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -285,7 +285,7 @@ the committed file matches the generator's output.
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NESTED-IH-NATIVE-REALIZATION` | Native realization of the nested-IH recursive computation beyond scalar admission -- emitted definition, ABI/owner wiring, and execution that survives the Cranelift verifier and agrees with the interpreter at Nat 3 | active | runtime | L | none | — |
-| `RT-OVERCONSTRUCTED-OUTER-RECOGNITION` | Stop minting static-worker recognitions for nested constructor fields whose transports no emitted call ever names, and establish the non-traversal as a property of the emitter rather than of the measured rows | ready | runtime | M | none | — |
+| `RT-OVERCONSTRUCTED-OUTER-RECOGNITION` | Stop minting static-worker recognitions for nested constructor fields whose transports no emitted call ever names, and establish the non-traversal as a property of the emitter rather than of the measured rows | active | runtime | M | none | — |
 | `RT-PARITY` | interpreter/native parity erratum (adversary F5 + F6) | closed | runtime | M | none | — |
 | `RT-PLANNED-CLOSURE-PREEXISTENCE` | Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction? | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2317 |
 | `RT-PLANNER-ATTRIB-K` | Boundary A planner: fixed K is a design invariant — move the K-exceeded rejection off the capacity channel | merged | runtime | XS | none | https://github.com/swe-toolkit/ken/pull/935 |
