@@ -1042,6 +1042,256 @@ mod tests {
     use super::*;
     use ken_kernel::GlobalEnv;
 
+    /// `V3-FO-GUARD-SHIFT-DIFFERENTIAL` `D0`-`D2`: pin `mentions_var0`
+    /// against the exact `shift`-built oracle `mentions_var0(t) <=>
+    /// shift(shift(t, -1, 0), 1, 0) != t`, rather than merely documenting
+    /// the discipline it must match. `mentions_var0` encodes
+    /// `ken_kernel::shift`'s binder discipline a SECOND time, in a second
+    /// file; this test is what makes that duplication provably safe rather
+    /// than merely readable. The oracle is built from `shift` itself, so it
+    /// cannot disagree with it -- it catches an EXISTING `Term` variant
+    /// silently changing binder status, which `mentions_var0`'s own
+    /// exhaustive match (`V3-FO-QUOTE-GUARD-FAIL-CLOSED` `D1`) only guards
+    /// against for a NEW variant, at compile time.
+    ///
+    /// **`D2`: this test's own soundness depends on `shift`'s underflow
+    /// guard leaving `Var(0)` unchanged at `d = -1, cutoff = 0`**
+    /// (`subst.rs`, documented there by `V3-FO-QUOTE-GUARD-FAIL-CLOSED`
+    /// `D3`). Down-shift: a free `Var(0)` hits that guard and stays
+    /// `Var(0)`; every other free `Var(i)` becomes `Var(i-1)`. Up-shift:
+    /// each `Var(i-1)` returns to `Var(i)`, but the stayed `Var(0)` becomes
+    /// `Var(1)`. So the round trip is the identity IFF no free `Var(0)`
+    /// occurs -- exactly `mentions_var0`'s own question. **If that guard's
+    /// semantics ever change (panic, wrap, or a different placeholder),
+    /// this test is EXPECTED to break, by design** -- that is the
+    /// dependency surfacing, not a regression to chase.
+    ///
+    /// Confirmed at the point of use against `subst.rs` (not merely cited):
+    /// `shift`'s only `cutoff + 1` arms are `Pi.b`, `Lam.t`, `Sigma.b`,
+    /// `Let.body` -- covered explicitly below, each with both an
+    /// outer-reference case (`Var(1)`, crosses the binder, mentioned) and
+    /// an own-var case (`Var(0)`, the binder's own variable, NOT
+    /// mentioned). `Elim`'s `..` covers only `fam`/`level_args` (no `Term`
+    /// subterms); its five term-bearing fields (`params`, `motive`,
+    /// `methods`, `indices`, `scrut`) are each covered explicitly.
+    #[test]
+    fn mentions_var0_agrees_with_shift_round_trip_oracle() {
+        fn oracle(t: &Term) -> bool {
+            shift(&shift(t, -1, 0), 1, 0) != *t
+        }
+        fn check(label: &str, t: Term) {
+            assert_eq!(
+                mentions_var0(&t),
+                oracle(&t),
+                "{label}: mentions_var0 and the shift-round-trip oracle must agree, got {t:?}"
+            );
+        }
+
+        let leaf = || Term::Type(Level::zero());
+        let gid = GlobalId(0);
+
+        // ── Leaves: no Term subterm position; oracle and traversal both false ──
+        check("Type", Term::Type(Level::zero()));
+        check("Omega", Term::Omega(Level::zero()));
+        check("Const", Term::Const { id: gid, level_args: vec![] });
+        check("IntLit", Term::IntLit(num_bigint::BigInt::from(0)));
+        check("IndFormer", Term::IndFormer { id: gid, level_args: vec![] });
+        check("Constructor", Term::Constructor { id: gid, level_args: vec![] });
+
+        // ── Var: the base case itself ──
+        check("Var(0)", Term::Var(0));
+        check("Var(1)", Term::Var(1));
+
+        // ── Binders: the four cutoff+1 arms, each distinguished explicitly ──
+        // Domain position (same depth as the binder itself): Var(0) is a
+        // direct outer reference, mentioned.
+        check("Pi.a", Term::pi(Term::Var(0), leaf()));
+        check("Lam.a", Term::lam(Term::Var(0), leaf()));
+        check("Sigma.a", Term::sigma(Term::Var(0), leaf()));
+        check(
+            "Let.ty",
+            Term::Let { ty: Box::new(Term::Var(0)), val: Box::new(leaf()), body: Box::new(leaf()) },
+        );
+        check(
+            "Let.val",
+            Term::Let { ty: Box::new(leaf()), val: Box::new(Term::Var(0)), body: Box::new(leaf()) },
+        );
+        // Binder position at depth+1: Var(1) is a reference to the OUTER
+        // var0 (crosses the binder), mentioned.
+        check("Pi.b (outer ref)", Term::pi(leaf(), Term::Var(1)));
+        check("Lam.t (outer ref)", Term::lam(leaf(), Term::Var(1)));
+        check("Sigma.b (outer ref)", Term::sigma(leaf(), Term::Var(1)));
+        check(
+            "Let.body (outer ref)",
+            Term::Let { ty: Box::new(leaf()), val: Box::new(leaf()), body: Box::new(Term::Var(1)) },
+        );
+        // Binder position at depth+1: Var(0) is the BINDER'S OWN variable,
+        // not the outer one -- NOT mentioned.
+        check("Pi.b (own var)", Term::pi(leaf(), Term::Var(0)));
+        check("Lam.t (own var)", Term::lam(leaf(), Term::Var(0)));
+        check("Sigma.b (own var)", Term::sigma(leaf(), Term::Var(0)));
+        check(
+            "Let.body (own var)",
+            Term::Let { ty: Box::new(leaf()), val: Box::new(leaf()), body: Box::new(Term::Var(0)) },
+        );
+
+        // ── The parent mistake, isolated: Pair vs Sigma on the SAME
+        // b=Var(0) input. Sigma is a binder (b at depth+1): Var(0) there is
+        // the binder's own variable, not mentioned. Pair is NOT a binder
+        // (b at the SAME depth): Var(0) there IS the outer reference,
+        // mentioned. Opposite answers on an otherwise-identical input is
+        // exactly the non-degenerate pair that would catch `Pair` being
+        // grouped with the binders again (`D1`, `AC-1`).
+        check("Pair.a", Term::pair(Term::Var(0), leaf()));
+        check("Pair.b (same depth)", Term::pair(leaf(), Term::Var(0)));
+        assert!(
+            mentions_var0(&Term::pair(leaf(), Term::Var(0))),
+            "Pair.b at Var(0) must be mentioned -- Pair does not shift its second component"
+        );
+        assert!(
+            !mentions_var0(&Term::sigma(leaf(), Term::Var(0))),
+            "Sigma.b at Var(0) must NOT be mentioned -- Sigma's second component is under its own binder"
+        );
+
+        // ── Non-binders: every remaining multi-subterm constructor, all
+        // positions at the same depth ──
+        check("App.f", Term::app(Term::Var(0), leaf()));
+        check("App.a", Term::app(leaf(), Term::Var(0)));
+        check("Proj1", Term::proj1(Term::Var(0)));
+        check("Proj2", Term::proj2(Term::Var(0)));
+        check("Ascript.t", Term::Ascript(Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Ascript.a", Term::Ascript(Box::new(leaf()), Box::new(Term::Var(0))));
+        check("Eq.ty", Term::Eq(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())));
+        check("Eq.t", Term::Eq(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Eq.u", Term::Eq(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))));
+        check("Refl", Term::Refl(Box::new(Term::Var(0))));
+        check(
+            "Cast.a",
+            Term::Cast(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf()), Box::new(leaf())),
+        );
+        check(
+            "Cast.b",
+            Term::Cast(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())),
+        );
+        check(
+            "Cast.e",
+            Term::Cast(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())),
+        );
+        check(
+            "Cast.t",
+            Term::Cast(Box::new(leaf()), Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))),
+        );
+        check("J.m", Term::J(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())));
+        check("J.d2", Term::J(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())));
+        check("J.e", Term::J(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))));
+        check("Quot.a", Term::Quot(Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Quot.r", Term::Quot(Box::new(leaf()), Box::new(Term::Var(0))));
+        check("QuotClass", Term::QuotClass(Box::new(Term::Var(0))));
+        check(
+            "QuotElim.motive",
+            Term::QuotElim {
+                motive: Box::new(Term::Var(0)),
+                method: Box::new(leaf()),
+                respect: Box::new(leaf()),
+                scrut: Box::new(leaf()),
+            },
+        );
+        check(
+            "QuotElim.method",
+            Term::QuotElim {
+                motive: Box::new(leaf()),
+                method: Box::new(Term::Var(0)),
+                respect: Box::new(leaf()),
+                scrut: Box::new(leaf()),
+            },
+        );
+        check(
+            "QuotElim.respect",
+            Term::QuotElim {
+                motive: Box::new(leaf()),
+                method: Box::new(leaf()),
+                respect: Box::new(Term::Var(0)),
+                scrut: Box::new(leaf()),
+            },
+        );
+        check(
+            "QuotElim.scrut",
+            Term::QuotElim {
+                motive: Box::new(leaf()),
+                method: Box::new(leaf()),
+                respect: Box::new(leaf()),
+                scrut: Box::new(Term::Var(0)),
+            },
+        );
+        check("Trunc", Term::Trunc(Box::new(Term::Var(0))));
+        check("TruncProj", Term::TruncProj(Box::new(Term::Var(0))));
+        check("Absurd.motive", Term::Absurd(Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Absurd.proof", Term::Absurd(Box::new(leaf()), Box::new(Term::Var(0))));
+
+        // ── Elim: five term-bearing positions (fam/level_args carry no
+        // Term subterms) ──
+        check(
+            "Elim.params",
+            Term::Elim {
+                fam: gid,
+                level_args: vec![],
+                params: vec![leaf(), Term::Var(0)],
+                motive: Box::new(leaf()),
+                methods: vec![],
+                indices: vec![],
+                scrut: Box::new(leaf()),
+            },
+        );
+        check(
+            "Elim.motive",
+            Term::Elim {
+                fam: gid,
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(Term::Var(0)),
+                methods: vec![],
+                indices: vec![],
+                scrut: Box::new(leaf()),
+            },
+        );
+        check(
+            "Elim.methods",
+            Term::Elim {
+                fam: gid,
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(leaf()),
+                methods: vec![leaf(), Term::Var(0)],
+                indices: vec![],
+                scrut: Box::new(leaf()),
+            },
+        );
+        check(
+            "Elim.indices",
+            Term::Elim {
+                fam: gid,
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(leaf()),
+                methods: vec![],
+                indices: vec![leaf(), Term::Var(0)],
+                scrut: Box::new(leaf()),
+            },
+        );
+        check(
+            "Elim.scrut",
+            Term::Elim {
+                fam: gid,
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(leaf()),
+                methods: vec![],
+                indices: vec![],
+                scrut: Box::new(Term::Var(0)),
+            },
+        );
+    }
+
     /// `D1`/`AC-3`: both controls quote; an out-of-slice form is refused by
     /// construction, not by a fallthrough.
     #[test]
