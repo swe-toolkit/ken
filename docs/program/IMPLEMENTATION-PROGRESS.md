@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 19:06:35Z — from 354 issue file(s) in `docs/program/issues/`.
+2026-08-16 19:16:30Z — from 354 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -254,7 +254,7 @@ the committed file matches the generator's output.
 | `RT-CTOR-TRANSPORT-RECOGNITION-ASYMMETRY` | Why constructor 26 field 0's worker transport is not on the recognized-transport path that constructor 36's is, and whether the route repair is what diverts it | closed | runtime | S | none | — |
 | `RT-DECL-CLOSURE-PORT` | Transparent-declaration-closure emission port — a retained TransparentDeclarationClosure residual forces the whole object onto the monolithic RecursiveDescent root, which exceeds Cranelift's per-function ceiling | merged | runtime | L | none | — |
 | `RT-DEPTH2-VAR-PARENT-DERIVATION` | Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one | closed | runtime | S | none | — |
-| `RT-DESCENT-RETIRE-PRIOR-ART` | The retirement's discharge is now a research referral -- Ken's own rules cannot settle source-reachability of the retained difference, so ask how other implementations closed the same shape and what that says about retiring the lane | active | research | M | none | — |
+| `RT-DESCENT-RETIRE-PRIOR-ART` | Prior art admits the shape and carries no second descent lane -- retirement is supported, but only after a stated and enforced pre-classifier IR invariant, never by source unreachability | merged | research | M | none | — |
 | `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | draft | runtime | M | none | — |
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
@@ -465,7 +465,6 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CENSUS-CAVEAT-GUARD` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
-- `RT-DESCENT-RETIRE` blocked by `RT-DESCENT-RETIRE-PRIOR-ART` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
