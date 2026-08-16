@@ -114,10 +114,35 @@ unflattering.** A sentence such as *"this program has no reason to exist except
 to trip the refusal"* is a **complete and valuable** discharge of this AC. **Do
 not manufacture plausibility.**
 
-**`AC-3`. A negative result is reported as a result, not as a failed turn.**
-If no reasonable source program reaches the refusal, say so and hand back.
-**That outcome makes the operator's decision easier, not harder**, and a turn
-that produces it has succeeded.
+**`AC-3`. A negative result is reported as a result, not as a failed turn** —
+**and it must be reported as REACHABILITY, never as absence of expectations.**
+If no reasonable source program reaches the refusal, say so and hand back; a
+turn that produces that has succeeded.
+
+> ### A ZERO HERE IS CONSISTENT WITH TWO WORLDS. SAY WHICH ONE YOU MEASURED.
+>
+> **Architect `evt_737c6vk66jztr`, correcting this AC as first written.** It
+> said a zero result *"makes the operator's decision easier."* **The first half
+> — that a zero is a real result — stands. The inference does not.**
+>
+> | world | what a census shows | implication |
+> |---|---|---|
+> | no well-typed Ken program **can** reach the refusal | zero end-to-end expectations | the stance costs little |
+> | no end-to-end layer **has ever tried** | zero end-to-end expectations | the cost is unmeasured, and the refusal may be squarely in the way |
+>
+> **These are indistinguishable from the outside**, and the corrected census —
+> 40 expected outcomes in `ken-runtime`, zero in `ken-cli`, `ken-elaborator`,
+> `ken-verify`, `ken-host`, `ken-interp` — is equally consistent with both.
+>
+> ⇒ **A census of what the corpus EXPECTS cannot answer this node's question.**
+> The deliverable is an attempt to *drive a well-typed Ken program into the
+> refusal*, and the report must say which of the two worlds the attempt
+> established. **"I found no expectations" discharges nothing.**
+>
+> **This is the third instance of one shape today** — `subst_qterm_at`'s
+> decrement arm and the six ignored tests were both unexercised-versus-
+> unreachable. **Unexercised and unreachable look identical until something
+> tries.**
 
 **`AC-4`. Row 1 is OUT OF SCOPE.** `NativeJoinPlanV1`'s *"terminal answer has
 no affine checked-root authority"* is a **different kind of thing** — an affine
@@ -146,9 +171,40 @@ targeted only — `-p ken-runtime` / `-p ken-cli`, never `--workspace`.
 ## Sequencing
 
 **Ahead of the operator's ruling if the operator wants magnitude first;
-otherwise alongside.** The Steward recommended accepting the narrowings without
-waiting on this, so it is not a hard gate — but it is the one measurement that
-would change the recommendation.
+otherwise alongside.** Not a hard gate — but it is the one measurement that
+bounds the cost.
+
+> ### WHAT THIS NODE FEEDS CHANGED. It is now an input to a SPEC question.
+>
+> **Architect `evt_737c6vk66jztr`.** The refusal is not merely an undecided
+> stance — **it is in tension with a contract that already exists.**
+>
+> `45 §3` **BE-Model (`AC3`)** states, with no carve-out for a function in a
+> constructor field and none at a unit boundary:
+>
+> > *"**Functions lower to ordinary closures** … ordinary closures and **graphs
+> > containing them** are runtime-local opaque values."*
+>
+> **A construct where a function value cannot be represented is a case where
+> functions do not lower to ordinary closures** — and a constructor carrying a
+> closure is precisely a *graph containing* one.
+>
+> ⇒ **If `45 §3` admits no exception, the refusal is a backend defect against
+> `AC3` rather than a permitted narrowing.** That question is Spec's and is
+> being framed separately. **This node measures; it does not settle it.**
+>
+> **The TCB defence is on the wrong axis and is not available here.** `45 §2`
+> **BE-NotInTCB (`AC1`)** already places the native backend **outside** the
+> type-soundness TCB, netted by differential agreement rather than trust. A
+> boxed-closure representation would add **no trusted surface**. The real cost
+> is **tested surface** — new backend machinery the corpus must cover — which
+> is a genuine but much smaller cost than the one it replaces.
+>
+> **Accepting the narrowing now is not declaring the stance ever.** If the
+> operator accepts, it lands as *"an interim limitation, recorded in the
+> `unsupported` construct lane, pending the `45 §3` question"* — **not** as
+> *"Ken has decided static workers are not first-class."* That second one is a
+> language commitment and nobody has made it.
 
 > ### RUNTIME AUTHORS. THE ADVERSARY ATTACKS. Not the other way round.
 >
