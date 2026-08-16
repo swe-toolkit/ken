@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-RETIRE
 title: "Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,9 +11,25 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # 2026-08-16 — MEASUREMENTS `A`/`B` RETURNED. BOTH VARIANTS ARE NOW FILED, AND
-> # THIS NODE IS BLOCKED BEHIND THEM. Steward.
+> # 2026-08-16 — RELEASED. TWELVE OF TWELVE DEPENDENCIES DISCHARGED; THE BAR IS
+> # LIFTED AND THIS NODE IS `ready`. Steward.
 >
+> **Do the retirement in TWO STEPS and do not collapse them** — `D2c` reroutes
+> without deleting and lets the whole corpus in CI be the differential; `D3`
+> through `D8` delete only after it is green. Frame:
+> `docs/program/wp/RT-DESCENT-RETIRE.md`. **The lift, the evidence and the
+> reason the staging exists are in the bar section below — read it before the
+> frame.**
+>
+> **The release gate is satisfied:** [[RT-FNUNIT-RESULT-TOKEN]] is `merged` and
+> no `nc22` test carries `#[ignore]`, so the one witness for the shape only this
+> lane supported is live rather than suppressed. **Verified by the Steward at
+> release, not inherited from the node's status.**
+>
+> **Everything below this block is the historical record of how the bar rose and
+> fell.** It is retained because the campaign paid for it; it is not live work.
+>
+
 > **The two read-only measurements the Architect required are complete**
 > (runtime-implementer `evt_4v0frfza70d2m`, runtime-leader `evt_1d5wb0t98jadx`),
 > at exact `3523868afe7cd84b47c7b07281ff7df7c3202d61` — a base whose complete
@@ -251,47 +267,75 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > only fail to. Its bar is **totality or a named refusal**, and a **silent**
 > conservative fail-closed arm is barred.
 >
-> ### `D1c` ANSWERED IT, AND NOT WITH A PORT. The bar moved; it did not lift.
+> ### THE BAR IS LIFTED. `D1d` COMPLETED THE DIFFERENTIAL 5-OF-5 AND THE
+> ### ARCHITECT DISCHARGED THE BLOCKER.
 >
-> **`evt_1e5wbj4af4xbc`, exact `b7f65ad0c`.** For both scalar-selected rows, the
-> **production** run and the **excluded** run returned the **identical**
-> refusal, with pre-exclusion residual exactly `{MatchScrutineeRecursor}` and
-> the `debug_assert!(was_present)` in force. ⇒ **Retiring the variant changes
-> nothing for those rows. There is no capability there to lose.**
+> **`D1c` (`b7f65ad0c`, scalar rows 1 and 3) and `D1d` (`77c52dd0a`, aggregate
+> rows 2, 4 and 5) together measured production against excluded on every row of
+> the `D1` quotient.**
 >
-> **A regression is a DIFFERENCE, and the measured difference is zero.** The
-> premise this bar carried — *"the population compiles today via the retained
-> lane"* — is not merely unwarranted, it is **FALSE for the scalar rows**.
+> | rows | production leg | excluded leg |
+> |---|---|---|
+> | 1, 3 | `UnsupportedLowering { construct: "Match", reason: "scrutinee is not a constructor value" }` | **identical** |
+> | 2, 4, 5 | `OK Returned(Int(Small(7)))` | **identical decoded value** |
 >
-> **THE BAR IS NOT LIFTED. The differential covers 2 of the 5 rows.** Rows 2, 4
-> and 5 execute under **exclusion**; **nobody has run them under retention to
-> confirm the same decoded value.** A silent value change is exactly what a lane
-> swap causes and exactly what "it compiles and runs" does not detect. **`D1d`
-> is that measurement, and deletion waits on it plus a ruling.**
-
-> ### THAT BLOCKER'S ID NAMES A HYPOTHESIS, NOT A SETTLED DISPOSITION.
+> **Every row: pre-exclusion residual exactly `{MatchScrutineeRecursor}`, live
+> `debug_assert!(was_present)` passing.** That probe is why the result means
+> anything — *"both legs agree"* is vacuous if the exclusion never activated.
+>
+> ⇒ **Exclusion is behaviour-preserving across the measured population.** The
+> aggregate rows carry more than the scalar ones: the excluded run **executed
+> and produced the value**, which is capability evidence rather than merely
+> classifier evidence.
+>
+> **Architect discharge, `evt_5f4jvs4f6pbdt`: not a port, `D2` correctly
+> unentered — a zero differential leaves no mechanism to build — and the
+> semantic question blocking this capstone is CLOSED.** Release is the
+> Steward's call, not the Architect's; the ruling clears the blocker rather
+> than scheduling the work.
+>
+> ### THE VARIANT IS ROUTING-LOAD-BEARING AND CAPABILITY-INERT.
+>
+> **The two nodes compose without contradiction — read them together.**
+>
+> | node | claim | result |
+> |---|---|---|
+> | [[RT-MATCH-SCRUTINEE-DISPOSITION]] `D2a` | **routing** — is the guard's difference from the producer route non-empty? | **non-empty** |
+> | [[RT-MATCH-SCRUTINEE-PORT]] `D1c`+`D1d` | **capability** — does that difference cost observable behaviour? | **none, 5 of 5** |
+>
+> ⇒ Retiring the variant **changes routing for a non-empty set and changes
+> observable behaviour for none of the measured population.** The caveat this
+> node recorded above — *"an exclusion returning `FunctionizedUnits` says the
+> classifier no longer retains the program, not that the lane can emit it; it is
+> not capability evidence"* — **is exactly what the differential closed.** It
+> stands as written about `D1`-era evidence and no longer bars deletion.
+>
+> ### WHAT FIVE ROWS CANNOT SETTLE: THE POPULATION. DO NOT PRETEND OTHERWISE.
+>
+> The differential covers **five hand-built `RuntimeExpr` with no kernel `Term`
+> preimage.** The retirement acts on **every program the narrowed guard
+> retains.** Those are not the same set, and treating a five-cell quotient as an
+> enumeration repeats the predicate-reachability-is-not-population error this
+> campaign has already paid for twice.
+>
+> **No census is owed. The retirement is STAGED so the corpus proves it** —
+> `D2c` in the frame reroutes without deleting and puts the **whole corpus**
+> through CI as the differential, and `D3`-`D8` delete only after it is green.
+> **The two steps must not be collapsed:** one commit that reroutes and deletes
+> cannot tell a routing regression from a compile error.
+>
+> ### THE ID STILL SAYS "PORT" AND THE ANSWER WAS NOT ONE.
 >
 > **An ID cannot carry a disjunction.** `RT-MATCH-SCRUTINEE-PORT` asserts
-> "port", and it travels un-qualified through `depends_on`, this bar, commit
-> subjects and every cross-reference — while the node's own title carries the
-> alternative and its `D1b` decides **whether it is a port at all.**
->
-> `D1` returned **non-total with a named refusal**, and the Architect ruled
-> (`evt_7yrhr0xs81hfc`) that a third arm is live: **the refusing cells may be
-> ill-formed**, in which case that node is a **disposition** and deleting the
-> retained lane removes an **over-acceptance rather than a capability.** ⇒ On
-> present evidence **that is the likeliest route to closing this capstone**, and
-> reading the blocker's ID as a promise of a port is the error to avoid.
+> "port" and travels un-qualified through `depends_on`, this bar, and every
+> cross-reference — while the node it names concluded **no port is owed and no
+> mechanism is built.** Renaming was declined (Architect `evt_3v1zp1g315vxz`:
+> the churn exceeds the harm). **Read that node's title, never its ID.**
 >
 > **The earlier warrant here — *"the difference population compiles today via
-> the retained lane, so a fail-closed arm is a capability regression"* — is
-> WITHDRAWN.** The operator's 2026-08-15 oracle ruling makes the interpreter the
-> oracle, so **what the retained lane accepts is not evidence of
-> well-formedness.** Whether a refusal costs a real capability is `D1b`'s
-> question.
->
-> **Until that evidence exists this node stays barred, and an empty blocker list
-> is not permission.**
+> the retained lane, so a fail-closed arm is a capability regression"* — was
+> WITHDRAWN, and the differential then refuted it outright.** The scalar rows do
+> not compile under the retained lane either.
 >
 > **A measurement that comes back the other way does NOT close this node.**
 > Operator, 2026-08-16: *"Prior art indicates that retiring `RecursiveDescent` is

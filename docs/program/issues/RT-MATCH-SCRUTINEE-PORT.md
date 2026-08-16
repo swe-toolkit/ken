@@ -1,7 +1,7 @@
 ---
 id: RT-MATCH-SCRUTINEE-PORT
-title: "NOT A PORT -- excluding MatchScrutineeRecursor is behaviour-preserving on the scalar-selected rows, measured differentially, so no capability is at stake; the residual obligation is the same differential on the aggregate rows"
-status: active
+title: "NOT A PORT -- excluding MatchScrutineeRecursor is behaviour-preserving across all five quotient rows, measured differentially in both directions, so no capability is at stake and no mechanism is owed; the variant is routing-load-bearing and capability-inert"
+status: closed
 owner: runtime
 size: L
 gate: none
@@ -10,6 +10,62 @@ blocks: [RT-DESCENT-RETIRE]
 github: null
 origin: "Architect ruling evt_nb12nmhd2zzk, 2026-08-16: build the retirement on the uniform-lowering family (GHC), declining the prior-art advisory's global IR invariant as the primary route. Sizing and framing assigned to the Steward in that ruling. Steward-filed per COORDINATION section 2."
 ---
+
+## DISCHARGED — 5 OF 5. NOT A PORT, AND NO MECHANISM IS OWED.
+
+**Architect `evt_5f4jvs4f6pbdt`, 2026-08-16: this node may close, `D2` is
+correctly unentered, and the semantic question blocking
+[[RT-DESCENT-RETIRE]] is CLOSED.** A zero differential leaves no mechanism to
+build.
+
+| rows | deliverable, base | production leg | excluded leg |
+|---|---|---|---|
+| 1, 3 (scalar) | `D1c`, `b7f65ad0c` | `UnsupportedLowering { construct: "Match", reason: "scrutinee is not a constructor value" }` | **identical** |
+| 2, 4, 5 (aggregate) | `D1d`, `77c52dd0a` | `OK Returned(Int(Small(7)))` | **identical decoded value** |
+
+**Every row: pre-exclusion residual exactly `{MatchScrutineeRecursor}`, live
+`debug_assert!(was_present)` passing.** That probe is why the result means
+anything — *"both legs agree"* is vacuous if the exclusion never activated.
+
+⇒ **Exclusion is behaviour-preserving across the `D1` quotient.** The aggregate
+rows carry more weight than the scalar ones: the excluded run **executed and
+produced the value**, which is capability evidence rather than merely
+classifier evidence.
+
+> ### THE VARIANT IS ROUTING-LOAD-BEARING AND CAPABILITY-INERT.
+>
+> **This node and [[RT-MATCH-SCRUTINEE-DISPOSITION]] compose without
+> contradiction — read them together.**
+>
+> | node | claim | result |
+> |---|---|---|
+> | `DISPOSITION` `D2a` | **routing** — is the guard's difference from the producer route non-empty? | **non-empty** |
+> | this node, `D1c`+`D1d` | **capability** — does that difference cost observable behaviour? | **none, 5 of 5** |
+>
+> ⇒ Retiring the variant **changes routing for a non-empty set and changes
+> observable behaviour for none of the measured population.** The standing
+> caveat — *"an exclusion returning `FunctionizedUnits` says the classifier no
+> longer retains the program, not that the lane can emit it; it is not
+> capability evidence"* — **is exactly what this differential closed.** It
+> remains true about `D1`-era evidence and no longer bars deletion.
+
+> ### PROVENANCE, CORRECTED. The enclave's FIRST framing was wrong, its SECOND right.
+>
+> **Architect `evt_45nb1qrszkd4v`.** An earlier draft of this node said the ring
+> got there by running a measurement neither the enclave nor the Steward had
+> framed. **That is not accurate, and it mislabels the transferable part.**
+> `evt_3yq8nkxz1gwh7` named the pair explicitly — `rt_run(expr)` against
+> `rt_run_functionized(expr, RecursiveDescentResidual::MatchScrutineeRecursor)`
+> — gave *"both refuse ⇒ no regression, `AC-3`'s premise dissolves without
+> settling well-formedness"* as the disposition, and **mandated the
+> `debug_assert!(was_present)` report per row.**
+>
+> ⇒ **The reusable lesson is "read whether the AC asserts an ABSOLUTE or a
+> DIFFERENCE before choosing an instrument"** — and it is lost if the record
+> says nobody framed it. The Steward's half is unchanged: **flagging a premise
+> unverified and then forking on top of it is the one-step gap, and noticing
+> that a load-bearing premise is untested is the trigger to TEST it, not to
+> caveat it.**
 
 ## D1c RESULT — THE REGRESSION PREMISE IS NOT UNWARRANTED, IT IS FALSE
 
@@ -59,14 +115,23 @@ exclusion probe). **`D1c` added the production leg for the two SCALAR rows.**
 They execute to `Returned(Int(Small(7)))` **excluded**; nobody has confirmed
 they produce the same value **retained**.
 
-> ### THAT IS THE HALF THAT COULD STILL HIDE A REGRESSION, and it is the only half.
+> ### THAT WAS THE HALF THAT COULD STILL HIDE A REGRESSION. `D1d` CLOSED IT.
 >
 > A scalar row that refuses both ways is safe. **An aggregate row that executes
 > under exclusion is only safe if it executes to the SAME VALUE under
 > retention** — a silent value change is exactly what a lane swap can cause and
 > exactly what "it compiles and runs" does not detect.
 >
-> **Do not close this campaign on the scalar half.**
+> **`D1d` ran it: rows 2, 4 and 5, both legs, `OK Returned(Int(Small(7)))` with
+> identical decoded values** (`evt_6zkdxrnpq8j24`, exact `77c52dd0a`, every row
+> with live `debug_assert!(was_present)`). **The section above is the
+> discharge.**
+>
+> **The scoping gap was the Architect's, not the ring's** (`evt_45nb1qrszkd4v`):
+> the `D1b` disposition scoped the differential to the two **refusing** rows,
+> which was too narrow for a deletion. **Kept here because the shape recurs — a
+> differential scoped to the rows that FAIL misses the rows that SUCCEED, and
+> those are the ones a lane swap corrupts silently.**
 
 ## What this node is
 
@@ -277,17 +342,32 @@ gate the retirement. **`AC-7` through `AC-10` below are record.**
 **`D1c` — DELIVERED. The production-versus-excluded differential** on the two
 scalar rows. See the result section.
 
-**`D1d` — THE RESIDUAL, AND THE ONLY LIVE DELIVERABLE. Same differential, rows
-2, 4 and 5.** For each aggregate-selected row, run **production** and
-**excluded** and compare the **decoded result value**, not merely that both
-compile. Pre-exclusion residual must be exactly `{MatchScrutineeRecursor}` with
-the `debug_assert!(was_present)` in force, as `D1c` had it.
+**`D1d` — DELIVERED, and it discharged the node.** The same differential on
+aggregate rows 2, 4 and 5: both legs `OK Returned(Int(Small(7)))`, identical
+decoded values, every row with pre-exclusion residual exactly
+`{MatchScrutineeRecursor}` and the live `debug_assert!(was_present)` passing.
+`evt_6zkdxrnpq8j24`, exact `77c52dd0a`, fixtures removed, no candidate.
 
-**Report per row: identical decoded value, or the two values.** A difference is
-the regression the whole campaign has been trying to rule out, and it would be
-found nowhere else.
-
-**Fixtures do not exist** — `D1` and `D1c` both cleaned up. Budget the rebuild.
+> **Two cautions the Architect attached (`evt_45nb1qrszkd4v`), kept because
+> they generalize past this node.**
+>
+> **1. The precondition was not guaranteed by the predicate.** Retention
+> requires the producer route FALSE (`core.rs:2176-2183`), so
+> `debug_assert!(was_present)` fires precisely when the excluded variant is
+> **absent** from a row's pre-exclusion residual. **Had it fired, that was a
+> RESULT, not a failed run** — the row never used the lane, so its differential
+> is zero by construction. **The hazard is what an implementer does with an
+> unattainable precondition: rebuild the row until it holds**, silently moving
+> the population while every reported field still looks correct. **The row is
+> not to be adjusted to satisfy the probe.** It did not fire; the caution stands
+> for the next measurement built this way.
+>
+> **2. Compare the WHOLE outcome string, not a hand-extracted value.** `rt_run`
+> already returns `OK {observation:?}` / `COMPILE-ERR {error:?}` / `RUN-ERR
+> {error:?}`. **Narrowing to a decoded value reintroduces the blind-spot class
+> the measurement exists to close** — a trap, a differing observation shape, or
+> a run-time error all pass a value-only comparison. Strictly cheaper and
+> strictly stronger.
 
 **`D2` — close what `D1` opens, inside the ordinary route.** Whatever the
 ordinary path lacks for this population, supply it there. **Not a new lane, not
