@@ -366,6 +366,15 @@ jobs:
           cargo test --locked -p ken-elaborator --features z3-process
           --test v3_z3_process_adapter
 
+  z3-emission-control:
+    name: z3 emission control
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test binary-independent SMT-LIB emission
+        run: >-
+          cargo test --locked -p ken-elaborator --features z3-process --lib
+
   # ⛔ DO NOT RENAME OR DELETE THIS JOB. `build + test` is a REQUIRED status
   # check in branch protection (docs/ops/github-setup.md §"Required status
   # checks"). The sharded matrix above publishes checks named `test shard
@@ -391,6 +400,7 @@ jobs:
       - native-buffer
       - native-rt-parity
       - z3-process-adapter
+      - z3-emission-control
       - ignored-row-sweep
     # `always()` so this reports a definite conclusion even when a job fails
     # or is skipped. Without it, a failed dependency leaves this job *skipped*,
@@ -404,12 +414,14 @@ jobs:
           buffer='${{ needs.native-buffer.result }}'
           rt_parity='${{ needs.native-rt-parity.result }}'
           z3_adapter='${{ needs.z3-process-adapter.result }}'
+          z3_emission='${{ needs.z3-emission-control.result }}'
           ignored_sweep='${{ needs.ignored-row-sweep.result }}'
           echo "test-shard matrix:      $shards"
           echo "native-write-partition: $write"
           echo "native-buffer:          $buffer"
           echo "native-rt-parity:       $rt_parity"
           echo "z3-process-adapter:     $z3_adapter"
+          echo "z3-emission-control:    $z3_emission"
           echo "ignored-row-sweep:      $ignored_sweep"
           failed=0
           for pair in "test shards:$shards" \
@@ -417,6 +429,7 @@ jobs:
                       "native-buffer:$buffer" \
                       "native-rt-parity:$rt_parity" \
                       "z3-process-adapter:$z3_adapter" \
+                      "z3-emission-control:$z3_emission" \
                       "ignored-row-sweep:$ignored_sweep"; do
             name="${pair%:*}"; result="${pair##*:}"
             if [ "$result" != "success" ]; then
