@@ -283,7 +283,9 @@ concealed the present finding for the whole campaign.**
 **Three of eighteen is narrow, not systemic.** The Architect censused it
 precisely so nobody has to assume either way. Do not widen the sweep.
 
-### D5 — RUNTIME RING, measurement. Does any REAL SOURCE program select `RecursiveDescent`?
+### D5 — RUNTIME RING, measurement
+
+**Does any REAL SOURCE program select `RecursiveDescent`?**
 
 > **This deliverable replaces an earlier `D5` instruction that asked for an
 > observation the real path cannot produce. That instruction was the Steward's
