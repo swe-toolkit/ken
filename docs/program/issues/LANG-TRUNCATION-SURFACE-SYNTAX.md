@@ -246,11 +246,17 @@ exactly which layers refuse.
 
 **`blocks` names [[V3-FO-CHECKER-SOUNDNESS]], and `depends_on` on that node
 deliberately does NOT name this one.** The dependency is real but partial: only
-`D1b` — `fok_derives` and `fok_classically_valid` — needs the spelling.
-`D1a` and `D2` over there are dispatchable today. **Adding the operative edge
-would mark a node with live work as gated**, and a blocked-looking node with an
-idle ring is the failure this asymmetry exists to avoid. The relationship is
-carried in prose on both nodes for that reason.
+`D1b` — `fok_derives` and `fok_classically_valid` — needs the spelling. **`D2`
+over there is dispatchable.** Adding the operative edge would mark a node with
+live work as gated, and a blocked-looking node with an idle ring is the failure
+this asymmetry exists to avoid. The relationship is carried in prose on both
+nodes for that reason.
+
+> **This sentence said `D1a` was dispatchable too. It hard-stopped on a second,
+> independent defect** — [[LANG-CTOR-PREMISE-ELABORATION-DIVERGES]]. **That node
+> is the higher priority of the two**: it blocks a broader capability, its
+> minimal reproduction is already landed, and its owner is genuinely open while
+> this node's premise is settled.
 
 **This is lane 2 under the operator's 2026-08-15 two-lane directive** — it is
 the FO Kripke embedding's blocker, not a third lane. It touches
