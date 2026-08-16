@@ -1,7 +1,7 @@
 ---
 id: RT-MATCH-DIFFERENCE-REACHABILITY
-title: "The narrowed MatchScrutineeRecursor difference is what now blocks the retirement -- settle whether it is source-reachable under the method gate, because it is the capstone's only discharge"
-status: active
+title: "Source-reachability of the narrowed MatchScrutineeRecursor difference is NOT SETTLED under the method gate -- normalization is not total, the elaborator refusal has an ascription escape, and the wrapper that blocks a witness is a compiler-path invariant rather than a language rule"
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -29,12 +29,18 @@ shape can be written by a user under the method gate**, and
 [[RT-DESCENT-RETIRE]] may delete nothing while the question is referred to
 research.
 
-> ### THIS IS THE CAPSTONE'S ONLY DISCHARGE. Nothing else lifts the bar.
+> ### DELIVERED AND MERGED (PR #2463). THE DISCHARGE HAS MOVED — do not read this node as the live gate.
 >
-> `RT-DESCENT-RETIRE` records, verbatim: *"the capstone is barred pending that
-> named measurement, not permanently."* **This node is that named measurement.**
-> Emptiness is **not** available as a discharge — `D2a` constructed a member, so
-> no measurement will ever empty the difference.
+> This node was filed as the capstone's sole discharge and it **discharged its
+> own obligation without lifting the bar**: `D1` returned outcome 3, which the
+> frame authorized in advance. Emptiness was never available — `D2a` constructed
+> a member — and unreachability is not available either, because no rule in the
+> consulted layers refuses the shape.
+>
+> ⇒ **`RT-DESCENT-RETIRE`'s discharge is now
+> [[RT-DESCENT-RETIRE-PRIOR-ART]]**, the research referral the operator directed
+> for exactly this outcome. **The measured rule gap below is that referral's
+> input**, and it is the reason the referral is answerable rather than open-ended.
 
 ## The difference, stated exactly
 

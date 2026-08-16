@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY]
+depends_on: [RT-DECL-CLOSURE-PORT, RT-SEED-CALL-PORT, RT-PRODUCER-MATCH-PORT, RT-RECURSOR-TRANSPORT, RT-FNUNIT-RESULT-TOKEN, RT-LEXICAL-RECURSOR-CONSUMERS, RT-CLOSURE-CROSSING-ELIMINATE, RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT, RT-MATCH-SCRUTINEE-DISPOSITION, RT-MATCH-DIFFERENCE-REACHABILITY, RT-DESCENT-RETIRE-PRIOR-ART]
 blocks: []
 github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
@@ -75,9 +75,13 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > narrowing left `MatchScrutineeRecursor` load-bearing on a difference whose
 > source-reachability is unmeasured. **A graph reading "every dependency landed"
 > would have advertised this capstone as dispatchable while its own text forbids
-> it to delete anything.** [[RT-MATCH-DIFFERENCE-REACHABILITY]] is the tenth
-> dependency and carries the sole discharge; this node returns to `active` when
-> **that** node settles the question, not when the children merged.
+> it to delete anything.** [[RT-MATCH-DIFFERENCE-REACHABILITY]] was filed as the
+> tenth dependency to carry that discharge. **It merged on 2026-08-16 having
+> settled the question in the one direction that lifts nothing** — outcome 3, not
+> settled under the method gate — so the discharge passed to the eleventh
+> dependency, [[RT-DESCENT-RETIRE-PRIOR-ART]]. **This node returns to `active`
+> when the referral resolves, and the shape of that resolution is the operator's
+> or the Architect's to state, not this node's to assume.**
 >
 > ## `LexicalCallArgumentRecursor` disposition — measured, no port owed
 >
@@ -207,6 +211,14 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > remains barred.** No deletion, re-narrowing, or retirement re-scope follows;
 > the Steward refers the measured rule gap to research under the operator's
 > 2026-08-16 directive.
+>
+> **THE DISCHARGE MOVED AGAIN, AND THIS IS THE CURRENT ONE:
+> [[RT-DESCENT-RETIRE-PRIOR-ART]]** — the referral, filed and owned, carrying
+> `D1`'s rule gap as its fixed input. **The paragraph above about
+> `RT-MATCH-DIFFERENCE-REACHABILITY` describes a dependency that reached `merged`
+> without lifting the bar**, which that node authorized in advance as outcome 3,
+> not a miss. Ten of this capstone's eleven dependencies are `merged`; the
+> eleventh is the referral, and it is the only live gate.
 >
 > **A measurement that comes back the other way does NOT close this node.**
 > Operator, 2026-08-16: *"Prior art indicates that retiring `RecursiveDescent` is
