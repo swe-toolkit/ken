@@ -146,6 +146,70 @@ others fixtures.**
 > judgement** — and equally, do not re-derive ten separate grammar arguments if
 > one gate genuinely governs them all. Establish which, and say so.
 
+## D1 result: all twelve exact renderings are fixtures
+
+**Measured at exact
+`ddd29db514c4eedf2eb48f50581fe9371964e5e6`.** The disposition is over every
+Ken program admitted through the production native-build path, not over a
+searched source corpus. One compiler/kernel gate governs all twelve hashes:
+
+1. `LexicalCallArgumentRecursor` requires one immediate `RuntimeExpr::Call`
+   whose callee is `RuntimeExpr::LexicalClosure` and whose argument is an
+   immediate recursive `RuntimeExpr::ComputationalMatch`
+   (`lowering/core.rs:2131-2142`).
+2. The direct structural route is an immediate checked-core `Application`
+   whose function is a `Lambda`: plan-aware erasure maps those two arms to
+   `Call` and `LexicalClosure` (`erasure.rs:2505-2535`).
+3. A source-written lambda cannot occupy that application head. Kernel
+   application inference first infers the function (`check.rs:251-256`), while
+   a lambda is deliberately not inferable (`check.rs:358-365`). Surface
+   ascription does not bypass the gate: elaboration checks it, then returns the
+   underlying term rather than a retained `Term::Ascript`
+   (`elab.rs:3593-3596`). The discriminating spelling
+   `((\value. Success) : Nat -> ExitCode) Zero` therefore receives that exact
+   kernel refusal.
+4. The only apparent indirect route is an application whose function is a
+   direct declaration call that erasure could inline to a lambda. Naming the
+   lambda does not preserve that route. Before checked-core selection, native
+   preparation replaces recursive members with opaque barriers and normalizes
+   every executable body
+   (`compiler_driver.rs:2179-2183`, `:2245-2252`). Acyclic lambda helpers beta
+   reduce into their callers; recursive heads remain declaration references.
+   Neither can reach erasure as the immediate `Application(Lambda, ...)`
+   required above.
+
+The fourth clause is load-bearing. A valid source probe combined a named
+lambda with a real nested-result computational match. Preparation normalized
+the call to an ordinary `Match`; the production census reported
+`residuals=[]`, `selector=true`, `authority=FunctionizedUnits`. This is a
+discriminator for the normalization account, not the basis of the negative
+existence claim.
+
+| row | hash | D1 disposition | governing gate |
+|---:|---|---|---|
+| 1 | `7433055269044ce8` | fixture | immediate lambda-call head is source-unreachable |
+| 2 | `c1294e143381564e` | fixture | immediate lambda-call head is source-unreachable |
+| 3 | `23fad2ab9d295856` | fixture | immediate lambda-call head is source-unreachable |
+| 4 | `a26749baed91331f` | fixture | immediate lambda-call head is source-unreachable |
+| 5 | `de31e8ed184a5754` | fixture | immediate lambda-call head is source-unreachable |
+| 6 | `e365f91d10c12a7c` | fixture | immediate lambda-call head is source-unreachable |
+| 7 | `25c3d81c8054e552` | fixture | immediate lambda-call head is source-unreachable |
+| 8 | `3db7ba503cbf472e` | fixture | immediate lambda-call head is source-unreachable |
+| 9 | `e8da0476e3b56008` | fixture | immediate lambda-call head is source-unreachable |
+| 10 | `4dc485d6d0951b49` | fixture | immediate lambda-call head is source-unreachable |
+| 11 | `aa5333756917f356` | fixture | immediate lambda-call head is source-unreachable |
+| 12 | `b6d242da59f49ca2` | fixture | same gate; additionally authored under `#[cfg(test)]` |
+
+The source-reachable D1 population is therefore zero of twelve exact
+renderings, accounting for zero of the 27 measured compiles.
+
+**Hash/rendering control.** The complete `crates/ken-runtime` tree is
+`17246cb8615e04fd520d646eed60079ea28d06f0` at both the fixed measurement base
+`3523868afe7cd84b47c7b07281ff7df7c3202d61` and this D1 base. The normalized
+`hash<TAB>rendering` population is therefore byte-identical: the twelve hashes
+above are the same twelve expressions, not reconstructed analogues. The three
+`MatchScrutineeRecursor` renderings remain outside this disposition.
+
 ## Deliverables
 
 **`D1` — the per-expression triage. This is the node's first deliverable and
