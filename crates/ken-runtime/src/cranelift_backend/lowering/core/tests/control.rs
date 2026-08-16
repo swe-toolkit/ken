@@ -6198,6 +6198,9 @@ fn required_consumer_projection_reaches_the_depth_two_funnel() {
 /// `257a9ddcc78c1a4fcebccac7048dc8a049efa301`): the existing non-ignored
 /// source-compilation paths exercised by
 /// `scripts/ken-cargo test -p ken-cli --tests -- --nocapture --test-threads=1`
+/// exclude the six closure-at-boundary tests: each is marked `#[ignore]` with
+/// the stated reason that a runtime-local closure has no durable lane across
+/// the boundary. The selected paths
 /// returned `unit_boundary_environment_fields={}` on all 81 completed returns
 /// across 15 processes; the plans contained 7 through 301 source occurrences.
 /// This is a scoped corpus measurement, not a universal property of Ken
