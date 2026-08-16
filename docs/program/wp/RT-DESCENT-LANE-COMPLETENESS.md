@@ -283,6 +283,64 @@ concealed the present finding for the whole campaign.**
 **Three of eighteen is narrow, not systemic.** The Architect censused it
 precisely so nobody has to assume either way. Do not widen the sweep.
 
+### D5 — RUNTIME RING, measurement. Does any REAL SOURCE program select `RecursiveDescent`?
+
+> **This deliverable replaces an earlier `D5` instruction that asked for an
+> observation the real path cannot produce. That instruction was the Steward's
+> and it was wrong; the ring was right to stop rather than substitute a
+> reachable route.** History and the refutation are in the node.
+
+**The fixed input, located in the tree by the Steward — not transcribed from
+the ruling, and it is larger than the ruling states.**
+
+**The route into native lowering is `ken native-build`**, and the chain is
+unbroken: `main.rs:51` dispatches `native_build_file` (`:81`) into
+`ken_cli::build_native_program` (`lib.rs:21`), into
+`ken_elaborator::compiler_driver::compile_native_program_sources` (`:2524`)
+which **takes real Ken source text**, into
+`build_bound_process_starter_executable_artifact`
+(`object_linker_packaging.rs:879`), into
+`emit_bound_process_program_object_with_cranelift` (`:937`), which holds the
+sole production call of `select_body_emission_authority`.
+
+**`build_native_program` is called from 18 test files and 36 call sites under
+`crates/ken-cli/tests/`.** Every one is **outside `-p ken-runtime --lib`**, the
+scope `D1`'s 805 arrivals and `D2c`'s 943/0/4 were measured over.
+
+**Two measurements, in this order.**
+
+1. **The census that was never taken.** Over the `ken-cli` native-build corpus,
+   which `BodyEmissionAuthority` does each compile select? **This is the
+   population the earlier census structurally excluded, and it is the one that
+   actually reaches the selector.** Report the distribution, not a summary
+   verdict.
+2. **The two-recursive-position probe.** Compile a Ken source program declaring
+   a **two-recursive-position constructor** through `build_native_program` and
+   observe whether it reaches the no-worker guard in `units.rs` — the
+   `backend_module` error reading *"the selected case has a recursive position
+   {position} that the continuation specialization projects no worker for"*.
+
+**Three bounds, all binding.**
+
+- **`tree-traversal.ken` is in `NEEDS_COLLECTIONS`**, so the prelude must be
+  prepended **exactly as `rosetta.rs` does** if you use it as the input.
+- **`native-build` requires a checked `Program I main`.** A build failure is
+  evidence **only if attributed to the tree shape rather than to the harness.
+  A refusal that is not attributed is not a result.**
+- **Readings only, no adjudication**, and **`D2c` `036e8ee91` is not rebased,
+  not published, not applied to this branch.** If a reroute reading is wanted,
+  take it in a disposable tree.
+
+**What each outcome does to the node**, so nobody has to infer it:
+
+| result of measurement 1 | consequence |
+|---|---|
+| **no native-build compile selects `RecursiveDescent`** | the fixture-only finding survives contact with the real-source population, and the recorded-gap disposition holds |
+| **any native-build compile selects `RecursiveDescent`** | a real source program depends on the retiring lane. **`D2`'s recorded-gap disposition is reopened for that construct** and the port is owed before `D3` |
+
+**`D1`'s four verdicts are not reopened by either outcome.** `D5` moves
+reachability, never correctness.
+
 ## 5. Acceptance criteria
 
 **AC-1.** `D1` records **four** verdicts, one per construct in section 3, each

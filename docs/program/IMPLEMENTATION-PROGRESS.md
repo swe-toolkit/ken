@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 22:41:52Z — from 361 issue file(s) in `docs/program/issues/`.
+2026-08-16 23:00:23Z — from 361 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -338,7 +338,7 @@ the committed file matches the generator's output.
 | `RT-SYNTHESIZED-ENV-RECORD-OCCURRENCE` | Give the unit-boundary environment record a planner-issued occurrence by extending the synthesized producer arm, so the closure crossing is attempted at the seam that actually refused it | merged | runtime | M | none | 2352 |
 | `RT-TERMINAL-ALL-ELIM-AUTHORITY` | Issue the typed terminal-All structured-IH elimination authority upstream in checked erasure/planning, and let only that issued relation license the source-machine Match seat to consume a ComputationalRecursorClosure | draft | runtime | M | none | — |
 | `RT-TEST-SCRATCH-RAII` | Runtime and CLI test fixtures mint a nanosecond-suffixed scratch directory per run and never remove it -- `temp_output_dir` returns a bare `PathBuf`, `tempfile` is not a dependency, and the resulting ~1200 leaked directories per hour under load have filled `/workspaces/ken` to 100% seven times, where the failure presents as a broad regression in the linker-invoking suites rather than as a disk condition | merged | runtime | M | none | — |
-| `RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE` | Two control.rs trace helpers assert over ABORTED compiles -- owner and multiplicity each run five expressions, EVERY functionized compile aborts, and their trace-event assertions stay green, so zero completed functionized runs back any claim built on them; live on main today and independent of the retirement | active | runtime | S | none | — |
+| `RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE` | Two control.rs trace helpers assert over ABORTED compiles -- owner and multiplicity each run five expressions, EVERY functionized compile aborts, and their trace-event assertions stay green, so zero completed functionized runs back any claim built on them; live on main today and independent of the retirement | merged | runtime | S | none | — |
 | `RT-UNIT-CLOSURE-CONVERT` | Activate function-unit closure conversion for predeclared units — a retained nested body's free de Bruijn references become declared typed capture slots, reconstructed at unit entry from exact caller operands | closed | runtime | TBD | none | — |
 | `RT-UNSUPPORTED-BINDING-ON-REFUSAL` | A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers | ready | runtime | M | none | — |
 | `RT-UNSUPPORTED-LANE-REFUSAL-REACH` | CLOSED, complete negative result: none of the five refused populations reaches the 48 unsupported lane -- every one returns Err before artifact construction, so the repair belongs at 48 section 5.4's native-artifact binding (owed even when no native bytes exist) and NOT at compiled.unsupported, and it is owed independently of the operator's narrowing decision | closed | runtime | S | none | — |

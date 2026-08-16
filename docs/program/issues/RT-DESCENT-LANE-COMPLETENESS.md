@@ -57,10 +57,30 @@ Exact test names are in the frame, section 3. A further **five** reds assert the
 retiring lane's own control, lifecycle or route state with no program refusing;
 those are `D6` rewrites in the predecessor and **stay gated behind the nine**.
 
-> # `D5` ANSWERED: **YES** — AND IT EXPOSES A POPULATION DEFECT IN `D1`/`D2b`/`D2c`.
+> # `D5` IS NOT ANSWERED. THE ROUTE THAT REACHES THE SELECTOR IS `ken native-build`.
 >
-> **Architect `evt_74f5ppk3tnh1q`. Every coordinate below re-verified by the
-> Steward in the tree before this was written, not transcribed.**
+> **SUPERSEDES the block that stood here, which read *"`D5` ANSWERED: YES — and
+> it exposes a population defect."* That heading was wrong in its answer and
+> right in its alarm.** Architect `evt_74f5ppk3tnh1q` proposed it, the runtime
+> ring refuted its premise (`evt_6w6sbwrb8k1zq`), the Steward verified the
+> refutation in the tree (`evt_46h0cskzqkjgy`), and the Architect confirmed it
+> and supplied the real route (`evt_1krepwa0fsf4n`).
+>
+> ### WHAT WAS REFUTED: both examples run the INTERPRETER, so they select nothing
+>
+> `crates/ken-cli/tests/rosetta.rs` spawns `CARGO_BIN_EXE_ken run`; `run_file`
+> reaches `ken_cli::run_program`, declared at `crates/ken-cli/src/lib.rs:64` as
+> **generic over `ken_interp::HostHandler`**. `select_body_emission_authority`
+> has its sole production call inside the **cranelift backend**, and the
+> `units.rs` no-worker guard is likewise native-only.
+>
+> ⇒ **Neither example selects any `BodyEmissionAuthority`, because neither
+> enters the path where authorities exist. Their greenness is evidence about
+> NEITHER lane.** The two-outcome table that stood here presupposed a selection
+> and died at that shared premise; **both of its arms were wrong for one
+> reason.**
+>
+> ### WHAT HOLDS UNCHANGED, and it was never the disputed part
 >
 > **A two-recursive-position constructor is source-admissible, and two are IN
 > THIS REPOSITORY, RUNNING IN CI TODAY:**
@@ -79,39 +99,72 @@ those are `D6` rewrites in the predecessor and **stay gated behind the nine**.
 > asserted to compile *and* produce output.
 >
 > ⇒ **The declaration shape construct 3 cannot build an IH prefix for is
-> source-admissible, in-tree, and exercised. `0/12` does not reach it.**
+> source-admissible and in-tree.** What is NOT established is that anything
+> carries it *into the selector* — that is exactly what `D5` still asks.
 >
-> ### THE POPULATION DEFECT, and it is the part that matters most
+> ### THE ROUTE THAT DOES REACH NATIVE LOWERING: `ken native-build`
 >
-> **`D1`'s 805 selector arrivals and `D2c`'s 943/0/4 were measured over
-> `-p ken-runtime --lib`. The rosetta corpus lives in `crates/ken-cli/tests/`
-> and runs a separate binary.** ⇒ **The census that concluded "28 arrivals, all
-> fixture-only" was taken over a population that STRUCTURALLY EXCLUDES the
-> example programs — and the examples are where the ordinary source shapes
-> live.**
+> **Architect `evt_1krepwa0fsf4n`. Every hop below located by the Steward in the
+> tree, not transcribed** — the chain is unbroken:
 >
-> **This is not a criticism of the ring: the frame scoped it that way.** It is
-> the reason a fixture-only conclusion could coexist with a binary tree sitting
-> in `examples/`.
->
-> ### NOT YET BLOCKED. Two outcomes, opposite consequences, and NOBODY MAY GUESS.
->
-> **These programs are green today**, so exactly one of these holds:
->
-> | if `tree-traversal` selects | then |
+> | hop | coordinate |
 > |---|---|
-> | **`RecursiveDescent`** | the retirement **breaks a program that runs in CI today**. **BLOCKED**, and construct 3's port is owed **before `D3`**. **And `D2c`'s green is over the WRONG POPULATION** — the whole evidentiary base needs restating over a corpus that includes `ken-cli`. |
-> | **`FunctionizedUnits`, passing** | the two-recursive-position case is already handled on another path and `units.rs:1252` is **narrower than the general shape**. Construct 3 stays a missing port; **the gap is smaller than the declaration suggests.** |
+> | subcommand dispatch | `crates/ken-cli/src/main.rs:51` to `native_build_file` at `:81` |
+> | CLI entry | `ken_cli::build_native_program`, `crates/ken-cli/src/lib.rs:21` |
+> | elaborator driver, **takes real Ken source text** | `compile_native_program_sources`, `crates/ken-elaborator/src/compiler_driver.rs:2524` |
+> | runtime packaging | `build_bound_process_starter_executable_artifact`, `object_linker_packaging.rs:879` |
+> | into cranelift | `emit_bound_process_program_object_with_cranelift`, `object_linker_packaging.rs:937` |
+> | the selector | sole production call of `select_body_emission_authority` |
 >
-> **The Architect declined to guess between them and so do I.** `D5`'s remaining
-> half is a **runtime-ring measurement** under this node: compile both examples
-> through the real path, record **which `BodyEmissionAuthority` each selects**
-> and whether either reaches the `units.rs` no-worker error, **then re-run under
-> `D2c`'s reroute.**
+> ⇒ **Ken does NOT have a native backend that no source program reaches, and
+> "fixture-only" is NOT structurally true for every construct.** That was the
+> larger of the two possibilities the reframed question opened, and it is
+> closed. It is worth stating positively.
 >
-> **`D1`'s verdicts are UNCHANGED.** Construct 3 remains **missing port**. What
-> `D5` moves is whether the gap is **reachable** — the blocked-versus-recorded-gap
-> question, not the correctness one.
+> ### THE POPULATION DEFECT STANDS — on a corrected example, and it is BIGGER
+>
+> **The claim was right; the example demonstrating it was wrong.** The Rosetta
+> pair does not exercise the mechanism, so it could not show the exclusion
+> mattered. **The `native-build` corpus does, and it is excluded by the same
+> scoping.**
+>
+> **Measured by the Steward, not cited:** `build_native_program` is called from
+> **18 test files and 36 call sites under `crates/ken-cli/tests/`** — among them
+> `px4b_native_production` (11 calls), `px7l_checked_host_recursive_bind`,
+> `px7o_heterogeneous_eliminator_frames`, `px7p_constructor_field_composition`,
+> `px8ta_oriented_subcontinuation`, `px8l_recursive_decl_native`,
+> `mrc_4a_cross_crate_census`, `mrc_4a1_child_transport`. **This is larger than
+> the seven files the ruling names.**
+>
+> ⇒ **`D1`'s 805 selector arrivals and `D2c`'s 943/0/4 were measured over `-p
+> ken-runtime --lib`. Every one of those 36 call sites is OUTSIDE it.** The
+> census that concluded "28 arrivals, all fixture-only" was taken over a
+> population that structurally excludes **the real-source corpus that actually
+> reaches the selector.**
+>
+> **Whether any of them selects `RecursiveDescent` is UNMEASURED.** That is the
+> live question, and it is one command to answer.
+>
+> **This is not a criticism of the ring: the frame scoped it that way.**
+>
+> ### `D5`, RESTATED SO THE REAL PATH CAN PRODUCE IT
+>
+> > Compile a Ken source program declaring a **two-recursive-position
+> > constructor** through `build_native_program`, and observe whether it reaches
+> > the no-worker guard in `units.rs` — the `backend_module` error reading *"the
+> > selected case has a recursive position {position} that the continuation
+> > specialization projects no worker for"*.
+>
+> **Two cautions, both from the Architect, both binding on whoever runs it:**
+> `tree-traversal.ken` is in `NEEDS_COLLECTIONS`, so the prelude must be
+> prepended **exactly as `rosetta.rs` does**; and `native-build` requires a
+> checked `Program I main`, so **a build failure is evidence only if it is
+> attributed to the tree shape rather than to the harness. A refusal that is
+> not attributed is not a result.**
+>
+> **`D1`'s four verdicts are UNCHANGED by any of this.** Construct 3 remains
+> **missing port**. What `D5` moves is whether the gap is **reachable** — the
+> blocked-versus-recorded-gap question, not the correctness one.
 
 ## `D1` DELIVERED. THE HEADLINE QUESTION HAS AN ANSWER, AND IT IS "NO".
 
