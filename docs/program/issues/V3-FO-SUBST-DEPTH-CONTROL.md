@@ -7,7 +7,7 @@ size: S
 gate: none
 depends_on: [V3-FO-GUARD-SHIFT-DIFFERENTIAL]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2379
 origin: "Steward, 2026-08-16, dispositioning Adversary hunt evt_d1wy8d6kytpw on the merged range 790c16ea6..197374712. The hunt answered a question the Steward handed it on V3-FO-GUARD-SHIFT-DIFFERENTIAL's merge -- whether the depth<=1 refutation shape generalizes -- and it does. Every coordinate re-verified by symbol against origin/main b03c1084b before filing. Steward-filed per COORDINATION section 2."
 ---
 
@@ -136,6 +136,22 @@ premise is enough, because legibility is what `D2` is for.
 > there changes what the control tests rather than what the guard describes.
 > **Do not fold it into the clause**; naming it would make the premise vaguer,
 > not stronger.
+
+> # `D0`-`D1` MERGED 2026-08-16 as PR #2379. ACCEPTED PARTIAL — `D2` REMAINS.
+>
+> **Candidate `b3f8cbb37b5b991056d25803592e4d0e6b22666b`, base `bf33ef099`,
+> sole path `crates/ken-elaborator/src/fo_kripke.rs`, `+104/-0`, purely
+> additive.** Blob identity verified from the declared base: the candidate's
+> blob `1d899658` is the one on `main`, and differs from the base's
+> `aaaba760`. QA `evt_43bszaytky8g1`; Architect `evt_400nejhbde4kp`.
+>
+> **THE NODE STAYS `active`. `D2` below and `AC-7` are OUTSTANDING.**
+>
+> **`D2` was folded into this node AFTER it was released to the ring**, from a
+> later Adversary hunt (`evt_44194ewx0dxa`). **It was never asked of them and
+> its absence from the candidate is not a shortfall on their part** — that is
+> the Steward's sequencing, told to the ring at `evt_11echdf4h73de`. Do not
+> read the partial as an incomplete delivery.
 
 ## `D2` — state the bottom_id exclusion as a CRITERION, not as a constant
 
