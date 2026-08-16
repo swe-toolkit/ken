@@ -11,6 +11,156 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # 2026-08-16 — `D1` HARD-STOPPED. THE LANE IS NOT DEAD. DO NOT DELETE ANYTHING.
+>
+> **`D1` fired section 7's trigger at exact `5eb05d6b2`, and that is the correct
+> outcome, not a setback.** Over the serial complete `ken-runtime --lib` corpus
+> — 941 passed, 0 failed, 4 ignored; 801 compilation entries; 103 non-empty
+> full-residual enumerations — **production selected
+> `BodyEmissionAuthority::RecursiveDescent` 31 times across 20 tests**: 27
+> `LexicalCallArgumentRecursor`, 4 `MatchScrutineeRecursor`. Probe reverted,
+> branch range empty, `core.rs` byte-identical, worktree clean.
+> **`D2`-`D8` were correctly not entered.** runtime-leader `evt_511w8d94qcp5w`,
+> attribution `evt_2vhjfm8ds954f`.
+>
+> **The certified `FunctionizedUnits` refusals were NOT miscounted as firings.**
+> The 72 non-empty rows selecting `FunctionizedUnits` were excluded. Section 7's
+> certified-refusal-is-not-a-residual-firing paragraph is what made that
+> separable; do not remove it.
+>
+> ## Architect ruling `evt_620806vfy5kwm` — the disposition is PER-VARIANT
+>
+> **A selection is not a failure and not a refusal. It is a positive
+> classification carrying a typed reason**, so the disposition axis is the
+> `RecursiveDescentResidual` variant, not the expression. **Fifteen exact
+> renderings cannot carry fifteen dispositions; they carry at most two**, because
+> the live enum has exactly two members left. All coordinates below were
+> re-verified against the tree by the Steward.
+>
+> - **`LexicalCallArgumentRecursor` is an INCOMPLETE PORT. Capability is owed,
+>   and the variant's own doc says so** (`lowering/core.rs:2005-2011`): *"The
+>   recursive result still carries invocation-local scope/return-hole state.
+>   Passing it through a separately declared lexical unit is **not one of the
+>   completed functionized ports**, so the established recursive descent lane
+>   retains the whole call."* That is a statement that the port was never built —
+>   not a conservation law and not an invariant.
+> - **`MatchScrutineeRecursor` is UNMEASURED. Symmetry is not an argument for
+>   it.** Its entire doc is one line (`core.rs:2003`) — *"An ordinary match
+>   consuming an active computational recursor."* **No reason is recorded.**
+>   Nothing in the tree says whether it is an unbuilt port or a shape the
+>   functionized lane would correctly refuse. **Do not rule it by analogy to its
+>   neighbour**; each of the four retired variants got a node that built the port
+>   first.
+>
+> **`evt_5h7vzc27mc11j` DOES NOT CARRY HERE, and the reason is stronger than
+> selections-versus-refusals.** That ruling was about `FunctionizedUnits`
+> refusals grounded in conservation laws, an invariant, a semantic impossibility
+> and a structural absence — correct, over-strict, nothing owed. **This is the
+> retained lane holding programs because its replacement was never written.
+> Opposite disposition.** Applying the earlier ruling here would conclude "no
+> capability owed" about the one class where the tree explicitly says it is.
+>
+> ## The cut: ONE node keyed on the variant, triage FIRST
+>
+> **Group by residual variant, not by provenance.** All twelve distinct lexical
+> expressions enumerate the same variant, so they need the same port: one port,
+> one node. Provenance records which census saw them; it does not predict the
+> mechanism.
+>
+> **The homogeneity premise is already false, so the node's FIRST deliverable is
+> a per-expression fixture-or-production triage.**
+> `rt_lexical_call_argument_recursor_executable()` is `#[cfg(test)]` at
+> `lowering/core/tests/control.rs:16166-16167`, doc-commented *"`D1` position B"*
+> — **a fixture authored to occupy the position, not a production-reachable
+> shape. No production capability is owed for it.** The other three
+> out-of-population expressions — ordinary-frame aggregate, dynamic-effect
+> host-result, the two `D8` revisit-with-join compiles — **have not been
+> opened**, and one fixture out of four does not make the other three fixtures.
+> **A port sized against twelve expressions when some are fixtures builds
+> capability for a population that cannot arise** — the thing ruled out hours
+> earlier.
+>
+> ## `#6d` IS NOT REFUTED. The defect is the GATE that consumed it.
+>
+> **Its population statement was accurate about the scope it named.** Campaign
+> §4 item 6d says *"rows 1-5 **only**, eight expressions across five test
+> families"* — a deliberate narrowing, recorded at
+> `RT-LEXICAL-RECURSOR-CONSUMERS.md:11` as *"narrowed to rows 1-5 by the re-rule
+> `evt_3r4j14fv1jtj2` on the **nine-expression** census"*. **A nine-expression
+> census was known and deliberately cut to eight. `#6d` never claimed to be the
+> variant's population and nobody was misled.**
+>
+> ⇒ **It is a scoped claim used by a consumer as though it were variant-wide, and
+> that consumer is the retirement gate** — `#6d` closure was made the
+> precondition for retiring `LexicalCallArgumentRecursor`, which requires the
+> variant's population, not rows 1-5's.
+>
+> **This IS the same defect as `RT-RECURSOR-TRANSPORT` `D3`, and the Architect
+> affirmed the regularity deliberately after refusing a false one the same
+> morning.** `D3` named two executable positions when the governed population was
+> broader; `#6d` names rows 1-5 when the variant is broader. **Both are
+> under-specified gates with the same repair — name the population the gate
+> governs.** That is still a different defect from #2442's unsatisfiable
+> condition, whose repair is deletion. **The test is whether the repairs
+> coincide, not whether the symptoms rhyme.**
+>
+> **Sweep bound, and it is a documentary check on gates rather than a
+> re-measurement of corpora:** *did a closed node commit a scoped population, and
+> does any live gate cite its closure as if it were complete?* No method node.
+>
+> ## The comparison baseline was stale and under-counts by two
+>
+> **`#6d`'s live population is SIX, not eight.**
+> `RT-LEXICAL-R3-FUSION-EMITTER.md:228`: *"`#6d`'s population drops from eight
+> expressions to **six**: rows 1, 3, 4, and row 5's after-hole expression. Row 2
+> is [[RT-LEXICAL-ROW2-MISSING-MINT]]'s. Row 5's before-hole is this node's."*
+>
+> **This does not change the no-live-owner finding** — all four of
+> `RT-LEXICAL-RECURSOR-CONSUMERS`, `RT-MATCH-RECURSOR-CONSUMERS`,
+> `RT-LEXICAL-R3-FUSION-EMITTER` and `RT-LEXICAL-ROW2-MISSING-MINT` are
+> `merged`, verified. **It changes which node's claim each occurrence tests, so
+> the new node's frame carries six and names the two spun-out cells
+> separately.**
+>
+> ## TWO MEASUREMENTS BEFORE ANY CAPABILITY WORK IS SCOPED. runtime-leader owns both.
+>
+> **A. Which function did the `D1` probe read? This can invalidate the 27/4
+> split.** `recursive_descent_residual` (`core.rs:2079`) **short-circuits** —
+> every arm is `find_map`/`or_else`. In the `Match` arm `MatchScrutineeRecursor`
+> is tested **first** and `.or_else`s the rest, so **a program retained by both
+> variants under a `Match` reports only `MatchScrutineeRecursor`. Lexical
+> retention is masked ⇒ 27 is a LOWER BOUND and 27/4 is not a partition** — if
+> the probe read the selector's answer. The non-short-circuiting twin is
+> `enumerate_recursive_descent_residuals` (`core.rs:2180`), surfaced as
+> `observed_recursive_descent_residuals() -> Option<BTreeSet<...>>`
+> (`core.rs:1134`, `#[cfg(test)]`). **The set-valued instrument is the
+> established currency** — `#6d` stated its own population in set language.
+> The tree already names this hazard:
+> `ResidualEnumerationMutation::ShortCircuitLikeTheSelector` (`core.rs:570`,
+> injected at `core.rs:2189`), commented *"this is the regression the instrument
+> exists to prevent, injected at the instrument itself rather than at a
+> convenient downstream point, so a control that stays green under it is
+> measuring something else."*
+>
+> **B. Retention multiplicity of each of the 15.** The `D1` exclusion probe
+> returns `FunctionizedUnits` only when the residual set is **empty after
+> removing the excluded variant**. For a doubly-retained program, removing one
+> leaves the other, so it stays on the retained lane and **the probe observes
+> nothing about the functionized lane's capability for it.** Its `debug_assert`
+> checks only that the excluded variant **was present**, not that it was the sole
+> retainer — **so the blindness is silent.** Until multiplicity is known, an
+> exclusion result is not capability evidence for any program that is not singly
+> retained.
+>
+> ## Explicitly NOT ruled
+>
+> **Whether the port is worth building.** That is scope — Steward's and the
+> operator's — and it is decided **after** `A` says whether the population is
+> twelve expressions or more, and after the triage says how many are
+> production-reachable at all. **No `crates/` work is authorized**; `A` and `B`
+> are read-only against existing `#[cfg(test)]` instruments. **The Steward files
+> the node once `A` returns, because `A` can move the population.**
+
 > # 2026-08-16 — THIS NODE NOW ABSORBS THE TWO RESIDUAL VARIANTS AND THE
 > # CONTROL RE-DESCRIPTION. `RT-RECURSOR-TRANSPORT` IS CLOSED. Steward.
 >
