@@ -339,6 +339,72 @@ necessary.**
 **Only after both executable positions are green**, retire the two residual
 variants and their test-only selector hooks.
 
+> #### `D3` ATTEMPT STOPPED AT THE NEWLY REACHABLE POPULATION — 2026-08-16
+>
+> **Measured at exact base
+> `3f95967b8e1246a4a20f9daa6a1807dc4744dfb1`.** A disposable retirement
+> removed both residual variants, their production constructor/insertion sites
+> and their variant-specific hooks. The complete targeted Runtime library run
+> returned **920 passed, 12 failed, 4 ignored**. The entire attempt was then
+> reverted; this is a result record, not retained mechanism.
+>
+> The first FunctionizedUnits outcomes split into six categories:
+>
+> | population | first outcome |
+> |---|---|
+> | row 5 before-hole plus the R3 seed and checked controls | `ComputationalMatch`: a computational recursor closure names an in-flight activation, not a transferable value |
+> | row 4 depths 1, 2 and 3 plus row 5 after-hole | existing `StaticWorkerBinding` conservation refusal |
+> | row 1 owned-scope | `PlannerInvariant`: terminal answer has no affine checked-root authority |
+> | the two-sibling rows | recursive position 1 has no projected continuation worker |
+> | `d8d` | **count divergence, not a refusal:** FunctionizedUnits records two installs where the retained lane records zero |
+> | corrected row 2 | no `SourceMachine` mint; this invalidates the obsolete all-producer-path control, not the corrected lifecycle |
+>
+> The exact position-A and position-B witnesses passed. The
+> propagation-disable negative also passed, and corrected row 2 passed with the
+> exact FunctionizedUnits lifecycle `{Composed}` and separate `Mint`, `Install`
+> and `DirectConsume` observations. Therefore the stop is the broader governed
+> population, not either exact witness or the corrected row-2 authority.
+>
+> **Producer provenance, read from that exact Git object.** The six outcome
+> categories do not share one input kind. None is a Ken `.ken` source input,
+> but only some are hand-authored `RuntimeExpr` emitter inputs.
+>
+> | outcome category | exact producer and disposition |
+> |---|---|
+> | `ComputationalMatch` | Row 5 before-hole and the R3 seed use the test-only `RuntimeExpr` from `host_result_closure_match(px8j_equal_payload_hole_placement(BeforeReturnHole))` (`control.rs:2699-2705`, `:5398-5404`). The checked controls use the `#[cfg(test)]` `d2j_checked_fixture_under` producer, which returns a `RuntimeExpr`, declaration and oriented plan (`planning/static_transition.rs:20234-20247`). This seed is **not** a member of production `nc5_seed_examples()` (`ir.rs:1084`): that separate public `RuntimeExample` corpus is a hand-authored IR cross-crate differential oracle, not `.ken`, and does not produce this category. |
+> | `StaticWorkerBinding` | Row 4 depths 1-3 and row 5 after-hole are the four hand-authored `RuntimeExpr` rows detailed below. They remain current internal emitter-contract pins. |
+> | row 1 `PlannerInvariant` | The owned-scope row is the fifth hand-authored `RuntimeExpr` row detailed below. It remains a current internal emitter-contract pin. |
+> | two-sibling rows | `oriented_dynamic_sibling_fixture` (`control.rs:428`) returns `OrientedSubcontinuationPlanV1`, `RecursorInvocationSegment` and `Vec<DynamicSpliceEdge>`. These are planner structures, not a `RuntimeExpr` emitter input. This fixture is therefore one layer farther from Ken source than the direct-emitter rows; this provenance statement does not select its retirement disposition. |
+> | `d8d` | `d8d_the_composed_binding_site_is_live_and_neither_landed_population_installs_a_target` (`control.rs:23298`) combines a hand-authored `RuntimeExpr::Match` with the test-object `emit_px8tr_nested_post_effect_object` route. Its retirement outcome remains the separately measured install-count divergence, not a refusal. |
+> | corrected row 2 | `px8j_all_three_producer_paths_reach_real_consumers` constructs a test-only `RuntimeExpr` with `recursive_computational_result_depth(2, aggregate)` and passes it directly to `px8j_capture_source_trace` (`control.rs:1449-1459`; `core/tests/mod.rs:134`). It pins an internal emitter/lowering lifecycle, not frontend reachability; this provenance record does not settle its retirement disposition. |
+>
+> The exact five-row internal-emitter group is below. Every `control.rs`
+> coordinate is in
+> `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/control.rs`.
+> The shared wrapper `host_result_closure_match` is itself a test helper
+> returning `RuntimeExpr` at `core/tests/mod.rs:311`.
+>
+> | row | exact test coordinate and producer |
+> |---|---|
+> | row 4 depth 1 | `control.rs:6821`, `host_result_closure_match(px8j_scope_chain_observation_result(1, 0))`; the helper constructs `RuntimeExpr` directly at `control.rs:2376` |
+> | row 4 depth 2 | `control.rs:6822`, the same hand-authored helper with depth `2`; the compiling-baseline control independently constructs it at `control.rs:6497-6498` |
+> | row 4 depth 3 | `control.rs:6823`, the same hand-authored helper with depth `3`; the compiling-baseline control independently constructs it at `control.rs:6497-6498` |
+> | row 5 after-hole | `control.rs:6824-6826`, `px8j_equal_payload_hole_placement(AfterReturnHole)`; that helper constructs `RuntimeExpr` directly at `control.rs:7437` |
+> | row 1 owned-scope | `control.rs:6820`, `host_result_closure_match(px8j_layered_recursive_result(1, 1))`; the same hand-authored input drives the owned-scope control at `control.rs:1367-1374`, and its helper constructs `RuntimeExpr` directly at `control.rs:7349` |
+>
+> The primary five-row control is
+> `d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed`
+> (`control.rs:6811`). Its wall helper takes `&RuntimeExpr`
+> (`control.rs:5569-5573`) and reaches
+> `emit_process_entrypoint_object_with_cranelift` through the test trace helper
+> (`control.rs:2204-2223`). No parser, elaborator or Ken-source compilation path
+> participates. These five rows therefore remain current internal
+> emitter-contract pins; they cannot observe frontend reachability. Under the
+> Architect's partial Trap-2 ruling, retirement changes their expected outcome
+> to the measured FunctionizedUnits refusal. That is an explicit expectation
+> change, not a repair. This attempt does not refute the landed
+> source-unreachability disposition.
+
 The lane itself is **not** yours. [[RT-DESCENT-RETIRE]] owns the
 `RecursiveDescent` lane, its selector, its enum and its authority. Retiring
 these two variants is what unblocks that node; performing its deletion here is
