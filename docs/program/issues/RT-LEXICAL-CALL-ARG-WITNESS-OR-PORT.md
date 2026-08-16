@@ -1,6 +1,6 @@
 ---
 id: RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT
-title: "LexicalCallArgumentRecursor retains twelve exact renderings and its port was never built -- triage each as fixture or source-reachable, then decide whether the port is owed"
+title: "LexicalCallArgumentRecursor's twelve fixed renderings are fixture-only -- no port is owed and the variant is re-described with the retained lane"
 status: active
 owner: runtime
 size: M
@@ -13,12 +13,22 @@ origin: "Architect ruling evt_620806vfy5kwm (2026-08-16) on RT-DESCENT-RETIRE's 
 
 ## What this node is
 
-**`RT-DESCENT-RETIRE`'s `D1` found the lane is not dead.** Production selects
-`BodyEmissionAuthority::RecursiveDescent` 31 times across 20 tests, and 27 of
-those selections carry the residual variant `LexicalCallArgumentRecursor`.
-**This node owns that variant.**
+**`RT-DESCENT-RETIRE`'s `D1` found this variant live only in fixtures.**
+Production selects `BodyEmissionAuthority::RecursiveDescent` 31 times across
+20 tests, and 27 of those selections carry
+`LexicalCallArgumentRecursor`. This node's corpus-independent `D1` then
+measured all twelve fixed renderings as fixture-only under the current
+production source path: source reachability is `0/12`, accounting for `0/27`
+measured compiles.
 
-**The variant's own doc says the port was never built** —
+**No lexical port is owed.** This is a measured conclusion, not a capability
+decision: kernel definition admission rejects the required source shape before
+native preparation or Runtime lowering, so there is no source-reachable
+population for the missing port to serve. `LexicalCallArgumentRecursor` is
+therefore re-described as fixture-only with the retained lane and retires when
+[[RT-DESCENT-RETIRE]] removes that lane. This node changes no production code.
+
+**The variant's own doc correctly records that the port was never built** —
 `lowering/core.rs:2005-2011`, verbatim:
 
 > The recursive result still carries invocation-local scope/return-hole state.
@@ -26,16 +36,12 @@ those selections carry the residual variant `LexicalCallArgumentRecursor`.
 > completed functionized ports**, so the established recursive descent lane
 > retains the whole call.
 
-**That is a statement of missing capability, not a conservation law and not an
-invariant.** It is the opposite disposition from the four
-`FunctionizedUnits` refusals ruled correct-and-over-strict at
-`evt_5h7vzc27mc11j`, and applying that ruling here would conclude "no capability
-owed" about the one class where the tree explicitly says it is owed.
-
-**But capability owed to WHOM is the open question, and it is `D1`.** One of the
-twelve renderings is already known to be a `#[cfg(test)]` fixture authored to
-occupy the position. **A port sized against twelve renderings when some cannot
-arise builds capability for a population that does not exist.**
+**That text identified a missing mechanism, not a conservation law or an
+invariant.** Before `D1`, it correctly opened a capability question. `D1` closes
+the population question without pretending the mechanism exists: all twelve
+renderings are fixtures, so the unbuilt port has no current user-program
+surface. This disposition remains separate from `MatchScrutineeRecursor`, whose
+three renderings belong only to [[RT-MATCH-SCRUTINEE-DISPOSITION]].
 
 ## The population, measured, and it is a true partition
 
@@ -217,6 +223,33 @@ renderings, accounting for zero of the 27 measured compiles.
 `hash<TAB>rendering` population is therefore byte-identical: the twelve hashes
 above are the same twelve expressions, not reconstructed analogues. The three
 `MatchScrutineeRecursor` renderings remain outside this disposition.
+
+## D2/D3 closeout: measured fixture population, repaired retirement gate
+
+**`D2` takes the all-fixture branch.** All twelve fixed lexical renderings are
+fixture-only under the current production source path: source reachability is
+`0/12`, accounting for `0/27` measured compiles. This is a **measured
+conclusion, not a capability decision**. There is no source-reachable
+population for the missing lexical port to serve, so no port is owed and
+`LexicalCallArgumentRecursor` is re-described as fixture-only with the retained
+lane for [[RT-DESCENT-RETIRE]]. The lane, selector, residual enum, and production
+code remain untouched here; the retirement node owns their deletion.
+
+The conclusion is conditional on the measured kernel-definition-admission
+gate. A future kernel completeness change that admits or normalizes the
+ascribed `Application(Lambda, ...)` shape re-opens this twelve-row disposition.
+
+**`D3` records that `#6d` was deliberately scoped, not refuted.**
+[[RT-LEXICAL-RECURSOR-CONSUMERS]] accurately governed its rows-1-5 population;
+it never claimed the complete `LexicalCallArgumentRecursor` population. The
+defect was the retirement gate consuming that scoped claim as variant-wide.
+That gate is repaired by [[RT-DESCENT-RETIRE]]'s published `depends_on` edge to
+this node and this variant-wide, hash-preserved measured population. No
+deliverable remains delegated to `#6d` for this disposition.
+
+`MatchScrutineeRecursor` remains outside this result. Its separate dependency
+[[RT-MATCH-SCRUTINEE-DISPOSITION]] is the only authority for that variant; this
+fixture-only result must not be carried across by symmetry.
 
 ## Deliverables
 
