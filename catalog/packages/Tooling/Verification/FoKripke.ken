@@ -1,0 +1,199 @@
+-- FO Kripke embedding slice: quoted syntax and embed (23 section 4.3, 4.5).
+--
+-- Ken-level mirror of `crates/ken-elaborator/src/fo_kripke.rs`'s D0 quoted
+-- types and D1 `embed` (V3-FO-KEN-LEVEL-CHECKER-AUTHORING, increment 1). The
+-- Rust module is reference for SHAPE only -- every definition here is
+-- authored independently, never transcribed from Rust computation. Every
+-- name carries a `Fok`/`fok_` prefix to keep this file's constructors and
+-- functions out of the shared catalog namespace, following the `nc9_`
+-- convention in `ProofErasureBoundaryChecker.ken`.
+--
+-- Deliberately NOT in this file: `check_cert` (a separate, later increment),
+-- any FO `Proved` verdict, any new kernel primitive or trusted axiom, and any
+-- widening of the five-constructor / three-rule slice below.
+
+-- === D0: quoted source data (23 section 4.3, slice subset) ===
+
+-- A bound source object variable, de Bruijn (23 section 4.3 `IVar`).
+data FokIVar = FokMkIVar Nat
+
+-- Quoted intuitionistic source formula -- SLICE CONSTRUCTOR SUBSET (23
+-- section 4.5: bottom, atom, or, imp, forall). Exactly five constructors,
+-- mirroring `fo_kripke::IForm`. The general section 4.3 `IForm` also has
+-- `top`, `and`, and `exists`; this slice's source grammar deliberately
+-- carries none of the three -- not an oversight, the same omission the Rust
+-- reference makes for the same reason (23 section 4.5's fragment).
+data FokIForm =
+    FokIBottom
+  | FokIAtom FokIVar
+  | FokIOr FokIForm FokIForm
+  | FokIImp FokIForm FokIForm
+  | FokIForall FokIForm
+
+-- === D0: quoted target data (23 section 4.3, slice subset) ===
+
+-- A quoted-target variable, de Bruijn bound or a certificate-local free
+-- eigenparameter (23 section 4.3 `QTerm`). The slice folds `QSort` (world
+-- vs. object) into which `FokForm`/`FokRule` variant is used, never onto
+-- `FokQTerm` itself -- mirroring `fo_kripke::QTerm`.
+data FokQTerm = FokQBound Nat | FokQParameter Nat
+
+-- Target classical formula -- SLICE CONSTRUCTOR SUBSET (23 section 4.5):
+-- bottom, relation, and, or, imp, forall. Nine constructors, mirroring
+-- `fo_kripke::Form`. `FokAnd` is needed even though the SOURCE slice above
+-- has no `and`: `K(Sigma)`'s own axioms (23 section 4.2) use it in their
+-- antecedents.
+data FokForm =
+    FokBottom
+  | FokAccess FokQTerm FokQTerm
+  | FokDomainA FokQTerm FokQTerm
+  | FokForcingP FokQTerm FokQTerm
+  | FokAnd FokForm FokForm
+  | FokOr FokForm FokForm
+  | FokImp FokForm FokForm
+  | FokForallWorld FokForm
+  | FokForallObj FokForm
+
+-- A sequent Gamma => Delta (23 section 4.3). The general contract uses
+-- canonical multisets (exchange is representation equality); the slice's
+-- three rules below never weaken/contract/exchange, so an insertion-order
+-- `List` loses nothing here, exactly as `fo_kripke::Sequent` uses `Vec`.
+data FokSequent = FokMkSequent (List FokForm) (List FokForm)
+
+-- Certificate rule tags -- SLICE SUBSET ONLY: init, imp-right, forall-right
+-- (23 section 4.5: "the positive proof needs exactly [these] certificate
+-- rules"). Three variants against the general section 4.3 `Rule`'s ~20: this
+-- slice deliberately carries none of and-left/and-right, or-left, imp-left,
+-- forall-left, exists-left/exists-right, top-right, bottom-left, cut,
+-- weaken, contract, exchange, or any classical double-negation/excluded-
+-- middle rule the general calculus offers. The route's own positive-proof
+-- fragment closes every certificate this slice can produce with exactly
+-- these three.
+data FokRule =
+    FokInit Nat Nat
+  | FokImpRight Nat
+  | FokForallRight Nat FokQTerm
+
+-- A certificate proof-tree node (23 section 4.3 `Cert`).
+data FokCert = FokMkCert FokSequent FokRule (List FokCert)
+
+-- === D1: embed -- the exact classical Kripke theory (23 section 4.2) ===
+
+-- Total lookup into a `Nat`-valued `List` at a `Nat` index, defaulting to
+-- `Zero` out of range. `fok_w_forces` below only ever indexes `object_env`
+-- at a position a well-scoped `FokIForm` guarantees present (one entry per
+-- enclosing `FokIForall`, in binder order) -- the default arm is
+-- unreachable on any input this increment's controls exercise, exactly as
+-- `fo_kripke::w_forces`'s `object_env[*k]` relies on the same invariant
+-- without asserting it.
+fn fok_nth_nat_default (xs : List Nat) (i : Nat) : Nat =
+  match xs {
+    Nil ↦ Zero;
+    Cons x rest ↦
+      match i {
+        Zero ↦ x;
+        Suc j ↦ fok_nth_nat_default rest j
+      }
+  }
+
+-- `object_env.iter().map(|i| i + 1)` -- `fo_kripke.rs`'s own shift-on-entry
+-- discipline, shared by both the `Imp` and `Forall` cases below.
+fn fok_map_suc (xs : List Nat) : List Nat =
+  match xs {
+    Nil ↦ Nil Nat;
+    Cons x rest ↦ Cons Nat (Suc x) (fok_map_suc rest)
+  }
+
+-- `K(Sigma)`'s five axioms (23 section 4.2), each its own top-level
+-- definition so `fok_k_sigma`'s composition below mirrors
+-- `fo_kripke::k_sigma`'s local-`let` structure exactly.
+
+-- `forall w. Le w w`.
+const fok_preorder_reflexive : FokForm =
+  FokForallWorld (FokAccess (FokQBound Zero) (FokQBound Zero))
+
+-- `forall w v u. (Le w v and Le v u) => Le w u`.
+const fok_preorder_transitive : FokForm =
+  FokForallWorld (FokForallWorld (FokForallWorld
+    (FokImp
+      (FokAnd
+        (FokAccess (FokQBound (Suc (Suc Zero))) (FokQBound (Suc Zero)))
+        (FokAccess (FokQBound (Suc Zero)) (FokQBound Zero)))
+      (FokAccess (FokQBound (Suc (Suc Zero))) (FokQBound Zero)))))
+
+-- `forall w v x. (Le w v and Dom_A w x) => Dom_A v x`.
+const fok_domain_growth_a : FokForm =
+  FokForallWorld (FokForallWorld (FokForallObj
+    (FokImp
+      (FokAnd
+        (FokAccess (FokQBound (Suc (Suc Zero))) (FokQBound (Suc Zero)))
+        (FokDomainA (FokQBound (Suc (Suc Zero))) (FokQBound Zero)))
+      (FokDomainA (FokQBound (Suc Zero)) (FokQBound Zero)))))
+
+-- `forall w x. Force_P w x => Dom_A w x` (unary P: single conjunct, no
+-- `and` needed).
+const fok_atom_domain_p : FokForm =
+  FokForallWorld (FokForallObj
+    (FokImp
+      (FokForcingP (FokQBound (Suc Zero)) (FokQBound Zero))
+      (FokDomainA (FokQBound (Suc Zero)) (FokQBound Zero))))
+
+-- `forall w v x. (Le w v and Force_P w x) => Force_P v x`.
+const fok_atom_persistence_p : FokForm =
+  FokForallWorld (FokForallWorld (FokForallObj
+    (FokImp
+      (FokAnd
+        (FokAccess (FokQBound (Suc (Suc Zero))) (FokQBound (Suc Zero)))
+        (FokForcingP (FokQBound (Suc (Suc Zero))) (FokQBound Zero)))
+      (FokForcingP (FokQBound (Suc Zero)) (FokQBound Zero)))))
+
+-- The five axioms conjoined, matching `fo_kripke::k_sigma`'s nesting
+-- exactly: `And(And(And(reflexive, transitive), domain_growth), And(atom_
+-- domain, atom_persistence))`.
+const fok_k_sigma : FokForm =
+  FokAnd
+    (FokAnd
+      (FokAnd fok_preorder_reflexive fok_preorder_transitive)
+      fok_domain_growth_a)
+    (FokAnd fok_atom_domain_p fok_atom_persistence_p)
+
+-- `w |= f`, the forcing translation (23 section 4.2), given the current
+-- world's index and the object-variable environment (source `FokIVar`
+-- index -> its current target index), both counted in the SAME unified de
+-- Bruijn space `FokForm` uses for world and object binders alike -- mirrors
+-- `fo_kripke::w_forces` exactly, case by case.
+fn fok_w_forces (world : Nat) (object_env : List Nat) (f : FokIForm) : FokForm =
+  match f {
+    FokIBottom ↦ FokBottom;
+    FokIAtom v ↦
+      match v {
+        FokMkIVar k ↦
+          FokForcingP (FokQBound world) (FokQBound (fok_nth_nat_default object_env k))
+      };
+    FokIOr p q ↦
+      FokOr (fok_w_forces world object_env p) (fok_w_forces world object_env q);
+    FokIImp p q ↦
+      FokForallWorld
+        (FokImp
+          (FokAccess (FokQBound (Suc world)) (FokQBound Zero))
+          (FokImp
+            (fok_w_forces Zero (fok_map_suc object_env) p)
+            (fok_w_forces Zero (fok_map_suc object_env) q)));
+    FokIForall p ↦
+      FokForallWorld
+        (FokImp
+          (FokAccess (FokQBound (Suc world)) (FokQBound Zero))
+          (FokForallObj
+            (FokImp
+              (FokDomainA (FokQBound (Suc Zero)) (FokQBound Zero))
+              (fok_w_forces
+                (Suc Zero)
+                (Cons Nat Zero (fok_map_suc (fok_map_suc object_env)))
+                p))))
+  }
+
+-- `embed(Sigma, f) := K(Sigma) => forall w : World. w |= f` (23 section
+-- 4.2). `K(Sigma)` is INSIDE the target: no frame or forcing premise is
+-- emitted outside `fok_embed`'s own `FokForm` -- mirrors `fo_kripke::embed`.
+fn fok_embed (f : FokIForm) : FokForm =
+  FokImp fok_k_sigma (FokForallWorld (fok_w_forces Zero (Nil Nat) f))
