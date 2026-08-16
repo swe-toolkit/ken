@@ -71,10 +71,63 @@ member) and it is what the retained lane is currently carrying.
 retention is **existential** over a per-case field; routing is **universal**
 over case bodies. Do not re-derive this; it has been settled twice.
 
+## D1 RESULT — NON-TOTAL, WITH A NAMED REFUSAL. The fallback is NOT triggered.
+
+**Handed back at `evt_5h96qz12red0f`, measured at exact
+`5c5ee5b6c37dfc0017afa547f83cd0b9aa5f5111`. There is no candidate and no diff**
+— the five-row control was disposable and was fully reverted. **This section is
+the only durable record of the measurement; nothing merges to carry it.**
+
+**Coverage (`AC-2`).** The predicate-defined finite quotient, across
+selected-case recursive/nonrecursive × aggregate/scalar, including **coincident
+and split existential witnesses** — the two "some"s landing on the same case and
+on different cases. Not a sample.
+
+**Instrument (`AC-1`) held.** Every row carried exact pre-exclusion
+`{MatchScrutineeRecursor}` under the non-short-circuiting enumerator, and the
+exclusion assertion held.
+
+| rows | selected case body | outcome |
+|---|---|---|
+| 2, 4, 5 | aggregate | **lower and execute**, `Returned(Int(Small(7)))` |
+| 1, 3 | **scalar** | **refuse:** `UnsupportedLowering { construct: "Match", reason: "scrutinee is not a constructor value" }`, emitted at `core.rs:17959` |
+
+> ### THE REFUSAL IS SELECTED-BODY-SENSITIVE, AND THAT IS WHY `AC-3` IS SATISFIED
+>
+> **A conservative fail-closed arm would refuse the whole population.** This one
+> splits it on the selected body, so it is a **named refusal about a specific
+> shape** — the second arm of `AC-3`, not the silent outcome it bars.
+>
+> **And the scalar cells compile today through the retained lane.** Leaving them
+> refusing is the capability regression `AC-3` names. **The refusal is a finding,
+> not an acceptable resting state.**
+
+**What the site is, verified by the Steward at `main` = `70fd2b69f`.**
+`core.rs:17959` is the **terminal fallthrough of a `Lowered`-shape dispatch
+chain** that runs *after* `lower_expr` has already succeeded on the scrutinee —
+`Carried`, `BorrowedNativeValue`, `BorrowedOption`, …, `Bool`, then
+`Constructor`, then the `Err`.
+
+⇒ **The refusal is not about the scrutinee being a `ComputationalMatch`.** The
+uniform-lowering sentence did its job: the scrutinee lowered. What has no arm is
+the **resulting operand shape**. That is a narrower and more tractable gap than
+"uniform lowering does not carry this population," and it is the fact the
+mechanism ruling turns on.
+
+**`D2` IS NOT AUTHORIZED AND WAS NOT ATTEMPTED.** The ring stopped at the
+deliverable boundary as instructed. ⇒ **"Non-total" is established;
+"uncloseable" is NOT** — those are different claims and only the first was
+measured. `AC-3`'s stop-and-hand-back arm is conditioned on a refusal that
+*cannot be closed*, which nobody has tested.
+
+⇒ **The family-A fallback stays out of scope.** It is reached on an *uncloseable*
+refusal plus a fresh ruling, and neither exists.
+
 ## Deliverables
 
 **`D1` — activation measurement. Independently releasable, and size the turn
-around it.** With the exclusion probe set for `MatchScrutineeRecursor`, take the
+around it. DELIVERED — see the result section above.**
+With the exclusion probe set for `MatchScrutineeRecursor`, take the
 heterogeneous-case-body population through the ordinary route and report, per
 shape: **lawful lowering, or a refusal quoted in full with its emitting site.**
 This is the deliverable that decides whether `D2` is a port or a hard stop.
@@ -141,10 +194,17 @@ only.
 
 ## Sequencing
 
-**`active`. `D1` assigned to the runtime ring at `evt_38he57edb7bpm`, on
-`wp/RT-MATCH-SCRUTINEE-PORT` at exact `origin/main` =
-`5c5ee5b6c37dfc0017afa547f83cd0b9aa5f5111`.** Both dependencies are `merged` and
-the inputs are the fixed statements above; nothing else gates it.
+**`active`, and `D1` is DONE.** Assigned `evt_38he57edb7bpm`, handed back
+`evt_5h96qz12red0f`, measured at exact
+`5c5ee5b6c37dfc0017afa547f83cd0b9aa5f5111`. No candidate — see the result
+section.
+
+**`D2` is HELD on a mechanism ruling, routed to the Architect.** The question is
+whether the scalar-selected refusal is closeable inside uniform lowering — a
+component-design call, and the Steward's to route rather than to answer. **The
+ring is not blocked on me for anything else and does not wait idle:**
+[[RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN]] is released in the meantime, which is
+exactly the between-increments window that node was queued for.
 
 **It blocks [[RT-DESCENT-RETIRE]] and becomes that node's twelfth dependency.**
 The other eleven are `merged` and the capstone is still barred — every named

@@ -1,7 +1,7 @@
 ---
 id: RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN
 title: "The route-equality controls' duplicated hand-built reconstruction is the mechanism that detects an added routing disjunct -- record that at both assertion sites and retain the C-arrival mutation, because a routine tidy-up deletes it silently"
-status: draft
+status: ready
 owner: runtime
 size: S
 gate: none
@@ -99,9 +99,12 @@ assertions, the rows and the observation domain all stay exactly as they landed.
 
 ## Sequencing
 
-**`draft`, and `draft` here means QUEUED, not unframed.** Dispatchable on sight.
-Lane 1 is [[RT-MATCH-SCRUTINEE-PORT]], which is `active` with the ring.
+**`ready`, and RELEASED — the between-increments window it was queued for
+arrived.** [[RT-MATCH-SCRUTINEE-PORT]] `D1` handed back non-total with a named
+refusal, and its `D2` is held on an Architect mechanism ruling. **The ring is
+free and this node is the work in front of it.**
 
-**Flip it `ready` when the runtime ring is between port increments.** It blocks
-nothing, and the mechanism it protects works today — the risk is a future edit,
-not a present defect.
+**It still blocks nothing**, and the mechanism it protects works today — the
+risk is a future edit, not a present defect. ⇒ **If the `D2` ruling lands
+mid-flight, the port takes priority and this node goes back in the queue at
+whatever increment it has reached.**
