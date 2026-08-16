@@ -1,7 +1,7 @@
 ---
 id: RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT
 title: "Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none

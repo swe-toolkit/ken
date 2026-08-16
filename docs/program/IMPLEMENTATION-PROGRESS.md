@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 00:57:29Z — from 329 issue file(s) in `docs/program/issues/`.
+2026-08-16 01:00:44Z — from 329 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -277,7 +277,7 @@ the committed file matches the generator's output.
 | `RT-GROUNDVALUE-RECURSIVE-DROP` | `RuntimeGroundValue` is a recursive type, so a decoder that is carefully iterative still cannot honour \"deep valid data uses no recursive host stack\" end to end -- a deeply nested value overflows the stack in its own `drop`, reproducible without the decoder, and the depth at which that happens is UNMEASURED: the two numbers in the source report are an observed abort and a deliberately-safe control, not a bisected threshold | draft | runtime | unknown | none | — |
 | `RT-JOIN-DISPOSITION` | Join-disposition phase repair — the landed RECUR-PORT `consumed XOR statically-unselected` invariant conflates structural materialization with semantic reachability and false-rejects a join materialized before its enclosing match selects | merged | runtime | M | none | — |
 | `RT-JOIN-ORIGIN-ATTRIBUTION` | A planner-required join origin is neither traversal-consumed nor structurally dispositioned, and the set difference does not say which of three authorities is wrong | merged | runtime | S | none | — |
-| `RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT` | Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned | ready | runtime | M | none | — |
+| `RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT` | Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned | active | runtime | M | none | — |
 | `RT-LEXICAL-R3-FUSION-EMITTER` | Row 5's before-hole expression is the one member of the eight-expression lexical-recursor population whose lawful repair requires static-continuation fusion -- it is carved out of RT-LEXICAL-RECURSOR-CONSUMERS together with its repair and discriminating-control obligations, because leaving the expression in the parent while moving the machinery would give the parent an AC it cannot discharge | merged | runtime | M | none | — |
 | `RT-LEXICAL-RECURSOR-CONSUMERS` | Repair the LexicalCallArgumentRecursor consumer population on the functionized lane, activated by B-only exclusion before the retirement removes the seam | active | runtime | M | none | — |
 | `RT-LEXICAL-ROW2-MISSING-MINT` | Row 2 of the lexical-recursor population fails post-compile with a missing Mint rather than at a lowering boundary, so it is not repairable by RT-LEXICAL-RECURSOR-CONSUMERS' D2 | merged | runtime | S | none | — |
@@ -352,7 +352,7 @@ the committed file matches the generator's output.
 | `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | ready | runtime | M | none | — |
 | `V3-D-OPEN-GOAL-WITNESS-ROUTE` | The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver | merged | verify | S | none | — |
 | `V3-FO-CONVERSION-LOAD-MEASURED` | Establish source-level provenance for FO obligations and measure the Rust reference checker over their certificate trees, recording that the kernel-conversion quantity 23 section 4.4 names is not takeable at this SHA | merged | language | M | none | https://github.com/swe-toolkit/ken/pull/2363 |
-| `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` | Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect | ready | language | S | none | — |
+| `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` | Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect | active | language | S | none | — |
 | `V3-FO-GUARD-SHIFT-DIFFERENTIAL` | Pin mentions_var0 against a shift-built oracle so the duplicated binder discipline cannot drift silently | merged | language | S | none | https://github.com/swe-toolkit/ken/pull/2371 |
 | `V3-FO-KEN-LEVEL-CHECKER-AUTHORING` | Author the Ken-level check_cert, embed, Form and Cert so the conversion cost 23 section 4.4 names becomes measurable at all, and take that measurement | draft | language | L | none | — |
 | `V3-FO-KRIPKE-SLICE` | Build the first route-(a) vertical slice of the FO Kripke embedding, up to the theorem boundary the spec reserves: quotation, embed, Cert, check_cert, and both controls | merged | language | L | none | — |
@@ -391,12 +391,10 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-CONTSRC-CALLABLE-CONTRACT` — Closed callable-contract arm for continuation sources — a recursive IH is a compiler-only static worker with no value carrier, and the enclosing slot authority is unconditionally a value contract, so its environment sits outside the domain RT-CONTSRC-PRODUCER-LOCAL owns
 - `RT-EFFECT-DIFF` — One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
-- `RT-LEDGER-UNNAMEABLE-OBLIGATION-CONTRACT` — Decide how the static-worker ledger should treat an obligation the emitter can provably never name, given that rebind is the transition and every recognition must have transitioned
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
-- `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` — Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect
 - `V3-FO-SEARCH-FUEL-STACK-AGREEMENT` — Relate find_certificate's fuel budget to the depth the production stack actually survives, so the FO route's designed refusal cannot be pre-empted by an abort, and name the measured quantity in the printed report
 
 ## Blockers
