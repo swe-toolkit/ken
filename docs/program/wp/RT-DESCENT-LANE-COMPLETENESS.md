@@ -283,6 +283,35 @@ concealed the present finding for the whole campaign.**
 **Three of eighteen is narrow, not systemic.** The Architect censused it
 precisely so nobody has to assume either way. Do not widen the sweep.
 
+> #### THAT BOUND WAS A COUNT WITHOUT ITS PREDICATE
+>
+> **A bound nobody can re-take is not a bound. Stating the predicate.**
+>
+> **Adversary `evt_7ar8w31nr88wh`; every number below re-measured by the
+> Steward.** *"Discards the compile result"* has **two distinct mechanisms**,
+> and the count did not say which it used:
+>
+> | predicate | base `e2e15f8e1` | merged `8b78b48cd` |
+> |---|---|---|
+> | `set_selector_variant_exclusion(Some(...))` sites | 18 | 16 |
+> | `let _ = rt_run*` — outcome discarded at the call | 2 | 2 |
+> | helper that never returns an outcome (`owner`, `multiplicity`) + the sentinel | 3 | 1 (sentinel) |
+>
+> ⇒ **"Three of eighteen" counted the second mechanism. By the first there are
+> two, both in the route-equality control, and the repair left them
+> byte-unchanged** — the deleted helpers discarded their results *inside*
+> themselves, so they never appeared under a `let _ =` census at all.
+>
+> **The claim is true on the metric that produced it and was not checkable as
+> written.** The reason an independent census could not be taken is that the
+> predicate was missing, not that nobody tried. **Record base, tip, count, AND
+> predicate.**
+>
+> The surviving `let _ =` pair carries its own non-vacuity anchor and its own
+> bound; both are recorded at
+> [[RT-ROUTE-EQUALITY-PIN-AT-THE-BINDINGS]]. **That does not widen this
+> node's sweep** — it is filed where the control lives.
+
 ### D5 — RUNTIME RING, measurement
 
 **Does any REAL SOURCE program select `RecursiveDescent`?**
@@ -442,6 +471,27 @@ callers, expressions and abort constructs named, with the explicit finding that
 their assertions rest on aborted compilations. `AC-7` and `AC-8` **hold**: no
 candidate or instrumentation remains, `D2c` untouched. `AC-1` and `AC-3` remain
 open on `D1`.
+
+**AC-13. `D5` REPORTS A DISTRIBUTION AND AN ATTRIBUTION, NOT A VERDICT.**
+
+The census in `D5` measurement 1 reports, per `ken-cli` native-build call site,
+**which `BodyEmissionAuthority` was selected** — the distribution over the
+corpus, not a summary sentence. **A report naming only the conclusion
+("none select `RecursiveDescent`") does not discharge this**; the whole
+point is that the earlier census's population was invisible in its summary.
+
+The probe in `D5` measurement 2 reports **either** that the guard was reached
+**or** that it was not, **and in the failure case names which of the two causes
+applies** — the tree shape, or the harness (`NEEDS_COLLECTIONS` prelude, or the
+checked `Program I main` requirement). **An unattributed refusal does not
+discharge this criterion**, and it is the criterion most likely to be
+accidentally satisfied by a red that means nothing.
+
+**Control:** `AC-13` fails if the report contains a refusal whose cause is not
+named, or a census whose per-site results are not given.
+
+**This AC does NOT gate `D1`.** `D5` moves reachability only; `AC-1` and `AC-3`
+are unaffected by its outcome.
 
 ## 6. Two foreclosed shortcuts. Do not take either.
 

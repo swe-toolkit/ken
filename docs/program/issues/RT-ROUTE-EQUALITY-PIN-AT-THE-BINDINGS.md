@@ -84,3 +84,49 @@ retention guard all stay exactly as they landed.
 the retirement's critical path. **This node blocks nothing and protects a
 mechanism that works today** — flip it `ready` at the next between-increments
 window, exactly as its predecessor was.
+
+## SECOND FINDING, same control: it discards its compile result
+
+**Adversary hunt `evt_7ar8w31nr88wh` on `e2e15f8e1...8b78b48cd`, every number
+re-measured by the Steward before it was written here.**
+
+`msd_d2a_residual_equals_subject_guard_and_route_complement` discards the
+compile outcome at both of its run sites:
+
+```
+control.rs:16367   let _ = rt_run_functionized(expression, excluded);
+control.rs:16370   let _ = rt_run(expression);
+```
+
+**These are the ONLY two `let _ = rt_run*` sites in the whole file**, at base
+`e2e15f8e1` and at merged `8b78b48cd` alike — the
+[[RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE]] repair left this population
+byte-unchanged, because the helpers it deleted discarded their results *inside*
+`owner(...)`/`multiplicity(...)`, which returned trace data rather than an
+outcome.
+
+### It is NOT vulnerable the way those helpers were, and the reason is the point
+
+Its `assert_eq!(observed_routes, vec![ordinary_route])` requires **exactly one**
+recorded routing decision, and the following assertion indexes
+`observed_routes[0]`. **That decision can only exist if the compile reached the
+ordinary-`Match` lowering.** So the control carries an independent non-vacuity
+anchor that the deleted helpers lacked — they asserted trace structure without
+requiring the compile to reach anything in particular.
+
+### But reaching the routing site is not completing the compile
+
+⇒ **Its assertions are claims about a compilation that got at least as far as
+one `Match`, not about one that succeeded.** That is a real bound on a control
+the retirement campaign now leans on heavily.
+
+**Remedy, and it is one line either way:** state the bound in the control's own
+comment, or assert on the returned outcome and delete the bound. **Prefer the
+assertion** — a comment is not a detector.
+
+**Note the name.** The discarding test is
+`..._residual_equals_subject_guard_and_route_complement`, *not*
+`msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference`, which is
+the `msd_d2a` named in [[RT-DESCENT-LANE-COMPLETENESS]]'s five-without-a-
+refusing-construct set. Two different tests share the `msd_d2a` prefix; a
+name-keyed sweep will conflate them.
