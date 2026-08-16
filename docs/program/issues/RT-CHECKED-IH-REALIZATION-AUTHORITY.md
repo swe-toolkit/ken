@@ -6,7 +6,7 @@ owner: runtime
 size: M
 gate: none
 depends_on: []
-blocks: []
+blocks: [RT-NESTED-IH-NATIVE-REALIZATION]
 github: null
 origin: "Architect mechanism ruling evt_7mgzv23cnjm0a (2026-08-14), answering the Steward's question at evt_1469rndt5745r. The ruling is that checked-IH REALIZATION authority and RT-TERMINAL-ALL-ELIM-AUTHORITY's terminal-All ELIMINATION relation are TWO mechanisms, so this successor carries no KERNEL-NESTED-IND dependency and is framable now. Steward-filed (agents cannot create tracked work per COORDINATION §2). Every structural fact below re-verified by the Steward against main fea9cd96 before filing."
 ---

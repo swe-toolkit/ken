@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 15:09:15Z — from 351 issue file(s) in `docs/program/issues/`.
+2026-08-16 15:28:00Z — from 351 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -465,6 +465,7 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
 - `RT-DESCENT-RETIRE` blocked by `RT-LEXICAL-CALL-ARG-WITNESS-OR-PORT` (status: active)
 - `RT-DESCENT-RETIRE` blocked by `RT-MATCH-SCRUTINEE-DISPOSITION` (status: ready)
+- `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress
