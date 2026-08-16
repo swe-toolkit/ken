@@ -275,6 +275,18 @@ the proof is unavailable and any argument for it is circular.
   convenient, because a revert of step 1 must restore production routing in a
   single commit.
 
+  > ### `D2c` RAN AND THE RETIREMENT IS BLOCKED. Architect `evt_35hwm50tas8kp`.
+  >
+  > **The sentinel failed on assertion 1 verbatim — `must retain its compiling
+  > RecursiveDescent baseline`.** `RecursiveDescent` compiled row 4 depth 2 at
+  > base; **the functionized lane REFUSES it at `StaticWorkerBinding`.** Same
+  > program, two worlds, different behaviour ⇒ **a regression established
+  > differentially on a real production compile.**
+  >
+  > **No `D6` re-home is lawful. `D3`-`D8` gated. `D2c` stays UNPUBLISHED** —
+  > one revertible commit that never landed, which is `AC-7` earning its keep.
+  > **The full record and the successor's question are in the node.**
+
   > ### HOW TO READ A RED. Three conditions, Architect `evt_98zg6sbqh7ej`.
   >
   > **1. A red from a program NOT in `D2b`'s pinned set is the HARD STOP, in

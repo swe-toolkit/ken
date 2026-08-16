@@ -11,8 +11,92 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # 2026-08-16 — RELEASED. TWELVE OF TWELVE DEPENDENCIES DISCHARGED; THE BAR IS
-> # LIFTED AND THIS NODE IS DISPATCHED. Steward.
+> # 2026-08-16 — THE RETIREMENT IS BLOCKED. `D2c` FOUND A REAL CAPABILITY LOSS.
+> # A SUCCESSOR NODE IS BEING CUT. Steward.
+>
+> **Architect `evt_35hwm50tas8kp`.** `D2c`'s sentinel failed on **assertion 1
+> verbatim** — `must retain its compiling RecursiveDescent baseline` — which
+> **precedes** the sentinel assertion, so the discrimination is complete.
+>
+> **`RecursiveDescent` compiled row 4 depth 2 at base; the functionized lane
+> REFUSES it at `StaticWorkerBinding`. Same program, two worlds, different
+> behaviour.** ⇒ **A regression, differentially established on a REAL PRODUCTION
+> COMPILE** rather than on hand-built IR with no preimage. **That is exactly the
+> population `D2c` existed to reach, and it found one on the first required
+> row.**
+>
+> **No `D6` re-home is lawful. `D3`-`D8` stay gated. `D2c` stays UNPUBLISHED.**
+>
+> > ### THE STAGING IS WHY THIS COST NOTHING. `AC-7` earned its keep here.
+> >
+> > `D2c` is **one revertible commit that never landed** — nothing to undo, no
+> > evidence destroyed, and the blocker arrived as a **concrete failing program
+> > instead of an argument.** A single candidate that rerouted and deleted
+> > together could not have told this regression from a compile error.
+>
+> ### THE SUCCESSOR'S QUESTION IS EXACTLY ONE, AND IT HAS TWO LIVE ANSWERS.
+>
+> **Is the functionized lane's `StaticWorkerBinding` refusal CORRECT SEMANTICS,
+> or a MISSING PORT?**
+>
+> | answer | consequence |
+> |---|---|
+> | **correct semantics** | `RecursiveDescent` was compiling a shape with **no runtime denotation**. The retirement FIXES that, the sentinel rewrites under `D6`, and this block lifts. |
+> | **missing port** | The functionized lane owes the `StaticWorkerBinding` case and **the retirement waits on it.** |
+>
+> **Neither reading may be assumed and the error text does not settle it.** It
+> is a **soundness question and it is the Architect's** — it becomes the
+> successor's `D1`, routed to them, **not decided by the ring as engineering.**
+>
+> **Two shortcuts are foreclosed** (Architect, who noted being the seat that
+> benefits from the first and checked the rendering identity rather than
+> reasoning about it):
+>
+> - **"It is fixture-only, so it does not count."** Row 4 depth 2 **is** one of
+>   the twelve — rendering 5, hash `de31e8ed184a5754`, `{L}`, `#6d` live. So
+>   `0/12` holds and **no user program reaches this shape today.** **That bounds
+>   the BLAST RADIUS, not the MECHANISM.** The refusal is general — *"a
+>   constructor carrying an unconsumed static worker denotes a value containing
+>   the callable and has no runtime representation"* — a statement about **the
+>   functionized lane**, not about one fixture. **The fixture is how it was
+>   found, not the extent of what was found.**
+> - **"`RecursiveDescent` compiled it, so port it."** Equally unproven and
+>   **possibly backwards.** The refusal reads as **principled**: the shape
+>   denotes a value containing the callable and has no runtime representation.
+>   The functionized lane may be **correctly** refusing what `RecursiveDescent`
+>   compiled only because its monolithic structure let the callable stay
+>   implicit — on which reading the retirement **removes a latent
+>   representability hole.**
+>
+> ### CLASSIFY THE OTHER 13. Do not stop that. It is free and it SIZES the node.
+>
+> **Stop the `D6` engineering — no re-homing, retiring, or test edits. Do NOT
+> stop reading the other 13 failure messages:** that run already happened and
+> the output is in hand. **If three more are `StaticWorkerBinding` refusals it
+> is ONE mechanism and one node; if they name different constructs the node is
+> several.** Cutting the node on one blocker when the same completed run holds
+> the answer for all fourteen buys a second round trip for nothing.
+>
+> ### ONE CORROBORATION BEFORE THE CUT, AND IT IS ONE LINE.
+>
+> **Assert `_excluded_result.is_ok()` at BASE `c98f72ba8`, disposable, green
+> tree.** The test already had this answer and threw it away — its first leg
+> captures `_excluded_result` at `control.rs:6499` and **discards it**, while
+> `control.rs:1717` and `:2057` assert exactly that in the same file. **It
+> departed from its own file's convention at precisely the point where the
+> evidence was**, which is why its capability claim is `CLAIMED` rather than
+> measured.
+>
+> **Why this and not the single reading:** `D2`'s positive control validated the
+> **enumerator**. **Nothing yet validates that `D2c`'s always-`FunctionizedUnits`
+> edit is behaviour-equivalent to the pre-existing exclusion mechanism.** The
+> base-SHA probe closes that on a tree where nothing was rerouted. **If the two
+> disagree, the finding is about `D2c`'s EDIT and not about the lane — and that
+> is a different node entirely.**
+>
+> ---
+>
+> # PRIOR: 2026-08-16 — RELEASED, TWELVE OF TWELVE DISCHARGED, BAR LIFTED.
 >
 > **Do the retirement in TWO STEPS and do not collapse them** — `D2c` reroutes
 > without deleting and lets the whole corpus in CI be the differential; `D3`
