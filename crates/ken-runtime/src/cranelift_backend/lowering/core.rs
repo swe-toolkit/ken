@@ -2000,7 +2000,8 @@ enum FrameScopeHarnessMutation {
 /// not an asymptotic verdict about those rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum RecursiveDescentResidual {
-    /// An ordinary match consuming an active computational recursor.
+    /// An ordinary match consuming an active computational recursor that the
+    /// ordinary producer route declines.
     MatchScrutineeRecursor,
     /// A lexical unit call whose argument is an active computational recursor.
     ///
@@ -2103,13 +2104,7 @@ fn recursive_descent_residual(expr: &RuntimeExpr) -> Option<RecursiveDescentResi
         }
         RuntimeExpr::Match {
             scrutinee, cases, ..
-        } => matches!(
-            scrutinee.as_ref(),
-            RuntimeExpr::ComputationalMatch { cases, .. }
-                if cases
-                    .iter()
-                    .any(|case| !case.recursive_positions.is_empty())
-        )
+        } => match_scrutinee_requires_recursive_descent(scrutinee)
         .then_some(RecursiveDescentResidual::MatchScrutineeRecursor)
         .or_else(|| recursive_descent_residual(scrutinee))
         .or_else(|| {
@@ -2155,6 +2150,24 @@ fn recursive_descent_residual(expr: &RuntimeExpr) -> Option<RecursiveDescentResi
         | RuntimeExpr::ImportedDeclarationRef { .. }
         | RuntimeExpr::Trap(_) => None,
     }
+}
+
+/// Retain an ordinary match over an active computational recursor exactly when
+/// the ordinary producer route would decline it.
+///
+/// The other routing disjunct accepts only a `Call` to a transparent
+/// declaration. This predicate's subject is an immediate `ComputationalMatch`,
+/// so calling the shared heterogeneous-deforestation predicate is the complete
+/// routing decision for this residual population.
+fn match_scrutinee_requires_recursive_descent(scrutinee: &RuntimeExpr) -> bool {
+    matches!(
+        scrutinee,
+        RuntimeExpr::ComputationalMatch { cases, .. }
+            if cases
+                .iter()
+                .any(|case| !case.recursive_positions.is_empty())
+                && !requires_heterogeneous_deforestation(scrutinee)
+    )
 }
 
 /// **`RT-DECL-CLOSURE-PORT` `D1` -- report EVERY residual variant present, not
@@ -2252,13 +2265,7 @@ fn collect_recursive_descent_residuals(
         } => {
             // The classification, then BOTH walks. The twin stops after
             // whichever fires first; this one records and keeps walking.
-            if matches!(
-                scrutinee.as_ref(),
-                RuntimeExpr::ComputationalMatch { cases, .. }
-                    if cases
-                        .iter()
-                        .any(|case| !case.recursive_positions.is_empty())
-            ) {
+            if match_scrutinee_requires_recursive_descent(scrutinee) {
                 found.insert(RecursiveDescentResidual::MatchScrutineeRecursor);
             }
             collect_recursive_descent_residuals(scrutinee, found);
