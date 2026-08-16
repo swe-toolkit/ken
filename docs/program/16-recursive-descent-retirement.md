@@ -25,6 +25,37 @@ linger in a half-migrated state. That just carries tech debt for no benefit."*
 > two backends to each other; it cannot tell you which one matches the oracle.
 > It remains a useful regression net and is not a specification.
 
+> ### OPERATOR DIRECTIVE, 2026-08-16 — the objective stands; 2 or 3 go to research
+>
+> > Prior art indicates that retiring `RecursiveDescent` is possible and observed
+> > resource usage by that implementation makes it desirable. If outcome 2 or 3
+> > is returned by `runtime-implementer`, that is a clear signal to refer the
+> > matter to research for guidance.
+>
+> **Context: this answers a Steward escalation and it answers it in the
+> negative.** With every one of `RT-DESCENT-RETIRE`'s nine dependencies merged
+> and the capstone still barred, the Steward reported that *"retire
+> `RecursiveDescent`" may not be achievable as scoped* and named partial
+> retirement — everything except the narrowed `MatchScrutineeRecursor` — as the
+> operator's call. **The operator did not take that fork.** The objective is
+> unchanged, on two grounds the campaign did not previously have on record:
+> **prior art says it is possible**, and **the resource usage of the
+> implementation that did it says it is desirable.**
+>
+> ⇒ **A "cannot settle" or a witness is not the end of the line, it is a
+> handoff.** The three outcomes of
+> [`RT-MATCH-DIFFERENCE-REACHABILITY`](issues/RT-MATCH-DIFFERENCE-REACHABILITY.md)
+> now route as: **outcome 1** (unreachable, gate argument) proceeds to a fresh
+> Architect ruling as framed; **outcomes 2 and 3 go to the research seat.**
+>
+> **Why research and not a re-scope, stated because the routing is not
+> arbitrary.** Prior art is exactly what the research seat may read and no build
+> seat may (`CLEAN-ROOM.md` — the permissive references are enclave/research/
+> adversary only, to understand and never to copy). A ring that returns a witness
+> or an honest "cannot settle" has exhausted what it can learn from Ken's own
+> rules; the next question is how other implementations closed the same shape,
+> and **that question is answerable only in a seat with reference access.**
+
 **This campaign closes a migration the code itself calls temporary.**
 `select_body_emission_authority` is documented as *"The one **temporary** B2F
 migration selector"* (`lowering/core.rs:174`). It has been temporary long enough

@@ -194,6 +194,15 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > Architect ruling. Until then the capstone is barred pending that named
 > measurement, not permanently.
 >
+> **A measurement that comes back the other way does NOT close this node.**
+> Operator, 2026-08-16: *"Prior art indicates that retiring `RecursiveDescent` is
+> possible and observed resource usage by that implementation makes it
+> desirable."* A witness, or an honest "cannot settle", **refers the matter to
+> research for guidance** — it does not retire the objective and it does not
+> trigger a re-scope. The Steward offered partial retirement as a fallback and
+> the operator declined it. Full statement:
+> `docs/program/16-recursive-descent-retirement.md`.
+>
 > **The discharge MOVED, 2026-08-16 (Steward), and the move is the point.** It
 > was written as `RT-MATCH-SCRUTINEE-DISPOSITION` `D3-delete` while that node was
 > live. **That node merged at PR #2458 without taking the delete branch**, so the
