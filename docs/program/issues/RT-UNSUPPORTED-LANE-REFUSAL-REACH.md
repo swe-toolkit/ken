@@ -1,7 +1,7 @@
 ---
 id: RT-UNSUPPORTED-LANE-REFUSAL-REACH
 title: "Measure whether the refused recursor rows and the depth-2/3 static-worker constructs reach the 48 unsupported lane, the one fact that separates a conditionally-permitted narrowing from a recordable spec gap"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
