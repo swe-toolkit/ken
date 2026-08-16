@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 19:23:07Z — from 355 issue file(s) in `docs/program/issues/`.
+2026-08-16 19:50:52Z — from 355 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -314,7 +314,7 @@ the committed file matches the generator's output.
 | `RT-REQUIRED-OCCURRENCE-PROJECTION` | Project the required consuming occurrence into lowering as a validated value derived in planning -- a second, differently-named relation, never the key's source-level certificate and never a bare carrier | merged | runtime | M | none | — |
 | `RT-ROOT-AUTHORITY-BLAME-DOMAIN` | The three root-authority guards report a compiler-owned invariant failure through the unsupported-construct channel, which reverses the fault domain -- and the correct arm, BackendFailure::PlannerInvariant, already exists with 40 producers in the same crate | merged | runtime | M | none | — |
 | `RT-ROOT-AUTHORITY-REACHABILITY-WITNESS` | ANSWERED, bounded negative on all three guards: three Ken-source programs attacking absence-at-consumption, wrong-outer-cursor and duplication all built and exited 0, so no language restriction is triggered -- three stress shapes are a search, not a proof of unreachability | closed | runtime | M | none | — |
-| `RT-ROUTE-EQUALITY-CONTROL-B-ROW` | The route-equality control's population never makes B fire, so on the shipped rows it reduces to the formula it replaced -- add the transparent-declaration Call row that exercises the second disjunct | active | runtime | S | none | — |
+| `RT-ROUTE-EQUALITY-CONTROL-B-ROW` | The route-equality control now observes its second disjunct true -- a transparent-declaration Call row records (subject_guard, A, B, route) = (false, false, true, true), and the mutation claim it carried is no longer unexercised | merged | runtime | S | none | — |
 | `RT-SCALE-A` | Boundary A — re-derive the planner census for n=3..7 against the COMPLETED factored representation, superseding the provisional outer-planner numbers | merged | runtime | M | none | — |
 | `RT-SCALE-B` | Boundary B — the full n=3..7 emission measurement, the research-grounded analytical model, and the operator scaling verdict that gates RT-NATIVE-FNSPLIT's merge | merged | runtime | L | none | — |
 | `RT-SCRATCH-LIFETIME-REMAINING-CRATES` | `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names | ready | runtime | M | none | — |

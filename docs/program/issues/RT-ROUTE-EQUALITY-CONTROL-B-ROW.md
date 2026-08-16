@@ -1,7 +1,7 @@
 ---
 id: RT-ROUTE-EQUALITY-CONTROL-B-ROW
-title: "The route-equality control's population never makes B fire, so on the shipped rows it reduces to the formula it replaced -- add the transparent-declaration Call row that exercises the second disjunct"
-status: active
+title: "The route-equality control now observes its second disjunct true -- a transparent-declaration Call row records (subject_guard, A, B, route) = (false, false, true, true), and the mutation claim it carried is no longer unexercised"
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -11,7 +11,27 @@ github: null
 origin: "Adversary M8 hunt on merged b7bb88c6d (evt_5r2brk2f7pye8), filed by the Steward. Queued behind lane 1 per the operator's two-lane directive -- the control is under-exercised, not wrong, and nothing regresses while the row is missing."
 ---
 
-## What this node is
+## DELIVERED AND MERGED (PR #2470, exact `0e9d20444`)
+
+**The cell exists and it is the one that was specified.** A transparent
+declaration call whose closure body constructs `Wrap`, observed at the ordinary
+`Match` row as **`(subject_guard, A, B, actual_route) = (false, false, true,
+true)`** — `B` true with `A` false, the one combination the three shipped rows
+could not produce. `AC-1` is met by observation, not by construction argument.
+
+**`AC-2` is met and it is the half that mattered.** Mutating that declaration
+body from a recursive `Construct` to a scalar `Value` reds the new cell at
+`(false, false, false, false)` and leaves the other three rows untouched. **A
+second-disjunct contribution is now visible to the control**, so the standing
+claim that a future disjunct `C` would red the difference row has stopped being
+an assertion about an unexercised capability.
+
+**`AC-3` held:** the only production-file hunk is inside the existing
+`#[cfg(test)]` block, widening the observation domain from `ComputationalMatch`
+to also include `Call`. The routing predicate remains a single evaluated
+`A || B` binding and the observation records that same value.
+
+## What this node was
 
 **A one-row addition to a control that shipped sound and under-exercised.**
 Nothing is broken and nothing regresses while this is open. It is filed rather
