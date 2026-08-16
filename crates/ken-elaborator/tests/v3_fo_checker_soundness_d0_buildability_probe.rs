@@ -93,10 +93,20 @@ fn probe1_fokderivation_indexed_by_foksequent_elaborates_and_kernel_checks() {
 // ---------------------------------------------------------------------
 
 /// The literal spec syntax: `Derives(s) : Omega := ‖ FokDerivation s ‖`
-/// (`23 §4.3`, adapted to the Fok names). If this elaborates, `Derives`
-/// itself must also be recorded and checked. If it does not, the exact
-/// rejection is the `D0` result for this axis, and probe 2b establishes what
-/// the surface *does* admit in its place.
+/// (`23 §4.3`, adapted to the Fok names).
+///
+/// **Flipped by [[LANG-TRUNCATION-SURFACE-SYNTAX]] `D1`.** At `D0` this
+/// probe recorded a LEXER rejection (no `‖`/`Trunc` token existed at all) as
+/// its complete, honest result — see that node's git history for the
+/// original negative finding. `LANG-TRUNCATION-SURFACE-SYNTAX` has since
+/// delivered exactly this surface spelling (`crates/ken-elaborator/src/
+/// lexer.rs`'s `Token::TruncBar`, elaborating to the kernel's existing
+/// `Term::Trunc`), so the axis this probe measures now reads PASS, not
+/// FAIL — updating the assertion here is this WP's own regression fix, not
+/// an encroachment onto that node's remaining `D1b` work (`fok_derives`/
+/// `fok_classically_valid`'s REAL definitions are still untouched: this
+/// probe still only builds a placeholder `FokDerivation` and a throwaway
+/// `fok_derives`, exactly as before).
 #[test]
 fn probe2_propositional_truncation_literal_spec_syntax() {
     let mut env = mk_env();
@@ -108,29 +118,24 @@ fn probe2_propositional_truncation_literal_spec_syntax() {
     )
     .expect("probe 1 must hold for probe 2 to test the real Derives shape");
 
-    let result =
-        env.elaborate_decl("fn fok_derives (s : FokSequent) : Omega = ‖ FokDerivation s ‖");
-
-    match result {
-        Ok(_) => panic!(
-            "propositional truncation unexpectedly elaborated from `.ken` surface syntax -- \
-             the D0 report's answer to probe 2 must change from FAIL to PASS"
-        ),
-        Err(e) => {
-            // Record the exact rejection so the D0 report cites it, not a
-            // paraphrase. As of this probe: no lexer token exists for `‖`/`‖`
-            // at all (`crates/ken-elaborator/src/lexer.rs` has no Trunc/‖
-            // entry), so this must fail at LEXING, before any semantic
-            // question about `FokDerivation` or `Omega` is even reached.
-            let msg = e.to_string();
-            eprintln!("probe2 (literal ‖A‖ syntax) rejected: {msg}");
-        }
-    }
+    env.elaborate_decl("fn fok_derives (s : FokSequent) : Omega = ‖ FokDerivation s ‖")
+        .expect(
+            "propositional truncation must now elaborate from `.ken` surface syntax -- \
+             LANG-TRUNCATION-SURFACE-SYNTAX D1 delivered the ‖A‖ formation spelling",
+        );
 }
 
-/// Same statement, ASCII `|A|`-style spelling some Ken surface formers use
-/// as an ASCII alternative to a Unicode delimiter -- checked independently
-/// in case `‖ ‖` specifically has no token but a different spelling does.
+/// Same statement, ASCII spelling(s) — checked independently in case `‖ ‖`
+/// specifically has no token but a different spelling does.
+///
+/// **Partially flipped by [[LANG-TRUNCATION-SURFACE-SYNTAX]] `D1`** (see
+/// `probe2` above for the full rationale): the delivered ASCII spelling is
+/// the double-pipe digraph `||A||` (same token as `‖A‖`, `lexer.rs`'s `'|'`
+/// arm), which now elaborates. The bare-identifier spelling `Trunc (...)`
+/// was never adopted (the node's own design section rejected a
+/// ConId-resolution route in favor of a collision-proof punctuation token)
+/// and remains correctly rejected — `UnresolvedCon`, since no global named
+/// `Trunc` exists.
 #[test]
 fn probe2b_propositional_truncation_ascii_spelling_probe() {
     let mut env = mk_env();
@@ -142,24 +147,21 @@ fn probe2b_propositional_truncation_ascii_spelling_probe() {
     )
     .expect("probe 1 must hold for probe 2b to test the real Derives shape");
 
-    for (label, src) in [
-        (
-            "double-pipe ||A||",
-            "fn fok_derives_ascii (s : FokSequent) : Omega = ||FokDerivation s||",
+    env.elaborate_decl("fn fok_derives_ascii (s : FokSequent) : Omega = ||FokDerivation s||")
+        .expect(
+            "the ASCII double-pipe spelling '||A||' must now elaborate -- \
+             LANG-TRUNCATION-SURFACE-SYNTAX D1 delivered it as the same token as ‖A‖",
+        );
+
+    let trunc_ident_result = env
+        .elaborate_decl("fn fok_derives_trunc (s : FokSequent) : Omega = Trunc (FokDerivation s)");
+    match trunc_ident_result {
+        Ok(_) => panic!(
+            "bare identifier 'Trunc' unexpectedly elaborated -- LANG-TRUNCATION-SURFACE-SYNTAX \
+             deliberately did not adopt this spelling (collision risk with a user global named \
+             Trunc); if this now passes, something else made 'Trunc' resolve"
         ),
-        (
-            "bare identifier Trunc",
-            "fn fok_derives_trunc (s : FokSequent) : Omega = Trunc (FokDerivation s)",
-        ),
-    ] {
-        let result = env.elaborate_decl(src);
-        match result {
-            Ok(_) => panic!(
-                "ASCII truncation spelling '{label}' unexpectedly elaborated -- \
-                 the D0 report's answer to probe 2 must change from FAIL to PASS"
-            ),
-            Err(e) => eprintln!("probe2b ({label}) rejected: {e}"),
-        }
+        Err(e) => eprintln!("probe2b (bare identifier Trunc) still rejected, as designed: {e}"),
     }
 }
 

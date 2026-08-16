@@ -688,7 +688,8 @@ fn collect_expr_spans(expr: &Expr, out: &mut Vec<Span>) {
         Expr::ELam(_, body, _)
         | Expr::EOld(body, _)
         | Expr::EProj(body, _, _)
-        | Expr::EPosProj(body, _, _) => collect_expr_spans(body, out),
+        | Expr::EPosProj(body, _, _)
+        | Expr::ETrunc(body, _) => collect_expr_spans(body, out),
         Expr::EPair(components, _) => components
             .iter()
             .for_each(|component| collect_expr_spans(component, out)),

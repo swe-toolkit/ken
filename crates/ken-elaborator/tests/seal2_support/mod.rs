@@ -645,7 +645,8 @@ pub fn type_names_in_expr(e: &Expr, out: &mut BTreeSet<String>) {
         Expr::ELam(_, body, _)
         | Expr::EOld(body, _)
         | Expr::EProj(body, _, _)
-        | Expr::EPosProj(body, _, _) => {
+        | Expr::EPosProj(body, _, _)
+        | Expr::ETrunc(body, _) => {
             type_names_in_expr(body, out);
         }
         Expr::EPair(components, _) => {

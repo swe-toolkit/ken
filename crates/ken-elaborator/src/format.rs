@@ -25,6 +25,7 @@ pub(crate) fn canonical_token_spelling(token: &Token) -> Option<&'static str> {
         Token::Or => Some("∨"),
         Token::FlowsTo => Some("⊑"),
         Token::Times => Some("×"),
+        Token::TruncBar => Some("‖"),
         _ => None,
     }
 }
@@ -179,6 +180,7 @@ mod tests {
             (Token::Or, "∨"),
             (Token::FlowsTo, "⊑"),
             (Token::Times, "×"),
+            (Token::TruncBar, "‖"),
         ];
         for (token, spelling) in cases {
             assert_eq!(canonical_token_spelling(&token), Some(spelling));

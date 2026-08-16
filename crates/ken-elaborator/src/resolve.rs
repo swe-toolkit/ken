@@ -291,6 +291,10 @@ pub enum RExpr {
         binding_span: Span,
         span: Span,
     },
+    /// `‖A‖` / `||A||` — propositional-truncation formation (`16 §6`,
+    /// LANG-TRUNCATION-SURFACE-SYNTAX D1). Scope-resolved sibling of
+    /// `Expr::ETrunc`.
+    RTrunc(Box<RExpr>, Span),
 }
 
 impl RExpr {
@@ -318,6 +322,7 @@ impl RExpr {
             | RExpr::RArrow(_, _, s)
             | RExpr::RAttachedProofRef { span: s, .. }
             | RExpr::RRecursiveResult { span: s, .. }
+            | RExpr::RTrunc(_, s)
             | RExpr::RBinOp(_, _, _, s) => s,
             RExpr::RMatch { span, .. } | RExpr::RIf { span, .. } => span,
         }
@@ -611,7 +616,8 @@ fn expr_as_type(expr: &Expr) -> Result<Type, ElabError> {
         | Expr::EProj(..)
         | Expr::EPosProj(..)
         | Expr::EAttachedProofRef { .. }
-        | Expr::ERecursiveResult { .. } => Err(unsupported_constructor_type_expr(expr)),
+        | Expr::ERecursiveResult { .. }
+        | Expr::ETrunc(..) => Err(unsupported_constructor_type_expr(expr)),
     }
 }
 
@@ -749,7 +755,7 @@ fn resolve_explicit_ctor(
 // ----- reserved surface sugar (FR-2, `docs/program/wp/
 // ds-1-findings-remediation.md`) -----
 
-/// `elab.rs`'s five checked-mode surface sugar identifiers, named here so
+/// `elab.rs`'s checked/infer-mode surface sugar identifiers, named here so
 /// both `elab.rs`'s interception arms and this module's declaration guard
 /// below read the SAME constants and can't drift apart. They do NOT all
 /// intercept the same way — this is exactly the distinction the Architect's
@@ -759,17 +765,31 @@ fn resolve_explicit_ctor(
 /// - `Refl`/`Axiom` — a bare `RCon`, TOTAL intercept at any arity (zero
 ///   arguments needed): a declared global of either name is wholly
 ///   unreachable, full stop.
-/// - `absurd` — `RApp(RCon("absurd"), arg)`, arity-**1** only.
-/// - `J`/`Eq` — `peel_named_app(_, name, 3)`, arity-**3** only, BY DESIGN so
-///   a lower-arity type-former/class of the same name coexists (the landed
-///   `class Eq a` — spec-grounded, `51-lawful-classes.md §2.1` — is arity-1
-///   and never collides with the arity-3 kernel-equality sugar `Eq A a b`;
-///   the elaborator's own arity gate already disambiguates the two).
+/// - `absurd`/`trunc_intro` — `RApp(RCon(name), arg)`, arity-**1** only.
+/// - `J`/`Eq`/`elim_trunc` — `peel_named_app(_, name, 3)`, arity-**3** only,
+///   BY DESIGN so a lower-arity type-former/class of the same name coexists
+///   (the landed `class Eq a` — spec-grounded, `51-lawful-classes.md §2.1` —
+///   is arity-1 and never collides with the arity-3 kernel-equality sugar
+///   `Eq A a b`; the elaborator's own arity gate already disambiguates the
+///   two).
 pub(crate) const SUGAR_REFL: &str = "Refl";
 pub(crate) const SUGAR_AXIOM: &str = "Axiom";
 pub(crate) const SUGAR_ABSURD: &str = "absurd";
 pub(crate) const SUGAR_J: &str = "J";
 pub(crate) const SUGAR_EQ: &str = "Eq";
+/// `trunc_intro a` — `16 §6` truncation introduction
+/// (LANG-TRUNCATION-SURFACE-SYNTAX D2). Same shape as `absurd`:
+/// `RApp(RCon("trunc_intro"), arg)`, arity-**1** only, checked-mode. The
+/// kernel's own `Debug` spelling `|a|` is unavailable as surface syntax
+/// (`|` is already `Pipe`, the match-arm separator), so this identifier
+/// sugar is the introduction spelling.
+pub(crate) const SUGAR_TRUNC_INTRO: &str = "trunc_intro";
+/// `elim_trunc P f t` — `16 §6` truncation elimination
+/// (LANG-TRUNCATION-SURFACE-SYNTAX D2). Same shape as `J`/`Eq`:
+/// `peel_named_app(_, name, 3)`, arity-**3** only, infer-mode — a
+/// lower-arity type-former/class of the same name may coexist, exactly the
+/// `J`/`Eq` precedent.
+pub(crate) const SUGAR_ELIM_TRUNC: &str = "elim_trunc";
 
 /// The declaration-time hard-error set — ONLY the names above whose
 /// interception is total/arity-independent (`Refl`, `Axiom`, `absurd`).
@@ -790,7 +810,8 @@ pub(crate) const SUGAR_EQ: &str = "Eq";
 /// `RCon("Ascript")` match arm exists anywhere in
 /// `elab.rs`/`resolve.rs`/`parser.rs`, so neither shadows a user global the
 /// way `Refl`/`Axiom`/`absurd` do.
-pub(crate) const RESERVED_SUGAR: &[&str] = &[SUGAR_REFL, SUGAR_AXIOM, SUGAR_ABSURD];
+pub(crate) const RESERVED_SUGAR: &[&str] =
+    &[SUGAR_REFL, SUGAR_AXIOM, SUGAR_ABSURD, SUGAR_TRUNC_INTRO];
 
 /// Resolve-time hard error (fail-closed) when a declared name collides with
 /// a totally-reserved sugar identifier — the collision diagnostic FR-2 adds
@@ -1796,6 +1817,11 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
             let ra = resolve_expr_ctx(scope, a, ctx)?;
             let rb = resolve_expr_ctx(scope, b, ctx)?;
             Ok(RExpr::RArrow(Box::new(ra), Box::new(rb), span.clone()))
+        }
+
+        Expr::ETrunc(e, span) => {
+            let re = resolve_expr_ctx(scope, e, ctx)?;
+            Ok(RExpr::RTrunc(Box::new(re), span.clone()))
         }
 
         Expr::EAttachedProofRef {

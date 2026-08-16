@@ -108,6 +108,11 @@ pub enum Token {
     Times,       // `><` / `×`
     // L2 punctuation
     MapsTo, // `|->` / `↦` — match arm separator
+    // K2 punctuation (`16 §6`, LANG-TRUNCATION-SURFACE-SYNTAX)
+    TruncBar, // `‖` / `||` — propositional-truncation formation delimiter,
+              // paired: `‖A‖` / `||A||`. A genuine new token (not a
+              // sugar-identifier), so no user-declared name can ever
+              // collide with it.
     // L1 numeric literal tokens
     IntLit(BigInt),       // integer literal too large for u32
     FloatLit(f64),        // decimal or hexadecimal f64: `3.14`, `1e-9`, `0x1p-3`
@@ -752,6 +757,14 @@ impl<'s> Lexer<'s> {
                     self.advance();
                     return Ok((Token::MapsTo, Span::new(start, self.pos)));
                 }
+                // ASCII spelling of `‖` (16 §6): two adjacent `|` with no
+                // intervening whitespace. Checked after `|->` so that
+                // ambiguity is impossible; a lone `|` remains `Pipe` (match
+                // arm separator), unaffected.
+                if self.cur() == Some('|') {
+                    self.advance();
+                    return Ok((Token::TruncBar, Span::new(start, self.pos)));
+                }
                 return Ok((Token::Pipe, Span::new(start, self.pos)));
             }
             ';' => {
@@ -841,6 +854,10 @@ impl<'s> Lexer<'s> {
             '×' => {
                 self.advance();
                 return Ok((Token::Times, Span::new(start, self.pos)));
+            }
+            '‖' => {
+                self.advance();
+                return Ok((Token::TruncBar, Span::new(start, self.pos)));
             }
             'Ω' => {
                 self.advance();
