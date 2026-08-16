@@ -104,11 +104,61 @@ originally named.** Corrected by the Steward 2026-08-15 on Architect Finding A
 > had one near-miss already, and the frame was steering into the second.
 
 **`D2a` — make `D1` actually run, and this is the whole point.** Add a
-feature-on `--lib` execution for `ken-elaborator`. **Put it in the ordinary
-required `build + test` job, not the optional solver job.** `D1` was
-demonstrated to pass with `PATH=/definitely/absent`, so it is binary-independent
-and has no reason to hang off the job whose sole purpose is installing the
-solver it does not need.
+feature-on `--lib` execution for `ken-elaborator`, as **its own job, wired into
+the required `build + test` aggregate through `needs:` and the pass/fail loop.**
+`D1` was demonstrated to pass with `PATH=/definitely/absent`, so it is
+binary-independent and has no reason to hang off the job whose sole purpose is
+installing the solver it does not need.
+
+> ### AMENDED 2026-08-16. A CANDIDATE WAS BUILT ON THE EARLIER WORDING.
+>
+> **This sentence previously read *"Put it in the ordinary required `build +
+> test` job, not the optional solver job."*** `190f705bb` did exactly that —
+> added a checkout and a `cargo test` step **inside** `build-test` — and it is
+> a correct implementation of the sentence as written. **The defect is the
+> frame's, not the ring's** (Architect `evt_2q76aqesx3hnj`; `COORDINATION §14a`
+> puts the amendment here rather than in the ring's fold-in).
+>
+> **`build-test` is a pure aggregate gate.** `ci.yml:379` says so in the block
+> already carrying a do-not-touch warning: *"It is intentionally a pure gate —
+> no checkout, no build, a few seconds."* Steward-verified: the job has
+> `needs:` and a single `echo`/exit step, and **no `actions/checkout` and no
+> `cargo` anywhere in it.**
+>
+> **Three things break if a build step goes inside it**, none of them a
+> soundness failure — the gate stays fail-closed either way, and a new step can
+> only add a failure mode:
+>
+> 1. **The warning comment becomes false**, in the one job the file flags as
+>    load-bearing for branch protection.
+> 2. **The diagnosis regresses.** Steps abort the job on failure and `All test
+>    jobs passed` carries no `if:`, so a failing new step means the six
+>    `::error::$name did not pass` lines never emit. **The case that costs you
+>    is a shard failing *and* the new test failing** — shard attribution is
+>    exactly what is lost, on the single check branch protection and the
+>    publisher both read.
+> 3. **`if: always()` makes it compile on every run**, including runs where
+>    every test job already failed. A job documented as "a few seconds" would
+>    pay a cold `ken-elaborator` build before reporting that things are broken.
+>
+> **The contrast the sentence was actually drawing is with the solver job**, and
+> a sibling job satisfies it. The frame's own vocabulary already agreed: two
+> sections above, it describes `z3-process-adapter` — **a separate job** — as
+> *"wired into the required `build + test` aggregate"*. `ci.yml:381-384` gives
+> the procedure: *"EVERY TEST-RUNNING JOB MUST BE LISTED IN `needs` AND CHECKED
+> BELOW. Add a job above, add it in both places here."*
+>
+> **This is the cheap remedy, not the expensive one.** It needs no
+> repository-settings change — which is the aggregator's stated reason for
+> existing. `build + test` keeps its name and its contract; one new job name
+> appears in the PR checks.
+
+**The shape, so the recut is mechanical.** A sibling job mirroring
+`z3-process-adapter` minus the Z3 install, then three edits in `build-test`:
+add it to `needs:`, add its result binding and `echo` line, and add it to the
+failure loop. **The four-places sharded-matrix discipline at `ci.yml:192-205`
+does not apply** — the matrix runs this crate's lib tests with default features,
+so a feature-on run is a distinct configuration, not a binary exclusion.
 
 **`D2b` — only after `D2a` is green on `main`.** Make the round-trip test skip
 when `z3` is absent rather than asserting unconditionally, and take the
@@ -185,13 +235,25 @@ authority.
 
 **`AC-6`.** No-regression, in CI (`COORDINATION §12`). **If `D2` lands, say
 explicitly in the handback which required checks changed**, since `D2` edits the
-gate that this criterion is measured by.
+gate that this criterion is measured by. **Under the amended `D2a` the expected
+answer is: one new job name appears in the PR checks, `build + test` keeps its
+name and its contract, and branch protection needs no edit.** An answer that
+reports a change to `build + test` itself is the signal the recut went back into
+the aggregate.
 
 **`AC-7`.** `D2a` is demonstrated by **a CI run on the PR that shows `D1`
 executing** — the test name in a job's output, not the workflow diff. A workflow
 edit that looks correct and selects no new target is the exact failure `D2a`
 repairs, and it cannot be caught by reading the YAML. **`D2b` may not land until
 this is shown green.**
+
+> **"A job's output" means the new job's log — NOT `build + test`'s.** This
+> criterion needed no amendment, but the `190f705bb` review request paraphrased
+> it as *"exact PR `build + test` output naming ..."*, and that narrowing is
+> part of what made the aggregator look like the only place the step could go
+> (Architect `evt_2q76aqesx3hnj`). **The aggregate runs no tests and never
+> prints a test name**; requiring one from it is unsatisfiable under any correct
+> implementation. A dedicated job's log satisfies `AC-7` exactly as written.
 
 ## Banned scope
 

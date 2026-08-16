@@ -219,7 +219,7 @@ signature of a missing token.
 `‖A‖ := (P : Omega) -> (A -> P) -> P` does not typecheck, because `Ω` is
 predicative (`ken-kernel/src/lib.rs:23`) so that `Pi` does not land back in `Ω`.
 
-### `D3`/`D4` are not affected, and `D2` is dispatchable
+### `D3`/`D4` are not affected, and `D2` HAS LANDED
 
 `checker_soundness`'s conclusion is `classically_valid q : Omega`, which is
 where `D1b` needs truncation. **The proof steps do not.** `D2` is the
@@ -228,7 +228,34 @@ exist in `FoKripke.ken` (`:263`/`:256`) — no truncation, no `FokDerivation`.
 `D0` part (3) established the signature shape every one of those lemmas must be
 written in, so `D2` is derisked rather than blocked.
 
-⇒ **This node is not stalled. `D2` is dispatchable.**
+⇒ **This node is not stalled.**
+
+> **`D2` LANDED 2026-08-16, PR #2431, squash `d6491e52c`** — merge-base
+> `f97ffb87a`, `+404/-0`, blob-verified on both paths. Decision
+> `dec_6wavec6gh1rxb`.
+>
+> **It delivers a different set than first proposed, and the difference is the
+> lesson.** The first candidate (`ab99a358a`, rejected) supplied a `fok_or a b
+> = True` eliminator. The Architect censused all 8 `fok_or` call sites: every
+> one sits in the `*_mentions_parameter` freshness chain, whose sole consumer
+> `fok_check_forall_right:554` accepts **only when that chain is `False`**.
+> **The delivered inversions were the dual of the ones `ForallRight` needs.**
+>
+> ⇒ **What is on `main`:** `fok_and_left`/`fok_and_right` at `= True` (for
+> `FokInit`, which consumes `fok_form_eq` at `:583`), and
+> `fok_or_left_false`/`fok_or_right_false` at `= False` (for `ForallRight`).
+> `fok_or_elim` is retained and now labelled as having no checker consumer.
+> Five failable naive pre-bound controls, one per lemma.
+>
+> **A polarity is a fact about the call path, not about the connective.** The
+> first cut was derived from the shape of `fok_and`/`fok_or` themselves; the
+> correct set is derived from where the checker consumes them. **`D3`/`D4`
+> should state which polarity each lemma they invoke is consumed at.**
+>
+> Non-blocking, for whichever candidate next touches `FoKripke.ken`:
+> `:662-664` cites `:328` as a seventh `fok_and` site when a complete census
+> gives exactly six (`:352 :365 :378 :391 :404 :417`), and the five controls
+> assert `is_err()` rather than the specific refinement failure.
 
 > **This paragraph originally read *"`D1a` and `D2` are both dispatchable"*, and
 > `D1a` was dispatched on it. It hard-stopped**: authoring `FokDerivation`
