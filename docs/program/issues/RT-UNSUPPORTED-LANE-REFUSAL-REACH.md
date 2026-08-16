@@ -1,6 +1,6 @@
 ---
 id: RT-UNSUPPORTED-LANE-REFUSAL-REACH
-title: "CLOSED, complete negative result: none of the five refused populations reaches the 48 unsupported lane -- every one returns Err before artifact construction, and the lane is a field on a SUCCESSFUL compile, so the gap is not repairable by recording"
+title: "CLOSED, complete negative result: none of the five refused populations reaches the 48 unsupported lane -- every one returns Err before artifact construction, so the repair belongs at 48 section 5.4's native-artifact binding (owed even when no native bytes exist) and NOT at compiled.unsupported, and it is owed independently of the operator's narrowing decision"
 status: closed
 owner: runtime
 size: S
@@ -29,7 +29,10 @@ origin: "Steward, 2026-08-16, on the Architect's spec read at evt_7wzkzpjmttbht 
 > sentences.** They are **error payloads, not lane records** — that distinction
 > is the whole finding, and `AC-1` was written to force it.
 
-> ### THE STRUCTURAL REASON, AND IT IS WHY "REPAIRABLE BY RECORDING" IS WRONG
+> ### THE STRUCTURAL REASON THE LANE IS UNREACHABLE FROM AN ERROR PATH
+>
+> **This block establishes the NO. It does not settle the remedy** — see the
+> binding-layer block below, which corrects the Steward's first reading.
 >
 > **`compiled.unsupported` is a field on a compile that SUCCEEDED.** Every site
 > that reads it has the identical shape:
@@ -54,22 +57,76 @@ origin: "Steward, 2026-08-16, on the Architect's spec read at evt_7wzkzpjmttbht 
 > emitter was the right one.** A successor must not cite `test_objects.rs` as
 > evidence about production.
 
-> ### WHAT THIS COSTS THE OPERATOR ASK — IT GOT BIGGER, NOT SMALLER
+> ### THE REMEDY IS AT THE BINDING LAYER, NOT AT `compiled.unsupported`
+> ### Architect `evt_6gsyts7v5eg43`. This CORRECTS the Steward's first reading.
 >
-> The pre-measurement expectation, recorded before `D0` ran, was that a NO
-> would be **"a `48` gap repairable by RECORDING"**. **That is now refuted.**
+> **The Steward initially concluded that populating the lane required converting
+> these refusals from compile-time `Err` into compile-time success carrying a
+> record — a change to what the compiler PRODUCES. That is the wrong layer**,
+> and the Architect names it as the obvious next mistake: it would mean
+> producing an artifact for a compile that failed, **which is worse than the
+> gap.**
 >
-> `48:210` scopes the lane to constructs that *"must fail before native
-> execution"* — which presumes **an artifact exists** and declines to run.
-> Populating it for these five therefore requires converting them from
-> **compile-time `Err`** into **compile-time success carrying a lane record that
-> fails loudly at load or run.** That is a change to what the compiler
-> *produces*, not to what it *reports*.
+> **Two mechanisms share the word `unsupported` and must not be conflated:**
 >
-> ⇒ **Neither of the two dispositions this node was framed to choose between is
-> the actual one.** It is not a conditionally-permitted narrowing (the condition
-> is unmet, five for five), and it is not a cheap recording gap. **Sizing the
-> conversion is an Architect call and is unowned as of this closure.**
+> | | what it is | reachable from a refusal? |
+> |---|---|---|
+> | `compiled.unsupported: Vec<String>` | a **fact on a produced artifact** — constructs in emitted bytes that are not natively executable | **No, by construction** |
+> | `CraneliftBackendError::Unsupported` | an **error that aborts compilation**, so no artifact and no fact list exist | it *is* the refusal |
+>
+> **The obligation sits one level up, at `48 §5.4`** (verified by the Steward at
+> `spec/40-runtime/48-executable-artifact-contract.md:168-175`): *"The
+> native-artifact binding is required **even when no native bytes exist.** It has
+> exactly one status"* — `available` / `unavailable` / `unsupported`, the last
+> carrying a stable lane, target symbol, construct, and reason. **A failed
+> compile owes a binding and today yields none at all.** That is the repair site.
+>
+> ⇒ **It is a RECORDING repair after all** — just at the artifact-binding layer
+> rather than the artifact-fact layer. **The operator ask does not grow.**
+>
+> **`:180` adds a consequence neither reading had reached:** *"An `unavailable`
+> or `unsupported` marker is part of the contract hash."* ⇒ the missing binding
+> is not merely an unreported fact; **it changes the contract hash**, which is
+> why this is owed rather than nice to have.
+
+> ### THE DECOUPLING — THIS IS NOT A TERM IN THE OPERATOR DECISION
+>
+> **The `48 §5.4` binding is owed no matter how the operator rules**, because
+> `§5.4` requires it for **any** unsupported construct, not for these five in
+> particular. **So it must not be bundled into the narrowing decision.** If it
+> rides along, accepting the narrowing will read as discharging the reporting
+> obligation — and it does not: **the same hole stays open for every future
+> unsupported construct.** Two artifacts, two decisions.
+>
+> **The narrowing itself remains acceptable-in-principle and the operator's to
+> accept.** Nothing here revives the closure crossing, and `41 §2.1` clause 3
+> still grants nothing.
+
+> ### THE CONSTRUCT HALF OF THE LANE WAS NAMED AND NEVER WIRED
+> ### Verified by the Steward, not accepted from the citation.
+>
+> ```rust
+> pub enum ExecutableUnsupportedLane {   // executable_artifact_contract.rs:182
+>     RuntimeIrNativePhaseGate,
+>     RuntimeIrTarget,
+>     RuntimeIrConstruct,                // :185
+> }
+> ```
+>
+> **`RuntimeIrConstruct` has exactly two occurrences in the tree** — its
+> declaration at `:185` and its serialization string at `:1423`. **Zero
+> producers.** The only marker constructed in production is `RuntimeIrTarget`
+> at `:871`, whose `construct` field is the fixed literal
+> `"RuntimeIrProgramReport.unsupported_targets"` — **the name of the map it came
+> from, not a Ken construct.**
+>
+> The Steward's one refinement to the Architect's read: there is a **second**
+> `RuntimeIrTarget` construction at `:2065`, but it sits under the `#[cfg(test)]`
+> gate opened at `:1486`, so the production claim stands exactly as stated.
+>
+> ⇒ **`48`'s lane is half-implemented: the target half is wired, the construct
+> half was given a name and left with no producer.** That is the missing
+> surface, and it is what a successor acts on.
 
 ## Why this existed: it gated an operator decision, and it was one measurement
 

@@ -1,13 +1,13 @@
 ---
 id: V3-FO-TOP-REFUSAL-ENFORCEMENT
 title: "Give the sort-candidate criterion an enforcement: a test asserting quote_iform refuses top_id with UnsupportedTermShape, so an IForm::Top arm reds at the same moment the collector needs updating -- and soften the D2 claim that the criterion forces that update"
-status: active
+status: merged
 owner: language
 size: XS
 gate: none
 depends_on: [V3-FO-SUBST-DEPTH-CONTROL]
 blocks: []
-github: null
+github: "https://github.com/swe-toolkit/ken/pull/2388"
 origin: "Steward, 2026-08-16, on the Architect's named successor to V3-FO-SUBST-DEPTH-CONTROL D2, routed by language-leader at evt_7a12mnz4398p0. The Architect approved the D2-D3 candidate unchanged and named this as its successor rather than a fold. Steward-filed per COORDINATION section 2."
 ---
 

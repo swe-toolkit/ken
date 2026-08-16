@@ -1,7 +1,7 @@
 ---
 id: RT-REFUSAL-CONSEQUENCE-RESTORE
 title: "Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: none
