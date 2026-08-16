@@ -351,6 +351,22 @@ refusal is asserted without reference to the retiring enum.
 > gate, it set the record requirement, and here it catches the record's own
 > instrument. **Check what a pin is built ON, not just what it asserts.**
 
+**CONFIRMED: constructs 1 and 2 keep TWO rows and TWO pins.** Architect
+`evt_74f5ppk3tnh1q`, answering the Steward's question rather than letting it be
+assumed. *"One law at two callable kinds"* explains **why** both refuse; it is
+**not** a licence to cover both with one assertion.
+
+**The arms are independently mutable** — `Lowered::Closure`/`DeclarationClosure`
+and `Lowered::ComputationalRecursorClosure` are separate arms of the same
+`match`. **A single pin exercising a closure-in-a-constructor-field would stay
+green if the recursor-closure arm changed**, and vice versa. A pin's job is to
+red on a behaviour change, and a merged pin cannot red for the arm it does not
+exercise.
+
+> **The general form, worth keeping beside the one above: a shared REASON never
+> justifies shared COVERAGE.** That is a property of the category, not of either
+> site.
+
 **AC-12. Constructs 3 and 4 owe a RECORDED OBLIGATION with a named owner, and
 the record must outlive `D6`.** Discharged by tracked nodes
 [[RT-FNUNIT-MULTI-WORKER-CONTINUATION]] and
