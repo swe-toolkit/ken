@@ -1,13 +1,13 @@
 ---
 id: RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT
 title: "For every refusal still holding the RecursiveDescent retirement, exhibit a Ken source program that reaches it or establish that none exists -- and record the ones with none as compiler invariants"
-status: active
+status: merged
 owner: runtime
 size: L
 gate: none
 depends_on: []
 blocks: [RT-LEXICAL-RECURSOR-CONSUMERS, RT-RECURSOR-TRANSPORT, RT-DESCENT-RETIRE]
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2440
 origin: "Operator, 2026-08-16, verbatim: the row 'represented a genuinely invalid compiler state, and its generation was due to careful creation of a fixture to trigger the error, and that such an arrangement likely could not be created by a ken surface level program, and that we should accept the refusal as a proper compiler assert/invariant. I think it was on you to dispatch the runtime team to look for a ken source program that could generate that state, or declare that such a program did not exist. At that point all conditions would be met and we could proceed to retire RecursiveDescent.' Steward-filed per COORDINATION section 2. Population measured against origin/main 4c5de1793."
 ---
 
@@ -177,9 +177,16 @@ measured and named above.
 2026-08-14 ruling that this path outranks every other Runtime node still binds.
 
 > **Why this node exists at all, recorded so the gap does not reform.** Three of
-> the four items have had no owner since [[RT-CROSSING-CALL-SITE-ATTRIBUTION]]
-> merged without carrying the dispositions
-> [[RT-LEXICAL-RECURSOR-CONSUMERS]] delegated to it. The blocked node kept
-> advertising the work as *"dispositioned in the successor"* while the successor
-> no longer contained it. **A defect spanning two nodes has a half owned by
-> nobody**, and it read from outside as a campaign waiting on a decision.
+> the four items have had no owner since [[RT-CLOSURE-CROSSING-ELIMINATE]]
+> merged with the `D2a` and `D2b` headings that carry them still unaddressed —
+> the dispositions [[RT-LEXICAL-RECURSOR-CONSUMERS]] delegated to it. The
+> blocked node kept advertising the work as *"dispositioned in the successor"*
+> while the successor no longer contained it. **A defect spanning two nodes has
+> a half owned by nobody**, and it read from outside as a campaign waiting on a
+> decision.
+>
+> **This paragraph named [[RT-CROSSING-CALL-SITE-ATTRIBUTION]] until 2026-08-16**,
+> inheriting the referent from a Steward correction block that had it wrong.
+> That node carries none of these rows. The conclusion is unchanged — both are
+> merged nodes that did not carry the dispositions — but the wrong name sent a
+> reader 500 lines up the wrong file.
