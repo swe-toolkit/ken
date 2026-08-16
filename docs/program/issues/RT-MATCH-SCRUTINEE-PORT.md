@@ -1,6 +1,6 @@
 ---
 id: RT-MATCH-SCRUTINEE-PORT
-title: "Port the MatchScrutineeRecursor difference onto uniform lowering -- for the heterogeneous-case-body population the ordinary route must terminate in a lawful lowering, or the refusal is named and handed back"
+title: "NOT A PORT -- excluding MatchScrutineeRecursor is behaviour-preserving on the scalar-selected rows, measured differentially, so no capability is at stake; the residual obligation is the same differential on the aggregate rows"
 status: active
 owner: runtime
 size: L
@@ -11,23 +11,83 @@ github: null
 origin: "Architect ruling evt_nb12nmhd2zzk, 2026-08-16: build the retirement on the uniform-lowering family (GHC), declining the prior-art advisory's global IR invariant as the primary route. Sizing and framing assigned to the Steward in that ruling. Steward-filed per COORDINATION section 2."
 ---
 
+## D1c RESULT — THE REGRESSION PREMISE IS NOT UNWARRANTED, IT IS FALSE
+
+**Handed back `evt_1e5wbj4af4xbc`, measured at exact `b7f65ad0c`. No candidate,
+no diff** — fixtures removed, `git diff --exit-code` and `--check` clean. **This
+section is the only durable record.**
+
+**`D1c` ran the differential nobody had run: production versus excluded, on the
+same row.** For both scalar-selected rows, pre-exclusion residual was exactly
+`{MatchScrutineeRecursor}` and `debug_assert!(was_present)` passed — **so the
+exclusion was live, not vacuous.** Both legs returned the **identical**
+`Unsupported(UnsupportedLowering { construct: "Match", reason: "scrutinee is not
+a constructor value" })`.
+
+⇒ **The scalar cells DO NOT COMPILE TODAY UNDER THE RETAINED LANE EITHER.
+Retiring the variant changes nothing for them.**
+
+> ### THIS IS A FOURTH ANSWER. It is not arm 1, 2 or 3, and it is stronger than any.
+>
+> The three arms all asked **"are these programs well-formed?"** — via the
+> interpreter, because the answer was supposed to decide whether a refusal costs
+> a capability. **`D1c` makes that question irrelevant to the retirement.** A
+> regression is a **difference** between retaining and removing, and **the
+> measured difference is zero.**
+>
+> **I withdrew the `AC-3` premise as UNVERIFIED. It is REFUTED.** *"The scalar
+> cells compile today via the retained lane"* is not merely unwarranted — it is
+> **false**, and one differential run showed it. **The Architect and I both
+> built three arms on top of it.**
+>
+> ⇒ **`D1b`'s evaluator refusal is correctly NOT carried as evidence.** It was
+> answering a question that turned out not to gate anything.
+
+**Soundness note, because the obvious attack is available.** Identical error
+text does not prove identical code paths — production may never have reached
+`core.rs:17959` by the same route. **That does not weaken the conclusion:** the
+regression claim is about **observable behaviour under removal**, and if the
+retained lane is not what produced these rows' behaviour, removing it cannot
+change it. **Either reading gives a zero differential.**
+
+## THE RESIDUAL OBLIGATION: the differential is complete on 2 of 5 rows
+
+**`D1` measured all five rows under EXCLUSION ONLY** (its own instrument was the
+exclusion probe). **`D1c` added the production leg for the two SCALAR rows.**
+
+⇒ **Rows 2, 4 and 5 — the aggregate-selected ones — have NO production leg.**
+They execute to `Returned(Int(Small(7)))` **excluded**; nobody has confirmed
+they produce the same value **retained**.
+
+> ### THAT IS THE HALF THAT COULD STILL HIDE A REGRESSION, and it is the only half.
+>
+> A scalar row that refuses both ways is safe. **An aggregate row that executes
+> under exclusion is only safe if it executes to the SAME VALUE under
+> retention** — a silent value change is exactly what a lane swap can cause and
+> exactly what "it compiles and runs" does not detect.
+>
+> **Do not close this campaign on the scalar half.**
+
 ## What this node is
 
 **The retirement's last piece of engineering, and the campaign's own landed
 method applied to its last variant.**
 
 Four of the six original residual variants were retired by porting to uniform
-lowering. `MatchScrutineeRecursor` is the survivor, and after two measurements
-and a prior-art survey the ruling is that it goes the same way.
+lowering. `MatchScrutineeRecursor` is the survivor. **It was framed to go the
+same way, and it did not need to** — `D1c` measured that excluding it is
+behaviour-preserving on the scalar rows, so there was no port to build.
 
-> ### THE TITLE SAYS "PORT". NOT YET SETTLED — read `D1b` before acting on it.
+> ### THIS IS NO LONGER A PORT. The ID still says so and cannot be renamed.
 >
-> `D1` returned **non-total**, and the Architect ruled that a third arm is live:
-> **the scalar-selected cells may be ill-formed, in which case this node is a
-> DISPOSITION and not a port at all.** The title, the lede and `D2` are all
-> written for the port reading because it was the only one on the table when
-> they were written. **`D1b` decides which node this is, and the recut is the
-> Steward's once it returns.**
+> **`D1c` settled it: excluding the variant is behaviour-preserving on the
+> measured scalar rows, so there is no capability to port.** `D2`'s
+> pre-authorized bound, the three arms, and the interpreter question below are
+> all **retained as record, not as live work.**
+>
+> **The ID `RT-MATCH-SCRUTINEE-PORT` asserts a conclusion this node refuted**
+> (Architect, `evt_3v1zp1g315vxz`: an ID cannot carry a disjunction, and the
+> churn of renaming exceeds the harm). **Read the title, not the ID.**
 
 > ### THE ROUTE IS SETTLED. Do not re-derive it, and do not re-open what it closed.
 >
@@ -42,7 +102,9 @@ and a prior-art survey the ruling is that it goes the same way.
 > does is the live error** (Architect, `evt_7yrhr0xs81hfc`). Whether a member
 > whose **selected case body is a bare scalar** is admissible **was never the
 > proposition measured.** ⇒ Those cells are unmeasured on **both** axes — not
-> shown well-formed, and not shown source-reachable. **That gap is `D1b`.**
+> shown well-formed, and not shown source-reachable. **That gap was `D1b`'s,
+> and `D1c` made it moot for the retirement** — a question about those cells
+> that does not change under removal cannot gate a removal.
 >
 > **The global-IR-invariant family was declined as the primary route**
 > (Architect, `evt_nb12nmhd2zzk`). It survives only as a fallback, boundary-
@@ -81,7 +143,12 @@ over case bodies** (`mod.rs:16688-16697`, `cases.iter().all(...)`).
 ⇒ **One case body that does not produce a deforestable aggregate — a bound
 scalar, as `D1`'s witness had — takes the whole subject out of the producer
 route.** That population is non-empty as backend IR (`D2a` constructed a
-member) and it is what the retained lane is currently carrying.
+member).
+
+**It was assumed to be what the retained lane is carrying. `D1c` REFUTED that
+for the scalar rows** — the retained lane refuses them identically. **What the
+lane actually carries is an open question, and `D1d` asks it for the aggregate
+rows.**
 
 **The two quantifiers do not line up and that is the whole difference:**
 retention is **existential** over a per-case field; routing is **universal**
@@ -203,13 +270,24 @@ heterogeneous-case-body population through the ordinary route and report, per
 shape: **lawful lowering, or a refusal quoted in full with its emitting site.**
 This is the deliverable that decides whether `D2` is a port or a hard stop.
 
-**`D1b` — THE ARM-DECIDING MEASUREMENT. Run the two scalar rows through the
-interpreter.** This is the next dispatchable increment and it gates `D2`
-entirely. Its own criteria are `AC-7` through `AC-10`.
+**`D1b` — SUPERSEDED, and its result is deliberately not carried.** It asked
+whether the scalar rows are well-formed. `D1c` showed that question does not
+gate the retirement. **`AC-7` through `AC-10` below are record.**
 
-**Budget the reconstruction.** The five-row control was fully reverted, so **the
-fixtures do not exist** — `D1b` has to rebuild the two scalar rows before it can
-run anything. Size the turn with that in it rather than discovering it.
+**`D1c` — DELIVERED. The production-versus-excluded differential** on the two
+scalar rows. See the result section.
+
+**`D1d` — THE RESIDUAL, AND THE ONLY LIVE DELIVERABLE. Same differential, rows
+2, 4 and 5.** For each aggregate-selected row, run **production** and
+**excluded** and compare the **decoded result value**, not merely that both
+compile. Pre-exclusion residual must be exactly `{MatchScrutineeRecursor}` with
+the `debug_assert!(was_present)` in force, as `D1c` had it.
+
+**Report per row: identical decoded value, or the two values.** A difference is
+the regression the whole campaign has been trying to rule out, and it would be
+found nowhere else.
+
+**Fixtures do not exist** — `D1` and `D1c` both cleaned up. Budget the rebuild.
 
 **`D2` — close what `D1` opens, inside the ordinary route.** Whatever the
 ordinary path lacks for this population, supply it there. **Not a new lane, not
@@ -350,27 +428,23 @@ handback correctly kept apart.
 `5c5ee5b6c37dfc0017afa547f83cd0b9aa5f5111`. No candidate — see the result
 section.
 
-**`D1b` IS THE NEXT DISPATCHABLE INCREMENT, and it gates `D2` entirely.** The
-Architect ruled (`evt_7yrhr0xs81hfc`) that the mechanism question **is not yet
-answerable**: arm 2 is live, and neither "closeable" nor "uncloseable" can be
-ruled on until it is excluded. **No mechanism was chosen. One measurement was
-named.**
+**`D1b` ran and is SUPERSEDED** (`evt_71v2py6b26b2` assigned). **`D1c` ran the
+differential and settled the node** (`evt_1e5wbj4af4xbc`, exact `b7f65ad0c`).
+Neither produced a candidate.
 
-**`D2` needs no further ruling if `D1b` returns arm 1** — its bound is
-pre-authorized above.
+**`D2` is DEAD, not held.** There is no port to bound. Its pre-authorized bound
+stays above as a record of what would have been authorized.
 
-**The ring is on [[RT-ROUTE-EQUALITY-RECONSTRUCTION-PIN]]** (kicked
-`evt_6bb28ktkzstyn`), released into the window `D1`'s handback opened. **`D1b`
-is queued behind it and is lane 1's critical path** — the leader sequences the
-handover.
+**`D1d` is the only live deliverable** — the same differential on rows 2, 4
+and 5.
 
-**The capstone is unchanged and still barred.** Nothing in the ruling authorizes
-a deletion.
+**The capstone is still barred, and `D1c` did NOT lift it.** The differential
+covers **2 of 5 rows**. Nothing here authorizes a deletion; `D1d` completes the
+evidence and the ruling on it is the Architect's.
 
-**It blocks [[RT-DESCENT-RETIRE]] and becomes that node's twelfth dependency.**
-The other eleven are `merged` and the capstone is still barred — every named
-measurement returned and none licensed the deletion. **This node is the first
-one in the chain whose success would.**
+**It blocks [[RT-DESCENT-RETIRE]] as that node's twelfth dependency**, and it is
+still **the first link in the chain whose success would license deletion** —
+every predecessor could only fail to. **`D1c` is the first result that points
+that way, and it is half-measured.**
 
-**Lane 1 under the operator's directive**, and it is the retirement itself
-rather than a measurement about it.
+**Lane 1 under the operator's directive.**

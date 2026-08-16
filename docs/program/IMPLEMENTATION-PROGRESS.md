@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-16 20:35:04Z — from 357 issue file(s) in `docs/program/issues/`.
+2026-08-16 20:51:32Z — from 357 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -294,7 +294,7 @@ the committed file matches the generator's output.
 | `RT-MATCH-FRAME-FP` | match-frame fingerprints must hash a dedicated closure-free header carrier, not a Debug rendering of closure-capable cases | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/1108 |
 | `RT-MATCH-RECURSOR-CONSUMERS` | Complete the MatchScrutineeRecursor consumer repair in Position A — the D2 increment closed one witness, not the population | merged | runtime | M | none | — |
 | `RT-MATCH-SCRUTINEE-DISPOSITION` | MatchScrutineeRecursor's retention guard was broader than the capability boundary it stood in for -- NARROWED to retain exactly when the ordinary producer route declines; the difference is non-empty, so the variant survives load-bearing | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2458 |
-| `RT-MATCH-SCRUTINEE-PORT` | Port the MatchScrutineeRecursor difference onto uniform lowering -- for the heterogeneous-case-body population the ordinary route must terminate in a lawful lowering, or the refusal is named and handed back | active | runtime | L | none | — |
+| `RT-MATCH-SCRUTINEE-PORT` | NOT A PORT -- excluding MatchScrutineeRecursor is behaviour-preserving on the scalar-selected rows, measured differentially, so no capability is at stake; the residual obligation is the same differential on the aggregate rows | active | runtime | L | none | — |
 | `RT-MINT-SITE-STATIC-DISCRIMINATOR` | Determine whether a principled static discriminator exists at the static-worker recognition mint that entails the constructed field is never read, and specify the predicate without discharging it | closed | runtime | S | none | — |
 | `RT-NATIVE-FNSPLIT` | Native backend: bound per-function lowering growth to O(n) — helper identity is a variable-width whole-configuration key (orig. single-Function VReg::MAX, since fixed) | merged | runtime | TBD | none | — |
 | `RT-NESTED-CONSTRUCT-ROUTE-EXCLUSIVITY` | CLOSED, complete negative result: route exclusivity is not expressible in this node's surfaces (Q2 NO) and the machine it would unify onto is behavior-incomplete for carried arguments (Q4), so the precondition itself has a precondition | closed | runtime | M | none | — |
