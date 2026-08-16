@@ -1,13 +1,13 @@
 ---
 id: V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT
 title: "Exclude bottom_id from conjunct 1's sort candidates, and correct the design note's direction claim, which does not cover the mechanism that produced the defect"
-status: active
+status: merged
 owner: language
 size: S
 gate: none
 depends_on: [V3-FO-OBLIGATION-SIGNATURE-DISCOVERY]
 blocks: []
-github: null
+github: https://github.com/swe-toolkit/ken/pull/2375
 origin: "Steward, 2026-08-15, on Adversary hunt evt_11cr9qyqympq5 against the merged range de551a4dd..427fc4069. Every line cited below was verified against the tree at origin/main a44700911 by the Steward before filing. Steward-filed per COORDINATION section 2."
 ---
 
