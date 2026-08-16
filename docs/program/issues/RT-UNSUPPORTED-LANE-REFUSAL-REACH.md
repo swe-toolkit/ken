@@ -1,7 +1,7 @@
 ---
 id: RT-UNSUPPORTED-LANE-REFUSAL-REACH
-title: "Measure whether the refused recursor rows and the depth-2/3 static-worker constructs reach the 48 unsupported lane, the one fact that separates a conditionally-permitted narrowing from a recordable spec gap"
-status: active
+title: "CLOSED, complete negative result: none of the five refused populations reaches the 48 unsupported lane -- every one returns Err before artifact construction, and the lane is a field on a SUCCESSFUL compile, so the gap is not repairable by recording"
+status: closed
 owner: runtime
 size: S
 gate: none
@@ -11,7 +11,69 @@ github: null
 origin: "Steward, 2026-08-16, on the Architect's spec read at evt_7wzkzpjmttbht answering the question routed at evt_71jgtxcsy1b20. The Architect named this measurement explicitly as unmeasured and as the fact that decides the disposition. It gates the operator scope call on retiring RecursiveDescent. Steward-filed per COORDINATION section 2."
 ---
 
-## Why this exists: it gates an operator decision, and it is one measurement
+> # CLOSED. `D0` RETURNED A UNIFORM **NO** ACROSS ALL FIVE POPULATIONS.
+>
+> Runtime `evt_7b5qy026214z7` / `evt_6ekhab1erhbds`, measured at exact
+> `63644c71d01767205839ab4ad36697c02ba4b8ac`. **No candidate exists and none
+> was owed** — this node was a measurement, so it never reaches `merged`.
+>
+> | population | reaches the `48` lane? | what was returned instead |
+> |---|---|---|
+> | row 1 owned-scope | **NO** | pre-artifact `Unsupported(NativeJoinPlanV1, "terminal answer has no affine checked-root authority")`, `lowering/mod.rs:18335-18340` |
+> | row 4 depth 1 conservation | **NO** | pre-artifact `Unsupported(StaticWorkerBinding, ...)`, `lowering/mod.rs:4726-4740` |
+> | row 5 after-hole conservation | **NO** | same |
+> | row 4 depth 2 `close` | **NO** | same |
+> | row 4 depth 3 `close` | **NO** | same |
+>
+> **The four static-worker payloads are the exact per-row `D2k-0` conservation
+> sentences.** They are **error payloads, not lane records** — that distinction
+> is the whole finding, and `AC-1` was written to force it.
+
+> ### THE STRUCTURAL REASON, AND IT IS WHY "REPAIRABLE BY RECORDING" IS WRONG
+>
+> **`compiled.unsupported` is a field on a compile that SUCCEEDED.** Every site
+> that reads it has the identical shape:
+>
+> ```rust
+> let compiled = compile_*(...)?;              // Err short-circuits HERE
+> let unsupported = compiled.unsupported.clone();   // reached only on Ok
+> ```
+>
+> ⇒ **A refusal that returns `Err` produces no `Compiled`, therefore no lane
+> record, and no contract report from which lane/target/construct/reason could
+> be emitted.** Not a wiring miss — the lane is unreachable from an error path
+> **by construction**.
+>
+> **The implementer measured through `test_objects.rs:54`, which is
+> test-support** (`pub(crate)`, importing `new_object_module_for_lowering_tests`)
+> **and NOT the production path the Architect named.** The Steward therefore
+> re-checked the four production sites directly —
+> `artifact/api.rs:370`, `:417`, `:879`, `:945` — and **all four carry the same
+> `?`-before-copy shape.** ⇒ **The conclusion generalizes to production**, but
+> it does so because the structure is shared, **not because the measured
+> emitter was the right one.** A successor must not cite `test_objects.rs` as
+> evidence about production.
+
+> ### WHAT THIS COSTS THE OPERATOR ASK — IT GOT BIGGER, NOT SMALLER
+>
+> The pre-measurement expectation, recorded before `D0` ran, was that a NO
+> would be **"a `48` gap repairable by RECORDING"**. **That is now refuted.**
+>
+> `48:210` scopes the lane to constructs that *"must fail before native
+> execution"* — which presumes **an artifact exists** and declines to run.
+> Populating it for these five therefore requires converting them from
+> **compile-time `Err`** into **compile-time success carrying a lane record that
+> fails loudly at load or run.** That is a change to what the compiler
+> *produces*, not to what it *reports*.
+>
+> ⇒ **Neither of the two dispositions this node was framed to choose between is
+> the actual one.** It is not a conditionally-permitted narrowing (the condition
+> is unmet, five for five), and it is not a cheap recording gap. **Sizing the
+> conversion is an Architect call and is unowned as of this closure.**
+
+## Why this existed: it gated an operator decision, and it was one measurement
+
+**HISTORICAL — the framing below is preserved as written before `D0` ran.**
 
 **Two refusals are converging on one operator scope call** — the recursor rows
 that fail closed on the functionized lane, and the depth-2/3 static-worker
@@ -83,6 +145,14 @@ repair, no lane entry authored.** Recording what is missing is this node's
 output; **writing the missing entries is `D1` and is not authorized here.**
 
 ## Acceptance criteria
+
+**ALL DISCHARGED at closure.** `AC-1` — five explicit NOs, with the returned
+payload quoted per row; the "four required fields" clause was vacuous on a NO
+and is not a shortfall. `AC-2` — row 1 owned-scope answered on its own row at
+its own construct, which was the criterion's whole purpose. `AC-3` — reported
+as a NO and handed back with **no repair attempted and no lane entry
+authored**, exactly as framed. `AC-4` — no spec re-litigation occurred.
+`AC-5` — no candidate, so no CI run was owed.
 
 **`AC-1`. Each population gets an explicit YES or NO**, with the four required
 fields quoted as actually emitted where the answer is YES. **A "the mechanism

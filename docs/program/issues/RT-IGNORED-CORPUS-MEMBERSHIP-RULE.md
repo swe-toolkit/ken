@@ -1,7 +1,7 @@
 ---
 id: RT-IGNORED-CORPUS-MEMBERSHIP-RULE
 title: "State the measurement corpus's exclusion by its membership rule -- all 33 ignored tests -- rather than by the six whose stated reason matched, which re-selects by reason at one scale down from the defect just repaired"
-status: ready
+status: active
 owner: runtime
 size: XS
 gate: none
