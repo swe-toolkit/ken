@@ -1,7 +1,7 @@
 ---
 id: RT-ROOT-AUTHORITY-REACHABILITY-WITNESS
-title: "Can a Ken PROGRAM drive the lowering into the undischarged root-authority state -- and if one can, the remedy is to make that program inexpressible, because the state the compiler arrives at is genuinely invalid"
-status: active
+title: "ANSWERED, bounded negative on all three guards: three Ken-source programs attacking absence-at-consumption, wrong-outer-cursor and duplication all built and exited 0, so no language restriction is triggered -- three stress shapes are a search, not a proof of unreachability"
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,41 @@ blocks: []
 github: null
 origin: "Operator, 2026-08-16, on the Steward's relay of research advisory evt_nw85nh58a7dd: 'the next step is to ask if there is a ken program that can reach this state, and not just a fixture in the test. If such a program can be found, then we should instead understand how to modify the language to make that program impossible to express, since the state the compiler arrives at seems genuinely invalid.' Steward-filed per COORDINATION section 2."
 ---
+
+> # ANSWERED AND CLOSED, 2026-08-16. BOUNDED NEGATIVE ON ALL THREE GUARDS.
+> # Runtime `evt_26zesecxs7ndt`. Empty range — no candidate, no retained probe.
+>
+> **Closed rather than merged: measurement-only.** Nothing lands.
+>
+> **Three Ken-source programs** built through `ken native-build` →
+> `native_build_file` → `ken_cli::build_native_program` →
+> `compile_native_program_sources` at `1b86202dd`. Steward verified
+> `native_build_file` at `ken-cli/src/main.rs:81`. **Each built an executable and
+> exited 0. None fired its guard.**
+>
+> | guard | attack shape |
+> |---|---|
+> | absence at consumption (`:18340`) | a single checked host-effect episode |
+> | wrong outer cursor (`:18296`) | nested `Result`, `ProcessInput`/list matches, host bind |
+> | duplication (`:18307`) | two sequential `Vis` nodes in one bind |
+>
+> **The bound, stated as reachability:** *"evidence of three deliberately chosen
+> source-control stress shapes, not a universal proof."* **Correct shape, and
+> the ring reached it unprompted for the second node running.**
+>
+> ⇒ **No enclave language restriction is triggered.** The operator's conditional
+> — *if* a program is found, make it inexpressible — **did not fire.** The
+> guards stand as assertions over a state nothing has been shown to reach, which
+> is the healthy outcome on this ladder.
+>
+> **What this does NOT establish:** that the state is unreachable. Three shapes
+> is a search, not a proof, and the deeper reading — whether the affine protocol
+> makes the state unreachable *by construction* — was not attempted and is not
+> owed by this node.
+>
+> **`AC-6` discharged:** the `PlannerInvariant` reclassification *"remains
+> correct regardless of this negative result, and was not implemented."*
+> That is [[RT-ROOT-AUTHORITY-BLAME-DOMAIN]], now unblocked.
 
 > # THE DISPOSITION LADDER IS INVERTED FROM THE STATIC-WORKER NODE. READ THIS FIRST.
 >
