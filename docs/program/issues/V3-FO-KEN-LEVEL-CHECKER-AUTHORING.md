@@ -400,6 +400,45 @@ that matters, leaning on the argued-not-mechanized half of `18 §6`. **A
 non-terminating or pathological case is a result, not something to work
 around.**
 
+> ### TWO THINGS `D3` LEFT LOADED FOR `D4`/`D5`. NEITHER IS A DEFECT TODAY.
+>
+> **Architect `evt_2jrv6bkbf541t`, on the approved `D3`. Both are inert now and
+> both fail silently later, which is why they are written down rather than
+> fixed.**
+>
+> **1. `placeholder_child` is itself a REJECTING certificate.** It is
+> `(FokMkCert (FokMkSequent (Nil FokForm) (Nil FokForm)) (FokInit Zero Zero)
+> (Nil FokCert))` — an `Init` indexing into two empty lists.
+>
+> It is **inert at all three of its current sites**, verified individually: each
+> traversal rejects before recursing into children (wrong-shaped target at two,
+> wrong child count at the third), so its own invalidity is never evaluated. **No
+> current row is over-determined by it.**
+>
+> ⇒ **The moment it is used in a position the traversal actually reaches, that
+> row is rejected by two independent mechanisms** and proves only that rejection
+> happened. **That is exactly the `D2` defect this node already repaired, re-created
+> by a helper named for convenience** — its name says where it goes, not what it
+> is. Either give it a valid derivation or rename it
+> `rejecting_child_never_reached`.
+>
+> **This is the THIRD appearance of the over-determination shape on this node.**
+> Two doubly-malformed cases at `D2`, and now a helper that is one use-site away
+> from the same thing. **Treat the shape as recurring rather than the instances
+> as unlucky.**
+>
+> **2. The serializer's field order is exercised INCIDENTALLY, not by design.**
+> No control pins it. What protects it is that the **population happens to be
+> asymmetric**: `Rule::Init { left: 1, right: 0 }` has `left != right`, and
+> eleven cases carry an empty `gamma` against a non-empty `delta`, so a
+> transposition is grossly visible.
+>
+> ⇒ **If a future increment normalizes those pairs to symmetric sequents, that
+> protection disappears silently** — no control reds, and the same-typed-adjacent
+> field swap this node has now produced twice relocates into the serializer.
+> **A property held by a population's accident is not a property the suite
+> enforces.**
+
 ## Acceptance criteria
 
 **`AC-1`.** `D4`'s measured interval contains **kernel conversion** and nothing
