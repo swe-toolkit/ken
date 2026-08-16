@@ -1,7 +1,7 @@
 ---
 id: RT-STATIC-WORKER-WITNESS-PROGRAM
 title: "Write a Ken PROGRAM that reaches the static-worker conservation refusal -- the incidence question the operator's narrowing decision rests on, which every existing demonstration answers only for hand-built fixtures"
-status: active
+status: closed
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,61 @@ blocks: []
 github: null
 origin: "Operator request, 2026-08-16, on the Steward's capability-loss brief: the refusal's cost SHAPE is known and its MAGNITUDE is not. The operator asked for a Ken program demonstrating the refusal and proposed the Adversary; the Steward's routing is runtime authors, Adversary attacks -- rationale in Sequencing. Steward-filed per COORDINATION section 2."
 ---
+
+> # ANSWERED AND CLOSED, 2026-08-16. `D0`/`D1` returned a BOUNDED NEGATIVE.
+> # Runtime `evt_6ttpazvf9hbx9`. Empty range — no candidate, no retained probe.
+>
+> **Closed rather than merged: this node measures, so nothing lands.** A
+> measurement-only node left `active` gates successors on a landing that cannot
+> happen.
+>
+> ## The result
+>
+> **A Ken-source program was compiled through the production path** — `ken
+> native-build` → `ken_cli::build_native_program` →
+> `ken_elaborator::compiler_driver::compile_native_program_sources`. Steward
+> verified both symbols exist (`ken-cli/src/lib.rs:21`,
+> `ken-elaborator/src/compiler_driver.rs:2524`). **`AC-1` discharged.**
+>
+> **No static-worker conservation refusal occurred.** The reachable
+> closure-boxing constructor had to be passed to a statically visible discard to
+> keep it in the executable closure at all — **and that discard is itself a
+> lawful disposition**, so the refusal's condition (neither consumed nor erased)
+> was never met.
+>
+> **`AC-2` discharged, unflatteringly and correctly:** the attempted program is
+> **contrived under the Adversary criterion, and even it did not refuse.**
+>
+> ## The bound, stated as REACHABILITY — and its limit
+>
+> > **No reasonable source program was found that both keeps the constructor in
+> > the production executable closure and leaves it neither called nor
+> > statically discarded before the fixed main-result boundary. This is not a
+> > universal proof.**
+>
+> **The ring reached this framing on its own, from a base predating `AC-3`'s
+> correction.** It is the right one: a search bound, not an absence-of-
+> expectations claim.
+>
+> ⇒ **This does NOT establish that no well-typed Ken program can reach the
+> refusal.** It establishes that the shape resists construction at source level,
+> **with a mechanism reason rather than a bare miss**: at source level, whatever
+> keeps the constructor live in the executable closure appears to also supply a
+> lawful disposition. **Whether that is a theorem or an artifact of one search
+> is open**, and `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` `AC-4` consumes it
+> with that caveat attached.
+>
+> ## The two-family question is answered: there is only one
+>
+> `constructors.rs`'s eight are **lexeme occurrences across three lower-level
+> hand-built harness shapes — not eight end-to-end refusal outcomes.** So the
+> corrected census's 40 is not 40 comparable things, and `control.rs`'s 32
+> fixture-route occurrences are the only family of refusal outcomes.
+>
+> ## Nothing is owed to the Adversary here
+>
+> **There is no finished witness to attack.** The forward assignment recorded
+> below was conditional on one existing; it lapses with the negative result.
 
 > # THE QUESTION IS *"DOES A PROGRAM HIT THIS"*, NOT *"CAN THE REFUSAL FIRE"*.
 >
