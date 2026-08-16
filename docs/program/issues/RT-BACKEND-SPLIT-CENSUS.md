@@ -5,7 +5,7 @@ status: draft
 owner: runtime
 size: M
 gate: none
-depends_on: [RT-DESCENT-RETIRE]
+depends_on: [RT-DESCENT-RETIRE, RT-CENSUS-CAVEAT-GUARD, RT-CALL-EDGE-EXECUTABILITY-AXIS, RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]
 blocks: [RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]
 github: null
 origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 1. Enclave pass anchored at evt_104nz8cedzyat on operator instruction 2026-08-10. Stage A is research/compiler-refactoring-program.md §5.1. Steward-filed per COORDINATION §2.
@@ -17,6 +17,47 @@ origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-M
 > tree the capstone is about to change, and it is the reason every other #8
 > child stays `draft` too: **the census supplies their binding paths, counts and
 > sizes.**
+
+> # OPERATOR RULING 2026-08-16 — THREE CONTROL FIXES LAND BEFORE THIS CENSUS
+>
+> **`depends_on` now names three campaign spinouts**, and the edge is on
+> `depends_on` rather than their `blocks` because `scripts/gen-progress.sh`
+> reads only `depends_on`; a `blocks` edge alone is invisible to every generated
+> view.
+>
+> | node | size | region |
+> |---|---|---|
+> | [[RT-CENSUS-CAVEAT-GUARD]] | S | `lowering/core/tests/control.rs` |
+> | [[RT-CALL-EDGE-EXECUTABILITY-AXIS]] | S | `planning/static_transition.rs` |
+> | [[RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]] | S | `control.rs`, `core.rs`, `mod.rs` |
+>
+> **The discriminator was file contention, not tidiness.** All three are
+> semantic edits inside this node's own scope
+> (`crates/ken-runtime/src/cranelift_backend/` plus `boundary_value_clif.rs`),
+> and a split cannot run concurrently with semantic work on the files it
+> partitions — campaign §4 ground 3. Landing them first means one rebase rather
+> than a re-home followed by a fix.
+>
+> **`RT-CENSUS-CAVEAT-GUARD` has the stronger reason, and it is specific to this
+> node.** Inventory 4 is a **test-property ledger that becomes binding on all
+> seventeen later slices.** That node's defect is a staleness guard which cannot
+> detect the drift it was written to catch. **Census it as-is and the ledger
+> records a broken guard as the expected property**, after which every slice is
+> checked against a wrong expected value. A faithful census can freeze a design
+> defect; that is what this edge prevents.
+>
+> **Two other campaign spinouts were considered and deliberately NOT sequenced
+> here** — [[RT-GROUNDVALUE-RECURSIVE-DROP]] and
+> [[RT-FRONTEND-REACHABILITY-TRIPWIRE]]. Neither lives in this scope: the first
+> is `RuntimeGroundValue` decode/drop, the second is a grammar and elaborator
+> instrument by construction. **Gating the phase on them would hold
+> [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] and the nineteen transitive ABI
+> dependents behind it for work that does not contend.** Do not add them.
+>
+> **Sequencing within lane 1**, Steward's call under the ruling: the capstone
+> first (it makes the largest change to these same files), then the three fixes,
+> then this census. Putting them ahead of the capstone would have the deletion
+> re-open work already done.
 
 ## What it is
 

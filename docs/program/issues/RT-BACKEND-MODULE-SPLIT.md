@@ -59,6 +59,7 @@ complete for its named transfer, independently reviewable and mergeable, and
 
 | # | slice | filed |
 |---:|---|---|
+| 0 | three campaign spinouts, sequenced ahead of the census — see below | yes |
 | 1 | [[RT-BACKEND-SPLIT-CENSUS]] — Stage A, no code move | yes |
 | 2 | [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] — early critical-path slice | yes |
 | 3 | `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | |
@@ -89,6 +90,38 @@ that sizes it.
 does not permit a planner or lowering mega-diff, and it does not permit grouping
 to reduce node count.** An exposed behavioural dependency **stops the move and
 returns for a semantic ruling**; it is not repaired inside a "pure move."
+
+### Item 0 — three campaign spinouts land before the census (operator, 2026-08-16)
+
+**The census's `depends_on` now names three `ready` `S` nodes**, and the edge is
+there rather than only on their `blocks`, because `scripts/gen-progress.sh`
+reads `depends_on` and nothing else.
+
+| node | region |
+|---|---|
+| [[RT-CENSUS-CAVEAT-GUARD]] | `lowering/core/tests/control.rs` |
+| [[RT-CALL-EDGE-EXECUTABILITY-AXIS]] | `planning/static_transition.rs` |
+| [[RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]] | `control.rs`, `core.rs`, `mod.rs` |
+
+**The discriminator was file contention, not tidiness.** All three are semantic
+edits inside this phase's scope, and §4 ground 3 already says a split and
+semantic work on the same files cannot run concurrently. So it is pure ordering,
+and first costs one rebase instead of a re-home followed by a fix.
+
+**`RT-CENSUS-CAVEAT-GUARD` carries the reason specific to Stage A.** Inventory 4
+is a **test-property ledger binding on all seventeen later slices**, and that
+node's defect is a staleness guard which cannot detect the drift it was written
+to catch. **Censusing it as-is records a broken guard as the expected property**,
+after which every slice is checked against a wrong expected value.
+
+**Two further spinouts were considered and excluded** —
+[[RT-GROUNDVALUE-RECURSIVE-DROP]] and [[RT-FRONTEND-REACHABILITY-TRIPWIRE]].
+Neither is inside this scope, so neither contends, and gating the phase on them
+would hold [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] and the nineteen ABI
+dependents behind it. **Do not add them.** The general form of the rejected
+proposal was *"close all campaign spinouts before the phase"*, which is a
+preference for a tidy graph rather than a grounded constraint; the grounded
+constraint is contention, and it selects three nodes rather than seven.
 
 ## Gates binding every structural frame in the phase
 
