@@ -59,3 +59,30 @@ obligation stops being a recorded gap and **blocks the retirement.**
 
 Related: [[RT-FNUNIT-CHECKED-ROOT-AUTHORITY-ROUTING]] is the sibling obligation
 from the same ruling.
+
+## CURRENTLY MASKED BY AN ELABORATOR GAP. This question goes live when that closes.
+
+**Architect `evt_7msgce14888x4`, on `D5`'s probe result
+(runtime-implementer `evt_6tveatdhcz72y`).**
+
+**This construct's source-reachability is UNDETERMINED, not zero.** The probe
+that would have decided it never reached the guard: an ordinary binary-tree
+traversal fails first, in the **elaborator**, at
+`crates/ken-elaborator/src/compiler_driver.rs:2013-2017`.
+
+**It was intercepted, not turned away.** A positive control declaring
+`data D5Tree = D5Leaf | D5Node D5Tree Nat D5Tree` — two recursive positions —
+**built and selected `FunctionizedUnits`**, so the shape is admitted. What is
+missing is a traversal that reaches lowering.
+
+⇒ **Do NOT record this construct as fixture-only-by-nature.** *"The guard was
+not reached"* and *"the guard is unreachable"* are different facts, and only
+the first is established.
+
+**The load-bearing copy of this dependency is on
+[[LANG-CHECKED-IH-BODY-VIEW-CAUSE]], not here** — whoever closes the elaborator
+gap reads their own node and has no reason to open this one. That node carries
+the activation warning; this is its mirror.
+
+**What is already built, so the next attempt is a re-run:** the positive
+control establishes admission. Only the traversal is missing.
