@@ -56,6 +56,39 @@ origin: Operator directive 2026-07-29 — prioritize replacement of RecursiveDes
 > exactly the two live variants named above; three classes are retired. The
 > campaign doc's own entries stop at 2026-08-09 and are not the instrument.
 
+> # CORRECTION 2026-08-16 — THE `D3` GATE ABOVE CAN NEVER FIRE AS WRITTEN.
+> # `D3` IS GATED ON `D0`-`D2`, WHICH ARE YOURS. Steward.
+>
+> **[[RT-LEXICAL-RECURSOR-CONSUMERS]] is `merged`** (PR #2440 closed it via
+> [[RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT]]). **All five `depends_on` are now
+> closed.**
+>
+> **The gate above told you to check the tree rather than the node status. Do —
+> and then read this, because the tree will tell you the opposite of what that
+> instruction intended.** The consumers node closed by **disposition**, not by
+> transport: its four remaining expressions are recorded as **compiler
+> asserts/invariants**, unreachable from any admitted Ken source program. **No
+> residual row was ever going to move**, so *"the transport half actually
+> landing"* is a condition that cannot be satisfied by anything, and a seat
+> applying it literally concludes `D3` is permanently blocked.
+>
+> **A gate keyed on one closure route cannot fire for a node that closed by
+> another.** The banner was written when a repair was expected; the ratified
+> criterion the node actually closed on was *"every expression carries a
+> recorded disposition."*
+>
+> **Measured at `148f805f9`, and the coordinate above is stale:** the enum is at
+> `core.rs:`**`2002`**, not `:1979`. Both variants still live; 30
+> `LexicalCallArgumentRecursor` + 27 `MatchScrutineeRecursor` references in
+> `crates/ken-runtime/src`; `RecursiveDescent` 117 across `crates/`. **Those
+> rows are `D3`'s own work to delete, not evidence that a precondition is
+> unmet.**
+>
+> ⇒ **`D3`'s only remaining condition is the frame's own item 3** — *"only after
+> both executable positions are green may the two variants and their test-only
+> selector hooks retire"* — **and that is `D0`/`D1`'s outcome. The gate is on
+> this ring, not on another node.** Resumption posted at `evt_6pkf5hwqwv21k`.
+
 > # `D0`-`D2` LANDS; `D3` IS GATED — 2026-08-08, hard stop 4
 >
 > **The node is split across a merge boundary and the two halves are in
