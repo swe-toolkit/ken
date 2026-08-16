@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-RETIRE
 title: "Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
