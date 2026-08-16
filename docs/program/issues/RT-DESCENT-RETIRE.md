@@ -174,8 +174,15 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 >
 > **Retirement consequence:** `MatchScrutineeRecursor` survives in reduced,
 > load-bearing form. This capstone may not delete the residual enum, selector,
-> `RecursiveDescent` authority, or emission lane while that retained difference
-> remains. No source-unreachability or deletion claim was made.
+> `RecursiveDescent` authority, or emission lane on the present evidence. `D2a`
+> proves that the retained difference is non-empty as a backend-IR shape, so
+> emptiness is not the discharge condition; `D2b` stopped short and made no
+> source-unreachability claim. The bar lifts only through
+> `RT-MATCH-SCRUTINEE-DISPOSITION` `D3-delete`: a source-unreachability argument
+> for the difference satisfying the method gate — surface grammar, elaborator
+> admission, and kernel gates, not failed-attempt sampling — and accepted by a
+> fresh Architect ruling. Until then the capstone is barred pending that named
+> measurement, not permanently.
 >
 > **`evt_5h7vzc27mc11j` DOES NOT CARRY HERE, and the reason is stronger than
 > selections-versus-refusals.** That ruling was about `FunctionizedUnits`

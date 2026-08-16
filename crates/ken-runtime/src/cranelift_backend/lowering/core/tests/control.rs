@@ -16429,6 +16429,89 @@ fn msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference() {
     );
 }
 
+/// `RT-MATCH-SCRUTINEE-DISPOSITION` `D2a`: the narrowed residual predicate is
+/// exactly the active-recursion subject guard intersected with the complement
+/// of ordinary Match lowering's complete producer-route decision.
+///
+/// **Promise class: transition sentinel.** This equality intentionally turns
+/// red if either side of the coupling changes: the heterogeneous-deforestation
+/// decision changes, the declaration-call disjunct becomes live for an
+/// immediate `ComputationalMatch`, or another routing disjunct is added. Such a
+/// divergence would conservatively miss a migration onto the ordinary route;
+/// it would leave the program on a retained lane that handles it today, not
+/// miscompile it.
+///
+/// **MEASURED:** the difference, handled-intersection, and non-recursive
+/// scrutinees agree across the production residual predicate and a `Lowering`
+/// evaluating the routing site's complete `A || B` decision.
+///
+/// **CLAIMED:** the narrowed residual remains precisely the active-recursion
+/// population that ordinary Match lowering does not route to the producer.
+///
+/// **THE GAP:** this is a representative relation control, not an exhaustive
+/// enumeration of every `ComputationalMatch`; a future routing change that
+/// intentionally changes the equality must retire or revise this sentinel.
+#[test]
+fn msd_d2a_residual_equals_subject_guard_and_route_complement() {
+    fn match_scrutinee(expr: &RuntimeExpr) -> &RuntimeExpr {
+        let RuntimeExpr::Match { scrutinee, .. } = expr else {
+            unreachable!("the fixture is an ordinary Match")
+        };
+        scrutinee
+    }
+
+    let difference = rt_match_scrutinee_guard_difference();
+    let intersection = rt_match_scrutinee_recursor_executable();
+    let non_recursive = rt_match_over_nonrecursive_computational_match();
+    let seed_env = NativeSeedEnvironment::empty();
+    let lowering = root_authority_test_lowering(&seed_env);
+
+    for (label, expression, excluded) in [
+        (
+            "difference",
+            &difference,
+            Some(RecursiveDescentResidual::MatchScrutineeRecursor),
+        ),
+        ("handled-intersection", &intersection, None),
+        ("non-recursive", &non_recursive, None),
+    ] {
+        let scrutinee = match_scrutinee(expression);
+        let subject_guard = matches!(
+            scrutinee,
+            RuntimeExpr::ComputationalMatch { cases, .. }
+                if cases
+                    .iter()
+                    .any(|case| !case.recursive_positions.is_empty())
+        );
+        let ordinary_route = requires_heterogeneous_deforestation(scrutinee)
+            || lowering.declaration_call_produces_deforestable_aggregate(scrutinee);
+
+        reset_match_scrutinee_producer_route_decisions();
+        match excluded {
+            Some(excluded) => {
+                let _ = rt_run_functionized(expression, excluded);
+            }
+            None => {
+                let _ = rt_run(expression);
+            }
+        }
+        let observed_routes = take_match_scrutinee_producer_route_decisions();
+        assert_eq!(
+            observed_routes,
+            vec![ordinary_route],
+            "{label}: the constructed Lowering's complete A || B decision must equal the decision \
+             observed at the actual ordinary-Match routing site"
+        );
+
+        assert_eq!(
+            match_scrutinee_requires_recursive_descent(scrutinee),
+            subject_guard && !observed_routes[0],
+            "{label}: residual retention must equal the active-recursion subject guard and the \
+             complement of ordinary Match lowering's complete producer-route decision"
+        );
+    }
+}
+
 /// **`D2` controls 3 and 4 after `D3-narrow` — exact functionized arrival,
 /// match and propagation counts, and a measured A/B.**
 ///

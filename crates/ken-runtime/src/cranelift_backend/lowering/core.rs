@@ -21,6 +21,19 @@ thread_local! {
         const { std::cell::Cell::new(false) };
     static REQUIRED_CONSUMER_ROUTE_SUPPRESSIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
+    static MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS: std::cell::RefCell<Vec<bool>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn reset_match_scrutinee_producer_route_decisions() {
+    MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS.with(|decisions| decisions.borrow_mut().clear());
+}
+
+#[cfg(test)]
+fn take_match_scrutinee_producer_route_decisions() -> Vec<bool> {
+    MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS
+        .with(|decisions| std::mem::take(&mut *decisions.borrow_mut()))
 }
 
 #[cfg(test)]
@@ -17718,9 +17731,14 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 default,
             } => {
                 let scrutinee_occurrence = self.child_occurrence(static_origin, 0, scrutinee)?;
-                if requires_heterogeneous_deforestation(scrutinee)
-                    || self.declaration_call_produces_deforestable_aggregate(scrutinee)
-                {
+                let producer_route = requires_heterogeneous_deforestation(scrutinee)
+                    || self.declaration_call_produces_deforestable_aggregate(scrutinee);
+                #[cfg(test)]
+                if matches!(scrutinee.as_ref(), RuntimeExpr::ComputationalMatch { .. }) {
+                    MATCH_SCRUTINEE_PRODUCER_ROUTE_DECISIONS
+                        .with(|decisions| decisions.borrow_mut().push(producer_route));
+                }
+                if producer_route {
                     return self.lower_computational_producer_expr(
                         builder,
                         scrutinee_occurrence,
