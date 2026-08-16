@@ -23,7 +23,7 @@ consulted the surface grammar, elaborator admission and the kernel gates, and
 be claimed, and the retained difference cannot be deleted. That is a complete,
 accepted answer, not a failure, and it is what triggers this node.
 
-> ### THE PRIOR-ART QUESTION IS ANSWERABLE ONLY HERE, AND THAT IS THE WHOLE REASON FOR THIS SEAT
+> ### ONLY THIS SEAT CAN ASK THE PRIOR-ART QUESTION, AND THAT IS THE POINT
 >
 > `CLEAN-ROOM.md` puts the permissive and copyleft references off-limits to
 > every build seat. **The runtime ring could not have consulted prior art if it
