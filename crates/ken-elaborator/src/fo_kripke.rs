@@ -141,7 +141,7 @@ fn discover_fo_slice_signature(env: &GlobalEnv, phi_closed: &Term) -> Option<FoS
     let mut pred_ids = BTreeSet::new();
     let mut sort_ids = BTreeSet::new();
     let mut or_ids = BTreeSet::new();
-    collect_signature_candidates(phi_closed, &mut pred_ids, &mut sort_ids, &mut or_ids);
+    collect_signature_candidates(env, phi_closed, &mut pred_ids, &mut sort_ids, &mut or_ids);
 
     let mut sort_iter = sort_ids.into_iter();
     let sort_id = sort_iter.next()?;
@@ -209,15 +209,39 @@ fn discover_fo_slice_signature(env: &GlobalEnv, phi_closed: &Term) -> Option<FoS
 }
 
 /// Recursive syntax scan backing [`discover_fo_slice_signature`]'s conjunct
-/// 1. A missed occurrence here only costs COMPLETENESS (a discoverable
-/// obligation goes unrecognized, falls through to IPC/HO exactly like an
-/// out-of-slice one) -- never SOUNDNESS, because [`discover_and_quote_fo`]'s
-/// separate conjunct-3 preservation check is the actual safety gate against
-/// adopting a wrong candidate. This walk therefore does not need
-/// `mentions_var0`'s exhaustive-match discipline; it recurses into the
-/// shapes a slice-fragment-shaped obligation can plausibly use and stops at
-/// the rest.
+/// 1. This walk can fail in EITHER direction, and both directions are
+/// completeness-only, never soundness (`V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT`
+/// `D2`, correcting the single-direction claim this comment used to make):
+///
+/// - **Under-collection** (a missed occurrence): a discoverable obligation
+///   goes unrecognized, falling through to IPC/HO exactly like an
+///   out-of-slice one -- a completeness loss, nothing more.
+/// - **Over-collection** (a spurious candidate): a second, unintended
+///   `sort`/`pred`/`or` id gets inserted, and conjunct 1's own ambiguity
+///   check (exactly one candidate required) then refuses the obligation --
+///   also a completeness loss, via a different path through the same
+///   refusal machinery.
+///
+/// Both directions fail closed by construction: neither can cause
+/// [`discover_fo_slice_signature`] to ADOPT a wrong candidate, because a
+/// wrong candidate is caught downstream by [`discover_and_quote_fo`]'s
+/// separate conjunct-3 preservation check, the actual safety gate. This walk
+/// therefore does not need `mentions_var0`'s exhaustive-match discipline; it
+/// recurses into the shapes a slice-fragment-shaped obligation can plausibly
+/// use and stops at the rest.
+///
+/// **`bottom_id` is excluded from sort candidates, specifically and only
+/// because `quote_iform` already reads it as `IForm::Bottom`** (a bare
+/// `Const` distinct from any object sort). Without this exclusion, `⊥` in
+/// an obligation's antecedent (e.g. `forall x:A. bottom -> ...`) is itself a
+/// bare-`Const` `Pi`-domain and registers as a SECOND sort candidate
+/// alongside the genuine object sort `A` -- an over-collection that makes
+/// conjunct 1 refuse a constructible, slice-provable obligation as
+/// ambiguous. No other `Const` is excluded here: `bottom_id` is checkable
+/// against `quote_iform`'s own recognition, not a "skip suspicious
+/// constants" heuristic.
 fn collect_signature_candidates(
+    env: &GlobalEnv,
     term: &Term,
     pred_ids: &mut std::collections::BTreeSet<GlobalId>,
     sort_ids: &mut std::collections::BTreeSet<GlobalId>,
@@ -232,7 +256,7 @@ fn collect_signature_candidates(
     }
     if let Term::Pi(domain, _) = term {
         if let Term::Const { id, level_args } = domain.as_ref() {
-            if level_args.is_empty() {
+            if level_args.is_empty() && *id != env.bottom_id() {
                 sort_ids.insert(*id);
             }
         }
@@ -250,29 +274,29 @@ fn collect_signature_candidates(
     }
     match term {
         Term::Pi(a, b) | Term::Lam(a, b) | Term::Sigma(a, b) | Term::Pair(a, b) => {
-            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
-            collect_signature_candidates(b, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, a, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, b, pred_ids, sort_ids, or_ids);
         }
         Term::App(f, a) => {
-            collect_signature_candidates(f, pred_ids, sort_ids, or_ids);
-            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, f, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, a, pred_ids, sort_ids, or_ids);
         }
         Term::Proj1(t) | Term::Proj2(t) | Term::Trunc(t) | Term::TruncProj(t) => {
-            collect_signature_candidates(t, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, t, pred_ids, sort_ids, or_ids);
         }
         Term::Ascript(t, a) => {
-            collect_signature_candidates(t, pred_ids, sort_ids, or_ids);
-            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, t, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, a, pred_ids, sort_ids, or_ids);
         }
         Term::Eq(a, t, u) => {
-            collect_signature_candidates(a, pred_ids, sort_ids, or_ids);
-            collect_signature_candidates(t, pred_ids, sort_ids, or_ids);
-            collect_signature_candidates(u, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, a, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, t, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, u, pred_ids, sort_ids, or_ids);
         }
         Term::Let { ty, val, body } => {
-            collect_signature_candidates(ty, pred_ids, sort_ids, or_ids);
-            collect_signature_candidates(val, pred_ids, sort_ids, or_ids);
-            collect_signature_candidates(body, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, ty, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, val, pred_ids, sort_ids, or_ids);
+            collect_signature_candidates(env, body, pred_ids, sort_ids, or_ids);
         }
         _ => {}
     }

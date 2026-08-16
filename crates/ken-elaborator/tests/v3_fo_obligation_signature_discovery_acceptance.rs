@@ -59,6 +59,22 @@ fn real_positive_obligation(sort_a: &Term, pred_id: GlobalId) -> Term {
     Term::pi(sort_a.clone(), Term::pi(px, px_at_codomain))
 }
 
+/// `forall x : A. (bottom -> (P x -> P x))` -- `V3-FO-DISCOVERY-BOTTOM-
+/// OVERCOLLECT` `D1`: a constructible, slice-provable obligation with
+/// `bottom` in an ANTECEDENT (a bare-`Const` `Pi`-domain, the exact
+/// position the unfixed collector over-collects as a spurious second sort
+/// candidate alongside `A`). Provable with exactly imp-right, imp-right,
+/// init -- the slice's own rule set, no wider.
+fn real_bottom_in_antecedent_obligation(env: &GlobalEnv, sort_a: &Term, pred_id: GlobalId) -> Term {
+    let px = Term::app(Term::const_(pred_id, vec![]), Term::Var(0));
+    let px_at_depth2 = shift(&px, 1, 0); // after crossing bottom's own binder
+    let px_at_depth3 = shift(&px, 2, 0); // after crossing bottom's binder AND the inner Pi's own
+    let bottom = Term::const_(env.bottom_id(), vec![]);
+    let inner = Term::pi(px_at_depth2, px_at_depth3); // P x -> P x, correctly indexed
+    let mid = Term::pi(bottom, inner); // bottom -> (P x -> P x)
+    Term::pi(sort_a.clone(), mid) // forall x:A. bottom -> (P x -> P x)
+}
+
 fn closed_triple(env: &mut GlobalEnv, id: &str, phi: Term) -> ObligationTriple {
     let placeholder_hole = env.fresh_id();
     ObligationTriple {
@@ -104,6 +120,46 @@ fn real_positive_obligation_reaches_fo_boundary_through_public_route() {
         label.contains(FO_WITHHELD_MARKER),
         "the hole must carry the FO-withheld label -- proof the public route \
          reached the 23 §4.4 boundary via discovery, not the IPC fallback; got {label:?}"
+    );
+}
+
+/// `V3-FO-DISCOVERY-BOTTOM-OVERCOLLECT` `D0`/`D1`/`AC-1`/`AC-2`: `bottom` in
+/// an obligation's ANTECEDENT must not be collected as a spurious second
+/// sort candidate. Before this node's fix, this exact obligation was
+/// refused by discovery as ambiguous (`bottom_id` and the genuine sort `A`
+/// both registering as bare-`Const` `Pi`-domain candidates); after the fix,
+/// discovery succeeds, a real certificate is found and accepted, and the
+/// public route reaches the same `23 §4.4` boundary as any ordinary
+/// positive obligation.
+#[test]
+fn bottom_in_antecedent_does_not_overcollect_as_a_spurious_sort() {
+    let mut env = GlobalEnv::new();
+    let (sort_a, pred_id) = declare_real_program_signature(&mut env);
+    let phi = real_bottom_in_antecedent_obligation(&env, &sort_a, pred_id);
+
+    assert_eq!(classify(&env, &phi), Route::FO, "classify must route this obligation to FO");
+
+    // Precondition, not decoration: discovery succeeds and a genuine
+    // certificate (imp-right, imp-right, init) is found and accepted for
+    // this exact obligation.
+    let (_sig, problem) = discover_and_quote_fo(&env, &phi)
+        .expect("discovery must succeed once bottom_id is excluded from sort candidates");
+    let cert =
+        find_certificate(&problem.f).expect("a certificate must be found for this tautology");
+    let target = embed(&problem.f);
+    assert!(check_cert(&target, &cert), "the certificate must compute True");
+
+    let triple = closed_triple(&mut env, "d1.bottom_antecedent", phi);
+    let result = attempt_obligation(&mut env, &triple);
+    let hole_id = match result.verdict {
+        Verdict::Unknown { hole_id } => hole_id,
+        other => panic!("must never be Proved, got {other:?}"),
+    };
+    let label = hole_label(&env, hole_id);
+    assert!(
+        label.contains(FO_WITHHELD_MARKER),
+        "the hole must carry the FO-withheld label -- proof the public route \
+         reached the boundary despite bottom appearing in the antecedent; got {label:?}"
     );
 }
 
