@@ -83,7 +83,60 @@ candidate**.
 **Confirm pin 1 stays green under that perturbation** — the arms must remain
 independently meaningful.
 
-## Deliverable `D2b` — record the pin's DOMAIN beside the pin. Architect's requirement at approval.
+## `D2b` IS HELD 2026-08-17, MID-DISPATCH. The limitation may be REMOVABLE, and a comment explaining an open gap is the wrong artifact if it can be closed.
+
+> ### The Adversary hunted `D1` and refuted half the premise `D2b` was built on. `evt_10kfceqnt1fh1`.
+>
+> **Every mechanical claim verified by the Steward at `origin/main` before
+> routing.** The ruling was that string matching is the only available
+> predicate here. **The operative distinction is FRAGMENT versus EXACT, and
+> exact is constructible.**
+>
+> **The refusal message is a `format!` with five interpolations**
+> (`lowering/mod.rs:4728-4741`), and **the test supplies or can bind every
+> one**: `constructor` is the literal it passes, `owner` comes from
+> `planned_root_occurrence`, `position` is the `0` it passes, `field_origin`
+> comes from `child_static_origin(owner, 0)`, and **`recognition` is RETURNED
+> by `recognize`** — `-> Result<StaticWorkerRecognitionId, _>`
+> (`mod.rs:4490-4497`), which derives `Debug` (`mod.rs:4442`).
+>
+> **The test DISCARDS that return** — `.expect("the real issuer mints the
+> recognition")`, unbound. **Binding it is the entire cost of making the message
+> reconstructible.**
+>
+> **This is the FIFTH discarded result in this campaign, and the first whose
+> cost is a lost ASSERTION rather than a lost explanation.** The others were the
+> sentinel's `_excluded_result`, the two `control.rs` trace helpers,
+> `compiler_driver.rs`'s `map_err(|_| …)`, and `D2c`'s deliberate `let _ =`.
+> **Here the discarded value was the one piece needed to make the strongest form
+> of the pin constructible, and nobody noticed because discarding it compiles.**
+>
+> **One correction in the ruling's favour, which does not rescue the premise.**
+> Pin 1's full equality is on a **constant** message with no `format!` at all —
+> so *"the sibling pin already uses exact matching"* is true about the idiom,
+> not about the difficulty. **The reconstruction is available anyway.** The
+> ruling's two halves now fare differently: ***"or an id change"* is REFUTED**
+> (the ids are bindable); ***"an incidental rewording"* STANDS and is now the
+> whole argument.**
+>
+> ⇒ **The choice is not "string matching leaves no better option." It is
+> brittle-and-total versus tolerant-and-phrase-shaped**, on a pin that after
+> `D3` is the only assertion of that text anywhere.
+>
+> **Measured and standing regardless of the ruling:** *"prior to construction"*
+> passes all three clauses with pin 1 green. **The synonym limitation is
+> measured now, not merely ruled.**
+>
+> **WITH THE ARCHITECT** (`evt_3p3sbs83j6gr0`), because it is his ruling's
+> premise. Three arms: **close it** (bind the recognition, assert full equality,
+> delete `D1`'s clause as subsumed); **document it** with the justification
+> corrected to the rewording trade alone; or **both**, if the two are worth
+> having as independent arms.
+>
+> **`D1` STANDS MERGED under every arm.** The clause discriminates — reproduced
+> against production by the Adversary independently of the ring's report.
+
+## Deliverable `D2b` — record the pin's DOMAIN beside the pin. HELD; see above.
 
 **One comment, in `control.rs`, immediately above
 `refusal_pins_rehomed_static_worker_without_selector_exclusion`'s guard.** No
@@ -102,10 +155,13 @@ direction is the right one** — a future message legitimately using the phrase
 reds this spuriously, and a red is a prompt to think, where the alternative is
 a silent pass.
 
-**And why `contains` rather than `==`:** pin 2's message is a `format!`
-carrying runtime ids, so full equality would conflate *a refuted claim
-returning* with *an incidental rewording or an id change*. **The absence clause
-pins the semantic fact; full equality was considered and rejected.**
+**And why `contains` rather than `==`** — **THIS CLAUSE IS WHAT THE HOLD IS
+ABOUT. Do not write it as it stands.** It read: *pin 2's message is a `format!`
+carrying runtime ids, so full equality would conflate a refuted claim returning
+with an incidental rewording or an id change.* **The id half is refuted** — the
+ids are bindable and a reconstructed message tracks them exactly. **Only the
+rewording trade survives**, and whether it carries the conclusion is the
+Architect's to rule.
 
 > **Why this is a deliverable and not a note in the frame.** The failure it
 > prevents is **over-citation of the pin** — a later reader treating it as
