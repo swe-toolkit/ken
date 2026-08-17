@@ -270,6 +270,47 @@ the proof is unavailable and any argument for it is circular.
   see**, and it arrives as a concrete failing program rather than as an
   argument. Hand it back as a node; do not delete around it.
 
+  > ### READ `D2c`'s EVIDENCE AGAINST ITS OWN BASE, NEVER AGAINST `main`
+  >
+  > **`D2c` `036e8ee91` is deliberately unrebased**, so *"do not rebase it"*
+  > protects the pin's **base** while the world underneath it moves. Nothing was
+  > recording what moved, and a reader comparing `D2c`'s numbers to `main` will
+  > read ordinary drift as contradiction. Raised by the Architect
+  > (`evt_7k49amvgbj8z3`); **both halves measured by the Steward before being
+  > written down, and they did not come out the same way.**
+  >
+  > **The denominator HAS moved, and not by a single subtraction.** `D2c` reded
+  > **17 of 943** at base `c98f72ba8` over `-p ken-runtime --lib`. Since then
+  > `8b78b48cd` ([[RT-TRACE-HELPER-ABORTED-COMPILE-EVIDENCE]]) **deleted two**
+  > tests from `control.rs`:
+  >
+  > ```
+  > d2k_1a_the_five_static_workers_are_recognized_at_their_construct_owners
+  > d2k_1c_0_one_planner_field_origin_is_recognized_more_than_once_in_one_compile
+  > ```
+  >
+  > and [[RT-REFUSAL-PINS-REHOMED]] **adds two**. **The population moves in both
+  > directions, so `943` is not repaired by arithmetic; only a run at a named SHA
+  > gives the figure.** ⇒ **Cite `943` with its base attached, or do not cite it.**
+  >
+  > **The VOCABULARY did NOT move, and the claim that it did is refuted here so
+  > it is not re-raised.** The concern was that `close()`'s refusal read *"so the
+  > field is neither consumed at an exact-Var call nor erased before
+  > construction"* at `c98f72ba8` and reads *"so this recognition's own transport
+  > never reaches a consumer at an exact-Var call and is not erased"* today.
+  > **Both rewording commits PREDATE `D2c`'s base** — `27393ab51`
+  > (`RT-SECOND-RECOGNITION-ERASURE` `D2`) and `5f922bc2e`
+  > (`RT-REFUSAL-CONSEQUENCE-RESTORE`) are each `git merge-base --is-ancestor` of
+  > **both** `c98f72ba8` and `origin/main`. The old phrasing has **zero hits at
+  > `c98f72ba8`**, and the base's own expectations already carry today's
+  > sentence. ⇒ **`D2c` is stated in the current vocabulary. Its failure text is
+  > directly comparable to `main`.**
+  >
+  > **The general form, which is why this is written at the deliverable and not
+  > in a note:** *do not rebase* freezes **one side** of a comparison. The other
+  > side keeps moving, and **which axes actually moved is a measurement** — here
+  > one of the two suspected axes had not moved at all.
+
   **`D2c` LANDS AS ITS OWN CANDIDATE, AHEAD OF ANY DELETION.** Partial-WP merge
   is standing policy (`COORDINATION §10⁻`); here it is load-bearing rather than
   convenient, because a revert of step 1 must restore production routing in a
