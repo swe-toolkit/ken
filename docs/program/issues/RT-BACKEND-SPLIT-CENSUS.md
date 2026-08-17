@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-SPLIT-CENSUS
 title: "Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves"
-status: draft
+status: ready
 owner: runtime
 size: M
 gate: none
@@ -11,13 +11,24 @@ github: null
 origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) decomposing RT-BACKEND-MODULE-SPLIT into independently mergeable slices, cut item 1. Enclave pass anchored at evt_104nz8cedzyat on operator instruction 2026-08-10. Stage A is research/compiler-refactoring-program.md §5.1. Steward-filed per COORDINATION §2.
 ---
 
-> # THE RETIREMENT MERGED 2026-08-17. THIS NODE IS NOW FRAMED, AND STILL `draft`.
+> # `ready` AS OF 2026-08-17. ALL FOUR DEPENDENCIES ARE `merged`. THIS IS NEXT.
 >
-> **The original bar has expired.** [[RT-DESCENT-RETIRE]] is `merged` — the
-> `RecursiveDescent` route was deleted at `1aec3e3e1` and the closing record
-> landed at PR #2527 — so the tree this node measures now exists and holding
-> the frame back no longer buys anything. **Deliverables and acceptance
-> criteria are written below as of 2026-08-17.**
+> **Every bar is down**, each verified at its landed squash rather than by
+> ancestry:
+>
+> | dependency | landed |
+> |---|---|
+> | [[RT-DESCENT-RETIRE]] | route deleted at `1aec3e3e1`, closeout PR #2527 |
+> | [[RT-CENSUS-CAVEAT-GUARD]] | squash `be25ea6a2`, PR #2531 |
+> | [[RT-CALL-EDGE-EXECUTABILITY-AXIS]] | squash `e5286ea06`, PR #2533 |
+> | [[RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]] | squash `6ed648762`, PR #2536 |
+>
+> **The tree this node measures now exists**, and the three clean-ups that
+> sharpened the instruments it will use are in it. Deliverables and acceptance
+> criteria below were written 2026-08-17 and are shovel-ready.
+>
+> **Per the operator's run order (2026-08-17), this is step 2 of 3**: the three
+> clean-ups, then this census, then the [[RT-BACKEND-MODULE-SPLIT]] nodes.
 >
 > **It stays `draft` for a different and still-live reason: three of its four
 > `depends_on` are unmerged**, and all three edit files inside this node's own
@@ -143,11 +154,24 @@ Steward's, not this node's.
   under `cfg(test)` is a real edge a move can break, and reading one profile
   and reporting one number is how it goes missing.
 
-- **`AC-4` — inventory 4 records the caveat guard as FIXED, not as found.**
-  It is a test-property ledger binding on all seventeen later slices, and
-  [[RT-CENSUS-CAVEAT-GUARD]] is sequenced ahead of this node precisely so the
-  ledger does not freeze a broken guard as the expected property. Census the
-  post-fix state; if that node has not landed, this one does not start.
+- **`AC-4` — inventory 4 records the caveat guard as FIXED, not as found —
+  and records that its fix is PARTIAL.** It is a test-property ledger binding
+  on all seventeen later slices, and [[RT-CENSUS-CAVEAT-GUARD]] is sequenced
+  ahead of this node precisely so the ledger does not freeze a broken guard as
+  the expected property. It has landed; census the post-fix state.
+
+  > **"Fixed" here does not mean "correct", and writing 322 down unqualified
+  > would repeat this criterion's own failure one level down.** The landed
+  > guard pins `#[cfg(test)]` — 322 regions, exact for the sentence's selector
+  > clause. **Its rationale clause covers 340**: 18 further regions under
+  > `any(test, …)` gate code active under `cargo test` and are uncounted, and
+  > the guard cannot see more arrive. That residual is
+  > [[RT-CAVEAT-GUARD-SPELLING-DOMAIN]], filed, `ready`, and **not a blocker
+  > for this node** — `AC-2` already obliges every lexical count here to name
+  > its domain and say what its pattern cannot see.
+  >
+  > ⇒ **The ledger entry must carry the domain, not just the number.** A bare
+  > 322 is what freezes a false completeness onto seventeen slices.
 
 - **`AC-5` — no code moved.** `git diff --stat` against the base shows zero
   changed paths under `crates/`. An inventory that edits its own subject has
