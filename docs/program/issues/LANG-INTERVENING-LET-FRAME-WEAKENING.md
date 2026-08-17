@@ -61,6 +61,41 @@ conversion weakens the assertion by design.
 **Still owed by this node after the carve-out:** `D2`'s semantic diagnosis, `D3`,
 and the parked status below stands for both.
 
+## Three Architect should-fixes on the landed carve-out, none blocking
+
+Recorded here because this node's own rule is that a finding left in a thread is
+lost. Architect review `evt_555d656pdhg8k`; decision `dec_23c8hd6j7wtw7`
+resolved APPROVED at exact `d2c2258bfacaf87ca1b2f3e0023482a8e9c9b493`. Line
+numbers are post-edit; the converted site was `:514` before the change and `:524`
+after.
+
+1. **The converted site's two conjuncts are independent searches over the whole
+   message.** `contains("found: ((")` and `contains(" Dg67) @")` can in principle
+   be satisfied by different terms. It is safe **only because `:507` pins
+   `expected` to a bare id**, so `" Dg67) @"` cannot come from the `expected`
+   operand. **That dependency between two assertions is written down nowhere — if
+   `:507` is ever loosened, the converted site silently weakens with it.**
+2. **`Dg67` survives as a literal in both remaining assertions**, so a prelude
+   declaration added **ahead of** `Nat` still reds them. That is per the remedy
+   table, so it is not a deviation — but the site's own new comment claims a
+   **relational** invariant the code does not assert: *"whose inner argument is
+   the SAME `Dg67` as `expected`"*. The comment says *same as expected*; the code
+   says *equal to the literal 67*. Extracting the id from the `expected:` operand
+   would make the assertion say what the comment already claims, and would be
+   renumber-proof in **both** directions rather than one.
+3. **The `other =>` panic message still names `@9`/`@4`** — literals the test no
+   longer asserts, in text read **only on failure**. It can drift silently and
+   then mislead exactly the person debugging a red. Same remedy as one site up:
+   move the measured instance into a comment.
+
+**A Steward correction for the next Decision, carried so it is not repeated:** the
+proposal said *"Required evidence: candidate and held-`3d23` two-point green,
+structural mutation red"*, which specifies what must be shown rather than
+reporting that it was. **State evidence in the past tense with its outcome** — the
+two-point green and the red mutation are the whole reason this is a repair and not
+a renumber, and a future reader cannot tell from that sentence whether the
+mutation actually redded.
+
 > # PARKED 2026-08-16, NOT STALLED. `active` OVERSTATES THIS NODE.
 >
 > **`D4` merged 2026-08-15; `D2` has real remaining work. Nobody is on it**, and

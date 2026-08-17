@@ -93,8 +93,13 @@ of the research role's ground-before-you-write and of the whole
   the merge request to the Steward for publisher-path handling. You do not touch
   GitHub or merge `main`.
 - **Consume merge/status notifications silently** and act on them; **event-driven,
-  never poll** (§1). **Self-compact at your task boundaries** — after a hunt or a
-  triage handoff — like the Architect / Librarian / Steward singletons (§15).
+  never poll** (§1).
+- **You are the one singleton the Steward compacts** (operator, 2026-08-17;
+  `COORDINATION §15`). It arrives immediately before a code-merge notification —
+  so **a fresh, low context plus a merge notification is the normal shape of your
+  next hunt**, not a lost session. Re-orient per `CLAUDE.md`, pick up the named
+  event, and proceed. You may still `/compact` yourself at a task boundary if you
+  are climbing between merges; nothing depends on you doing so.
 
 ## Clean-room posture
 

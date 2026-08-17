@@ -1,69 +1,66 @@
-# ken federation — moot launch profile. TWO HARNESSES, split 24 / 4.
+# ken federation — moot launch profile. TWO HARNESSES, split 26 / 2.
 #
-# ⚠ THIS HEADER WAS REWRITTEN 2026-07-25 BECAUSE IT DESCRIBED A FLEET THAT NO
-# LONGER EXISTS. The previous version claimed "EVERY role runs DIRECT on the
-# Anthropic subscription", "enclave on claude-opus-*", "all build / coordination
-# roles on claude-sonnet-5", and "ONE EXCEPTION — foundation-implementer routes
-# through the local claudex proxy". Every one of those is now FALSE: no seat runs
-# sonnet-5, the enclave is not on Anthropic at all, and there is no claudex route
-# or `env` block anywhere in this file. Derive wiring from the `[agents.*]`
-# blocks below, never from prose — including this prose.
+# ⚠ DERIVE WIRING FROM THE `[agents.*]` BLOCKS, NEVER FROM PROSE — INCLUDING
+# THIS PROSE. This header has been wrong twice (it once claimed every seat ran
+# direct on the Anthropic subscription, and it later still listed four Claude
+# Code seats after three had moved). The blocks are the configuration; this is a
+# summary that goes stale between edits.
 #
-# **24 seats — native Codex harness** (`harness = "codex"`, the operator's
-# ChatGPT/Codex subscription). Two tiers, by role shape rather than by team:
-#   - `gpt-5.6-sol`   — implementers, and the seats that author or audit deeply
-#                       (spec-author, conformance-validator, librarian,
-#                       doc-author, research, runtime-implementer).
-#   - `gpt-5.6-terra` — leaders and QA (coordination + verification).
-# Effort is `model_reasoning_effort` on these seats, NOT `effort`.
+# **26 seats — native Codex harness** (`harness = "codex"`, the operator's
+# ChatGPT/Codex subscription). Effort is `model_reasoning_effort` on these seats.
+#   - `gpt-5.6-sol`   — the seats that author or audit deeply: spec-author,
+#                       conformance-validator, librarian, doc-author, research,
+#                       architect, and the kernel/verify/ergo/foundation
+#                       implementers.
+#   - `gpt-5.6-terra` — leaders, QA, and the runtime and language implementers.
 #
-# **4 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
-# steward's cold-start `/login`; these use `effort`, not
-# `model_reasoning_effort`). Three on `claude-opus-5[1m]`, one on
-# `claude-sonnet-5` — so this group is NO LONGER uniformly Opus, and you cannot
-# infer a seat's model from its harness:
-#   - `steward`             — operator proxy / workflow authority. Opus.
-#   - `adversary`           — standing red team. Opus.
-#   - `architect`           — Opus; reseated from `gpt-5.6-sol` on 2026-08-13
-#                             per the operator, swapping with
-#                             `runtime-implementer`.
-#   - `language-implementer` — **Sonnet 5**, reseated from `gpt-5.6-sol` on
-#                             2026-08-13. This one is NOT a tier change:
-#                             Sonnet-class is the role's documented T2 tier.
-#                             The reason is a PROVIDER CAPABILITY GAP — the
-#                             OpenAI policy layer refuses stack-depth subjects,
-#                             the refusal fires on the SUBJECT so it re-trips
-#                             rather than clearing, and the node in front of the
-#                             seat is entirely that subject.
+# **2 seats — Claude Code direct on the Anthropic subscription** (OAuth via the
+# steward's cold-start `/login`; these use `effort`, NOT
+# `model_reasoning_effort`). Both Opus:
+#   - `steward`   — operator proxy / workflow authority.
+#   - `adversary` — standing red team.
 #
-# ⚠ THE 2026-08-13 SWAP. `runtime-implementer` had been on Opus 5 since
-# 2026-07-25 (operator: early results showed it the stronger coding model) and
-# `architect` on `gpt-5.6-sol`. Those two seats exchanged models on 2026-08-13.
-# The count is unchanged at 25 / 3; the MEMBERSHIP is not, so a reader who
-# remembers "the implementer is the Claude seat" is now wrong.
+# ⚠ THE KEY SPLIT IS THE THING THAT SILENTLY BREAKS. A Codex seat needs
+# `harness = "codex"` AND `model_reasoning_effort`; a Claude Code seat has NO
+# `harness` key and uses `effort`. Changing `model` alone misconfigures the seat.
+# **Measured 2026-08-17: three seats — architect, runtime-implementer,
+# language-implementer — were on Claude Code carrying `model_reasoning_effort`,
+# each under a comment stating that Claude Code seats use `effort`.** The comment
+# and the key disagreed for days and nothing reported it. Their move to Codex
+# resolved it; all 28 seats now agree. **Verify with a parse, not by reading:**
 #
-# ⇒ The old note called `runtime-implementer` "the one seat where the MODELS.md
-# tier table is deliberately overridden — a T2 build seat running a T1 model."
-# That override has MOVED, not ended: `architect` is T1 and now runs a T1 model,
-# which is the table's default, while `runtime-implementer` is back on the tier
-# its role shape implies. **Treat the tier table as a DEFAULT, not a
-# constraint** — that lesson survives the swap even though its example does not.
+#   python3 -c "import tomllib;d=tomllib.load(open('moot.toml','rb'))['agents'];\
+#   print([n for n,a in d.items() if (a.get('harness')=='codex')!=str(a.get('model','')).startswith('gpt')])"
 #
-# ⛔ The two harnesses need DIFFERENT operational handling, and conflating them
+# ⚠ THE 2026-08-17 RESEAT (operator). `architect` -> `gpt-5.6-sol` (high),
+# reversing the 2026-08-13 swap; `runtime-implementer` and `language-implementer`
+# -> `gpt-5.6-terra` (medium). Both implementer seats had been on Sonnet 5 for
+# reasons recorded in their blocks — read those before inferring intent.
+#
+# ⚠ "MCP startup interrupted ... convo, convo-channel were not initialized" IS
+# EXPECTED ON A FRESH LAUNCH AND IS NOT A DEAD TRANSPORT. Measured on all three
+# seats of the 2026-08-17 reseat: the warning appeared on every one, and within
+# ~60s all three had called `orientation()`, `update_status` and
+# `convo-channel.subscribe` successfully. The servers initialize after the
+# startup window closes; the message reports the window, not the outcome.
+#
+# ⇒ **Do not restart a seat on that warning.** Wait and read what the pane
+# actually does. Restarting is the expensive wrong move — it costs the seat its
+# fresh orientation and, done across a cascade, storms the join endpoint for
+# real. A genuinely dead transport looks different: the seat's convo tool calls
+# FAIL, and `last_seen_at` stops advancing while the pane still looks busy.
+
+# ⛔ THE TWO HARNESSES NEED DIFFERENT OPERATIONAL HANDLING, and conflating them
 # has cost real time. Codex seats: strand on a convo mention (repair with a bare
 # `Enter`), take `/compact` reliably via `moot compact`, and need `send-keys -l`
 # for literal text. Claude Code seats: do not strand on mentions, and `moot
 # compact` is no-op-prone there — prefer `send-keys`. See
 # `agent/playbooks/federation/steward.md` §2c for the full mechanics.
 #
-# ⚠ THE 2026-08-13 SWAP MOVED THE STRANDING RISK, and this is its most practical
-# consequence. `architect` stranded on nearly every mention on 2026-08-13 — five
-# stacked pastes, then six — and it is the seat every scope fork routes through.
-# On the Claude Code harness it should stop. Conversely `runtime-implementer`
-# inherits the Codex behaviour it did not have: it will now strand on mentions,
-# it will take `moot compact` reliably, and it needs `send-keys -l` for literal
-# text. ⇒ Move the per-tick composer check FROM the architect pane TO the
-# implementer pane; do not keep watching the seat that no longer has the fault.
+# ⇒ THE STRANDING RISK MOVED AGAIN ON 2026-08-17, and this is the practical
+# consequence. The per-tick composer check belongs on `architect`,
+# `runtime-implementer` and `language-implementer` — all three are Codex now and
+# all three will strand on mentions. Only `steward` and `adversary` are exempt.
 
 [convo]
 api_url = "https://mootup.io"
@@ -103,12 +100,21 @@ effort = "high"
 startup_prompt = "You are Ken's Steward (operator proxy, workflow authority). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/steward.md and docs/program/05-implementation-dag.md, then begin tracking program progress per your playbook."
 
 [agents.architect]
+
 display_name = "architect"
-# Reseated from `gpt-5.6-sol` to Opus 5 on 2026-08-13 per the operator, swapping
-# seats with `runtime-implementer`. Claude Code harness, so `effort` — NOT
-# `model_reasoning_effort`, and no `harness` key.
-model = "claude-opus-5[1m]"
-effort = "high"
+# Reseated from Opus 5 to `gpt-5.6-sol` (high) on 2026-08-17 per the operator,
+# reversing the 2026-08-13 swap for this seat. Codex harness, so `harness =
+# "codex"` is PRESENT and the effort key is `model_reasoning_effort` — NOT
+# `effort`.
+#
+# ⇒ THE STRANDING RISK RETURNS TO THIS PANE. On Codex this seat strands on convo
+# mentions (repair with a bare `Enter`), takes `moot compact` reliably, and needs
+# `send-keys -l` for literal text. It stranded on nearly every mention the last
+# time it ran Codex — five stacked pastes, then six — and it is the seat every
+# scope fork routes through. Put the per-tick composer check BACK on this pane.
+model = "gpt-5.6-sol"
+harness = "codex"
+model_reasoning_effort = "high"
 startup_prompt = "You are Ken's Architect (component design + security review). Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/federation/architect.md, set status, and stand ready for design queries and merge reviews. Do not poll."
 
 [agents.spec-leader]
@@ -202,18 +208,28 @@ model_reasoning_effort = "medium"
 startup_prompt = "You lead Ken's Language team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/language/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.language-implementer]
+
 display_name = "Language implementer"
-# Reseated from `gpt-5.6-sol` to Sonnet 5 on 2026-08-13 per the operator.
-# NOT a tier change — Sonnet-class is this role's documented T2 tier in
-# MODELS.md. The reason is a PROVIDER CAPABILITY GAP, not difficulty: the
-# OpenAI policy layer refuses stack-depth subjects outright ("we take extra
-# caution with cybersecurity requests"), the refusal fires on the SUBJECT so it
-# re-trips rather than clearing on retry, and `LANG-RECORD-STACK-OVERFLOW` is
-# entirely that subject. There is no way to route around it.
-# Claude Code harness, so `effort` — NOT `model_reasoning_effort`, and no
-# `harness` key. Escalate to Opus only on observed misses, never up front.
-model = "claude-sonnet-5"
-effort = "high"
+# Reseated from Sonnet 5 (high) to `gpt-5.6-terra` (medium) on 2026-08-17 per the
+# operator. Codex harness: `harness = "codex"` present, effort key is
+# `model_reasoning_effort`.
+#
+# The 2026-08-13 reason for the Anthropic seating is DISCHARGED, not overridden.
+# That move was a PROVIDER CAPABILITY GAP, not difficulty: the OpenAI policy
+# layer refuses stack-depth subjects outright, the refusal fires on the SUBJECT
+# so it re-trips rather than clearing on retry, and `LANG-RECORD-STACK-OVERFLOW`
+# was entirely that subject. **That node is `merged`** (checked 2026-08-17), and
+# the seat's current work — `LANG-INTERVENING-LET-FRAME-WEAKENING` and the V3
+# nodes — is not that subject. So the gap is not being walked back into.
+#
+# ⇒ If a stack-depth subject returns to this seat, the refusal returns with it
+# and it will re-trip rather than clear. That is a reseat trigger, not a retry.
+#
+# ⇒ Codex stranding behaviour applies again: mentions strand this pane, `moot
+# compact` works here, `send-keys -l` for literal text.
+model = "gpt-5.6-terra"
+harness = "codex"
+model_reasoning_effort = "medium"
 startup_prompt = "You are the Language team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/language/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.language-qa]
@@ -231,35 +247,29 @@ model_reasoning_effort = "medium"
 startup_prompt = "You lead Ken's Runtime team. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/leader.md and agent/teams/runtime/leader.md if present, set status, await the Steward's kickoff. Do not poll."
 
 [agents.runtime-implementer]
+
 display_name = "Runtime implementer"
-# Reseated from `gpt-5.6-sol` to Sonnet 5 on 2026-08-17 per the operator
-# ("reseat runtime-implementer as sonnet 5 high thinking").
+# Reseated from Sonnet 5 (high) to `gpt-5.6-terra` (medium) on 2026-08-17 per the
+# operator. Codex harness: `harness = "codex"` present, effort key is
+# `model_reasoning_effort`.
 #
-# This EXECUTES the switch MODELS.md already ruled and scheduled: the operator's
-# 2026-08-10 directive suspends Runtime's T1 exception for the
-# `RT-BACKEND-MODULE-SPLIT` slices, names "default Sonnet 5" between the two T2
-# options, and sets the timing at the phase boundary — "when the first #8 slice
-# is released, not before." That slice, `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT`,
-# merged 2026-08-17. So this is the scheduled T1 -> T2 move, not an ad-hoc one.
+# This exercises the condition MODELS.md already named for the Terra option —
+# it lists "default Sonnet 5" between the two T2 choices and flips to Terra when
+# Anthropic-pool capacity is the binding constraint, the pools being independent.
+# The T1 -> T2 move itself was the scheduled one, taken 2026-08-17 at the #8
+# phase boundary; this changes which T2.
 #
-# Done at a seam: the seat had just handed back `RT-SITEOP-CARRIED-WITNESS` `D2`
-# and released a clean worktree. MODELS.md warns that downgrading mid-arc lands
-# the cost on the hardest deliverable — this is the opposite of mid-arc.
+# ⇒ Raise, do not assume: MODELS.md documents the T2 suspension as covering the
+# `RT-BACKEND-MODULE-SPLIT` #8 slices, with discovery and semantic repair staying
+# T1. `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` — a new lowering capability with an
+# advancing-refusal acceptance — is semantic repair by that description. The
+# operator's instruction stands; flag it at release rather than re-deciding it.
 #
-# Claude Code harness, so `effort` — NOT `model_reasoning_effort`, and the
-# `harness = "codex"` key is DELETED, not left behind. Changing `model` alone
-# would misconfigure the seat; this file warns about that key split twice.
-#
-# ⇒ THE STRANDING RISK MOVES BACK. The 2026-08-13 note below says this seat
-# "inherits the Codex behaviour it did not have" — mentions strand it, `moot
-# compact` works, `send-keys -l` needed. On Claude Code that reverses again:
-# it should stop stranding on mentions, and `moot compact` becomes no-op-prone
-# here. Move the per-tick composer check OFF this pane.
-#
-# The exception covers #8 slices. Work that is discovery or semantic repair is
-# documented as staying T1 — raise it rather than assuming this seating carries.
-model = "claude-sonnet-5"
-effort = "high"
+# ⇒ Codex stranding behaviour applies again: mentions strand this pane, `moot
+# compact` works here, `send-keys -l` for literal text.
+model = "gpt-5.6-terra"
+harness = "codex"
+model_reasoning_effort = "medium"
 startup_prompt = "You are the Runtime team implementer. Read agent/COORDINATION.md (federation law) and MODELS.md first. Read agent/playbooks/build/implementer.md and agent/teams/runtime/implementer.md if present, set status, await your leader's kickoff. Do not poll."
 
 [agents.runtime-qa]

@@ -1337,10 +1337,10 @@ context. Who triggers a compaction is fixed (operator, 2026-06-29):
   delivers the next WP **only after** compacting. So a team's WP boundary is:
   done → leader calls for retros in-thread → members post → leader signals the
   Steward "retros in" → Steward reviews → Steward compacts → next WP.
-- **Singletons self-compact.** Agents with no team/leader — **Steward,
-  Architect, Librarian, Research, Adversary** — self-compact at their own task
-  boundaries (Architect after a review, Librarian after a pass, Adversary after a
-  hunt or a triage handoff, Steward after a directing cycle) via
+- **Singletons self-compact, EXCEPT the Adversary.** Agents with no team/leader
+  — **Steward, Architect, Librarian, Research** — self-compact at their own task
+  boundaries (Architect after a review, Librarian after a pass, Steward after a
+  directing cycle) via
   the `tmux send-keys -t moot-<role> -l '/compact'` path (two-step: `/compact`,
   ~2s, then a **separate** `Enter`). To auto-continue afterward — a self-compact
   otherwise leaves the seat idle at `❯` with nothing to re-invoke it — launch
@@ -1354,6 +1354,16 @@ context. Who triggers a compaction is fixed (operator, 2026-06-29):
   nonexistent `convo-<role>` session and its error message *names* `convo-<role>`,
   which is the bug, not a target to retry). Full mechanics:
   `playbooks/federation/steward.md` (self-compact).
+- **The Adversary is compacted by the Steward, at the merge notification.**
+  Operator, 2026-08-17: *"There is nothing that compacts adversary and the
+  adversary does not self-compact."* This clause used to list it with the
+  singletons above, and that assignment produced **no compaction at all** — the
+  seat had no work boundary anyone else could see, because it is event-driven and
+  an idle event-driven seat drops out of every active-agent enumeration. Its
+  compaction is now a numbered step the Steward runs: `merge-procedure.md` **M8a**,
+  immediately before the M8b code-merge notification, with the pane rouse after
+  it (a mention does not wake a compacted no-poll seat). **The pairing is the
+  rule: never notify it without offering it a compaction first.**
 - **Never mid-reasoning.** Compact only at a clean boundary; it summarizes away
   in-flight work.
 - **Start new work from current `origin/main` (operator, 2026-06-29).** A WP
