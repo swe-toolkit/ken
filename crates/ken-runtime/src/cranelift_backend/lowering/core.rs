@@ -2399,10 +2399,10 @@ fn declaration_recursive_descent_residual(
 /// The one temporary B2F migration selector, evaluated once at compilation
 /// entry from source syntax and declaration kinds only.
 ///
-/// `FunctionizedUnits` is selected only after both exhaustive production
-/// classifiers produce no typed retained reason. No runtime value, carrier
-/// class, walk result, or emission failure can change this answer after it is
-/// chosen.
+/// `RT-DESCENT-RETIRE` `D2c` leaves both exhaustive production classifiers and
+/// the retained lane intact while routing every compilation through
+/// `FunctionizedUnits`. This one reversible routing change lets CI measure the
+/// whole corpus before the later deletion spends the dead-code oracle.
 fn select_body_emission_authority(
     expr: &RuntimeExpr,
     declarations: &BTreeMap<&str, &RuntimeDeclaration>,
@@ -2420,24 +2420,14 @@ fn select_body_emission_authority(
             "the D1 exclusion was set for a variant this program does not fire; the probe would \
              then measure an ordinary functionized program rather than this position"
         );
-        return if found.is_empty() {
-            BodyEmissionAuthority::FunctionizedUnits
-        } else {
-            BodyEmissionAuthority::RecursiveDescent
-        };
     }
-    if recursive_descent_residual(expr)
+    let _ = recursive_descent_residual(expr)
         .or_else(|| {
             declarations
                 .values()
                 .find_map(|declaration| declaration_recursive_descent_residual(declaration))
-        })
-        .is_some()
-    {
-        BodyEmissionAuthority::RecursiveDescent
-    } else {
-        BodyEmissionAuthority::FunctionizedUnits
-    }
+        });
+    BodyEmissionAuthority::FunctionizedUnits
 }
 
 pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
