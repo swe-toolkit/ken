@@ -35313,6 +35313,7 @@ fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
             reason,
         }) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
             && reason.contains("a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation")
+            && !reason.contains("before construction")
     ));
 }
 
