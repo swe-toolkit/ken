@@ -1,7 +1,7 @@
 ---
 id: RT-SITEOP-CARRIED-WITNESS
 title: "Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried"
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
@@ -11,7 +11,15 @@ github: null
 origin: Hard stop returned by RT-CARRIER-BYTESPAN-OBSERVE D5, 2026-08-07, candidate 4244d082. The frame's own §1a recut clause fired — the 30 quarantined rows do not discharge from one mechanism. Steward-cut per that clause. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # `ready` 2026-08-17 — THE FORK IS RULED AND THIS NODE IS NOW ON THE CRITICAL PATH
+> # DISPATCHED 2026-08-17 — THE FORK IS RULED AND THIS NODE IS ON THE CRITICAL PATH
+>
+> **Kicked to the runtime ring at `evt_gwrw3dkpt577`, base `origin/main`
+> `02f255fc1`, after the full handoff gate** (ring quiescent, all three home
+> branches confirmed carrying current `agent/COORDINATION.md`, all three
+> compacted and verified per-pane). **`active` from release** so the node is not
+> invisible to a frontier audit while it is being worked.
+>
+> **The dispatch is `D1b` ONLY.** See the start-here block below.
 >
 > **The one bar was §3 of its frame: an open Architect fork on the mechanism.
 > The Architect ruled it at `evt_559gymspqap8w`, and the ruling is pasted
