@@ -11,6 +11,29 @@ github: 41
 origin: charter backlog (#41); RE-GROUNDED as a live PX8 clause-(a) blocker by architect verdict evt_163mfgjs7fkh8 (2026-07-23); RE-SCOPED spec-first by architect ruling evt_xnkrzjy1c8br (2026-07-23)
 ---
 
+# THE FOUR `cap41_*` ROWS ARE THIS NODE'S, AND THEY COME BACK HERE — 2026-08-17
+
+**Measured, not inferred.** All four `cap41_*` rows in
+`crates/ken-cli/tests/rt_parity_native.rs` were added by a single commit,
+`4c9c59d3e` *"WIP PX8-F-CAP-41: seal capacity-carrying buffer handle"*, carried
+into [[NATIVE-HANDLE-CARRIER]]'s candidate through its rebase. They are **this
+node's acceptance fixture**, not the carrier's deliverable.
+
+They are being **deleted** from that candidate (Steward `evt_7xt2j81m7tevz`),
+because a new test switched off in the same commit that ships the work it exists
+to measure is a partial claiming its own evidence is unavailable. **They return
+here, un-ignored and green, as the missing port's acceptance evidence.**
+
+⇒ **Do not re-add them to any candidate before the port lands**, and do not
+`#[ignore]` them with an annotation naming the carrier — the carrier is not what
+retires them.
+
+**The port's route is now measured** (`evt_4tqpqn2gpcsx6`): all five refusing
+programs take the **non-`Construct` scrutinee** route at
+`recursive_position_unit_body`. That rules out the `RT-WORKER-BIND` /
+`StaticWorker` lineage as the **first** blocker and makes the owner a new node,
+not yet filed and not yet sized.
+
 > # UNPAIRED 2026-08-17 — Phase 2 does NOT close on [[NATIVE-HANDLE-CARRIER]]'s merge
 >
 > **Architect ruling `evt_13ax2j6e0jfq2`; Steward disposition, this unpairing is
@@ -33,7 +56,9 @@ origin: charter backlog (#41); RE-GROUNDED as a live PX8 clause-(a) blocker by a
 >
 > ### ⇒ What Phase 2 may NOT claim
 >
-> **The four CAP-41 rows still refuse**, at `lowering/core.rs:2929`
+> **The four CAP-41 rows refuse** — *not* "still refuse": measured 2026-08-17,
+> they **do not exist** at the carrier candidate's declared base, so *still* is
+> false and the word is load-bearing. They refuse at `lowering/core.rs:2929`
 > `reject_carried_residual_arguments`. The Architect ruled the gap a **MISSING
 > PORT** whose owner is **outside this node** — the determinant is whether the
 > body has a declared recursive-position unit, not any property of the carried

@@ -11,6 +11,56 @@ github: null
 origin: "language-implementer's bounded section 5 witness attempt (evt_4n7wdytrehs23), routed for separate ownership by language-leader and language-qa. The Architect made the three-way attribution measurement a REQUIRED follow-up of his approval evt_5b3c38r3xrqm6, owned by this filing rather than by a new SHA. Steward-filed per COORDINATION section 2."
 ---
 
+# CARVE-OUT 2026-08-17 — `AC-6` is being discharged by the RUNTIME ring
+
+**`D2`'s semantic half stays parked. Only the four operand assertions move, and
+they move as a precursor PR to [[NATIVE-HANDLE-CARRIER]].** Steward
+authorization `evt_7xt2j81m7tevz`; Architect diagnosis `evt_7gf6345mwqr4n`.
+
+**Why now.** `NATIVE-HANDLE-CARRIER`'s candidate adds 6 prelude declarations
+yielding **7** new globals, so `Vec` shifted `Dg574 → Dg581` while `Nat`
+(`Dg67`) did not move — it is declared before the insertion point. `:514` went
+red in CI on a **renumbered global table, not a changed term.** The hazard this
+node recorded is no longer latent, and it is armed against **any** prelude
+addition by anyone.
+
+**Runtime takes all four sites, not just the one that fired.** This file's
+assertion convention was already split across two owners once, and the ruling
+below was that `D2` takes all four; splitting it again by owner would repeat the
+defect that ruling fixed. Remedies are per-site and **not the same remedy** —
+see the table in `D2` further down. Applying both remedies to one site is the
+error to avoid.
+
+**`AC-2` is not breached.** *"No repair lands before `D2`'s diagnosis"* is scoped
+to the **semantic** repair; this node's own finding records that the assertion
+convention has **no production reach**.
+
+**Census correction, and it cuts both ways** (Steward measurement, confirmed by
+the Architect):
+
+- `Dg###` appears **7** times in the file and only **2** are assertions
+  (`:507`, `:514`). `:231`, `:296`, `:467`, `:547` are `///` doc comments and
+  `:509` is an assert *message* string — none can affect pass/fail. So *"seven
+  pins"* over-counts the assertions by five.
+- The other **two** operand pins spell the pin as an `@` level and read
+  `expected_dbg` / `found_dbg`, so a `Dg`-keyed grep **and** a `msg.contains(`
+  grep both miss them: `:599 contains("@9")`, `:604 contains("@4")`.
+
+⇒ **Four operand assertions. Both a `Dg`-keyed census and a `msg`-keyed census
+undercount them, in different directions.** Line numbers re-verified in the tree
+at `bcf0fe169`.
+
+**The control, which is the load-bearing part.** The repaired test must pass at
+`origin/main` **and** at `3d23f1182`. Green at `main` alone is satisfied by a
+literal renumber — and a renumber restores green until the next prelude change
+and re-arms the trap. The candidate tip is the only tree that has the prelude
+growth, so it is the witness. Plus **one discriminating mutation on the converted
+`:514`**: a change to the term's structure must still red it, because the
+conversion weakens the assertion by design.
+
+**Still owed by this node after the carve-out:** `D2`'s semantic diagnosis, `D3`,
+and the parked status below stands for both.
+
 > # PARKED 2026-08-16, NOT STALLED. `active` OVERSTATES THIS NODE.
 >
 > **`D4` merged 2026-08-15; `D2` has real remaining work. Nobody is on it**, and

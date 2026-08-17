@@ -11,52 +11,112 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # ⛔ CI RED — PR #2563 FAILED, DID NOT MERGE. `3d23f1182` IS NOT LANDABLE.
->
-> **The banner below is superseded on its central claim.** The partial was
-> approved and then **refused by the publisher gate**, correctly. Steward stop
-> `evt_54jwhbqge8hyr`; PR annotated and left open so a fix pushed to
-> `wp/NATIVE-HANDLE-CARRIER` re-runs checks.
->
-> ### Failure 1 falsifies the premise this whole node was reasoning from
->
-> `native-slow (rt_parity_native)`: the four `cap41_*` rows fail at
-> `rt_parity_native.rs:503`/`:600`. **Measured at both ends — those four tests DO
-> NOT EXIST at the declared base `7b8dad7df`.** This candidate **adds** them,
-> **un-ignored**, and they **fail**.
->
-> ⇒ **"The four CAP-41 rows STILL refuse" is false in its load-bearing word.**
-> *Still* framed them as inherited; they are not pre-existing. So the candidate
-> does not merely fail to green the fixture — **it adds four failing tests to
-> `main`**, which is `AC-6` collateral regression.
->
-> ⇒ ⭐ **The Steward audited `AC-5`'s row provenance hard and never checked the
-> four rows this node exists to green.** The `--ignored` differential was the
-> right instrument aimed at the **wrong row**. **A provenance check on one row is
-> not a provenance check on the population.**
->
-> ### Failure 2 — independent, and NOT YET ATTRIBUTED
->
-> `test shard 3/4`:
-> `intervening_let_fresh_binder_fails_invariantly_across_all_three_bases` panics
-> at `ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs:513`.
-> The candidate does not touch that test but changes four `ken-elaborator`
-> sources beneath it. ⛔ **Unmeasured at the base — do not call it inherited.**
->
-> ### Disposition
->
-> **`dec_1reay8hc7qy2b` is SPENT, not reusable**: it approved a claim set
-> including `AC-6`/`AC-7` that the tree does not produce.
->
-> Owed by the ring, in order: **(1)** `ds5b…` at base **and** tip, failure text
-> at each end; **(2)** then the shape — `#[ignore]` the four new rows with an
-> annotation **naming the node that RETIRES them**, or hold the candidate until
-> the missing port lands. ⇒ **That choice goes to the Architect, not the
-> Steward.**
+# CURRENT STATE — 2026-08-17, 13:55 UTC
 
-> # IN REVIEW 2026-08-17 — `3d23f1182` is an AUTHORIZED PARTIAL at the exact-SHA gate
+**Read this section only. Everything below it is reverse-chronological history,
+and the top three banners are superseded on their central claims.** Fifteen
+stacked banners is what the operator meant by *"disorganized and doesn't fit a
+human reading model"*; this section is the fix, and the history stays because it
+carries measurements nothing else records.
+
+**What this node is:** a constructor-private resource-carrying handle fails
+native lowering when it crosses the higher-order `withBuffer` normalization
+boundary. Its own carrier work is done. What remains is a **missing port** owned
+outside this node.
+
+| | state |
+|---|---|
+| candidate `3d23f1182` | exists, approved once (`dec_1reay8hc7qy2b`), **refused by CI, not landable**, being recut |
+| `dec_1reay8hc7qy2b` | **spent** — it approved a claim set including `AC-6`/`AC-7` that the tree does not produce |
+| PR #2563 | **open with red checks**, annotated, so a fix pushed to `wp/NATIVE-HANDLE-CARRIER` re-runs them |
+| `AC-5` | **outstanding by measurement.** A stale ban is not a met criterion |
+| `D3` / `D4` / `D5`, `AC-3` | unclaimed |
+| `PX8-F-CAP-41` Phase 2 | **unpaired** — does not close on this node's merge |
+
+## Why CI refused it, and the lesson that is the Steward's
+
+`native-slow (rt_parity_native)`: the four `cap41_*` rows fail. **Measured at
+both ends — those four tests do not exist at the declared base `7b8dad7df`.**
+The candidate adds them un-ignored and they fail, so it does not merely fail to
+green the fixture: it **adds four failing tests to `main`**. That is `AC-6`.
+
+⇒ *"The four CAP-41 rows still refuse"* was false in its load-bearing word.
+*Still* framed them as inherited. **The Steward audited `AC-5`'s row provenance
+hard and never checked the four rows this node exists to green** — the
+`--ignored` differential was the right instrument aimed at the wrong row. **A
+provenance check on one row is not a provenance check on the population.**
+
+The second CI failure, `ds5b_dependent_match_refinement_acceptance.rs:513`, is
+**not a regression at all**: the candidate adds 6 prelude declarations yielding 7
+new globals, so `Vec` shifts `Dg574 → Dg581` while `Nat` (`Dg67`) does not move.
+Same term, renumbered table. Architect diagnosis `evt_7gf6345mwqr4n`. **The
+defect is the test's literal `Dg` pin**, and it is another node's — see below.
+
+## What is authorized now (Steward `evt_7xt2j81m7tevz`)
+
+1. **Delete the four `cap41_*` rows** and their exclusive helper
+   `assert_cap41_derived_without_read`. All four come from **one commit**,
+   `4c9c59d3e` *"WIP PX8-F-CAP-41: seal capacity-carrying buffer handle"* — they
+   are [[PX8-F-CAP-41]]'s acceptance fixture, carried in by another node's WIP
+   commit, and they return **green** as the port's evidence when it lands.
+   Not `#[ignore]`: an absent test makes no claim, an ignored one makes a false
+   claim, and these have no green history to park.
+   Two fences: do **not** revert `4c9c59d3e` (it also modified 7 existing
+   lines), and do **not** delete the Ken decls `rt_body_ok` /
+   `rt_cap41_expect_eof` — each has a live reference that is not one of the four
+   rows.
+2. **A precursor PR fixes the `Dg`/`@` pins**, executed by the runtime ring as a
+   carve-out of [[LANG-INTERVENING-LET-FRAME-WEAKENING]] `D2`/`AC-6`. It is that
+   node's criterion, so it does **not** ride in this candidate's claim set.
+3. **Then recut** on top of the precursor. The declared base changes ⇒
+   **re-declare the range**, open a **new** Decision, and carry the Architect's
+   per-test inventory on **two** axes (new-or-inherited × passing/failing/
+   ignored). **Re-measure `ds5b` on the recut** — the cut changes the
+   declaration set again, so it changes the numbering again.
+4. **Preserve `3d23f1182` before the recut touches the branch** —
+   `refs/preserved/native-handle-carrier-route1-3d23f118`. The port is only
+   measurable in a tree that has the CAP-41 fixtures, and the recut deletes
+   them. Cheap now, unrecoverable after a force-push.
+
+## The missing port: the route is measured, its KIND is not
+
+Measured `evt_4tqpqn2gpcsx6`, throwaway instrumentation at
+`recursive_position_unit_body` (`core.rs:15668`): **all five refusing programs —
+the four `cap41_*` rows plus `AC-5`'s row — take route 1, the non-`Construct`
+scrutinee return at `:15680`.** No `Err` path fired.
+
+**Two corrections to how that result reads** (Steward `evt_9jds3whs094h`):
+
+- **Route 1 is undocumented.** The function's doc sentence *"structural-data
+  recursive positions return `None`; they resume the eliminator directly and take
+  no arguments"* is about the **recursive position's** form — decided at `match
+  argument.expr`, which is route 3's arms, and reached only **after**
+  `args.get(position)`. Route 1 returns **before the argument is ever read**, on a
+  property of the **scrutinee**. So the code says nothing at route 1, and whether
+  it is a gap or a correct refusal is **still unknown**.
+- **Routes 2 and 3 are unreachable once route 1 fires**, so their zero counts are
+  counts and not evidence. `StaticWorker` is ruled out as the **first** blocker,
+  **not** as a requirement of the port: once the scrutinee is a proper
+  `Construct`, the argument could still be a captured `LexicalClosure` (route 2)
+  or a `Checked*` IH form (route 3). **The next blocker is unmeasured.**
+
+⇒ **No port node is filed yet, deliberately.** The addendum that sizes it is one
+line on the same instrument: **what `RuntimeExpr` variant is the scrutinee at
+`:15680`?** If it is a `Call`, the owner is the closed `RecursiveDescent` residual
+lineage that `RT-FNSPLIT-B2F` approved and [[RT-FNSPLIT-RECUR-PORT]] ported,
+**not** a new capability. That is the whole difference the cut moves by.
+
+**Also identified, so nobody hunts for it:** the refusal is the fallback arm of
+the same two-arm dispatch, not a separate downstream mechanism. `:15951` is the
+sole call and stores into `invocation.recursive_unit_body`; the four guard sites
+`:2958`, `:3440`, `:9731`, `:17481` each dispatch on it with
+`reject_carried_residual_arguments` as the `else`.
+
+> # SUPERSEDED 2026-08-17 — was: IN REVIEW, `3d23f1182` an AUTHORIZED PARTIAL
 >
-> **The hard stop below is RESOLVED. Read this banner for the current state.**
+> **Superseded by CURRENT STATE above: the partial was approved and then refused
+> by CI.** Retained for the both-ends `AC-5` measurement and the inert-instrument
+> correction, which nothing else records.
 >
 > ### The differential came back outcome 1
 >
