@@ -1,7 +1,7 @@
 ---
 id: RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT
 title: "Port the recursive-unit-body resolution through a branched scrutinee -- resolve_recursive_unit_body returns None whenever the scrutinee is a plain Match rather than a literal Construct, so a carried child whose owning form branches has no declared body unit and every consumer falls back to refusal"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none

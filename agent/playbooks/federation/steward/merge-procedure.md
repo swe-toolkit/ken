@@ -328,6 +328,32 @@ tmux capture-pane -p -S -50 -t moot-adversary | grep -c Compacting   # confirm
 **ctx unread.** Do not look at the number to decide, for the reason
 `compaction.md` gives: every rationalization for skipping is a threshold.
 
+> ### THE ONE EXEMPTION: A SEAT AT A FRESH-SESSION FLOOR. Measured at the first firing, 2026-08-17.
+>
+> **`moot compact` on a just-started session is not a cheap no-op — it is a
+> LOSS.** A fresh seat holds exactly its orientation: playbook, memory scopes,
+> role. Compaction summarizes that away, so the seat you then notify must
+> re-orient before it can hunt. **A restart is strictly stronger than a
+> compaction** — it discards rather than summarizes — so the goal of M8a is
+> already met by construction.
+>
+> **The tell is not the ctx number, and this is why the rule below still says to
+> ignore it.** `ctx 0%` alone does not distinguish "fresh" from "compacted an
+> hour ago and idle since" — and the second case is also already at the floor, so
+> both exempt. What you are looking for is the **session-start signature** in the
+> pane: `Skills restored (<role>)`, the file-reference block from its orientation,
+> and an empty composer. Read the pane, not the percentage.
+>
+> **This exemption is narrow and it is the only one.** It says *"there is nothing
+> to compact"*, never *"the context is warm"*, *"they are only at N%"*, or *"I
+> will catch it next merge" — those are the rationalizations `compaction.md`
+> names, and they remain forbidden. If the seat has hunted since it started, it
+> has context, and it gets compacted.
+>
+> **Log the skip in the M8b notification** so the next reader can see the step was
+> evaluated rather than forgotten. A silently skipped step and a step that never
+> existed look identical three merges later.
+
 **Precondition, same as any other seat: quiescent, and owing nothing in
 flight.** If it is mid-hunt on the previous merge, or holds a finding it has not
 yet handed to you, compaction drops the obligation — do M8b now and take the
