@@ -62,7 +62,7 @@ complete for its named transfer, independently reviewable and mergeable, and
 | 0 | three campaign spinouts, sequenced ahead of the census — see below | yes |
 | 1 | [[RT-BACKEND-SPLIT-CENSUS]] — Stage A, no code move | yes |
 | 2 | [[RT-BACKEND-PRIMITIVE-LOWERING-SPLIT]] — early critical-path slice | yes |
-| 3 | `RT-PLANNER-GRAPH-FOUNDATION-SPLIT` | |
+| 3 | [[RT-PLANNER-GRAPH-FOUNDATION-SPLIT]] — planner substrate; unblocks 4-9 | yes |
 | 4 | `RT-PLANNER-UNITS-ABI-SPLIT` — first planner domain | |
 | 5 | `RT-PLANNER-OCCURRENCES-SPLIT` | |
 | 6 | `RT-PLANNER-CONTINUATIONS-SPLIT` | |
@@ -79,10 +79,23 @@ complete for its named transfer, independently reviewable and mergeable, and
 | 17 | `RT-EMITTER-TERMINALS-CLEANUP-SPLIT` | |
 | 18 | `RT-BACKEND-SPLIT-CLOSURE` — delete adapters, narrow facades, remeasure | |
 
-**Only the first two are filed, and that is deliberate.** They are the two with
-structural consequence today: item 1 gates the phase, and item 2 releases
-[[NATIVE-HANDLE-CARRIER]]. The census supplies the binding paths, counts and
-sizes for the rest, and **it may prove two adjacent small families are one
+> ### ITEM 3 WAS FILED 2026-08-17. The bar below lapsed when the census merged.
+>
+> **The bar was evidence, and the evidence landed.** The paragraph below says
+> filing ahead of the census *"would create work ahead of the evidence that sizes
+> it."* [[RT-BACKEND-SPLIT-CENSUS]] is `merged`, and its type-ownership inventory
+> records all 76 planner-owned type declarations with visibility and full external
+> consumer sets. ⇒ Item 3 is now grounded, and it is the one that unblocks the six
+> planner domain slices behind it.
+>
+> **Items 4-18 remain unfiled and that is still deliberate.** They wait on item
+> 3's `D0`, which reports where the foundation boundary actually falls — and the
+> census may still prove two adjacent small families are one lifecycle.
+
+**Only the first two were filed initially, and that was deliberate.** They are the
+two with structural consequence at the time: item 1 gates the phase, and item 2
+releases [[NATIVE-HANDLE-CARRIER]]. The census supplies the binding paths, counts
+and sizes for the rest, and **it may prove two adjacent small families are one
 lifecycle** — filing all sixteen now would create work ahead of the evidence
 that sizes it.
 
@@ -298,9 +311,28 @@ with a measurement**, not a Steward assumption in either direction. Measured at
   `RT-DECL-CLOSURE-PORT` — are **all `merged`**. This node is the only thing
   holding it.
 - Its remaining `ken-runtime` work is one `match primitive.symbol.as_str()` arm
-  inside `lower_primitive_call` (`core.rs:17977`, refusing at `:18208`), plus
-  the CAP-41 fixture to native green, the fold with `c07e63c2`, and the six-axis
-  matrix.
+  inside `lower_primitive_call`, plus the CAP-41 fixture to native green, the
+  fold with `c07e63c2`, and the six-axis matrix.
+
+  > **THE COORDINATES THIS BULLET CARRIED ARE DEAD, AND THE PREMISE UNDER IT IS
+  > TOO. Corrected 2026-08-17, both halves.**
+  >
+  > **(i)** It read `core.rs:17977`, refusing at `:18208`. [[RT-BACKEND-PRIMITIVE-
+  > LOWERING-SPLIT]] merged, so **those resolve to nothing.** `lower_primitive_call`
+  > is now `lowering/core/primitive.rs:43` as `pub(super) fn`.
+  >
+  > **(ii) More important: adding that arm no longer unblocks
+  > [[NATIVE-HANDLE-CARRIER]].** The ring ran the diagnostic and the first native
+  > refusal is a **non-primitive effect-seat gap** — `Argument(0)` of `FsReadFile`
+  > needs `BytesPointerLength`, unobservable in `CarriedWord` — which the
+  > pre-existing two-bracket control row hits identically. Architect ruling
+  > `evt_559gymspqap8w`: the fix belongs to synthesized error-value construction
+  > and site-operand provenance, i.e. [[RT-SITEOP-CARRIED-WITNESS]], **not here
+  > and not in `NATIVE-HANDLE-CARRIER`.**
+  >
+  > ⇒ **This bullet's "remaining work" list is a description of the past.** It is
+  > kept because the split it justified was correct and did land; it is no longer
+  > a route to native green.
 
 ⇒ The region it needs re-homed is a **primitive-lowering emitter family** — the
 class the program report's §5.2 puts last in its order, as "emitter families
