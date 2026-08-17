@@ -3,8 +3,7 @@
 //! MEASURED: the route-1 observer counts the direct non-`Construct` return in
 //! `recursive_position_unit_body` while this checked Ken source lowers.
 //! CLAIMED: D2 advances the carried child's owning plain `Match` past route 1.
-//! THE GAP: the observer counts that return, not the newly exposed constructor
-//! arity refusal.
+//! A red route-1 assertion after D2 is the intended AC-3 advance, not a regression.
 
 #![cfg(target_os = "linux")]
 
@@ -89,15 +88,15 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
         )
     });
 
-    assert!(route1.is_empty(), "D2 must advance past route 1: {route1:?}");
+    assert_eq!(route1.len(), 1, "the resolver must still be entered once");
+    assert!(
+        !route1[0].route1,
+        "D2 must advance past route 1: {route1:?}"
+    );
     eprintln!(
-        "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 rows={} plain_match={} \
-         scrutinee_var={} cases={} construct_bodies={}",
+        "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 entered={} route1={}",
         route1.len(),
-        false,
-        false,
-        0,
-        false,
+        route1.iter().filter(|row| row.route1).count(),
     );
     let error = result.expect_err("D2 exposes the next refusal");
     eprintln!("RT_BRANCHED_SCRUTINEE_UNIT_BODY_D2_ADVANCED {error:?}");
