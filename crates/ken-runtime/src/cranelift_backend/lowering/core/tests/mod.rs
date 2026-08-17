@@ -33,8 +33,8 @@ pub(in crate::cranelift_backend) use super::super::super::{
 
 // Crate-root items the subject tests assert against.
 pub(in crate::cranelift_backend) use crate::{
-    CraneliftObjectArtifact, NativeFidelity, RuntimeExample, RuntimeLowerabilityStatus,
-    RuntimeObservation, UnsupportedLowering,
+    CraneliftObjectArtifact, RuntimeExample, RuntimeLowerabilityStatus, RuntimeObservation,
+    UnsupportedLowering,
 };
 
 // Ruled test module: a `use` is permitted here (AC-8 class 2).
@@ -59,7 +59,6 @@ pub(in crate::cranelift_backend) use crate::cranelift_backend::artifact::{
 mod constructors;
 mod control;
 mod effects;
-mod values;
 
 /// A real, planner-issued origin for a hand-built frame or layer that carries
 /// **no** syntax children (an empty `cases` list, a childless residual).
@@ -337,7 +336,7 @@ fn host_result_closure_match(argument: RuntimeExpr) -> RuntimeExpr {
 }
 
 #[cfg(test)]
-fn big(sign: crate::Sign, limbs: &[u64]) -> RuntimeExpr {
+pub(super) fn big(sign: crate::Sign, limbs: &[u64]) -> RuntimeExpr {
     RuntimeExpr::Value(RuntimeValue::Int(crate::RuntimeIntV1::Big {
         sign,
         limbs: limbs.to_vec(),
