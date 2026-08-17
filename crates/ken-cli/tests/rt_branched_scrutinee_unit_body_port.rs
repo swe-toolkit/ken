@@ -1,9 +1,9 @@
 //! `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` D1 witness.
 //!
-//! MEASURED: the route-1 observer counts the direct non-`Construct` return in
-//! `recursive_position_unit_body` while this checked Ken source lowers.
-//! CLAIMED: D2 advances the carried child's owning plain `Match` past route 1.
-//! A red route-1 assertion after D2 is the intended AC-3 advance, not a regression.
+//! MEASURED: the observer records resolver entry, plain-Match descent, and the
+//! direct non-`Construct` route-1 return while this checked Ken source lowers.
+//! CLAIMED: D2 enters and descends through the carried child's owning plain
+//! `Match`, then advances past route 1.
 
 #![cfg(target_os = "linux")]
 
@@ -93,6 +93,7 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
         !route1[0].route1,
         "D2 must advance past route 1: {route1:?}"
     );
+    assert!(route1[0].match_descent, "D2 must descend into the plain Match");
     eprintln!(
         "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 entered={} route1={}",
         route1.len(),
@@ -103,5 +104,26 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
     assert!(
         format!("{error:?}").contains("recursive position is outside its source constructor"),
         "D2 must advance to the constructor-arity refusal: {error:?}"
+    );
+}
+
+#[test]
+fn suppressed_match_descent_keeps_the_old_observation_but_fails_the_repaired_one() {
+    let root = tempfile::tempdir().expect("temporary native-build root");
+    let (_, rows) = ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
+        ken_runtime::with_branched_scrutinee_unit_body_match_descent_suppressed(|| {
+            ken_cli::build_native_program(
+                BRANCHED_SCRUTINEE_SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "rt_branched_scrutinee_unit_body_mutation",
+                root.path(),
+            )
+        })
+    });
+    assert_eq!(rows.len(), 1, "the resolver entry remains observable");
+    assert!(!rows[0].route1, "the old route-1 observation remains satisfied");
+    assert!(
+        !rows[0].match_descent,
+        "the repaired witness must reject a resolver that does not descend"
     );
 }

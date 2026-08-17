@@ -88,6 +88,7 @@ pub use lowering::with_px8ds_retired_flat_order;
 // census suites are what keep it honest.
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::core::{
+    with_branched_scrutinee_unit_body_match_descent_suppressed,
     with_branched_scrutinee_unit_body_route1, with_match_recursor_census,
     BranchedScrutineeUnitBodyRoute1, MatchRecursorCensusRow,
 };
