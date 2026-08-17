@@ -49,6 +49,54 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > declared deletion as its own prescribed disposition, which is why `AC-10`
 > resolves rather than blocks.
 >
+> ### THE ZERO-REACHABILITY PREMISE IS NARROWER THAN IT READS. ROUTED TO THE ARCHITECT.
+>
+> **Adversary `evt_6x0ewnvnvdq3j`, hunted on this landing. The deletion itself
+> verifies** — zero `RecursiveDescentResidual` / `set_selector_variant_exclusion`
+> in `crates/`, both re-homed pins survive.
+>
+> **His mechanism holds, verified by the Steward at `main`:**
+>
+> - **`ken-cli` has 33 `#[ignore]` tests, and 9 carry `RT-CLOSURE-BOUNDARY-LANE`**
+>   — *"a runtime-local closure has no durable lane across the boundary."*
+>   (He reported 6; the count depends on the context window. The population is
+>   real either way.)
+> - **Row 4's own shape is `host_result_closure_match(...)`**
+>   (`control.rs:1368`) — **closure-at-boundary, which is the stated reason
+>   those tests are excluded.**
+>
+> ⇒ **The corpus that returns "zero source-reachable" has the matching shape
+> removed from it by the ignore rule.** That is a real narrowing of the bound
+> and it was not previously recorded.
+>
+> ### ONE HALF OF THE FINDING IS REFUTED, AND IT IS ITS STRONGEST SENTENCE.
+>
+> **He wrote that the premise is *"the open question of the node commissioned to
+> settle it"* and that *"the deletion did not wait for it."*
+> [[RT-STATIC-WORKER-WITNESS-PROGRAM]] is `closed`, ANSWERED** — bounded
+> negative: *"no reasonable Ken source program was found that reaches the
+> static-worker conservation refusal... and that is a search bound, not a
+> universal proof."*
+>
+> ⇒ **The question was answered before the deletion, and the answer already
+> labels itself a search bound rather than a proof.** The deletion did not
+> outrun its evidence.
+>
+> ### WHAT ACTUALLY STANDS, AND WHY IT STILL MATTERS
+>
+> **Not *"the premise is unsettled"* but *"the settled premise's BOUND is
+> narrower than its consumers read it."*** A bounded negative whose search
+> corpus excludes the matching shape is weaker than one whose corpus includes
+> it — and nothing in the tree said which.
+>
+> **This is the Architect's `AC-10` amendment (`evt_3bkkjpps1bcpe`), so the
+> disposition is his.** It does **not** call for reverting: the record says
+> representability gap over zero source-reachable programs, and the honest
+> repair is to state the bound's domain beside it. **What would settle it is
+> unchanged and cheap relative to what landed: one Ken source program reaching
+> this refusal, or a measurement over a corpus that does not exclude
+> closure-at-boundary tests.**
+>
 > ### THE NODE STAYS `active`. TWO DELIVERABLES REMAIN.
 >
 > - **`D6a`** — sweep the reachability-premised *"cannot occur"* arguments. It

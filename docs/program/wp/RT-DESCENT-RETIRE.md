@@ -796,6 +796,39 @@ the proof is unavailable and any argument for it is circular.
   code-size distribution across the measured programs, against
   `RT-DECL-CLOSURE-PORT.AC-6`'s opening figures.
 
+  > ### THE OPENING FIGURES ARE NOT IN THE TREE. MEASURED BEFORE DISPATCH, 2026-08-17.
+  >
+  > **`AC-6` said *"post the table"* and made itself dischargeable by *"the
+  > table existing and being routed to the Steward"* — a condition a convo post
+  > satisfies.** `RT-DECL-CLOSURE-PORT` is `merged`, but **no such table exists
+  > anywhere under `docs/`**: the only occurrences of *"emitted function count"*
+  > in the corpus are `AC-6`'s own sentence and this deliverable's.
+  >
+  > ⇒ **`AC-4` names a location to record next to, and that location was never
+  > written.** A frame can point at a baseline that does not exist, and nothing
+  > reds.
+  >
+  > ⚠ **AND THE BASELINE IS NOW UNRECOVERABLE.** `AC-6` measures *"under each
+  > authority — the `RecursiveDescent` root before, and the `FunctionizedUnits`
+  > population after."* **The `RecursiveDescent` root was deleted at
+  > `1aec3e3e1`.** The before-figure cannot be re-taken at any base that still
+  > has the campaign's other work.
+  >
+  > **So `D7` is an ABSOLUTE measurement, not a differential.** Discharge it by:
+  >
+  > 1. **Measuring and recording the post-deletion figures** — emitted function
+  >    count and per-function code-size distribution — **into `docs/`**, not
+  >    into a thread.
+  > 2. **Stating plainly that the `RecursiveDescent`-authority opening figures
+  >    were never written to the tree and are no longer obtainable**, so no
+  >    delta is claimed. **Do not reconstruct one by argument, and do not
+  >    estimate the missing side.**
+  >
+  > **`AC-4`'s substance is unchanged and still binds: report, do not tune, do
+  > not pin a threshold.** A regression cannot be claimed here in either
+  > direction — there is nothing to regress against — which is precisely why
+  > the absolute table must be written down now, before this tree also moves.
+
 - **`D8` — RE-DESCRIBE THE FIVE REFUSAL CONTROLS. Do not repair them and do not
   retire them.** Absorbed into this node 2026-08-16 when
   [[RT-RECURSOR-TRANSPORT]] closed at PR #2443/#2444.
