@@ -311,10 +311,25 @@ the proof is unavailable and any argument for it is circular.
   > side keeps moving, and **which axes actually moved is a measurement** — here
   > one of the two suspected axes had not moved at all.
 
-  **`D2c` LANDS AS ITS OWN CANDIDATE, AHEAD OF ANY DELETION.** Partial-WP merge
-  is standing policy (`COORDINATION §10⁻`); here it is load-bearing rather than
-  convenient, because a revert of step 1 must restore production routing in a
-  single commit.
+  > **THIS CLAUSE IS REFUTED BY MEASUREMENT AND IS WITH THE ARCHITECT.** It read
+  > *"`D2c` LANDS AS ITS OWN CANDIDATE, AHEAD OF ANY DELETION"*, on the standing
+  > partial-WP merge policy (`COORDINATION §10⁻`), the stated reason being that a
+  > revert of step 1 must restore production routing in one commit.
+  >
+  > **A `D2c` cannot merge through the publisher.** Its acceptance criterion is a
+  > differential that **includes 17 expected reds** against the frozen `D2b`
+  > oracle; the publisher merges only on **CI green**. Measured 2026-08-17: the
+  > fresh `D2c` `f68b8c866` was approved by QA and the Architect, published as
+  > PR #2509, and **failed CI on members of the frozen set**. PR closed.
+  >
+  > **The revert-in-one-commit property is real and is not what is in doubt** —
+  > what is refuted is that a candidate with that property can pass this gate.
+  >
+  > ⇒ **Fork routed to the Architect** (`evt_4cw8rsesahmeh`): `D2c` is
+  > measurement-only like its held predecessor, with `D3` the first landing; or a
+  > `D2c` lands and dispositions the 17 reding tests in the same candidate,
+  > **spending the dead-code oracle early** and losing *"delete nothing"*.
+  > **Until that is ruled, do not treat "`D2c` merges" as a fixed input.**
 
   > ### `D2c` RAN. NOT CAPABILITY-BLOCKED — the RECORD is the gate.
   >
@@ -613,11 +628,20 @@ the proof is unavailable and any argument for it is circular.
   > `D1`** — correct semantics leaves an asserted-refusal pin, a missing port
   > leaves an owned obligation.
 
-- **`AC-7` — the two steps are SEPARATE CANDIDATES.** `D2c` merged, with the
-  full workspace suite and conformance green in CI, **before any deletion
-  lands**. A single candidate that both reroutes and deletes **fails this AC
-  however green it is** — the point is that its red, had it been red, would
-  have been uninterpretable.
+- **`AC-7` — the two steps are SEPARATE CANDIDATES.** A single candidate that
+  both reroutes and deletes **fails this AC however green it is** — the point is
+  that its red, had it been red, would have been uninterpretable. **That half
+  stands and is untouched.**
+
+  > **The other half of this AC — *"`D2c` merged, with the full workspace suite
+  > and conformance green in CI, before any deletion lands"* — is UNSATISFIABLE
+  > AS WRITTEN**, for the reason recorded at the `D2c` deliverable: a reroute
+  > whose expected shape is 17 reds cannot be green. **`AC-7` currently demands
+  > green from the one candidate that is defined to be red.**
+  >
+  > **Separation is the requirement; "merged green" was the assumed mechanism**,
+  > and only the mechanism is refuted. **Do not discharge or fail `AC-7` on this
+  > clause until the Architect rules the `D2c` fork** (`evt_4cw8rsesahmeh`).
 
 ## 6. Banned scope
 
