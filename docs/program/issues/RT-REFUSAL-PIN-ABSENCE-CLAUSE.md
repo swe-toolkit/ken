@@ -11,7 +11,10 @@ github: null
 origin: "Adversary hunt evt_3t7y5zwng8aba on merged RT-REFUSAL-PINS-REHOMED (a48c28915...d6a9760a9), 2026-08-17. Confirmed in the tree by the Steward before filing. Cut separately rather than folded into RT-DESCENT-RETIRE because folding it would make the repair ride a gated node, which is the defect's own shape."
 ---
 
-Frame: this node. **One deliverable, one line of test code, one mutation.**
+Frame: this node. **Two deliverables, both small: `D1` is one line of test code
+plus a mutation proof; `D2` is two comment corrections at named coordinates.**
+`D1` is the reason the node exists and `D2` is folded in because it is the same
+increment shape in the same crate — **make the artifact say what is true.**
 
 ## The finding
 
@@ -76,6 +79,52 @@ candidate**.
 **Confirm pin 1 stays green under that perturbation** — the arms must remain
 independently meaningful.
 
+## Deliverable D2 — two comment corrections at EXACTLY these two sites
+
+**Architect `evt_2xm79ytjgz3j0`, both raised as should-fix at `D2c`'s approval
+and explicitly not blocking it.** Folded here rather than cut as a third node:
+they are comment-only edits in the same crate, in the same increment shape as
+`D1` — make the artifact say what is true. **Coordinates verified by the Steward
+in the candidate at `f68b8c866`, not transcribed.**
+
+**A. `lowering/core.rs:2410-2413` is now FALSE.** The comment above the
+`#[cfg(test)]` exclusion block still reads:
+
+> *"…and let the remainder decide -- so a program still retained by some other
+> variant keeps the retained lane and cannot be mistaken for this position
+> working."*
+
+**Under `D2c` the remainder decides nothing and no program keeps the retained
+lane** — the block's early `return` was removed and the function now always
+returns `FunctionizedUnits`. The function's *doc* comment was correctly updated
+for `D2c`; this inner one was missed.
+
+**Why it is worth fixing now rather than at `D6a`.** [[RT-DESCENT-RETIRE]]'s
+`D6a` exists precisely to sweep reachability-premised comments that went false
+silently, and **`D2c` created one inside the function the whole campaign is
+about.** `D3` deletes the function, but `D3` is gated on this node, so **the
+false comment sits on `main` for as long as this node takes.**
+
+**B. `lowering/core.rs:2424` needs a because-clause.** The construct is correct
+and approved:
+
+```rust
+let _ = recursive_descent_residual(expr).or_else(|| { ... });
+```
+
+**It keeps the classifiers evaluating while discarding the answer** — routing to
+nothing without *running* nothing, so the reroute cannot mask a classifier
+defect. **State that at the site, in one line.**
+
+> **This is the FOURTH discarded-result site in this campaign — and the ONLY
+> deliberate one.** The others were the sentinel's `_excluded_result`, the two
+> `control.rs` trace helpers, and `compiler_driver.rs`'s `map_err(|_| …)`; each
+> cost a measurement its explanation. **A future auditor sweeping that family
+> needs one line to tell this apart from those three.**
+>
+> **A discard that is correct should say so at the site.** Apply it here going
+> forward rather than reconstructing the intent later.
+
 ## Acceptance criteria
 
 **AC-1.** Pin 2 fails when the production refusal carries `"before
@@ -84,8 +133,9 @@ construction"` alongside both currently-pinned clauses. **Observed, not argued.*
 **AC-2.** Pin 2 still passes at unmodified `origin/main`, and pin 1 is
 untouched and green.
 
-**AC-3.** No production change. This node edits one test guard and **deletes
-nothing**.
+**AC-3.** No production BEHAVIOUR change. This node edits one test guard and two
+comments, and **deletes nothing**. `D2`'s edits are comment-only: control by
+`git diff` showing no change to any expression in `select_body_emission_authority`.
 
 **AC-4.** `D2c` `036e8ee916844fb91a4f42f2a2b04ebaea0dde2f` untouched.
 
@@ -96,9 +146,13 @@ targeted only — `-p ken-runtime` or `--test`, never `--workspace`.
 
 - **Rewriting pin 1.** It uses full equality and has no gap; changing it trades
   a stronger assertion for a uniform one.
-- **Any `D3`-`D8` retirement work.**
+- **Any `D3`-`D8` retirement work**, other than `D2`'s two named comment edits,
+  which the Architect raised at `D2c` approval and routed here.
 - **Widening to other `contains`-style assertions in `control.rs`.** If the
   pattern looks general, **say so and stop** — that is a census, not this node.
+- **A general `D6a` comment sweep.** `D2` covers **exactly the two named sites**
+  and nothing else. Other stale reachability comments are `D6a`'s, and finding
+  one is a report, not a fix to make here.
 
 ## Standing
 

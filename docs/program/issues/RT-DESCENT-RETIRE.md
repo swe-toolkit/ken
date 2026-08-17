@@ -46,6 +46,46 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > deletion but cannot detect the regression it was written for survives in name
 > only.**
 
+> ### `D2c` CANNOT MERGE THROUGH THE PUBLISHER, AND THAT IS A FRAMING DEFECT
+>
+> **Measured 2026-08-17. The fresh `D2c` `f68b8c866` was approved by QA and the
+> Architect, published, and FAILED CI — as any correct `D2c` must.**
+>
+> **`D2c`'s acceptance criterion is a differential that INCLUDES 17 expected
+> reds** against the frozen `D2b` oracle. **The publisher path merges only on CI
+> green.** Those two criteria are incompatible, so **no correct `D2c` candidate
+> could ever have merged through this path.** The two failures CI named —
+> `d0_r3_fusion_gate…checked_twin` and `d2f_0_the_applied_root_production_path_gate`
+> — are **rows 3 and 6 of the frozen set**, verified by the Steward, and the
+> publisher's log states its filter is a **floor, not the whole failure set**.
+>
+> **The measurement SUCCEEDED and is accepted.** The frozen A/B classification
+> reproduced exactly on a moved base. **Nothing about the candidate is wrong.**
+>
+> **The frame is what is wrong.** *"`D2c` LANDS AS ITS OWN CANDIDATE, AHEAD OF
+> ANY DELETION"* cannot hold together with licensing reds on the frozen 18.
+>
+> **The tell was already present and the Steward missed it:** the predecessor
+> `D2c` `036e8ee91` has been held **unpublished since the day it ran**, because
+> it is a measurement instrument. **Its successor was released as a landing
+> without anyone asking why its twin had never been publishable.** `M1`-`M3`
+> check the Decision and the candidate's shape; **no step asks whether a
+> candidate's own acceptance criterion is compatible with the gate it is being
+> sent through.**
+>
+> **ROUTED TO THE ARCHITECT** (`evt_4cw8rsesahmeh`), because it is a
+> campaign-design fork rather than sequencing:
+>
+> 1. **`D2c` is measurement-only like its predecessor** — banked, never merged,
+>    with `D3` the first actual landing. The held candidate's own treatment
+>    supports this reading.
+> 2. **A `D2c` lands**, and the 17 reding tests are dispositioned **in the same
+>    candidate** — which **spends the dead-code oracle early** and contradicts
+>    *"delete nothing"*, the one property `D2c` exists to have.
+>
+> **PR #2509 is CLOSED** with this reason. Held `036e8ee91` untouched;
+> `f68b8c866` retained as the fresh measurement's artifact.
+
 > ### THE HELD `D2c` CANDIDATE IS NOT THE `D2c` LANDING. Cut a fresh one.
 >
 > **`036e8ee91` stays frozen at base `c98f72ba8` — it is EVIDENCE, and rebasing
