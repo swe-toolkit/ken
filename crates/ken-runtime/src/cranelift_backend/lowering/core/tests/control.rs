@@ -7884,6 +7884,19 @@ fn correspondence_adds_no_emitted_unit_to_the_production_census() {
             data_declarations: 0,
             data_definitions: 0,
         },
+        // `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` moves the primitive dispatcher
+        // and its exclusive helpers into this nested production module. The
+        // explicit zero row keeps the whole-roster relation closed while
+        // asserting that the move creates no second emission authority.
+        Census {
+            file: "lowering/core/primitive.rs",
+            source: include_str!("../primitive.rs"),
+            builders: 0,
+            definitions: 0,
+            declarations: 0,
+            data_declarations: 0,
+            data_definitions: 0,
+        },
         Census {
             file: "lowering/mod.rs",
             source: include_str!("../../mod.rs"),
@@ -8620,6 +8633,10 @@ const BACKEND_PRODUCTION_SOURCES: &[(&str, &str)] = &[
     ("artifact/mod.rs", include_str!("../../../artifact/mod.rs")),
     ("compiled.rs", include_str!("../../../compiled.rs")),
     ("lowering/core.rs", include_str!("../../core.rs")),
+    (
+        "lowering/core/primitive.rs",
+        include_str!("../primitive.rs"),
+    ),
     ("lowering/mod.rs", include_str!("../../mod.rs")),
     // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. Registered
     // here the moment the module exists, because every pin that iterates this
@@ -8695,6 +8712,7 @@ fn the_backend_production_surface_inventory_is_closed() {
             ("cranelift_backend.rs", "test_objects"),
             ("cranelift_backend.rs", "test_support"),
             ("artifact/mod.rs", "api"),
+            ("lowering/core.rs", "primitive"),
             ("lowering/mod.rs", "core"),
             // `RT-FNSPLIT-B2F` `D1`/`D2`. A sibling of `core` rather than a
             // region inside it: `core.rs` is the module whose recursive

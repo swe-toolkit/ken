@@ -4,10 +4,15 @@
 //! (`evt_3xvn8g7n5rv7m`): subject is the production mechanism a test
 //! discriminates, not the entrypoint it enters through.
 
-use super::*;
+use super::super::tests::big;
+use super::super::*;
 
 // Ruled test module: imports permitted here (AC-8 class 2).
-use crate::nc5_seed_examples;
+use crate::cranelift_backend::test_support::total_primitive;
+use crate::{
+    nc5_seed_examples, run_example_with_seed_observation, NativeFidelity, RuntimeExample,
+    RuntimeObservation, UnsupportedLowering,
+};
 
 #[test]
 fn cranelift_runs_scalar_seed_and_verifies_function() {
