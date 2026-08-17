@@ -1,7 +1,7 @@
 ---
 id: RT-PLANNER-GRAPH-FOUNDATION-SPLIT
 title: "Move the planner's shared substrate out of the static-transition monolith — the root plan type and the identity vocabulary that all six planner domain slices quote"
-status: ready
+status: active
 owner: runtime
 size: TBD
 gate: none
