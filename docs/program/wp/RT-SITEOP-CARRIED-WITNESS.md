@@ -226,6 +226,38 @@ after `D1b` reports** — see the sizing hold below.
 > if the answer looks obvious — the recut is the Steward's and it depends on
 > which answer you got.
 
+> ### `D1b` RAN 2026-08-17 AND RE-RUNS AGAINST A SHARPENED QUESTION. Read this first.
+>
+> **The chain below was walked correctly and its terminal step was
+> misclassified** (report `evt_2vj52hacadmab`, Architect ruling
+> `evt_6f3exyz6we97n`). `constructor_field_bindings` clones a `Lowered` and wraps
+> it in the specialized phase — **it never inspects the value**, so it demands a
+> `Lowered`, not a template. `Lowered` has runtime-valued inhabitants, so that
+> demand is satisfiable by a runtime span.
+>
+> **The genuine template demand is UPSTREAM and is the refusal itself:**
+> `ClaimedEffectSeats::specialized` (`lowering/mod.rs:13434`), *"Read one seat's
+> compile-time template."* Its own doc contemplates *"a carried route being
+> written for it"* — the opposite of a settled wall.
+>
+> **THE QUESTION IS NOW PREMISE (2), AND NO WALK CAN ANSWER IT:**
+>
+> > **Is a runtime-valued `Lowered` — a `ResponseBytes`-shaped span — a
+> > legitimate site-operand value, or does `Lowered` in this position mean
+> > compile-time-KNOWN content?**
+>
+> **Tracing shows what is passed; it cannot show what is permitted.** Do not
+> answer this by walking the chain again.
+>
+> **The discriminating test is one fixture.** `px7m_hostresult_computational_
+> match.rs` is the right witness, previously read for the wrong thing: **binding
+> the path bytes is not the question — what the program then DOES with them is.**
+> Consumed in a way that needs their content at compile time (a structural match
+> on a literal) ⇒ representational. Only passed on ⇒ a port.
+>
+> **The original `D1b` text is retained below unchanged**, because the walk it
+> produced is sound as a chain and the re-run should not redo it.
+
 - **`D1b` — THE FIRST DELIVERABLE. Answer the Architect's premise (1): is the
   synthesized `FileError`'s child read as a TEMPLATE anywhere downstream?**
 
