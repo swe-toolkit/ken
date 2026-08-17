@@ -1,7 +1,7 @@
 ---
 id: RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL
-title: "Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see"
-status: active
+title: "REFUTED AND CLOSED: the predecessor's own committed control DOES red when the source-machine Construct arm's dispatch is deleted -- the frame asserted the opposite in a table while stating two sections earlier that nobody had run the mutation"
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -10,6 +10,83 @@ blocks: [RT-BACKEND-SPLIT-CENSUS]
 github: null
 origin: "Architect ruling evt_9qn4nm8gg0ye section 4 on RT-SRCMACHINE-CTOR-RECOGNITION-ARM's AC-2 seat: the unit control is accepted and the D2k-1c route harness is refused, leaving a reachability residual he explicitly declined to authorize inside that node and routed to the Steward as a scope question (runtime-leader evt_48cjhd4pdeey4). Steward-filed per COORDINATION §2."
 ---
+
+> # MERGED 2026-08-17. `D1`/`D3` at squash `6ed648762`, PR #2536. NO GAP EXISTED.
+>
+> **Reviewed candidate exact `d11852ed8ef03c34dee45d7a72dd9c7414a1d7a6`, range
+> `e5286ea0665d4b81c91427e42aab175dfd23cdbb...d11852ed8ef03c34dee45d7a72dd9c7414a1d7a6`.**
+> One commit, sole path
+> `crates/ken-runtime/src/cranelift_backend/lowering/core/tests/constructors.rs`,
+> `+30/-0`, every added line rustdoc. QA at `evt_3kffk7x59m5j7`; Architect
+> resolved `dec_7tzbvmagtb2qy`, no should-fix notes.
+>
+> ## THE NODE'S CENTRAL PREMISE WAS FALSE, AND THE MUTATION IS WHAT SHOWED IT
+>
+> **The frame's table below says that deleting the source-machine `Construct`
+> arm's dispatch call leaves the predecessor's committed control green. It
+> reds.** Replacing the sole classifier call with an inert
+> `vec![None; args.len()]` compiles, and
+> `source_machine_recognized_worker_enters_the_constructor_template` fails at
+> the restored `StaticWorkerBinding` / `value_at` refusal. Byte-identical
+> restore returns it green. Run by the implementer and reproduced independently
+> by QA.
+>
+> **That test is not an adjacent control — it is the predecessor's own seat.**
+> Its rustdoc opens *"`RT-SRCMACHINE-CTOR-RECOGNITION-ARM` AC-2: the
+> source-machine producer..."*, so the frame's table row names the very control
+> that refutes it.
+>
+> ⇒ **`D2` was not needed and no counter was authored.** The presumptive
+> `cfg(test)` arrival counter would have duplicated an assertion that already
+> existed, and — placed before the dispatch — would have observed arrival at the
+> arm rather than the dispatch. **The node cost 30 rustdoc lines and zero
+> production surface.**
+>
+> ### THE FRAME CONTAINED BOTH THE CLAIM AND THE ADMISSION IT WAS UNTESTED
+>
+> **Steward defect, recorded because the shape is reusable.** The table states
+> *"stays green"* as a fact. Twenty lines above it, the same frame states
+> *"the mutation proof is still owed and still unrun — nobody has deleted the
+> dispatch call and watched a control red."*
+>
+> **Both sentences are in the artifact I wrote, and only one of them is
+> hedged.** A negative that has never been measured was rendered as a table
+> cell, and **a table cell reads as measured** — that is what the format is for.
+> The hedge lived in prose and lost.
+>
+> ⇒ **An unrun mutation may not be reported in a table.** If the instrument has
+> not been run, the cell says so, or the claim stays in prose where its
+> qualifier can travel with it.
+>
+> ### THE FRAME INSTRUCTION THAT SAVED IT IS THE ONE THAT INVERTED THE WORK ORDER
+>
+> *"Check for an already-existing governed compile FIRST — an answer needing no
+> new machinery at all beats a cheap one, and nobody has looked."* **Nobody had
+> looked, and the answer was there.** Costing the presumptive mechanism first
+> would have landed a working, well-tested, entirely redundant counter, and
+> nothing in the node would have reded to say so.
+>
+> ### WHAT REMAINS TRUE, AND IT IS THE PART WORTH KEEPING
+>
+> **The arm-local dispatch is pinned. The upstream route is not.** The depth-3
+> observation — row 4 advancing `value_at` → `StaticWorkerBinding` — is still
+> **MEASURED-BUT-UNPINNED**, exactly as before this node. Nothing here claims a
+> particular governed `D2k` route reaches the arm, and `D3` records that
+> boundary next to the control rather than in a thread.
+>
+> **`AC-1` holds by construction** (no production code changed at all), `AC-3`
+> and `AC-4` by the empty intersection, `AC-5` by `D3` landing as the sole
+> change. `AC-2` is inapplicable: it is conditional on `D2`, which was correctly
+> not built.
+>
+> **[[RT-STATIC-WORKER-ARM-SOURCE-WITNESS]] is the node that sizes the remaining
+> route risk.** It is `ready`, unscheduled, and blocks nothing.
+
+> # EVERYTHING BELOW IS THE ORIGINAL FRAME AND IT IS HISTORICAL.
+>
+> **Read it for the cost ladder and the barred-apparatus reasoning, which
+> stand.** Do not read its gap analysis as a description of the tree — the
+> premise it rests on was measured false above.
 
 > # SEQUENCED AHEAD OF [[RT-BACKEND-SPLIT-CENSUS]] — operator ruling, 2026-08-16
 >
@@ -45,6 +122,12 @@ origin: "Architect ruling evt_9qn4nm8gg0ye section 4 on RT-SRCMACHINE-CTOR-RECOG
 > permanently, not a failure to deliver.
 >
 > ### THE ANSWER IS PROBABLY "YES", AND IT IS MEASURED
+>
+> **SUPERSEDED. The counter this banner presumes was never built and was never
+> needed.** What is measured here is that the SITE is reached — 569 arrivals —
+> which is true and is not the same as no existing control observing it. The
+> cost ladder below stands; its conclusion that a new mechanism was required
+> does not.
 >
 > Adversary hunt on `301b7af20` (`evt_7d22mprba897f`), re-checked against
 > `origin/main` by the Steward.
@@ -127,14 +210,25 @@ origin: "Architect ruling evt_9qn4nm8gg0ye section 4 on RT-SRCMACHINE-CTOR-RECOG
 The predecessor armed recognition on the source-machine `Construct` arm, and its
 committed unit control **drives the dispatcher directly.**
 
+> ### THIS TABLE IS THE REFUTED CELL. The control REDS. See the merge lede.
+>
+> **`stays green` was never measured.** The mutation ran on 2026-08-17 and the
+> control fails at the `StaticWorkerBinding` / `value_at` refusal. The row is
+> retained unaltered because the defect is the row itself, not a typo in it.
+
 | regression | governed route | the committed control |
 |---|---|---|
-| delete the source-machine `Construct` arm's dispatch call | falls back to `value_at` | **stays green** |
+| delete the source-machine `Construct` arm's dispatch call | falls back to `value_at` | **stays green** — FALSE, it reds |
 
 ⇒ **The one regression that silently restores the defect the predecessor exists
 to repair is the one regression its control cannot see.** The predecessor's own
 `D1` finding was that the arm *"never calls it — production simply never
 asks."* Nothing today would notice production going back to not asking.
+
+> **The paragraph above is the refuted conclusion, kept for the record.** The
+> predecessor's `D1` finding about production never asking is true and
+> unaffected; what does not follow from it is that no control observes the
+> arm now that production does ask.
 
 **This is a reachability gap, not a recording gap.** Do not carry any remnant of
 the recording question into this node: *"a `StaticWorker` field exists whose

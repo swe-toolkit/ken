@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-17 07:27:25Z — from 366 issue file(s) in `docs/program/issues/`.
+2026-08-17 07:48:19Z — from 366 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -212,7 +212,7 @@ the committed file matches the generator's output.
 | `RT-AGG-COMPOSE` | escaping two Resources into one aggregate (Prod (Resource _) (Resource _)) fails at erasure — checked endpoints do not compose | draft | runtime | TBD | none | — |
 | `RT-BACKEND-MODULE-SPLIT` | Split the oversized ken-runtime backend files into modules — the follow-on to the recursive-descent retirement, not an interlude in it | draft | runtime | M | none | — |
 | `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` | Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER | draft | runtime | M | none | — |
-| `RT-BACKEND-SPLIT-CENSUS` | Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves | draft | runtime | M | none | — |
+| `RT-BACKEND-SPLIT-CENSUS` | Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves | ready | runtime | M | none | — |
 | `RT-BODY-OCCURRENCE-PROVENANCE` | Non-root function seeds alias the scheduling entry as the body origin, so the source traversal enters the entry and never reaches the real body occurrence or its join subtree | merged | runtime | M | none | — |
 | `RT-BOUNDARY-IGNORED-CORPUS-MEASURE` | Read unit_boundary_environment_fields on the six ignored closure-at-boundary tests, the population the merged measurement's own selection rule excluded | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2381 |
 | `RT-C2-DRIVER-STAGE-ATTRIBUTION` | The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors | ready | runtime | XS | none | — |
@@ -336,7 +336,7 @@ the committed file matches the generator's output.
 | `RT-SRC-DISPATCH-COVER` | close the source-machine scrutinee-dispatch coverage tier surfaced by RT-SPLIT slice 4 | draft | runtime | TBD | none | — |
 | `RT-SRCBODY-BIND-ORDER` | Functionized source-body units install the parameter run in ABI order where the body reads de Bruijn-nearest-first, so every multi-parameter source body binds its parameters permuted | merged | runtime | M | none | — |
 | `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` | Arm static-worker recognition on the source-machine Construct arm, which never dispatches the classifier, after a bounded check that every eligible-field state can enter the template | merged | runtime | M | none | — |
-| `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` | Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see | active | runtime | S | none | — |
+| `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` | REFUTED AND CLOSED: the predecessor's own committed control DOES red when the source-machine Construct arm's dispatch is deleted -- the frame asserted the opposite in a table while stating two sections earlier that nobody had run the mutation | merged | runtime | S | none | — |
 | `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` | Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm | ready | runtime | M | none | — |
 | `RT-STATIC-WORKER-WITNESS-PROGRAM` | ANSWERED, bounded negative: no reasonable Ken source program was found that reaches the static-worker conservation refusal -- every attempt that keeps the constructor live in the executable closure also supplies a lawful disposition, and that is a search bound, not a universal proof | closed | runtime | M | none | — |
 | `RT-SYMLINK-LANE` | SymlinkPolicy is honoured by the interpreter lane and unreachable in the native lane — FollowWithinScope has no native behaviour | draft | runtime | TBD | none | — |
@@ -418,6 +418,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-SYMBOLIC-OPERATOR-NAMES` — `31-lexical.md:494` says operators are symbolic `from a fixed set plus user-defined`, and `33 section 6` says they are ordinary `fn` definitions with symbolic names -- but the lexer has no symbolic-operator token path at all, so a user operator can neither be named nor defined
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
 - `RT-4B-UNIQUENESS-GATE-REACH` — Count whether any candidate reaches the twelfth of thirteen elimination exits before building anything that classifies what happens there -- a call-site counter at `fusion_unique_static_body_triple`, changing no signature, no control flow and no plan, which decides whether the attribution increment has a subject at all
+- `RT-BACKEND-SPLIT-CENSUS` — Stage A of the backend module split — five inventories over the post-retirement tree, before any code moves
 - `RT-C2-DRIVER-STAGE-ATTRIBUTION` — The D5 observation identity driver reports every non-zero nested exit as `nested {} compilation failed`, so the one message AC-2 itself produces names the wrong stage -- plus one clause recording why the compiled-feature const must stay adjacent to the gate it mirrors
 - `RT-CANDIDATE-LEDGER-RESIDUALS` — Two named population questions on the merged candidate/disposition ledger were never reached, and the node that could have covered them is closed
 - `RT-CARRIER-PRODUCER-OCCURRENCE` — a source aggregate reaches the carrier with no planner-issued producer occurrence, so the C2 edge refuses to emit and the nested-payload selection row never exercises its property
@@ -470,8 +471,7 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
-- `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: active)
+- `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
