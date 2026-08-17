@@ -1,24 +1,50 @@
 ---
 id: RT-SITEOP-CARRIED-WITNESS
 title: "Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried"
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
 depends_on: [RT-CARRIER-BYTESPAN-OBSERVE]
-blocks: []
+blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: Hard stop returned by RT-CARRIER-BYTESPAN-OBSERVE D5, 2026-08-07, candidate 4244d082. The frame's own §1a recut clause fired — the 30 quarantined rows do not discharge from one mechanism. Steward-cut per that clause. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> ## THIS NODE IS `draft` BECAUSE A DESIGN FORK IS OPEN, NOT BECAUSE IT IS UNSCOPED
+> # `ready` 2026-08-17 — THE FORK IS RULED AND THIS NODE IS NOW ON THE CRITICAL PATH
 >
-> The gap is measured and confirmed twice, independently. **What is not settled
-> is the mechanism**, and that is the Architect's call, not the Steward's. This
-> node goes `ready` when the Architect has ruled the fork in §3 of its frame.
+> **The one bar was §3 of its frame: an open Architect fork on the mechanism.
+> The Architect ruled it at `evt_559gymspqap8w`, and the ruling is pasted
+> verbatim into `§3b` of the frame** — read it there, not from the event. Its
+> sole `depends_on`, [[RT-CARRIER-BYTESPAN-OBSERVE]], is `merged`.
 >
-> **Do not read `draft` as "not yet investigated."** The investigation is done
-> and is recorded below.
+> **The ruled mechanism:** project the carried word to runtime `(pointer, len)`
+> through an **emitted helper** and admit that as the site operand's value —
+> §2g's sanctioned route, not the banned `Carried -> Lowered` inverse.
+>
+> ### THIS NODE ACQUIRED A DEPENDENT IT DID NOT HAVE. `blocks` was `[]`.
+>
+> [[NATIVE-HANDLE-CARRIER]] hard-stopped on **this exact gap**
+> (`evt_4eynen6drs79x`, 2026-08-17): its first native refusal is *"seat
+> `Argument(0)` of `FsReadFile` needs `BytesPointerLength`, which it cannot
+> observe in `CarriedWord`"*. The Architect ruled the fix **does not belong in
+> that node** — the component that must change is synthesized error-value
+> construction and site-operand provenance. ⇒ **This node is its successor**,
+> and through it heads **19 transitive dependents**.
+>
+> ### START AT `D1b`, AND STOP WHEN IT REPORTS.
+>
+> **`D1b` answers the one premise the Architect deliberately did not walk:** is
+> the synthesized `FileError`'s child read as a **template** anywhere downstream
+> (erasure, checked-core body view)? **If it is, the ruled direction is wrong by
+> the Architect's own terms** and this returns to the Architect.
+>
+> **`size: L` is the PRE-RULING provisional and is not evidence of anything.**
+> The Architect held sizing until `D1b` reports, *"because a plumbing answer and
+> a representational answer are not the same node."* The recut is the Steward's.
+>
+> **Do not read `L` and plan a long campaign; do not read `ready` and start at
+> `D2`.**
 
 ## The gap
 
