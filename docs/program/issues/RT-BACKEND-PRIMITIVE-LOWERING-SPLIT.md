@@ -75,8 +75,88 @@ from emission. No widened production API, no facade recreation.
 contradiction** rather than widening silently. Present measurement is enough to
 choose and frame it; the census supplies the binding paths and counts.
 
+## Deliverables
+
+**`D0` — read the census's `D6` verdict FIRST, and cite it.**
+[[RT-BACKEND-SPLIT-CENSUS]] revalidates the ownership proof this node was
+chosen on. **If `D6` reported a
+new shared owner or a cycle, this node stops with that contradiction and the
+re-cut is the Steward's** — do not widen the slice to absorb it. If `D6` is
+clean, quote the SHA it was measured at; that SHA is this node's base.
+
+**`D1` — create the child and move the exclusively-primitive family.** The
+dispatcher `lower_primitive_call`, the twelve contiguous helpers, and the
+exclusive recursive `lowered_char_list`, into `lowering/core/primitive.rs` (or
+the child the census's inventory 3 shows is correct). **Bodies move unchanged.**
+
+**`D2` — move the domain tests and mutations with the code they cover.** They
+are a domain property family, not a file's worth of tests; a move that leaves
+them behind separates the property from its subject.
+
+**`D3` — enumerate the seams the move requires**, each as narrow `pub(super)`,
+each with the consumer that forced it. The move calls the existing
+source-machine evaluator and shared value services; **stating that dependency
+honestly is the deliverable**, not routing around it.
+
+**`D4` — the move-fidelity evidence.** See `AC-1`: this is what makes the
+candidate reviewable as a move rather than as a rewrite.
+
+## Acceptance criteria
+
+- **`AC-1` — fidelity is DEMONSTRATED, not asserted.** For every moved item,
+  show the body is unchanged apart from the mechanical adjustments the move
+  forces — module path, `use` lines, indentation, visibility. **A reviewer must
+  be able to check this without reading the logic**, so produce the normalized
+  comparison rather than a claim that one would pass. **"The suite is green" is
+  not evidence of a faithful move**: a move that also changes behaviour is
+  exactly as green as one that does not, wherever the tests do not discriminate.
+
+- **`AC-2` — `int_to_uint64_raw` does not appear.** That arm is
+  [[NATIVE-HANDLE-CARRIER]]'s and lands after this move, once, in the durable
+  home. A slice carrying it is a move plus a semantic change.
+
+- **`AC-3` — no widened production API.** Every new `pub(super)` is listed with
+  its forcing consumer. No facade recreation, no second evaluator, no widened
+  planner state. **A seam that exists to avoid admitting a dependency is the
+  failure this node's Shape section is written against.**
+
+- **`AC-4` — supported symbols and partiality are unchanged**, and rule
+  selection is not split from emission. `lower_primitive_call` owns argument
+  evaluation, partiality, carried projection, symbol/arity/representation
+  checks, dispatch, and identity conversions that emit nothing. **It moves as
+  that whole thing** — decomposing it into a typed command interpreter is a
+  different node and is not authorized here.
+
+- **`AC-5` — no-regression, in CI** (`COORDINATION §12`).
+
+- **`AC-6` — THE RELEASE CONDITION IS THE COMPLETED MOVE, NOT THIS NODE'S
+  MERGE EVENT.** Read this before proposing any partial.
+
+  > **[[NATIVE-HANDLE-CARRIER]]'s `depends_on` names this node, and
+  > `gen-progress.sh` keys eligibility on `status: merged`.** Nineteen
+  > transitive dependents sit behind it — the whole remaining Linux ABI
+  > completion program.
+  >
+  > **The accepted-partial policy means a partial WP merges.** So a partial
+  > that flips this node to `merged` releases all nineteen **on an incomplete
+  > move**, and nothing reds to say so: the tracker cannot distinguish "merged
+  > because done" from "merged because a partial landed."
+  >
+  > ⇒ **Partials may land, but this node stays `active` until `D1`-`D3` are
+  > complete.** The flip to `merged` is a separate, deliberate act that asserts
+  > the move is whole. **A release condition keyed on a merge event fires the
+  > moment the first accepted partial lands, which is not when the property it
+  > gates becomes true.**
+
 ## Sequencing
 
 Campaign node #8, cut item 2 — the first production slice of the phase, and the
 only one that is not a planner domain. The phase record and the full 18-item cut
 are in [[RT-BACKEND-MODULE-SPLIT]].
+
+**`draft` until the census returns.** Not framing debt: the frame above is
+shovel-ready and the ownership proof is measured. What is missing is `D6`'s
+verdict, which can re-cut this node — and per the node's own Shape section,
+*"present measurement is enough to choose and frame it; the census supplies the
+binding paths and counts."* **Flip to `ready` when the census merges with a
+clean `D6`.**
