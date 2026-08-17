@@ -11,6 +11,60 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # 2026-08-17 — THE `RecursiveDescent` ROUTE IS DELETED. `D3`-`D6`/`D8` MERGED.
+>
+> **Landed squash `1aec3e3e1c0dbc1100656b1abce84aaf37134910`** (PR #2523),
+> blob-verified on `lowering/core.rs`, `core/tests/control.rs` and
+> `planning/static_transition.rs`. Nine `crates/ken-runtime` paths,
+> **`+378/-5178`**, one non-merge commit off `fe5778ef7`.
+>
+> **`AC-3` is discharged and the Steward re-measured it on `main` rather than
+> reading the report:** zero hits across `crates/` for
+> `RecursiveDescentResidual`, `select_body_emission_authority` and
+> `BodyEmissionAuthority`. The Architect's both-ends census is what makes the
+> zero meaningful — 77→0, 57→0, 30→0, plus `set_selector_variant_exclusion`
+> 61→0 and `recursive_descent_residual` 97→0.
+>
+> **`AC-5` — no silent coverage loss.** Test sets censused at both ends, not
+> read off diff hunks: **439 → 416, 23 removed, zero added.** The decisive
+> check is that **both re-homed pins SURVIVE the deletion** —
+> `refusal_pins_rehomed_computational_match_without_selector_exclusion` and
+> `refusal_pins_rehomed_static_worker_without_selector_exclusion`. `D6` did not
+> delete the pins re-homed specifically to survive it, which was the failure
+> mode being watched for.
+>
+> **`D6b` and `D8` are DONE inside this landing.** `D6b` completed
+> asymmetrically — one live acceptance row, **no live same-shape refusal row**,
+> recorded as a routed coverage finding rather than repaired, which is what
+> `AC-5` prescribes. `D8` folded in as **re-description only**, from
+> `RT-RECURSOR-TRANSPORT.md`'s first-outcome table; the post-deletion reruns
+> corroborate it and do not re-specify it.
+>
+> ### THE BEHAVIOURAL FACT A FUTURE READER MOST NEEDS
+>
+> **Row 4 at depths 1-3 moves from COMPILING to REFUSED.** The deleted
+> transition sentinel asserted `result.is_ok()`; the tree now expects
+> `Unsupported(StaticWorkerBinding)`. **This is a recorded representability gap
+> over ZERO source-reachable programs — not a lost capability.** The sentinel
+> declared deletion as its own prescribed disposition, which is why `AC-10`
+> resolves rather than blocks.
+>
+> ### THE NODE STAYS `active`. TWO DELIVERABLES REMAIN.
+>
+> - **`D6a`** — sweep the reachability-premised *"cannot occur"* arguments. It
+>   was gated on exactly this landing, because the sweep is worthless before the
+>   campaign's largest reachability change. **Now unblocked, and it can change
+>   code rather than only prose:** a stale *"cannot occur"* is the justification
+>   for an arm that may now be reachable and wrong, **and no test reds.**
+> - **`D7`** — the closing measurement against
+>   [[RT-DECL-CLOSURE-PORT]]`.AC-6`'s opening figures. Report; do not tune and
+>   do not pin a threshold.
+>
+> **Both read the post-deletion tree, so both were correctly excluded from
+> #2523.**
+>
+> ### Superseded by the above, kept for its reasoning
+>
 > # 2026-08-17 — EVERY GATE IS SATISFIED. UNBLOCKED FOR THE FIRST TIME.
 >
 > **All fourteen `depends_on` entries are `merged` or `closed`**, checked field
