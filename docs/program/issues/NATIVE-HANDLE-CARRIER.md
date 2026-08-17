@@ -33,6 +33,14 @@ outside this node.
 | `D3` / `D4` / `D5`, `AC-3` | unclaimed |
 | `PX8-F-CAP-41` Phase 2 | **unpaired** — does not close on this node's merge |
 
+**Fence on this node's own closure: do not flip it to `merged` or `closed` until
+[[PX8-F-CAP-41]]'s `depends_on` names the port's owner.** `gen-progress.sh`
+treats `closed` exactly like `merged` when clearing a dependency, so closing this
+node and moving its residual to a successor — the disposition currently favoured
+— would unblock Phase 2 with the port still missing. A partial landing while this
+node stays `active` is harmless; **the status flip is the trigger, not the
+merge.**
+
 ## Why CI refused it, and the lesson that is the Steward's
 
 `native-slow (rt_parity_native)`: the four `cap41_*` rows fail. **Measured at
