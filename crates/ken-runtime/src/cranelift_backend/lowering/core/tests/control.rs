@@ -31546,22 +31546,28 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
 
         let units = plan.emittable_units().expect("emittable units");
         let edges = plan.emittable_call_edges().expect("call edges");
+        // Mirror production's last-wins function-to-body join. A linear
+        // first-match scan would ask a different question if duplicate
+        // descriptors ever became reachable.
+        let body_axis: BTreeMap<PredeclaredFunctionId, StaticOriginId> = units
+            .into_iter()
+            .map(|unit| (unit.function(), unit.body_occurrence()))
+            .collect();
 
         let mut joined = 0usize;
         let mut superseded_callees = 0usize;
         let mut divergent = Vec::new();
         for edge in &edges {
-            let Some(callee) = units.iter().find(|unit| unit.function() == edge.callee()) else {
+            let Some(body) = body_axis.get(&edge.callee()) else {
                 continue;
             };
             joined += 1;
-            let body = callee.body_occurrence();
             let entry = edge.callee_origin();
-            if template_only.contains(&body) {
+            if template_only.contains(body) {
                 superseded_callees += 1;
             }
-            if template_only.contains(&body) && !template_only.contains(&entry) {
-                divergent.push((edge.callee(), body, entry));
+            if template_only.contains(body) && !template_only.contains(&entry) {
+                divergent.push((edge.callee(), *body, entry));
             }
         }
 
@@ -31569,6 +31575,12 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
             joined > 0,
             "no call edge joined to a callee descriptor, so the disagreement scan ranged over \
              nothing"
+        );
+        assert_eq!(
+            joined,
+            edges.len(),
+            "the disagreement scan silently skipped {} call edge(s) with no callee descriptor",
+            edges.len() - joined
         );
         // NON-VACUITY, and the sharper half. The scan does not merely run -- it
         // reaches a call edge whose callee body IS superseded, so the first
@@ -31584,9 +31596,8 @@ fn call_edge_executability_axis_the_two_filters_cannot_yet_disagree_on_any_calle
         assert!(
             divergent.is_empty(),
             "AC-2's population now EXISTS: a call edge's callee has a superseded BODY whose ENTRY \
-             is not superseded {divergent:?}. The two filters disagree on this callee, which is \
-             the defect's exact failure direction. Write the real AC-2 control against it and \
-             retire this sentinel"
+             is not superseded {divergent:?}. The two filters disagree in the defect's direction \
+             on this callee. Write the real AC-2 control against it and retire this sentinel"
         );
     });
 }
