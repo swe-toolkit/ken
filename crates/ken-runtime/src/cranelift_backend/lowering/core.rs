@@ -15751,9 +15751,41 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
             ));
         };
         let scrutinee = self.child_occurrence(eliminator_origin, 0, scrutinee)?;
-        let RuntimeExpr::Construct { args, .. } = scrutinee.expr else {
+        self.resolve_recursive_unit_body(scrutinee.static_origin, position)
+    }
+
+    fn resolve_recursive_unit_body(
+        &self,
+        source_origin: StaticOriginId,
+        position: usize,
+    ) -> Result<Option<StaticOriginId>, CraneliftBackendError> {
+        let source = self.retained_body_occurrence(source_origin)?;
+        let RuntimeExpr::Construct { args, .. } = source.expr else {
+            if let RuntimeExpr::Match { cases, .. } = source.expr {
+                let mut agreed = None;
+                for (case_index, case) in cases.iter().enumerate() {
+                    let body = self.case_body_occurrence(source_origin, case_index, &case.body)?;
+                    let Some(unit) = self.resolve_recursive_unit_body(body.static_origin, position)? else {
+                        return Ok(None);
+                    };
+                    if let Some(expected) = agreed {
+                        if expected != unit {
+                            return Err(unsupported(
+                                "ComputationalMatch",
+                                format!(
+                                    "plain Match branches declare different recursive body units: \
+                                     {expected:?} versus {unit:?}"
+                                ),
+                            ));
+                        }
+                    } else {
+                        agreed = Some(unit);
+                    }
+                }
+                return Ok(agreed);
+            }
             #[cfg(any(test, feature = "px8-ds-test-support"))]
-            record_branched_scrutinee_unit_body_route1(scrutinee.expr);
+            record_branched_scrutinee_unit_body_route1(source.expr);
             return Ok(None);
         };
         let Some(argument) = args.get(position) else {
@@ -15761,7 +15793,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                 "recursive position is outside its source constructor".to_string(),
             ));
         };
-        let argument = self.child_occurrence(scrutinee.static_origin, position, argument)?;
+        let argument = self.child_occurrence(source_origin, position, argument)?;
         match argument.expr {
             RuntimeExpr::LexicalClosure { captures, body, .. } if captures.is_empty() => Ok(Some(
                 self.child_occurrence(argument.static_origin, 0, body)?

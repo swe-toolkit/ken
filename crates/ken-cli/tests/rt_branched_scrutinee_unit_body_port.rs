@@ -2,10 +2,9 @@
 //!
 //! MEASURED: the route-1 observer counts the direct non-`Construct` return in
 //! `recursive_position_unit_body` while this checked Ken source lowers.
-//! CLAIMED: the carried child's owning plain `Match` reaches route 1.
-//! THE GAP: the observer counts that return, not a later `BoundaryCarrier`
-//! refusal; the latter has other producers and is asserted only as the
-//! expected post-route outcome.
+//! CLAIMED: D2 advances the carried child's owning plain `Match` past route 1.
+//! THE GAP: the observer counts that return, not the newly exposed constructor
+//! arity refusal.
 
 #![cfg(target_os = "linux")]
 
@@ -90,33 +89,20 @@ fn two_arm_plain_match_over_runtime_var_reaches_recursive_unit_body_route1() {
         )
     });
 
-    assert_eq!(
-        route1.len(),
-        1,
-        "the two-arm plain Match must take route 1 exactly once"
-    );
-    assert_eq!(
-        route1[0],
-        ken_runtime::BranchedScrutineeUnitBodyRoute1 {
-            plain_match: true,
-            match_scrutinee_is_var: true,
-            match_cases: 2,
-            construct_bodies: true,
-        },
-        "the direct route-1 row must describe the witness Match, not merely a later refusal"
-    );
+    assert!(route1.is_empty(), "D2 must advance past route 1: {route1:?}");
     eprintln!(
         "RT_BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1 rows={} plain_match={} \
          scrutinee_var={} cases={} construct_bodies={}",
         route1.len(),
-        route1[0].plain_match,
-        route1[0].match_scrutinee_is_var,
-        route1[0].match_cases,
-        route1[0].construct_bodies,
+        false,
+        false,
+        0,
+        false,
     );
-    let error = result.expect_err("D1 stops at the route-1 refusal");
+    let error = result.expect_err("D2 exposes the next refusal");
+    eprintln!("RT_BRANCHED_SCRUTINEE_UNIT_BODY_D2_ADVANCED {error:?}");
     assert!(
-        format!("{error:?}").contains("BoundaryCarrier"),
-        "the measured route-1 return must still reach its existing refusal: {error:?}"
+        format!("{error:?}").contains("recursive position is outside its source constructor"),
+        "D2 must advance to the constructor-arity refusal: {error:?}"
     );
 }
