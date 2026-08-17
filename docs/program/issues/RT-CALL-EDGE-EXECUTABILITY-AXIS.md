@@ -55,6 +55,47 @@ origin: Adversary report evt_1gtad2keqngcq (2026-08-09) on merged 1f706520, the 
 > test must not scan a partial population. **One line at the assertion saying
 > the divergence is deliberate**, or a later reader "aligns" them in good faith
 > and silently restores the hollow-population hazard.
+>
+> ### OWED, SECOND HALF — the assertion's MESSAGE names the wrong cause.
+>
+> **Adversary `evt_2rbev0dq0nfjd`. Same two lines, different failure, and the
+> two remedies are one edit.**
+>
+> `control.rs:31582` reads *"the disagreement scan silently skipped {} call
+> edge(s) with no callee descriptor"* — **it blames the scan.** Production at
+> the same join (`static_transition.rs:16108`) says the opposite: *"A callee
+> with no descriptor is a **planner contradiction** this filter does not own."*
+>
+> ⇒ **A descriptor-less edge reaching `edges` is a PLAN defect that production
+> deliberately propagates, not a scan defect.** So **if this assertion ever
+> reds, the cause is the plan and the message sends the investigation to the
+> scan.**
+>
+> **The repo already names this exact failure shape** — *"a true sentence about
+> the wrong thing, naming a cause that is not the cause"*
+> ([[RT-SPECIALIZED-MATCH-ATTRIBUTION]], and twice in the production file at
+> `core.rs:7568` and `:16603`).
+>
+> **The remedy, borrowing production's own vocabulary:** *"{} call edge(s) have
+> no callee descriptor — a planner contradiction production retains for
+> downstream rejection; the scan covered the rest."* Keeps the coverage count,
+> stops the misdirection, and the deliberate-divergence comment above serves
+> both notes at once.
+>
+> **Correction to the finding, recorded because the citation matters more than
+> the conclusion here:** it attributes the principle to a `D3` CARRIED arm
+> *"three thousand lines away in the same file."* **That sentence is not in
+> `control.rs` at all** — verified, including for wrapping. It is in
+> [[RT-SPECIALIZED-MATCH-ATTRIBUTION]] and in `core.rs`. **The substance is
+> unaffected and in fact stronger:** the principle sits twice in the
+> *production* file this test stands in for, not in the test file.
+
+> ### DO NOT BATCH EITHER NOTE INTO [[RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL]].
+>
+> That node is active in this same file and its **`AC-5` requires blob identity
+> on any file it does not intend to change.** Folding an unrelated two-line
+> edit into it would break its own acceptance criterion. These notes wait for a
+> node that intends to touch `control.rs`, or for a dispatch of their own.
 
 > ### THE SHA BELOW IS A PRE-SQUASH HEAD. The landed `D0` is `b7bba72dd`.
 >
