@@ -28,6 +28,25 @@ here, un-ignored and green, as the missing port's acceptance evidence.**
 `#[ignore]` them with an annotation naming the carrier — the carrier is not what
 retires them.
 
+## The edge hazard, with its trigger corrected
+
+`depends_on` still names [[NATIVE-HANDLE-CARRIER]], and an earlier banner below
+says that makes this node read startable *"the moment the partial merges."*
+**That names the wrong event, twice.** `gen-progress.sh` requires **both** that
+this node's own `status` be `ready` — it is `draft` — **and** that every
+`depends_on` entry be `merged` **or `closed`**. A partial landing on a node that
+stays `active` changes nothing.
+
+⇒ **The actual trigger is the carrier's status flip, and `closed` fires it
+exactly like `merged` does.** That matters because closing the carrier and moving
+its residual to a successor is the disposition currently favoured for it — so the
+tidying step is itself the trap.
+
+**Fence: do not flip [[NATIVE-HANDLE-CARRIER]] to `merged` or `closed` until this
+node's `depends_on` names the port's owner.** The port node is not filed yet
+(its size waits on the scrutinee variant), which is why the edge is not
+re-pointed today rather than left by oversight.
+
 **The port's route is now measured** (`evt_4tqpqn2gpcsx6`): all five refusing
 programs take the **non-`Construct` scrutinee** route at
 `recursive_position_unit_body`. That rules out the `RT-WORKER-BIND` /
