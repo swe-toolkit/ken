@@ -311,25 +311,110 @@ the proof is unavailable and any argument for it is circular.
   > side keeps moving, and **which axes actually moved is a measurement** — here
   > one of the two suspected axes had not moved at all.
 
-  > **THIS CLAUSE IS REFUTED BY MEASUREMENT AND IS WITH THE ARCHITECT.** It read
-  > *"`D2c` LANDS AS ITS OWN CANDIDATE, AHEAD OF ANY DELETION"*, on the standing
-  > partial-WP merge policy (`COORDINATION §10⁻`), the stated reason being that a
-  > revert of step 1 must restore production routing in one commit.
+  > ### RULED 2026-08-17: `D2c` IS MEASUREMENT-ONLY AND IS NEVER MERGED. `D3` IS THE CAMPAIGN'S FIRST LANDING.
   >
-  > **A `D2c` cannot merge through the publisher.** Its acceptance criterion is a
+  > **Architect, resolving `evt_4cw8rsesahmeh`.** The clause here read *"`D2c`
+  > LANDS AS ITS OWN CANDIDATE, AHEAD OF ANY DELETION"*, on the standing
+  > partial-WP merge policy (`COORDINATION §10⁻`).
+  >
+  > **The load-bearing words were AS ITS OWN CANDIDATE. `AC-7` never required a
+  > landing** — it requires that the reroute's red stay interpretable, which
+  > separation alone delivers. *"Lands"* was a spelling of *"is separate"*, and a
+  > disposition got specified by accident. Everything downstream inherited it,
+  > including a publisher path that can only merge on green.
+  >
+  > **A `D2c` cannot merge through that path.** Its acceptance criterion is a
   > differential that **includes 17 expected reds** against the frozen `D2b`
   > oracle; the publisher merges only on **CI green**. Measured 2026-08-17: the
   > fresh `D2c` `f68b8c866` was approved by QA and the Architect, published as
-  > PR #2509, and **failed CI on members of the frozen set**. PR closed.
+  > PR #2509, and **failed CI on members of the frozen set** — rows 3 and 6.
+  > PR closed. **The measurement succeeded; only its disposition was wrong.**
   >
-  > **The revert-in-one-commit property is real and is not what is in doubt** —
-  > what is refuted is that a candidate with that property can pass this gate.
+  > **Why not the other arm.** Landing would require dispositioning the 17 reds
+  > in the same candidate; dispositioning them means retiring or re-homing
+  > tests; that is **spending the dead-code oracle inside the measurement
+  > commit** — the two-step collapse `AC-7` forbids, arriving from the other
+  > direction, and `D6`/`D7` depend on that oracle being unspent. Three further
+  > grounds: the held twin `036e8ee91` has sat unpublished since the day it ran
+  > with nothing downstream suffering; **`D3` deletes
+  > `select_body_emission_authority` outright**, so a landed `D2c` would be
+  > overwritten by the next candidate; and a measurement instrument's value is
+  > the reading, not the artifact — landing is the one thing that makes it
+  > irreversible.
   >
-  > ⇒ **Fork routed to the Architect** (`evt_4cw8rsesahmeh`): `D2c` is
-  > measurement-only like its held predecessor, with `D3` the first landing; or a
-  > `D2c` lands and dispositions the 17 reding tests in the same candidate,
-  > **spending the dead-code oracle early** and losing *"delete nothing"*.
-  > **Until that is ruled, do not treat "`D2c` merges" as a fixed input.**
+  > **The condition that makes this safe is not optional: THE READING MUST LIVE
+  > IN `docs/`.** A candidate that never merges leaves its evidence on a branch
+  > and in a thread, and neither is an artifact. That reading is the section
+  > immediately below; `036e8ee91` and `f68b8c866` are cited there as
+  > **provenance, not as storage**.
+  >
+  > **The general form, and it is wider than this node:** a **measurement
+  > candidate** and a **landing candidate** have incompatible success criteria,
+  > and a process with a single merge path will silently apply the landing
+  > criterion to both. **Any deliverable whose expected result is red needs an
+  > explicit non-merging disposition declared when it is framed** — otherwise it
+  > is routed into a gate it cannot pass, and the failure looks like the ring's.
+
+  > ### `D2c`'s DELIVERABLE IS THIS READING. It is the whole product of the deliverable.
+  >
+  > **Provenance, not storage:** measured by the runtime ring on fresh `D2c`
+  > `f68b8c8660f1dc57659795a726b7953225b604b6` (base
+  > `634d02c242f8be3d421ba8a406ecdac2634ce485`), reproducing the held
+  > predecessor `036e8ee916844fb91a4f42f2a2b04ebaea0dde2f` (base `c98f72ba8`).
+  > Independently re-run by runtime QA at the same SHA. **Neither object is on
+  > `main` and neither ever will be. The numbers below are the artifact.**
+  >
+  > **Targeted `-p ken-runtime --lib` under the reroute: `926 passed; 17 failed;
+  > 4 ignored`. Every red is inside the frozen `D2b` set. No red escaped it.**
+  >
+  > **The direct-caller census — this is the discriminating half.** 27 direct
+  > `select_body_emission_authority` assertion sites: **six expect
+  > `RecursiveDescent` and all six red; twenty-one expect `FunctionizedUnits`
+  > and all twenty-one stay green.** A reroute that broke something would move
+  > the second number.
+  >
+  > **The 14 Category-A reds** (program-arrival pins):
+  >
+  > 1. `d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin`
+  > 2. `d0_row2_functionized_lane_never_reaches_the_source_machine_mint`
+  > 3. `d2e_ac9_layout_agrees_with_the_prefix_production_assembled`
+  > 4. `d2f_0_the_applied_root_production_path_gate`
+  > 5. `d2f_a_production_compile_builds_the_fusion_identity_plane`
+  > 6. `d2k_0_control_reddens_when_the_wrong_consumer_condition_is_removed`
+  > 7. `msd_d2a_the_retention_and_routing_guards_have_a_concrete_difference`
+  > 8. `px8j_all_three_producer_paths_reach_real_consumers`
+  > 9. `px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind`
+  > 10. `px8j_owned_scope_deletion_fails_closed_before_another_frame_is_emitted`
+  > 11. `px8j_selected_scope_partitions_differ_across_the_real_return_hole`
+  > 12. `px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin`
+  > 13. `recursive_descent_recursors_compile_without_a_boundary_crossing`
+  > 14. `row2_functionized_lane_installs_and_consumes_the_recursive_ih`
+  >
+  > **The three Category-B-only reds** (direct selector assertions):
+  >
+  > 1. `d5_c3_a_second_residual_retains_recursive_descent`
+  > 2. `retained_authority_residual_is_the_typed_selector_accounting`
+  > 3. `the_body_authority_selector_narrows_only_completed_ports_and_stays_fail_closed`
+  >
+  > `msd_d2a_...` is the A/B overlap, which is why 14 + 3 is 17 and not 18.
+  >
+  > **Retained-surface controls green under the same run:**
+  > `d1_each_residual_variant_is_observable`,
+  > `d1_the_enumerator_reports_every_variant_not_the_first`, and both
+  > `refusal_pins_rehomed` pins. **The enum, the classifiers and the emission
+  > lane are all still live** — this is a routing change, not a deletion.
+  >
+  > **The `D2` positive control ran and was restored byte-identically.** A
+  > disposable mapping of `RuntimeExpr::Value(RuntimeValue::Bool(true))` to
+  > `MatchScrutineeRecursor` in both selector and enumerator made the enumerator
+  > return exactly `{MatchScrutineeRecursor}` and flipped production authority to
+  > `RecursiveDescent`. **The instrument can see the thing it is measuring.**
+  >
+  > **What this reading is FOR.** The frozen A/B classification **reproduced
+  > exactly on a moved base** — the same six/twenty-one census the held
+  > predecessor produced at `c98f72ba8`. That is the strongest available evidence
+  > the measurement survived the move, and it is what `D3`-`D8` consume. **They
+  > need the reading, never the routing change.**
 
   > ### `D2c` RAN. NOT CAPABILITY-BLOCKED — the RECORD is the gate.
   >
@@ -400,12 +485,20 @@ the proof is unavailable and any argument for it is circular.
   > stated here because the pressure under a line reading *"expected shape,
   > route it"* runs toward deletion.
 
-> ### `D3` THROUGH `D8` ARE STEP 2, GATED ON `D2c` GREEN IN CI.
+> ### `D3` THROUGH `D8` ARE STEP 2, GATED ON `D2c`'s READING — NOT ON A GREEN CI VERDICT.
 >
 > **DO NOT COLLAPSE THE TWO STEPS.** Architect `evt_5f4jvs4f6pbdt`: a single
 > commit that reroutes **and** deletes cannot tell a routing regression from a
 > compile error, and the evidence is destroyed either way it goes. **Step 1 is
 > the measurement; step 2 is bookkeeping over provably dead code.**
+>
+> **This heading read *"GATED ON `D2c` GREEN IN CI"* until 2026-08-17 and that
+> gate can never open** — `D2c` is defined to red 17 tests, and it is now ruled
+> **measurement-only, never merged** (see the `D2c` deliverable). **The gate is
+> the reading: the differential reproduced with every red inside the frozen set
+> and no unaccounted red.** That condition is **met**. `D3` is the campaign's
+> first landing, and what still gates it is
+> [[RT-REFUSAL-PIN-ABSENCE-CLAUSE]] and the `depends_on` list, not `D2c`.
 
 - **`D3` — Delete the classifiers**: `recursive_descent_residual`,
   `declaration_recursive_descent_residual`, `RecursiveDescentResidual`, and
@@ -633,15 +726,22 @@ the proof is unavailable and any argument for it is circular.
   that its red, had it been red, would have been uninterpretable. **That half
   stands and is untouched.**
 
-  > **The other half of this AC — *"`D2c` merged, with the full workspace suite
-  > and conformance green in CI, before any deletion lands"* — is UNSATISFIABLE
-  > AS WRITTEN**, for the reason recorded at the `D2c` deliverable: a reroute
-  > whose expected shape is 17 reds cannot be green. **`AC-7` currently demands
-  > green from the one candidate that is defined to be red.**
+  > ### `AC-7` RESTATED 2026-08-17 AS WHAT IT ALWAYS MEANT. Architect's wording, ruling `evt_4cw8rsesahmeh`.
   >
-  > **Separation is the requirement; "merged green" was the assumed mechanism**,
-  > and only the mechanism is refuted. **Do not discharge or fail `AC-7` on this
-  > clause until the Architect rules the `D2c` fork** (`evt_4cw8rsesahmeh`).
+  > > **`D2c` is its own candidate and is NEVER MERGED.** Its acceptance
+  > > criterion is that the frozen A/B differential reproduces with every red
+  > > inside the frozen set and no unaccounted red — **evaluated on CI's OUTPUT,
+  > > not on CI's VERDICT.** `D3` is the campaign's first landing.
+  >
+  > **What was replaced, so nobody restores it:** *"`D2c` merged, with the full
+  > workspace suite and conformance green in CI, before any deletion lands."*
+  > That clause demanded green from the one candidate defined to be red.
+  > **Separation was always the requirement; "merged green" was an assumed
+  > mechanism, and only the mechanism is gone.**
+  >
+  > ⇒ **`D2c` IS DISCHARGED.** The differential reproduced with all 17 reds
+  > inside the frozen set — the reading at the `D2c` deliverable is the evidence
+  > and the artifact. **`D3` is unblocked by this AC.**
 
 ## 6. Banned scope
 
