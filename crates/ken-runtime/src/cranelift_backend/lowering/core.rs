@@ -1011,6 +1011,80 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+// `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` D1 records the early return in
+// `recursive_position_unit_body` directly. The later BoundaryCarrier refusal
+// has other producers, so it cannot identify this route on its own.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BranchedScrutineeUnitBodyRoute1 {
+    pub plain_match: bool,
+    pub match_scrutinee_is_var: bool,
+    pub match_cases: usize,
+    pub construct_bodies: bool,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1:
+        std::cell::RefCell<Option<Vec<BranchedScrutineeUnitBodyRoute1>>> =
+            const { std::cell::RefCell::new(None) };
+}
+
+/// Run `body` while counting direct route-1 returns from
+/// `recursive_position_unit_body` on this thread.
+///
+/// Hidden and default-off: this observer is inert unless a test scope installs
+/// its counter, and it does not affect the `None` returned by production.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_branched_scrutinee_unit_body_route1<R>(
+    body: impl FnOnce() -> R,
+) -> (R, Vec<BranchedScrutineeUnitBodyRoute1>) {
+    struct Restore(Option<Vec<BranchedScrutineeUnitBodyRoute1>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1.with(|cell| {
+                *cell.borrow_mut() = self.0.take();
+            });
+        }
+    }
+
+    let previous = BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1
+        .with(|cell| cell.borrow_mut().replace(Vec::new()));
+    let restore = Restore(previous);
+    let value = body();
+    let count = BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1
+        .with(|cell| cell.borrow_mut().take())
+        .unwrap_or_default();
+    drop(restore);
+    (value, count)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_branched_scrutinee_unit_body_route1(scrutinee: &RuntimeExpr) {
+    BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1.with(|cell| {
+        if let Some(rows) = cell.borrow_mut().as_mut() {
+            let (plain_match, match_scrutinee_is_var, match_cases, construct_bodies) = match scrutinee {
+                RuntimeExpr::Match { scrutinee, cases, .. } => (
+                    true,
+                    matches!(scrutinee.as_ref(), RuntimeExpr::Var(_)),
+                    cases.len(),
+                    cases
+                        .iter()
+                        .all(|case| matches!(case.body, RuntimeExpr::Construct { .. })),
+                ),
+                _ => (false, false, 0, false),
+            };
+            rows.push(BranchedScrutineeUnitBodyRoute1 {
+                plain_match,
+                match_scrutinee_is_var,
+                match_cases,
+                construct_bodies,
+            });
+        }
+    });
+}
+
 /// Run `body` with the census recorder installed on this thread, and return its
 /// value together with the rows recorded.
 ///
@@ -15678,6 +15752,8 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
         };
         let scrutinee = self.child_occurrence(eliminator_origin, 0, scrutinee)?;
         let RuntimeExpr::Construct { args, .. } = scrutinee.expr else {
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            record_branched_scrutinee_unit_body_route1(scrutinee.expr);
             return Ok(None);
         };
         let Some(argument) = args.get(position) else {

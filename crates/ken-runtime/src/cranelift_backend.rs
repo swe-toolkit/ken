@@ -87,7 +87,10 @@ pub use lowering::with_px8ds_retired_flat_order;
 // observe a break in this path, so the `ken-cli`/`ken-verify`/`ken-elaborator`
 // census suites are what keep it honest.
 #[cfg(feature = "px8-ds-test-support")]
-pub use lowering::core::{with_match_recursor_census, MatchRecursorCensusRow};
+pub use lowering::core::{
+    with_branched_scrutinee_unit_body_route1, with_match_recursor_census,
+    BranchedScrutineeUnitBodyRoute1, MatchRecursorCensusRow,
+};
 
 // `RT-4B-OBSERVATION-FEATURE-GATE`: the existing D2f observer, reachable by
 // governed cross-crate controls only when its isolated default-off feature is
