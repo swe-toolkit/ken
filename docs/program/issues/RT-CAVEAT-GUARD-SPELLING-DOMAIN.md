@@ -11,6 +11,33 @@ github: null
 origin: "Adversary hunt evt_6dxxrgvd0w5zs (2026-08-17) on the RT-CENSUS-CAVEAT-GUARD landing be25ea6a2. Steward-filed per COORDINATION section 2, with two corrections to the finding recorded below."
 ---
 
+> # HELD 2026-08-17 — THIS NODE'S PREMISE IS NOW IN QUESTION. Do not start it.
+>
+> **Gated behind [[RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING]]'s `D3`.**
+>
+> A later Adversary hunt (`evt_12x7wnwfbfbr`, on `ca639b5ef`) measured something
+> this node assumes away: **the census the guard's caveat annotates carries
+> `#[cfg(any())]`** (`control.rs:9233`) and is therefore **compiled out**.
+> Steward-verified by reading the attribute; the Adversary confirmed it by
+> planting `compile_error!` in the body and compiling clean, with a positive
+> control in the live test beside it.
+>
+> ⇒ **The clause below — *"the census still errs toward a false red, never a
+> false green"* — cannot be true as stated.** A census that does not compile errs
+> toward **nothing**. The direction claim I recorded as surviving untouched does
+> not survive this.
+>
+> **What that does to this node.** Widening the guard from one spelling to the
+> full test-gating domain is only worth doing **if the guard protects something
+> compiled.** Right now it does not, so the census in the table below is accurate
+> and the *work it implies* rests on a constraint that may not be real (§4c).
+>
+> **`RT-D2-EVIDENCE-INSTRUMENTS-NONDISCRIMINATING` `D3` decides which:** revive
+> the census, retire the guard with its caveat, or re-key it across all six
+> spellings. **Only the third outcome leaves this node with work**, and then it
+> is likely subsumed rather than run separately. Re-read this block before
+> releasing it.
+
 > # THIS DOES NOT RECLASSIFY THE LANDING, AND IT IS NOT A REGRESSION.
 >
 > `RT-CENSUS-CAVEAT-GUARD` corrected a caveat magnitude from **22** to **322**
