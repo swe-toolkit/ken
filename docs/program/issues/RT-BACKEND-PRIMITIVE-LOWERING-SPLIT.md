@@ -1,7 +1,7 @@
 ---
 id: RT-BACKEND-PRIMITIVE-LOWERING-SPLIT
 title: "Move the primitive-lowering family to its own module — the first production slice of the backend split, and the architectural release point for NATIVE-HANDLE-CARRIER"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,67 @@ blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: Architect ruling evt_54zvaqbrm752x (2026-08-10) §5, answering the campaign's standing question of whether an early subset of #8 releases NATIVE-HANDLE-CARRIER. Answer yes, on a bounded ownership proof. Enclave pass anchored at evt_104nz8cedzyat on operator instruction 2026-08-10. Steward-filed per COORDINATION §2.
 ---
+
+> # MERGED 2026-08-17 — the complete `D0`-`D4` move. 19 DEPENDENTS RELEASED.
+>
+> **Landed squash `7b05136bda5e586649dd03331888321f110fbfb4`, PR #2545**, from
+> reviewed candidate exact `23601bdc98d619ff6a5a602f5e2b00a06f76669f`; range
+> `3001cd431d1b84ddfc3b3d9e59120d161ba59773...23601bdc9`. One non-merge commit,
+> six `crates/ken-runtime` paths, `+882/-844`. Decision `dec_h838ht881t7y`
+> resolved APPROVED; QA `evt_1yem11kv1gc4v`. All six paths verified by blob
+> identity from the declared merge-base.
+>
+> **`AC-6` WAS DISCHARGED BY A COMPLETED MOVE, NOT BY THIS MERGE EVENT.** The
+> node was deliberately held `active` through review so that this flip could
+> assert the move is whole rather than let a merge event stand in for the
+> property. It is whole: `lower_primitive_call` moved with its entire
+> responsibility, all twelve helpers and `lowered_char_list` came with it, and
+> the domain test family moved with its subject. **Nineteen transitive dependents
+> are released by this flip**, so the distinction was the whole reason for the
+> criterion.
+>
+> **`AC-1` is the criterion that earned its cost, and the diff is why.**
+> `+882/-844` on a pure move reads as deleted behaviour — `values.rs` became
+> `primitive/tests.rs` at 98% similarity alongside a new production child — and
+> **no reading of the diff can separate a faithful move from a rewrite.** Three
+> independent instruments did:
+>
+> 1. the ring extracted every item's body at base and candidate via
+>    `rust-analyzer symbols` node ranges, normalized whitespace and the one
+>    forced visibility change, and compared: **14/14 production, 13/13
+>    test/helper exact**;
+> 2. QA reproduced that by its own independent extraction;
+> 3. the Architect used two instruments repeating neither — a whitespace-
+>    normalized **line-multiset** comparison (825 removed, 834 added) finding
+>    **exactly one line that left the tree without returning**, `fn
+>    lower_primitive_call(`, which returns as `pub(super) fn`, the other nine new
+>    lines being scaffolding; and then, **because a multiset check is order-blind
+>    and cannot see a statement moved between two function bodies**, a
+>    per-function pass closing that gap at 14/14 identical.
+>
+> **`AC-3` came in at exactly one non-private item.** The child exposes only
+> `pub(super) lower_primitive_call`, forced by the parent's `PrimitiveCall` arm;
+> `core.rs` gains only `mod primitive;`. The test-only `core::tests::big` seam is
+> forced jointly by the moved `primitive::tests` and the retained
+> `core::tests::effects`.
+>
+> **`expect_two_args` stayed parent-owned, and that was a choice.** `D6`
+> permitted it either way; leaving it puts the boundary exactly at what was
+> warranted rather than one step past it.
+>
+> **`AC-2` verified at the mechanism:** zero `int_to_uint64_raw` anywhere under
+> `cranelift_backend`, and zero occurrences in the diff in either direction. The
+> arm is [[NATIVE-HANDLE-CARRIER]]'s and now has a durable home to land in —
+> `lowering/core/primitive.rs`, with the dispatcher at `:43`.
+>
+> **One should-fix carried, not respun.** The child's module doc says it owns
+> "symbol dispatch, and **emission**", while the census row added in this same
+> candidate asserts the move creates "no second **emission authority**". Both are
+> true in different senses — 30 `.ins()` instruction-emission sites, zero
+> artifact-level declare/define sites — **but that reconciliation is written
+> nowhere in the candidate**, and a reader resolving the conflict could conclude
+> the census row is wrong and weaken or delete it. Qualifying the doc as
+> *instruction* emission forecloses that.
 
 > # THIS NODE IS WHY 19 NODES DO NOT WAIT FOR THE WHOLE PHASE
 >
