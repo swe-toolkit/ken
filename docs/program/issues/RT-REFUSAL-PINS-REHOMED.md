@@ -54,6 +54,32 @@ defect.
 
 **`D2c` `036e8ee91` unchanged** (`AC-5`), no production change (`AC-6`).
 
+### ADVERSARY HUNT: both pins discriminate. One residual gap, filed.
+
+**`evt_3t7y5zwng8aba`, on the merged range.** The Adversary **reproduced the
+one-arm-at-a-time result independently by mutating production**, rather than
+taking it from the report: removing the construct-1 refusal reded pin 1 with pin
+2 green; disabling the construct-2 close refusal reded pin 2 with pin 1 green.
+**Clean separation in both directions, and neither pin references
+`RecursiveDescentResidual`, `set_selector_variant_exclusion` or `rt_run`.** The
+re-homing achieves its purpose.
+
+**The gap: the two pins are NOT equally strong, and only one was measured for
+it.** Pin 1 asserts `reason == "..."` in full equality. **Pin 2 asserts two
+`contains` clauses, which pin what the refusal must SAY and nothing about what
+it must NOT say** — so the temporal phrasing `D1c` refuted can be re-added
+beside both pinned clauses with every assertion still passing. **The two
+restorations are guarded; the removal is guarded by nothing.**
+
+⇒ Filed as [[RT-REFUSAL-PIN-ABSENCE-CLAUSE]], one line plus a mutation proof.
+**Not folded into [[RT-DESCENT-RETIRE]]**, where it would ride a gated node and
+stay unfixed while being green.
+
+**Also confirmed by the Adversary, and worth keeping beside the Architect's
+`:12214` note:** if the refusal *moved* off `mod.rs:11985`, pin 1 still calls
+`boundary_transfer_admissibility()` on a real capsule and requires the typed
+error — **it follows the behaviour rather than the line.**
+
 ## Why this node exists, and why it is not part of the node that ruled it
 
 [[RT-DESCENT-LANE-COMPLETENESS]] `AC-9` requires that each of `D1`'s four
