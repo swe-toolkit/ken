@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-17 02:12:57Z — from 364 issue file(s) in `docs/program/issues/`.
+2026-08-17 03:12:45Z — from 364 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -313,7 +313,7 @@ the committed file matches the generator's output.
 | `RT-PRODUCER-MATCH-PORT` | Producer-match call port — an ordinary Match whose scrutinee is directly a Call routes the whole object to RecursiveDescent | merged | runtime | M | none | — |
 | `RT-RECURSOR-TRANSPORT` | Retire the two live recursor residual classes — MatchScrutineeRecursor and LexicalCallArgumentRecursor — off the RecursiveDescent lane | merged | runtime | M | none | https://github.com/swe-toolkit/ken/pull/2443 |
 | `RT-REFUSAL-CONSEQUENCE-RESTORE` | Restore the two clauses the D2 refusal rewrite dropped as collateral -- the consumption site and the runtime-representation consequence -- without reopening the transfer reading D2 closed | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2390 |
-| `RT-REFUSAL-PIN-ABSENCE-CLAUSE` | Pin 2 of the re-homed refusal pins asserts two contains() clauses, so it pins what the refusal must SAY and nothing about what it must NOT say -- the temporal phrasing D1c refuted can be re-added beside both pinned clauses and every assertion still passes. Add the absence clause while both lanes still exist | active | runtime | S | none | — |
+| `RT-REFUSAL-PIN-ABSENCE-CLAUSE` | Pin 2 of the re-homed refusal pins asserts two contains() clauses, so it pins what the refusal must SAY and nothing about what it must NOT say -- the temporal phrasing D1c refuted can be re-added beside both pinned clauses and every assertion still passes. Add the absence clause while both lanes still exist | merged | runtime | S | none | — |
 | `RT-REFUSAL-PINS-REHOMED` | Constructs 1 and 2 were ruled CORRECT SEMANTICS, so AC-9 owes them asserted-refusal pins -- but the only pin that asserts them today rides RecursiveDescentResidual, which D3 deletes. Re-home the assertion onto a mechanism that survives the retirement, before D6 deletes the tests carrying the fact | merged | runtime | S | none | — |
 | `RT-REFUSAL-SOURCE-WITNESS-OR-INVARIANT` | For every refusal still holding the RecursiveDescent retirement, exhibit a Ken source program that reaches it or establish that none exists -- and record the ones with none as compiler invariants | merged | runtime | L | none | https://github.com/swe-toolkit/ken/pull/2440 |
 | `RT-REQUIRED-CONSUMER-REACH-CENSUS` | The projection mints an entry only where required differs from source, so row 4 depth 1 is excluded from the new surface BY CONSTRUCTION -- census which rows the surface reaches, and attribute by SENTENCE the Closure refusal depths 2 and 3 now sit at | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2305 |
@@ -475,7 +475,6 @@ is itself not yet `merged`/`closed`:
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CENSUS-CAVEAT-GUARD` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
-- `RT-DESCENT-RETIRE` blocked by `RT-REFUSAL-PIN-ABSENCE-CLAUSE` (status: active)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
