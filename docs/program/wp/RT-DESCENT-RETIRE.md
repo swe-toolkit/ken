@@ -857,4 +857,6 @@ to the Steward as a node** — not to delete around it.
 > ⇒ **The stop's live form is `D2c`'s condition 1: a red from a program OUTSIDE
 > `D2b`'s pinned set.** A live selection is not a surviving class **while nothing
 > is being deleted**; it becomes one the moment deletion is on the table without
-> the differential — which is why `D3`-`D8` stay gated on `D2c` green.
+> the differential — which is why `D3`-`D8` stay gated on `D2c`'s READING.
+> **Not on a green CI verdict:** `D2c`'s own criterion licenses 17 reds, so the
+> gate that phrasing named could never open. Ruled 2026-08-17, arm 1.

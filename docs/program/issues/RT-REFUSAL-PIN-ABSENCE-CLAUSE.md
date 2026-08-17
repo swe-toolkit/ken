@@ -1,7 +1,7 @@
 ---
 id: RT-REFUSAL-PIN-ABSENCE-CLAUSE
 title: "Pin 2 of the re-homed refusal pins asserts two contains() clauses, so it pins what the refusal must SAY and nothing about what it must NOT say -- the temporal phrasing D1c refuted can be re-added beside both pinned clauses and every assertion still passes. Add the absence clause while both lanes still exist"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -16,8 +16,21 @@ Frame: this node. **`D1` is DELIVERED at exact
 mutation proof, QA-approved and resolved by the Architect at
 `dec_797e7wbbb1ae9`.
 
-**One live deliverable remains: `D1b`** — replace `D1`'s fragment guard with
-full equality, binding the recognition id that makes it constructible.
+**MERGED 2026-08-17. `D1b` was the last deliverable and it landed at
+`db73817c933bc0746f2911f3bfd909b4426b1f9f`** — pin 2 asserts `reason ==` the
+complete refusal, reconstructed from the same five values `close()`
+interpolates, with `recognize()`'s returned recognition id bound rather than
+discarded. `D1`'s fragment guard is gone as subsumed. Blob-verified on
+`control.rs`.
+
+**Nothing is left open.** `D2` and `D2b` are both withdrawn, not parked, so no
+deliverable survives this node.
+
+**The property worth carrying forward:** the assertion is **exact on WORDING
+but computed on IDENTIFIERS**, so it cannot be broken by id churn and cannot be
+passed by a reworded refusal. The pin it supersedes in spirit had this
+backwards — `d2k_0_the_five_no_longer_reach_a_static_worker_value_read`
+hardcodes `StaticOriginId(26)` while matching only fragments of the wording.
 **`D2b` is WITHDRAWN** (the limitation it was to document is closable, not
 documentable), and the original `D2` is **WITHDRAWN with its two items now
 PERMANENTLY MOOT**. Both sections below.
@@ -228,9 +241,9 @@ amended: **a comment explaining why a closable gap was left open is the wrong
 artifact, and that clause would have enshrined a false claim in the tree** —
 the exact class [[RT-DESCENT-RETIRE]]'s `D6a` exists to sweep.
 
-**This node stays `active` until `D1b` lands**, and it is the only thing between
-[[RT-DESCENT-RETIRE]]'s `D3` and the frontier — so it is a short turn, not a
-parking space.
+**Written while `D1b` was outstanding; it landed at `db73817c9` and this node is
+`merged`.** It was the last thing between [[RT-DESCENT-RETIRE]]'s `D3` and the
+frontier, and `D3` is now dispatchable.
 
 ## `D2` — WITHDRAWN 2026-08-17 before dispatch, and its items are now PERMANENTLY MOOT.
 
@@ -363,8 +376,11 @@ targeted only — `-p ken-runtime` or `--test`, never `--workspace`.
   byte-identically.
 - **Any `D3`-`D8` retirement work**, and **any `lowering/core.rs` edit at all**
   — `D2` is withdrawn and its two comment items are struck, not pending.
-- **Weakening or rewriting the absence clause `D1` landed.** `D2b` documents
-  the pin; it does not touch it.
+- ~~**Weakening or rewriting the absence clause `D1` landed.**~~ **SUPERSEDED
+  2026-08-17.** This bullet was written for `D2b`, which only documented the
+  pin. The Architect's close-it ruling **required `D1b` to DELETE that clause
+  as subsumed** by full equality, so the bullet forbade the very thing the
+  ruling ordered. `D1b` landed the deletion at `db73817c9`.
 - **Widening to other `contains`-style assertions in `control.rs`.** If the
   pattern looks general, **say so and stop** — that is a census, not this node.
 - **A general `D6a` comment sweep**, and the two parked comment items with it.
