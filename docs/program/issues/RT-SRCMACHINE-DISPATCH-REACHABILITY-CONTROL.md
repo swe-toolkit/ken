@@ -81,6 +81,38 @@ origin: "Architect ruling evt_9qn4nm8gg0ye section 4 on RT-SRCMACHINE-CTOR-RECOG
 >
 > **[[RT-STATIC-WORKER-ARM-SOURCE-WITNESS]] is the node that sizes the remaining
 > route risk.** It is `ready`, unscheduled, and blocks nothing.
+>
+> ## ONE OWED EDIT, NON-BLOCKING. Adversary `evt_55ae0x8j06bqe`, ACCEPTED.
+>
+> **`constructors.rs:5612` reads *"No second observation is needed."*** Verified
+> at that coordinate on `origin/main`, with the cost census beginning at
+> `:5614`.
+>
+> **The intended subject is the instrument, and that reading is right** — `D2`'s
+> conclusion is that no second *mechanism* was needed. **But the sentence sits
+> in the mutation paragraph**, immediately after *"the unmodified test then
+> passed again"*, so read in place it says one mutation observation suffices.
+> **Two were taken**, by the implementer and independently by QA.
+>
+> ⇒ **This is the exact inverse of the framing defect recorded above, in the
+> same candidate.** There, an **unrun** mutation got a table cell and read as
+> measured. Here, a **twice-run** mutation is written up as needing only one
+> observation — and a durable artifact stating a weaker evidentiary standard
+> than the campaign actually practices is what the next author cites as
+> precedent.
+>
+> **The general form is worth more than either instance: a format or a phrase
+> that signals sufficiency outruns any qualifier placed outside it.**
+>
+> **Remedy — three words, or a move.** Either *"No second **instrument** is
+> needed"*, or relocate the sentence into the cost census below, where its
+> subject already lives.
+>
+> **DO NOT batch this into [[RT-BACKEND-SPLIT-CENSUS]].** That node is `active`
+> and its `AC-5` requires **zero changed paths under `crates/`** — an inventory
+> that edits its own subject has invalidated itself. This waits for the next
+> runtime candidate that touches `constructors.rs`, or a standalone doc-only
+> cut after the census lands.
 
 > # EVERYTHING BELOW IS THE ORIGINAL FRAME AND IT IS HISTORICAL.
 >
