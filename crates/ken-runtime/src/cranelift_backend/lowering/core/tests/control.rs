@@ -35280,28 +35280,43 @@ fn refusal_pins_rehomed_computational_match_without_selector_exclusion() {
 ///
 /// Promise class: durable invariant. Removing the retiring lane leaves this
 /// conservation law unchanged.
+///
+/// This is the sole carrier of a ratified refusal. If it reds, ask whether the
+/// refusal changed, not whether the string changed; do not paste a new message
+/// into the expected value without answering that question.
 #[test]
 fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
     use crate::cranelift_backend::lowering::{FuncId, StaticWorkerFieldLedger};
 
+    let constructor = "ctor:fixture::RefusalPin::Mk";
+    let position = 0;
     let owner_expr = RuntimeExpr::Construct {
-        constructor: "ctor:fixture::RefusalPin::Mk".to_string(),
+        constructor: constructor.to_string(),
         args: vec![RuntimeExpr::Var(0)],
     };
     let (plan, owner) = planned_root_occurrence(&owner_expr);
     let field = plan
-        .child_static_origin(owner, 0)
+        .child_static_origin(owner, position)
         .expect("the constructor plans its worker field");
     let mut ledger = StaticWorkerFieldLedger::default();
-    ledger
+    let recognition = ledger
         .recognize(
             owner,
-            0,
+            position,
             field,
-            "ctor:fixture::RefusalPin::Mk",
+            constructor,
             Some(FuncId::from_u32(0)),
         )
         .expect("the real issuer mints the recognition");
+    let expected_reason = format!(
+        "constructor {} at origin {:?} transports a static worker in field {} \
+         (field origin {:?}, recognition {recognition:?}) that no static \
+         elimination rebinds, so this recognition's own transport never reaches \
+         a consumer at an exact-Var call and is not erased; a constructor carrying \
+         an unconsumed static worker denotes a value containing the callable and \
+         has no runtime representation",
+        constructor, owner, position, field
+    );
 
     let refused = ledger
         .close()
@@ -35311,9 +35326,7 @@ fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "StaticWorkerBinding",
             reason,
-        }) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
-            && reason.contains("a constructor carrying an unconsumed static worker denotes a value containing the callable and has no runtime representation")
-            && !reason.contains("before construction")
+        }) if reason == expected_reason
     ));
 }
 
