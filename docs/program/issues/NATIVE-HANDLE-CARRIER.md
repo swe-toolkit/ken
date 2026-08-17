@@ -11,6 +11,49 @@ github: null
 origin: discovered under [[PX8-F-CAP-41]] Phase 2 impl (foundation-implementer hard-stop evt_563ss8821n7f); Architect means/representation ruling evt_2zkjr68y1sdgf (thr_570t9qzcthjv9, 2026-07-23). Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
+> # ⛔ CI RED — PR #2563 FAILED, DID NOT MERGE. `3d23f1182` IS NOT LANDABLE.
+>
+> **The banner below is superseded on its central claim.** The partial was
+> approved and then **refused by the publisher gate**, correctly. Steward stop
+> `evt_54jwhbqge8hyr`; PR annotated and left open so a fix pushed to
+> `wp/NATIVE-HANDLE-CARRIER` re-runs checks.
+>
+> ### Failure 1 falsifies the premise this whole node was reasoning from
+>
+> `native-slow (rt_parity_native)`: the four `cap41_*` rows fail at
+> `rt_parity_native.rs:503`/`:600`. **Measured at both ends — those four tests DO
+> NOT EXIST at the declared base `7b8dad7df`.** This candidate **adds** them,
+> **un-ignored**, and they **fail**.
+>
+> ⇒ **"The four CAP-41 rows STILL refuse" is false in its load-bearing word.**
+> *Still* framed them as inherited; they are not pre-existing. So the candidate
+> does not merely fail to green the fixture — **it adds four failing tests to
+> `main`**, which is `AC-6` collateral regression.
+>
+> ⇒ ⭐ **The Steward audited `AC-5`'s row provenance hard and never checked the
+> four rows this node exists to green.** The `--ignored` differential was the
+> right instrument aimed at the **wrong row**. **A provenance check on one row is
+> not a provenance check on the population.**
+>
+> ### Failure 2 — independent, and NOT YET ATTRIBUTED
+>
+> `test shard 3/4`:
+> `intervening_let_fresh_binder_fails_invariantly_across_all_three_bases` panics
+> at `ken-elaborator/tests/ds5b_dependent_match_refinement_acceptance.rs:513`.
+> The candidate does not touch that test but changes four `ken-elaborator`
+> sources beneath it. ⛔ **Unmeasured at the base — do not call it inherited.**
+>
+> ### Disposition
+>
+> **`dec_1reay8hc7qy2b` is SPENT, not reusable**: it approved a claim set
+> including `AC-6`/`AC-7` that the tree does not produce.
+>
+> Owed by the ring, in order: **(1)** `ds5b…` at base **and** tip, failure text
+> at each end; **(2)** then the shape — `#[ignore]` the four new rows with an
+> annotation **naming the node that RETIRES them**, or hold the candidate until
+> the missing port lands. ⇒ **That choice goes to the Architect, not the
+> Steward.**
+
 > # IN REVIEW 2026-08-17 — `3d23f1182` is an AUTHORIZED PARTIAL at the exact-SHA gate
 >
 > **The hard stop below is RESOLVED. Read this banner for the current state.**
