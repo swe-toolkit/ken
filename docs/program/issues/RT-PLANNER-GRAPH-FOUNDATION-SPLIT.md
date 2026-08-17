@@ -73,9 +73,64 @@ origin: Cut item 3 of RT-BACKEND-MODULE-SPLIT, filed 2026-08-17 once RT-BACKEND-
 > but `AC-2` does say *representation*, and I will not read my own preferred
 > answer into a campaign gate.
 >
-> **Routed to the Architect. Held for the operator:** if the pivot is allowed, it
-> changes what cut item 3 *is*, which is a campaign-scope question rather than a
-> sequencing one.
+> ### ARCHITECT RULED, AND AGAINST THE PIVOT. `evt_559kbpkvacqyg`, 22:14.
+>
+> **`AC-2` BARS the in-place per-domain storage decomposition inside this node.**
+> *"Representation" is an independent member of that list*; reading it as only
+> externally observable would make it redundant with the later clauses and erase
+> §4/§8's explicit hard stop. Replacing the flat private fields with six nested
+> records changes the type/field graph, construction and access paths,
+> layout/borrow topology, and what the existing `Clone` derive traverses.
+> **Absence of `repr`, serialization, hash or a public field shows low observable
+> risk — it does not show representation identity, and only identity authorizes
+> a pure move.**
+>
+> **And a SECOND closure failure, independent of `AC-2`, which I had not seen.**
+> Decomposing in place **does not** make "move the thin root, leave the two impls
+> in the parent" private: once the root is declared in a child module, **the
+> parent cannot reach the child-private six handle fields.** The same three
+> choices recur — widen, move the impls, or add an accessor layer — and `D0`
+> already barred the first two. ⇒ **My proposed precursor would not have
+> established the movable set even if `AC-2` had allowed it.** A fresh closure
+> proof would still be owed.
+>
+> ### THE CAMPAIGN RECUT, WHICH IS MINE — AND ITEM 3 MAY NOT SURVIVE IT
+>
+> The Architect's disposition: treat `StaticTransitionPlan` as the **container /
+> orchestrator ABOVE the six domains**, not a foundation beneath them, and keep
+> it in the parent. **A child domain module may host domain-specific `impl`
+> blocks that access ancestor-private root state** — that direction preserves the
+> private root boundary and is the one that stays open.
+>
+> ⇒ **Re-evaluate item 3 as only the genuinely shared graph/identity foundation,
+> and if no useful closed set exists independently of the root, DELETE OR REPLACE
+> item 3 rather than manufacturing one.**
+>
+> **`D0` has largely answered that already, and the answer points at deletion.**
+> It found every identity candidate single-domain (`PlannedTrapIdentity`,
+> `ContinuationSourceCoordinate`, `AggregateOccurrenceId`, `EffectSeat*`,
+> `EmittableUnit`) and the shared vocabulary — `StaticOriginId`, `FieldIdentity`,
+> `ConstructorIdentity`, `PredeclaredFunctionId` — **already carved into
+> `semantic_ir`.** Subtract the root, subtract the single-domain identities,
+> subtract what `semantic_ir` owns, and the residue of a "shared foundation" is
+> empty. **This is §4c: the constraint demanding this node may simply not be
+> real.**
+>
+> **I am not deleting a campaign item on my own inference.** Item 3's framing
+> constraints are the operator's (`RT-BACKEND-MODULE-SPLIT:330-359`, 2026-08-08),
+> so deleting or replacing it is scope, not sequencing. **Routed to the
+> operator** with the recommendation above.
+>
+> **If the permanent design still wants six private storage records**, the
+> Architect's terms are: a **separately authorized representation-change
+> precursor**, not part of a pure-move `D1` — replacing the flat form once with
+> no parallel old/new representation, carrying exact old-to-new storage,
+> constructor/writer, accessor, derive/layout and `cfg` ledgers, landing without
+> module motion, **and then `D0` is rerun against the landed representation.** Do
+> not pre-claim the root is movable.
+>
+> Grounded in `research/compiler-refactoring-program.md` §§5.2 and 7.3, and the
+> obligation-IR report's parallel-representation warning.
 
 > # `ready` 2026-08-17 — CUT ITEM 3, THE FIRST PLANNER SLICE
 >
