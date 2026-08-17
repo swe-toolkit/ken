@@ -1,7 +1,7 @@
 ---
 id: RT-DESCENT-RETIRE
 title: "Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -11,7 +11,26 @@ github: null
 origin: Operator directive 2026-07-29 — "we should not let it linger in a half-migrated state. That just carries tech debt for no benefit." Campaign docs/program/16-recursive-descent-retirement.md. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
 
-> # 2026-08-17 — `D6a` AND `D7` COMPLETE. THE NODE'S FINAL READS ARE RECORDED.
+> # 2026-08-17 — THE NODE IS COMPLETE. `RecursiveDescent` IS RETIRED.
+>
+> **Every deliverable is discharged and the campaign has no residual.** The
+> route itself was deleted at landed squash `1aec3e3e1` (PR #2523, `+378/-5178`
+> over nine `crates/ken-runtime` paths); `D6a` and `D7`, the closing reads,
+> landed at PR #2527 on exact `2b1037a6f`.
+>
+> **One AC could never be met as written, and that is the lesson worth
+> carrying** (Architect, `evt_4t440vck49pny`): **`AC-4` asked for a delta
+> against a baseline nobody captured**, and the deletion made the before-side
+> unrecoverable. `AC-6` of [[RT-DECL-CLOSURE-PORT]] had made itself
+> dischargeable by a convo post, so the opening figures were never written into
+> the tree. ⇒ **When an AC compares against a lane you are retiring, the
+> opening measurement has to be taken while the lane still exists.** `AC-4` was
+> reframed before dispatch and discharged absolutely — `D7` reports the
+> post-deletion population and claims no delta.
+>
+> **One successor is filed and blocks nothing:**
+> [[RT-STATIC-WORKER-ARM-SOURCE-WITNESS]]. It sizes remaining risk honestly; it
+> is not a correction to anything that landed here.
 >
 > ## `D6a` — THE POST-DELETION REACHABILITY-PREMISE SWEEP
 >
@@ -176,10 +195,28 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 >   by saying the arm cannot run.
 >
 > **Disposition:** the two widened-selector counterexamples are still true at
-> their current coordinates, and the complete behavioral sweep found no stale
-> live premise. The six ignored closure-boundary tests remain an arm-level
-> sibling fact only; `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` remains a separate
-> successor and is not folded into this result.
+> their current coordinates, and the behavioral sweep **found no stale live
+> premise anywhere in the seed domain.** The six ignored closure-boundary tests
+> remain an arm-level sibling fact only; `RT-STATIC-WORKER-ARM-SOURCE-WITNESS`
+> remains a separate successor and is not folded into this result.
+>
+> ### THE SWEEP IS COMPLETE OVER THE SEED DOMAIN. IT IS NOT A BOUND ON THE MECHANISM.
+>
+> **Architect should-fix 1, `evt_4t440vck49pny`, applied 2026-08-17.** The
+> classification work above is genuinely behavioural, and that is not in
+> dispute. But **entry to the census was lexical**: a premise phrased outside
+> the ten seed expressions never became one of the 93 and was never
+> classified.
+>
+> ⇒ **Read "complete" as complete over the seed domain.** A zero-hit census is
+> evidence about a **name**, not about a **mechanism**, and this instance sits
+> at domain *entry* rather than at the conclusion — which is the easiest place
+> for it to be missed.
+>
+> **Still owed, non-blocking (Architect should-fix 2): the two counterexamples
+> are asserted but identified nowhere in this document.** A reader cannot
+> locate or re-verify them, which is what a durable record exists to permit.
+> Their coordinates go here on the next edit this file takes.
 >
 > ## `D7` — ABSOLUTE POST-DELETION EMITTED-CODE MEASUREMENT
 >
@@ -361,7 +398,11 @@ origin: Operator directive 2026-07-29 — "we should not let it linger in a half
 > conservation ledger. **They are not a ready-made corpus**, and *"cheap
 > relative to what just landed"* is not established.
 >
-> ### THE NODE STAYS `active`. TWO DELIVERABLES REMAIN.
+> ### SUPERSEDED 2026-08-17 — BOTH LANDED AT PR #2527. THE NODE IS `merged`.
+>
+> **Kept for what it says about why these two were held back from #2523.** The
+> status claim in its heading is dead: `D6a` and `D7` are recorded in the lede
+> above.
 >
 > - **`D6a`** — sweep the reachability-premised *"cannot occur"* arguments. It
 >   was gated on exactly this landing, because the sweep is worthless before the

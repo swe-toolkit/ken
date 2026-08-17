@@ -875,6 +875,15 @@ the proof is unavailable and any argument for it is circular.
 - **`AC-4`.** `D7`'s closing figures are recorded next to
   `RT-DECL-CLOSURE-PORT.AC-6`'s opening figures. Report; do not tune, and
   do not pin a threshold — a size number rots at the next merge.
+
+  > **DISCHARGED 2026-08-17 AS REFRAMED, NOT AS WRITTEN. Read the `D7` block
+  > above before citing this line.** `AC-6`'s opening figures were never
+  > written into the tree, and the `RecursiveDescent` root that would let
+  > anyone re-take them was deleted at `1aec3e3e1`. **The literal criterion —
+  > "recorded next to" those figures — is unsatisfiable and always was, from
+  > the moment the deletion landed.** `D7` discharges the surviving substance:
+  > the absolute post-deletion population, written into `docs/`, with no delta
+  > claimed and none reconstructed.
 - **`AC-5`.** Every test removed under `D6` is accounted for: retired as
   lane-specific, or re-homed with its semantic property intact.
   A silent net loss of coverage fails this.

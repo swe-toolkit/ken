@@ -32,7 +32,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-08-17 05:19:36Z — from 365 issue file(s) in `docs/program/issues/`.
+2026-08-17 05:44:28Z — from 365 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -257,7 +257,7 @@ the committed file matches the generator's output.
 | `RT-DEPTH2-VAR-PARENT-DERIVATION` | Name the parent of the depth-2 Var occurrence at source-machine origin 25 index 0, so the route fork can be ruled on a derived premise instead of an inherited one | closed | runtime | S | none | — |
 | `RT-DESCENT-LANE-COMPLETENESS` | Is the functionized lane a complete replacement for RecursiveDescent, or has it been carrying only the ported subset? D2c refused NINE programs the retiring lane compiles, across FOUR independent constructs -- a pattern, not a missing case, so this is a lane-completeness question and not a port | closed | runtime | M | none | — |
 | `RT-DESCENT-RETIRE-PRIOR-ART` | Prior art admits the shape and carries no second descent lane -- retirement is supported and never by source unreachability -- this node's proposed pre-classifier IR invariant was DECLINED by the Architect in favour of uniform lowering, so the retirement is NOT gated on it and this row is not an unmet bar | merged | research | M | none | — |
-| `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | active | runtime | M | none | — |
+| `RT-DESCENT-RETIRE` | Retire RecursiveDescent — delete the migration selector, the residual enum, the authority variant, and the recursive-descent emission lane | merged | runtime | M | none | — |
 | `RT-DYNAMIC-ARM-SCALAR-MERGE` | A carried Match arm carrying a nested-IH result cannot satisfy merge_scalar_operand -- measure what the arm actually produces before bounding the repair | merged | runtime | M | none | — |
 | `RT-EFFECT-DIFF` | One reusable rich differential boundary over EffectObservation — interpreter vs native, first-divergence reporting, so backend-local tests can observe what only the CLI suites currently can | ready | runtime | L | none | — |
 | `RT-EMITTED-WORKER-CONSUMER-WALK` | Walk the tag set forward from the successful static-worker emission to the refusal the five governed expressions actually hit, and report the first site that changes disposition | closed | runtime | S | none | — |
@@ -429,6 +429,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `RT-FNSPLIT-B2O-CHECK` — the B2O checking layer advertises more than it enforces — structural closure for the item enumerator and reachability for the validator arms
 - `RT-SCRATCH-LIFETIME-REMAINING-CRATES` — `RT-TEST-SCRATCH-RAII` fixed the scratch-directory leak in the two directories its census declared, and the defect is not confined to them -- unguarded `temp_dir()` sites remain in `ken-interp`, `ken-host` and `ken-verify`, including one that reproduces the original node's defect statement verbatim and generates the second half of a prefix `scripts/ken-cargo`'s reaper already names
 - `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` — Nothing observes that the source-machine Construct arm still dispatches to the classifier -- the one regression that silently restores the predecessor's defect is the one its control cannot see
+- `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` — Find one Ken SOURCE program that reaches the StaticWorkerBinding conservation arm specifically -- the existing bound is a search over hand-authored fixtures, and the six ignored ken-cli tests are NOT a ready-made corpus because they fail upstream at the sibling Closure arm
 - `RT-UNSUPPORTED-BINDING-ON-REFUSAL` — A compile that refuses a construct owes a 48 section 5.4 native-artifact binding with status unsupported, and today yields none at all -- the construct half of the lane was named as RuntimeIrConstruct and left with zero producers
 - `RT-WORKER-FIXTURE-DECODE` — AC-5's target-redirect detector is dark — its expression dies at the run step with Backend NativeResultDecode token 9, before any of its three comparisons, while the fixture helper's other caller passes
 - `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` — Does 45 section 3's 'functions lower to ordinary closures' admit an exception for a function value held in a constructor field with no statically visible consumer -- if not, the native backend's current refusal is a defect against AC3 rather than a permitted narrowing
@@ -470,14 +471,11 @@ is itself not yet `merged`/`closed`:
 - `PX9` blocked by `PX8` (status: draft)
 - `PX9` blocked by `ABI-REVOKE` (status: draft)
 - `RT-4B-UNIQUENESS-GATE-ATTRIBUTION` blocked by `RT-4B-UNIQUENESS-GATE-REACH` (status: ready)
-- `RT-BACKEND-MODULE-SPLIT` blocked by `RT-DESCENT-RETIRE` (status: active)
 - `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` blocked by `RT-BACKEND-SPLIT-CENSUS` (status: draft)
-- `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-DESCENT-RETIRE` (status: active)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CENSUS-CAVEAT-GUARD` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-CALL-EDGE-EXECUTABILITY-AXIS` (status: ready)
 - `RT-BACKEND-SPLIT-CENSUS` blocked by `RT-SRCMACHINE-DISPATCH-REACHABILITY-CONTROL` (status: ready)
 - `RT-NESTED-IH-NATIVE-REALIZATION` blocked by `RT-CHECKED-IH-REALIZATION-AUTHORITY` (status: ready)
-- `RT-STATIC-WORKER-ARM-SOURCE-WITNESS` blocked by `RT-DESCENT-RETIRE` (status: active)
 - `RT-TERMINAL-ALL-ELIM-AUTHORITY` blocked by `KERNEL-NESTED-IND` (status: active)
 
 ## Gate progress
