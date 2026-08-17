@@ -1,7 +1,7 @@
 ---
 id: RT-CALL-EDGE-EXECUTABILITY-AXIS
 title: "executable_call_edges probes a body-axis set with an entry-axis key, so a template-only callee whose axes differ survives the filter and fails later as a forward-declaration error"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: none
@@ -29,7 +29,44 @@ origin: Adversary report evt_1gtad2keqngcq (2026-08-09) on merged 1f706520, the 
 > yet** — lane 1 is on [[RT-DESCENT-RETIRE]], which hard-stopped on `D1` with
 > two surviving classes still selecting the lane.
 
-> # `D1` — OWED AND FRAMED, **NOT** SEQUENCED IN FRONT OF THE CAMPAIGN
+> # 2026-08-17 — COMPLETE. `D1` MERGED AT `e5286ea06` (PR #2533).
+>
+> **Both deliverables are in.** `D0` landed 2026-08-10; `D1a`/`D1b` landed
+> today at exact `60065fc13`, squashed to `e5286ea0665d4b81c91427e42aab175dfd23cdbb`
+> — one test-only path, `+19/-8`. Architect resolved `dec_59rm7x793vy9w`; QA at
+> `evt_3v2423rs1ec5t`.
+>
+> **`AC-2` is discharged on its BOUNDED-NEGATIVE arm, which the frame
+> authorized.** No unit is known to be both split-axis and template-only. What
+> stands in its place is a **sentinel that reds when that population appears**:
+> `divergent.is_empty()`, whose failure text announces the witness. It is green,
+> so **the witness does not exist** — do not read that message as a report of
+> one. No same-axis fixture was substituted, which the frame forbade.
+>
+> **`D1b` converged the detector onto production's join.** The sentinel used a
+> linear first-match `units.iter().find(..)`; production builds a last-wins
+> `BTreeMap`. The test now uses the identical construction. **`D1a`** corrected
+> a diagnostic that claimed *"the defect's exact failure direction"* from a
+> predicate that is one-sided by design.
+>
+> **OWED, non-blocking (Architect `evt_6csb4936b510g`):** production retains a
+> descriptor-less edge (`None => true`) while the new test **reds** on one.
+> Both are correct — production must not suppress a planner contradiction, the
+> test must not scan a partial population. **One line at the assertion saying
+> the divergence is deliberate**, or a later reader "aligns" them in good faith
+> and silently restores the hollow-population hazard.
+
+> ### THE SHA BELOW IS A PRE-SQUASH HEAD. The landed `D0` is `b7bba72dd`.
+>
+> **`35265ca5` is NOT an ancestor of `main`** — the publisher squashes, so the
+> reviewed branch head never lands. Checked 2026-08-17: `git merge-base
+> --is-ancestor 35265ca5 origin/main` fails, while `b7bba72dd` passes and is the
+> commit that introduced production's `body_axis` join.
+>
+> ⇒ **Cite the landed squash, or `merge-base...tip`. A bare reviewed-tip SHA
+> resolves as an object and shows a reader the wrong history.**
+
+> # SUPERSEDED — `D1` was owed here; it has since landed. Kept for its reasoning.
 >
 > **`D0` merged at `35265ca5` (PR #1797). This node returns to `ready` because
 > `D1` is owed, not because anything about `D0` is in doubt.**
@@ -107,6 +144,31 @@ origin: Adversary report evt_1gtad2keqngcq (2026-08-09) on merged 1f706520, the 
 >
 > **Do not repair this inside `RT-SPECIALIZED-MATCH-ATTRIBUTION`**, which is
 > measurement-only and forbids production changes.
+
+> # EVERYTHING BELOW IS THE ORIGINAL FRAME AND IT IS HISTORICAL. `D0` FIXED IT.
+>
+> **Read this section as the defect that WAS, not one that is.** Verified at
+> `origin/main`, 2026-08-17:
+>
+> - **The code shown below is gone.** `template_only.contains(&edge.callee_origin())`
+>   returns zero hits at every base checked. Production's
+>   `executable_call_edges` builds a `body_axis` map and probes
+>   `body_axis.get(&edge.callee())` — that is `D0` option 1, landed at
+>   `b7bba72dd`.
+> - **Every `11354` coordinate below is stale.** The site is now **`16098`**,
+>   and `template_only.contains(&body)` — the correct body-axis probe — sits at
+>   `15480`.
+> - **`D0`'s "decide the axis, one line either way" is DECIDED**, and the
+>   `AC-1` phrasing keyed on `11354` is discharged by that landing.
+>
+> **This is why the section is banded rather than deleted:** the reasoning about
+> *why* the two axes meet at exactly one site, and why the error was natural
+> rather than careless, is the durable part and still reads true.
+>
+> ⚠ **A frame describes when it was written, not what the tree contains.** The
+> Steward's 2026-08-17 kickoff quoted this section and handed `D0` to the ring
+> as an open choice, six days after it had merged. The lede above said so; the
+> body did not. **Read the producer, not the prose.**
 
 ## The defect
 
