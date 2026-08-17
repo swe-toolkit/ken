@@ -1011,9 +1011,11 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
-// `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` D1 records the early return in
-// `recursive_position_unit_body` directly. The later BoundaryCarrier refusal
-// has other producers, so it cannot identify this route on its own.
+// `RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT` records resolver entry in
+// `recursive_position_unit_body`, plain-Match descent in
+// `resolve_recursive_unit_body`, and direct non-`Construct` route-1 returns.
+// The later BoundaryCarrier refusal has other producers, so it cannot identify
+// this route on its own.
 #[cfg(any(test, feature = "px8-ds-test-support"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BranchedScrutineeUnitBodyRoute1 {
@@ -1098,9 +1100,10 @@ fn record_branched_scrutinee_unit_body_route1(scrutinee: &RuntimeExpr) {
                 _ => (false, false, 0, false),
             };
             let row = rows.last_mut().expect("route-1 entry row");
+            let match_descent = row.match_descent;
             *row = BranchedScrutineeUnitBodyRoute1 {
                 route1: true,
-                match_descent: false,
+                match_descent,
                 plain_match,
                 match_scrutinee_is_var,
                 match_cases,
@@ -1133,6 +1136,22 @@ fn record_branched_scrutinee_unit_body_match_descent() {
             row.match_descent = true;
         }
     });
+}
+
+#[cfg(test)]
+mod branched_scrutinee_unit_body_observer_tests {
+    use super::*;
+
+    #[test]
+    fn plain_match_descent_is_retained_when_the_same_resolution_reaches_route1() {
+        let (_, rows) = with_branched_scrutinee_unit_body_route1(|| {
+            record_branched_scrutinee_unit_body_entry();
+            record_branched_scrutinee_unit_body_match_descent();
+            record_branched_scrutinee_unit_body_route1(&RuntimeExpr::Var(0));
+        });
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].match_descent && rows[0].route1, "{rows:?}");
+    }
 }
 
 fn agreeing_recursive_body_unit<Unit>(
