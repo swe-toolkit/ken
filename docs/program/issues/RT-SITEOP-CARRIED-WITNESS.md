@@ -1,7 +1,7 @@
 ---
 id: RT-SITEOP-CARRIED-WITNESS
 title: "Site-bound operand reader cannot witness a carried value — a synthesized SiteOperand demands a compile-time Lowered template from the same seat byte-span activation wants carried"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
@@ -10,6 +10,57 @@ blocks: [NATIVE-HANDLE-CARRIER]
 github: null
 origin: Hard stop returned by RT-CARRIER-BYTESPAN-OBSERVE D5, 2026-08-07, candidate 4244d082. The frame's own §1a recut clause fired — the 30 quarantined rows do not discharge from one mechanism. Steward-cut per that clause. Steward-filed (agents cannot create tracked work per COORDINATION §2).
 ---
+
+> # MERGED 2026-08-17 — `D2` LANDED. PR #2557, exact `a388dc06`.
+
+> **Architect Decision `dec_hmd070mq1h2b` resolved APPROVED (`evt_28demcmgkr8t`);
+> Runtime QA exact-SHA approval `evt_2mp5ejpsangd2`.** Base `2e7daa622`, one
+> non-merge commit, `+461/-74`, 14 paths, no `spec/` or `conformance/` path.
+> Verified by blob identity from the declared merge-base on all 14.
+>
+> **The mechanism:** `host_effect_site_operand_slots` derives occurrence-bound
+> slots from the **existing synthesized-result recipe**, not a second operation
+> table, so adding or removing a `SiteOperand` moves the child relation and this
+> population together. The `Direct`/`SiteOperandProjection` split keeps the
+> exception off the seat-wide `Avail` relation, and the four `Fs*` `Argument(0)`
+> seats' `SPECIALIZED_ONLY` row is **unchanged** for the direct consumer.
+>
+> ### THE 29 ROWS DID NOT SPLIT. §9's HARD STOP DID NOT FIRE.
+>
+> **13 un-ignored and passing, 16 retained** carrying the *later*
+> eliminated-not-callable refusal. That is an **advancing refusal** — the port
+> succeeded and those rows reached the next wall — **not two causes.** All 29
+> stale pointers now credit `D1a`/`D2` instead of `RT-CARRIER-BYTESPAN-OBSERVE
+> D5`.
+>
+> ### THREE NON-BLOCKING SHOULD-FIXES. Batched by the Architect, not recut.
+>
+> 1. **All 13 un-ignored tests keep a leading comment block that is now false** —
+>    still naming `RT-CARRIER-BYTESPAN-OBSERVE` as owner and claiming the program
+>    never executes. The true correction sits **below** `#[test]`, so a reader
+>    meets seven false lines first. **This is the same class of defect this node
+>    was chartered to correct**, fixed at the three `mod.rs` doc sites and missed
+>    at the test sites people actually land on. The still-ignored 16 have a
+>    smaller version: their *"Observed signature, exactly"* is no longer observed.
+> 2. **The ledger's admissibility gate for the new route is partly
+>    caller-attested** — planner-recipe membership is not re-derived from the
+>    record, weakening a documented defense-in-depth recompute. Sound at one call
+>    site; a second caller would inherit the weaker gate silently. The
+>    self-contained fix, if wanted later: carry the site-bound fact on
+>    `PlannedEffectSeat` so the ledger re-derives it.
+> 3. **`site_operand_argument` masks a non-zero observation outcome** into a null
+>    span, while the sibling consumer of the identical word raises a typed
+>    three-valued refusal. Believed unreachable and safe, **but the reachability
+>    argument is non-local and written nowhere at the projection.**
+>
+> **Scope note:** declared as "14 Runtime paths"; measured it is **9 `ken-cli`,
+> 4 `ken-runtime`, 1 `ken-verify`**. The `ken-verify` path (`scenario.rs`) is
+> test-annotation only.
+>
+> ⇒ **[[NATIVE-HANDLE-CARRIER]] is now fully unblocked** — all five of its
+> `depends_on` are `merged`. Its frame was amended the same day (PR #2556) and
+> **that amendment is load-bearing**: the input ref is `85dcee25`, not
+> `c07e63c2`, and the identity arm has left `core.rs`.
 
 > # `D1b` ANSWERED: PLUMBING AVAILABLE. RECUT IS IN THE FRAME'S §4a. SIZE IS `M`.
 >

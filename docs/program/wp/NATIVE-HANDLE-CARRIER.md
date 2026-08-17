@@ -68,13 +68,16 @@ nodes; this is one of `PX8`'s three blockers.
 > in `scalar_kind` would survive that control untouched** — the control would
 > pass and the defect would ship. Raise it with the coordinates before building.
 >
-> ## Sequencing — this node is behind ONE live node
+> ## Sequencing — UNBLOCKED 2026-08-17. All five dependencies are `merged`.
 >
-> `depends_on` gained [[RT-SITEOP-CARRIED-WITNESS]] on 2026-08-17. That node is
-> `active` and owns `lowering/mod.rs`; its `D2` is in flight. **Do not start this
-> node until it merges** — and note `scalar_kind`'s emitted-scalar-helper route
-> is adjacent mechanism in the same subsystem, which is why the question above
-> matters more than usual.
+> [[RT-SITEOP-CARRIED-WITNESS]] `D2` **merged** (PR #2557, exact `a388dc06`), so
+> `RT-NATIVE-FNSPLIT`, `RT-JOIN-DISPOSITION`, `RT-DECL-CLOSURE-PORT`,
+> `RT-BACKEND-PRIMITIVE-LOWERING-SPLIT` and `RT-SITEOP-CARRIED-WITNESS` are all
+> `merged`. **This node is dispatchable.**
+>
+> ⚠ **`scalar_kind`'s emitted-scalar-helper route is adjacent mechanism to what
+> `D2` just landed**, in the same subsystem — which is why `§7 D2a` matters more
+> than usual and why it is a hard stop rather than a judgment call.
 >
 > **The 12th row is no longer this node's known blocker.** The 07-29 failure
 > `fs_write_at_malformed_offset_narrows_to_invalid_offset` was owned by
