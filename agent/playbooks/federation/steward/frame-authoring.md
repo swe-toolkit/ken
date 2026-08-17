@@ -273,6 +273,44 @@ Architect's phrase is the test to keep — *genuinely driven, not
 declared-then-shadowed.* Press the mechanism, not the imports, and write the AC
 so a reviewer can tell the difference.
 
+## Audit (e): after a disposition is refuted, sweep the frame BY PHRASE
+
+**Promoted here from the watchdog tick prompt, 2026-08-17**, which had no room
+left and is the wrong home: this fires when a ruling lands, not on a timer.
+
+When a disposition a frame rests on is refuted, **the correction is not the AC
+alone.** Sweep the whole artifact by the dead phrase: title, lede, deliverables,
+every AC, and the tracker node's one-liner. **A reader consults the title
+INSTEAD of the ACs**, so a title still asserting a refuted disposition
+out-argues a corrected criterion two screens down.
+
+**Measured: five dispositions died on one node in one arc, and the frame still
+asserted every one of them.** Grep the dead phrase and prove zero live hits —
+the phrase, not the conclusion, because the conclusion gets paraphrased and a
+paraphrase survives a grep keyed on your own wording.
+
+## Audit (f): a CITED coordinate is not a VERIFIED one, including the Architect's
+
+**Promoted here from the watchdog tick prompt, 2026-08-17**, for the same reason
+as audit (e): it fires when you frame, not on a timer, and the tick had no room.
+
+**Locate the symbol yourself before framing on it.** Repeatedly a cited site
+named a function that did not do what was attributed to it — and the citation
+came from the Architect as often as from anywhere else, so seniority is not the
+filter. Open the file, read the function, confirm it does the thing the frame is
+about to require of it.
+
+**Two forms this takes, both measured:**
+
+- **The coordinate is right and the attribution is wrong.** The line exists, the
+  function exists, and its behaviour is one level above or below what the frame
+  needs. Route 1 of `resolve_recursive_unit_body` is the clean example: its doc
+  sentence describes the recursive *position*, the code at that site turns on the
+  *scrutinee*, and a frame quoting the doc as warrant for the code would have been
+  wrong while quoting accurately.
+- **The coordinate decays.** A `path:NNNN` is destroyed by the very edit the
+  deliverable performs — see audit (c-prime). Cite by grep-able phrase.
+
 ## Frame patterns by WP type
 
 Each of these was promoted after the shape cost a merge or a red `main`.

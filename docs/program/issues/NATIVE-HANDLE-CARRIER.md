@@ -33,13 +33,15 @@ outside this node.
 | `D3` / `D4` / `D5`, `AC-3` | unclaimed |
 | `PX8-F-CAP-41` Phase 2 | **unpaired** — does not close on this node's merge |
 
-**Fence on this node's own closure: do not flip it to `merged` or `closed` until
-[[PX8-F-CAP-41]]'s `depends_on` names the port's owner.** `gen-progress.sh`
-treats `closed` exactly like `merged` when clearing a dependency, so closing this
-node and moving its residual to a successor — the disposition currently favoured
-— would unblock Phase 2 with the port still missing. A partial landing while this
-node stays `active` is harmless; **the status flip is the trigger, not the
-merge.**
+**Fence on this node's own closure — DISCHARGED 2026-08-17.**
+[[PX8-F-CAP-41]]'s `depends_on` now names
+[[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]] alongside this node, and that node
+carries the residual with its own witness deliverable. The hazard it guarded was
+real and is worth keeping stated: `gen-progress.sh` treats `closed` exactly like
+`merged` when clearing a dependency, so closing this node and moving its residual
+to a successor — the disposition then favoured — would have unblocked Phase 2
+with the port unowned. **The status flip was the trigger, not the merge.** With
+the edge wired, the flip is safe on this node's own merits.
 
 ## Why CI refused it, and the lesson that is the Steward's
 
@@ -113,6 +115,45 @@ line on the same instrument: **what `RuntimeExpr` variant is the scrutinee at
 `:15680`?** If it is a `Call`, the owner is the closed `RecursiveDescent` residual
 lineage that `RT-FNSPLIT-B2F` approved and [[RT-FNSPLIT-RECUR-PORT]] ported,
 **not** a new capability. That is the whole difference the cut moves by.
+
+### The variant came back: plain `Match`. The `Call` arm is dead.
+
+Measured by runtime-leader at the preserved exact `3d23f1182`
+(`evt_2fzzxf778smjj`, reported `evt_42nvqwvj71mjb`): **all five governed programs
+take route 1 exactly once, and the scrutinee is uniformly plain
+`RuntimeExpr::Match` — not `ComputationalMatch`.** The later refusal is the same
+`BoundaryCarrier` fallback through `reject_carried_residual_arguments`.
+Instrumentation reverted, throwaway deleted, `wp/NATIVE-HANDLE-CARRIER`
+unchanged.
+
+**What that settles:** the carried child's owning form is a match, not a call, so
+the port is **not a call-frame argument-passing port** and the closed
+`RecursiveDescent` residual lineage is **not** its home. That arm closed on a
+measurement, not on the reading it replaced.
+
+**What it does not settle — two owners remain, and `why` is the discriminator.**
+The leader declared route-2/3 behavior, *why* plain `Match` occurs, and any
+repair all unmeasured, correctly:
+
+| if plain `Match` is | then the port is | owner |
+|---|---|---|
+| the correct shape, and `resolve_recursive_unit_body` has no arm for it | a missing arm in the lowerer | runtime, new capability, small cut |
+| itself the symptom of an upstream production that should have emitted `ComputationalMatch` | upstream of the lowerer | whoever owns that production |
+
+Same deliverable text, different node, different team. **The node is not cut
+until that is one measurement rather than two readings** (dispatched
+`evt_3sv9516b7b7nk`).
+
+> ### THIS MEASUREMENT IS NOT REPRODUCIBLE IN-TREE AFTER THE RECUT
+>
+> Four of the five governed programs **are** the `cap41_*` rows, and the recut
+> deletes them; the fifth is an `#[ignore]`d row. So the measured population
+> ceases to exist in the tree, no test carries the result forward, and **this
+> prose plus the preserved ref is the only record there will be.**
+>
+> That is what `refs/heads/preserved/native-handle-carrier-route1-3d23f118` is
+> for, and it is why the read was queued **before** the recut rather than after
+> it. Do not delete the ref on the theory that the node is closed.
 
 **Also identified, so nobody hunts for it:** the refusal is the fallback arm of
 the same two-arm dispatch, not a separate downstream mechanism. `:15951` is the

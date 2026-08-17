@@ -39,6 +39,27 @@ before-work threshold *invites* the "still under it" rationalization, so there
 is none. Compaction is not lossy for what matters: the summary preserves recent
 detail and the agent re-fetches any source from the filesystem at pickup.
 
+## Compacting the ADVERSARY: yours, at the merge notification
+
+**Operator, 2026-08-17: *"There is nothing that compacts adversary and the
+adversary does not self-compact."*** `COORDINATION §15` files it with the
+singletons who compact themselves; that assignment produced nothing, so the
+Steward owns it.
+
+**Its gate is `merge-procedure.md` M8a — compact it, confirm the drop, post the
+notification, then rouse the pane.** All four beats, because a mention does not
+wake a compacted no-poll seat.
+
+**Do not build it a schedule.** The merge notification is not merely *a*
+boundary for this seat, it is **all of them**: the Adversary is event-driven,
+its context grows only while hunting, and it hunts only when notified. A
+periodic sweep would fire mostly on an idle seat and would still miss the
+handback, which is the moment that matters.
+
+**Watchdog backstop:** its pane is in the tick's ctx scan like any other, and it
+is the seat that scan is most likely to lapse on, because an event-driven seat
+reads as "not active" and drops out of an active-agent enumeration.
+
 ## Compacting a team: the mechanism
 
 **Use the checked-in script. Do not hand-drive `tmux send-keys` pane by pane** —
@@ -305,4 +326,5 @@ SessionStart hook cannot substitute — it shapes the next turn's context, it
 cannot trigger a turn.
 
 Steward, Architect, and Librarian all self-compact this way; see
-`../architect.md` section 3.
+`../architect.md` section 3. **The Adversary does not** — it is a singleton by
+law and Steward-compacted in practice, at M8a above.

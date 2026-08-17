@@ -14,8 +14,37 @@ not expire, and no measurement of mine ends them.**
 
 | lane | ring | objective |
 |---|---|---|
-| **1** | **runtime** | **Retire `RecursiveDescent`.** Stays on `RT-LEXICAL-RECURSOR-CONSUMERS` (#6d) and continues down the campaign chain. `docs/program/16-recursive-descent-retirement.md` |
-| **2** | **language + verify** | **The z3 round-trip and the FO Kripke embedding.** `attempt_fo` (`prover.rs:332`) still just calls `attempt_ipc`; `V3-KRIPKE-DECOMPOSITION` merged its plan with **no successors filed** |
+| **1** | **runtime** | **The RecursiveDescent retirement's RESIDUALS** (operator, 2026-08-17). In order: the `NATIVE-HANDLE-CARRIER` recut, then [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]], then the `RT-*` nodes already at `ready`, plus `RT-DESCENT-RETIRE`'s owed `D6a`. `docs/program/16-recursive-descent-retirement.md` |
+| **2** | **language + verify** | **The z3 round-trip and the FO Kripke embedding.** `V3-FO-CHECKER-SOUNDNESS` and `V3-Z3-EMISSION-CONTROL` are the `active` nodes |
+
+> ### LANE 1's HEADLINE OBJECTIVE IS DONE. THE LANE IS NOT.
+>
+> **Measured 2026-08-17:** `RT-DESCENT-RETIRE` is `merged` with all 15
+> dependencies `merged`/`closed`, the `RecursiveDescent` identifier has **0**
+> occurrences under `crates/`, `LexicalCallArgumentRecursor` has 0, and
+> `MatchScrutineeRecursor`'s 5 surviving hits are **absence pins plus one doc
+> comment** — which is the correct residue of a retirement, not a survivor.
+>
+> **I put that to the operator rather than acting on it**, because this block
+> says no measurement of mine ends a priority. **The ruling was: continue on the
+> residuals.** So lane 1 stays runtime and the row above is the operator's
+> answer, not my inference.
+>
+> **What that ruling declines, explicitly:** `RT-NESTED-IH-NATIVE-REALIZATION`
+> and its gating successor `RT-CHECKED-IH-REALIZATION-AUTHORITY` stay **held**.
+> The latter is `ready` and dependency-free, and its own opening block says it is
+> held behind this very priority — so it will look startable at every future
+> tick. **It is not.** `RT-NESTED-IH-NATIVE-REALIZATION`'s `active` flag is
+> **stale as a liveness signal** (runtime-leader, `evt_5tg2t2zwvm33m`): nothing is
+> being worked, its `D2` is merged and terminal, and no runtime branch is open.
+>
+> **Both stale instances in this table were mine.** Lane 1 named
+> `RT-LEXICAL-RECURSOR-CONSUMERS` (#6d), which is `merged`, as were its successors
+> `RT-RECURSOR-TRANSPORT` and `RT-DESCENT-RETIRE`. Lane 2 asserted *"`attempt_fo`
+> (`prover.rs:332`) still just calls `attempt_ipc`"*, and the tree now carries
+> `attempt_fo_with_signature`, a `z3_process.rs`, and a Kripke slice boundary.
+> ⇒ **An objective is a state, but the NODE cited to locate it is a claim about
+> the tree, and it decays.** Re-measure the citation before acting on the row.
 
 > ### THIS BLOCK IS RESIDENT FOR THE SAME REASON §0a IS. Do not move it behind a pointer.
 >

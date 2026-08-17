@@ -300,9 +300,58 @@ scripts/gen-progress.sh
 
 Bundle both into your next publish.
 
-## M8 — Notify the Adversary, if the merge carries code
+## M8 — Compact the Adversary, then notify it, if the merge carries code
 
-A step, not a courtesy.
+Two actions in that order, both required, both yours. A step, not a courtesy.
+
+### M8a — Compact it FIRST. Nothing else in the fleet does.
+
+**Operator, 2026-08-17: *"There is nothing that compacts adversary and the
+adversary does not self-compact."*** `COORDINATION §15` assigns the job to the
+seat itself, along with the other singletons. Measured, that does not happen —
+so the assignment produced no compaction at all, and the Adversary is the one
+seat that can climb indefinitely with no instrument pointed at it.
+
+**Why the compaction belongs here and not on a schedule.** The Adversary is
+event-driven with no WP pipeline, so the release path never hands it a
+before-work gate. **This notification is the only work boundary it has** — and
+it is the *complete* set of them, because its context grows only when it hunts
+and it hunts only when notified. Compacting at M8a is therefore the same rule
+as `compaction.md`'s *"always compact before new work"*, applied at the only
+seam that exists for this seat.
+
+```sh
+moot compact adversary
+tmux capture-pane -p -S -50 -t moot-adversary | grep -c Compacting   # confirm
+```
+
+**ctx unread.** Do not look at the number to decide, for the reason
+`compaction.md` gives: every rationalization for skipping is a threshold.
+
+**Precondition, same as any other seat: quiescent, and owing nothing in
+flight.** If it is mid-hunt on the previous merge, or holds a finding it has not
+yet handed to you, compaction drops the obligation — do M8b now and take the
+compaction at its next handoff. Never compact it mid-reasoning.
+
+> ### THE ORDER CREATES A SILENCE, AND THIS STEP EXISTS TO REMOVE ONE
+>
+> **A convo mention does not wake a freshly compacted seat.** It returns to an
+> empty composer and does not poll (`adversary.md`, §1). So compact-then-notify,
+> run naively, produces a notified-and-asleep Adversary — **the exact failure
+> M8 was created to fix in 2026-07-29, arrived at from the other direction.**
+>
+> The sequence is four beats, not two: **compact → confirm the drop → post M8b →
+> rouse the pane.**
+>
+> ```sh
+> tmux send-keys -t moot-adversary -l 'run get_recent_context and pick up event <evt_id>; re-orient per CLAUDE.md, then proceed'
+> tmux send-keys -t moot-adversary Enter     # a SEPARATE call
+> ```
+>
+> **Skipping the rouse is invisible from your side.** A seat that was never
+> woken and a seat with nothing to report post identically: nothing.
+
+### M8b — The notification
 
 > ### NAME THE LANDED SQUASH, OR `merge-base...tip`. NEVER A BARE TIP SHA.
 >
@@ -332,6 +381,11 @@ A step, not a courtesy.
 **Doc-only merges do not concern the Adversary** (operator, 2026-07-29). Do not
 notify it for them. Frames, tracker flips, node registrations, counters, and
 corpus edits are not its surface.
+
+**A skipped M8 skips M8a with it, and that is correct, not a gap.** No
+notification means no hunt means no growth, so a long doc-only run leaves the
+seat uncompacted *and* idle. The thing to keep true is the pairing: **you never
+notify it without having offered it a compaction first.**
 
 > ### `--doc-only` STOPPED being this step's discriminator on 2026-08-12
 >

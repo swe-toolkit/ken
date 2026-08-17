@@ -5,7 +5,7 @@ status: draft
 owner: foundation
 size: M
 gate: none
-depends_on: [NATIVE-HANDLE-CARRIER]
+depends_on: [NATIVE-HANDLE-CARRIER, RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]
 blocks: [PX8]
 github: 41
 origin: charter backlog (#41); RE-GROUNDED as a live PX8 clause-(a) blocker by architect verdict evt_163mfgjs7fkh8 (2026-07-23); RE-SCOPED spec-first by architect ruling evt_xnkrzjy1c8br (2026-07-23)
@@ -42,16 +42,23 @@ exactly like `merged` does.** That matters because closing the carrier and movin
 its residual to a successor is the disposition currently favoured for it — so the
 tidying step is itself the trap.
 
-**Fence: do not flip [[NATIVE-HANDLE-CARRIER]] to `merged` or `closed` until this
-node's `depends_on` names the port's owner.** The port node is not filed yet
-(its size waits on the scrutinee variant), which is why the edge is not
-re-pointed today rather than left by oversight.
+**Fence DISCHARGED 2026-08-17: the edge is wired.** This node's `depends_on` now
+names [[RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT]] alongside
+[[NATIVE-HANDLE-CARRIER]], so the carrier's status flip no longer clears Phase 2
+on its own and the port has a named owner.
 
-**The port's route is now measured** (`evt_4tqpqn2gpcsx6`): all five refusing
-programs take the **non-`Construct` scrutinee** route at
-`recursive_position_unit_body`. That rules out the `RT-WORKER-BIND` /
-`StaticWorker` lineage as the **first** blocker and makes the owner a new node,
-not yet filed and not yet sized.
+**How the owner was determined, in three measurements, none of them a reading:**
+
+| measurement | result |
+|---|---|
+| route (`evt_4tqpqn2gpcsx6`) | all five refusing programs take the non-`Construct` scrutinee route — rules out the `RT-WORKER-BIND` / `StaticWorker` lineage as the **first** blocker only |
+| scrutinee variant (`evt_2fzzxf778smjj`) | uniformly plain `RuntimeExpr::Match` — kills the `Call` arm, so the closed `RecursiveDescent` residual lineage is not the home |
+| plain-`Match` origin (`evt_5zknkg76cn3w5`) | `Var` scrutinee, two non-recursive `Result` cases, `Construct` bodies in both arms — a **local lowerer gap**, not a missed `ComputationalMatch`, so the owner is runtime and not upstream |
+
+**Phase 2 still does not become startable when the port lands.** This node is
+`draft` and `gen-progress.sh` requires its own `status: ready` as well as every
+`depends_on` entry cleared. Two conditions, and only one of them is about the
+port.
 
 > # UNPAIRED 2026-08-17 — Phase 2 does NOT close on [[NATIVE-HANDLE-CARRIER]]'s merge
 >

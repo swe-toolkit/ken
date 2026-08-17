@@ -157,7 +157,13 @@ wake a no-poll idle seat.**
 ## Tick step 4: read the Adversary's threads
 
 Its reports do not surface in the space-level event read, so a clear tick is
-not evidence it has filed nothing. The command is in `merge-procedure.md`, M8.
+not evidence it has filed nothing. The command is in `merge-procedure.md`, M8b.
+
+**Read its ctx on the same tick.** Nothing else in the fleet compacts it
+(`compaction.md`), its own gate fires only at a code merge, and **an idle
+event-driven seat is exactly what an active-agent ctx enumeration leaves out** —
+so this is the seat where step 2 lapses silently. If it is climbing and no merge
+is near, compact it here rather than waiting for the next M8a.
 
 ## Reading a pane
 

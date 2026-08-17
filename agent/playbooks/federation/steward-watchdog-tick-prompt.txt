@@ -4,7 +4,7 @@ ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` befor
 
 0. CONTEXT GATE FIRST. `tmux capture-pane -t moot-steward -p | grep -oE 'ctx [0-9]+%' | tail -1`. At or near 33%, commit durable state, update `local/steward-resume-checkpoint.md`, then `moot compact steward` from /workspaces/ken. Announcing is not doing.
 
-1. PRIORITY LANES ARE THE ONLY LANES (operator). Lane 1 = runtime, retire RecursiveDescent. Lane 2 = language+verify, z3 round-trip and FO Kripke embedding. No third lane gets a ring however idle. Finished work still merges; filings queue.
+1. PRIORITY LANES ARE THE ONLY LANES (operator). Lane 1 = runtime, the RecursiveDescent retirement's RESIDUALS in order: carrier recut, RT-BRANCHED-SCRUTINEE-UNIT-BODY-PORT, the ready RT-* nodes, RT-DESCENT-RETIRE D6a (operator ruled 2026-08-17; the headline retirement itself measures done). RT-CHECKED-IH-REALIZATION-AUTHORITY is ready + dependency-free and STAYS HELD -- it looks startable every tick. Lane 2 = language+verify, z3 + FO Kripke. No third lane however idle. Finished work still merges; filings queue.
 
 2. ARE THE LANES' CRATES MOVING? ANCHOR THE PATHSPEC: `git log --since='12 hours ago' --oneline origin/main -- ':/crates/' | wc -l` plus `git log -1 --pretty='%ci %h %s' origin/main -- ':/crates/'`. A bare `-- crates/` is cwd-relative and the Bash cwd PERSISTS, so after any `cd` it silently reports 0 without erroring. Measured: 0 twice while the truth was 10.
 
@@ -12,7 +12,7 @@ ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` befor
 
 2c. A DISPATCHED NODE LEFT AT `ready` IS INVISIBLE TO 2b. On release flip it `active`. A ring being awake is not the record.
 
-3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file. Check none runs first: `pgrep -af 'scripted-pr[-]automerge'` (bracket it or it matches your own cmdline). Never fetch or commit while one holds its window; never pipe it through tail/grep -- it block-buffers, poll `gh pr view <N>`. M1 needs a RESOLVED Decision read fresh over HTTP; the API IGNORES `limit`, so save to a file and filter.
+3. HELD FINISHED WORK IS TOP OF QUEUE (COORDINATION 10-). Any candidate handed back and unpublished? Publish it: M1-M9 from `agent/playbooks/federation/steward/merge-procedure.md`. Read the file. Check none runs first: `ps -eo pid,ppid,etime,args >f; grep scripted-pr-automerge.sh f`; read the LISTING, skip `bash -c` lines. pgrep + `grep -v claude` HID a live publisher and I started a second. Never fetch or commit while one holds its window; never pipe it through tail/grep -- it block-buffers, poll `gh pr view <N>`. M1 needs a RESOLVED Decision read fresh over HTTP; the API IGNORES `limit`, so save to a file and filter. M8a: COMPACT ADVERSARY before the code-merge notify -- nothing else in the fleet does -- then rouse its pane.
 
 4. WIP AUDIT, 60 MIN -- VERIFY DELIVERY POSITIVELY BEFORE FIRING. Resets: Architect ruling, QA verdict, handoff, leader routing, my own kick. Read the thread first. A reset you never looked for cannot reset a clock.
 
@@ -22,10 +22,6 @@ ARMING SOURCE. KEEP UNDER 4096 CHARS -- set_interval rejects more. `wc -c` befor
 
 6. RESOLVE ACTOR IDS BEFORE COMPOSING MENTIONS: `scripts/moot-actor-id.sh <role>`. A remembered id wakes the wrong seat or nobody, silently.
 
-7. A CITED COORDINATE IS NOT A VERIFIED ONE, INCLUDING THE ARCHITECT'S. Locate the symbol yourself before framing on it. Repeatedly a cited site named a function that did not do what was attributed to it.
-
-8. AFTER A DISPOSITION IS REFUTED, SWEEP THE FRAME BY PHRASE -- title, lede, deliverables, ACs. A reader consults the title INSTEAD of the ACs. Five died on one node in one arc and the frame asserted every one. Grep the dead phrase; prove zero live hits.
-
-9. NEVER call get_transcript. Use get_recent_context/get_mentions with detail="standard"; poll adversary reports with since_event_id from the last tick.
+7. NEVER call get_transcript. Use get_recent_context/get_mentions with detail="standard"; poll adversary reports with since_event_id from the last tick.
 
 If nothing above produces an action, post nothing and stop. A quiet tick is a correct tick.
