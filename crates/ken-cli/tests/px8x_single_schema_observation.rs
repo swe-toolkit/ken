@@ -55,7 +55,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // binding order is observable in it.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsReadFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
+// FileError SiteOperand(0) could not project its carried word. D5 byte-span
+// observation was not the blocker; D2 supplies the exact emitted-helper port.
+#[ignore = "RT-SITEOP-CARRIED-WITNESS D2: the carried SiteOperand port succeeds; this row next refuses because a carried recursive hypothesis is an eliminated value, not a callable, but the call provides 1"]
 fn linked_route_exposes_real_ordered_bindings_and_filters_reserved_input() {
     let dir = output_dir();
     std::fs::write(dir.path().join("held.bin"), b"held").unwrap();

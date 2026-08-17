@@ -768,6 +768,55 @@ fn b2f_process_pair_fixture() -> RuntimeExpr {
     }
 }
 
+/// The D2 witness differs from [`b2f_process_pair_fixture`] only in the path
+/// operand's route. The inner closure receives the literal path through a unit
+/// parameter, so `FsReadFile` sees it as a carried word while retaining the
+/// real process capability through the closure capture.
+fn b2f_carried_site_operand_fixture() -> RuntimeExpr {
+    RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: vec![RuntimeExpr::Var(0), RuntimeExpr::Var(1)],
+            params: Vec::new(),
+            body: Box::new(RuntimeExpr::Match {
+                scrutinee: Box::new(RuntimeExpr::Var(0)),
+                cases: vec![RuntimeMatchCase {
+                    constructor: crate::PROCESS_INPUT_CONSTRUCTOR.to_string(),
+                    binders: 3,
+                    body: RuntimeExpr::Let {
+                        value: Box::new(RuntimeExpr::Call {
+                            callee: Box::new(RuntimeExpr::LexicalClosure {
+                                captures: vec![RuntimeExpr::Var(4)],
+                                params: vec!["path".to_string()],
+                                body: Box::new(RuntimeExpr::Effect {
+                                    family: "FS".to_string(),
+                                    operation: ken_host::HostOpV1::FsReadFile,
+                                    capability: Some(crate::RuntimeCapabilityUse {
+                                        identity: "b2f.process.capability".to_string(),
+                                        value: Box::new(RuntimeExpr::Var(1)),
+                                    }),
+                                    args: vec![RuntimeExpr::Var(0)],
+                                }),
+                            }),
+                            args: vec![RuntimeExpr::Value(RuntimeValue::Bytes(
+                                b"b2f-carried-site-operand".to_vec(),
+                            ))],
+                        }),
+                        body: Box::new(RuntimeExpr::Construct {
+                            constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
+                            args: Vec::new(),
+                        }),
+                    },
+                }],
+                default: RuntimeTrap {
+                    code: RuntimeTrapCode::PatternMatchFailure,
+                    message: "B2F carried site-operand default".to_string(),
+                },
+            }),
+        }),
+        args: Vec::new(),
+    }
+}
+
 thread_local! {
     static B2F_PROCESS_PAIR_OBSERVATION: std::cell::Cell<(usize, u64)> =
         const { std::cell::Cell::new((0, 0)) };
@@ -810,7 +859,10 @@ extern "C" fn b2f_process_pair_probe(
     0
 }
 
-fn compile_b2f_process_pair_fixture() -> Result<CompiledModule<JITModule>, CraneliftBackendError> {
+fn compile_b2f_fixture(
+    symbol: &str,
+    expression: &RuntimeExpr,
+) -> Result<CompiledModule<JITModule>, CraneliftBackendError> {
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let isa = native_isa().expect("native ISA");
     let mut jit = JITBuilder::with_isa(isa, default_libcall_names());
@@ -820,9 +872,9 @@ fn compile_b2f_process_pair_fixture() -> Result<CompiledModule<JITModule>, Crane
     );
     compile_expr_into_module(
         JITModule::new(jit),
-        "b2f_process_pair_slots",
+        symbol,
         Linkage::Local,
-        &b2f_process_pair_fixture(),
+        expression,
         &NativeSeedEnvironment::empty(),
         BTreeMap::new(),
         None,
@@ -831,6 +883,62 @@ fn compile_b2f_process_pair_fixture() -> Result<CompiledModule<JITModule>, Crane
         Some(test_only_distinguished_root_join_plan()),
         None,
     )
+}
+
+fn compile_b2f_process_pair_fixture() -> Result<CompiledModule<JITModule>, CraneliftBackendError> {
+    compile_b2f_fixture("b2f_process_pair_slots", &b2f_process_pair_fixture())
+}
+
+fn compile_b2f_carried_site_operand_fixture(
+) -> Result<CompiledModule<JITModule>, CraneliftBackendError> {
+    compile_b2f_fixture(
+        "b2f_carried_site_operand",
+        &b2f_carried_site_operand_fixture(),
+    )
+}
+
+/// `RT-SITEOP-CARRIED-WITNESS` `AC-1`: the carried path is projected through
+/// the emitted helper, but the source seat's authority cannot be lent to a
+/// different lowered value.
+#[test]
+fn carried_site_operand_projection_preserves_the_exact_source_witness() {
+    const SUBSTITUTION_ASSERTION: &str =
+        "the source seat's authority must not admit a substituted site operand";
+
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+        }
+    }
+    let _reset = Reset;
+
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+    compile_b2f_carried_site_operand_fixture()
+        .expect("the exact carried site operand projects through the emitted helper");
+
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::SubstituteSiteOperandValue);
+    let substitution_red = std::panic::catch_unwind(|| {
+        compile_b2f_carried_site_operand_fixture().expect(SUBSTITUTION_ASSERTION);
+    })
+    .expect_err("the substitution must make the exact-success assertion red");
+    assert!(
+        site_operand_substitution_hits() > 0,
+        "the substitution mutation never reached the carried projection"
+    );
+    let message = substitution_red
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| substitution_red.downcast_ref::<&str>().copied())
+        .unwrap_or("");
+    assert!(
+        message.contains(SUBSTITUTION_ASSERTION) && message.contains("the emitter built a Int"),
+        "the substitution reached the wrong assertion or refusal: {message}"
+    );
+
+    set_effect_seat_dispatch_mutation(EffectSeatDispatchMutation::Exact);
+    compile_b2f_carried_site_operand_fixture()
+        .expect("the exact carried projection compiles after the mutation clears");
 }
 
 #[test]
@@ -3539,11 +3647,11 @@ fn ac1_a_specialized_constructor_scrutinee_still_selects_and_delivers() {
 /// a normative compatibility vector, not a snapshot. Changing either side takes
 /// a per-seat evidence decision, which is exactly the review this forces.
 ///
-/// The `SPECIALIZED_ONLY` side is not a gap in the observer. `D5` measured all
-/// four of those seats refusing at a SECOND reader: the synthesized `FileError`
-/// declares `SiteOperand(0)`, which demands a compile-time `Lowered` template
-/// that a carried word cannot supply without the banned `Carried -> Lowered`
-/// inverse. The byte-span observation itself succeeds at every one of them.
+/// The `SPECIALIZED_ONLY` side is not a gap in the observer. `D5` measured the
+/// byte-span observation succeeding at all four seats. Their synthesized
+/// `FileError` separately declares `SiteOperand(0)`; the exact carried use is
+/// projected through the emitted helper without widening this direct-consumer
+/// availability partition.
 #[test]
 fn ac_4_byte_span_seats_are_activated_exactly_where_d5_proved_them() {
     let mut either_phase = Vec::new();

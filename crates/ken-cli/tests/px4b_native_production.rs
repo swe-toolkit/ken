@@ -514,7 +514,9 @@ proc main (input : ProcessInput) (_caps : ProgramCaps APartial)
 // e6b4a13b and absent on main 3015aafd. Annotation only -- the test is unchanged
 // and still compiles; nothing here repairs the cause.
 #[test]
-#[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsWriteFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
+// FileError SiteOperand(0) could not project its carried word. D5 byte-span
+// observation was not the blocker; D2 supplies the exact emitted-helper port.
 fn fs_write_and_read_resume_through_the_native_capability() {
     let dir = output_dir("fs-roundtrip");
     let source = r#"program capabilities FS AFull
@@ -618,7 +620,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 // e6b4a13b and absent on main 3015aafd. Annotation only -- the test is unchanged
 // and still compiles; nothing here repairs the cause.
 #[test]
-#[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsReadFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
+// FileError SiteOperand(0) could not project its carried word. D5 byte-span
+// observation was not the blocker; D2 supplies the exact emitted-helper port.
 fn canonical_fs_identity_exactly_matches_across_real_producers_and_drift_fails() {
     let dir = output_dir("fs-identity-cross-lane");
     let path = b"shared.bin";
@@ -723,7 +727,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
 // e6b4a13b and absent on main 3015aafd. Annotation only -- the test is unchanged
 // and still compiles; nothing here repairs the cause.
 #[test]
-#[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsWriteFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+// RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
+// FileError SiteOperand(0) could not project its carried word. D5 byte-span
+// observation was not the blocker; D2 supplies the exact emitted-helper port.
 fn fs_scope_denial_reaches_ken_as_the_named_error() {
     let dir = output_dir("fs-denial");
     let source = r#"program capabilities FS AFull

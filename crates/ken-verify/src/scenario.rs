@@ -746,7 +746,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsWriteFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn real_artifact_five_op_observation_matches_interp_on_twin_roots() {
         let run = run_scenario(&five_op_scenario()).expect("real five-op differential");
         run.compare_exact().expect("six-field equality");
@@ -796,7 +798,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsChangeMode path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsChangeMode Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn change_mode_is_observed_and_matches_across_real_twin_roots() {
         let run = run_scenario(&change_mode_scenario()).expect("real change-mode differential");
         run.compare_exact().expect("mode-aware equality");
@@ -854,7 +858,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsChangeMode path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsChangeMode Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn directory_change_mode_matches_across_real_twin_roots() {
         let run = run_scenario(&change_directory_mode_scenario())
             .expect("real directory change-mode differential");
@@ -903,7 +909,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsChangeMode path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsChangeMode Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn invalid_change_mode_is_a_typed_pre_dispatch_result_in_both_lanes() {
         let run =
             run_scenario(&invalid_change_mode_scenario()).expect("real invalid-mode differential");
@@ -935,7 +943,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsReadFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn real_producers_preserve_raw_requests_across_descriptor_collision() {
         let run = run_scenario(&raw_descriptor_collision_scenario())
             .expect("real raw-descriptor collision differential");
@@ -992,7 +1002,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsReadFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn execution_start_cwd_root_reaches_the_same_real_node_in_both_lanes() {
         let run = run_scenario(&execution_start_cwd_root_scenario())
             .expect("PX15 real cwd-root differential");
@@ -1122,7 +1134,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsWriteFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn real_captured_evidence_mutations_bite_while_return_proxy_stays_green() {
         let run = run_scenario(&five_op_scenario()).expect("real five-op differential");
         let proxy = RunnerOnlyProxy {
@@ -1182,7 +1196,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsWriteFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn real_scope_denial_is_typed_and_precedes_any_host_action() {
         let run = run_scenario(&denial_scenario()).expect("real denial differential");
         run.compare_exact().expect("typed denial equality");
@@ -1233,7 +1249,9 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     // binding order is observable in it.
     // Annotation only -- test body and expectations are unchanged.
     #[test]
-    #[ignore = "RT-CARRIER-BYTESPAN-OBSERVE D5: the FsWriteFile path seat at Argument(0) is SITE-BOUND -- the synthesized FileError declares SiteOperand(0), which demands a compile-time Lowered template the carried word cannot supply without the banned Carried->Lowered inverse. D5 landed byte-span observation and it is NOT the blocker; awaiting Steward recut"]
+    // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsWriteFile Argument(0) was site-bound:
+    // FileError SiteOperand(0) could not project its carried word. D5 byte-span
+    // observation was not the blocker; D2 supplies the exact emitted-helper port.
     fn cwd_root_preserves_scope_escape_and_symlink_denied_identities() {
         for (scenario, expected) in [
             (
