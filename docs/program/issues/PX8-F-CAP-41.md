@@ -28,6 +28,63 @@ here, un-ignored and green, as the missing port's acceptance evidence.**
 `#[ignore]` them with an annotation naming the carrier — the carrier is not what
 retires them.
 
+## THE DELETION LEFT A LIVE COVERAGE GAP, AND IT IS CHEAPER TO CLOSE THAN IT LOOKS
+
+**Adversary finding on the landed squash `f9dd79f52`, `evt_3hg4qay5686x0`.
+Verified independently before filing.** The carrier implements spec `38 §1.7.1`'s
+five-step admission ladder for derived `readAt` at `prelude.rs:2371`
+(`private_read_at_admit_window`, with `buffer_min_int` at `:2366`). **Two of
+those steps are new behaviour on the checked surface and nothing in the tree
+executes them:**
+
+| step | behaviour now in checked code | witnessed by |
+|---|---|---|
+| 3, tail cap | `effective = min(length, capacity - start)` — a window running past the buffer tail is **silently shortened** and reported as ordinary short progress | nothing |
+| 4, closed endpoint | `effective = 0` returns `ReadEof` **from checked code, without emitting a read or visiting the host** | nothing |
+
+**The spec names the witnesses by literal value:** at capacity 8, `(start=8,
+length=4)` returns `ReadEof` while `start=9` returns `InvalidBounds`. Those are
+exactly the four deleted rows' programs.
+
+> ### THE PROGRAMS ARE STILL IN THE TREE. ONLY THE RUST ROWS WERE DELETED.
+>
+> `rt_parity_native.rs:349-387` still carries `rt_cap41_endpoint_buffer`,
+> `rt_cap41_out_of_range_buffer`, and the offset-precedence pair, with `_file`
+> wrappers at `:389-423` and `_stage` wrappers at `:426-459` — inside the
+> `RT_PARITY_SOURCE` literal. **Every `cap41` occurrence in `crates/` is inside
+> that literal; there are zero Rust-level references**, and
+> `assert_cap41_derived_without_read` is gone from the repo.
+>
+> ⇒ **Closing this gap is writing test functions, not restoring programs.**
+
+**No live fixture reaches either branch, and that is measured rather than
+assumed.** The full cross product of `MkBufferWindow` against its `withBuffer`
+capacity across `crates/` gives the live pairs `(0,1)@1`, `(0,2)@8`, `(0,6)@6`,
+`(0,6)@8`, `(0,8)@8`, `(2,4)@8`, `(-1,1)@1`. **Every one fits its buffer exactly
+or sits strictly inside it**, so no live program is tail-capped and none reaches
+the closed endpoint. The only windows with `start >= capacity` are the four dead
+ones. The capacity-2 handle at `rt_escape_second_resource_native.rs:421` looks
+like a live endpoint case and is not — that buffer is never read.
+
+> ### THE WALL THAT BLOCKS THE NEIGHBOURING ROWS DOES NOT BLOCK THIS
+>
+> The `cap41_*` rows were expensive because `differential()` compiles a native
+> artifact, and this fixture's siblings refuse at object emission under
+> [[RT-CARRIER-BYTESPAN-OBSERVE]] / [[RT-SITEOP-CARRIED-WITNESS]]. **Steps 3 and
+> 4 never visit the host**, so that ceiling does not bind an interpreter-only row
+> over the same programs.
+>
+> **This is a statement about what is NOT blocking, not a prescribed remedy.**
+> The shape of the fix is the ring's call when this node is cut.
+
+**One inventory sharpening, because it was recorded as a pair and the two halves
+differ.** The Architect's resolution named `rt_body_ok` and
+`rt_cap41_expect_eof` together as remaining live. Both still **compile**; only
+`rt_body_ok` is **row-reachable**, through `rt_allocate_stage`.
+`rt_cap41_expect_eof` (`:335`) is referenced only by the four dead procs.
+⇒ **Compiling and running are different properties**, and an inventory that runs
+them together will report a dead declaration as live.
+
 ## The edge hazard, with its trigger corrected
 
 `depends_on` still names [[NATIVE-HANDLE-CARRIER]], and an earlier banner below
